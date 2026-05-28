@@ -1,20 +1,20 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
-import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.GitHubProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceProvidersDTO;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -45,29 +45,33 @@ public class WorkspaceQueryService {
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final UserRepository userRepository;
-    private final GitHubProperties gitHubProperties;
-    private final GitLabProperties gitLabProperties;
-    private final FeatureFlagService featureFlagService;
     private final ConnectionService connectionService;
+
+    /**
+     * Per-kind availability ports — keyed for O(1) lookup when building the providers DTO.
+     * Each vendor adapter contributes one impl; the query service stays kind-agnostic and
+     * delegates the "is this provider exposable to the wizard?" decision back to the adapter.
+     */
+    private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     public WorkspaceQueryService(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         UserRepository userRepository,
-        GitHubProperties gitHubProperties,
-        GitLabProperties gitLabProperties,
-        FeatureFlagService featureFlagService,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        List<WorkspaceProviderAvailability> providerAvailabilityList
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.userRepository = userRepository;
-        this.gitHubProperties = gitHubProperties;
-        this.gitLabProperties = gitLabProperties;
-        this.featureFlagService = featureFlagService;
         this.connectionService = connectionService;
+        Map<IntegrationKind, WorkspaceProviderAvailability> map = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceProviderAvailability a : providerAvailabilityList) {
+            map.put(a.kind(), a);
+        }
+        this.providerAvailability = map;
     }
 
     /**
@@ -93,15 +97,27 @@ public class WorkspaceQueryService {
 
     /**
      * Returns available workspace creation providers based on server configuration.
+     *
+     * <p>Resolves each provider's hint through the {@link WorkspaceProviderAvailability} SPI
+     * — the query service itself is provider-agnostic. The DTO still carries kind-specific
+     * fields because the wizard UI ultimately renders kind-specific flows; the boundary
+     * between SPI and DTO is the {@code installationUrl} / {@code defaultServerUrl} string.
      */
     public WorkspaceProvidersDTO getAvailableProviders() {
-        var github =
-            gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null
-                ? new WorkspaceProvidersDTO.GitHubProviderDTO(gitHubProperties.app().installationUrl())
-                : null;
+        var github = providerAvailability
+            .getOrDefault(IntegrationKind.GITHUB, null) instanceof WorkspaceProviderAvailability ghAvail
+            ? ghAvail
+                .connectionHint()
+                .map(h -> new WorkspaceProvidersDTO.GitHubProviderDTO(h.hintUrl()))
+                .orElse(null)
+            : null;
 
-        var gitlab = featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
-            ? new WorkspaceProvidersDTO.GitLabProviderDTO(gitLabProperties.defaultServerUrl())
+        var gitlab = providerAvailability
+            .getOrDefault(IntegrationKind.GITLAB, null) instanceof WorkspaceProviderAvailability glAvail
+            ? glAvail
+                .connectionHint()
+                .map(h -> new WorkspaceProvidersDTO.GitLabProviderDTO(h.hintUrl()))
+                .orElse(null)
             : null;
 
         return new WorkspaceProvidersDTO(github, gitlab);

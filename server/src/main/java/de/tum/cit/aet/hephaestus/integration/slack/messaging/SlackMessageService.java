@@ -150,7 +150,6 @@ public class SlackMessageService {
                     null
                 )
             )
-            .filter(b -> b instanceof BearerToken)
-            .map(b -> ((BearerToken) b).token());
+            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt.token()) : Optional.empty());
     }
 }

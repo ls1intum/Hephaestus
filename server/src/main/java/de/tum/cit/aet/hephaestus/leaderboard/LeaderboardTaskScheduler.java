@@ -2,10 +2,9 @@ package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
-import de.tum.cit.aet.hephaestus.leaderboard.tasks.SlackWeeklyLeaderboardTask;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
@@ -18,7 +17,15 @@ import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
 
-/** Wires the weekly Slack message + league-points update onto the cron defined in {@link LeaderboardProperties}. */
+/**
+ * Wires every registered {@link LeaderboardNotificationTask} + the league-points update
+ * onto the cron defined in {@link LeaderboardProperties}.
+ *
+ * <p>Notification tasks register themselves as Spring beans implementing the marker
+ * interface — the scheduler picks them up via constructor injection and stays vendor-
+ * agnostic. The Slack task lives in the slack module; future Teams/Discord/email tasks
+ * register the same way without changing this class.
+ */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @Component
 @Profile("!test")
@@ -29,18 +36,18 @@ public class LeaderboardTaskScheduler {
 
     private final LeaderboardProperties leaderboardProperties;
     private final TaskScheduler taskScheduler;
-    private final ObjectProvider<SlackWeeklyLeaderboardTask> slackWeeklyLeaderboardTaskProvider;
+    private final List<LeaderboardNotificationTask> notificationTasks;
     private final LeaguePointsUpdateTask leaguePointsUpdateTask;
 
     public LeaderboardTaskScheduler(
         LeaderboardProperties leaderboardProperties,
         TaskScheduler taskScheduler,
-        ObjectProvider<SlackWeeklyLeaderboardTask> slackWeeklyLeaderboardTaskProvider,
+        List<LeaderboardNotificationTask> notificationTasks,
         LeaguePointsUpdateTask leaguePointsUpdateTask
     ) {
         this.leaderboardProperties = leaderboardProperties;
         this.taskScheduler = taskScheduler;
-        this.slackWeeklyLeaderboardTaskProvider = slackWeeklyLeaderboardTaskProvider;
+        this.notificationTasks = notificationTasks;
         this.leaguePointsUpdateTask = leaguePointsUpdateTask;
     }
 
@@ -60,24 +67,25 @@ public class LeaderboardTaskScheduler {
             return;
         }
 
-        scheduleSlackMessage(cron);
+        scheduleNotificationTasks(cron);
         scheduleLeaguePointsUpdate(cron);
     }
 
-    private void scheduleSlackMessage(String cron) {
+    private void scheduleNotificationTasks(String cron) {
         if (!leaderboardProperties.notification().enabled()) {
-            log.info("Skipped Slack message scheduling: reason=notificationsDisabled");
+            log.info("Skipped notification task scheduling: reason=notificationsDisabled");
+            return;
+        }
+        if (notificationTasks.isEmpty()) {
+            log.warn("Skipped notification task scheduling: reason=noTasksRegistered");
             return;
         }
 
-        SlackWeeklyLeaderboardTask task = slackWeeklyLeaderboardTaskProvider.getIfAvailable();
-        if (task == null) {
-            log.warn("Skipped Slack message scheduling: reason=beanNotAvailable");
-            return;
+        for (LeaderboardNotificationTask task : notificationTasks) {
+            String description = task.getClass().getSimpleName();
+            log.info("Scheduled notification task: task={}, cronExpression={}", description, cron);
+            scheduleSafely(task, new CronTrigger(cron), description);
         }
-
-        log.info("Scheduled Slack message: cronExpression={}", cron);
-        scheduleSafely(task, new CronTrigger(cron), "Slack weekly leaderboard message");
     }
 
     private void scheduleLeaguePointsUpdate(String cron) {

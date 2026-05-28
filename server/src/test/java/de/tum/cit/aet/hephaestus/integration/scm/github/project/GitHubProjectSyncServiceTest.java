@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.BackfillProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.FilterProperties;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
@@ -95,7 +94,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     private GitHubProjectItemFieldValueSyncService fieldValueSyncService;
 
     @Mock
-    private BackfillStateProvider backfillStateProvider;
+    private GitHubProjectBackfillStateProvider backfillStateProvider;
 
     @Mock
     private TransactionTemplate transactionTemplate;

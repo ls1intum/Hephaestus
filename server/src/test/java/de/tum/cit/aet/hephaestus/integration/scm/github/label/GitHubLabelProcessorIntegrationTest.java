@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -389,34 +389,34 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestLabelEventListener {
 
-        private final List<DomainEvent.LabelCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.LabelUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.LabelDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.LabelCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.LabelUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.LabelDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onLabelCreated(DomainEvent.LabelCreated event) {
+        public void onLabelCreated(ScmDomainEvent.LabelCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onLabelUpdated(DomainEvent.LabelUpdated event) {
+        public void onLabelUpdated(ScmDomainEvent.LabelUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onLabelDeleted(DomainEvent.LabelDeleted event) {
+        public void onLabelDeleted(ScmDomainEvent.LabelDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.LabelCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.LabelCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.LabelUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.LabelUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.LabelDeleted> getDeletedEvents() {
+        public List<ScmDomainEvent.LabelDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 

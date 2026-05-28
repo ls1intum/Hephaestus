@@ -66,7 +66,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             reviewCommentRepository,
             contributorHistoryProvider,
             gitDiffOperations,
-            null
+            List.of()
         );
     }
 

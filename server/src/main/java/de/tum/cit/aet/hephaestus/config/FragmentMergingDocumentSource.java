@@ -42,7 +42,7 @@ import reactor.core.publisher.Mono;
  *
  * @see ResourceDocumentSource
  */
-class FragmentMergingDocumentSource extends ResourceDocumentSource {
+public class FragmentMergingDocumentSource extends ResourceDocumentSource {
 
     // Matches "fragment FragmentName on TypeName { ... }" blocks.
     // Uses a simple brace-counting approach rather than regex for the body,
@@ -62,7 +62,11 @@ class FragmentMergingDocumentSource extends ResourceDocumentSource {
      * @param fragmentResources resources containing shared fragment definitions to append
      * @throws IllegalStateException if any fragment resource cannot be read
      */
-    FragmentMergingDocumentSource(List<Resource> locations, List<String> extensions, List<Resource> fragmentResources) {
+    public FragmentMergingDocumentSource(
+        List<Resource> locations,
+        List<String> extensions,
+        List<Resource> fragmentResources
+    ) {
         super(locations, extensions);
         this.fragmentsByName = parseFragments(loadRawContent(fragmentResources));
     }

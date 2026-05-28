@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.commit;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -304,7 +304,7 @@ public class GitHubCommitBackfillService {
     }
 
     /**
-     * Publishes a {@link DomainEvent.CommitCreated} event for a newly persisted commit.
+     * Publishes a {@link ScmDomainEvent.CommitCreated} event for a newly persisted commit.
      */
     private void publishCommitCreated(String sha, Repository repository, Long scopeId) {
         Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
@@ -313,7 +313,7 @@ public class GitHubCommitBackfillService {
             return;
         }
 
-        EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
+        ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
             UUID.randomUUID(),
             Instant.now(),
@@ -325,7 +325,7 @@ public class GitHubCommitBackfillService {
             GitProviderType.GITHUB
         );
 
-        eventPublisher.publishEvent(new DomainEvent.CommitCreated(commitData, context));
+        eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }
 
     private String buildCommitUrl(String nameWithOwner, String sha) {

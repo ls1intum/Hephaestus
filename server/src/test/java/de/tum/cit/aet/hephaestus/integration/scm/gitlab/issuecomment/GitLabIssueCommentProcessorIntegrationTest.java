@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
@@ -36,7 +36,7 @@ import org.springframework.test.context.TestPropertySource;
  * Integration tests for {@link GitLabIssueCommentProcessor#processFromSync} covering Gap 8
  * (GitLab sync audit): {@code issue_comment.updated_at} must persist verbatim and never
  * fall back to {@code created_at}. When a subsequent sync returns a distinct
- * {@code updatedAt}, the processor must fire a {@link DomainEvent.CommentUpdated}
+ * {@code updatedAt}, the processor must fire a {@link ScmDomainEvent.CommentUpdated}
  * carrying {@code "updatedAt"} in {@code changedFields} — downstream profile views rely on
  * this divergence to detect edits.
  */
@@ -137,7 +137,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         assertThat(saved.getCreatedAt()).isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
         assertThat(saved.getUpdatedAt()).isNotEqualTo(saved.getCreatedAt());
 
-        List<DomainEvent.CommentUpdated> updates = eventListener.getUpdatedEvents();
+        List<ScmDomainEvent.CommentUpdated> updates = eventListener.getUpdatedEvents();
         assertThat(updates).hasSize(1);
         assertThat(updates.get(0).changedFields()).contains("updatedAt");
     }
@@ -284,24 +284,24 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestCommentEventListener {
 
-        private final List<DomainEvent.CommentCreated> createdEvents = new CopyOnWriteArrayList<>();
-        private final List<DomainEvent.CommentUpdated> updatedEvents = new CopyOnWriteArrayList<>();
+        private final List<ScmDomainEvent.CommentCreated> createdEvents = new CopyOnWriteArrayList<>();
+        private final List<ScmDomainEvent.CommentUpdated> updatedEvents = new CopyOnWriteArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.CommentCreated event) {
+        public void onCreated(ScmDomainEvent.CommentCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.CommentUpdated event) {
+        public void onUpdated(ScmDomainEvent.CommentUpdated event) {
             updatedEvents.add(event);
         }
 
-        public List<DomainEvent.CommentCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.CommentCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.CommentUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.CommentUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 

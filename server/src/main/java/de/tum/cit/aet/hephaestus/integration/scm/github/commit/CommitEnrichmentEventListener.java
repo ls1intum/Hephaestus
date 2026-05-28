@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.commit;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +14,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Triggers commit metadata enrichment when new commits arrive via webhooks.
  *
- * <p>Listens for {@link DomainEvent.CommitCreated} events and calls
+ * <p>Listens for {@link ScmDomainEvent.CommitCreated} events and calls
  * {@link CommitMetadataEnrichmentService#enrichCommitMetadata} to resolve
  * multi-author contributor data, signature details, and associated PR links.
  *
@@ -32,7 +32,7 @@ public class CommitEnrichmentEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCommitCreated(DomainEvent.CommitCreated event) {
+    public void onCommitCreated(ScmDomainEvent.CommitCreated event) {
         var context = event.context();
 
         // Sync events are already followed by enrichment in GithubDataSyncService

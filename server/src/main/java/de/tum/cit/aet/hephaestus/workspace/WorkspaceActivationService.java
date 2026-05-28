@@ -2,16 +2,17 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -44,11 +45,15 @@ public class WorkspaceActivationService {
     // activation paths that need it are themselves server-only.
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final GitLabWorkspaceInitializationService gitLabInitService;
     private final ConnectionService connectionService;
 
-    // Lazy-loaded to break circular reference with sync services
-    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
+    /**
+     * Per-kind sync triggers, collected through the SPI so workspace activation never
+     * imports a specific provider's sync service. The dispatch dispatches strictly by the
+     * workspace's bound {@link IntegrationKind}; an unmapped kind is treated as "no sync
+     * needed for this workspace" rather than throwing — symmetric with shouldSkipActivation.
+     */
+    private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -59,9 +64,8 @@ public class WorkspaceActivationService {
         WorkspaceRepository workspaceRepository,
         ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        GitLabWorkspaceInitializationService gitLabInitService,
         ConnectionService connectionService,
-        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
+        List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -69,15 +73,13 @@ public class WorkspaceActivationService {
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
-        this.gitLabInitService = gitLabInitService;
         this.connectionService = connectionService;
-        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        Map<IntegrationKind, WorkspaceDataSyncTrigger> map = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceDataSyncTrigger t : dataSyncTriggerList) {
+            map.put(t.kind(), t);
+        }
+        this.dataSyncTriggers = map;
         this.monitoringExecutor = monitoringExecutor;
-    }
-
-    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
-    private GithubDataSyncService getGitHubDataSyncService() {
-        return gitHubDataSyncServiceProvider.getObject();
     }
 
     /**
@@ -233,22 +235,18 @@ public class WorkspaceActivationService {
             WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of(), installationId);
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
-                GitProviderType providerType = connectionService
+                IntegrationKind kind = connectionService
                     .findActiveProviderKind(workspace.getId())
-                    .map(GitProviderType::from)
-                    .orElse(GitProviderType.GITHUB);
-                if (providerType == GitProviderType.GITLAB) {
-                    // Core initialization: webhook, project discovery, org linking, monitors
-                    gitLabInitService.initialize(workspace);
-
-                    // Full data sync: memberships, issue types, per-repo data, teams
-                    gitLabInitService.syncFullData(workspace);
+                    .orElse(IntegrationKind.GITHUB);
+                WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
+                if (trigger == null) {
+                    log.debug(
+                        "Skipped startup sync: reason=noTriggerForKind, workspaceId={}, kind={}",
+                        workspace.getId(),
+                        kind
+                    );
                 } else {
-                    // GitHub: use the central sync orchestrator which handles:
-                    // 1. Organization and teams sync (via GraphQL)
-                    // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
-                    // 3. Workspace-level relationships (issue types, issue dependencies, sub-issues)
-                    getGitHubDataSyncService().syncAllRepositories(workspace.getId());
+                    trigger.syncAllRepositories(workspace.getId());
                 }
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());

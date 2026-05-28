@@ -555,6 +555,21 @@ hephaestus:
             # URL where users install the GitHub App (shown in workspace creation UI)
             installation-url: ${GH_APP_INSTALLATION_URL:}
         meta:
+            # DEPRECATED: token used to live here; the Hephaestus-contributor
+            # endpoint now reads hephaestus.contributors.github.auth-token instead.
+            # Binding kept for backwards compatibility — remove once all environments
+            # have been migrated.
+            auth-token: ${GH_AUTH_TOKEN:}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CONTRIBUTORS (Hephaestus meta — who built the app)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Token used by ContributorService to fetch the ls1intum/Hephaestus contributor
+    # graph. Detached from `hephaestus.github` so SCM-integration code no longer
+    # carries an unrelated PAT. Defaults to the legacy GH_AUTH_TOKEN env var so
+    # existing deployments keep working without touching their secrets stores.
+    contributors:
+        github:
             auth-token: ${GH_AUTH_TOKEN:}
 
     # ═══════════════════════════════════════════════════════════════════════════

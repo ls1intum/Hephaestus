@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -279,7 +279,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
+                new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
             log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
         }
@@ -291,8 +291,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         // unique constraint dedupes, so replaying an existing close is a safe no-op.
         if (issueState == Issue.State.CLOSED) {
             eventPublisher.publishEvent(
-                new DomainEvent.IssueClosed(
-                    EventPayload.IssueData.from(issue),
+                new ScmDomainEvent.IssueClosed(
+                    ScmEventPayload.IssueData.from(issue),
                     stateReason != null ? stateReason : "completed",
                     EventContext.from(ctx)
                 )
@@ -311,7 +311,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Issue issue = process(event, context);
         if (issue != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.IssueClosed(EventPayload.IssueData.from(issue), "completed", EventContext.from(context))
+                new ScmDomainEvent.IssueClosed(ScmEventPayload.IssueData.from(issue), "completed", EventContext.from(context))
             );
             log.debug("Closed issue: issueId={}", issue.getId());
         }
@@ -327,7 +327,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Issue issue = process(event, context);
         if (issue != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.IssueReopened(EventPayload.IssueData.from(issue), EventContext.from(context))
+                new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
             );
             log.debug("Reopened issue: issueId={}", issue.getId());
         }
@@ -445,7 +445,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
             if (isNew) {
                 eventPublisher.publishEvent(
-                    new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
+                    new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
                 );
                 log.debug("Created issue: nativeId={}, iid={}", nativeId, issueNumber);
             }

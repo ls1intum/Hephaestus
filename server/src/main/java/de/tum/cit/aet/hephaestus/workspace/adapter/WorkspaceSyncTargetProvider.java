@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.SyncTargetFactory;
@@ -44,20 +43,17 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
-    private final ProjectRepository projectRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final ConnectionService connectionService;
 
     public WorkspaceSyncTargetProvider(
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
-        ProjectRepository projectRepository,
         WorkspaceScopeFilter workspaceScopeFilter,
         ConnectionService connectionService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
-        this.projectRepository = projectRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.connectionService = connectionService;
     }
@@ -497,166 +493,5 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             syncTargets,
             syncContext
         );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROJECT ITEM SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Override
-    @Transactional
-    public void updateProjectItemSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setItemSyncCursor(cursor);
-                    projectRepository.save(project);
-                },
-                () ->
-                    // DEBUG: Expected if project was deleted during sync
-                    log.debug(
-                        "Skipped project item sync cursor update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateProjectItemsSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setItemsSyncedAt(syncedAt);
-                    project.setItemSyncCursor(null); // Clear cursor on completion
-                    projectRepository.save(project);
-                },
-                () ->
-                    // DEBUG: Expected if project was deleted during sync
-                    log.debug(
-                        "Skipped project items sync timestamp update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<String> getProjectItemSyncCursor(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getItemSyncCursor());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Instant> getProjectItemsSyncedAt(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getItemsSyncedAt());
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROJECT FIELD SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Override
-    @Transactional
-    public void updateProjectFieldSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setFieldSyncCursor(cursor);
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project field sync cursor update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateProjectFieldsSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setFieldsSyncedAt(syncedAt);
-                    project.setFieldSyncCursor(null); // Clear cursor on completion
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project fields sync timestamp update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<String> getProjectFieldSyncCursor(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getFieldSyncCursor());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Instant> getProjectFieldsSyncedAt(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getFieldsSyncedAt());
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROJECT STATUS UPDATE SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Override
-    @Transactional
-    public void updateProjectStatusUpdateSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setStatusUpdateSyncCursor(cursor);
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project status update sync cursor update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateProjectStatusUpdatesSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setStatusUpdatesSyncedAt(syncedAt);
-                    project.setStatusUpdateSyncCursor(null); // Clear cursor on completion
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project status updates sync timestamp update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<String> getProjectStatusUpdateSyncCursor(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getStatusUpdateSyncCursor());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Instant> getProjectStatusUpdatesSyncedAt(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getStatusUpdatesSyncedAt());
     }
 }

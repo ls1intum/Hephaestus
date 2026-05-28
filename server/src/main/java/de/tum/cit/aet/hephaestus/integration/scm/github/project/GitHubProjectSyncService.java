@@ -15,7 +15,6 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
@@ -27,7 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionCl
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Connection;
@@ -154,7 +153,7 @@ public class GitHubProjectSyncService {
     private final GitHubProjectItemProcessor itemProcessor;
     private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
     private final GitHubProjectItemFieldValueSyncService fieldValueSyncService;
-    private final BackfillStateProvider backfillStateProvider;
+    private final GitHubProjectBackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
@@ -256,7 +255,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
@@ -763,7 +762,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project item sync after transport error: projectId={}, page={}, attempt={}, error={}",
@@ -1198,7 +1197,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
@@ -1421,7 +1420,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying status updates sync after transport error: projectId={}, attempt={}, error={}",

@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -687,22 +687,22 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestMilestoneEventListener {
 
-        private final List<DomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        void onCreated(DomainEvent.MilestoneCreated event) {
+        void onCreated(ScmDomainEvent.MilestoneCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        void onUpdated(DomainEvent.MilestoneUpdated event) {
+        void onUpdated(ScmDomainEvent.MilestoneUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        void onDeleted(DomainEvent.MilestoneDeleted event) {
+        void onDeleted(ScmDomainEvent.MilestoneDeleted event) {
             deletedEvents.add(event);
         }
 
@@ -712,15 +712,15 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             deletedEvents.clear();
         }
 
-        List<DomainEvent.MilestoneCreated> getCreatedEvents() {
+        List<ScmDomainEvent.MilestoneCreated> getCreatedEvents() {
             return createdEvents;
         }
 
-        List<DomainEvent.MilestoneUpdated> getUpdatedEvents() {
+        List<ScmDomainEvent.MilestoneUpdated> getUpdatedEvents() {
             return updatedEvents;
         }
 
-        List<DomainEvent.MilestoneDeleted> getDeletedEvents() {
+        List<ScmDomainEvent.MilestoneDeleted> getDeletedEvents() {
             return deletedEvents;
         }
     }

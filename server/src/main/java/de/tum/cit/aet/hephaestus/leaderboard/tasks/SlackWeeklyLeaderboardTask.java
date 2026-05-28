@@ -1,156 +1,77 @@
 package de.tum.cit.aet.hephaestus.leaderboard.tasks;
 
-import static com.slack.api.model.block.Blocks.asBlocks;
-import static com.slack.api.model.block.Blocks.context;
-import static com.slack.api.model.block.Blocks.divider;
-import static com.slack.api.model.block.Blocks.header;
-import static com.slack.api.model.block.Blocks.section;
-import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
-
-import com.slack.api.model.User;
-import com.slack.api.model.block.LayoutBlock;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
-import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardMode;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardNotificationTask;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardProperties;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardService;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardSortType;
+import de.tum.cit.aet.hephaestus.leaderboard.spi.LeaderboardDigestReadyEvent;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.IntStream;
-import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Weekly Slack digest fan-out. Posts to every ACTIVE Slack {@link Connection} whose
- * workspace has notifications enabled and a configured channel; one workspace's failure
- * does NOT block the next.
+ * Weekly Slack digest fan-out — leaderboard-side half.
+ *
+ * <p>Owns the schedule + data assembly: enumerates active Slack connections, computes the
+ * weekly window, fetches the top-3 leaderboard entries per workspace, and publishes a
+ * vendor-neutral {@link LeaderboardDigestReadyEvent} per qualifying workspace-channel
+ * target. The actual Slack publish lives in {@code integration/slack/leaderboard/} so
+ * this module no longer imports any Slack types.
+ *
+ * <p>Fan-out is per-target: one workspace → one channel → one event. Skip preconditions
+ * (notifications-off, no channel configured, empty leaderboard) remain on the leaderboard
+ * side — if the assembled payload would be empty, no event is emitted (preserves the
+ * "reason=noQualifiedReviewers" / "reason=disabled" / "reason=noChannelConfigured" early
+ * returns of the original code path).
+ *
+ * <p>NOTE: This task remains a {@link LeaderboardNotificationTask} so the existing cron
+ * wiring in {@code LeaderboardTaskScheduler} picks it up unchanged. The class is still
+ * gated on {@code hephaestus.integration.slack.enabled} because publishing leaderboard
+ * digest events that no subscriber listens to would be wasted work — the gate keeps the
+ * cron firing pattern identical to the pre-flip behaviour.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
-public class SlackWeeklyLeaderboardTask implements Runnable {
+public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
 
     private static final Logger log = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
     private final LeaderboardProperties leaderboardProperties;
     private final ApplicationProperties applicationProperties;
-    private final SlackMessageService slackMessageService;
     private final LeaderboardService leaderboardService;
     private final ConnectionRepository connectionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SlackWeeklyLeaderboardTask(
         LeaderboardProperties leaderboardProperties,
         ApplicationProperties applicationProperties,
-        SlackMessageService slackMessageService,
         LeaderboardService leaderboardService,
-        ConnectionRepository connectionRepository
+        ConnectionRepository connectionRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.leaderboardProperties = leaderboardProperties;
         this.applicationProperties = applicationProperties;
-        this.slackMessageService = slackMessageService;
         this.leaderboardService = leaderboardService;
         this.connectionRepository = connectionRepository;
-    }
-
-    private List<User> getTop3SlackReviewers(
-        Workspace workspace,
-        Instant after,
-        Instant before,
-        Optional<String> team
-    ) {
-        if (workspace == null || workspace.getId() == null) {
-            return List.of();
-        }
-
-        var leaderboard = leaderboardService.createLeaderboard(
-            workspace,
-            after,
-            before,
-            team.orElse("all"),
-            LeaderboardSortType.SCORE,
-            LeaderboardMode.INDIVIDUAL
-        );
-        var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
-        log.debug(
-            "Fetched top reviewers: workspaceId={}, userCount={}, users={}",
-            workspace.getId(),
-            top3.size(),
-            top3
-                .stream()
-                .map(entry -> entry.user() != null ? entry.user().name() : "<team>")
-                .toList()
-        );
-
-        List<User> allSlackUsers = slackMessageService.listMembers(workspace.getId());
-        return top3
-            .stream()
-            .map(mapToSlackUser(allSlackUsers))
-            .filter(user -> user != null)
-            .toList();
-    }
-
-    private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
-        return entry -> {
-            UserInfoDTO leaderboardUser = entry.user();
-            if (leaderboardUser == null) {
-                return null;
-            }
-
-            var exactUser = allSlackUsers
-                .stream()
-                .filter(
-                    user ->
-                        user.getName().equalsIgnoreCase(leaderboardUser.name()) ||
-                        (user.getProfile() != null &&
-                            user.getProfile().getEmail() != null &&
-                            user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
-                )
-                .findFirst();
-            if (exactUser.isPresent()) {
-                return exactUser.get();
-            }
-
-            // find through String edit distance
-            return allSlackUsers
-                .stream()
-                .min((a, b) -> {
-                    String aName = a.getRealName() != null ? a.getRealName() : a.getName();
-                    String bName = b.getRealName() != null ? b.getRealName() : b.getName();
-
-                    return Integer.compare(
-                        LevenshteinDistance.getDefaultInstance().apply(leaderboardUser.name(), aName),
-                        LevenshteinDistance.getDefaultInstance().apply(leaderboardUser.name(), bName)
-                    );
-                })
-                .orElse(null);
-        };
-    }
-
-    private String formatDateForURL(Instant instant) {
-        // Use ISO-8601 for query params (e.g., 2025-01-01T00:00:00Z)
-        return DateTimeFormatter.ISO_INSTANT.format(instant);
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -175,14 +96,15 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             .withNano(0);
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
+        String baseUrl = normalizeBaseUrl(applicationProperties.hostUrl());
 
         for (Connection connection : connections) {
             // Skip-then-iterate; one workspace's failure must NOT block the next.
             try {
-                postForConnection(connection, currentDate, after, before);
+                publishForConnection(connection, currentDate, after, before, baseUrl);
             } catch (RuntimeException e) {
                 log.warn(
-                    "Slack notification failed for workspace={}: {}",
+                    "Slack notification fan-out failed for workspace={}: {}",
                     connection.getWorkspace() == null ? null : connection.getWorkspace().getId(),
                     e.getMessage()
                 );
@@ -190,7 +112,13 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         }
     }
 
-    private void postForConnection(Connection connection, long currentDate, Instant after, Instant before) {
+    private void publishForConnection(
+        Connection connection,
+        long currentDate,
+        Instant after,
+        Instant before,
+        String baseUrl
+    ) {
         Workspace workspace = connection.getWorkspace();
         if (workspace == null) {
             log.warn("Slack Connection {} has no workspace — skipping", connection.getId());
@@ -211,76 +139,52 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         }
 
         Optional<String> team = Optional.ofNullable(slackConfig.teamLabel()).filter(t -> !t.isBlank());
-        var topReviewers = getTop3SlackReviewers(workspace, after, before, team);
-        if (topReviewers.isEmpty()) {
+        List<LeaderboardEntryDTO> topEntries = fetchTopEntries(workspace, after, before, team);
+        if (topEntries.isEmpty()) {
             log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
             return;
         }
 
-        List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before, team.orElse(null));
-        try {
-            slackMessageService.sendForWorkspace(workspace.getId(), channelId, blocks, "Weekly review highlights");
-        } catch (SlackSendException e) {
-            log.warn(
-                "Failed to send scheduled Slack message: workspaceId={}, channelId={}, slackError={}",
+        eventPublisher.publishEvent(
+            new LeaderboardDigestReadyEvent(
                 workspace.getId(),
-                e.channelId(),
-                e.slackError()
-            );
-        }
+                workspace.getWorkspaceSlug(),
+                channelId,
+                team.orElse(null),
+                currentDate,
+                after,
+                before,
+                topEntries,
+                baseUrl
+            )
+        );
     }
 
-    private List<LayoutBlock> buildBlocks(
+    private List<LeaderboardEntryDTO> fetchTopEntries(
         Workspace workspace,
-        List<User> topReviewers,
-        long currentDate,
         Instant after,
         Instant before,
-        String team
+        Optional<String> team
     ) {
-        final String baseUrl = normalizeBaseUrl(applicationProperties.hostUrl());
-        final String workspaceBase = baseUrl + "/w/" + workspace.getWorkspaceSlug();
-        String teamFilter = team == null ? "all" : team;
-        return asBlocks(
-            header(header -> header.text(plainText(pt -> pt.text(":newspaper: Weekly review highlights :newspaper:")))),
-            context(context ->
-                context.elements(
-                    List.of(
-                        markdownText(
-                            "<!date^" + currentDate + "^{date} at {time}| Today at 9:00AM CEST> | " + workspaceBase
-                        )
-                    )
-                )
-            ),
-            divider(),
-            section(section ->
-                section.text(
-                    markdownText(
-                        "Last week's review leaderboard is finalized. See where you landed <" +
-                            workspaceBase +
-                            "?after=" +
-                            encode(formatDateForURL(after)) +
-                            "&before=" +
-                            encode(formatDateForURL(before)) +
-                            "&team=" +
-                            encode(teamFilter) +
-                            "|here>."
-                    )
-                )
-            ),
-            section(section -> section.text(markdownText("Congrats to last week's top 3 reviewers:"))),
-            section(section ->
-                section.text(
-                    markdownText(
-                        IntStream.range(0, topReviewers.size())
-                            .mapToObj(i -> ((i + 1) + ". <@" + topReviewers.get(i).getId() + ">"))
-                            .reduce((a, b) -> a + "\n" + b)
-                            .orElse("")
-                    )
-                )
-            ),
-            section(section -> section.text(markdownText("Thanks for keeping reviews moving! :rocket:")))
+        if (workspace == null || workspace.getId() == null) {
+            return List.of();
+        }
+        var leaderboard = leaderboardService.createLeaderboard(
+            workspace,
+            after,
+            before,
+            team.orElse("all"),
+            LeaderboardSortType.SCORE,
+            LeaderboardMode.INDIVIDUAL
         );
+        var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
+        log.debug(
+            "Fetched top reviewers: workspaceId={}, userCount={}, users={}",
+            workspace.getId(),
+            top3.size(),
+            top3.stream().map(entry -> entry.user() != null ? entry.user().name() : "<team>").toList()
+        );
+        return top3;
     }
 
     private String normalizeBaseUrl(String url) {
@@ -292,9 +196,5 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             return "https://" + trimmed;
         }
         return trimmed;
-    }
-
-    private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

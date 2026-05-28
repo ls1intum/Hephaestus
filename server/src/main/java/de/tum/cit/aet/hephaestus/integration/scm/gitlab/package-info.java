@@ -22,7 +22,19 @@
         "integration.core::webhook",
         "integration.scm",
         "core",
+        // GitLabWebhookService uses WebhookProperties; GitLabPreflightService validates URLs.
+        "core::webhook",
+        "core::security",
         "workspace",
+        // Workspace flows that lived in workspace/ pre-#1198 now live here — they still
+        // depend on the workspace named sub-surfaces.
+        "workspace::context",
+        "workspace::spi",
+        "workspace::dto",
+        // GraphQL config moved from cross-cutting config; FragmentMergingDocumentSource lives there.
+        "config",
+        // Provider availability gated by FeatureFlagService.
+        "feature",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab;

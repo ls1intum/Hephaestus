@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
@@ -571,34 +571,34 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     @Component
     static class TestCommentEventListener {
 
-        private final List<DomainEvent.DiscussionCommentCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionCommentEdited> editedEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionCommentDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionCommentCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionCommentEdited> editedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionCommentDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.DiscussionCommentCreated event) {
+        public void onCreated(ScmDomainEvent.DiscussionCommentCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onEdited(DomainEvent.DiscussionCommentEdited event) {
+        public void onEdited(ScmDomainEvent.DiscussionCommentEdited event) {
             editedEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.DiscussionCommentDeleted event) {
+        public void onDeleted(ScmDomainEvent.DiscussionCommentDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.DiscussionCommentCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.DiscussionCommentCreated> getCreatedEvents() {
             return createdEvents;
         }
 
-        public List<DomainEvent.DiscussionCommentEdited> getEditedEvents() {
+        public List<ScmDomainEvent.DiscussionCommentEdited> getEditedEvents() {
             return editedEvents;
         }
 
-        public List<DomainEvent.DiscussionCommentDeleted> getDeletedEvents() {
+        public List<ScmDomainEvent.DiscussionCommentDeleted> getDeletedEvents() {
             return deletedEvents;
         }
 

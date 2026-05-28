@@ -139,6 +139,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             // Methods that have command-object overloads but need many params for internal processing
             Set<String> allowedOverloads = Set.of(
                 "ActivityEventService.record", // Has RecordActivityCommand overload for cleaner API
+                "ActivityRecorder.record", // SPI mirror of ActivityEventService.record — same shape by design
                 // @Bean factory wiring Spring dependencies — not business logic complexity
                 "DockerSandboxConfiguration.dockerSandboxAdapter",
                 "DockerSandboxConfiguration.dockerInteractiveSandboxAdapter"
@@ -465,7 +466,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceActivationService",
                 "GithubLifecycleListener", // IntegrationNatsConsumer absent under the webhook runtime role (server.enabled=false) — see ADR 0008
                 "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
-                "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
+                "GitHubWorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
                 "WorkspaceRepositoryMonitorService",
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
@@ -473,7 +474,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
                 "AccountService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
-                "LeaderboardTaskScheduler", // SlackWeeklyLeaderboardTask is optional, gated by leaderboard.notification.enabled=true
+                "GitHubWorkspaceDataSyncTrigger", // Lazy-loads GithubDataSyncService + SyncTargetProvider to break the same circular reference WorkspaceProvisioningAdapter handled; the workspace-side trigger sits on the GitHub adapter post-SPI extraction
                 "WorkspaceScopedTables" // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
             );
 

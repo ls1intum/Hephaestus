@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussion;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionCategory;
@@ -167,11 +167,11 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         // Publish domain events
         EventContext eventContext = EventContext.from(context);
-        EventPayload.DiscussionData discussionData = EventPayload.DiscussionData.from(discussion);
+        ScmEventPayload.DiscussionData discussionData = ScmEventPayload.DiscussionData.from(discussion);
 
         if (isNew) {
             log.debug("Created discussion: discussionId={}, discussionNumber={}", dbId, dto.number());
-            eventPublisher.publishEvent(new DomainEvent.DiscussionCreated(discussionData, eventContext));
+            eventPublisher.publishEvent(new ScmDomainEvent.DiscussionCreated(discussionData, eventContext));
         } else {
             Set<String> changedFields = computeChangedFields(existingOpt.get(), discussion);
             if (labelsChanged) {
@@ -179,7 +179,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             }
             if (!changedFields.isEmpty()) {
                 eventPublisher.publishEvent(
-                    new DomainEvent.DiscussionUpdated(discussionData, changedFields, eventContext)
+                    new ScmDomainEvent.DiscussionUpdated(discussionData, changedFields, eventContext)
                 );
                 log.debug("Updated discussion: discussionId={}, changedFields={}", dbId, changedFields);
             }
@@ -206,7 +206,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             .ifPresent(discussion -> {
                 Long discussionId = discussion.getId();
                 discussionRepository.delete(discussion);
-                eventPublisher.publishEvent(new DomainEvent.DiscussionDeleted(discussionId, eventContext));
+                eventPublisher.publishEvent(new ScmDomainEvent.DiscussionDeleted(discussionId, eventContext));
                 log.info("Deleted discussion: discussionId={}, discussionNumber={}", discussionId, dto.number());
             });
     }
@@ -225,8 +225,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         if (discussion != null) {
             String stateReason = dto.stateReason() != null ? dto.stateReason() : null;
             eventPublisher.publishEvent(
-                new DomainEvent.DiscussionClosed(
-                    EventPayload.DiscussionData.from(discussion),
+                new ScmDomainEvent.DiscussionClosed(
+                    ScmEventPayload.DiscussionData.from(discussion),
                     stateReason,
                     EventContext.from(context)
                 )
@@ -249,8 +249,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         Discussion discussion = process(dto, context);
         if (discussion != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.DiscussionReopened(
-                    EventPayload.DiscussionData.from(discussion),
+                new ScmDomainEvent.DiscussionReopened(
+                    ScmEventPayload.DiscussionData.from(discussion),
                     EventContext.from(context)
                 )
             );
@@ -274,8 +274,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             // The answer comment's database ID, if available from the DTO
             Long answerCommentId = dto.answerComment() != null ? dto.answerComment().getDatabaseId() : null;
             eventPublisher.publishEvent(
-                new DomainEvent.DiscussionAnswered(
-                    EventPayload.DiscussionData.from(discussion),
+                new ScmDomainEvent.DiscussionAnswered(
+                    ScmEventPayload.DiscussionData.from(discussion),
                     answerCommentId != null ? answerCommentId : 0L,
                     EventContext.from(context)
                 )

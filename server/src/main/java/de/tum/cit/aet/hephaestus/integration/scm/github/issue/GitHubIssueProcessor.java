@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -218,7 +218,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         if (publishEvents) {
             if (isNew) {
                 eventPublisher.publishEvent(
-                    new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
+                    new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
                 );
                 log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
 
@@ -227,8 +227,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 if (emitLifecycleOnCreate && issue.getState() == Issue.State.CLOSED) {
                     String stateReason = dto.stateReason() != null ? dto.stateReason() : "completed";
                     eventPublisher.publishEvent(
-                        new DomainEvent.IssueClosed(
-                            EventPayload.IssueData.from(issue),
+                        new ScmDomainEvent.IssueClosed(
+                            ScmEventPayload.IssueData.from(issue),
                             stateReason,
                             EventContext.from(context)
                         )
@@ -243,8 +243,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                         changedFields.add("relationships");
                     }
                     eventPublisher.publishEvent(
-                        new DomainEvent.IssueUpdated(
-                            EventPayload.IssueData.from(issue),
+                        new ScmDomainEvent.IssueUpdated(
+                            ScmEventPayload.IssueData.from(issue),
                             changedFields,
                             EventContext.from(context)
                         )
@@ -325,9 +325,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 issue.setIssueType(issueType);
                 issue = issueRepository.save(issue);
                 eventPublisher.publishEvent(
-                    new DomainEvent.IssueTyped(
-                        EventPayload.IssueData.from(issue),
-                        EventPayload.IssueTypeData.from(issueType),
+                    new ScmDomainEvent.IssueTyped(
+                        ScmEventPayload.IssueData.from(issue),
+                        ScmEventPayload.IssueTypeData.from(issueType),
                         EventContext.from(context)
                     )
                 );
@@ -350,9 +350,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             issue.setIssueType(null);
             issue = issueRepository.save(issue);
             eventPublisher.publishEvent(
-                new DomainEvent.IssueUntyped(
-                    EventPayload.IssueData.from(issue),
-                    EventPayload.IssueTypeData.from(previousType),
+                new ScmDomainEvent.IssueUntyped(
+                    ScmEventPayload.IssueData.from(issue),
+                    ScmEventPayload.IssueTypeData.from(previousType),
                     EventContext.from(context)
                 )
             );
@@ -370,7 +370,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Issue issue = processInternal(issueDto, context, true, false);
         String stateReason = issueDto.stateReason() != null ? issueDto.stateReason() : "completed";
         eventPublisher.publishEvent(
-            new DomainEvent.IssueClosed(EventPayload.IssueData.from(issue), stateReason, EventContext.from(context))
+            new ScmDomainEvent.IssueClosed(ScmEventPayload.IssueData.from(issue), stateReason, EventContext.from(context))
         );
         log.debug("Closed issue: issueId={}, stateReason={}", issue.getId(), stateReason);
         return issue;
@@ -383,7 +383,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     public Issue processReopened(GitHubIssueDTO issueDto, ProcessingContext context) {
         Issue issue = process(issueDto, context);
         eventPublisher.publishEvent(
-            new DomainEvent.IssueReopened(EventPayload.IssueData.from(issue), EventContext.from(context))
+            new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(issue), EventContext.from(context))
         );
         log.debug("Reopened issue: issueId={}", issue.getId());
         return issue;
@@ -398,9 +398,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.IssueLabeled(
-                    EventPayload.IssueData.from(issue),
-                    EventPayload.LabelData.from(label),
+                new ScmDomainEvent.IssueLabeled(
+                    ScmEventPayload.IssueData.from(issue),
+                    ScmEventPayload.LabelData.from(label),
                     EventContext.from(context)
                 )
             );
@@ -418,9 +418,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.IssueUnlabeled(
-                    EventPayload.IssueData.from(issue),
-                    EventPayload.LabelData.from(label),
+                new ScmDomainEvent.IssueUnlabeled(
+                    ScmEventPayload.IssueData.from(issue),
+                    ScmEventPayload.LabelData.from(label),
                     EventContext.from(context)
                 )
             );
@@ -442,7 +442,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             .ifPresent(issue -> {
                 Long syntheticId = issue.getId();
                 issueRepository.delete(issue);
-                eventPublisher.publishEvent(new DomainEvent.IssueDeleted(syntheticId, EventContext.from(context)));
+                eventPublisher.publishEvent(new ScmDomainEvent.IssueDeleted(syntheticId, EventContext.from(context)));
                 log.info("Deleted issue: issueId={}, number={}", syntheticId, issueDto.number());
             });
     }

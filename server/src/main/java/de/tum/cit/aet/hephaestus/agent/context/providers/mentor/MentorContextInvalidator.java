@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -51,7 +51,7 @@ public class MentorContextInvalidator {
      */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestUpdated(DomainEvent.PullRequestUpdated event) {
+    public void onPullRequestUpdated(ScmDomainEvent.PullRequestUpdated event) {
         Long workspaceId = resolveWorkspaceId(event.context());
         if (workspaceId == null) return;
         Long authorId = event.pullRequest() != null ? event.pullRequest().authorId() : null;
@@ -70,7 +70,7 @@ public class MentorContextInvalidator {
      */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueUpdated(DomainEvent.IssueUpdated event) {
+    public void onIssueUpdated(ScmDomainEvent.IssueUpdated event) {
         Long workspaceId = resolveWorkspaceId(event.context());
         if (workspaceId == null) return;
         Long authorId = event.issue() != null ? event.issue().authorId() : null;
@@ -91,27 +91,27 @@ public class MentorContextInvalidator {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
+    public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
         evictForReview(event.context(), event.review());
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public void onReviewEdited(DomainEvent.ReviewEdited event) {
+    public void onReviewEdited(ScmDomainEvent.ReviewEdited event) {
         evictForReview(event.context(), event.review());
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
+    public void onReviewDismissed(ScmDomainEvent.ReviewDismissed event) {
         evictForReview(event.context(), event.review());
     }
 
     private void evictForReview(
         de.tum.cit.aet.hephaestus.integration.core.events.EventContext context,
-        de.tum.cit.aet.hephaestus.integration.core.events.EventPayload.ReviewData review
+        de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload.ReviewData review
     ) {
         Long workspaceId = resolveWorkspaceId(context);
         if (workspaceId == null || review == null) return;
@@ -131,7 +131,7 @@ public class MentorContextInvalidator {
      */
     private Long resolveWorkspaceId(de.tum.cit.aet.hephaestus.integration.core.events.EventContext context) {
         if (context == null || context.repository() == null) return null;
-        // The DomainEvent context carries a RepositoryRef — we resolve to workspace via the
+        // The ScmDomainEvent context carries a RepositoryRef — we resolve to workspace via the
         // RepositoryToMonitor join (same approach the aspect queries use).
         return workspaceRepository.findWorkspaceIdByRepositoryId(context.repository().id()).orElse(null);
     }

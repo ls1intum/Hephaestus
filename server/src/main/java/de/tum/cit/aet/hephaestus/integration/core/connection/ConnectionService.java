@@ -141,8 +141,7 @@ public class ConnectionService {
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return findActive(workspaceId, kind)
             .flatMap(c -> c.credentials(credentialConverter))
-            .filter(b -> b instanceof BearerToken)
-            .map(b -> (BearerToken) b);
+            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 
     /**

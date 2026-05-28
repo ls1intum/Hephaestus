@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -233,7 +233,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
                 GitProviderType.GITLAB
             );
             eventPublisher.publishEvent(
-                new DomainEvent.CommentCreated(EventPayload.CommentData.from(saved), issueId, eventCtx)
+                new ScmDomainEvent.CommentCreated(ScmEventPayload.CommentData.from(saved), issueId, eventCtx)
             );
             log.debug("Created comment from sync: commentId={}, parentId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
@@ -243,7 +243,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
                 GitProviderType.GITLAB
             );
             eventPublisher.publishEvent(
-                new DomainEvent.CommentUpdated(EventPayload.CommentData.from(saved), issueId, changedFields, eventCtx)
+                new ScmDomainEvent.CommentUpdated(ScmEventPayload.CommentData.from(saved), issueId, changedFields, eventCtx)
             );
             log.debug("Updated comment from sync: commentId={}, changed={}", saved.getId(), changedFields);
         }
@@ -303,8 +303,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommentCreated(
-                    EventPayload.CommentData.from(saved),
+                new ScmDomainEvent.CommentCreated(
+                    ScmEventPayload.CommentData.from(saved),
                     issueId,
                     EventContext.from(context)
                 )
@@ -312,8 +312,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             log.debug("Created comment: commentId={}, parentId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommentUpdated(
-                    EventPayload.CommentData.from(saved),
+                new ScmDomainEvent.CommentUpdated(
+                    ScmEventPayload.CommentData.from(saved),
                     issueId,
                     changedFields,
                     EventContext.from(context)

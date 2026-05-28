@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
@@ -719,94 +719,94 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestEventListener {
 
-        private final List<DomainEvent.IssueCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueClosed> closedEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueLabeled> labeledEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueUnlabeled> unlabeledEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueTyped> typedEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueUntyped> untypedEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueClosed> closedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueLabeled> labeledEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueUnlabeled> unlabeledEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueTyped> typedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueUntyped> untypedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.IssueCreated event) {
+        public void onCreated(ScmDomainEvent.IssueCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.IssueUpdated event) {
+        public void onUpdated(ScmDomainEvent.IssueUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(DomainEvent.IssueClosed event) {
+        public void onClosed(ScmDomainEvent.IssueClosed event) {
             closedEvents.add(event);
         }
 
         @EventListener
-        public void onReopened(DomainEvent.IssueReopened event) {
+        public void onReopened(ScmDomainEvent.IssueReopened event) {
             reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onLabeled(DomainEvent.IssueLabeled event) {
+        public void onLabeled(ScmDomainEvent.IssueLabeled event) {
             labeledEvents.add(event);
         }
 
         @EventListener
-        public void onUnlabeled(DomainEvent.IssueUnlabeled event) {
+        public void onUnlabeled(ScmDomainEvent.IssueUnlabeled event) {
             unlabeledEvents.add(event);
         }
 
         @EventListener
-        public void onTyped(DomainEvent.IssueTyped event) {
+        public void onTyped(ScmDomainEvent.IssueTyped event) {
             typedEvents.add(event);
         }
 
         @EventListener
-        public void onUntyped(DomainEvent.IssueUntyped event) {
+        public void onUntyped(ScmDomainEvent.IssueUntyped event) {
             untypedEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.IssueDeleted event) {
+        public void onDeleted(ScmDomainEvent.IssueDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.IssueCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.IssueCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.IssueUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.IssueUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.IssueClosed> getClosedEvents() {
+        public List<ScmDomainEvent.IssueClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<DomainEvent.IssueReopened> getReopenedEvents() {
+        public List<ScmDomainEvent.IssueReopened> getReopenedEvents() {
             return new ArrayList<>(reopenedEvents);
         }
 
-        public List<DomainEvent.IssueLabeled> getLabeledEvents() {
+        public List<ScmDomainEvent.IssueLabeled> getLabeledEvents() {
             return new ArrayList<>(labeledEvents);
         }
 
-        public List<DomainEvent.IssueUnlabeled> getUnlabeledEvents() {
+        public List<ScmDomainEvent.IssueUnlabeled> getUnlabeledEvents() {
             return new ArrayList<>(unlabeledEvents);
         }
 
-        public List<DomainEvent.IssueTyped> getTypedEvents() {
+        public List<ScmDomainEvent.IssueTyped> getTypedEvents() {
             return new ArrayList<>(typedEvents);
         }
 
-        public List<DomainEvent.IssueUntyped> getUntypedEvents() {
+        public List<ScmDomainEvent.IssueUntyped> getUntypedEvents() {
             return new ArrayList<>(untypedEvents);
         }
 
-        public List<DomainEvent.IssueDeleted> getDeletedEvents() {
+        public List<ScmDomainEvent.IssueDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 

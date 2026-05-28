@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionCl
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
 import java.time.Duration;
 import java.time.Instant;
@@ -285,7 +285,7 @@ public class CommitMetadataEnrichmentService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying commit metadata enrichment after transport error: repo={}, attempt={}, error={}",
@@ -947,7 +947,7 @@ public class CommitMetadataEnrichmentService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying {}: repo={}, attempt={}, error={}",

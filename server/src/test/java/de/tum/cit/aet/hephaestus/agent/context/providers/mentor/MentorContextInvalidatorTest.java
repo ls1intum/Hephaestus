@@ -7,9 +7,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -108,8 +108,8 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     // Event builders
     // ════════════════════════════════════════════════════════════════════════
 
-    private static DomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
-        EventPayload.PullRequestData pr = new EventPayload.PullRequestData(
+    private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
+        ScmEventPayload.PullRequestData pr = new ScmEventPayload.PullRequestData(
             1L,
             42,
             "title",
@@ -129,11 +129,11 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
             mergedById != null ? Instant.now() : null,
             mergedById
         );
-        return new DomainEvent.PullRequestUpdated(pr, Set.of(), buildContext(repoId));
+        return new ScmDomainEvent.PullRequestUpdated(pr, Set.of(), buildContext(repoId));
     }
 
-    private static DomainEvent.IssueUpdated buildIssueUpdated(long repoId, Long authorId) {
-        EventPayload.IssueData issue = new EventPayload.IssueData(
+    private static ScmDomainEvent.IssueUpdated buildIssueUpdated(long repoId, Long authorId) {
+        ScmEventPayload.IssueData issue = new ScmEventPayload.IssueData(
             1L,
             17,
             "title",
@@ -148,7 +148,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
             Instant.now(),
             null
         );
-        return new DomainEvent.IssueUpdated(issue, Set.of(), buildContext(repoId));
+        return new ScmDomainEvent.IssueUpdated(issue, Set.of(), buildContext(repoId));
     }
 
     private static EventContext buildContext(long repoId) {

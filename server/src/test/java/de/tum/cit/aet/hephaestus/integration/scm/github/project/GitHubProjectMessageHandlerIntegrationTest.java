@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -311,54 +314,54 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestProjectEventListener {
 
-        private final List<DomainEvent.ProjectCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectClosed> closedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectReopened> reopenedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectDeleted> deletedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectCreated> createdEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectUpdated> updatedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectClosed> closedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectReopened> reopenedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.ProjectCreated event) {
+        public void onCreated(GitHubProjectEvent.ProjectCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.ProjectUpdated event) {
+        public void onUpdated(GitHubProjectEvent.ProjectUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(DomainEvent.ProjectClosed event) {
+        public void onClosed(GitHubProjectEvent.ProjectClosed event) {
             closedEvents.add(event);
         }
 
         @EventListener
-        public void onReopened(DomainEvent.ProjectReopened event) {
+        public void onReopened(GitHubProjectEvent.ProjectReopened event) {
             reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.ProjectDeleted event) {
+        public void onDeleted(GitHubProjectEvent.ProjectDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.ProjectCreated> getCreatedEvents() {
+        public List<GitHubProjectEvent.ProjectCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.ProjectUpdated> getUpdatedEvents() {
+        public List<GitHubProjectEvent.ProjectUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.ProjectClosed> getClosedEvents() {
+        public List<GitHubProjectEvent.ProjectClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<DomainEvent.ProjectReopened> getReopenedEvents() {
+        public List<GitHubProjectEvent.ProjectReopened> getReopenedEvents() {
             return new ArrayList<>(reopenedEvents);
         }
 
-        public List<DomainEvent.ProjectDeleted> getDeletedEvents() {
+        public List<GitHubProjectEvent.ProjectDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 

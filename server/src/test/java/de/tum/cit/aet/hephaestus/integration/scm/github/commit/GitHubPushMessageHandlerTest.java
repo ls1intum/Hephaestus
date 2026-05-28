@@ -12,7 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
@@ -968,10 +968,10 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             invokeHandleEvent(event);
 
             // Verify event was published
-            ArgumentCaptor<DomainEvent.CommitCreated> captor = ArgumentCaptor.forClass(DomainEvent.CommitCreated.class);
+            ArgumentCaptor<ScmDomainEvent.CommitCreated> captor = ArgumentCaptor.forClass(ScmDomainEvent.CommitCreated.class);
             verify(eventPublisher).publishEvent(captor.capture());
 
-            DomainEvent.CommitCreated published = captor.getValue();
+            ScmDomainEvent.CommitCreated published = captor.getValue();
             assertThat(published.commit().sha()).isEqualTo("abc123def456789012345678901234567890abcd");
             assertThat(published.commit().message()).isEqualTo("feat: publish test");
             assertThat(published.commit().repositoryId()).isEqualTo(100L);
@@ -1000,7 +1000,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             invokeHandleEvent(event);
 
             // Verify event was NOT published
-            verify(eventPublisher, never()).publishEvent(any(DomainEvent.CommitCreated.class));
+            verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.CommitCreated.class));
         }
     }
 }

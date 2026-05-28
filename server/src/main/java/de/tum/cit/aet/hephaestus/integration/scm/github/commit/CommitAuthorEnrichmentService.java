@@ -6,7 +6,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionCl
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Duration;
@@ -118,7 +118,7 @@ public class CommitAuthorEnrichmentService {
      * @param scopeId          the scope ID for GraphQL client authentication
      * @param providerId       the provider ID for scoping user lookups
      * @param repository       the repository entity used to populate the {@link RepositoryRef}
-     *                         on the published {@link DomainEvent.CommitAuthorsReconciled} event;
+     *                         on the published {@link ScmDomainEvent.CommitAuthorsReconciled} event;
      *                         may be {@code null} when a reference cannot be materialised.
      * @return the number of commits enriched
      */
@@ -207,7 +207,7 @@ public class CommitAuthorEnrichmentService {
         // would otherwise silently fail to trigger the activity backfill.
         if (total > 0) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommitAuthorsReconciled(
+                new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
                     EventContext.forSync(scopeId, RepositoryRef.from(repository), GitProviderType.GITHUB)
                 )
@@ -482,7 +482,7 @@ public class CommitAuthorEnrichmentService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying commit enrichment after transport error: repo={}, attempt={}, error={}",

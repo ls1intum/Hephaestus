@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
@@ -401,26 +401,26 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Component
     static class GitLabNoteTestEventListener {
 
-        private final List<DomainEvent.CommentCreated> createdEvents =
+        private final List<ScmDomainEvent.CommentCreated> createdEvents =
             new java.util.concurrent.CopyOnWriteArrayList<>();
-        private final List<DomainEvent.CommentUpdated> updatedEvents =
+        private final List<ScmDomainEvent.CommentUpdated> updatedEvents =
             new java.util.concurrent.CopyOnWriteArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.CommentCreated event) {
+        public void onCreated(ScmDomainEvent.CommentCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.CommentUpdated event) {
+        public void onUpdated(ScmDomainEvent.CommentUpdated event) {
             updatedEvents.add(event);
         }
 
-        public List<DomainEvent.CommentCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.CommentCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.CommentUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.CommentUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 

@@ -1,8 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
@@ -90,11 +93,11 @@ public class GitHubProjectStatusUpdateProcessor {
 
         // Publish events
         EventContext eventContext = EventContext.from(context);
-        EventPayload.ProjectStatusUpdateData data = EventPayload.ProjectStatusUpdateData.from(statusUpdate);
+        GitHubProjectEventPayload.ProjectStatusUpdateData data = GitHubProjectEventPayload.ProjectStatusUpdateData.from(statusUpdate);
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectStatusUpdateCreated(data, project.getId(), eventContext)
+                new GitHubProjectEvent.ProjectStatusUpdateCreated(data, project.getId(), eventContext)
             );
             log.debug(
                 "Created project status update: id={}, nodeId={}",
@@ -103,7 +106,7 @@ public class GitHubProjectStatusUpdateProcessor {
             );
         } else {
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectStatusUpdateUpdated(data, project.getId(), eventContext)
+                new GitHubProjectEvent.ProjectStatusUpdateUpdated(data, project.getId(), eventContext)
             );
             log.debug(
                 "Updated project status update: id={}, nodeId={}",
@@ -127,7 +130,7 @@ public class GitHubProjectStatusUpdateProcessor {
                 Long id = statusUpdate.getId();
                 statusUpdateRepository.delete(statusUpdate);
                 eventPublisher.publishEvent(
-                    new DomainEvent.ProjectStatusUpdateDeleted(id, projectId, EventContext.from(context))
+                    new GitHubProjectEvent.ProjectStatusUpdateDeleted(id, projectId, EventContext.from(context))
                 );
                 log.info("Deleted project status update: id={}, nodeId={}", id, nodeId);
             });

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
@@ -120,13 +120,13 @@ public class GitHubTeamProcessor {
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.TeamCreated(EventPayload.TeamData.from(saved), EventContext.from(context))
+                new ScmDomainEvent.TeamCreated(ScmEventPayload.TeamData.from(saved), EventContext.from(context))
             );
             log.debug("Created team: teamId={}, teamSlug={}", saved.getId(), saved.getName());
         } else {
             eventPublisher.publishEvent(
-                new DomainEvent.TeamUpdated(
-                    EventPayload.TeamData.from(saved),
+                new ScmDomainEvent.TeamUpdated(
+                    ScmEventPayload.TeamData.from(saved),
                     Set.of("name", "description"),
                     EventContext.from(context)
                 )
@@ -165,7 +165,7 @@ public class GitHubTeamProcessor {
                 team.getRepoPermissions().clear();
 
                 teamRepository.delete(team);
-                eventPublisher.publishEvent(new DomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context)));
+                eventPublisher.publishEvent(new ScmDomainEvent.TeamDeleted(teamId, teamName, EventContext.from(context)));
                 log.info("Deleted team: teamId={}, teamSlug={}", teamId, teamName);
             });
     }

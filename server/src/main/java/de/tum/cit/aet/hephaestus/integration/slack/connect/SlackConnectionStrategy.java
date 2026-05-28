@@ -125,15 +125,26 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
     @Override
     public void revoke(IntegrationRef ref) {
         // Best-effort: invalidate the bot token on Slack's side so a disconnect doesn't
-        // leave a dangling credential. Failure here doesn't block the local UNINSTALLED
-        // transition — the caller has already cleared credentials_encrypted.
+        // leave a dangling credential. Failure here MUST NOT block the local UNINSTALLED
+        // transition — the caller has already cleared credentials_encrypted, so the
+        // local state is consistent regardless of Slack's reachability. Network failures
+        // (502/timeout), 401 (already-revoked), 5xx — all swallowed with a single
+        // warn log so the disconnect flow stays idempotent.
         var bundle = credentialProvider.resolve(ref);
         if (bundle.isEmpty() || !(bundle.get() instanceof BearerToken bt)) {
             log.debug("Slack revoke skipped: no bearer token for workspace={}", ref.workspaceId());
             return;
         }
-        boolean revoked = oauthClient.revoke(bt.token());
-        log.info("Slack revoke for workspace={}: success={}", ref.workspaceId(), revoked);
+        try {
+            boolean revoked = oauthClient.revoke(bt.token());
+            log.info("Slack revoke for workspace={}: success={}", ref.workspaceId(), revoked);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Slack revoke call failed for workspace={} (local UNINSTALLED still applied): {}",
+                ref.workspaceId(),
+                e.toString()
+            );
+        }
     }
 
     private String redirectUri() {

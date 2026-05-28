@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
@@ -126,13 +126,13 @@ public class GitHubLabelProcessor {
         Label saved = labelRepository.save(label);
 
         // Publish domain event with DTO payload (safe for async handling)
-        EventPayload.LabelData labelData = EventPayload.LabelData.from(saved);
+        ScmEventPayload.LabelData labelData = ScmEventPayload.LabelData.from(saved);
         EventContext eventContext = EventContext.from(context);
         if (isNew) {
-            eventPublisher.publishEvent(new DomainEvent.LabelCreated(labelData, eventContext));
+            eventPublisher.publishEvent(new ScmDomainEvent.LabelCreated(labelData, eventContext));
             log.debug("Created label: labelId={}, labelName={}", saved.getId(), saved.getName());
         } else {
-            eventPublisher.publishEvent(new DomainEvent.LabelUpdated(labelData, eventContext));
+            eventPublisher.publishEvent(new ScmDomainEvent.LabelUpdated(labelData, eventContext));
             log.debug("Updated label: labelId={}, labelName={}", saved.getId(), saved.getName());
         }
 
@@ -187,7 +187,7 @@ public class GitHubLabelProcessor {
 
         labelRepository.delete(label);
         eventPublisher.publishEvent(
-            new DomainEvent.LabelDeleted(label.getId(), label.getName(), EventContext.from(context))
+            new ScmDomainEvent.LabelDeleted(label.getId(), label.getName(), EventContext.from(context))
         );
         log.info("Deleted label: labelId={}, labelName={}", label.getId(), label.getName());
     }

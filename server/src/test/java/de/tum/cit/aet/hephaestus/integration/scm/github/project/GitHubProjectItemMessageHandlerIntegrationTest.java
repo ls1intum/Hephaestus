@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -422,74 +425,74 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     @Component
     static class TestProjectItemEventListener {
 
-        private final List<DomainEvent.ProjectItemCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectItemUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectItemArchived> archivedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectItemRestored> restoredEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectItemDeleted> deletedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectItemConverted> convertedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectItemReordered> reorderedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemCreated> createdEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemUpdated> updatedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemArchived> archivedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemRestored> restoredEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemDeleted> deletedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemConverted> convertedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectItemReordered> reorderedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.ProjectItemCreated event) {
+        public void onCreated(GitHubProjectEvent.ProjectItemCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.ProjectItemUpdated event) {
+        public void onUpdated(GitHubProjectEvent.ProjectItemUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onArchived(DomainEvent.ProjectItemArchived event) {
+        public void onArchived(GitHubProjectEvent.ProjectItemArchived event) {
             archivedEvents.add(event);
         }
 
         @EventListener
-        public void onRestored(DomainEvent.ProjectItemRestored event) {
+        public void onRestored(GitHubProjectEvent.ProjectItemRestored event) {
             restoredEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.ProjectItemDeleted event) {
+        public void onDeleted(GitHubProjectEvent.ProjectItemDeleted event) {
             deletedEvents.add(event);
         }
 
         @EventListener
-        public void onConverted(DomainEvent.ProjectItemConverted event) {
+        public void onConverted(GitHubProjectEvent.ProjectItemConverted event) {
             convertedEvents.add(event);
         }
 
         @EventListener
-        public void onReordered(DomainEvent.ProjectItemReordered event) {
+        public void onReordered(GitHubProjectEvent.ProjectItemReordered event) {
             reorderedEvents.add(event);
         }
 
-        public List<DomainEvent.ProjectItemCreated> getCreatedEvents() {
+        public List<GitHubProjectEvent.ProjectItemCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.ProjectItemUpdated> getUpdatedEvents() {
+        public List<GitHubProjectEvent.ProjectItemUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.ProjectItemArchived> getArchivedEvents() {
+        public List<GitHubProjectEvent.ProjectItemArchived> getArchivedEvents() {
             return new ArrayList<>(archivedEvents);
         }
 
-        public List<DomainEvent.ProjectItemRestored> getRestoredEvents() {
+        public List<GitHubProjectEvent.ProjectItemRestored> getRestoredEvents() {
             return new ArrayList<>(restoredEvents);
         }
 
-        public List<DomainEvent.ProjectItemDeleted> getDeletedEvents() {
+        public List<GitHubProjectEvent.ProjectItemDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 
-        public List<DomainEvent.ProjectItemConverted> getConvertedEvents() {
+        public List<GitHubProjectEvent.ProjectItemConverted> getConvertedEvents() {
             return new ArrayList<>(convertedEvents);
         }
 
-        public List<DomainEvent.ProjectItemReordered> getReorderedEvents() {
+        public List<GitHubProjectEvent.ProjectItemReordered> getReorderedEvents() {
             return new ArrayList<>(reorderedEvents);
         }
 

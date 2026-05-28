@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -304,34 +304,34 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestMilestoneWebhookEventListener {
 
-        private final List<DomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.MilestoneCreated event) {
+        public void onCreated(ScmDomainEvent.MilestoneCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.MilestoneUpdated event) {
+        public void onUpdated(ScmDomainEvent.MilestoneUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.MilestoneDeleted event) {
+        public void onDeleted(ScmDomainEvent.MilestoneDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.MilestoneCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.MilestoneCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.MilestoneUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.MilestoneUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.MilestoneDeleted> getDeletedEvents() {
+        public List<ScmDomainEvent.MilestoneDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 

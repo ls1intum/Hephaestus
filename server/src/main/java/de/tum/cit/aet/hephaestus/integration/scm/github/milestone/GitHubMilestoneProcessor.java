@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.milestone;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -170,14 +170,14 @@ public class GitHubMilestoneProcessor {
 
         Milestone saved = milestoneRepository.save(milestone);
 
-        // Publish domain event with EventPayload DTO
-        EventPayload.MilestoneData milestoneData = EventPayload.MilestoneData.from(saved);
+        // Publish domain event with ScmEventPayload DTO
+        ScmEventPayload.MilestoneData milestoneData = ScmEventPayload.MilestoneData.from(saved);
         EventContext eventContext = EventContext.from(context);
         if (isNew) {
-            eventPublisher.publishEvent(new DomainEvent.MilestoneCreated(milestoneData, eventContext));
+            eventPublisher.publishEvent(new ScmDomainEvent.MilestoneCreated(milestoneData, eventContext));
             log.debug("Created milestone: milestoneId={}, milestoneNumber={}", saved.getId(), saved.getNumber());
         } else {
-            eventPublisher.publishEvent(new DomainEvent.MilestoneUpdated(milestoneData, eventContext));
+            eventPublisher.publishEvent(new ScmDomainEvent.MilestoneUpdated(milestoneData, eventContext));
             log.debug("Updated milestone: milestoneId={}, milestoneNumber={}", saved.getId(), saved.getNumber());
         }
 
@@ -236,7 +236,7 @@ public class GitHubMilestoneProcessor {
 
                 milestoneRepository.delete(milestone);
                 eventPublisher.publishEvent(
-                    new DomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context))
+                    new ScmDomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context))
                 );
                 log.info("Deleted milestone: milestoneId={}, milestoneNumber={}", milestoneId, milestone.getNumber());
             });

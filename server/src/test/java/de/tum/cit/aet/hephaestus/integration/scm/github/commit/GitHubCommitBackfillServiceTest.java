@@ -12,7 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
@@ -299,12 +299,12 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             service.backfillCommits(target, repo, 100L);
 
-            ArgumentCaptor<DomainEvent.CommitCreated> eventCaptor = ArgumentCaptor.forClass(
-                DomainEvent.CommitCreated.class
+            ArgumentCaptor<ScmDomainEvent.CommitCreated> eventCaptor = ArgumentCaptor.forClass(
+                ScmDomainEvent.CommitCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
 
-            DomainEvent.CommitCreated event = eventCaptor.getValue();
+            ScmDomainEvent.CommitCreated event = eventCaptor.getValue();
             assertThat(event.context().scopeId()).isEqualTo(100L);
         }
     }

@@ -9,29 +9,30 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationSuspensionTracker;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ProjectIntegrityHook;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GithubDataSyncService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
 import io.micrometer.common.util.StringUtils;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,15 +61,20 @@ public class WorkspaceRepositoryMonitorService {
     private final GitProviderRepository gitProviderRepository;
 
     // Services — natsConsumerService absent under webhook profile.
-    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
-    private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
+    private final org.springframework.beans.factory.ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final GitHubAppTokenService gitHubAppTokenService;
-    private final ProjectIntegrityService projectIntegrityService;
     private final GitRepositoryManager gitRepositoryManager;
 
-    // Lazy-loaded dependencies (to break circular references)
-    private final ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider;
+    /**
+     * Per-kind ports. The workspace module never imports a vendor-specific service —
+     * installation-bound operations dispatch by the workspace's bound kind. A missing
+     * impl for a given kind is treated as "this kind doesn't support installation-bound
+     * operations" (e.g. GitLab PAT) rather than an error.
+     */
+    private final Map<IntegrationKind, InstallationSuspensionTracker> suspensionTrackers;
+    private final Map<IntegrationKind, InstallationRepositoryEnumerator> installationEnumerators;
+    private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
+    private final List<ProjectIntegrityHook> projectIntegrityHooks;
 
     // Authoritative source for provider mode and credentials
     private final ConnectionService connectionService;
@@ -79,14 +85,14 @@ public class WorkspaceRepositoryMonitorService {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         GitProviderRepository gitProviderRepository,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
+        org.springframework.beans.factory.ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        GitHubAppTokenService gitHubAppTokenService,
-        ProjectIntegrityService projectIntegrityService,
         GitRepositoryManager gitRepositoryManager,
-        ObjectProvider<GithubDataSyncService> gitHubDataSyncServiceProvider,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        List<InstallationSuspensionTracker> suspensionTrackerList,
+        List<InstallationRepositoryEnumerator> installationEnumeratorList,
+        List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
+        List<ProjectIntegrityHook> projectIntegrityHookList
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -94,18 +100,29 @@ public class WorkspaceRepositoryMonitorService {
         this.repositoryRepository = repositoryRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.natsConsumerService = natsConsumerService;
-        this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.workspaceScopeFilter = workspaceScopeFilter;
-        this.gitHubAppTokenService = gitHubAppTokenService;
-        this.projectIntegrityService = projectIntegrityService;
         this.gitRepositoryManager = gitRepositoryManager;
-        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.connectionService = connectionService;
-    }
 
-    /** Lazy accessor for GithubDataSyncService to break circular dependency. */
-    private GithubDataSyncService getGitHubDataSyncService() {
-        return gitHubDataSyncServiceProvider.getObject();
+        Map<IntegrationKind, InstallationSuspensionTracker> suspensionMap = new EnumMap<>(IntegrationKind.class);
+        for (InstallationSuspensionTracker t : suspensionTrackerList) {
+            suspensionMap.put(t.kind(), t);
+        }
+        this.suspensionTrackers = suspensionMap;
+
+        Map<IntegrationKind, InstallationRepositoryEnumerator> enumeratorMap = new EnumMap<>(IntegrationKind.class);
+        for (InstallationRepositoryEnumerator e : installationEnumeratorList) {
+            enumeratorMap.put(e.kind(), e);
+        }
+        this.installationEnumerators = enumeratorMap;
+
+        Map<IntegrationKind, WorkspaceDataSyncTrigger> triggerMap = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceDataSyncTrigger t : dataSyncTriggerList) {
+            triggerMap.put(t.kind(), t);
+        }
+        this.dataSyncTriggers = triggerMap;
+
+        this.projectIntegrityHooks = List.copyOf(projectIntegrityHookList);
     }
 
     // ========================================================================
@@ -276,7 +293,9 @@ public class WorkspaceRepositoryMonitorService {
     ) {
         // Check if installation is suspended BEFORE adding repo monitor.
         // This prevents NATS replay from adding repos to suspended installations.
-        if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+        // Installation-bound suspension is a GitHub-App concept today; the GitLab kind
+        // does not register a tracker and the check short-circuits to "not suspended".
+        if (isInstallationSuspended(installationId)) {
             log.debug(
                 "Skipped repository monitor: reason=installationSuspended, installationId={}, repoName={}",
                 installationId,
@@ -426,7 +445,7 @@ public class WorkspaceRepositoryMonitorService {
     ) {
         // Check if installation is suspended BEFORE adding repos and triggering syncs.
         // This prevents NATS replay of old "created" events from triggering hundreds of failed syncs.
-        if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
+        if (isInstallationSuspended(installationId)) {
             log.info("Skipped repository enumeration: reason=installationSuspended, installationId={}", installationId);
             return;
         }
@@ -441,7 +460,16 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var snapshots = installationRepositoryEnumerator.enumerate(installationId);
+        InstallationRepositoryEnumerator enumerator = installationEnumerators.get(IntegrationKind.GITHUB);
+        if (enumerator == null) {
+            log.debug(
+                "Skipped repository enumeration: reason=noEnumeratorForKind, installationId={}, kind={}",
+                installationId,
+                IntegrationKind.GITHUB
+            );
+            return;
+        }
+        var snapshots = enumerator.enumerate(installationId);
         if (snapshots.isEmpty()) {
             log.warn(
                 "Skipped repository enumeration: reason=noDataReturned, installationId={}, workspaceSlug={}",
@@ -452,7 +480,7 @@ public class WorkspaceRepositoryMonitorService {
         }
 
         // Filter snapshots BEFORE processing to avoid creating Repository entities for filtered repos
-        List<GitHubInstallationRepositoryEnumerationService.InstallationRepositorySnapshot> allowedSnapshots = snapshots
+        List<InstallationRepositoryEnumerator.InstallationRepository> allowedSnapshots = snapshots
             .stream()
             .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
             .toList();
@@ -561,15 +589,20 @@ public class WorkspaceRepositoryMonitorService {
                 // Clean up local git clone before deleting the DB entity
                 gitRepositoryManager.deleteClone(repoId);
 
-                // Cascade delete projects owned by this repository BEFORE deleting the repository
-                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
-                if (deletedProjects > 0) {
-                    log.debug(
-                        "Cascade deleted projects for orphaned repository: repoId={}, repoName={}, projectCount={}",
-                        repoId,
-                        LoggingUtils.sanitizeForLog(nameWithOwner),
-                        deletedProjects
-                    );
+                // Cascade-delete vendor-specific dependents (e.g. GitHub Projects v2 rows)
+                // BEFORE deleting the repository — broadcast across registered hooks. Each
+                // adapter owns the cleanup for its own tables; hooks for kinds with no
+                // dependents are simply no-ops.
+                for (ProjectIntegrityHook hook : projectIntegrityHooks) {
+                    int deletedProjects = hook.cascadeDeleteForRepository(repoId);
+                    if (deletedProjects > 0) {
+                        log.debug(
+                            "Cascade deleted projects for orphaned repository: repoId={}, repoName={}, projectCount={}",
+                            repoId,
+                            LoggingUtils.sanitizeForLog(nameWithOwner),
+                            deletedProjects
+                        );
+                    }
                 }
 
                 repositoryRepository.delete(repository);
@@ -607,9 +640,24 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
         if (repositoryAllowed) {
-            getGitHubDataSyncService().syncSyncTargetAsync(
-                SyncTargetFactory.create(workspace, monitor, connectionService)
-            );
+            // Sync the just-persisted target through the bound kind's trigger. We pass
+            // the freshly-saved monitor's id; the trigger looks it up via the SyncTargetProvider
+            // and dispatches asynchronously. Falls back to a debug log when no trigger is
+            // registered for the active kind (e.g. PAT-only deployments without sync wiring).
+            connectionService
+                .findActiveProviderKind(workspace.getId())
+                .ifPresent(kind -> {
+                    WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
+                    if (trigger != null) {
+                        trigger.syncSingleSyncTarget(monitor.getId());
+                    } else {
+                        log.debug(
+                            "Skipped single-target sync: reason=noTriggerForKind, repoName={}, kind={}",
+                            LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()),
+                            kind
+                        );
+                    }
+                });
         } else {
             log.debug(
                 "Persisted repository without sync: reason=filteredByScope, repoName={}",
@@ -737,6 +785,22 @@ public class WorkspaceRepositoryMonitorService {
             throw new IllegalArgumentException("Workspace context slug must not be blank.");
         }
         return slug;
+    }
+
+    /**
+     * Dispatches the installation-suspension check across kind-specific trackers.
+     *
+     * <p>Today only the GitHub adapter contributes an impl. If a future kind also exposes
+     * an installation-suspension concept, its tracker will participate without changes
+     * here — short-circuit on the first {@code true} result.
+     */
+    private boolean isInstallationSuspended(long installationId) {
+        for (InstallationSuspensionTracker t : suspensionTrackers.values()) {
+            if (t.isInstallationMarkedSuspended(installationId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Workspace is bound to a GitHub App installation (vs GitHub PAT or GitLab PAT). */

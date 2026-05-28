@@ -4,21 +4,22 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -56,8 +57,16 @@ public class PullRequestContentProvider implements ContentProvider {
     private final ContributorHistoryProvider contributorHistoryProvider;
     private final GitDiffOperations gitDiffOperations;
 
-    @Nullable
-    private final GitLabTokenService gitLabTokenService;
+    /**
+     * SCM token sources keyed by integration kind. Collected via constructor injection so
+     * adding a new SCM (Bitbucket etc.) is a matter of registering a new {@link ScmTokenSource}
+     * bean — this class never has to learn the new kind.
+     *
+     * <p>Pre-fetch only fires when a token source is available for the workspace's bound kind;
+     * stale repos under workspaces with no active SCM connection still get diffed against the
+     * cached clone, just without a network refresh.
+     */
+    private final Map<IntegrationKind, ScmTokenSource> tokenSources;
 
     public PullRequestContentProvider(
         ObjectMapper objectMapper,
@@ -66,7 +75,7 @@ public class PullRequestContentProvider implements ContentProvider {
         PullRequestReviewCommentRepository reviewCommentRepository,
         ContributorHistoryProvider contributorHistoryProvider,
         GitDiffOperations gitDiffOperations,
-        @Autowired(required = false) @Nullable GitLabTokenService gitLabTokenService
+        List<ScmTokenSource> tokenSourceList
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -74,7 +83,11 @@ public class PullRequestContentProvider implements ContentProvider {
         this.reviewCommentRepository = reviewCommentRepository;
         this.contributorHistoryProvider = contributorHistoryProvider;
         this.gitDiffOperations = gitDiffOperations;
-        this.gitLabTokenService = gitLabTokenService;
+        Map<IntegrationKind, ScmTokenSource> map = new EnumMap<>(IntegrationKind.class);
+        for (ScmTokenSource src : tokenSourceList) {
+            map.put(src.kind(), src);
+        }
+        this.tokenSources = map;
     }
 
     @Override
@@ -135,10 +148,14 @@ public class PullRequestContentProvider implements ContentProvider {
         boolean fetched = false;
         try {
             var workspace = job.getWorkspace();
-            if (workspace != null && gitLabTokenService != null) {
+            // The pre-diff fetch only makes sense for kinds that expose a deterministic
+            // clone URL the agent can derive from {serverUrl, repository_full_name}. Today
+            // that's GitLab; GitHub historical fetches go through GithubDataSyncService instead.
+            ScmTokenSource gitlabSource = workspace == null ? null : tokenSources.get(IntegrationKind.GITLAB);
+            if (gitlabSource != null) {
                 Long scopeId = workspace.getId();
-                String serverUrl = gitLabTokenService.resolveServerUrl(scopeId);
-                String token = gitLabTokenService.getAccessToken(scopeId);
+                String serverUrl = gitlabSource.serverUrl(scopeId).orElse(null);
+                String token = gitlabSource.accessToken(scopeId).orElse(null);
                 JsonNode metadata = job.getMetadata();
                 String repoFullName =
                     metadata != null && metadata.has("repository_full_name")

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
+import de.tum.cit.aet.hephaestus.activity.spi.ActivityRecorder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -36,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><strong>Do NOT expose this service to controllers or REST endpoints.</strong>
  * All event recording flows through the listener pattern:
  * <pre>
- * Authenticated Webhook → MessageHandler → DomainEvent → ActivityEventListener → ActivityEventService
+ * Authenticated Webhook → MessageHandler → ScmDomainEvent → ActivityEventListener → ActivityEventService
  * </pre>
  *
  * <p>If authorization is needed in the future (e.g., manual event injection),
@@ -46,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Slf4j
 @Service
-public class ActivityEventService {
+public class ActivityEventService implements ActivityRecorder {
 
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -113,6 +114,7 @@ public class ActivityEventService {
      *   <li>Workspace not found (logs warning, does not throw)</li>
      * </ul>
      */
+    @Override
     @Transactional
     @Observed(name = "activity.record", contextualName = "record-activity-event")
     public boolean record(
@@ -233,6 +235,7 @@ public class ActivityEventService {
      * @param targetId    the ID of the deleted entity
      * @return true if recorded successfully, false otherwise
      */
+    @Override
     @Transactional
     @Observed(name = "activity.record.deleted", contextualName = "record-deleted-activity-event")
     public boolean recordDeleted(

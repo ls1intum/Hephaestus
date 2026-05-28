@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -180,8 +180,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             .ifPresent(review -> {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
-                EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
+                ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
                 );
                 log.debug("Dismissed review: nativeId={}", reviewNativeId);
             });
@@ -218,9 +218,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
         }
         PullRequestReview saved = reviewRepository.save(review);
-        EventPayload.ReviewData.from(saved).ifPresent(reviewData ->
+        ScmEventPayload.ReviewData.from(saved).ifPresent(reviewData ->
             eventPublisher.publishEvent(
-                new DomainEvent.ReviewEdited(reviewData, Set.of("body", "state"), EventContext.from(context))
+                new ScmDomainEvent.ReviewEdited(reviewData, Set.of("body", "state"), EventContext.from(context))
             )
         );
         log.debug("Updated review: reviewId={}", dto.id());
@@ -263,7 +263,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         }
 
         PullRequestReview saved = reviewRepository.save(review);
-        var reviewDataOpt = EventPayload.ReviewData.from(saved);
+        var reviewDataOpt = ScmEventPayload.ReviewData.from(saved);
         if (reviewDataOpt.isPresent()) {
             var reviewData = reviewDataOpt.get();
             log.info(
@@ -274,7 +274,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
                 reviewData.authorId(),
                 reviewData.repositoryId()
             );
-            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)));
+            eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)));
         } else {
             log.warn(
                 "ReviewData.from() returned empty - no event published: reviewId={}, prId={}, prIsNull={}",

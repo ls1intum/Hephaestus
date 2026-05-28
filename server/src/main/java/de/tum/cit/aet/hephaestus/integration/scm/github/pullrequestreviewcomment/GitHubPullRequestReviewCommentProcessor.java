@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -187,8 +187,8 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         PullRequestReviewComment saved = commentRepository.save(comment);
         eventPublisher.publishEvent(
-            new DomainEvent.ReviewCommentCreated(
-                EventPayload.ReviewCommentData.from(saved),
+            new ScmDomainEvent.ReviewCommentCreated(
+                ScmEventPayload.ReviewCommentData.from(saved),
                 pr.getId(),
                 EventContext.from(context)
             )
@@ -210,8 +210,8 @@ public class GitHubPullRequestReviewCommentProcessor {
                 comment.setUpdatedAt(dto.updatedAt());
                 PullRequestReviewComment saved = commentRepository.save(comment);
                 eventPublisher.publishEvent(
-                    new DomainEvent.ReviewCommentEdited(
-                        EventPayload.ReviewCommentData.from(saved),
+                    new ScmDomainEvent.ReviewCommentEdited(
+                        ScmEventPayload.ReviewCommentData.from(saved),
                         prId,
                         Set.of("body"),
                         EventContext.from(context)
@@ -251,7 +251,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 );
             });
 
-        eventPublisher.publishEvent(new DomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context)));
+        eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentDeleted(commentId, prId, EventContext.from(context)));
     }
 
     private PullRequestReviewComment createComment(

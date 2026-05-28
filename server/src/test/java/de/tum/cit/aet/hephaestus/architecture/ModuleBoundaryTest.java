@@ -449,19 +449,28 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
             // featureModulesDoNotBypassScmSpis for the broader rationale.
             //
             // Equivalent to: no feature-module class may depend on a class that is
-            // in ..integration.scm.github.. AND not in ..integration.scm.github.project..
+            // in ..integration.scm.github.. AND not in {..integration.scm.github.project..,
+            // ..integration.scm.github.events..}.
+            //
+            // The events subpackage carries GitHub-specific event payloads (Project v2 events
+            // among them) that the activity log consumes verbatim — keeping the listener
+            // outside activity would create a platform→activity cycle (see ArchitectureTest
+            // noCyclesBetweenModules). The pragmatic exemption: events are data-only records,
+            // they can't bypass an SPI because they don't have one.
             ArchRule rule = noClasses()
                 .that()
                 .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
                 .should()
                 .dependOnClassesThat(
                     com.tngtech.archunit.base.DescribedPredicate.describe(
-                        "reside in ..integration.scm.github.. but not ..integration.scm.github.project..",
+                        "reside in ..integration.scm.github.. but not ..integration.scm.github.project.. " +
+                            "and not ..integration.scm.github.events..",
                         cls -> {
                             String pkg = cls.getPackageName();
                             return (
                                 pkg.contains(".integration.scm.github") &&
-                                !pkg.contains(".integration.scm.github.project")
+                                !pkg.contains(".integration.scm.github.project") &&
+                                !pkg.contains(".integration.scm.github.events")
                             );
                         }
                     )

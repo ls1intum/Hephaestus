@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import java.util.Objects;
 
 /**
  * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#PULL_REQUEST_REVIEW}
  * jobs.
  *
- * <p>Combines the async-safe {@link EventPayload.PullRequestData} snapshot with branch
+ * <p>Combines the async-safe {@link ScmEventPayload.PullRequestData} snapshot with branch
  * information not present on that DTO. The event listener (issue #746) constructs this
  * from the {@code PullRequest} entity before it detaches.
  *
@@ -18,7 +18,7 @@ import java.util.Objects;
  * @param baseRefName target branch name (e.g. {@code "main"})
  */
 public record PullRequestReviewSubmissionRequest(
-    EventPayload.PullRequestData pullRequest,
+    ScmEventPayload.PullRequestData pullRequest,
     String headRefName,
     String headRefOid,
     String baseRefName

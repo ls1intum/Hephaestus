@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceInitializationHook;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -13,7 +14,9 @@ import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.exception.*;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -71,8 +74,13 @@ public class WorkspaceService {
     private final WorkspaceSettingsService workspaceSettingsService;
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService;
     private final ConnectionService connectionService;
+
+    /**
+     * Per-kind post-create initialization hooks (currently: GitLab discovery). Dispatched
+     * after the workspace row commits so async vendor flows can find the row in the DB.
+     */
+    private final Map<IntegrationKind, WorkspaceInitializationHook> initializationHooks;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
@@ -81,8 +89,8 @@ public class WorkspaceService {
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService,
-        GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        List<WorkspaceInitializationHook> initializationHookList
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -90,8 +98,12 @@ public class WorkspaceService {
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.gitLabWorkspaceInitializationService = gitLabWorkspaceInitializationService;
         this.connectionService = connectionService;
+        Map<IntegrationKind, WorkspaceInitializationHook> map = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceInitializationHook h : initializationHookList) {
+            map.put(h.kind(), h);
+        }
+        this.initializationHooks = map;
     }
 
     // ========================================================================
@@ -242,11 +254,13 @@ public class WorkspaceService {
     public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
         Workspace workspace = createWorkspace(request);
 
-        // Trigger async repository discovery for GitLab PAT workspaces.
-        // The @Transactional createWorkspace() has already committed at this point,
-        // so the async thread will find the workspace in the database.
-        if (request.kind() == IntegrationKind.GITLAB) {
-            gitLabWorkspaceInitializationService.initializeAsync(workspace.getId());
+        // Trigger async vendor-specific initialization (e.g. GitLab group discovery + webhook
+        // setup). The @Transactional createWorkspace() has already committed by the time we
+        // dispatch, so the async thread can find the workspace. Hooks are kind-keyed so
+        // adding a new SCM is a matter of registering an impl, not editing this class.
+        WorkspaceInitializationHook hook = initializationHooks.get(request.kind());
+        if (hook != null) {
+            hook.initializeAsync(workspace.getId());
         }
 
         return workspace;

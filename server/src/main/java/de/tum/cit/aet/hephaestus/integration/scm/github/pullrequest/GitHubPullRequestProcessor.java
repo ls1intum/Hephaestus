@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -251,18 +251,18 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // because the entity was an Issue, not a PullRequest, so computeChangedFields would crash.
         if (isNew || promotedFromIssue) {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+                new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
 
             // Emit lifecycle events for PRs that arrived already in a terminal state during sync.
             // Skipped when called from processClosed() which emits its own events.
             if (emitLifecycleOnCreate && (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED)) {
-                EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+                ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
                 EventContext eventContext = EventContext.from(context);
-                eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, pr.isMerged(), eventContext));
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestClosed(prData, pr.isMerged(), eventContext));
                 if (pr.isMerged()) {
-                    eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventContext));
+                    eventPublisher.publishEvent(new ScmDomainEvent.PullRequestMerged(prData, eventContext));
                 }
                 log.debug(
                     "Emitted lifecycle events for already-terminal PR: prId={}, merged={}",
@@ -277,8 +277,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                     changedFields.add("relationships");
                 }
                 eventPublisher.publishEvent(
-                    new DomainEvent.PullRequestUpdated(
-                        EventPayload.PullRequestData.from(pr),
+                    new ScmDomainEvent.PullRequestUpdated(
+                        ScmEventPayload.PullRequestData.from(pr),
                         changedFields,
                         EventContext.from(context)
                     )
@@ -359,13 +359,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processClosed(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = processInternal(dto, context, false);
         boolean wasMerged = dto.isMerged();
-        EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+        ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
         EventContext eventContext = EventContext.from(context);
 
-        eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, wasMerged, eventContext));
+        eventPublisher.publishEvent(new ScmDomainEvent.PullRequestClosed(prData, wasMerged, eventContext));
 
         if (wasMerged) {
-            eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventContext));
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestMerged(prData, eventContext));
             log.info("Merged pull request: prId={}, prNumber={}", pr.getId(), pr.getNumber());
         } else {
             log.debug("Closed pull request: prId={}, merged=false", pr.getId());
@@ -381,7 +381,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processReopened(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
         eventPublisher.publishEvent(
-            new DomainEvent.PullRequestReopened(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+            new ScmDomainEvent.PullRequestReopened(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
         log.debug("Reopened pull request: prId={}", pr.getId());
         return pr;
@@ -394,7 +394,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processReadyForReview(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
         eventPublisher.publishEvent(
-            new DomainEvent.PullRequestReady(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+            new ScmDomainEvent.PullRequestReady(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
         log.debug("Marked pull request ready for review: prId={}", pr.getId());
         return pr;
@@ -407,7 +407,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processConvertedToDraft(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
         eventPublisher.publishEvent(
-            new DomainEvent.PullRequestDrafted(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+            new ScmDomainEvent.PullRequestDrafted(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
         log.debug("Converted pull request to draft: prId={}", pr.getId());
         return pr;
@@ -420,7 +420,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     public PullRequest processSynchronize(GitHubPullRequestDTO dto, ProcessingContext context) {
         PullRequest pr = process(dto, context);
         eventPublisher.publishEvent(
-            new DomainEvent.PullRequestSynchronized(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+            new ScmDomainEvent.PullRequestSynchronized(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
         );
         log.debug("Synchronized pull request: prId={}", pr.getId());
         return pr;
@@ -435,9 +435,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestLabeled(
-                    EventPayload.PullRequestData.from(pr),
-                    EventPayload.LabelData.from(label),
+                new ScmDomainEvent.PullRequestLabeled(
+                    ScmEventPayload.PullRequestData.from(pr),
+                    ScmEventPayload.LabelData.from(label),
                     EventContext.from(context)
                 )
             );
@@ -455,9 +455,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         Label label = findOrCreateLabel(labelDto, context.repository());
         if (label != null) {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestUnlabeled(
-                    EventPayload.PullRequestData.from(pr),
-                    EventPayload.LabelData.from(label),
+                new ScmDomainEvent.PullRequestUnlabeled(
+                    ScmEventPayload.PullRequestData.from(pr),
+                    ScmEventPayload.LabelData.from(label),
                     EventContext.from(context)
                 )
             );
@@ -540,7 +540,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // Publish CommitCreated event for newly created merge commits
         if (isNew && commitOpt.isPresent()) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommitCreated(EventPayload.CommitData.from(commitOpt.get()), EventContext.from(context))
+                new ScmDomainEvent.CommitCreated(ScmEventPayload.CommitData.from(commitOpt.get()), EventContext.from(context))
             );
         }
 

@@ -11,16 +11,14 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Duration;
-import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -45,51 +43,49 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
-    private final GithubLifecycleListener githubLifecycleListener;
-    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
-    private final GitHubAppTokenService gitHubAppTokenService;
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final GitLabProperties gitLabProperties;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
     private final ConnectionService connectionService;
     private final WebClient webClient;
+
+    /**
+     * Per-kind availability providers — used to derive default server URLs for PAT
+     * bootstrap without binding to a specific vendor's {@code Properties} bean. The
+     * workspace module never has to know which vendor owns which property prefix.
+     */
+    private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
-        GithubLifecycleListener githubLifecycleListener,
-        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
-        GitHubAppTokenService gitHubAppTokenService,
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceScopeFilter workspaceScopeFilter,
-        GitLabProperties gitLabProperties,
         AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        List<WorkspaceProviderAvailability> providerAvailabilityList
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceService = workspaceService;
-        this.githubLifecycleListener = githubLifecycleListener;
-        this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
-        this.gitHubAppTokenService = gitHubAppTokenService;
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.workspaceScopeFilter = workspaceScopeFilter;
-        this.gitLabProperties = gitLabProperties;
         this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
         this.connectionService = connectionService;
+        Map<IntegrationKind, WorkspaceProviderAvailability> map = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceProviderAvailability a : providerAvailabilityList) {
+            map.put(a.kind(), a);
+        }
+        this.providerAvailability = map;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -339,14 +335,32 @@ public class WorkspaceProvisioningService {
 
     /**
      * Resolves the GitLab server URL from the workspace config or falls back to the
-     * global default from {@link GitLabProperties}.
+     * global default exposed via {@link WorkspaceProviderAvailability}.
+     *
+     * <p>The availability port exposes the same URL the wizard would show — that URL is the
+     * one configured under {@code hephaestus.gitlab.default-server-url} (the historical
+     * single source of truth). When availability is unset (feature flag off), throws —
+     * bootstrap of a GitLab workspace cannot proceed without one.
      */
     private String resolveGitLabServerUrl(String configServerUrl) {
         if (!isBlank(configServerUrl)) {
             String url = configServerUrl.trim();
             return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         }
-        return gitLabProperties.defaultServerUrl();
+        WorkspaceProviderAvailability gitLabAvailability = providerAvailability.get(IntegrationKind.GITLAB);
+        if (gitLabAvailability == null) {
+            throw new IllegalStateException(
+                "GitLab provider availability port is not configured; cannot resolve default GitLab server URL"
+            );
+        }
+        return gitLabAvailability
+            .connectionHint()
+            .map(WorkspaceProviderAvailability.ConnectionHint::hintUrl)
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitLab provider availability has no connection hint; default server URL unavailable"
+                )
+            );
     }
 
     /**
@@ -531,177 +545,8 @@ public class WorkspaceProvisioningService {
             });
     }
 
-    /**
-     * Enumerates GitHub App installations and ensures each has a corresponding workspace.
-     * <p>
-     * Intentionally NOT {@code @Transactional}: each installation is provisioned
-     * in its own transaction so that a failure in one does not roll back others.
-     */
-    public void ensureGitHubAppInstallations() {
-        if (!gitHubAppTokenService.isConfigured()) {
-            log.info(
-                "Skipped GitHub App installation processing: reason=credentialsNotConfigured, appId={}",
-                gitHubAppTokenService.getConfiguredAppId()
-            );
-            return;
-        }
-
-        try {
-            String appJwt = gitHubAppTokenService.generateAppJWT();
-
-            // Get app info
-            AppInfoResponse appInfo = webClient
-                .get()
-                .uri("/app")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToMono(AppInfoResponse.class)
-                .block();
-
-            if (appInfo == null) {
-                log.warn("Skipped GitHub App processing: reason=nullAppInfoResponse");
-                return;
-            }
-
-            String ownerLogin = appInfo.owner() != null ? appInfo.owner().login() : "unknown";
-            log.info(
-                "Authenticated as GitHub App: appName={}, appSlug={}, appId={}, ownerLogin={}",
-                appInfo.name(),
-                appInfo.slug(),
-                appInfo.id(),
-                ownerLogin
-            );
-
-            // List installations
-            List<InstallationDto> installations = webClient
-                .get()
-                .uri("/app/installations")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToFlux(InstallationDto.class)
-                .collectList()
-                .block();
-
-            if (installations == null || installations.isEmpty()) {
-                log.warn(
-                    "Skipped GitHub App processing: reason=noInstallations, appSlug={}, appId={}",
-                    appInfo.slug(),
-                    appInfo.id()
-                );
-                return;
-            }
-
-            log.info(
-                "Ensured GitHub App installations reflected as workspaces: installationCount={}",
-                installations.size()
-            );
-
-            for (InstallationDto installation : installations) {
-                String accountLogin = installation.account() != null ? installation.account().login() : "<unknown>";
-                log.info(
-                    "Processed GitHub App installation: installationId={}, accountLogin={}, selection={}",
-                    installation.id(),
-                    accountLogin,
-                    installation.repositorySelection()
-                );
-                synchronizeInstallation(installation);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to reconcile GitHub App installations: reason=apiError", e);
-        }
-    }
-
-    private void synchronizeInstallation(InstallationDto installation) {
-        if (installation.account() == null) {
-            log.warn("Skipped installation sync: reason=noAccountInfo, installationId={}", installation.id());
-            return;
-        }
-
-        // Check if installation is suspended - don't waste cycles on suspended installations
-        if (installation.suspendedAt() != null) {
-            log.info("Skipped installation sync: reason=suspended, installationId={}", installation.id());
-            gitHubAppTokenService.markInstallationSuspended(installation.id());
-            // If workspace exists, ensure it's marked suspended
-            workspaceRepository
-                .findByInstallationId(installation.id())
-                .ifPresent(ws -> {
-                    if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
-                        githubLifecycleListener.updateWorkspaceStatus(
-                            installation.id(),
-                            Workspace.WorkspaceStatus.SUSPENDED
-                        );
-                    }
-                });
-            return;
-        }
-        // Mark active in memory for fast fail-fast checks
-        gitHubAppTokenService.markInstallationActive(installation.id());
-
-        String login = installation.account().login();
-
-        if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
-            log.info(
-                "Skipped installation sync: reason=filteredByScope, installationId={}, accountLogin={}",
-                installation.id(),
-                login
-            );
-            return;
-        }
-
-        String accountType = installation.account().type();
-        long installationId = installation.id();
-        RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
-
-        log.info(
-            "Ensured installation workspace: installationId={}, orgLogin={}, selection={}",
-            installationId,
-            login,
-            selection
-        );
-
-        var account = installation.account();
-        IntegrationLifecycleListener.AccountKind wsAccountKind = "Organization".equalsIgnoreCase(accountType)
-            ? IntegrationLifecycleListener.AccountKind.ORGANIZATION
-            : IntegrationLifecycleListener.AccountKind.USER;
-
-        Workspace workspace = githubLifecycleListener.createOrUpdateFromInstallation(
-            installationId,
-            account.id(),
-            login,
-            wsAccountKind,
-            account.avatarUrl(),
-            selection
-        );
-
-        if (workspace == null) {
-            log.warn(
-                "Skipped workspace creation: reason=userNotFound, installationId={}, orgLogin={}",
-                installationId,
-                login
-            );
-            return;
-        }
-
-        workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
-
-        log.info("Configured organization sync via webhooks: workspaceSlug={}", workspace.getWorkspaceSlug());
-
-        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, null, true);
-    }
-
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private RepositorySelection convertRepositorySelection(String selection) {
-        if (selection == null) {
-            return null;
-        }
-        return switch (selection.toLowerCase()) {
-            case "all" -> RepositorySelection.ALL;
-            case "selected" -> RepositorySelection.SELECTED;
-            default -> null;
-        };
     }
 
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
@@ -769,21 +614,6 @@ public class WorkspaceProvisioningService {
         @JsonProperty("avatar_url") String avatarUrl,
         @JsonProperty("html_url") String htmlUrl
     ) {}
-
-    // ============ DTOs for GitHub REST API ============
-
-    private record AppInfoResponse(long id, String name, String slug, OwnerDto owner) {}
-
-    private record OwnerDto(String login) {}
-
-    private record InstallationDto(
-        long id,
-        AccountDto account,
-        @JsonProperty("repository_selection") String repositorySelection,
-        @JsonProperty("suspended_at") Instant suspendedAt
-    ) {}
-
-    private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
 
     // ============ DTOs for GitLab REST API ============
 

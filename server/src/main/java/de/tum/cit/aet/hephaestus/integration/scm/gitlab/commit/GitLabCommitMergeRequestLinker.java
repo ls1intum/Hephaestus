@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
@@ -696,7 +696,7 @@ public class GitLabCommitMergeRequestLinker {
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         if (commitAuthorRowsUpdated > 0) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommitAuthorsReconciled(
+                new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
                     EventContext.forSync(scopeId, RepositoryRef.from(repository), GitProviderType.GITLAB)
                 )

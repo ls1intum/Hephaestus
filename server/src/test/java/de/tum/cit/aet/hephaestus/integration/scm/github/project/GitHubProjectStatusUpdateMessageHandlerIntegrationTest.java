@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -253,34 +256,34 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     @Component
     static class TestStatusUpdateEventListener {
 
-        private final List<DomainEvent.ProjectStatusUpdateCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectStatusUpdateUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.ProjectStatusUpdateDeleted> deletedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectStatusUpdateCreated> createdEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectStatusUpdateUpdated> updatedEvents = new ArrayList<>();
+        private final List<GitHubProjectEvent.ProjectStatusUpdateDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.ProjectStatusUpdateCreated event) {
+        public void onCreated(GitHubProjectEvent.ProjectStatusUpdateCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.ProjectStatusUpdateUpdated event) {
+        public void onUpdated(GitHubProjectEvent.ProjectStatusUpdateUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.ProjectStatusUpdateDeleted event) {
+        public void onDeleted(GitHubProjectEvent.ProjectStatusUpdateDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.ProjectStatusUpdateCreated> getCreatedEvents() {
+        public List<GitHubProjectEvent.ProjectStatusUpdateCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.ProjectStatusUpdateUpdated> getUpdatedEvents() {
+        public List<GitHubProjectEvent.ProjectStatusUpdateUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.ProjectStatusUpdateDeleted> getDeletedEvents() {
+        public List<GitHubProjectEvent.ProjectStatusUpdateDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 

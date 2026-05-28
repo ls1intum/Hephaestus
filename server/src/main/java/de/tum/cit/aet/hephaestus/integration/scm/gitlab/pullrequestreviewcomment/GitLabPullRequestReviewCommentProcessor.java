@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcommen
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -178,8 +178,8 @@ public class GitLabPullRequestReviewCommentProcessor {
             log.debug("Updated diff note: nativeId={}", existing.getNativeId());
 
             eventPublisher.publishEvent(
-                new DomainEvent.ReviewCommentEdited(
-                    EventPayload.ReviewCommentData.from(existing),
+                new ScmDomainEvent.ReviewCommentEdited(
+                    ScmEventPayload.ReviewCommentData.from(existing),
                     pr.getId(),
                     changedFields,
                     createSyncContext(pr, scopeId)
@@ -251,8 +251,8 @@ public class GitLabPullRequestReviewCommentProcessor {
         log.debug("Created diff note: nativeId={}, path={}, line={}", nativeId, path, data.newLine());
 
         eventPublisher.publishEvent(
-            new DomainEvent.ReviewCommentCreated(
-                EventPayload.ReviewCommentData.from(saved),
+            new ScmDomainEvent.ReviewCommentCreated(
+                ScmEventPayload.ReviewCommentData.from(saved),
                 context.pr().getId(),
                 createSyncContext(context.pr(), context.scopeId())
             )

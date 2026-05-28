@@ -24,7 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSync
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryNameParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubTransportErrors;
+import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryCollaboratorConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryCollaboratorEdge;
@@ -148,7 +148,7 @@ public class GitHubCollaboratorSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(GitHubTransportErrors::isTransportError)
+                            .filter(ScmTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying after transport error: context=collaboratorSync, repoName={}, page={}, attempt={}, error={}",

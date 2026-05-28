@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,7 +13,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -391,8 +394,8 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             verify(issueRepository, never()).existsById(any());
 
             // Verify created event was published
-            ArgumentCaptor<DomainEvent.ProjectItemCreated> eventCaptor = ArgumentCaptor.forClass(
-                DomainEvent.ProjectItemCreated.class
+            ArgumentCaptor<GitHubProjectEvent.ProjectItemCreated> eventCaptor = ArgumentCaptor.forClass(
+                GitHubProjectEvent.ProjectItemCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue().projectId()).isEqualTo(PROJECT_ID);
@@ -698,11 +701,11 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             processor.process(dto, project, context);
 
-            ArgumentCaptor<DomainEvent.ProjectItemCreated> captor = ArgumentCaptor.forClass(
-                DomainEvent.ProjectItemCreated.class
+            ArgumentCaptor<GitHubProjectEvent.ProjectItemCreated> captor = ArgumentCaptor.forClass(
+                GitHubProjectEvent.ProjectItemCreated.class
             );
             verify(eventPublisher).publishEvent(captor.capture());
-            DomainEvent.ProjectItemCreated event = captor.getValue();
+            GitHubProjectEvent.ProjectItemCreated event = captor.getValue();
             assertThat(event.projectId()).isEqualTo(PROJECT_ID);
             assertThat(event.item().id()).isEqualTo(ITEM_DB_ID);
             assertThat(event.item().contentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
@@ -716,11 +719,11 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             processor.process(dto, project, context);
 
-            ArgumentCaptor<DomainEvent.ProjectItemUpdated> captor = ArgumentCaptor.forClass(
-                DomainEvent.ProjectItemUpdated.class
+            ArgumentCaptor<GitHubProjectEvent.ProjectItemUpdated> captor = ArgumentCaptor.forClass(
+                GitHubProjectEvent.ProjectItemUpdated.class
             );
             verify(eventPublisher).publishEvent(captor.capture());
-            DomainEvent.ProjectItemUpdated event = captor.getValue();
+            GitHubProjectEvent.ProjectItemUpdated event = captor.getValue();
             assertThat(event.projectId()).isEqualTo(PROJECT_ID);
             assertThat(event.item().id()).isEqualTo(ITEM_DB_ID);
         }
@@ -1042,10 +1045,10 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             List<Object> events = eventCaptor.getAllValues();
             assertThat(events).hasSize(2);
-            assertThat(events.get(0)).isInstanceOf(DomainEvent.ProjectItemUpdated.class);
-            assertThat(events.get(1)).isInstanceOf(DomainEvent.ProjectItemArchived.class);
+            assertThat(events.get(0)).isInstanceOf(GitHubProjectEvent.ProjectItemUpdated.class);
+            assertThat(events.get(1)).isInstanceOf(GitHubProjectEvent.ProjectItemArchived.class);
 
-            DomainEvent.ProjectItemArchived archivedEvent = (DomainEvent.ProjectItemArchived) events.get(1);
+            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) events.get(1);
             assertThat(archivedEvent.projectId()).isEqualTo(PROJECT_ID);
             assertThat(archivedEvent.item().id()).isEqualTo(ITEM_DB_ID);
         }
@@ -1056,7 +1059,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.processArchived(null, project, context);
 
             assertThat(result).isNull();
-            verify(eventPublisher, never()).publishEvent(any(DomainEvent.ProjectItemArchived.class));
+            verify(eventPublisher, never()).publishEvent(any(GitHubProjectEvent.ProjectItemArchived.class));
         }
 
         @Test
@@ -1073,7 +1076,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
 
-            DomainEvent.ProjectItemArchived archivedEvent = (DomainEvent.ProjectItemArchived) eventCaptor
+            GitHubProjectEvent.ProjectItemArchived archivedEvent = (GitHubProjectEvent.ProjectItemArchived) eventCaptor
                 .getAllValues()
                 .get(1);
             assertThat(archivedEvent.item().actorId()).isEqualTo(actorId);
@@ -1140,10 +1143,10 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             List<Object> events = eventCaptor.getAllValues();
             assertThat(events).hasSize(2);
-            assertThat(events.get(0)).isInstanceOf(DomainEvent.ProjectItemUpdated.class);
-            assertThat(events.get(1)).isInstanceOf(DomainEvent.ProjectItemRestored.class);
+            assertThat(events.get(0)).isInstanceOf(GitHubProjectEvent.ProjectItemUpdated.class);
+            assertThat(events.get(1)).isInstanceOf(GitHubProjectEvent.ProjectItemRestored.class);
 
-            DomainEvent.ProjectItemRestored restoredEvent = (DomainEvent.ProjectItemRestored) events.get(1);
+            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) events.get(1);
             assertThat(restoredEvent.projectId()).isEqualTo(PROJECT_ID);
             assertThat(restoredEvent.item().id()).isEqualTo(ITEM_DB_ID);
         }
@@ -1154,7 +1157,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ProjectItem result = processor.processRestored(null, project, context);
 
             assertThat(result).isNull();
-            verify(eventPublisher, never()).publishEvent(any(DomainEvent.ProjectItemRestored.class));
+            verify(eventPublisher, never()).publishEvent(any(GitHubProjectEvent.ProjectItemRestored.class));
         }
 
         @Test
@@ -1170,7 +1173,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, org.mockito.Mockito.times(2)).publishEvent(eventCaptor.capture());
 
-            DomainEvent.ProjectItemRestored restoredEvent = (DomainEvent.ProjectItemRestored) eventCaptor
+            GitHubProjectEvent.ProjectItemRestored restoredEvent = (GitHubProjectEvent.ProjectItemRestored) eventCaptor
                 .getAllValues()
                 .get(1);
             assertThat(restoredEvent.item().actorId()).isEqualTo(actorId);

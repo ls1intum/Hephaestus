@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionCategoryRepository;
@@ -1447,64 +1447,64 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestDiscussionEventListener {
 
-        private final List<DomainEvent.DiscussionCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionClosed> closedEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionReopened> reopenedEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionAnswered> answeredEvents = new ArrayList<>();
-        private final List<DomainEvent.DiscussionDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionClosed> closedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionReopened> reopenedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionAnswered> answeredEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.DiscussionDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.DiscussionCreated event) {
+        public void onCreated(ScmDomainEvent.DiscussionCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.DiscussionUpdated event) {
+        public void onUpdated(ScmDomainEvent.DiscussionUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(DomainEvent.DiscussionClosed event) {
+        public void onClosed(ScmDomainEvent.DiscussionClosed event) {
             closedEvents.add(event);
         }
 
         @EventListener
-        public void onReopened(DomainEvent.DiscussionReopened event) {
+        public void onReopened(ScmDomainEvent.DiscussionReopened event) {
             reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onAnswered(DomainEvent.DiscussionAnswered event) {
+        public void onAnswered(ScmDomainEvent.DiscussionAnswered event) {
             answeredEvents.add(event);
         }
 
         @EventListener
-        public void onDeleted(DomainEvent.DiscussionDeleted event) {
+        public void onDeleted(ScmDomainEvent.DiscussionDeleted event) {
             deletedEvents.add(event);
         }
 
-        public List<DomainEvent.DiscussionCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.DiscussionCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.DiscussionUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.DiscussionUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.DiscussionClosed> getClosedEvents() {
+        public List<ScmDomainEvent.DiscussionClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<DomainEvent.DiscussionReopened> getReopenedEvents() {
+        public List<ScmDomainEvent.DiscussionReopened> getReopenedEvents() {
             return new ArrayList<>(reopenedEvents);
         }
 
-        public List<DomainEvent.DiscussionAnswered> getAnsweredEvents() {
+        public List<ScmDomainEvent.DiscussionAnswered> getAnsweredEvents() {
             return new ArrayList<>(answeredEvents);
         }
 
-        public List<DomainEvent.DiscussionDeleted> getDeletedEvents() {
+        public List<ScmDomainEvent.DiscussionDeleted> getDeletedEvents() {
             return new ArrayList<>(deletedEvents);
         }
 

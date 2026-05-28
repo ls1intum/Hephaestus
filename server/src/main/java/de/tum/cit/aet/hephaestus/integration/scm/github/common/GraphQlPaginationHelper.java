@@ -6,6 +6,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import java.time.Duration;
@@ -146,7 +147,7 @@ public final class GraphQlPaginationHelper {
                     Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
-                        .filter(GitHubTransportErrors::isTransportError)
+                        .filter(ScmTransportErrors::isTransportError)
                         .doBeforeRetry(signal ->
                             log.warn(
                                 "Retrying GraphQL request after transport error: context={}, page={}, attempt={}, error={}",

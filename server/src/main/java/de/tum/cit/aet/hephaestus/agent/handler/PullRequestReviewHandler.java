@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -118,7 +118,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        EventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
+        ScmEventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
 
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", pullRequestData.repository().id());

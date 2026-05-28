@@ -278,8 +278,23 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         .getPackageName()
                         .matches("^de\\.tum\\.cit\\.aet\\.hephaestus\\.integration\\.[a-z]+\\..*");
 
+                    // Same-module SPI impl: the class lives in the same top-level module as
+                    // the SPI interface it implements (e.g. activity/ActivityEventService implements
+                    // activity/spi/ActivityRecorder). The module exposes its own contract; this is
+                    // not an adapter pattern, it's a "this module IS the implementation" pattern.
+                    boolean implementsSpiFromSameModule = javaClass
+                        .getRawInterfaces()
+                        .stream()
+                        .filter(i -> i.getPackageName().startsWith(BASE_PACKAGE) && i.getPackageName().contains(".spi"))
+                        .anyMatch(spiInterface -> {
+                            String classModule = topLevelModule(javaClass.getPackageName());
+                            String spiModule = topLevelModule(spiInterface.getPackageName());
+                            return classModule != null && classModule.equals(spiModule);
+                        });
+
                     boolean inAdapterPackage =
                         inIntegrationVendorPackage ||
+                        implementsSpiFromSameModule ||
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
@@ -583,5 +598,18 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 .because("Test classes should be easily identifiable");
             rule.check(classesWithTests);
         }
+    }
+
+    /**
+     * Returns the top-level module name ({@code activity}, {@code workspace}, …) for a
+     * package, or {@code null} if the package is outside {@code BASE_PACKAGE}.
+     */
+    private static String topLevelModule(String packageName) {
+        if (!packageName.startsWith(BASE_PACKAGE + ".")) {
+            return null;
+        }
+        String tail = packageName.substring(BASE_PACKAGE.length() + 1);
+        int dot = tail.indexOf('.');
+        return dot < 0 ? tail : tail.substring(0, dot);
     }
 }

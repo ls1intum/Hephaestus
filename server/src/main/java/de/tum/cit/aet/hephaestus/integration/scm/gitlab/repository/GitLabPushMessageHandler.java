@@ -5,9 +5,9 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -466,7 +466,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
         Long scopeId = resolveScopeId(repository);
 
-        EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
+        ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
             UUID.randomUUID(),
             Instant.now(),
@@ -478,7 +478,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             GitProviderType.GITLAB
         );
 
-        eventPublisher.publishEvent(new DomainEvent.CommitCreated(commitData, context));
+        eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }
 
     // ========================================================================

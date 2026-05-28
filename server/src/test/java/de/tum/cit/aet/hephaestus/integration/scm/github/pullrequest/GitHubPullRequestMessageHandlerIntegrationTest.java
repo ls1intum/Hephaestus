@@ -6,7 +6,7 @@ import static org.mockito.Mockito.*;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -878,104 +878,104 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     @Component
     static class TestPullRequestEventListener {
 
-        private final List<DomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestLabeled> labeledEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestUnlabeled> unlabeledEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestReady> readyEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestDrafted> draftedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestSynchronized> synchronizedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestLabeled> labeledEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestUnlabeled> unlabeledEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestReady> readyEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestDrafted> draftedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestSynchronized> synchronizedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.PullRequestCreated event) {
+        public void onCreated(ScmDomainEvent.PullRequestCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onUpdated(DomainEvent.PullRequestUpdated event) {
+        public void onUpdated(ScmDomainEvent.PullRequestUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(DomainEvent.PullRequestClosed event) {
+        public void onClosed(ScmDomainEvent.PullRequestClosed event) {
             closedEvents.add(event);
         }
 
         @EventListener
-        public void onReopened(DomainEvent.PullRequestReopened event) {
+        public void onReopened(ScmDomainEvent.PullRequestReopened event) {
             reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onLabeled(DomainEvent.PullRequestLabeled event) {
+        public void onLabeled(ScmDomainEvent.PullRequestLabeled event) {
             labeledEvents.add(event);
         }
 
         @EventListener
-        public void onUnlabeled(DomainEvent.PullRequestUnlabeled event) {
+        public void onUnlabeled(ScmDomainEvent.PullRequestUnlabeled event) {
             unlabeledEvents.add(event);
         }
 
         @EventListener
-        public void onMerged(DomainEvent.PullRequestMerged event) {
+        public void onMerged(ScmDomainEvent.PullRequestMerged event) {
             mergedEvents.add(event);
         }
 
         @EventListener
-        public void onReady(DomainEvent.PullRequestReady event) {
+        public void onReady(ScmDomainEvent.PullRequestReady event) {
             readyEvents.add(event);
         }
 
         @EventListener
-        public void onDrafted(DomainEvent.PullRequestDrafted event) {
+        public void onDrafted(ScmDomainEvent.PullRequestDrafted event) {
             draftedEvents.add(event);
         }
 
         @EventListener
-        public void onSynchronized(DomainEvent.PullRequestSynchronized event) {
+        public void onSynchronized(ScmDomainEvent.PullRequestSynchronized event) {
             synchronizedEvents.add(event);
         }
 
-        public List<DomainEvent.PullRequestCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.PullRequestCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.PullRequestUpdated> getUpdatedEvents() {
+        public List<ScmDomainEvent.PullRequestUpdated> getUpdatedEvents() {
             return new ArrayList<>(updatedEvents);
         }
 
-        public List<DomainEvent.PullRequestClosed> getClosedEvents() {
+        public List<ScmDomainEvent.PullRequestClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<DomainEvent.PullRequestReopened> getReopenedEvents() {
+        public List<ScmDomainEvent.PullRequestReopened> getReopenedEvents() {
             return new ArrayList<>(reopenedEvents);
         }
 
-        public List<DomainEvent.PullRequestLabeled> getLabeledEvents() {
+        public List<ScmDomainEvent.PullRequestLabeled> getLabeledEvents() {
             return new ArrayList<>(labeledEvents);
         }
 
-        public List<DomainEvent.PullRequestUnlabeled> getUnlabeledEvents() {
+        public List<ScmDomainEvent.PullRequestUnlabeled> getUnlabeledEvents() {
             return new ArrayList<>(unlabeledEvents);
         }
 
-        public List<DomainEvent.PullRequestMerged> getMergedEvents() {
+        public List<ScmDomainEvent.PullRequestMerged> getMergedEvents() {
             return new ArrayList<>(mergedEvents);
         }
 
-        public List<DomainEvent.PullRequestReady> getReadyEvents() {
+        public List<ScmDomainEvent.PullRequestReady> getReadyEvents() {
             return new ArrayList<>(readyEvents);
         }
 
-        public List<DomainEvent.PullRequestDrafted> getDraftedEvents() {
+        public List<ScmDomainEvent.PullRequestDrafted> getDraftedEvents() {
             return new ArrayList<>(draftedEvents);
         }
 
-        public List<DomainEvent.PullRequestSynchronized> getSynchronizedEvents() {
+        public List<ScmDomainEvent.PullRequestSynchronized> getSynchronizedEvents() {
             return new ArrayList<>(synchronizedEvents);
         }
 

@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
@@ -92,7 +92,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     private PullRequestReviewSubmissionRequest sampleRequest() {
-        var pullRequestData = new EventPayload.PullRequestData(
+        var pullRequestData = new ScmEventPayload.PullRequestData(
             456L,
             42,
             "Fix authentication bug",

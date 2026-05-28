@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewthread;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
@@ -48,9 +48,9 @@ public class GitHubPullRequestReviewThreadProcessor {
                     thread.setResolvedBy(resolvedBy);
                 }
                 thread = threadRepository.save(thread);
-                EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
                     eventPublisher.publishEvent(
-                        new DomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
+                        new ScmDomainEvent.ReviewThreadResolved(threadData, EventContext.from(context))
                     )
                 );
                 log.info(
@@ -79,9 +79,9 @@ public class GitHubPullRequestReviewThreadProcessor {
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 thread.setResolvedBy(null);
                 thread = threadRepository.save(thread);
-                EventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
+                ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData ->
                     eventPublisher.publishEvent(
-                        new DomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
+                        new ScmDomainEvent.ReviewThreadUnresolved(threadData, EventContext.from(context))
                     )
                 );
                 log.info("Unresolved thread: threadId={}", threadId);

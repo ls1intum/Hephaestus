@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -121,8 +121,8 @@ public class GitLabReviewReconciler {
         // activity_event unique constraint on (workspace_id, event_key) dedupes, so
         // replaying is safe.
         if (ctx != null) {
-            EventPayload.ReviewData.from(existing).ifPresent(reviewData ->
-                eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+            ScmEventPayload.ReviewData.from(existing).ifPresent(reviewData ->
+                eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
             );
         }
         return existing;
@@ -156,8 +156,8 @@ public class GitLabReviewReconciler {
         pr.addReview(saved);
 
         if (ctx != null) {
-            EventPayload.ReviewData.from(saved).ifPresent(reviewData ->
-                eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+            ScmEventPayload.ReviewData.from(saved).ifPresent(reviewData ->
+                eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
             );
         }
 

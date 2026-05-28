@@ -1,8 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -148,15 +151,15 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             );
 
         // Publish domain events with actor information
-        EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+        GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
         EventContext eventContext = EventContext.from(context);
 
         if (isNew) {
-            eventPublisher.publishEvent(new DomainEvent.ProjectItemCreated(itemData, project.getId(), eventContext));
+            eventPublisher.publishEvent(new GitHubProjectEvent.ProjectItemCreated(itemData, project.getId(), eventContext));
             log.debug("Created project item: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         } else {
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectItemUpdated(itemData, project.getId(), Set.of(), eventContext)
+                new GitHubProjectEvent.ProjectItemUpdated(itemData, project.getId(), Set.of(), eventContext)
             );
             log.debug("Updated project item: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
@@ -200,9 +203,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // so the primitive defaults to false during deserialization. Force it to true.
         ProjectItem item = process(dto.withArchived(true), project, context, actorId);
         if (item != null) {
-            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectItemArchived(itemData, project.getId(), EventContext.from(context))
+                new GitHubProjectEvent.ProjectItemArchived(itemData, project.getId(), EventContext.from(context))
             );
             log.info("Project item archived: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
@@ -245,9 +248,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // defaults to false. This makes the intent unambiguous.
         ProjectItem item = process(dto.withArchived(false), project, context, actorId);
         if (item != null) {
-            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectItemRestored(itemData, project.getId(), EventContext.from(context))
+                new GitHubProjectEvent.ProjectItemRestored(itemData, project.getId(), EventContext.from(context))
             );
             log.info("Project item restored: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
@@ -285,9 +288,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
     ) {
         ProjectItem item = process(dto, project, context, actorId);
         if (item != null) {
-            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectItemConverted(itemData, project.getId(), EventContext.from(context))
+                new GitHubProjectEvent.ProjectItemConverted(itemData, project.getId(), EventContext.from(context))
             );
             log.info("Project item converted: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
@@ -325,9 +328,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
     ) {
         ProjectItem item = process(dto, project, context, actorId);
         if (item != null) {
-            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new DomainEvent.ProjectItemReordered(itemData, project.getId(), EventContext.from(context))
+                new GitHubProjectEvent.ProjectItemReordered(itemData, project.getId(), EventContext.from(context))
             );
             log.debug("Project item reordered: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
@@ -352,7 +355,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             .ifPresent(item -> {
                 projectItemRepository.delete(item);
                 eventPublisher.publishEvent(
-                    new DomainEvent.ProjectItemDeleted(itemId, projectId, EventContext.from(context))
+                    new GitHubProjectEvent.ProjectItemDeleted(itemId, projectId, EventContext.from(context))
                 );
                 log.info("Deleted project item: itemId={}, nodeId={}", itemId, item.getNodeId());
             });

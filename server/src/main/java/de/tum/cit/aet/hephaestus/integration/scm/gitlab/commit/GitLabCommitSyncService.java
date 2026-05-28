@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
@@ -284,7 +284,7 @@ public class GitLabCommitSyncService {
             commitRepository
                 .findByShaAndRepositoryId(sha, repository.getId())
                 .ifPresent(commit -> {
-                    EventPayload.CommitData commitPayload = EventPayload.CommitData.from(commit);
+                    ScmEventPayload.CommitData commitPayload = ScmEventPayload.CommitData.from(commit);
                     EventContext context = new EventContext(
                         UUID.randomUUID(),
                         Instant.now(),
@@ -295,7 +295,7 @@ public class GitLabCommitSyncService {
                         UUID.randomUUID().toString(),
                         GitProviderType.GITLAB
                     );
-                    eventPublisher.publishEvent(new DomainEvent.CommitCreated(commitPayload, context));
+                    eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitPayload, context));
                 });
         }
     }

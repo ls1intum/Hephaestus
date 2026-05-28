@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -266,22 +266,22 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
     @Component
     static class TestLabelEventListener {
 
-        private final List<DomainEvent.LabelCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.LabelUpdated> updatedEvents = new ArrayList<>();
-        private final List<DomainEvent.LabelDeleted> deletedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.LabelCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.LabelUpdated> updatedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.LabelDeleted> deletedEvents = new ArrayList<>();
 
         @EventListener
-        void onCreated(DomainEvent.LabelCreated event) {
+        void onCreated(ScmDomainEvent.LabelCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        void onUpdated(DomainEvent.LabelUpdated event) {
+        void onUpdated(ScmDomainEvent.LabelUpdated event) {
             updatedEvents.add(event);
         }
 
         @EventListener
-        void onDeleted(DomainEvent.LabelDeleted event) {
+        void onDeleted(ScmDomainEvent.LabelDeleted event) {
             deletedEvents.add(event);
         }
 
@@ -291,15 +291,15 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             deletedEvents.clear();
         }
 
-        List<DomainEvent.LabelCreated> getCreatedEvents() {
+        List<ScmDomainEvent.LabelCreated> getCreatedEvents() {
             return createdEvents;
         }
 
-        List<DomainEvent.LabelUpdated> getUpdatedEvents() {
+        List<ScmDomainEvent.LabelUpdated> getUpdatedEvents() {
             return updatedEvents;
         }
 
-        List<DomainEvent.LabelDeleted> getDeletedEvents() {
+        List<ScmDomainEvent.LabelDeleted> getDeletedEvents() {
             return deletedEvents;
         }
     }

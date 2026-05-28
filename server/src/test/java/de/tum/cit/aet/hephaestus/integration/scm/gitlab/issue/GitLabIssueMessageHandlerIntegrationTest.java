@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -424,34 +424,34 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Component
     static class GitLabTestEventListener {
 
-        private final List<DomainEvent.IssueCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueClosed> closedEvents = new ArrayList<>();
-        private final List<DomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueClosed> closedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.IssueCreated event) {
+        public void onCreated(ScmDomainEvent.IssueCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(DomainEvent.IssueClosed event) {
+        public void onClosed(ScmDomainEvent.IssueClosed event) {
             closedEvents.add(event);
         }
 
         @EventListener
-        public void onReopened(DomainEvent.IssueReopened event) {
+        public void onReopened(ScmDomainEvent.IssueReopened event) {
             reopenedEvents.add(event);
         }
 
-        public List<DomainEvent.IssueCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.IssueCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.IssueClosed> getClosedEvents() {
+        public List<ScmDomainEvent.IssueClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<DomainEvent.IssueReopened> getReopenedEvents() {
+        public List<ScmDomainEvent.IssueReopened> getReopenedEvents() {
             return new ArrayList<>(reopenedEvents);
         }
 

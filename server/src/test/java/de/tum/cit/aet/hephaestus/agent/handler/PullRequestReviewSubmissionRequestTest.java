@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 
 class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
 
-    private EventPayload.PullRequestData samplePullRequestData() {
-        return new EventPayload.PullRequestData(
+    private ScmEventPayload.PullRequestData samplePullRequestData() {
+        return new ScmEventPayload.PullRequestData(
             456L,
             42,
             "Fix bug",
@@ -63,7 +63,7 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
 
         @Test
         void shouldRejectNullRepository() {
-            var prDataNoRepo = new EventPayload.PullRequestData(
+            var prDataNoRepo = new ScmEventPayload.PullRequestData(
                 456L,
                 42,
                 "Fix bug",

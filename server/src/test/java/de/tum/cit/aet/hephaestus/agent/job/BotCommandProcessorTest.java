@@ -47,7 +47,12 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        processor = new BotCommandProcessor(agentJobService, pullRequestRepository, practiceReviewDetectionGate, null);
+        processor = new BotCommandProcessor(
+            agentJobService,
+            pullRequestRepository,
+            practiceReviewDetectionGate,
+            List.of()
+        );
     }
 
     @Nested

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
@@ -314,7 +314,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
 
             ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher).publishEvent(captor.capture());
-            assertThat(captor.getValue()).isInstanceOf(DomainEvent.ReviewCommentCreated.class);
+            assertThat(captor.getValue()).isInstanceOf(ScmDomainEvent.ReviewCommentCreated.class);
         }
 
         @Test

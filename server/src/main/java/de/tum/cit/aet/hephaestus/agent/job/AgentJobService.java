@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -119,7 +119,7 @@ public class AgentJobService {
             return "PR missing branch info: prId=" + prId;
         }
 
-        EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+        ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
         PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
             prData,
             pr.getHeadRefName(),

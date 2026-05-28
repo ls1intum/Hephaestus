@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard.tasks;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -16,13 +16,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
-import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardProperties;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardService;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardSortType;
+import de.tum.cit.aet.hephaestus.leaderboard.spi.LeaderboardDigestReadyEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -33,18 +32,28 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 
+/**
+ * Verifies the leaderboard-side half of the weekly Slack digest fan-out.
+ *
+ * <p>Post-flip the task publishes vendor-neutral {@link LeaderboardDigestReadyEvent}s
+ * rather than calling {@code SlackMessageService} directly — these tests pin both the
+ * fan-out granularity (per workspace-channel target) AND the skip preconditions that
+ * gate event emission (no active connections, disabled, no channel, no entries).
+ */
 class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
     @Mock
     private LeaderboardService leaderboardService;
 
     @Mock
-    private SlackMessageService slackMessageService;
+    private ConnectionRepository connectionRepository;
 
     @Mock
-    private ConnectionRepository connectionRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     private SlackWeeklyLeaderboardTask task;
 
@@ -61,31 +70,35 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         task = new SlackWeeklyLeaderboardTask(
             leaderboardProps,
             appProps,
-            slackMessageService,
             leaderboardService,
-            connectionRepository
+            connectionRepository,
+            eventPublisher
         );
     }
 
     @Test
-    void run_noActiveSlackConnections_skipsWithoutCallingSlack() {
+    void run_noActiveSlackConnections_skipsWithoutPublishingEvent() {
         when(
             connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
         ).thenReturn(List.of());
 
         task.run();
 
-        verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     /**
      * Per-workspace skip preconditions (notifications-off, no channel configured) all
      * route through the same fast-return path. Fold into one parameterised case so the
-     * contract stays clear: skip → never call Slack.
+     * contract stays clear: skip → never emit an event.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("skipScenarios")
-    void run_perWorkspaceSkipConditions_neverCallSlack(String name, Workspace w, ConnectionConfig.SlackConfig cfg) {
+    void run_perWorkspaceSkipConditions_neverPublishEvent(
+        String name,
+        Workspace w,
+        ConnectionConfig.SlackConfig cfg
+    ) {
         Connection c = connection(w, cfg);
         when(
             connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
@@ -93,7 +106,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
         task.run();
 
-        verify(slackMessageService, never()).sendForWorkspace(anyLong(), anyString(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     private static Stream<Arguments> skipScenarios() {
@@ -108,7 +121,30 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
     }
 
     @Test
-    void run_oneWorkspaceFailureDoesNotBlockTheNext() {
+    void run_emptyLeaderboard_doesNotPublishEvent() {
+        Workspace w = workspace(99L, "acme", true);
+        Connection c = connection(w, slackConfig("T1", "Acme", "C0974LJBPBK", null));
+        when(
+            connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
+        ).thenReturn(List.of(c));
+        when(
+            leaderboardService.createLeaderboard(
+                any(Workspace.class),
+                any(),
+                any(),
+                anyString(),
+                eq(LeaderboardSortType.SCORE),
+                eq(LeaderboardMode.INDIVIDUAL)
+            )
+        ).thenReturn(List.of());
+
+        task.run();
+
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void run_perConnectionFailureDoesNotBlockTheNext() {
         Workspace failing = workspace(1L, "fails", true);
         Workspace ok = workspace(2L, "succeeds", true);
         Connection failingConn = connection(failing, slackConfig("T1", "Fails", "C0974LJBPBK", null));
@@ -116,9 +152,6 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         when(
             connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
         ).thenReturn(List.of(failingConn, okConn));
-
-        // Both workspaces produce one top-reviewer; the first send throws.
-        when(slackMessageService.listMembers(anyLong())).thenReturn(List.of(slackUser("U1", "alice")));
         when(
             leaderboardService.createLeaderboard(
                 any(Workspace.class),
@@ -130,26 +163,24 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
             )
         ).thenReturn(List.of(leaderboardEntry("alice")));
 
-        // First call throws SlackSendException; second call must still be invoked.
-        org.mockito.Mockito.doThrow(new SlackSendException(1L, "C0974LJBPBK", "channel_not_found"))
-            .when(slackMessageService)
-            .sendForWorkspace(eq(1L), eq("C0974LJBPBK"), any(), any());
+        // First event publish throws — the second must still go through.
+        org.mockito.Mockito.doThrow(new RuntimeException("publish boom"))
+            .doNothing()
+            .when(eventPublisher)
+            .publishEvent(any(LeaderboardDigestReadyEvent.class));
 
         task.run();
 
-        // Both invocations happened: the first threw (caught), the second proceeded.
-        verify(slackMessageService, times(1)).sendForWorkspace(eq(1L), eq("C0974LJBPBK"), any(), any());
-        verify(slackMessageService, times(1)).sendForWorkspace(eq(2L), eq("C0974LJBPBKZ"), any(), any());
+        verify(eventPublisher, times(2)).publishEvent(any(LeaderboardDigestReadyEvent.class));
     }
 
     @Test
-    void run_happyPath_postsOncePerQualifyingWorkspace() {
+    void run_happyPath_publishesOneEventPerQualifyingWorkspace() {
         Workspace w = workspace(99L, "acme", true);
         Connection c = connection(w, slackConfig("T1", "Acme", "C0974LJBPBK", "engineering"));
         when(
             connectionRepository.findByKindAndStateWithWorkspace(IntegrationKind.SLACK, IntegrationState.ACTIVE)
         ).thenReturn(List.of(c));
-        when(slackMessageService.listMembers(99L)).thenReturn(List.of(slackUser("U1", "alice")));
         when(
             leaderboardService.createLeaderboard(
                 any(Workspace.class),
@@ -163,12 +194,17 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
         task.run();
 
-        verify(slackMessageService, times(1)).sendForWorkspace(
-            eq(99L),
-            eq("C0974LJBPBK"),
-            any(),
-            eq("Weekly review highlights")
+        ArgumentCaptor<LeaderboardDigestReadyEvent> captor = ArgumentCaptor.forClass(
+            LeaderboardDigestReadyEvent.class
         );
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        LeaderboardDigestReadyEvent event = captor.getValue();
+        assertThat(event.workspaceId()).isEqualTo(99L);
+        assertThat(event.workspaceSlug()).isEqualTo("acme");
+        assertThat(event.channelId()).isEqualTo("C0974LJBPBK");
+        assertThat(event.teamLabel()).isEqualTo("engineering");
+        assertThat(event.topEntries()).hasSize(1);
+        assertThat(event.baseUrl()).isEqualTo("https://app.test");
     }
 
     // ─── Test helpers ─────────────────────────────────────────────────────────
@@ -192,13 +228,6 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         String teamLabel
     ) {
         return new ConnectionConfig.SlackConfig(teamId, teamName, channelId, teamLabel, Set.of());
-    }
-
-    private static com.slack.api.model.User slackUser(String id, String name) {
-        com.slack.api.model.User u = new com.slack.api.model.User();
-        u.setId(id);
-        u.setName(name);
-        return u;
     }
 
     private static LeaderboardEntryDTO leaderboardEntry(String name) {

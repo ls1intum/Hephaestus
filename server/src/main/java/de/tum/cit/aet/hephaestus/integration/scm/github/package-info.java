@@ -27,6 +27,13 @@
         "core",
         "core::webhook",
         "workspace",
+        // GraphQL config moved from cross-cutting config package; still relies on
+        // FragmentMergingDocumentSource + Jackson mixins owned by config.
+        "config",
+        // Activity ledger write path consumed by the Projects v2 listener under
+        // project/activity/ — vendor-side records lifecycle rows through the narrow SPI.
+        "activity",
+        "activity::spi",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.scm.github;

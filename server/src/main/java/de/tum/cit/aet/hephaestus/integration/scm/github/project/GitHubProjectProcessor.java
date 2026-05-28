@@ -1,8 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
+
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -84,18 +87,18 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         }
 
         // Publish domain events with actor information
-        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(result.project(), actorId);
+        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(result.project(), actorId);
         EventContext eventContext = EventContext.from(context);
 
         if (result.isNew()) {
-            eventPublisher.publishEvent(new DomainEvent.ProjectCreated(projectData, eventContext));
+            eventPublisher.publishEvent(new GitHubProjectEvent.ProjectCreated(projectData, eventContext));
             log.debug(
                 "Created project: projectId={}, projectNumber={}",
                 result.project().getId(),
                 result.project().getNumber()
             );
         } else {
-            eventPublisher.publishEvent(new DomainEvent.ProjectUpdated(projectData, Set.of(), eventContext));
+            eventPublisher.publishEvent(new GitHubProjectEvent.ProjectUpdated(projectData, Set.of(), eventContext));
             log.debug(
                 "Updated project: projectId={}, projectNumber={}",
                 result.project().getId(),
@@ -226,8 +229,8 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         }
 
         Project project = result.project();
-        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project, actorId);
-        eventPublisher.publishEvent(new DomainEvent.ProjectClosed(projectData, EventContext.from(context)));
+        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(project, actorId);
+        eventPublisher.publishEvent(new GitHubProjectEvent.ProjectClosed(projectData, EventContext.from(context)));
         log.info("Project closed: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
     }
@@ -275,8 +278,8 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         }
 
         Project project = result.project();
-        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project, actorId);
-        eventPublisher.publishEvent(new DomainEvent.ProjectReopened(projectData, EventContext.from(context)));
+        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(project, actorId);
+        eventPublisher.publishEvent(new GitHubProjectEvent.ProjectReopened(projectData, EventContext.from(context)));
         log.info("Project reopened: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
     }
@@ -299,7 +302,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
                 String title = project.getTitle();
                 projectRepository.delete(project);
                 eventPublisher.publishEvent(
-                    new DomainEvent.ProjectDeleted(projectId, title, EventContext.from(context))
+                    new GitHubProjectEvent.ProjectDeleted(projectId, title, EventContext.from(context))
                 );
                 log.info("Deleted project: projectId={}, projectNumber={}", projectId, project.getNumber());
             });

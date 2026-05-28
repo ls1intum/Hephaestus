@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -262,8 +262,8 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         // Publish domain events with DTOs (safe for async handlers)
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommentCreated(
-                    EventPayload.CommentData.from(saved),
+                new ScmDomainEvent.CommentCreated(
+                    ScmEventPayload.CommentData.from(saved),
                     issueId,
                     EventContext.from(context)
                 )
@@ -271,8 +271,8 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             log.debug("Created comment: commentId={}, issueId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
             eventPublisher.publishEvent(
-                new DomainEvent.CommentUpdated(
-                    EventPayload.CommentData.from(saved),
+                new ScmDomainEvent.CommentUpdated(
+                    ScmEventPayload.CommentData.from(saved),
                     issueId,
                     changedFields,
                     EventContext.from(context)
@@ -315,7 +315,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
                 commentRepository.delete(comment);
                 eventPublisher.publishEvent(
-                    new DomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context))
+                    new ScmDomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context))
                 );
                 log.info("Deleted comment: commentId={}", commentId);
             });

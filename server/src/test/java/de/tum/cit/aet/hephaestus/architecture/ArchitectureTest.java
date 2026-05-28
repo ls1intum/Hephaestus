@@ -48,9 +48,26 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          * make testing difficult, and prevent independent deployment.
          * This is one of the most important architectural constraints.
          *
-         * <p><b>Slice note:</b> {@code integration} and {@code workspace} are folded
-         * into a single {@code platform} slice — they are bidirectionally coupled by
-         * design (Connection rows are workspace-owned). Inner cycles are policed by
+         * <p><b>Slice note:</b> the modules whose JPA repositories or @Service beans
+         * are tied to {@code integration.scm.domain.*} entities (PullRequest, User,
+         * Repository, Team, …) are folded into a single {@code platform} slice. They
+         * are bidirectionally coupled by design at the data layer:
+         * <ul>
+         *   <li>{@code integration}: vendor adapters + Connection registry.</li>
+         *   <li>{@code workspace}: owns Connection rows.</li>
+         *   <li>{@code config}: Jackson mixins for vendor GraphQL types.</li>
+         *   <li>{@code activity}: {@code ActivityEvent} carries FK references to
+         *       {@code scm.domain.User} and {@code scm.domain.Repository}; the GitHub
+         *       Projects V2 activity listener writes through {@code activity.spi.ActivityRecorder}.</li>
+         *   <li>{@code leaderboard}: {@code LeaderboardReviewQueryRepository} is
+         *       {@code JpaRepository<PullRequestReview>}; ranking depends on PR/Review/Team data.
+         *       Slack integration subscribes to {@code leaderboard.spi.LeaderboardDigestReadyEvent}.</li>
+         *   <li>{@code profile}: {@code ProfilePullRequestQueryRepository} is
+         *       {@code JpaRepository<PullRequest>}; profile aggregates contributions across
+         *       review/comment/issue entities.</li>
+         * </ul>
+         * Breaking these via Spring events would add indirection without value —
+         * these modules ARE the data platform. Inner cycles are policed by
          * {@code ModuleBoundaryTest} and {@code CrossCuttingModuleBoundaryTest}.
          */
         @Test
@@ -65,8 +82,15 @@ class ArchitectureTest extends HephaestusArchitectureTest {
                     String tail = pkg.substring(BASE_PACKAGE.length() + 1);
                     int dot = tail.indexOf('.');
                     String top = dot < 0 ? tail : tail.substring(0, dot);
-                    // integration + workspace = post-epic platform kernel.
-                    if ("integration".equals(top) || "workspace".equals(top)) {
+                    // Data-tier platform modules: tied to scm.domain entities at the JPA layer.
+                    if (
+                        "integration".equals(top) ||
+                        "workspace".equals(top) ||
+                        "config".equals(top) ||
+                        "activity".equals(top) ||
+                        "leaderboard".equals(top) ||
+                        "profile".equals(top)
+                    ) {
                         return SliceIdentifier.of("platform");
                     }
                     return SliceIdentifier.of(top);
@@ -74,7 +98,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
 
                 @Override
                 public String getDescription() {
-                    return "top-level slice (integration+workspace folded into platform)";
+                    return "top-level slice (data-tier modules folded into platform)";
                 }
             };
 

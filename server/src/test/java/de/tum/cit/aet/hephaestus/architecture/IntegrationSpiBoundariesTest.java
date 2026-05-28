@@ -119,6 +119,11 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .doNotHaveSimpleName("PullRequestReviewHandler")
                 .and()
                 .doNotHaveSimpleName("PullRequestReviewSubmissionRequest")
+                .and()
+                // PullRequestContentProvider builds a per-kind dispatch table of ScmTokenSource
+                // beans (Map<IntegrationKind, ScmTokenSource>). Kind reference is the SPI
+                // registry key, not switch-on-kind logic — same shape as BotCommandProcessor.
+                .doNotHaveSimpleName("PullRequestContentProvider")
                 .should()
                 .dependOnClassesThat()
                 .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind")

@@ -583,7 +583,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
                             // Known event types that carry workspace context through entity relationships
                             Set<String> workspaceAwareEventPrefixes = Set.of(
-                                "DomainEvent", // Our domain events carry repository which has workspace
+                                "ScmDomainEvent", // Our domain events carry repository which has workspace
                                 "PullRequest", // Through repository.organization.workspaceId
                                 "Issue", // Through repository.organization.workspaceId
                                 "Discussion", // Through repository.organization.workspaceId
@@ -594,6 +594,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
                                 "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
+                                "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
@@ -646,9 +647,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             "AgentJobSubmitter",
             // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
             "AgentJobEventListener",
-            // MentorContextInvalidator handles DomainEvent.{PullRequest,Issue,Review}* whose
+            // MentorContextInvalidator handles ScmDomainEvent.{PullRequest,Issue,Review}* whose
             // EventContext carries the originating repository → workspaceId is resolved per-event
-            "MentorContextInvalidator"
+            "MentorContextInvalidator",
+            // GitHubProjectActivityListener handles GitHubProjectEvent payloads whose EventContext
+            // carries scopeId (the originating workspace) — extracted out of ActivityEventListener
+            // in the SPI-isolation refactor, same payload-carries-context contract applies
+            "GitHubProjectActivityListener"
         );
 
         /**
@@ -700,7 +705,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     // also have context propagation or use events that carry full context
                     boolean hasRepositoryDependency = dependencies.stream().anyMatch(d -> d.endsWith("Repository"));
 
-                    // Events with full entity snapshots (like DomainEvent payloads) don't need
+                    // Events with full entity snapshots (like ScmDomainEvent payloads) don't need
                     // context propagation - they carry all needed data
                     boolean usesPayloadEvents = javaClass
                         .getMethods()
@@ -708,7 +713,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .filter(m -> m.isAnnotatedWith(TransactionalEventListener.class))
                         .flatMap(m -> m.getRawParameterTypes().stream())
                         .anyMatch(
-                            p -> p.getSimpleName().contains("DomainEvent") || p.getSimpleName().contains("Event")
+                            p -> p.getSimpleName().contains("ScmDomainEvent") || p.getSimpleName().contains("Event")
                         );
 
                     if (hasRepositoryDependency && !usesPayloadEvents) {
@@ -900,6 +905,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     // Skip workspace registry operations - these are ADMIN operations that happen
                     // BEFORE a workspace context exists (creating/listing workspaces).
                     if (controllerName.contains("WorkspaceRegistry")) {
+                        return;
+                    }
+
+                    // Same exemption applies to vendor-specific preflight controllers under
+                    // /workspaces/<kind>/* — they validate PATs / list discoverable scopes
+                    // BEFORE a workspace exists, so there's no workspace context to enforce.
+                    if (controllerName.equals("GitLabPreflightController")) {
                         return;
                     }
 

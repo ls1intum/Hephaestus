@@ -3,12 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.GitHubProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -30,15 +27,6 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Mock
-    private GitHubProperties gitHubProperties;
-
-    @Mock
-    private GitLabProperties gitLabProperties;
-
-    @Mock
-    private FeatureFlagService featureFlagService;
-
-    @Mock
     private ConnectionService connectionService;
 
     @Test
@@ -58,10 +46,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             workspaceMembershipRepository,
             repositoryToMonitorRepository,
             userRepository,
-            gitHubProperties,
-            gitLabProperties,
-            featureFlagService,
-            connectionService
+            connectionService,
+            List.of()
         );
 
         when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(
@@ -87,10 +73,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             workspaceMembershipRepository,
             repositoryToMonitorRepository,
             userRepository,
-            gitHubProperties,
-            gitLabProperties,
-            featureFlagService,
-            connectionService
+            connectionService,
+            List.of()
         );
 
         when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(

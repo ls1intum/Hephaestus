@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
@@ -125,8 +125,8 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         Long discussionId = discussion.getId();
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.DiscussionCommentCreated(
-                    EventPayload.DiscussionCommentData.from(comment),
+                new ScmDomainEvent.DiscussionCommentCreated(
+                    ScmEventPayload.DiscussionCommentData.from(comment),
                     discussionId,
                     EventContext.from(context)
                 )
@@ -134,8 +134,8 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
             log.debug("Created discussion comment: commentId={}", dbId);
         } else if (!changedFields.isEmpty()) {
             eventPublisher.publishEvent(
-                new DomainEvent.DiscussionCommentEdited(
-                    EventPayload.DiscussionCommentData.from(comment),
+                new ScmDomainEvent.DiscussionCommentEdited(
+                    ScmEventPayload.DiscussionCommentData.from(comment),
                     discussionId,
                     changedFields,
                     EventContext.from(context)
@@ -178,7 +178,7 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
 
                 commentRepository.delete(comment);
                 eventPublisher.publishEvent(
-                    new DomainEvent.DiscussionCommentDeleted(dbId, discussionId, EventContext.from(context))
+                    new ScmDomainEvent.DiscussionCommentDeleted(dbId, discussionId, EventContext.from(context))
                 );
                 log.info("Deleted discussion comment: commentId={}", dbId);
             });

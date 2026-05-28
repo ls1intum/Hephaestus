@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
@@ -302,14 +302,14 @@ public class GitLabPullRequestReviewThreadProcessor {
     }
 
     private void publishThreadStateEvent(PullRequestReviewThread thread, PullRequest pr, Long scopeId) {
-        EventPayload.ReviewThreadData.from(thread).ifPresent(threadData -> {
+        ScmEventPayload.ReviewThreadData.from(thread).ifPresent(threadData -> {
             RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
             EventContext ctx = EventContext.forSync(scopeId, repoRef, GitProviderType.GITLAB);
 
             if (thread.getState() == PullRequestReviewThread.State.RESOLVED) {
-                eventPublisher.publishEvent(new DomainEvent.ReviewThreadResolved(threadData, ctx));
+                eventPublisher.publishEvent(new ScmDomainEvent.ReviewThreadResolved(threadData, ctx));
             } else {
-                eventPublisher.publishEvent(new DomainEvent.ReviewThreadUnresolved(threadData, ctx));
+                eventPublisher.publishEvent(new ScmDomainEvent.ReviewThreadUnresolved(threadData, ctx));
             }
         });
     }

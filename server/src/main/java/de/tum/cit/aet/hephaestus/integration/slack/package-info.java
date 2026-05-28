@@ -22,6 +22,15 @@
         "integration.core::webhook",
         // SlackConnectionAdminController uses RequireAtLeastWorkspaceAdmin.
         "workspace::authorization",
+        // SlackLeaderboardDigestPublisher subscribes to LeaderboardDigestReadyEvent.
+        // The leaderboard task owns schedule + data assembly; this adapter owns the
+        // Slack publish (block-kit build + chat.postMessage). The event payload carries
+        // LeaderboardEntryDTO (leaderboard root package), which references UserInfoDTO
+        // transitively (integration.scm.domain). Slack consumes both as read-only data —
+        // it never reaches into leaderboard repositories / services.
+        "leaderboard",
+        "leaderboard::spi",
+        "integration.scm",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.slack;

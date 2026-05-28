@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -350,11 +350,11 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
 
             assertThat(result).isEqualTo(2);
 
-            ArgumentCaptor<DomainEvent.CommitAuthorsReconciled> captor = ArgumentCaptor.forClass(
-                DomainEvent.CommitAuthorsReconciled.class
+            ArgumentCaptor<ScmDomainEvent.CommitAuthorsReconciled> captor = ArgumentCaptor.forClass(
+                ScmDomainEvent.CommitAuthorsReconciled.class
             );
             verify(eventPublisher).publishEvent(captor.capture());
-            DomainEvent.CommitAuthorsReconciled event = captor.getValue();
+            ScmDomainEvent.CommitAuthorsReconciled event = captor.getValue();
             Assertions.assertThat(event.repositoryId()).isEqualTo(1L);
             Assertions.assertThat(event.context().providerType()).isEqualTo(GitProviderType.GITHUB);
             Assertions.assertThat(event.context().scopeId()).isEqualTo(7L);
@@ -371,7 +371,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             int result = service.enrichCommitAuthors(1L, "owner/repo", 7L, 1L, null);
 
             assertThat(result).isEqualTo(0);
-            verify(eventPublisher, never()).publishEvent(any(DomainEvent.CommitAuthorsReconciled.class));
+            verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.CommitAuthorsReconciled.class));
         }
     }
 }

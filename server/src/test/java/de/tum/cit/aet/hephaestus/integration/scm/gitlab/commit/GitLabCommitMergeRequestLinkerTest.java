@@ -14,7 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
@@ -406,12 +406,12 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
 
         assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
 
-        ArgumentCaptor<DomainEvent.CommitAuthorsReconciled> captor = ArgumentCaptor.forClass(
-            DomainEvent.CommitAuthorsReconciled.class
+        ArgumentCaptor<ScmDomainEvent.CommitAuthorsReconciled> captor = ArgumentCaptor.forClass(
+            ScmDomainEvent.CommitAuthorsReconciled.class
         );
         verify(eventPublisher).publishEvent(captor.capture());
 
-        DomainEvent.CommitAuthorsReconciled event = captor.getValue();
+        ScmDomainEvent.CommitAuthorsReconciled event = captor.getValue();
         assertThat(event.repositoryId()).isEqualTo(REPO_ID);
         assertThat(event.context().scopeId()).isEqualTo(SCOPE_ID);
         assertThat(event.context().providerType()).isEqualTo(GitProviderType.GITLAB);
@@ -441,7 +441,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         SyncResult result = linker.linkCommits(SCOPE_ID, repository, UPDATED_AFTER);
 
         assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
-        verify(eventPublisher, never()).publishEvent(any(DomainEvent.CommitAuthorsReconciled.class));
+        verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.CommitAuthorsReconciled.class));
     }
 
     @Test

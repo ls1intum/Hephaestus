@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -397,8 +397,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             assertThat(result.getProvider()).isEqualTo(gitLabProvider);
 
-            ArgumentCaptor<DomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
-                DomainEvent.IssueCreated.class
+            ArgumentCaptor<ScmDomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
+                ScmDomainEvent.IssueCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
         }
@@ -454,7 +454,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             // processClosed calls process() which may publish IssueCreated, then publishes IssueClosed
             verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue()).isInstanceOf(DomainEvent.IssueClosed.class);
+            assertThat(eventCaptor.getValue()).isInstanceOf(ScmDomainEvent.IssueClosed.class);
         }
 
         @Test
@@ -474,7 +474,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue()).isInstanceOf(DomainEvent.IssueReopened.class);
+            assertThat(eventCaptor.getValue()).isInstanceOf(ScmDomainEvent.IssueReopened.class);
         }
     }
 
@@ -641,8 +641,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
-            ArgumentCaptor<DomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
-                DomainEvent.IssueCreated.class
+            ArgumentCaptor<ScmDomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
+                ScmDomainEvent.IssueCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
         }

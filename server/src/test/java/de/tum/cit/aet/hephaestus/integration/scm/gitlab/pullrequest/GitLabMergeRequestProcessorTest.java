@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -494,8 +494,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             assertThat(result.getProvider()).isEqualTo(gitLabProvider);
 
-            ArgumentCaptor<DomainEvent.PullRequestCreated> eventCaptor = ArgumentCaptor.forClass(
-                DomainEvent.PullRequestCreated.class
+            ArgumentCaptor<ScmDomainEvent.PullRequestCreated> eventCaptor = ArgumentCaptor.forClass(
+                ScmDomainEvent.PullRequestCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
         }
@@ -517,7 +517,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
 
             // No PullRequestCreated event since PR already existed
-            verify(eventPublisher, never()).publishEvent(any(DomainEvent.PullRequestCreated.class));
+            verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.PullRequestCreated.class));
         }
 
         @Test
@@ -542,7 +542,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasPullRequestUpdated = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestUpdated);
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestUpdated);
             assertThat(hasPullRequestUpdated).isTrue();
         }
 
@@ -569,7 +569,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasPullRequestClosed = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestClosed closed && !closed.wasMerged());
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestClosed closed && !closed.wasMerged());
             assertThat(hasPullRequestClosed).isTrue();
         }
 
@@ -597,7 +597,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasPullRequestReopened = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestReopened);
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestReopened);
             assertThat(hasPullRequestReopened).isTrue();
         }
 
@@ -628,10 +628,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
             boolean hasPullRequestClosed = publishedEvents
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestClosed closed && closed.wasMerged());
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestClosed closed && closed.wasMerged());
             boolean hasPullRequestMerged = publishedEvents
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestMerged);
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestMerged);
 
             assertThat(hasPullRequestClosed).isTrue();
             assertThat(hasPullRequestMerged).isTrue();
@@ -679,7 +679,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasReviewSubmitted = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.ReviewSubmitted);
+                .anyMatch(e -> e instanceof ScmDomainEvent.ReviewSubmitted);
             assertThat(hasReviewSubmitted).isTrue();
         }
 
@@ -732,7 +732,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasReviewDismissed = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.ReviewDismissed);
+                .anyMatch(e -> e instanceof ScmDomainEvent.ReviewDismissed);
             assertThat(hasReviewDismissed).isTrue();
         }
 
@@ -805,7 +805,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasReviewSubmitted = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.ReviewSubmitted);
+                .anyMatch(e -> e instanceof ScmDomainEvent.ReviewSubmitted);
             assertThat(hasReviewSubmitted).isFalse();
         }
 
@@ -1036,7 +1036,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasReviewSubmitted = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.ReviewSubmitted);
+                .anyMatch(e -> e instanceof ScmDomainEvent.ReviewSubmitted);
             assertThat(hasReviewSubmitted).isTrue();
         }
 
@@ -1062,7 +1062,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
             assertThat(existingReview.getState()).isEqualTo(PullRequestReview.State.CHANGES_REQUESTED);
             verify(reviewRepository).save(existingReview);
-            verify(eventPublisher, atLeastOnce()).publishEvent(any(DomainEvent.ReviewSubmitted.class));
+            verify(eventPublisher, atLeastOnce()).publishEvent(any(ScmDomainEvent.ReviewSubmitted.class));
         }
 
         @Test
@@ -1102,7 +1102,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             processor.processRequestedChangesFromNote(pr, reviewer, createContext());
 
             verify(reviewRepository, never()).save(any());
-            verify(eventPublisher, never()).publishEvent(any(DomainEvent.ReviewSubmitted.class));
+            verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.ReviewSubmitted.class));
         }
 
         @Test
@@ -1285,8 +1285,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             var syncData = createSyncData();
             processor.processFromSync(syncData, testRepo, 1L);
 
-            ArgumentCaptor<DomainEvent.PullRequestCreated> eventCaptor = ArgumentCaptor.forClass(
-                DomainEvent.PullRequestCreated.class
+            ArgumentCaptor<ScmDomainEvent.PullRequestCreated> eventCaptor = ArgumentCaptor.forClass(
+                ScmDomainEvent.PullRequestCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
         }
@@ -1308,13 +1308,13 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             boolean hasUpdated = captor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestUpdated);
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestUpdated);
             assertThat(hasUpdated).as("PullRequestUpdated event should be published for existing MR in sync").isTrue();
 
             boolean hasCreated = captor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.PullRequestCreated);
+                .anyMatch(e -> e instanceof ScmDomainEvent.PullRequestCreated);
             assertThat(hasCreated).as("PullRequestCreated should NOT be published for existing MR in sync").isFalse();
         }
 

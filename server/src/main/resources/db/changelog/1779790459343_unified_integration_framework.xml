@@ -639,6 +639,39 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
+         8b. Cross-section data-loss guard. HALT (not MARK_RAN) if section 9 is
+             about to drop legacy columns on a workspace-populated DB without
+             backfilled connection rows — protects against the rare scenario
+             where section 8 was skipped via {@code liquibase changelogSync}
+             or a sibling operator process. Skips cleanly on fresh DBs (no
+             workspace rows) and on already-cutover DBs (legacy columns gone).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-21c" runOnChange="false">
+        <preConditions onFail="HALT" onFailMessage="ABORTED: workspace rows exist but no connection rows were backfilled before the section-9 column drops. Section 8 (WorkspaceConnectionBackfillChange) must succeed before legacy columns are dropped. Verify hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is set, inspect the migration logs, then re-run.">
+            <or>
+                <!-- Safe state #1: no workspace rows (fresh DB / CI). -->
+                <sqlCheck expectedResult="f">SELECT EXISTS (SELECT 1 FROM workspace)</sqlCheck>
+                <!-- Safe state #2: connection table populated. -->
+                <sqlCheck expectedResult="t">SELECT EXISTS (SELECT 1 FROM connection)</sqlCheck>
+                <!-- Safe state #3: legacy columns already gone (re-run on cutover DB). -->
+                <not><columnExists tableName="workspace" columnName="installation_id"/></not>
+            </or>
+        </preConditions>
+        <comment>
+            Cross-section data-loss guard. No DML; the precondition does the work.
+            HALT semantics mean a failing assertion aborts the migration so the
+            section-9 drops never run on a workspace-populated DB with empty
+            connection table.
+        </comment>
+        <sql>SELECT 1</sql>
+        <rollback>
+            <!-- Guard has no schema side-effects; rollback is a no-op. -->
+            <sql>SELECT 1</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
          9. Unconditional drop of legacy Workspace columns superseded by the
              Connection registry. account_login is intentionally KEPT.
 

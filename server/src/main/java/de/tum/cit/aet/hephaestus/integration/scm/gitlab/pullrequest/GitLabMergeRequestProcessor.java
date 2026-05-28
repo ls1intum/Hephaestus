@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -165,7 +165,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
      * overwriting newer sync data or M:N relationships.
      * <p>
      * Detects draft-to-ready and ready-to-draft transitions on UPDATE events
-     * and emits {@link DomainEvent.PullRequestReady} or {@link DomainEvent.PullRequestDrafted}.
+     * and emits {@link ScmDomainEvent.PullRequestReady} or {@link ScmDomainEvent.PullRequestDrafted}.
      * GitLab does not send separate webhook actions for these transitions (unlike GitHub's
      * {@code ready_for_review} and {@code converted_to_draft}), so we compare the stored
      * draft state against the incoming value.
@@ -252,17 +252,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         // Detect draft transitions and emit lifecycle events.
         // For new non-draft MRs, PullRequestReady is emitted so the practice review gate
         // can trigger immediately (matching GitHub's behavior for non-draft PR creation).
-        var prData = EventPayload.PullRequestData.from(pr);
+        var prData = ScmEventPayload.PullRequestData.from(pr);
         var eventCtx = EventContext.from(context);
         if (isNew && !attrs.draft()) {
-            eventPublisher.publishEvent(new DomainEvent.PullRequestReady(prData, eventCtx));
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReady(prData, eventCtx));
             log.debug("New non-draft merge request ready: prId={}", pr.getId());
         } else if (!isNew && wasDraft != null) {
             if (wasDraft && !attrs.draft()) {
-                eventPublisher.publishEvent(new DomainEvent.PullRequestReady(prData, eventCtx));
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReady(prData, eventCtx));
                 log.info("Merge request marked ready: prId={}, iid={}", pr.getId(), attrs.iid());
             } else if (!wasDraft && attrs.draft()) {
-                eventPublisher.publishEvent(new DomainEvent.PullRequestDrafted(prData, eventCtx));
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestDrafted(prData, eventCtx));
                 log.info("Merge request converted to draft: prId={}, iid={}", pr.getId(), attrs.iid());
             }
         }
@@ -280,8 +280,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         PullRequest pr = process(event, context);
         if (pr != null && before != Issue.State.CLOSED && before != Issue.State.MERGED) {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestClosed(
-                    EventPayload.PullRequestData.from(pr),
+                new ScmDomainEvent.PullRequestClosed(
+                    ScmEventPayload.PullRequestData.from(pr),
                     false,
                     EventContext.from(context)
                 )
@@ -301,7 +301,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         PullRequest pr = process(event, context);
         if (pr != null && before != Issue.State.OPEN) {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestReopened(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+                new ScmDomainEvent.PullRequestReopened(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Reopened merge request: prId={}", pr.getId());
         }
@@ -317,13 +317,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         Issue.State before = getExistingState(event, context);
         PullRequest pr = process(event, context);
         if (pr != null && before != Issue.State.MERGED) {
-            var prData = EventPayload.PullRequestData.from(pr);
+            var prData = ScmEventPayload.PullRequestData.from(pr);
             if (before != Issue.State.CLOSED) {
                 eventPublisher.publishEvent(
-                    new DomainEvent.PullRequestClosed(prData, true, EventContext.from(context))
+                    new ScmDomainEvent.PullRequestClosed(prData, true, EventContext.from(context))
                 );
             }
-            eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, EventContext.from(context)));
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestMerged(prData, EventContext.from(context)));
             log.debug("Merged merge request: prId={}", pr.getId());
         }
         return pr;
@@ -356,8 +356,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 review.setUpdatedAt(Instant.now());
                 reviewRepository.save(review);
 
-                EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+                ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
                 );
                 log.debug("Updated review to APPROVED: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
             }
@@ -367,8 +367,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             reviewRepository.save(review);
             pr.addReview(review);
 
-            EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+            ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
             );
             log.debug("Created approval review: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
         }
@@ -416,8 +416,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 review.setUpdatedAt(Instant.now());
                 reviewRepository.save(review);
 
-                EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
+                ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
                 );
                 log.debug("Dismissed review (unapproval): prId={}, reviewerId={}", pr.getId(), approver.getLogin());
             });
@@ -476,8 +476,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         review.setUpdatedAt(Instant.now());
         reviewRepository.save(review);
 
-        EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+        ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
+            eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
         );
         log.info(
             "Updated review to CHANGES_REQUESTED (from note signal): prId={}, reviewer={}",
@@ -656,24 +656,24 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         // Reconcile approvals (needs ctx for activity event emission)
         ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
         reconcileApprovals(data.syncApprovers(), pr, providerId, ctx);
-        var prData = EventPayload.PullRequestData.from(pr);
+        var prData = ScmEventPayload.PullRequestData.from(pr);
         var eventCtx = EventContext.from(ctx);
 
         if (isNew) {
-            eventPublisher.publishEvent(new DomainEvent.PullRequestCreated(prData, eventCtx));
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestCreated(prData, eventCtx));
 
             // Emit lifecycle events for MRs that are already in a terminal state
             // when first seen during sync (e.g. historical merged/closed MRs).
             if (isMerged) {
-                eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, true, eventCtx));
-                eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventCtx));
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestClosed(prData, true, eventCtx));
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestMerged(prData, eventCtx));
             } else if (mrState == Issue.State.CLOSED) {
-                eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, false, eventCtx));
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestClosed(prData, false, eventCtx));
             }
 
             log.debug("Created merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
         } else {
-            eventPublisher.publishEvent(new DomainEvent.PullRequestUpdated(prData, Set.of(), eventCtx));
+            eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(prData, Set.of(), eventCtx));
             log.debug("Updated merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
         }
 
@@ -816,13 +816,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
+                new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Created merge request: nativeId={}, iid={}", nativeId, mrNumber);
         } else {
             eventPublisher.publishEvent(
-                new DomainEvent.PullRequestUpdated(
-                    EventPayload.PullRequestData.from(pr),
+                new ScmDomainEvent.PullRequestUpdated(
+                    ScmEventPayload.PullRequestData.from(pr),
                     Set.of(),
                     EventContext.from(context)
                 )
@@ -1013,9 +1013,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                     reviewRepository.save(existingReview);
 
                     if (ctx != null) {
-                        EventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->
+                        ScmEventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->
                             eventPublisher.publishEvent(
-                                new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))
+                                new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))
                             )
                         );
                     }
@@ -1028,8 +1028,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 log.debug("Created approval review from sync: prId={}, reviewerId={}", pr.getId(), user.getLogin());
 
                 if (ctx != null) {
-                    EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                        eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+                    ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                        eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
                     );
                 }
             }
@@ -1053,8 +1053,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             log.debug("Dismissed stale review from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
 
             if (ctx != null) {
-                EventPayload.ReviewData.from(stale).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(ctx)))
+                ScmEventPayload.ReviewData.from(stale).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(ctx)))
                 );
             }
         }

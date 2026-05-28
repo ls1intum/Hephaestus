@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.contributors;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.scm.github.GitHubProperties;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -36,13 +35,13 @@ public class ContributorService {
     private final WebClient webClient;
     private final String githubAuthToken;
 
-    public ContributorService(WebClient.Builder webClientBuilder, GitHubProperties gitHubProperties) {
+    public ContributorService(WebClient.Builder webClientBuilder, ContributorProperties contributorProperties) {
         this.webClient = webClientBuilder
             .baseUrl(GITHUB_API_BASE)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
             .build();
-        this.githubAuthToken = gitHubProperties.meta().authToken();
+        this.githubAuthToken = contributorProperties.authToken();
     }
 
     /**
@@ -56,7 +55,7 @@ public class ContributorService {
         log.info("Fetching global contributors from GitHub.");
 
         if (githubAuthToken == null || githubAuthToken.isBlank()) {
-            log.warn("Contributor endpoint requires hephaestus.github.meta.auth-token to be configured.");
+            log.warn("Contributor endpoint requires hephaestus.contributors.github.auth-token to be configured.");
             return new ArrayList<>();
         }
 

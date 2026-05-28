@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.DomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -620,64 +620,64 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Component
     static class GitLabMergeRequestTestEventListener {
 
-        private final List<DomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
-        private final List<DomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
-        private final List<DomainEvent.ReviewSubmitted> reviewSubmittedEvents = new ArrayList<>();
-        private final List<DomainEvent.ReviewDismissed> reviewDismissedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.ReviewSubmitted> reviewSubmittedEvents = new ArrayList<>();
+        private final List<ScmDomainEvent.ReviewDismissed> reviewDismissedEvents = new ArrayList<>();
 
         @EventListener
-        public void onCreated(DomainEvent.PullRequestCreated event) {
+        public void onCreated(ScmDomainEvent.PullRequestCreated event) {
             createdEvents.add(event);
         }
 
         @EventListener
-        public void onClosed(DomainEvent.PullRequestClosed event) {
+        public void onClosed(ScmDomainEvent.PullRequestClosed event) {
             closedEvents.add(event);
         }
 
         @EventListener
-        public void onReopened(DomainEvent.PullRequestReopened event) {
+        public void onReopened(ScmDomainEvent.PullRequestReopened event) {
             reopenedEvents.add(event);
         }
 
         @EventListener
-        public void onMerged(DomainEvent.PullRequestMerged event) {
+        public void onMerged(ScmDomainEvent.PullRequestMerged event) {
             mergedEvents.add(event);
         }
 
         @EventListener
-        public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
+        public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
             reviewSubmittedEvents.add(event);
         }
 
         @EventListener
-        public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
+        public void onReviewDismissed(ScmDomainEvent.ReviewDismissed event) {
             reviewDismissedEvents.add(event);
         }
 
-        public List<DomainEvent.PullRequestCreated> getCreatedEvents() {
+        public List<ScmDomainEvent.PullRequestCreated> getCreatedEvents() {
             return new ArrayList<>(createdEvents);
         }
 
-        public List<DomainEvent.PullRequestClosed> getClosedEvents() {
+        public List<ScmDomainEvent.PullRequestClosed> getClosedEvents() {
             return new ArrayList<>(closedEvents);
         }
 
-        public List<DomainEvent.PullRequestReopened> getReopenedEvents() {
+        public List<ScmDomainEvent.PullRequestReopened> getReopenedEvents() {
             return new ArrayList<>(reopenedEvents);
         }
 
-        public List<DomainEvent.PullRequestMerged> getMergedEvents() {
+        public List<ScmDomainEvent.PullRequestMerged> getMergedEvents() {
             return new ArrayList<>(mergedEvents);
         }
 
-        public List<DomainEvent.ReviewSubmitted> getReviewSubmittedEvents() {
+        public List<ScmDomainEvent.ReviewSubmitted> getReviewSubmittedEvents() {
             return new ArrayList<>(reviewSubmittedEvents);
         }
 
-        public List<DomainEvent.ReviewDismissed> getReviewDismissedEvents() {
+        public List<ScmDomainEvent.ReviewDismissed> getReviewDismissedEvents() {
             return new ArrayList<>(reviewDismissedEvents);
         }
 

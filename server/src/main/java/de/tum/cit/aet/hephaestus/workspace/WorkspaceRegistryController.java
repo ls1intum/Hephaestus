@@ -4,9 +4,6 @@ import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
-import de.tum.cit.aet.hephaestus.workspace.dto.GitLabGroupDTO;
-import de.tum.cit.aet.hephaestus.workspace.dto.GitLabPreflightRequestDTO;
-import de.tum.cit.aet.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceProvidersDTO;
@@ -44,7 +41,6 @@ public class WorkspaceRegistryController {
     private final WorkspaceService workspaceService;
     private final WorkspaceQueryService workspaceQueryService;
     private final WorkspaceProvisioningService workspaceProvisioningService;
-    private final GitLabPreflightService gitLabPreflightService;
     private final FeatureFlagService featureFlagService;
 
     @GetMapping("/providers")
@@ -104,44 +100,4 @@ public class WorkspaceRegistryController {
         return ResponseEntity.ok(workspaceQueryService.findAccessibleWorkspaceListItems());
     }
 
-    @PostMapping("/gitlab/preflight")
-    @Operation(summary = "Validate a GitLab PAT before workspace creation")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Validation result",
-        content = @Content(schema = @Schema(implementation = GitLabPreflightResponseDTO.class))
-    )
-    @PreAuthorize(
-        "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
-    )
-    public ResponseEntity<GitLabPreflightResponseDTO> gitLabPreflight(
-        @Valid @RequestBody GitLabPreflightRequestDTO request
-    ) {
-        GitLabPreflightResponseDTO result = gitLabPreflightService.validateToken(
-            request.personalAccessToken(),
-            request.serverUrl(),
-            request.groupFullPath()
-        );
-        return ResponseEntity.ok(result);
-    }
-
-    @PostMapping("/gitlab/groups")
-    @Operation(summary = "List GitLab groups accessible to a PAT")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Accessible groups",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = GitLabGroupDTO.class)))
-    )
-    @PreAuthorize(
-        "@featureFlagService.isEnabled(T(de.tum.cit.aet.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
-    )
-    public ResponseEntity<List<GitLabGroupDTO>> listGitLabGroups(
-        @Valid @RequestBody GitLabPreflightRequestDTO request
-    ) {
-        List<GitLabGroupDTO> groups = gitLabPreflightService.listAccessibleGroups(
-            request.personalAccessToken(),
-            request.serverUrl()
-        );
-        return ResponseEntity.ok(groups);
-    }
 }

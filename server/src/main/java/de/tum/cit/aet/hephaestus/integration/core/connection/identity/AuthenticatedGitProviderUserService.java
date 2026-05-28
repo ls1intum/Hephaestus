@@ -5,10 +5,15 @@ import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.GitProviderServerUrlResolver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,16 +33,18 @@ public class AuthenticatedGitProviderUserService {
 
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
-    private final GitLabProperties gitLabProperties;
+    private final Map<IntegrationKind, GitProviderServerUrlResolver> serverUrlResolvers;
 
     public AuthenticatedGitProviderUserService(
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
-        GitLabProperties gitLabProperties
+        List<GitProviderServerUrlResolver> serverUrlResolvers
     ) {
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
-        this.gitLabProperties = gitLabProperties;
+        this.serverUrlResolvers = serverUrlResolvers
+            .stream()
+            .collect(Collectors.toUnmodifiableMap(GitProviderServerUrlResolver::kind, Function.identity()));
     }
 
     @Transactional
@@ -151,7 +158,13 @@ public class AuthenticatedGitProviderUserService {
             String url = configServerUrl.trim();
             return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         }
-        return gitLabProperties.defaultServerUrl();
+        GitProviderServerUrlResolver resolver = serverUrlResolvers.get(IntegrationKind.GITLAB);
+        if (resolver == null) {
+            throw new IllegalStateException(
+                "GitProviderServerUrlResolver for GITLAB is not wired — cannot resolve default GitLab URL"
+            );
+        }
+        return resolver.defaultServerUrl();
     }
 
     private Long upsertGitHubUser(

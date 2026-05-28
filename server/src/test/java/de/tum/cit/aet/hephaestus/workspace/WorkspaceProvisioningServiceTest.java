@@ -18,10 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.identity.Authentica
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,15 +41,6 @@ class WorkspaceProvisioningServiceTest {
     private WorkspaceService workspaceService;
 
     @Mock
-    private GithubLifecycleListener githubLifecycleListener;
-
-    @Mock
-    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
-
-    @Mock
-    private GitHubAppTokenService gitHubAppTokenService;
-
-    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -64,9 +51,6 @@ class WorkspaceProvisioningServiceTest {
 
     @Mock
     private WorkspaceMembershipService workspaceMembershipService;
-
-    @Mock
-    private WorkspaceScopeFilter workspaceScopeFilter;
 
     @Mock
     private AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
@@ -87,30 +71,18 @@ class WorkspaceProvisioningServiceTest {
             null
         );
 
-        var gitLabProperties = new GitLabProperties(
-            "https://gitlab.com",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
-
         provisioningService = new WorkspaceProvisioningService(
             workspaceProperties,
             workspaceRepository,
             repositoryToMonitorRepository,
             workspaceService,
-            githubLifecycleListener,
-            workspaceRepositoryMonitorService,
-            gitHubAppTokenService,
             userRepository,
             gitProviderRepository,
             workspaceMembershipRepository,
             workspaceMembershipService,
-            workspaceScopeFilter,
-            gitLabProperties,
             authenticatedGitProviderUserService,
-            connectionService
+            connectionService,
+            List.of()
         );
     }
 
