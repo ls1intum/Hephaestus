@@ -51,7 +51,7 @@ importers:
         specifier: 9.1.7
         version: 9.1.7
       mprocs:
-        specifier: ^0.9.3
+        specifier: 0.9.3
         version: 0.9.3
       npm-run-all2:
         specifier: 8.0.4
