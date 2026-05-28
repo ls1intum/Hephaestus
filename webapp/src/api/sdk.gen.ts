@@ -573,7 +573,7 @@ export const getUserProfile = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Get contributor activity monitor
  *
- * Returns configurable workspace-scoped activity monitor data for a contributor
+ * Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters
  */
 export const getActivityMonitor = <ThrowOnError extends boolean = false>(options: Options<GetActivityMonitorData, ThrowOnError>) => (options.client ?? client).get<GetActivityMonitorResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/profile/{login}/activity-monitor', ...options });
 

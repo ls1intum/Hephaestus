@@ -1270,7 +1270,7 @@ export const getActivityMonitorQueryKey = (options: Options<GetActivityMonitorDa
 /**
  * Get contributor activity monitor
  *
- * Returns configurable workspace-scoped activity monitor data for a contributor
+ * Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters
  */
 export const getActivityMonitorOptions = (options: Options<GetActivityMonitorData>) => queryOptions<GetActivityMonitorResponse, DefaultError, GetActivityMonitorResponse, ReturnType<typeof getActivityMonitorQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1290,7 +1290,7 @@ export const getActivityMonitorInfiniteQueryKey = (options: Options<GetActivityM
 /**
  * Get contributor activity monitor
  *
- * Returns configurable workspace-scoped activity monitor data for a contributor
+ * Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters
  */
 export const getActivityMonitorInfiniteOptions = (options: Options<GetActivityMonitorData>) => infiniteQueryOptions<GetActivityMonitorResponse, DefaultError, InfiniteData<GetActivityMonitorResponse>, QueryKey<Options<GetActivityMonitorData>>, Date | Pick<QueryKey<Options<GetActivityMonitorData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
 // @ts-ignore

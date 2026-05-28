@@ -6,10 +6,14 @@ import {
 	getUserProfileOptions,
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { ActivityMonitorFilters } from "@/components/profile/ProfileContent";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import {
+	type ActivityMonitorFilters,
+	DEFAULT_ACTIVITY_MONITOR_LIMIT,
+	MAX_ACTIVITY_MONITOR_LIMIT,
+} from "@/lib/activity-monitor";
 import {
 	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
@@ -17,13 +21,16 @@ import {
 	type LeaderboardSchedule,
 } from "@/lib/timeframe";
 
-// Default is computed dynamically using the leaderboard schedule
-// We don't set a default here because we need the schedule from the workspace
 const profileSearchSchema = z.object({
 	after: z.string().optional(),
 	before: z.string().optional(),
 	monitorRepositories: z.string().optional(),
-	monitorLimit: z.coerce.number().int().min(1).max(100).default(5),
+	monitorLimit: z.coerce
+		.number()
+		.int()
+		.min(1)
+		.max(MAX_ACTIVITY_MONITOR_LIMIT)
+		.default(DEFAULT_ACTIVITY_MONITOR_LIMIT),
 });
 
 type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
@@ -151,7 +158,7 @@ function UserProfile() {
 			search: (prev: ProfileSearchParams) => ({
 				...prev,
 				monitorRepositories: serializeRepositoryIds(filters.repositoryIds),
-				monitorLimit: filters.limit === 5 ? undefined : filters.limit,
+				monitorLimit: filters.limit === DEFAULT_ACTIVITY_MONITOR_LIMIT ? undefined : filters.limit,
 			}),
 		});
 	};
@@ -168,7 +175,8 @@ function UserProfile() {
 			onActivityMonitorFiltersChange={handleActivityMonitorFiltersChange}
 			isLoading={
 				(profileQuery.isPending && !profileQuery.data) ||
-				(workspaceQuery.isPending && !workspaceQuery.data)
+				(workspaceQuery.isPending && !workspaceQuery.data) ||
+				(activityMonitorQuery.isPending && !activityMonitorQuery.data)
 			}
 			error={profileQuery.isError}
 			username={username}

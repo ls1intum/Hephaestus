@@ -1,49 +1,23 @@
 import { CodeReviewIcon } from "@primer/octicons-react";
-import { ArrowRightIcon, Settings2Icon } from "lucide-react";
-import type {
-	ProfileActivityMonitor,
-	ProfileActivityStats,
-	ProfileReviewActivity,
-	PullRequestBaseInfo,
-	PullRequestInfo,
-	RepositoryInfo,
-} from "@/api/types.gen";
+import { ArrowRightIcon } from "lucide-react";
+import type { ProfileActivityMonitor, PullRequestBaseInfo } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import {
-	Popover,
-	PopoverContent,
-	PopoverDescription,
-	PopoverHeader,
-	PopoverTitle,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { type ActivityMonitorFilters, MAX_ACTIVITY_MONITOR_LIMIT } from "@/lib/activity-monitor";
 import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
 import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
+import { ActivityMonitorConfiguration } from "./ActivityMonitorConfiguration";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
-export interface ActivityMonitorFilters {
-	repositoryIds: number[];
-	limit: number;
-}
-
 export interface ProfileContentProps {
 	providerType?: ProviderType;
-	reviewActivity?: ProfileReviewActivity[];
-	openPullRequests?: PullRequestInfo[];
-	/** Server-computed activity stats */
-	activityStats?: ProfileActivityStats;
-	/** Server-provided list of reviewed pull requests */
-	reviewedPullRequests?: PullRequestInfo[];
 	activityMonitorData?: ProfileActivityMonitor;
-	activityMonitorFilters?: ActivityMonitorFilters;
-	onActivityMonitorFiltersChange?: (filters: ActivityMonitorFilters) => void;
+	activityMonitorFilters: ActivityMonitorFilters;
+	onActivityMonitorFiltersChange: (filters: ActivityMonitorFilters) => void;
 	isLoading: boolean;
 	username: string;
 	displayName?: string;
@@ -52,21 +26,13 @@ export interface ProfileContentProps {
 	afterDate?: string;
 	beforeDate?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
 }
 
 export function ProfileContent({
 	providerType = "GITHUB",
-	reviewActivity = [],
-	openPullRequests = [],
-	activityStats,
-	reviewedPullRequests,
 	activityMonitorData,
-	activityMonitorFilters = {
-		repositoryIds: [],
-		limit: 5,
-	},
+	activityMonitorFilters,
 	onActivityMonitorFiltersChange,
 	isLoading,
 	username,
@@ -77,54 +43,30 @@ export function ProfileContent({
 	onTimeframeChange,
 	schedule,
 }: ProfileContentProps) {
-	const skeletonReviews = isLoading ? Array.from({ length: 3 }, (_, i) => ({ id: i })) : [];
-	const skeletonPullRequests = isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : [];
+	const stats = activityMonitorData?.activityStats;
+	const repositories = activityMonitorData?.repositories ?? [];
 
-	const monitorReviewActivity = activityMonitorData?.reviewActivity ?? reviewActivity;
-	const monitorPullRequests = activityMonitorData?.authoredPullRequests ?? openPullRequests;
-	const monitorActivityStats = activityMonitorData?.activityStats ?? activityStats;
-	const monitorRepositories = activityMonitorData?.repositories ?? [];
-
-	const filteredReviewActivity = isLoading
-		? skeletonReviews
-		: (monitorReviewActivity ?? []).filter((activity) => (activity.score ?? 0) > 0);
-
-	const displayPullRequests = isLoading ? skeletonPullRequests : monitorPullRequests;
+	const reviewActivity = (activityMonitorData?.reviewActivity ?? []).filter(
+		(activity) => (activity.score ?? 0) > 0,
+	);
+	const pullRequests = activityMonitorData?.authoredPullRequests ?? [];
+	const totalReviewActivityCount = activityMonitorData?.totalReviewActivityCount ?? 0;
+	const totalAuthoredPullRequestCount = activityMonitorData?.totalAuthoredPullRequestCount ?? 0;
 
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
-	const totalReviewActivityCount =
-		activityMonitorData?.totalReviewActivityCount ?? filteredReviewActivity.length;
-	const totalAuthoredPullRequestCount =
-		activityMonitorData?.totalAuthoredPullRequestCount ?? displayPullRequests.length;
-	const canViewAllReviewActivity =
-		!isLoading && totalReviewActivityCount > filteredReviewActivity.length;
-	const canViewAllPullRequests =
-		!isLoading && totalAuthoredPullRequestCount > displayPullRequests.length;
 
-	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
-		!activityMonitorData && reviewedPullRequests && reviewedPullRequests.length > 0
-			? reviewedPullRequests
-			: (monitorReviewActivity ?? [])
-					.filter((activity) => (activity.score ?? 0) > 0)
-					.map((activity) => activity.pullRequest)
-					.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
+	const canViewAllReviewActivity = !isLoading && totalReviewActivityCount > reviewActivity.length;
+	const canViewAllPullRequests = !isLoading && totalAuthoredPullRequestCount > pullRequests.length;
 
-	const toggleRepository = (repositoryId: number, checked: boolean) => {
-		const nextRepositoryIds = checked
-			? [...new Set([...activityMonitorFilters.repositoryIds, repositoryId])]
-			: activityMonitorFilters.repositoryIds.filter((id) => id !== repositoryId);
-
-		onActivityMonitorFiltersChange?.({
-			...activityMonitorFilters,
-			repositoryIds: nextRepositoryIds,
-		});
-	};
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] = reviewActivity
+		.map((activity) => activity.pullRequest)
+		.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
 
 	const expandMonitor = () => {
-		onActivityMonitorFiltersChange?.({
+		onActivityMonitorFiltersChange({
 			...activityMonitorFilters,
-			limit: 100,
+			limit: MAX_ACTIVITY_MONITOR_LIMIT,
 		});
 	};
 
@@ -136,16 +78,16 @@ export function ProfileContent({
 						<h2 className="text-xl font-semibold">Activity Monitor</h2>
 						<ActivityBadges
 							reviewedPullRequests={reviewedPullRequestsForPopover}
-							approvals={monitorActivityStats?.numberOfApprovals ?? 0}
-							changeRequests={monitorActivityStats?.numberOfChangeRequests ?? 0}
-							comments={monitorActivityStats?.numberOfComments ?? 0}
-							codeComments={monitorActivityStats?.numberOfCodeComments ?? 0}
-							ownReplies={monitorActivityStats?.numberOfOwnReplies ?? 0}
-							openPullRequests={monitorActivityStats?.numberOfOpenPullRequests ?? 0}
-							mergedPullRequests={monitorActivityStats?.numberOfMergedPullRequests ?? 0}
-							closedPullRequests={monitorActivityStats?.numberOfClosedPullRequests ?? 0}
-							openedIssues={monitorActivityStats?.numberOfOpenedIssues ?? 0}
-							closedIssues={monitorActivityStats?.numberOfClosedIssues ?? 0}
+							approvals={stats?.numberOfApprovals ?? 0}
+							changeRequests={stats?.numberOfChangeRequests ?? 0}
+							comments={stats?.numberOfComments ?? 0}
+							codeComments={stats?.numberOfCodeComments ?? 0}
+							ownReplies={stats?.numberOfOwnReplies ?? 0}
+							openPullRequests={stats?.numberOfOpenPullRequests ?? 0}
+							mergedPullRequests={stats?.numberOfMergedPullRequests ?? 0}
+							closedPullRequests={stats?.numberOfClosedPullRequests ?? 0}
+							openedIssues={stats?.numberOfOpenedIssues ?? 0}
+							closedIssues={stats?.numberOfClosedIssues ?? 0}
 							isLoading={isLoading}
 							providerType={providerType}
 						/>
@@ -162,25 +104,26 @@ export function ProfileContent({
 						schedule={schedule}
 						enableAllActivity
 					/>
-					{onActivityMonitorFiltersChange && (
-						<ActivityMonitorConfiguration
-							repositories={monitorRepositories}
-							filters={activityMonitorFilters}
-							onRepositoryChange={toggleRepository}
-						/>
-					)}
+					<ActivityMonitorConfiguration
+						repositories={repositories}
+						filters={activityMonitorFilters}
+						onFiltersChange={onActivityMonitorFiltersChange}
+					/>
 				</div>
 			</div>
 			<div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-				{/* Review Activity */}
 				<div className="flex flex-col gap-4">
 					<h3 className="text-lg font-semibold">Review activity</h3>
 					<div className="flex flex-col gap-2">
-						{filteredReviewActivity.length > 0 ? (
-							(filteredReviewActivity as ProfileReviewActivity[]).map((activity) => (
+						{isLoading ? (
+							Array.from({ length: 3 }, (_, i) => (
+								<ReviewActivityCard key={i} isLoading providerType={providerType} />
+							))
+						) : reviewActivity.length > 0 ? (
+							reviewActivity.map((activity) => (
 								<ReviewActivityCard
 									key={activity.id}
-									isLoading={isLoading}
+									isLoading={false}
 									state={activity.state}
 									submittedAt={activity.submittedAt}
 									htmlUrl={activity.htmlUrl}
@@ -214,16 +157,18 @@ export function ProfileContent({
 						</Button>
 					)}
 				</div>
-
-				{/* Open Pull Requests / Merge Requests */}
 				<div className="flex flex-col gap-4">
 					<h3 className="text-lg font-semibold">Open {terms.pullRequests.toLowerCase()}</h3>
 					<div className="flex flex-col gap-2">
-						{displayPullRequests.length > 0 ? (
-							(displayPullRequests as PullRequestInfo[]).map((pullRequest) => (
+						{isLoading ? (
+							Array.from({ length: 2 }, (_, i) => (
+								<IssueCard key={i} isLoading providerType={providerType} />
+							))
+						) : pullRequests.length > 0 ? (
+							pullRequests.map((pullRequest) => (
 								<IssueCard
 									key={pullRequest.id}
-									isLoading={isLoading}
+									isLoading={false}
 									additions={pullRequest.additions}
 									deletions={pullRequest.deletions}
 									number={pullRequest.number}
@@ -264,81 +209,5 @@ export function ProfileContent({
 				</div>
 			</div>
 		</div>
-	);
-}
-
-interface ActivityMonitorConfigurationProps {
-	repositories: RepositoryInfo[];
-	filters: ActivityMonitorFilters;
-	onRepositoryChange: (repositoryId: number, checked: boolean) => void;
-}
-
-function ActivityMonitorConfiguration({
-	repositories,
-	filters,
-	onRepositoryChange,
-}: ActivityMonitorConfigurationProps) {
-	return (
-		<Popover>
-			<PopoverTrigger
-				render={
-					<Button type="button" variant="outline" className="w-65">
-						Configure activity monitor
-						<Settings2Icon data-icon="inline-end" />
-					</Button>
-				}
-			/>
-			<PopoverContent align="end" className="w-80">
-				<PopoverHeader>
-					<PopoverTitle>Activity monitor</PopoverTitle>
-					<PopoverDescription>Filter activity by repository.</PopoverDescription>
-				</PopoverHeader>
-
-				<div className="grid gap-2">
-					<p className="text-sm font-medium">Repositories</p>
-					{repositories.length > 0 ? (
-						repositories.map((repository) => (
-							<ActivityMonitorCheckbox
-								key={repository.id}
-								id={`activity-monitor-repository-${repository.id}`}
-								label={repository.nameWithOwner}
-								checked={filters.repositoryIds.includes(repository.id)}
-								onCheckedChange={(checked) => onRepositoryChange(repository.id, checked)}
-							/>
-						))
-					) : (
-						<p className="text-sm text-muted-foreground">No repositories for this timeframe.</p>
-					)}
-				</div>
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-interface ActivityMonitorCheckboxProps {
-	id: string;
-	label: string;
-	checked: boolean;
-	onCheckedChange: (checked: boolean) => void;
-}
-
-function ActivityMonitorCheckbox({
-	id,
-	label,
-	checked,
-	onCheckedChange,
-}: ActivityMonitorCheckboxProps) {
-	return (
-		<Label
-			htmlFor={id}
-			className="grid min-h-8 grid-cols-[1rem_1fr] items-center gap-2 text-sm font-normal"
-		>
-			<Checkbox
-				id={id}
-				checked={checked}
-				onCheckedChange={(nextChecked) => onCheckedChange(nextChecked === true)}
-			/>
-			<span className="truncate">{label}</span>
-		</Label>
 	);
 }

@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestBaseInfoDTO;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -39,7 +38,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.slf4j.Logger;
@@ -70,31 +68,29 @@ public class UserProfileService {
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceContributionActivityService workspaceContributionActivityService;
     private final ProfileActivityQueryService profileActivityQueryService;
-    private final PullRequestRepository pullRequestRepository;
     private final ActivityEventRepository activityEventRepository;
 
     /**
-     * Get user profile with workspace-scoped activity data.
+     * Get the profile header for a user: identity, league standing, contribution surface, XP.
+     *
+     * <p>Time-windowed activity (review activity, open PRs, badges) is served by
+     * {@link #getActivityMonitor} so the header doesn't refetch when filters change.
      *
      * @param login       GitHub login
-     * @param workspaceId workspace to scope activity to (null for global view)
+     * @param workspaceId workspace to scope contributions to (null for global view)
      * @param after       start of activity window (null for default 7 days before 'before')
      * @param before      end of activity window (null for now)
-     * @return user profile with open PRs, review activity with XP, etc.
      */
     @Transactional(readOnly = true)
     public Optional<ProfileDTO> getUserProfile(String login, Long workspaceId, Instant after, Instant before) {
         String safeLogin = LoggingUtils.sanitizeForLog(login);
         TimeRange timeRange = resolveTimeRange(login, after, before);
-        String safeWorkspace = workspaceId == null ? "null" : LoggingUtils.sanitizeForLog(workspaceId.toString());
-        String safeAfter = LoggingUtils.sanitizeForLog(timeRange.after().toString());
-        String safeBefore = LoggingUtils.sanitizeForLog(timeRange.before().toString());
         log.debug(
             "Getting user profile for login: {} in workspace: {} with timeframe {} - {}",
             safeLogin,
-            safeWorkspace,
-            safeAfter,
-            safeBefore
+            workspaceId,
+            timeRange.after(),
+            timeRange.before()
         );
 
         Optional<User> optionalUser = userRepository.findByLogin(login);
@@ -103,26 +99,15 @@ public class UserProfileService {
         }
 
         User userEntity = optionalUser.get();
-
         int leaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, userEntity);
         UserInfoDTO user = UserInfoDTO.fromUser(userEntity, leaguePoints);
 
-        // First contribution is workspace-scoped to only show activity in monitored repositories
-        var firstContribution =
+        Instant firstContribution =
             workspaceId == null
                 ? null
                 : workspaceContributionActivityService
                       .findFirstContributionInstant(workspaceId, userEntity.getId())
                       .orElse(null);
-
-        List<PullRequestInfoDTO> openPullRequests =
-            workspaceId == null
-                ? List.of()
-                : profilePullRequestQueryRepository
-                      .findAuthoredByLoginAndStates(login, Set.of(Issue.State.OPEN), workspaceId, null, null)
-                      .stream()
-                      .map(PullRequestInfoDTO::fromPullRequest)
-                      .toList();
 
         List<RepositoryInfoDTO> contributedRepositories =
             workspaceId == null
@@ -134,40 +119,9 @@ public class UserProfileService {
                       .sorted(Comparator.comparing(RepositoryInfoDTO::name))
                       .toList();
 
-        // Review activity uses ActivityEvent as the source of truth, then hydrates git entities.
-        List<ProfileReviewActivityDTO> reviewActivity = buildReviewActivity(userEntity.getId(), workspaceId, timeRange);
-
-        // Activity stats from activity events (matches leaderboard semantics)
-        ProfileActivityStatsDTO activityStats = profileActivityQueryService.getActivityStats(
-            workspaceId,
-            userEntity.getId(),
-            timeRange.after(),
-            timeRange.before()
-        );
-
-        // Keep the backend list aligned with leaderboard semantics; the profile UI can merge
-        // in visible own-PR activity when presenting this list.
-        List<PullRequestInfoDTO> reviewedPullRequests = buildReviewedPullRequestsList(
-            workspaceId,
-            userEntity.getId(),
-            timeRange
-        );
-
-        // Aggregate the user XP and let the XpSystem calculate the level and boundaries
         ProfileXpRecordDTO xpRecord = buildUserXpRecord(workspaceId, user.id());
 
-        return Optional.of(
-            new ProfileDTO(
-                user,
-                firstContribution,
-                contributedRepositories,
-                reviewActivity,
-                openPullRequests,
-                activityStats,
-                reviewedPullRequests,
-                xpRecord
-            )
-        );
+        return Optional.of(new ProfileDTO(user, firstContribution, contributedRepositories, xpRecord));
     }
 
     @Transactional(readOnly = true)
@@ -190,8 +144,9 @@ public class UserProfileService {
 
         User user = optionalUser.get();
         TimeRange timeRange = resolveTimeRange(login, after, before);
-        Set<Long> resolvedRepositoryIds = normalizeRepositoryIds(repositoryIds);
-        int resolvedLimit = resolveActivityMonitorLimit(limit);
+        Set<Long> repoFilter = repositoryIds == null ? Set.of() : repositoryIds;
+        int resolvedLimit =
+            limit == null ? DEFAULT_ACTIVITY_MONITOR_LIMIT : Math.max(1, Math.min(limit, MAX_ACTIVITY_MONITOR_LIMIT));
 
         List<ProfileReviewActivityDTO> allReviewActivity = buildReviewActivity(user.getId(), workspaceId, timeRange);
         List<PullRequestInfoDTO> allAuthoredPullRequests = profilePullRequestQueryRepository
@@ -208,26 +163,31 @@ public class UserProfileService {
 
         List<RepositoryInfoDTO> repositories = collectMonitorRepositories(allReviewActivity, allAuthoredPullRequests);
 
-        List<ProfileReviewActivityDTO> filteredReviewActivity = allReviewActivity
-            .stream()
-            .filter(activity -> matchesRepository(activity, resolvedRepositoryIds))
-            .toList();
+        List<ProfileReviewActivityDTO> filteredReviewActivity = filterByRepository(
+            allReviewActivity,
+            activity -> repositoryIdOf(activity.pullRequest()),
+            repoFilter
+        );
+        List<PullRequestInfoDTO> filteredAuthoredPullRequests = filterByRepository(
+            allAuthoredPullRequests,
+            pr -> repositoryIdOf(pr.repository()),
+            repoFilter
+        );
 
-        List<PullRequestInfoDTO> filteredAuthoredPullRequests = allAuthoredPullRequests
-            .stream()
-            .filter(pr -> matchesRepository(pr, resolvedRepositoryIds))
-            .toList();
-
-        ProfileActivityStatsDTO activityStats = buildMonitorActivityStats(
-            filteredReviewActivity,
-            filteredAuthoredPullRequests
+        // Aggregate stats come from the workspace-wide ledger so the badges reflect the user's
+        // full activity, while the lists are filtered to the selected repositories.
+        ProfileActivityStatsDTO activityStats = profileActivityQueryService.getActivityStats(
+            workspaceId,
+            user.getId(),
+            timeRange.after(),
+            timeRange.before()
         );
 
         return Optional.of(
             new ProfileActivityMonitorDTO(
                 activityStats,
-                limitList(filteredReviewActivity, resolvedLimit),
-                limitList(filteredAuthoredPullRequests, resolvedLimit),
+                filteredReviewActivity.stream().limit(resolvedLimit).toList(),
+                filteredAuthoredPullRequests.stream().limit(resolvedLimit).toList(),
                 repositories,
                 filteredReviewActivity.size(),
                 filteredAuthoredPullRequests.size()
@@ -370,128 +330,44 @@ public class UserProfileService {
             .toList();
     }
 
-    private Set<Long> normalizeRepositoryIds(Set<Long> repositoryIds) {
-        if (repositoryIds == null || repositoryIds.isEmpty()) {
-            return Set.of();
+    private static Long repositoryIdOf(PullRequestBaseInfoDTO pullRequest) {
+        return pullRequest != null && pullRequest.repository() != null ? pullRequest.repository().id() : null;
+    }
+
+    private static Long repositoryIdOf(RepositoryInfoDTO repository) {
+        return repository != null ? repository.id() : null;
+    }
+
+    private static <T> List<T> filterByRepository(
+        List<T> items,
+        Function<T, Long> repositoryIdExtractor,
+        Set<Long> repositoryIds
+    ) {
+        if (repositoryIds.isEmpty()) {
+            return items;
         }
-        return repositoryIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
-    }
-
-    private int resolveActivityMonitorLimit(Integer limit) {
-        if (limit == null) {
-            return DEFAULT_ACTIVITY_MONITOR_LIMIT;
-        }
-        return Math.max(1, Math.min(limit, MAX_ACTIVITY_MONITOR_LIMIT));
-    }
-
-    private <T> List<T> limitList(List<T> items, int limit) {
-        return items.stream().limit(limit).toList();
-    }
-
-    private boolean matchesRepository(ProfileReviewActivityDTO activity, Set<Long> repositoryIds) {
-        PullRequestBaseInfoDTO pullRequest = activity.pullRequest();
-        Long repositoryId =
-            pullRequest != null && pullRequest.repository() != null ? pullRequest.repository().id() : null;
-        return matchesRepository(repositoryId, repositoryIds);
-    }
-
-    private boolean matchesRepository(PullRequestInfoDTO pullRequest, Set<Long> repositoryIds) {
-        Long repositoryId = pullRequest.repository() != null ? pullRequest.repository().id() : null;
-        return matchesRepository(repositoryId, repositoryIds);
-    }
-
-    private boolean matchesRepository(Long repositoryId, Set<Long> repositoryIds) {
-        return repositoryIds == null || repositoryIds.isEmpty() || repositoryIds.contains(repositoryId);
+        return items
+            .stream()
+            .filter(item -> repositoryIds.contains(repositoryIdExtractor.apply(item)))
+            .toList();
     }
 
     private List<RepositoryInfoDTO> collectMonitorRepositories(
         List<ProfileReviewActivityDTO> reviewActivity,
         List<PullRequestInfoDTO> authoredPullRequests
     ) {
-        return Stream.concat(
-            reviewActivity
-                .stream()
-                .map(ProfileReviewActivityDTO::pullRequest)
-                .map(pullRequest -> pullRequest != null ? pullRequest.repository() : null),
-            authoredPullRequests.stream().map(PullRequestInfoDTO::repository)
-        )
-            .filter(Objects::nonNull)
-            .collect(Collectors.toMap(RepositoryInfoDTO::id, Function.identity(), (existing, replacement) -> existing))
-            .values()
+        Map<Long, RepositoryInfoDTO> byId = new LinkedHashMap<>();
+        reviewActivity
             .stream()
-            .sorted(Comparator.comparing(RepositoryInfoDTO::nameWithOwner))
-            .toList();
-    }
-
-    private ProfileActivityStatsDTO buildMonitorActivityStats(
-        List<ProfileReviewActivityDTO> reviewActivity,
-        List<PullRequestInfoDTO> authoredPullRequests
-    ) {
-        int score = reviewActivity
-            .stream()
-            .map(ProfileReviewActivityDTO::score)
+            .map(activity -> activity.pullRequest() == null ? null : activity.pullRequest().repository())
             .filter(Objects::nonNull)
-            .mapToInt(Integer::intValue)
-            .sum();
-        int reviewedPrs = (int) reviewActivity
+            .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
+        authoredPullRequests
             .stream()
-            .map(ProfileReviewActivityDTO::pullRequest)
+            .map(PullRequestInfoDTO::repository)
             .filter(Objects::nonNull)
-            .map(PullRequestBaseInfoDTO::id)
-            .filter(Objects::nonNull)
-            .distinct()
-            .count();
-        int approvals = countReviewState(reviewActivity, PullRequestReview.State.APPROVED);
-        int changeRequests = countReviewState(reviewActivity, PullRequestReview.State.CHANGES_REQUESTED);
-        int comments = countReviewState(reviewActivity, PullRequestReview.State.COMMENTED);
-        int unknowns = countReviewState(reviewActivity, PullRequestReview.State.UNKNOWN);
-        int codeComments = reviewActivity
-            .stream()
-            .map(ProfileReviewActivityDTO::codeComments)
-            .filter(Objects::nonNull)
-            .mapToInt(Integer::intValue)
-            .sum();
-        return new ProfileActivityStatsDTO(
-            score,
-            reviewedPrs,
-            approvals,
-            changeRequests,
-            comments,
-            codeComments,
-            unknowns,
-            0,
-            authoredPullRequests.size(),
-            0,
-            0,
-            0,
-            0
-        );
-    }
-
-    private int countReviewState(List<ProfileReviewActivityDTO> reviewActivity, PullRequestReview.State state) {
-        return (int) reviewActivity
-            .stream()
-            .filter(activity -> state.equals(activity.state()))
-            .count();
-    }
-
-    private List<PullRequestInfoDTO> buildReviewedPullRequestsList(Long workspaceId, Long userId, TimeRange timeRange) {
-        if (workspaceId == null) {
-            return List.of();
-        }
-
-        List<Long> prIds = activityEventRepository.findDistinctReviewedPullRequestIdsByActor(
-            workspaceId,
-            userId,
-            timeRange.after(),
-            timeRange.before()
-        );
-
-        if (prIds.isEmpty()) {
-            return List.of();
-        }
-
-        return pullRequestRepository.findAllById(prIds).stream().map(PullRequestInfoDTO::fromPullRequest).toList();
+            .forEach(repo -> byId.putIfAbsent(repo.id(), repo));
+        return byId.values().stream().sorted(Comparator.comparing(RepositoryInfoDTO::nameWithOwner)).toList();
     }
 
     private ProfileXpRecordDTO buildUserXpRecord(Long workspaceId, Long userId) {

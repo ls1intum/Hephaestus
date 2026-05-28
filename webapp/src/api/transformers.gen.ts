@@ -332,6 +332,19 @@ export const setActiveResponseTransformer = async (data: any): Promise<SetActive
     return data;
 };
 
+const profileSchemaResponseTransformer = (data: any) => {
+    data.contributedRepositories = data.contributedRepositories.map((item: any) => repositoryInfoSchemaResponseTransformer(item));
+    if (data.firstContribution) {
+        data.firstContribution = new Date(data.firstContribution);
+    }
+    return data;
+};
+
+export const getUserProfileResponseTransformer = async (data: any): Promise<GetUserProfileResponse> => {
+    data = profileSchemaResponseTransformer(data);
+    return data;
+};
+
 const pullRequestBaseInfoSchemaResponseTransformer = (data: any) => {
     if (data.repository) {
         data.repository = repositoryInfoSchemaResponseTransformer(data.repository);
@@ -344,22 +357,6 @@ const profileReviewActivitySchemaResponseTransformer = (data: any) => {
         data.pullRequest = pullRequestBaseInfoSchemaResponseTransformer(data.pullRequest);
     }
     data.submittedAt = new Date(data.submittedAt);
-    return data;
-};
-
-const profileSchemaResponseTransformer = (data: any) => {
-    data.contributedRepositories = data.contributedRepositories.map((item: any) => repositoryInfoSchemaResponseTransformer(item));
-    if (data.firstContribution) {
-        data.firstContribution = new Date(data.firstContribution);
-    }
-    data.openPullRequests = data.openPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
-    data.reviewActivity = data.reviewActivity.map((item: any) => profileReviewActivitySchemaResponseTransformer(item));
-    data.reviewedPullRequests = data.reviewedPullRequests.map((item: any) => pullRequestInfoSchemaResponseTransformer(item));
-    return data;
-};
-
-export const getUserProfileResponseTransformer = async (data: any): Promise<GetUserProfileResponse> => {
-    data = profileSchemaResponseTransformer(data);
     return data;
 };
 

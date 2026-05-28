@@ -7,8 +7,31 @@ const now = new Date();
 const defaultAfter = formatISO(startOfISOWeek(now));
 const defaultBefore = formatISO(endOfISOWeek(now));
 
-// Mock review activity data
-const mockReviewActivity = [
+const repositories = [
+	{
+		id: 1,
+		name: "Hephaestus",
+		nameWithOwner: "ls1intum/Hephaestus",
+		htmlUrl: "https://github.com/ls1intum/Hephaestus",
+		hiddenFromContributions: false,
+	},
+	{
+		id: 2,
+		name: "Artemis",
+		nameWithOwner: "ls1intum/Artemis",
+		htmlUrl: "https://github.com/ls1intum/Artemis",
+		hiddenFromContributions: false,
+	},
+	{
+		id: 3,
+		name: "Athena",
+		nameWithOwner: "ls1intum/Athena",
+		htmlUrl: "https://github.com/ls1intum/Athena",
+		hiddenFromContributions: false,
+	},
+];
+
+const reviewActivity = [
 	{
 		id: 1,
 		state: "APPROVED" as const,
@@ -22,13 +45,7 @@ const mockReviewActivity = [
 			isDraft: false,
 			isMerged: false,
 			htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
-			repository: {
-				id: 1,
-				name: "Hephaestus",
-				nameWithOwner: "ls1intum/Hephaestus",
-				htmlUrl: "https://github.com/ls1intum/Hephaestus",
-				hiddenFromContributions: false,
-			},
+			repository: repositories[0],
 		},
 		score: 80,
 		isDismissed: false,
@@ -47,13 +64,7 @@ const mockReviewActivity = [
 			isDraft: false,
 			isMerged: false,
 			htmlUrl: "https://github.com/ls1intum/Artemis/pull/123",
-			repository: {
-				id: 2,
-				name: "Artemis",
-				nameWithOwner: "ls1intum/Artemis",
-				htmlUrl: "https://github.com/ls1intum/Artemis",
-				hiddenFromContributions: false,
-			},
+			repository: repositories[1],
 		},
 		score: 65,
 		isDismissed: false,
@@ -72,13 +83,7 @@ const mockReviewActivity = [
 			isDraft: false,
 			isMerged: false,
 			htmlUrl: "https://github.com/ls1intum/Athena/pull/15",
-			repository: {
-				id: 3,
-				name: "Athena",
-				nameWithOwner: "ls1intum/Athena",
-				htmlUrl: "https://github.com/ls1intum/Athena",
-				hiddenFromContributions: false,
-			},
+			repository: repositories[2],
 		},
 		score: 50,
 		isDismissed: false,
@@ -86,8 +91,7 @@ const mockReviewActivity = [
 	},
 ];
 
-// Mock open pull requests data
-const mockOpenPullRequests = [
+const authoredPullRequests = [
 	{
 		id: 101,
 		number: 42,
@@ -100,13 +104,7 @@ const mockOpenPullRequests = [
 		deletions: 30,
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/42",
 		createdAt: subDays(new Date(), 3),
-		repository: {
-			id: 1,
-			name: "Hephaestus",
-			nameWithOwner: "ls1intum/Hephaestus",
-			htmlUrl: "https://github.com/ls1intum/Hephaestus",
-			hiddenFromContributions: false,
-		},
+		repository: repositories[0],
 		labels: [
 			{ id: 1, name: "enhancement", color: "0E8A16" },
 			{ id: 2, name: "frontend", color: "FBCA04" },
@@ -124,13 +122,7 @@ const mockOpenPullRequests = [
 		deletions: 280,
 		htmlUrl: "https://github.com/ls1intum/Artemis/pull/87",
 		createdAt: subDays(new Date(), 1),
-		repository: {
-			id: 2,
-			name: "Artemis",
-			nameWithOwner: "ls1intum/Artemis",
-			htmlUrl: "https://github.com/ls1intum/Artemis",
-			hiddenFromContributions: false,
-		},
+		repository: repositories[1],
 		labels: [
 			{ id: 3, name: "refactoring", color: "D93F0B" },
 			{ id: 4, name: "security", color: "5319E7" },
@@ -138,7 +130,7 @@ const mockOpenPullRequests = [
 	},
 ];
 
-const mockActivityStats = {
+const activityStats = {
 	score: 195,
 	numberOfReviewedPRs: 3,
 	numberOfApprovals: 1,
@@ -148,270 +140,111 @@ const mockActivityStats = {
 	numberOfUnknowns: 0,
 	numberOfOwnReplies: 2,
 	numberOfOpenPullRequests: 2,
-	numberOfMergedPullRequests: 0,
+	numberOfMergedPullRequests: 1,
 	numberOfClosedPullRequests: 0,
 	numberOfOpenedIssues: 1,
 	numberOfClosedIssues: 1,
 };
 
-const mockReviewedPullRequests = mockReviewActivity
-	.map((activity) => activity.pullRequest)
-	.filter(
-		(pullRequest): pullRequest is NonNullable<(typeof mockReviewActivity)[number]["pullRequest"]> =>
-			Boolean(pullRequest),
-	)
-	.map((pullRequest) => ({
-		...pullRequest,
-		commentsCount: 0,
-		additions: 0,
-		deletions: 0,
-	}));
-
-const emptyActivityStats = {
-	score: 0,
-	numberOfReviewedPRs: 0,
-	numberOfApprovals: 0,
-	numberOfChangeRequests: 0,
-	numberOfComments: 0,
-	numberOfCodeComments: 0,
-	numberOfUnknowns: 0,
-	numberOfOwnReplies: 0,
-	numberOfOpenPullRequests: 0,
-	numberOfMergedPullRequests: 0,
-	numberOfClosedPullRequests: 0,
-	numberOfOpenedIssues: 0,
-	numberOfClosedIssues: 0,
-};
-
-const mockActivityMonitorData = {
-	activityStats: mockActivityStats,
-	reviewActivity: mockReviewActivity,
-	authoredPullRequests: mockOpenPullRequests,
-	repositories: [
-		{
-			id: 1,
-			name: "Hephaestus",
-			nameWithOwner: "ls1intum/Hephaestus",
-			htmlUrl: "https://github.com/ls1intum/Hephaestus",
-			hiddenFromContributions: false,
-		},
-		{
-			id: 2,
-			name: "Artemis",
-			nameWithOwner: "ls1intum/Artemis",
-			htmlUrl: "https://github.com/ls1intum/Artemis",
-			hiddenFromContributions: false,
-		},
-		{
-			id: 3,
-			name: "Athena",
-			nameWithOwner: "ls1intum/Athena",
-			htmlUrl: "https://github.com/ls1intum/Athena",
-			hiddenFromContributions: false,
-		},
-	],
+const filledMonitor = {
+	activityStats,
+	reviewActivity,
+	authoredPullRequests,
+	repositories,
 	totalReviewActivityCount: 8,
 	totalAuthoredPullRequestCount: 6,
 };
 
-const mockRepositoryFilteredActivityMonitorData = {
-	...mockActivityMonitorData,
-	reviewActivity: mockReviewActivity.slice(0, 1),
-	authoredPullRequests: mockOpenPullRequests.slice(0, 1),
-	totalReviewActivityCount: 1,
-	totalAuthoredPullRequestCount: 1,
+const emptyMonitor = {
+	activityStats: {
+		score: 0,
+		numberOfReviewedPRs: 0,
+		numberOfApprovals: 0,
+		numberOfChangeRequests: 0,
+		numberOfComments: 0,
+		numberOfCodeComments: 0,
+		numberOfUnknowns: 0,
+		numberOfOwnReplies: 0,
+		numberOfOpenPullRequests: 0,
+		numberOfMergedPullRequests: 0,
+		numberOfClosedPullRequests: 0,
+		numberOfOpenedIssues: 0,
+		numberOfClosedIssues: 0,
+	},
+	reviewActivity: [],
+	authoredPullRequests: [],
+	repositories: [],
+	totalReviewActivityCount: 0,
+	totalAuthoredPullRequestCount: 0,
 };
 
-/**
- * Main content section of the profile page that displays a user's activity.
- * Shows pull requests, review activity, and other contribution metrics.
- */
+const baseArgs = {
+	isLoading: false,
+	username: "johndoe",
+	currUserIsDashboardUser: true,
+	workspaceSlug: "aet",
+	afterDate: defaultAfter,
+	beforeDate: defaultBefore,
+	activityMonitorFilters: { repositoryIds: [], limit: 5 },
+	onActivityMonitorFiltersChange: fn(),
+	onTimeframeChange: fn(),
+};
+
 const meta = {
 	component: ProfileContent,
-	parameters: {
-		layout: "padded",
-		docs: {
-			description: {
-				component:
-					"The main content section of the user profile showing activity data, reviews, and pull requests.",
-			},
-		},
-	},
-	argTypes: {
-		reviewActivity: {
-			description: "Array of user review activity data",
-			control: "object",
-		},
-		openPullRequests: {
-			description: "Array of user open pull requests",
-			control: "object",
-		},
-		isLoading: {
-			description: "Whether the component is in a loading state",
-			control: "boolean",
-		},
-		username: {
-			description: "Username of the profile owner",
-			control: "text",
-		},
-		workspaceSlug: {
-			description: "Active workspace slug",
-			control: "text",
-		},
-		afterDate: {
-			description: "Start of the activity window (ISO string)",
-			control: "text",
-		},
-		beforeDate: {
-			description: "End of the activity window (ISO string)",
-			control: "text",
-		},
-		onTimeframeChange: {
-			description: "Callback when the timeframe is adjusted",
-			table: { type: { summary: "function" } },
-		},
-	},
+	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 } satisfies Meta<typeof ProfileContent>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Standard view showing both reviews and pull requests for an active user.
- */
 export const Default: Story = {
-	args: {
-		reviewActivity: mockReviewActivity,
-		openPullRequests: mockOpenPullRequests,
-		activityStats: mockActivityStats,
-		reviewedPullRequests: mockReviewedPullRequests,
-		isLoading: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onTimeframeChange: fn(),
-	},
+	args: { ...baseArgs, activityMonitorData: filledMonitor },
 };
 
-/**
- * Filled monitor state using the activity-monitor DTO shape.
- */
-export const ActivityMonitorFilled: Story = {
+export const RepositoryFiltered: Story = {
 	args: {
-		activityMonitorData: mockActivityMonitorData,
-		activityMonitorFilters: {
-			repositoryIds: [],
-			limit: 5,
+		...baseArgs,
+		activityMonitorFilters: { repositoryIds: [1], limit: 5 },
+		activityMonitorData: {
+			...filledMonitor,
+			reviewActivity: reviewActivity.slice(0, 1),
+			authoredPullRequests: authoredPullRequests.slice(0, 1),
+			totalReviewActivityCount: 1,
+			totalAuthoredPullRequestCount: 1,
 		},
-		isLoading: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onActivityMonitorFiltersChange: fn(),
-		onTimeframeChange: fn(),
 	},
 };
 
-/**
- * Monitor after selecting one repository in the configure popover.
- */
-export const ActivityMonitorRepositoryFiltered: Story = {
-	args: {
-		activityMonitorData: mockRepositoryFilteredActivityMonitorData,
-		activityMonitorFilters: {
-			repositoryIds: [1],
-			limit: 5,
-		},
-		isLoading: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onActivityMonitorFiltersChange: fn(),
-		onTimeframeChange: fn(),
-	},
-};
-
-/**
- * Loading state shown while user data is being fetched from API.
- */
 export const Loading: Story = {
-	args: {
-		isLoading: true,
-		activityStats: emptyActivityStats,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onTimeframeChange: fn(),
-	},
+	args: { ...baseArgs, isLoading: true },
 };
 
-/**
- * Shows how the UI appears when the user has open pull requests but no review activity.
- */
 export const EmptyReviews: Story = {
 	args: {
-		reviewActivity: [],
-		openPullRequests: mockOpenPullRequests,
-		activityStats: {
-			...emptyActivityStats,
-			numberOfOpenPullRequests: 2,
-			numberOfOwnReplies: 1,
+		...baseArgs,
+		activityMonitorData: {
+			...filledMonitor,
+			reviewActivity: [],
+			totalReviewActivityCount: 0,
+			activityStats: { ...activityStats, numberOfReviewedPRs: 0, numberOfApprovals: 0 },
 		},
-		isLoading: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onTimeframeChange: fn(),
 	},
 };
 
-/**
- * Shows how the UI appears when the user has review activity but no open pull requests.
- */
 export const EmptyPullRequests: Story = {
 	args: {
-		reviewActivity: mockReviewActivity,
-		openPullRequests: [],
-		activityStats: {
-			...mockActivityStats,
-			numberOfOpenPullRequests: 0,
+		...baseArgs,
+		activityMonitorData: {
+			...filledMonitor,
+			authoredPullRequests: [],
+			totalAuthoredPullRequestCount: 0,
+			activityStats: { ...activityStats, numberOfOpenPullRequests: 0 },
 		},
-		reviewedPullRequests: mockReviewedPullRequests,
-		isLoading: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onTimeframeChange: fn(),
 	},
 };
 
-/**
- * Shows the empty state when a user has no activity (no reviews and no pull requests).
- */
 export const CompletelyEmpty: Story = {
-	args: {
-		reviewActivity: [],
-		openPullRequests: [],
-		activityStats: emptyActivityStats,
-		isLoading: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-		workspaceSlug: "aet",
-		afterDate: defaultAfter,
-		beforeDate: defaultBefore,
-		onTimeframeChange: fn(),
-	},
+	args: { ...baseArgs, activityMonitorData: emptyMonitor },
 };

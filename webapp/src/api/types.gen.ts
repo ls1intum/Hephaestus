@@ -1003,13 +1003,9 @@ export type ProfileActivityMonitor = {
 };
 
 /**
- * Complete user profile including contribution history and activity
+ * User profile header: identity, league standing, contribution surface, XP
  */
 export type Profile = {
-    /**
-     * Aggregated activity stats consistent with leaderboard calculations
-     */
-    activityStats: ProfileActivityStats;
     /**
      * Repositories the user has contributed to
      */
@@ -1018,18 +1014,6 @@ export type Profile = {
      * Timestamp of the user's first contribution
      */
     firstContribution?: Date;
-    /**
-     * Currently open pull requests authored by the user
-     */
-    openPullRequests: Array<PullRequestInfo>;
-    /**
-     * Recent scored review activity with XP scores
-     */
-    reviewActivity: Array<ProfileReviewActivity>;
-    /**
-     * Distinct pull requests reviewed by this user
-     */
-    reviewedPullRequests: Array<PullRequestInfo>;
     /**
      * Basic information about the user
      */
@@ -3323,9 +3307,6 @@ export type GetUserProfileData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
         login: string;
     };
     query?: {
@@ -3337,7 +3318,7 @@ export type GetUserProfileData = {
 
 export type GetUserProfileResponses = {
     /**
-     * user profile with open PRs, review activity, league points, etc.
+     * OK
      */
     200: Profile;
 };

@@ -8,11 +8,15 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,19 +29,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 @WorkspaceScopedController
 @RequestMapping("/profile")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Profile", description = "User profile and activity data")
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
 
-    /**
-     * Get a user's profile with workspace-scoped activity data.
-     *
-     * @param workspaceContext the resolved workspace context
-     * @param login the user's GitHub login
-     * @return user profile with open PRs, review activity, league points, etc.
-     * @throws EntityNotFoundException if user not found
-     */
     @GetMapping("/{login}")
     @Operation(
         summary = "Get user profile",
@@ -60,7 +57,7 @@ public class UserProfileController {
     @GetMapping("/{login}/activity-monitor")
     @Operation(
         summary = "Get contributor activity monitor",
-        description = "Returns configurable workspace-scoped activity monitor data for a contributor"
+        description = "Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters"
     )
     @SecurityRequirements
     public ResponseEntity<ProfileActivityMonitorDTO> getActivityMonitor(
@@ -68,8 +65,8 @@ public class UserProfileController {
         @PathVariable String login,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
-        @RequestParam(required = false) Set<Long> repositoryIds,
-        @RequestParam(required = false) Integer limit
+        @RequestParam(required = false) @Size(max = 100) Set<Long> repositoryIds,
+        @RequestParam(required = false) @Min(1) @Max(100) Integer limit
     ) {
         return ResponseEntity.ok(
             userProfileService

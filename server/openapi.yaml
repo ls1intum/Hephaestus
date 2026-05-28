@@ -1578,8 +1578,7 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: the user's GitHub login
-        in: path
+      - in: path
         name: login
         required: true
         schema:
@@ -1602,16 +1601,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Profile"
-          description: "user profile with open PRs, review activity, league points,\
-            \ etc."
+          description: OK
       security: []
       summary: Get user profile
       tags:
       - Profile
   /workspaces/{workspaceSlug}/profile/{login}/activity-monitor:
     get:
-      description: Returns configurable workspace-scoped activity monitor data for
-        a contributor
+      description: Returns workspace-scoped activity monitor data for a contributor
+        with optional repository and limit filters
       operationId: getActivityMonitor
       parameters:
       - description: Workspace slug
@@ -1646,6 +1644,8 @@ paths:
           items:
             type: integer
             format: int64
+          maxItems: 100
+          minItems: 0
           uniqueItems: true
       - in: query
         name: limit
@@ -1653,6 +1653,8 @@ paths:
         schema:
           type: integer
           format: int32
+          maximum: 100
+          minimum: 1
       responses:
         "200":
           content:
@@ -3735,11 +3737,9 @@ components:
       - verdict
     Profile:
       type: object
-      description: Complete user profile including contribution history and activity
+      description: "User profile header: identity, league standing, contribution surface,\
+        \ XP"
       properties:
-        activityStats:
-          $ref: "#/components/schemas/ProfileActivityStats"
-          description: Aggregated activity stats consistent with leaderboard calculations
         contributedRepositories:
           type: array
           description: Repositories the user has contributed to
@@ -3749,21 +3749,6 @@ components:
           type: string
           format: date-time
           description: Timestamp of the user's first contribution
-        openPullRequests:
-          type: array
-          description: Currently open pull requests authored by the user
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        reviewActivity:
-          type: array
-          description: Recent scored review activity with XP scores
-          items:
-            $ref: "#/components/schemas/ProfileReviewActivity"
-        reviewedPullRequests:
-          type: array
-          description: Distinct pull requests reviewed by this user
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
         userInfo:
           $ref: "#/components/schemas/UserInfo"
           description: Basic information about the user
@@ -3771,11 +3756,7 @@ components:
           $ref: "#/components/schemas/ProfileXpRecord"
           description: XP progress information for the users' profile
       required:
-      - activityStats
       - contributedRepositories
-      - openPullRequests
-      - reviewActivity
-      - reviewedPullRequests
       - userInfo
       - xpRecord
     ProfileActivityMonitor:

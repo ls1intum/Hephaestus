@@ -1,17 +1,18 @@
 import { XCircleIcon } from "lucide-react";
 import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
-import { type ActivityMonitorFilters, ProfileContent } from "./ProfileContent";
+import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
 interface ProfileProps {
 	providerType?: ProviderType;
 	profileData?: Profile;
 	activityMonitorData?: ProfileActivityMonitor;
-	activityMonitorFilters?: ActivityMonitorFilters;
-	onActivityMonitorFiltersChange?: (filters: ActivityMonitorFilters) => void;
+	activityMonitorFilters: ActivityMonitorFilters;
+	onActivityMonitorFiltersChange: (filters: ActivityMonitorFilters) => void;
 	isLoading: boolean;
 	error: boolean;
 	username: string;
@@ -74,10 +75,6 @@ export function ProfilePage({
 			/>
 			<ProfileContent
 				providerType={providerType}
-				reviewActivity={profileData?.reviewActivity}
-				openPullRequests={profileData?.openPullRequests}
-				activityStats={profileData?.activityStats}
-				reviewedPullRequests={profileData?.reviewedPullRequests}
 				activityMonitorData={activityMonitorData}
 				activityMonitorFilters={activityMonitorFilters}
 				onActivityMonitorFiltersChange={onActivityMonitorFiltersChange}
