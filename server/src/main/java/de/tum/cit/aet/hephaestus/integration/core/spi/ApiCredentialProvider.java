@@ -38,9 +38,11 @@ public interface ApiCredentialProvider {
             @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
             @JsonSubTypes.Type(value = InstallationCredential.class, name = "INSTALLATION_APP"),
             @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION"),
+            @JsonSubTypes.Type(value = OAuthClientSecret.class, name = "OAUTH_CLIENT_SECRET"),
         }
     )
-    sealed interface CredentialBundle permits BearerToken, InstallationCredential, OAuthSession {}
+    sealed interface CredentialBundle
+        permits BearerToken, InstallationCredential, OAuthSession, OAuthClientSecret {}
 
     /**
      * Long-lived or short-lived bearer (PAT, Slack xoxb, Outline OAuth access token).
@@ -78,6 +80,23 @@ public interface ApiCredentialProvider {
                 expiresAt +
                 "]"
             );
+        }
+    }
+
+    /**
+     * OAuth <em>application</em> credentials — the {@code client_id} + {@code client_secret}
+     * Hephaestus uses to talk to an upstream IdP <em>as the relying party</em>. Distinct
+     * from {@link OAuthSession} which holds end-user tokens.
+     *
+     * <p>Populated when a workspace admin registers a workspace-scoped OIDC login provider
+     * (e.g. a self-hosted GitLab OAuth app). Consumed by the composite
+     * {@code ClientRegistrationRepository} that overlays env-default registrations with
+     * DB-backed workspace ones.
+     */
+    record OAuthClientSecret(String clientId, String clientSecret) implements CredentialBundle {
+        @Override
+        public String toString() {
+            return "OAuthClientSecret[clientId=" + clientId + ", clientSecret=***]";
         }
     }
 }

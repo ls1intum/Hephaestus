@@ -18,6 +18,7 @@ import org.springframework.lang.Nullable;
         @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
         @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
         @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
+        @JsonSubTypes.Type(value = ConnectionConfig.OidcLoginConfig.class, name = "OIDC_LOGIN"),
     }
 )
 public sealed interface ConnectionConfig
@@ -26,7 +27,8 @@ public sealed interface ConnectionConfig
         ConnectionConfig.GitHubPatConfig,
         ConnectionConfig.GitLabConfig,
         ConnectionConfig.SlackConfig,
-        ConnectionConfig.OutlineConfig
+        ConnectionConfig.OutlineConfig,
+        ConnectionConfig.OidcLoginConfig
 {
     /** Enabled sync streams (subset of the source's catalog). */
     Set<String> enabledStreams();
@@ -95,4 +97,30 @@ public sealed interface ConnectionConfig
         @Nullable String workspaceExternalId,
         Set<String> enabledStreams
     ) implements ConnectionConfig {}
+
+    /**
+     * Workspace-scoped OIDC login provider configuration. Backs Connection rows of
+     * {@code kind = OIDC_LOGIN_GITHUB | OIDC_LOGIN_GITLAB} in family {@code IDENTITY}.
+     * The relying-party {@code client_secret} lives in {@code Connection.credentialsEncrypted}
+     * as an {@code OAuthClientSecret} {@code CredentialBundle}, AAD-bound per ADR 0014.
+     *
+     * <p>Identity Connections never participate in SCM sync; {@link #enabledStreams()}
+     * returns an empty set.
+     *
+     * @param issuerUrl  Discovery base URL of the IdP (e.g. {@code https://gitlab.lrz.de}).
+     *                   {@code /.well-known/openid-configuration} is fetched from here at
+     *                   registration time via the SSRF-protected probe.
+     * @param scopes     OAuth scopes to request (subset of what the IdP supports).
+     * @param displayName  Human-friendly label rendered in the SPA login picker.
+     */
+    record OidcLoginConfig(
+        String issuerUrl,
+        Set<String> scopes,
+        String displayName
+    ) implements ConnectionConfig {
+        @Override
+        public Set<String> enabledStreams() {
+            return Set.of();
+        }
+    }
 }

@@ -289,7 +289,21 @@ public class Connection {
             case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
             case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
             case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
+            // OidcLoginConfig binds to either OIDC_LOGIN_GITHUB or OIDC_LOGIN_GITLAB —
+            // the kind disambiguates which provider type the issuer URL refers to.
+            // Both are valid; the assertion below short-circuits this case via the
+            // kind-side check rather than a direct equality.
+            case ConnectionConfig.OidcLoginConfig __ -> kind;
         };
+        if (
+            config instanceof ConnectionConfig.OidcLoginConfig &&
+            kind != IntegrationKind.OIDC_LOGIN_GITHUB &&
+            kind != IntegrationKind.OIDC_LOGIN_GITLAB
+        ) {
+            throw new IllegalStateException(
+                "Connection kind=" + kind + " incompatible with OidcLoginConfig (expected OIDC_LOGIN_*)"
+            );
+        }
         if (expected != kind) {
             throw new IllegalStateException(
                 "Connection kind=" +
