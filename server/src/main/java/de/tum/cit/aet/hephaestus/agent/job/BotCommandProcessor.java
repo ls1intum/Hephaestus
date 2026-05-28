@@ -200,18 +200,22 @@ public class BotCommandProcessor {
 
     /**
      * Add an eyes emoji reaction to the bot command note. Dispatches through the
-     * {@link ScmCommentReactionSink} SPI; today only GitLab fires {@link BotCommandReceivedEvent}
-     * (because {@code noteId} is GitLab-shaped), but the dispatch path is kind-agnostic so a
-     * future GitHub or Bitbucket implementation slots in without touching this class.
+     * {@link ScmCommentReactionSink} SPI keyed by {@link IntegrationKind}; today only
+     * GitLab publishes {@link BotCommandReceivedEvent}, but the dispatch path is
+     * kind-agnostic so a future GitHub or Bitbucket publisher slots in without
+     * touching this class — the event record is vendor-neutral.
      */
     private void addEyesReaction(BotCommandReceivedEvent event) {
-        if (event.noteId() == null || event.scopeId() == null) {
+        if (event.commentId() == null || event.scopeId() == null) {
             return;
         }
+        // Today only the GitLab webhook path publishes this event; when a GitHub or
+        // Bitbucket publisher arrives, key the lookup off the source's IntegrationKind
+        // resolved from the repository instead of hardcoding GITLAB here.
         ScmCommentReactionSink sink = reactionSinks.get(IntegrationKind.GITLAB);
         if (sink == null) {
             return;
         }
-        sink.react(event.scopeId(), event.noteId(), "eyes");
+        sink.react(event.scopeId(), event.commentId(), "eyes");
     }
 }

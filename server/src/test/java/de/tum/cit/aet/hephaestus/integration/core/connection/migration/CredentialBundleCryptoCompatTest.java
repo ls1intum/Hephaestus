@@ -16,7 +16,14 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
+/**
+ * Pins the legacy-{@code EncryptedStringConverter} → {@link CredentialBundleConverter}
+ * compatibility surface that {@link WorkspaceConnectionBackfillChange}'s package-private
+ * helpers expose. Drives ONLY the crypto helpers — the customChange's
+ * {@code execute(Database)} path is exercised end-to-end against a real Testcontainer
+ * PostgreSQL by {@code WorkspaceConnectionBackfillChangeIntegrationTest}.
+ */
+class CredentialBundleCryptoCompatTest extends BaseUnitTest {
 
     private static final String KEY = "0123456789abcdef0123456789abcdef";
     private static final byte[] KEY_BYTES = KEY.getBytes(StandardCharsets.UTF_8);

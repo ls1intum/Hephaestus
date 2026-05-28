@@ -1,5 +1,7 @@
 src/test/resources/application-live-local.yml
 
-# ArchUnit freeze store - we don't freeze violations
-archunit_store/
+# ArchUnit freeze store: the BASELINE *is* committed (see archunit.properties — the rule
+# only fails on NEW cycles, so the file must be in version control for CI to honour it).
+# Ignore only the test-run temp files inside the store, not the store itself.
+src/test/resources/archunit_store/*.tmp
 /.factorypath

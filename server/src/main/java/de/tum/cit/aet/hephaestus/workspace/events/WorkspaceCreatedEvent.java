@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.workspace.spi;
+package de.tum.cit.aet.hephaestus.workspace.events;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 

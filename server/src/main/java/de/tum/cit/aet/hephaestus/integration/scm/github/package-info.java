@@ -24,6 +24,9 @@
         "integration.core::consumer",
         "integration.core::webhook",
         "integration.scm",
+        // RepositoryAboutToBeDeletedEvent in scm/domain/repository/events lives behind
+        // a NamedInterface so ProjectIntegrityService can subscribe.
+        "integration.scm::events",
         "core",
         "core::webhook",
         "workspace",

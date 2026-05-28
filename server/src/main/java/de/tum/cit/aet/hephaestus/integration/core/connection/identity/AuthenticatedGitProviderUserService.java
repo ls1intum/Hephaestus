@@ -5,17 +5,12 @@ import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.spi.GitProviderServerUrlResolver;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
@@ -25,6 +20,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Resolves / provisions the SCM {@code User} row for the JWT-authenticated principal.
+ *
+ * <p>The GitLab default server URL is read directly from the operator-facing
+ * {@code hephaestus.gitlab.default-server-url} property (binding to
+ * {@code GitLabProperties} would couple this vendor-neutral identity service to a
+ * vendor adapter, banned by {@code IntegrationCoreVendorNeutralityTest}). The GitHub
+ * default is the project-wide constant {@code https://github.com} — GitHub Enterprise
+ * Server support is deferred until a dedicated property is added.
+ */
 @Service
 public class AuthenticatedGitProviderUserService {
 
@@ -33,18 +38,20 @@ public class AuthenticatedGitProviderUserService {
 
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
-    private final Map<IntegrationKind, GitProviderServerUrlResolver> serverUrlResolvers;
+    private final String gitLabDefaultServerUrl;
 
     public AuthenticatedGitProviderUserService(
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
-        List<GitProviderServerUrlResolver> serverUrlResolvers
+        @Value("${hephaestus.gitlab.default-server-url:https://gitlab.com}") String gitLabDefaultServerUrl
     ) {
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
-        this.serverUrlResolvers = serverUrlResolvers
-            .stream()
-            .collect(Collectors.toUnmodifiableMap(GitProviderServerUrlResolver::kind, Function.identity()));
+        this.gitLabDefaultServerUrl = stripTrailingSlash(gitLabDefaultServerUrl);
+    }
+
+    private static String stripTrailingSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     @Transactional
@@ -155,16 +162,9 @@ public class AuthenticatedGitProviderUserService {
 
     private String resolveGitLabServerUrl(@Nullable String configServerUrl) {
         if (configServerUrl != null && !configServerUrl.isBlank()) {
-            String url = configServerUrl.trim();
-            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+            return stripTrailingSlash(configServerUrl.trim());
         }
-        GitProviderServerUrlResolver resolver = serverUrlResolvers.get(IntegrationKind.GITLAB);
-        if (resolver == null) {
-            throw new IllegalStateException(
-                "GitProviderServerUrlResolver for GITLAB is not wired — cannot resolve default GitLab URL"
-            );
-        }
-        return resolver.defaultServerUrl();
+        return gitLabDefaultServerUrl;
     }
 
     private Long upsertGitHubUser(

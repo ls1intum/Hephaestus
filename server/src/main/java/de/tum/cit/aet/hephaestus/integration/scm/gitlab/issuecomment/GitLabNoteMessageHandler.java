@@ -246,7 +246,6 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
                 event.objectAttributes().note(),
                 event.user().username(),
                 event.objectAttributes().id(),
-                event.project().pathWithNamespace(),
                 context.scopeId()
             )
         );

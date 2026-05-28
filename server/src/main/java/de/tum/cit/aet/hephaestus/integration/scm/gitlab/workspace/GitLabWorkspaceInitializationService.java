@@ -23,7 +23,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
-import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceCreatedEvent;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;

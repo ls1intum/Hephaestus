@@ -224,7 +224,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
     // -- Test helpers --
 
     private BotCommandReceivedEvent event(String noteBody) {
-        return new BotCommandReceivedEvent(REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null, null);
+        return new BotCommandReceivedEvent(REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null);
     }
 
     private PullRequest createOpenPr() {

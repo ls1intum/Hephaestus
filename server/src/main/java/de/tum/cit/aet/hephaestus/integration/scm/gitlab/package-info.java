@@ -30,6 +30,7 @@
         // depend on the workspace named sub-surfaces.
         "workspace::context",
         "workspace::spi",
+        "workspace::events",
         "workspace::dto",
         // GraphQL config moved from cross-cutting config; FragmentMergingDocumentSource lives there.
         "config",
