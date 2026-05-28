@@ -90,6 +90,16 @@ tags:
   name: Finding Feedback
 - description: User profile and activity data
   name: Profile
+- description: |-
+    GitLab-specific REST endpoints used during the workspace creation wizard:
+     <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
+     lists accessible groups for one. Split from <code>WorkspaceRegistryController</code> so the
+     workspace module no longer imports {@link GitLabPreflightService GitLabPreflightService}; the routes keep the
+     existing <code>/workspaces/gitlab/*</code> URL space for API stability.
+
+     <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
+     <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
+  name: git-lab-preflight-controller
 - description: Contributor rankings and league statistics
   name: Leaderboard
 paths:
@@ -592,7 +602,7 @@ paths:
           description: Accessible groups
       summary: List GitLab groups accessible to a PAT
       tags:
-      - workspace-registry
+      - git-lab-preflight
   /workspaces/gitlab/preflight:
     post:
       operationId: gitLabPreflight
@@ -611,7 +621,7 @@ paths:
           description: Validation result
       summary: Validate a GitLab PAT before workspace creation
       tags:
-      - workspace-registry
+      - git-lab-preflight
   /workspaces/providers:
     get:
       description: Returns available workspace providers with their configuration.
