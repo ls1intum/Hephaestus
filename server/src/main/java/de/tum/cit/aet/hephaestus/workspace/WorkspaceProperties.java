@@ -119,20 +119,6 @@ public record WorkspaceProperties(
     }
 
     /**
-     * Alias getter required so Spring Boot can bind configuration expressed under
-     * the {@code default} key (since "default" is a reserved word in Java).
-     *
-     * @return the default workspace properties
-     * @deprecated use {@link #defaultProperties()} instead; this method exists only
-     *             for YAML binding compatibility
-     */
-    @Deprecated(forRemoval = false)
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    public DefaultProperties getDefault() {
-        return defaultProperties;
-    }
-
-    /**
      * Validates that credentials are provided when default workspace initialization is enabled.
      *
      * <p>This method is invoked by JSR-380 bean validation. The validation ensures that
