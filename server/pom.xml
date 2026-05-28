@@ -1,0 +1,1135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.6</version>
+        <relativePath/>
+        <!-- lookup parent from repository -->
+    </parent>
+    <groupId>de.tum.cit.aet</groupId>
+    <artifactId>hephaestus-server</artifactId>
+    <version>0.0.0-development</version>
+    <name>Hephaestus</name>
+    <description>AI-driven learning for better software development</description>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>21</java.version>
+        <app.profiles>local</app.profiles>
+
+        <!-- Test Configuration -->
+        <maven.test.failure.ignore>false</maven.test.failure.ignore>
+        <maven.test.skip>false</maven.test.skip>
+        <hephaestus.surefire.timeout>900</hephaestus.surefire.timeout>
+
+        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
+        <openapi.server.port>38090</openapi.server.port>
+
+        <!-- Tag filtering: unit tests by default, exclude live tests -->
+        <surefire.excludedGroups>live</surefire.excludedGroups>
+        <surefire.includedGroups>unit</surefire.includedGroups>
+        <failsafe.excludedGroups>live</failsafe.excludedGroups>
+        <failsafe.includedGroups>integration</failsafe.includedGroups>
+
+        <!-- GraphQL Codegen Skip (auto-set by 'quick' profile when target/generated-sources exists) -->
+        <graphql.codegen.skip>false</graphql.codegen.skip>
+
+        <!-- Coverage Configuration (disabled by default) -->
+        <skipCoverage>true</skipCoverage>
+        <jacoco.line.coverage.minimum>0.00</jacoco.line.coverage.minimum>
+        <jacoco.branch.coverage.minimum>0.00</jacoco.branch.coverage.minimum>
+
+
+        <!-- Encoding -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Maven wrapper version -->
+        <maven.wrapper.version>3.9.12</maven.wrapper.version>
+
+        <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
+        <postgres.port>5432</postgres.port>
+
+        <!-- Stale class cleanup: always enabled to prevent ghost .class files from CI caches.
+             Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
+        <skipCleanStaleClasses>false</skipCleanStaleClasses>
+
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <okhttp.version>5.3.2</okhttp.version>
+        <docker-java.version>3.7.1</docker-java.version>
+        <archunit.version>1.4.2</archunit.version>
+        <spring-modulith.version>2.0.0</spring-modulith.version>
+        <liquibase-hibernate7.version>5.0.3</liquibase-hibernate7.version>
+        <springdoc.version>3.0.3</springdoc.version>
+        <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
+        <sentry.version>8.41.0</sentry.version>
+        <slack-bolt.version>1.48.1</slack-bolt.version>
+        <jnats.version>2.25.2</jnats.version>
+        <jgit.version>7.6.0.202603022253-r</jgit.version>
+        <keycloak-admin.version>26.0.9</keycloak-admin.version>
+        <java-jwt.version>4.5.2</java-jwt.version>
+        <graphql-codegen.version>5.10.0</graphql-codegen.version>
+        <postgresql.version>42.7.11</postgresql.version>
+        <therapi.version>0.15.0</therapi.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- Caffeine cache with TTL support and Micrometer metrics integration -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- Worker control channel (WSS over TLS-443). Server-side @WebSocketHandler + client-side
+             JDK java.net.http.WebSocket. ADR 0009. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>${java-jwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        <!-- WebClient.Builder autoconfig; not transitive via spring-boot-starter-webflux. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webclient</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-liquibase</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-docker-compose</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Spring Modulith 2.0: declares module boundaries via @ApplicationModule,
+             verified by ModulithVerificationTest in the architecture surefire group. -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-core</artifactId>
+            <version>${spring-modulith.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-starter-test</artifactId>
+            <version>${spring-modulith.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webtestclient</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Reactor test for reactive stream testing -->
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- AssertJ for fluent assertions -->
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+
+        <dependency>
+            <groupId>tools.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
+<!-- ArchUnit for architecture testing -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- springdoc-openapi reads class/method Javadoc via therapi-runtime-javadoc to inject
+             description="..." into the generated openapi.yaml. Removing this strips descriptions
+             from the public API contract, so it stays load-bearing despite no in-source callers. -->
+        <dependency>
+            <groupId>com.github.therapi</groupId>
+            <artifactId>therapi-runtime-javadoc</artifactId>
+            <version>${therapi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.nats</groupId>
+            <artifactId>jnats</artifactId>
+            <version>${jnats.version}</version>
+        </dependency>
+        <!-- Docker Java SDK for sandbox container management -->
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-api</artifactId>
+            <version>${docker-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-core</artifactId>
+            <version>${docker-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-transport-httpclient5</artifactId>
+            <version>${docker-java.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.slack.api</groupId>
+            <artifactId>bolt</artifactId>
+            <version>${slack-bolt.version}</version>
+            <exclusions>
+                <!-- Slack pulls okhttp:4.12.0; conflicts with our okhttp-jvm:5.x on TaskRunner. -->
+                <exclusion>
+                    <groupId>com.squareup.okhttp3</groupId>
+                    <artifactId>okhttp</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- okhttp 5.x: bare 'okhttp' is a KMP shim (square/okhttp#8913); use okhttp-jvm. -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>logging-interceptor</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver3</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+            <version>${keycloak-admin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.sentry</groupId>
+            <artifactId>sentry-spring-boot-4-starter</artifactId>
+            <version>${sentry.version}</version>
+        </dependency>
+        <!-- Spring GraphQL Client for GitHub GraphQL API -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-graphql</artifactId>
+        </dependency>
+        <!-- GraphQL Codegen Runtime (base classes for generated code) -->
+        <dependency>
+            <groupId>io.github.kobylynskyi</groupId>
+            <artifactId>graphql-java-codegen</artifactId>
+            <version>${graphql-codegen.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot4</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <!-- Resilience4j Micrometer integration for circuit breaker metrics -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-micrometer</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+        <!-- JGit for local git repository operations -->
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>${jgit.version}</version>
+        </dependency>
+    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp-bom</artifactId>
+                <version>${okhttp.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <build>
+        <plugins>
+            <!-- Clean compiled classes to prevent orphaned .class files from deleted/moved sources.
+                 Skipped by the 'quick' profile (skipCleanStaleClasses=true) for incremental builds. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>clean-stale-classes</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCleanStaleClasses}</skip>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${project.build.outputDirectory}</directory>
+                                </fileset>
+                                <fileset>
+                                    <directory>${project.build.testOutputDirectory}</directory>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                    <!--
+                        IMPORTANT: Set to false for ACTUAL incremental compilation!
+                        Due to Maven bug MCOMPILER-209, the behavior is inverted:
+                        - true  = recompiles ALL files on every change (broken)
+                        - false = recompiles only changed files (correct)
+
+                        Caveat: Deleted source files may leave orphaned .class files.
+                        Run 'mvn clean' periodically or when deleting source files.
+                        See: https://issues.apache.org/jira/browse/MCOMPILER-209
+                    -->
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
+                    <!-- Suppress warnings for generated code using deprecated GitHub API values -->
+                    <compilerArgs>
+                        <arg>-Xlint:all,-deprecation</arg>
+                    </compilerArgs>
+                    <showWarnings>false</showWarnings>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                        </path>
+                        <path>
+                            <groupId>com.github.therapi</groupId>
+                            <artifactId>therapi-runtime-javadoc-scribe</artifactId>
+                            <version>${therapi.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <!-- Build Helper to add generated sources to IDE -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>add-graphql-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/graphql-github</source>
+                                <source>${project.build.directory}/generated-sources/graphql-gitlab</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- GraphQL Code Generator for GitHub API Client -->
+            <!-- Generates type-safe Java classes from GitHub GraphQL schema -->
+            <!-- Run manually: mvn graphql-codegen:generate -->
+            <!-- Runs automatically during generate-sources phase -->
+            <plugin>
+                <groupId>io.github.kobylynskyi</groupId>
+                <artifactId>graphql-codegen-maven-plugin</artifactId>
+                <version>${graphql-codegen.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-github-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Skip generation (auto-set true by 'quick' profile) -->
+                            <skip>${graphql.codegen.skip}</skip>
+                            <!-- GitHub schema is ~70k lines (~1.4MB), skip size limit check -->
+                            <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
+
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/github</rootDir>
+                            </graphqlSchemas>
+
+                            <!-- Output configuration -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
+                            <packageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model
+                            </modelPackageName>
+                            <modelNamePrefix>GH</modelNamePrefix>
+
+                            <!-- Client-side code generation (for consuming GitHub API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+
+                            <!-- Skip Relay types that reference missing Query root type -->
+                            <fieldsWithoutResolvers>
+                                <fieldWithoutResolver>node</fieldWithoutResolver>
+                                <fieldWithoutResolver>nodes</fieldWithoutResolver>
+                                <fieldWithoutResolver>relay</fieldWithoutResolver>
+                            </fieldsWithoutResolvers>
+
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <!-- Use @Generated annotation with @SuppressWarnings to silence IDE warnings on generated code -->
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+
+                            <!-- GitHub-specific scalar mappings -->
+                            <customTypesMapping>
+                                <DateTime>java.time.OffsetDateTime</DateTime>
+                                <Date>java.time.LocalDate</Date>
+                                <URI>java.net.URI</URI>
+                                <HTML>java.lang.String</HTML>
+                                <GitObjectID>java.lang.String</GitObjectID>
+                                <GitSSHRemote>java.lang.String</GitSSHRemote>
+                                <GitTimestamp>java.time.OffsetDateTime</GitTimestamp>
+                                <PreciseDateTime>java.time.OffsetDateTime</PreciseDateTime>
+                                <X509Certificate>java.lang.String</X509Certificate>
+                                <Base64String>java.lang.String</Base64String>
+                                <BigInt>java.math.BigInteger</BigInt>
+                            </customTypesMapping>
+
+                            <!-- Naming conventions -->
+                            <modelNameSuffix></modelNameSuffix>
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+
+                            <!-- Use custom template for ResponseProjection to add @SuppressWarnings("unused") -->
+                            <!-- This suppresses false positive warnings for the projectionDepthOnFields field -->
+                            <!-- which is used internally by the all$() method -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
+                    <!-- GitLab GraphQL Code Generator -->
+                    <!-- Generates type-safe Java classes from GitLab GraphQL schema -->
+                    <execution>
+                        <id>generate-gitlab-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${graphql.codegen.skip}</skip>
+                            <!-- GitLab schema is large, skip size limit check -->
+                            <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
+
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/gitlab</rootDir>
+                            </graphqlSchemas>
+
+                            <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
+                            <packageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab.model
+                            </modelPackageName>
+                            <modelNamePrefix>GL</modelNamePrefix>
+
+                            <!-- Client-side code generation (for consuming GitLab API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            <!-- GitLab schema has types with 300+ fields (e.g., Project).
+                                 All-args constructors for these exceed the JVM 255-parameter limit. -->
+                            <generateNoArgsConstructorOnly>true</generateNoArgsConstructorOnly>
+
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+
+                            <!-- GitLab-specific scalar mappings -->
+                            <customTypesMapping>
+                                <Time>java.time.OffsetDateTime</Time>
+                                <ISO8601DateTime>java.time.OffsetDateTime</ISO8601DateTime>
+                                <ISO8601Date>java.time.LocalDate</ISO8601Date>
+                                <GlobalID>java.lang.String</GlobalID>
+                                <JSON>java.lang.Object</JSON>
+                                <UntrustedRegexp>java.lang.String</UntrustedRegexp>
+                                <Duration>java.lang.String</Duration>
+                                <BigInt>java.math.BigInteger</BigInt>
+                                <TodoableID>java.lang.String</TodoableID>
+                                <UserID>java.lang.String</UserID>
+                                <IterationID>java.lang.String</IterationID>
+                                <MilestoneID>java.lang.String</MilestoneID>
+                                <WorkItemID>java.lang.String</WorkItemID>
+                                <IssueID>java.lang.String</IssueID>
+                                <ProjectID>java.lang.String</ProjectID>
+                                <GroupID>java.lang.String</GroupID>
+                                <LabelsFilterType>java.lang.String</LabelsFilterType>
+                                <NegatedIterationWildcardId>java.lang.String</NegatedIterationWildcardId>
+                                <Upload>java.lang.String</Upload>
+                                <Color>java.lang.String</Color>
+                                <PaymentMethodID>java.lang.String</PaymentMethodID>
+                                <NamespaceID>java.lang.String</NamespaceID>
+                                <AuditEventsStreamingHeadersID>java.lang.String</AuditEventsStreamingHeadersID>
+                                <AuditEventsExternalAuditEventDestinationID>java.lang.String</AuditEventsExternalAuditEventDestinationID>
+                                <GoogleCloudLoggingConfigurationID>java.lang.String</GoogleCloudLoggingConfigurationID>
+                                <AmazonS3ConfigurationID>java.lang.String</AmazonS3ConfigurationID>
+                                <InstanceAuditEventsStreamingHeadersID>java.lang.String</InstanceAuditEventsStreamingHeadersID>
+                                <InstanceExternalAuditEventDestinationID>java.lang.String</InstanceExternalAuditEventDestinationID>
+                                <InstanceGoogleCloudLoggingConfigurationID>java.lang.String</InstanceGoogleCloudLoggingConfigurationID>
+                                <InstanceAmazonS3ConfigurationID>java.lang.String</InstanceAmazonS3ConfigurationID>
+                                <JsonString>java.lang.String</JsonString>
+                            </customTypesMapping>
+
+                            <!-- Naming conventions -->
+                            <modelNameSuffix></modelNameSuffix>
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+
+                            <!-- Use same custom template as GitHub for @SuppressWarnings -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Post-processing for GraphQL generated code (cross-platform) -->
+            <!-- Deletes Relay files that reference missing Query type and adds @SuppressWarnings -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>graphql-post-process</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Skip if codegen was skipped -->
+                            <skip>${graphql.codegen.skip}</skip>
+                            <target>
+                                <!-- Delete Relay files that depend on missing Query root type -->
+                                <delete failonerror="false">
+                                    <fileset
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model">
+                                        <include name="RelayQueryRequest.java"/>
+                                        <include name="RelayQueryResponse.java"/>
+                                    </fileset>
+                                </delete>
+                                <!-- Add @SuppressWarnings("deprecation") to classes using deprecated GitHub API fields -->
+                                <!-- flags="gm": g=global, m=multiline (^ matches start of each line) -->
+                                <replaceregexp flags="gm" byline="false">
+                                    <regexp pattern="^(public class (ProjectPendingCardsParametrizedInput|IssueProjectCardsParametrizedInput|PullRequestProjectCardsParametrizedInput|ProjectColumnCardsParametrizedInput))"/>
+                                    <substitution
+                                            expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
+                                    <fileset
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model">
+                                        <include name="ProjectPendingCardsParametrizedInput.java"/>
+                                        <include name="IssueProjectCardsParametrizedInput.java"/>
+                                        <include name="PullRequestProjectCardsParametrizedInput.java"/>
+                                        <include name="ProjectColumnCardsParametrizedInput.java"/>
+                                    </fileset>
+                                </replaceregexp>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- JaCoCo Maven Plugin for Code Coverage -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.14</version>
+                <executions>
+                    <execution>
+                        <id>default-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCoverage}</skip>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCoverage}</skip>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>check-coverage</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCoverage}</skip>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.line.coverage.minimum}</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.branch.coverage.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <!-- Webhook receiver pure-class layer (subject grammar, dedup ID,
+                                     HMAC, hex): ≥95% branch coverage so refactors fail loudly. -->
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>de.tum.cit.aet.hephaestus.gitprovider.webhook</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.95</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Surefire Plugin for Unit Tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Memory and JVM settings - @{argLine} is replaced by JaCoCo.
+                         4GB heap: the unit+architecture surefire run loads ArchUnit + Spring
+                         Modulith's full class graph (1000+ classes) in the same fork as the
+                         regular unit tests. 2GB OOMs on CI under that load. The dedicated
+                         `architecture-tests` profile uses the same 4GB ceiling. -->
+                    <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                        -XX:+EnableDynamicAgentLoading
+                    </argLine>
+                    <!-- Test output -->
+                    <printSummary>true</printSummary>
+                    <redirectTestOutputToFile>false</redirectTestOutputToFile>
+                    <!-- Parallel execution for faster tests -->
+                    <parallel>methods</parallel>
+                    <threadCount>4</threadCount>
+                    <perCoreThreadCount>true</perCoreThreadCount>
+                    <!-- Fail fast on errors -->
+                    <skipAfterFailureCount>5</skipAfterFailureCount>
+                    <!-- Forked JVM timeout settings to prevent hanging -->
+                    <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
+                    <forkedProcessExitTimeoutInSeconds>180</forkedProcessExitTimeoutInSeconds>
+                    <!-- Enable process checker so forkedProcessTimeoutInSeconds actually works.
+                         Without this, Surefire 3.x ignores the timeout and hung forks run forever. -->
+                    <enableProcessChecker>ping</enableProcessChecker>
+                    <!-- Tag filtering: run unit tests, exclude live tests -->
+                    <groups>${surefire.includedGroups}</groups>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+                </configuration>
+            </plugin>
+
+            <!-- Failsafe Plugin for Integration Tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8</argLine>
+                    <!-- Tag filtering: run integration tests, exclude live tests -->
+                    <groups>${failsafe.includedGroups}</groups>
+                    <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
+                    <!-- Include *IntegrationTest.java pattern (project convention) -->
+                    <includes>
+                        <include>**/*IntegrationTest.java</include>
+                    </includes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Default configuration for spring-boot:run -->
+                    <profiles>${app.profiles}</profiles>
+                    <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
+                        --enable-native-access=ALL-UNNAMED
+                    </jvmArguments>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                    <wait>1000</wait>
+                    <maxAttempts>100</maxAttempts>
+                    <!-- Rationale + digest refresh: docs/admin/buildpacks-cds-decision.md -->
+                    <image>
+                        <builder>paketobuildpacks/builder-noble-java-tiny@sha256:c8b5f936e6d9af492af4a493b4a03eaf496fe51f206c5d53ccddab7871ed4ef5</builder>
+                        <runImage>paketobuildpacks/ubuntu-noble-run-tiny@sha256:b5a167cf9a8021e289e5701a82f7c6b430ba85bb8360e9ddc767340e3f8824c3</runImage>
+                        <env>
+                            <BP_JVM_VERSION>21</BP_JVM_VERSION>
+                            <BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
+                            <!-- Activates application-cds-training.yml during the build-time training run.
+                                 Coolify's runtime SPRING_PROFILES_ACTIVE=prod overrides this. -->
+                            <SPRING_PROFILES_ACTIVE>cds-training</SPRING_PROFILES_ACTIVE>
+                        </env>
+                    </image>
+                </configuration>
+                <executions>
+                    <!-- OpenAPI spec generation: start server with 'specs' profile -->
+                    <execution>
+                        <id>start-for-openapi</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Use 'specs' profile for OpenAPI generation - disables WorkspaceStartupListener -->
+                            <profiles>specs</profiles>
+                            <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
+                                --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
+                                -Dserver.port=${openapi.server.port}
+                            </jvmArguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>stop-after-openapi</id>
+                        <phase>post-integration-test</phase>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-maven-plugin</artifactId>
+                <version>${springdoc-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>integration-test</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <apiDocsUrl>http://localhost:${openapi.server.port}/v3/api-docs.yaml</apiDocsUrl>
+                    <outputFileName>openapi.yaml</outputFileName>
+                    <outputDir>.</outputDir>
+                </configuration>
+            </plugin>
+            <!-- PMD for static code analysis - detects unused fields, variables, and other code quality issues -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>3.28.0</version>
+                <configuration>
+                    <rulesets>
+                        <ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
+                    </rulesets>
+                    <targetJdk>${java.version}</targetJdk>
+                    <includeTests>false</includeTests>
+                    <linkXRef>false</linkXRef>
+                    <printFailingErrors>true</printFailingErrors>
+                    <failOnViolation>false</failOnViolation>
+                    <!-- Exclude generated code -->
+                    <excludeRoots>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql-gitlab</excludeRoot>
+                    </excludeRoots>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.liquibase</groupId>
+                <artifactId>liquibase-maven-plugin</artifactId>
+                <version>${liquibase.version}</version>
+                <configuration>
+                    <changeLogFile>db/master.xml</changeLogFile>
+                    <diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
+                    <searchPath>${project.basedir}/src/main/resources</searchPath>
+                    <driver>org.postgresql.Driver</driver>
+                    <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
+                    <username>root</username>
+                    <password>root</password>
+                    <referenceUrl>
+                        hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
+                    </referenceUrl>
+                    <verbose>true</verbose>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.liquibase.ext</groupId>
+                        <artifactId>liquibase-hibernate7</artifactId>
+                        <version>${liquibase-hibernate7.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-data-jpa</artifactId>
+                        <version>${project.parent.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>jakarta.validation</groupId>
+                        <artifactId>jakarta.validation-api</artifactId>
+                        <version>${jakarta-validation.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.postgresql</groupId>
+                        <artifactId>postgresql</artifactId>
+                        <version>${postgresql.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+        </plugins>
+    </build>
+    <profiles>
+        <profile>
+            <id>local-db-timeout</id>
+            <activation>
+                <property>
+                    <name>env.HEPHAESTUS_DB_MODE</name>
+                    <value>local</value>
+                </property>
+            </activation>
+            <properties>
+                <hephaestus.surefire.timeout>900</hephaestus.surefire.timeout>
+            </properties>
+        </profile>
+
+        <!--
+            Live Tests Profile
+
+            Runs ONLY live GitHub API tests that require real GitHub App credentials
+            and make actual network calls. These tests are tagged with 'live' and
+            protected by Maven tag filtering (this profile) and by runtime credential
+            checks using assumeGitHubCredentialsConfigured() with JUnit Assumptions.
+
+            Usage:
+              ./mvnw test -Plive-tests
+
+            Required configuration (via environment variables or application-live-local.yml):
+              - GH_APP_ID: GitHub App ID
+              - GH_APP_INSTALLATION_ID: GitHub App installation ID
+              - GH_APP_PRIVATE_KEY: GitHub App private key (PEM format)
+              - GH_APP_PAT: Personal access token (optional, for certain operations)
+              - GH_APP_ORGANIZATION: Test organization name (default: HephaestusTest)
+
+            This profile is completely opt-in and will NOT run during:
+            - mvn test (runs only @Tag("unit") tests)
+            - mvn verify (runs @Tag("unit") + @Tag("integration") tests)
+            - CI pipelines (unless explicitly activated)
+        -->
+        <profile>
+            <id>live-tests</id>
+            <properties>
+                <!-- Override defaults to run ONLY live tests -->
+                <surefire.excludedGroups></surefire.excludedGroups>
+                <surefire.includedGroups>live</surefire.includedGroups>
+                <failsafe.excludedGroups></failsafe.excludedGroups>
+                <failsafe.includedGroups></failsafe.includedGroups>
+                <!--
+                  A single-test invocation (`-Dtest=…LiveLlmTest`) can match zero classes when
+                  the gating env var is unset. Without these flags Maven fails the build on
+                  "no tests matched", which masks the real "gate skipped" outcome.
+                -->
+                <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
+                <failsafe.failIfNoSpecifiedTests>false</failsafe.failIfNoSpecifiedTests>
+            </properties>
+        </profile>
+
+        <!--
+            Architecture Tests Profile
+
+            Runs ONLY architecture tests that verify structural constraints using ArchUnit.
+            These tests scan all compiled classes and can be memory-intensive.
+
+            Usage:
+              ./mvnw test -Parchitecture-tests
+
+            These tests verify:
+            - Module boundaries (gitprovider isolation, SPI patterns)
+            - SOLID principles (SRP, DIP, ISP)
+            - Spring best practices (layered architecture, security)
+            - Code quality (complexity limits, naming conventions)
+        -->
+        <profile>
+            <id>architecture-tests</id>
+            <properties>
+                <!-- Override defaults to run ONLY architecture tests -->
+                <surefire.excludedGroups></surefire.excludedGroups>
+                <surefire.includedGroups>architecture</surefire.includedGroups>
+                <failsafe.excludedGroups></failsafe.excludedGroups>
+                <failsafe.includedGroups></failsafe.includedGroups>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <!-- 4GB: ArchUnit OOMs at 2GB. -->
+                            <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                                -XX:+EnableDynamicAgentLoading
+                            </argLine>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+            Quick Development Profile (Auto-Activated)
+
+            Skips GraphQL codegen and stale-class cleanup for fast incremental builds
+            (~2-3s vs ~40s). Without this, codegen regenerates thousands of files with
+            new timestamps, and clean-stale-classes deletes all .class files — both
+            force full recompilation on every build.
+
+            Run 'mvn clean compile' after modifying .graphql schemas or deleting source files.
+            Override: mvn compile -Dgraphql.codegen.skip=false  |  mvn compile -P!quick
+        -->
+        <profile>
+            <id>quick</id>
+            <activation>
+                <!-- Checks for a deep path the codegen actually creates (not the parent
+                     output dir). Reason: `<exists>` matches any non-empty path, and the
+                     Maven Build Cache extension (used in CI) can restore the parent dir
+                     while skipping the deep generated files, producing an empty
+                     graphql-github dir that would falsely activate `quick` and cause
+                     compile failures because the model classes don't exist. The
+                     `model` subdirectory is only present when codegen actually ran. -->
+                <file>
+                    <exists>${basedir}/target/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model</exists>
+                </file>
+            </activation>
+            <properties>
+                <graphql.codegen.skip>true</graphql.codegen.skip>
+                <!-- Preserve .class files for incremental compilation -->
+                <skipCleanStaleClasses>true</skipCleanStaleClasses>
+                <!-- maven.main.skip deliberately NOT set — we want incremental compile -->
+                <maven.test.skip>true</maven.test.skip>
+            </properties>
+        </profile>
+
+        <!-- `mvn -P aot package` runs the Spring Boot AOT processor; output is inert until the
+             runtime sets `-Dspring.aot.enabled=true` (handled separately in #1282 Buildpacks).
+             https://docs.spring.io/spring-boot/maven-plugin/aot.html -->
+        <profile>
+            <id>aot</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>process-aot</id>
+                                <goals>
+                                    <goal>process-aot</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

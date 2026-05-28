@@ -53,6 +53,22 @@ Before upgrading to any new `0.x.0` version:
 
 ### v0.10.0 (Upcoming)
 
+#### 🔴 Agent image pin moved from `docker/agent-image-pin.env` to a signed release asset
+
+**Version**: v0.10.0
+**Affected**: any deployment relying on `docker/agent-image-pin.env` or `docker/agent-image-pin.local.env`.
+
+**Before**: `docker/agent-image-pin.env` was committed to `main` on every release by an auto-commit step in `release.yml`. `compose.app.yaml` loaded it via `env_file:` from the source tree.
+
+**After**: each GitHub Release publishes a signed `release-vX.Y.Z.yaml` (cosign keyless OIDC bundle, multi-subject in-toto attestation). The `release-pin-fetcher` init service in `compose.app.yaml` fetches + verifies it at deploy time onto a shared volume; `application-server` imports it via `spring.config.import: optional:file:/pin/release-pin.yaml` (declared in `application-prod.yml`).
+
+**Migration**:
+
+1. Deploy host must reach `github.com`, `fulcio.sigstore.dev`, `rekor.sigstore.dev`, and `tuf-repo-cdn.sigstore.dev` over HTTPS.
+2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yaml` or a shell env var instead — see [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
+3. Confirm `HEPHAESTUS_AGENT_IMAGE_REFERENCE` is not pre-set in your deploy substrate; an unintended value shadows the verified pin.
+4. Rolling back to a pre-v0.10.0 release: set `HEPHAESTUS_RELEASE_PIN_SKIP=true` plus an explicit `HEPHAESTUS_AGENT_IMAGE_REFERENCE=...@sha256:<digest>` env override on the init service.
+
 #### 🔴 Agent runtime: image config consolidated under `hephaestus.agent.image.*`
 
 **Version**: v0.10.0
@@ -67,21 +83,12 @@ HEPHAESTUS_AGENT_PI_PULL_POLICY=IF_NOT_PRESENT
 HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 ```
 
-**After** (`docker/agent-image-pin.env`, rewritten by the release workflow):
-
-```bash
-HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
-```
-
-`pull-policy` and `require-digest` are now Spring properties set in `application-prod.yml`, not env vars.
+**After**: production binds `HEPHAESTUS_AGENT_IMAGE_REFERENCE` from the signed release asset (previous entry). `pull-policy` and `require-digest` are now Spring properties set in `application-prod.yml`, not env vars.
 
 **Migration**:
 
 1. Drop the four old env vars from your prod configuration.
-2. Production reads the pinned digest from `docker/agent-image-pin.env` via Compose `env_file:`. If `HEPHAESTUS_AGENT_PI_IMAGE` is set in the Coolify UI, **unset it** — UI values shadow `env_file:`.
-3. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
-
-**Why**: GHCR retention previously pruned `:latest` between releases; sandboxes 500'd until the next push refilled the tag. Long-lived mentor containers on tags can pick up unexpected upstream changes mid-session. Digest pinning protects bytes-in-flight; the `require-digest` startup guard fails fast if a tag ever slips back into config.
+2. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
 
 
 

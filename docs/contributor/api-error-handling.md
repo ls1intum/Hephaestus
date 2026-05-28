@@ -12,7 +12,7 @@ Industry guidance for Spring Boot 3 in 2025 recommends centralizing REST excepti
 
 ## How `WorkspaceControllerAdvice` works
 
-1. `@RestControllerAdvice(basePackages = "de.tum.in.www1.hephaestus.workspace")` scopes the advice to workspace endpoints only, but covers the entire workspace package (controllers for repositories, labels, lifecycle, etc.). Consistency is guaranteed because every route in that package flows through one mapper.
+1. `@RestControllerAdvice(basePackages = "de.tum.cit.aet.hephaestus.workspace")` scopes the advice to workspace endpoints only, but covers the entire workspace package (controllers for repositories, labels, lifecycle, etc.). Consistency is guaranteed because every route in that package flows through one mapper.
 2. Each `@ExceptionHandler` method matches a domain exception (for example `EntityNotFoundException`) and returns a configured `ProblemDetail` object. Spring automatically serializes it to JSON with the proper status code.
 3. The private helpers sanitize exception messages via `LoggingUtils` before returning them so we never leak stack traces or SQL fragments. Any unexpected `IllegalStateException` is treated as a server error and logged, while domain-specific violations (slug conflicts, lifecycle issues) have their own exception classes so the advice can return the right HTTP semantics.
 4. Controllers simply throw exceptions (or let services throw) and never build ad-hoc `Map.of("error", ...)` responses again.

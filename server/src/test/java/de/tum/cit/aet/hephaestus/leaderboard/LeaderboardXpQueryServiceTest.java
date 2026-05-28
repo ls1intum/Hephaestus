@@ -1,0 +1,412 @@
+package de.tum.cit.aet.hephaestus.leaderboard;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import de.tum.cit.aet.hephaestus.activity.ActivityBreakdownProjection;
+import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
+import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
+import de.tum.cit.aet.hephaestus.activity.ActivityXpProjection;
+import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.profile.ProfilePullRequestQueryRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+/**
+ * Unit tests for LeaderboardXpQueryService.
+ *
+ * <p>Tests the CQRS read path that aggregates XP from the activity event ledger.
+ * Verifies correct data hydration and breakdown stat accumulation.
+ */
+@Tag("unit")
+@DisplayName("LeaderboardXpQueryService")
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class LeaderboardXpQueryServiceTest {
+
+    private static final Long WORKSPACE_ID = 1L;
+    private static final Instant SINCE = Instant.parse("2024-01-01T00:00:00Z");
+    private static final Instant UNTIL = Instant.parse("2024-01-08T00:00:00Z");
+
+    @Mock
+    private ActivityEventRepository activityEventRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
+
+    private LeaderboardXpQueryService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new LeaderboardXpQueryService(
+            activityEventRepository,
+            userRepository,
+            profilePullRequestQueryRepository
+        );
+
+        // Default mock for distinct PR count query - returns empty list (0 PRs) by default
+        when(
+            activityEventRepository.findDistinctReviewedPullRequestCountsByActors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(activityEventRepository.countOwnPullRequestRepliesByActors(any(), anySet(), any(), any())).thenReturn(
+            Map.of()
+        );
+        when(
+            profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(any(), anySet(), any(), any())
+        ).thenReturn(List.of());
+        when(
+            activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(Map.of());
+        when(
+            activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(any(), anySet(), anySet(), any(), any())
+        ).thenReturn(Map.of());
+        when(
+            profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countMergedPullRequestsByAuthorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(List.of());
+        when(
+            profilePullRequestQueryRepository.countClosedPullRequestsByAuthorsAndTeams(
+                any(),
+                anySet(),
+                anySet(),
+                any(),
+                any()
+            )
+        ).thenReturn(List.of());
+    }
+
+    @Nested
+    @DisplayName("getLeaderboardData")
+    class GetLeaderboardDataTests {
+
+        @Test
+        @DisplayName("returns empty map when no activity events exist")
+        void returnsEmptyMapWhenNoEvents() {
+            // Arrange
+            when(
+                activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(WORKSPACE_ID, SINCE, UNTIL)
+            ).thenReturn(List.of());
+
+            // Act
+            Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
+
+            // Assert
+            assertThat(result).isEmpty();
+            verify(activityEventRepository, never()).findActivityBreakdown(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("aggregates XP totals from activity events")
+        void aggregatesXpTotals() {
+            // Arrange
+            User user1 = createUser(100L, "alice");
+            User user2 = createUser(200L, "bob");
+
+            List<ActivityXpProjection> xpData = List.of(
+                createXpProjection(100L, 150.0, 10L),
+                createXpProjection(200L, 75.0, 5L)
+            );
+
+            when(
+                activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(WORKSPACE_ID, SINCE, UNTIL)
+            ).thenReturn(xpData);
+            when(
+                activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
+            ).thenReturn(List.of());
+            when(userRepository.findAllById(Set.of(100L, 200L))).thenReturn(List.of(user1, user2));
+
+            // Act
+            Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
+
+            // Assert
+            assertThat(result).hasSize(2);
+            assertThat(result.get(100L).totalScore()).isEqualTo(150);
+            assertThat(result.get(100L).eventCount()).isEqualTo(10);
+            assertThat(result.get(200L).totalScore()).isEqualTo(75);
+            assertThat(result.get(200L).eventCount()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("enriches data with activity breakdown by event type")
+        void enrichesWithBreakdown() {
+            // Arrange
+            User user = createUser(100L, "alice");
+
+            List<ActivityXpProjection> xpData = List.of(createXpProjection(100L, 100.0, 8L));
+
+            List<ActivityBreakdownProjection> breakdown = List.of(
+                createBreakdownProjection(100L, ActivityEventType.REVIEW_APPROVED, 3L),
+                createBreakdownProjection(100L, ActivityEventType.REVIEW_CHANGES_REQUESTED, 2L),
+                createBreakdownProjection(100L, ActivityEventType.REVIEW_COMMENTED, 1L),
+                createBreakdownProjection(100L, ActivityEventType.REVIEW_COMMENT_CREATED, 1L)
+            );
+
+            when(
+                activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(WORKSPACE_ID, SINCE, UNTIL)
+            ).thenReturn(xpData);
+            when(
+                activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
+            ).thenReturn(breakdown);
+            when(
+                activityEventRepository.countOwnPullRequestRepliesByActors(
+                    eq(WORKSPACE_ID),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(Map.of(100L, 1L));
+            when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
+
+            // Act
+            Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
+
+            // Assert
+            LeaderboardUserXp data = result.get(100L);
+            assertThat(data).isNotNull();
+            assertThat(data.approvals()).isEqualTo(3);
+            assertThat(data.changeRequests()).isEqualTo(2);
+            assertThat(data.comments()).isEqualTo(1);
+            assertThat(data.codeComments()).isEqualTo(1);
+            assertThat(data.ownReplies()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("skips actors without matching user entity")
+        void skipsUnknownActors() {
+            // Arrange
+            User knownUser = createUser(100L, "alice");
+
+            List<ActivityXpProjection> xpData = List.of(
+                createXpProjection(100L, 50.0, 5L),
+                createXpProjection(999L, 100.0, 10L) // Unknown user
+            );
+
+            when(
+                activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(WORKSPACE_ID, SINCE, UNTIL)
+            ).thenReturn(xpData);
+            when(
+                activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
+            ).thenReturn(List.of());
+            when(userRepository.findAllById(Set.of(100L, 999L))).thenReturn(List.of(knownUser));
+
+            // Act
+            Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
+
+            // Assert
+            assertThat(result).hasSize(1);
+            assertThat(result.containsKey(100L)).isTrue();
+            assertThat(result.containsKey(999L)).isFalse();
+        }
+
+        @Test
+        @DisplayName("filters by team IDs when provided")
+        void filtersByTeamIds() {
+            // Arrange
+            User user = createUser(100L, "alice");
+            Set<Long> teamIds = Set.of(10L, 20L);
+
+            List<ActivityXpProjection> xpData = List.of(createXpProjection(100L, 50.0, 5L));
+
+            when(
+                activityEventRepository.findExperiencePointsByWorkspaceAndTeamsAndTimeframe(
+                    WORKSPACE_ID,
+                    teamIds,
+                    SINCE,
+                    UNTIL
+                )
+            ).thenReturn(xpData);
+            when(
+                activityEventRepository.findActivityBreakdownByWorkspaceAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(List.of());
+            when(
+                activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(Map.of(100L, 2L));
+            when(
+                profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(List.of(authorCountProjection(100L, 1L)));
+            when(
+                activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
+                    eq(WORKSPACE_ID),
+                    eq(teamIds),
+                    anySet(),
+                    eq(SINCE),
+                    eq(UNTIL)
+                )
+            ).thenReturn(Map.of(100L, 3L));
+            when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
+
+            // Act
+            Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL, teamIds);
+
+            // Assert
+            assertThat(result).hasSize(1);
+            verify(activityEventRepository).findExperiencePointsByWorkspaceAndTeamsAndTimeframe(
+                WORKSPACE_ID,
+                teamIds,
+                SINCE,
+                UNTIL
+            );
+            assertThat(result.get(100L).ownReplies()).isEqualTo(2);
+            assertThat(result.get(100L).openPullRequests()).isEqualTo(1);
+            assertThat(result.get(100L).reviewedPrCount()).isEqualTo(3);
+            verify(activityEventRepository, never()).findExperiencePointsByWorkspaceAndTimeframe(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("handles null XP and event count gracefully")
+        void handlesNullValues() {
+            // Arrange
+            User user = createUser(100L, "alice");
+            ActivityXpProjection xpWithNulls = createXpProjection(100L, null, null);
+
+            when(
+                activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(WORKSPACE_ID, SINCE, UNTIL)
+            ).thenReturn(List.of(xpWithNulls));
+            when(
+                activityEventRepository.findActivityBreakdown(eq(WORKSPACE_ID), anySet(), eq(SINCE), eq(UNTIL))
+            ).thenReturn(List.of());
+            when(userRepository.findAllById(Set.of(100L))).thenReturn(List.of(user));
+
+            // Act
+            Map<Long, LeaderboardUserXp> result = service.getLeaderboardData(WORKSPACE_ID, SINCE, UNTIL);
+
+            // Assert
+            LeaderboardUserXp data = result.get(100L);
+            assertThat(data.totalScore()).isZero();
+            assertThat(data.eventCount()).isZero();
+        }
+    }
+
+    // ========================================================================
+    // Helper Methods
+    // ========================================================================
+
+    private User createUser(Long id, String login) {
+        User user = new User();
+        user.setId(id);
+        user.setLogin(login);
+        return user;
+    }
+
+    private ActivityXpProjection createXpProjection(Long actorId, Double totalXp, Long eventCount) {
+        return new ActivityXpProjection() {
+            @Override
+            public Long getActorId() {
+                return actorId;
+            }
+
+            @Override
+            public Double getTotalExperiencePoints() {
+                return totalXp;
+            }
+
+            @Override
+            public Long getEventCount() {
+                return eventCount;
+            }
+        };
+    }
+
+    private ActivityBreakdownProjection createBreakdownProjection(
+        Long actorId,
+        ActivityEventType eventType,
+        Long count
+    ) {
+        return new ActivityBreakdownProjection() {
+            @Override
+            public Long getActorId() {
+                return actorId;
+            }
+
+            @Override
+            public ActivityEventType getEventType() {
+                return eventType;
+            }
+
+            @Override
+            public Long getCount() {
+                return count;
+            }
+
+            @Override
+            public Double getExperiencePoints() {
+                return 0.0;
+            }
+        };
+    }
+
+    private ProfilePullRequestQueryRepository.AuthorCountProjection authorCountProjection(Long authorId, Long count) {
+        return new ProfilePullRequestQueryRepository.AuthorCountProjection() {
+            @Override
+            public Long getAuthorId() {
+                return authorId;
+            }
+
+            @Override
+            public Long getCount() {
+                return count;
+            }
+        };
+    }
+}

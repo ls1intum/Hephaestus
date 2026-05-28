@@ -12,7 +12,7 @@ This guide covers the minimum configuration required to deploy Hephaestus in pro
 The production stack consists of:
 
 - **Application server** (Spring Boot, runs the Pi mentor agent in-process)
-- **Webhook ingest** (Hono/TypeScript → NATS JetStream)
+- **Webhook server** (same Spring Boot artifact, `webhook` profile → NATS JetStream)
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
 - **Keycloak** (with GitHub and optional GitLab identity providers)
@@ -138,7 +138,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
 2. **Configure Keycloak:**
    - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
-   - Copy `server/application-server/.env.example` to `server/application-server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+   - Copy `server/.env.example` to `server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
    - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
    - If rolling out GitLab login, also configure the GitLab identity provider and apply the manual Keycloak adjustments for first broker login, automatic account linking, relaxed name validation, and clock skew tolerance.
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.

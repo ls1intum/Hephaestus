@@ -1,39 +1,71 @@
 services:
-  webhook-ingest:
-    image: "ghcr.io/ls1intum/hephaestus/webhook-ingest:${IMAGE_TAG}"
-    ports:
-      - "4200"
+  # ─────────────────────────────────────────────────────────────────────────────
+  # webhook-server — inbound webhook receiver (same image as application-server,
+  # activated with SPRING_PROFILES_ACTIVE=prod,webhook so only the
+  # gitprovider.webhook beans load). Deployed as a separate container from
+  # application-server so an app-server restart doesn't drop incoming webhooks
+  # (push events aren't manually redeliverable on GitHub/GitLab). See ADR 0008.
+  # ─────────────────────────────────────────────────────────────────────────────
+  webhook-server:
+    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    expose:
+      - "8080"
     environment:
-      NATS_URL: "nats://nats-server:4222"
+      APP_VERSION: ${IMAGE_TAG}
+      SPRING_PROFILES_ACTIVE: "prod,webhook"
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
+      HEPHAESTUS_RUNTIME_SERVER_ENABLED: "false"
+      HEPHAESTUS_RUNTIME_WORKER_ENABLED: "false"
+      SPRING_LIQUIBASE_ENABLED: "false"
+      # NATS — reuses the existing `natsConnection` bean to publish to gitlab.> / github.>
+      HEPHAESTUS_SYNC_NATS_ENABLED: "true"
+      HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
+      # Shared webhook secret used for incoming HMAC / token verification.
+      # WEBHOOK_EXTERNAL_URL is only used by auto-registration (server role) and is intentionally
+      # not set on the webhook-server pod.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      # DataSource kept until the workspace-context filter is made optional on this profile —
+      # the receiver itself never writes to the DB. Tracked as residual debt in ADR 0008.
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: root
+      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
+      KEYCLOAK_REALM: hephaestus
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/keycloak
+      KEYCLOAK_CLIENT_ID: hephaestus-confidential
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
+      SENTRY_DSN: ${SENTRY_DSN}
     depends_on:
       nats-server:
         condition: service_healthy
     restart: unless-stopped
+    # Spring drains HTTP (timeout-per-shutdown-phase 20s) THEN WebhookGracefulShutdown drains
+    # NATS (up to 15s). Docker must allow ≥35s before SIGKILL, or the JVM is cut mid-drain.
+    stop_grace_period: 40s
     networks:
       - shared-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
-      - "traefik.http.middlewares.https-webhook-ingest-stripprefix.stripprefix.prefixes=/webhooks"
+      - "traefik.http.middlewares.https-webhook-server-stripprefix.stripprefix.prefixes=/webhooks"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.routers.http-webhook-ingest.entryPoints=http"
-      - "traefik.http.routers.http-webhook-ingest.middlewares=redirect-to-https"
-      - "traefik.http.routers.http-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
-      - "traefik.http.routers.https-webhook-ingest.entryPoints=https"
-      - "traefik.http.routers.https-webhook-ingest.middlewares=https-webhook-ingest-stripprefix,gzip"
-      - "traefik.http.routers.https-webhook-ingest.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
-      - "traefik.http.routers.https-webhook-ingest.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.https-webhook-ingest.tls=true"
-      - "traefik.http.routers.http-webhook-ingest.priority=100"
-      - "traefik.http.routers.https-webhook-ingest.priority=100"
-      - "traefik.http.services.https-webhook-ingest.loadbalancer.server.port=4200"
+      - "traefik.http.routers.http-webhook-server.entryPoints=http"
+      - "traefik.http.routers.http-webhook-server.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-server.entryPoints=https"
+      - "traefik.http.routers.https-webhook-server.middlewares=https-webhook-server-stripprefix,gzip"
+      - "traefik.http.routers.https-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
+      - "traefik.http.routers.https-webhook-server.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.https-webhook-server.tls=true"
+      - "traefik.http.routers.http-webhook-server.priority=100"
+      - "traefik.http.routers.https-webhook-server.priority=100"
+      - "traefik.http.services.https-webhook-server.loadbalancer.server.port=8080"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4200/health"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
       retries: 5
-      start_period: 3s
+      start_period: 30s
     logging:
       driver: "json-file"
       options:

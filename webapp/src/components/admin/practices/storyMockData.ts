@@ -6,7 +6,6 @@ export const mockPractices: Practice[] = [
 		slug: "pr-description-quality",
 		name: "PR Description Quality",
 		category: "code-quality",
-		description: "Ensures PR descriptions are detailed and informative.",
 		triggerEvents: ["PullRequestCreated", "PullRequestReady"],
 		criteria:
 			"## PR Description Quality\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required Elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
@@ -19,8 +18,9 @@ export const mockPractices: Practice[] = [
 		slug: "code-review-thoroughness",
 		name: "Code Review Thoroughness",
 		category: "code-quality",
-		description: "Evaluates depth and quality of code reviews.",
 		triggerEvents: ["ReviewSubmitted"],
+		criteria:
+			"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
 		active: true,
 		createdAt: new Date("2025-06-02"),
 		updatedAt: new Date("2025-06-14"),
@@ -29,8 +29,9 @@ export const mockPractices: Practice[] = [
 		id: 3,
 		slug: "test-coverage",
 		name: "Test Coverage",
-		description: "Checks that new code includes appropriate test coverage.",
 		triggerEvents: ["PullRequestCreated", "PullRequestSynchronized"],
+		criteria:
+			"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
 		active: false,
 		createdAt: new Date("2025-06-03"),
 		updatedAt: new Date("2025-06-10"),
@@ -42,8 +43,9 @@ export const mockPracticeNoCategory: Practice = {
 	id: 5,
 	slug: "error-state-handling",
 	name: "Error State Handling",
-	description: "Evaluates whether the code properly handles and surfaces errors to the user.",
 	triggerEvents: ["PullRequestCreated"],
+	criteria:
+		"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
 	active: true,
 	createdAt: new Date("2025-06-05"),
 	updatedAt: new Date("2025-06-17"),
@@ -55,8 +57,6 @@ export const mockPracticeLongText: Practice = {
 	slug: "very-long-practice-name-to-test-overflow-in-card-layouts",
 	name: "Extremely Verbose Practice Name That Tests Text Wrapping and Overflow Behavior in Card Layouts",
 	category: "very-long-category-name",
-	description:
-		"This practice has an unusually long description to verify that the card layout handles multi-line text gracefully without breaking the visual hierarchy or causing horizontal scrolling on smaller viewports. It should wrap naturally and remain readable.",
 	triggerEvents: [
 		"PullRequestCreated",
 		"PullRequestReady",
@@ -75,7 +75,6 @@ export const mockPracticeWithAllTriggers: Practice = {
 	slug: "commit-discipline",
 	name: "Commit Discipline",
 	category: "commit-hygiene",
-	description: "Ensures commits follow conventional commit standards with meaningful messages.",
 	triggerEvents: [
 		"PullRequestCreated",
 		"PullRequestReady",

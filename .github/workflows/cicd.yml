@@ -21,11 +21,10 @@ jobs:
     outputs:
       webapp: ${{ steps.filter.outputs.webapp }}
       application-server: ${{ steps.filter.outputs.application-server }}
-      webhook-ingest: ${{ steps.filter.outputs.webhook-ingest }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
-      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.webhook-ingest == 'true' || steps.filter.outputs.agent-images == 'true' }}
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.agent-images == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
@@ -48,12 +47,8 @@ jobs:
               - 'package-lock.json'
               - '.node-version'
             application-server:
-              - 'server/application-server/**'
+              - 'server/**'
               - 'scripts/db-utils.sh'
-            webhook-ingest:
-              - 'server/webhook-ingest/**'
-              - 'package.json'
-              - 'package-lock.json'
             agent-images:
               - 'docker/agents/**'
             docs:
@@ -100,7 +95,6 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
     uses: ./.github/workflows/ci-security-scan.yml
@@ -129,7 +123,6 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
@@ -145,7 +138,6 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   all-ci-passed:
@@ -230,7 +222,6 @@ jobs:
           echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
           echo "| Webapp | ${{ needs.detect-changes.outputs.webapp == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Application Server | ${{ needs.detect-changes.outputs.application-server == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Agent Images | ${{ needs.detect-changes.outputs.agent-images == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -265,8 +256,7 @@ jobs:
               echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
               echo "| Webapp unit | \`pnpm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Webapp Storybook | \`pnpm --filter webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Application server | \`cd server/application-server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webhook ingest | \`pnpm --filter server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Application server | \`cd server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY

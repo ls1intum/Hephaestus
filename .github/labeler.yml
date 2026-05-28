@@ -11,11 +11,7 @@ webapp:
 
 application-server:
   - changed-files:
-    - any-glob-to-any-file: server/application-server/**
-
-webhook-ingest:
-  - changed-files:
-    - any-glob-to-any-file: "server/webhook-ingest/**"
+    - any-glob-to-any-file: server/**
 
 ci:
   - changed-files:

@@ -21,9 +21,9 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # semantic-release pushes the version tag
-      issues: write         # semantic-release closes resolved issues
-      pull-requests: write  # semantic-release comments on merged PRs
+      contents: write
+      issues: write
+      pull-requests: write
     outputs:
       new_version: ${{ steps.release.outputs.new_release_version }}
       released: ${{ steps.release.outputs.new_release_published }}
@@ -60,17 +60,14 @@ jobs:
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # commit the digest pin back to main
-      packages: write   # retag images in GHCR
+      packages: write
+      id-token: write
+      attestations: write
+      contents: write
     outputs:
       agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
+      application-server-digest: ${{ steps.retag.outputs.application-server-digest }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          token: ${{ secrets.GH_PAT }}
-          persist-credentials: true
-          ref: main
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
@@ -86,15 +83,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Authoritative registry-side digest of the manifest list.
           manifest_digest() {
-            printf 'sha256:%s\n' "$(docker buildx imagetools inspect --raw "$1" | sha256sum | awk '{print $1}')"
+            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r '.digest'
           }
 
-          IMAGES=("webapp" "application-server" "webhook-ingest" "agent-pi")
+          IMAGES=("webapp" "application-server" "agent-pi" "release-pin-fetcher")
+
+          # Probe all images first; refuse to partial-publish if any is missing.
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
-            echo "::group::$img"
-
             for i in $(seq 1 24); do
               if docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; then break; fi
               if [ "$i" -ge 24 ]; then
@@ -103,6 +101,11 @@ jobs:
               fi
               sleep 5
             done
+          done
+
+          for img in "${IMAGES[@]}"; do
+            FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
+            echo "::group::$img"
 
             SRC_DIGEST=$(manifest_digest "$FULL_IMAGE:$SHA")
             [[ "$SRC_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || {
@@ -114,14 +117,13 @@ jobs:
             DST_DIGEST=$(manifest_digest "$FULL_IMAGE:$VERSION")
             if [[ "$SRC_DIGEST" != "$DST_DIGEST" ]]; then
               echo "::error::Retag changed the digest for $img — refusing to publish."
-              echo "::error::  source ($FULL_IMAGE:$SHA): $SRC_DIGEST"
-              echo "::error::  retagged ($FULL_IMAGE:$VERSION): $DST_DIGEST"
               exit 1
             fi
 
-            if [ "$img" = "agent-pi" ]; then
-              echo "agent-pi-digest=$DST_DIGEST" >> "$GITHUB_OUTPUT"
-            fi
+            case "$img" in
+              agent-pi)            echo "agent-pi-digest=$DST_DIGEST" >> "$GITHUB_OUTPUT" ;;
+              application-server)  echo "application-server-digest=$DST_DIGEST" >> "$GITHUB_OUTPUT" ;;
+            esac
             echo "::endgroup::"
           done
 
@@ -133,61 +135,73 @@ jobs:
           docker pull "$IMAGE"
           docker run --rm --entrypoint /bin/sh "$IMAGE" -c 'bun --version && node --version'
 
-      - name: Update docker/agent-image-pin.env
+      - name: Write release pin asset
+        id: pin
         env:
-          DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
           VERSION: ${{ needs.release.outputs.new_version }}
+          AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
         run: |
           set -euo pipefail
-          if [ -z "$DIGEST" ]; then
-            echo "::error::agent-pi digest is empty — refusing to commit."
-            exit 1
-          fi
-          REF="ghcr.io/ls1intum/hephaestus/agent-pi@${DIGEST}"
-          PIN_FILE="docker/agent-image-pin.env"
-          EXPECTED_LINE="HEPHAESTUS_AGENT_IMAGE_REFERENCE=${REF}"
+          ASSET="release-v${VERSION}.yaml"
+          cat > "$ASSET" <<EOF
+          hephaestus:
+            agent:
+              image:
+                reference: ghcr.io/ls1intum/hephaestus/agent-pi@${AGENT_DIGEST}
+          EOF
+          echo "asset-path=$ASSET" >> "$GITHUB_OUTPUT"
+          cat "$ASSET"
 
-          tmp=$(mktemp)
-          awk -v ref="$EXPECTED_LINE" '
-            /^HEPHAESTUS_AGENT_IMAGE_REFERENCE=/ { print ref; found=1; next }
-            { print }
-            END { exit (found ? 0 : 1) }
-          ' "$PIN_FILE" > "$tmp" || {
-            echo "::error::$PIN_FILE is missing the HEPHAESTUS_AGENT_IMAGE_REFERENCE= line — refusing to silently no-op."
-            exit 1
-          }
-          mv "$tmp" "$PIN_FILE"
+      - name: Generate subject checksums
+        id: subjects
+        env:
+          ASSET: ${{ steps.pin.outputs.asset-path }}
+          APP_DIGEST: ${{ steps.retag.outputs.application-server-digest }}
+          AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
+        run: |
+          # shasum-format: '<hex>  <name>'. Names must be plain identifiers
+          # (no URL chars) — actions/attest forwards them verbatim into the
+          # in-toto subject.name field.
+          set -euo pipefail
+          {
+            printf '%s  %s\n' "${APP_DIGEST#sha256:}"   "application-server"
+            printf '%s  %s\n' "${AGENT_DIGEST#sha256:}" "agent-pi"
+            printf '%s  %s\n' "$(sha256sum "$ASSET" | awk '{print $1}')" "$ASSET"
+          } > subjects.sha256
+          cat subjects.sha256
 
-          if git diff --quiet -- "$PIN_FILE"; then
-            echo "agent-pi digest unchanged — skipping commit."
-            exit 0
-          fi
+      - name: Attest release pin
+        # Version belongs inside the purl, not as a top-level field.
+        # https://github.com/in-toto/attestation/blob/main/spec/predicates/release.md
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-checksums: subjects.sha256
+          predicate-type: https://in-toto.io/attestation/release/v0.1
+          predicate: |
+            { "purl": "pkg:github/ls1intum/hephaestus@v${{ needs.release.outputs.new_version }}" }
 
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "$PIN_FILE"
-          # [skip ci] keeps cicd.yml from re-firing on this commit.
-          git commit -m "chore(release): pin agent-pi to ${DIGEST} for v${VERSION} [skip ci]"
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-          for attempt in 1 2 3; do
-            if git push origin HEAD:main; then exit 0; fi
-            echo "push attempt $attempt failed — fetching + rebasing"
-            git fetch origin main
-            git rebase origin/main || {
-              echo "::error::rebase produced conflicts on $PIN_FILE — investigate manually."
-              git rebase --abort
-              exit 1
-            }
-            if ! grep -qxF "$EXPECTED_LINE" "$PIN_FILE"; then
-              echo "::error::pin line was lost during rebase; refusing to push a no-op."
-              exit 1
-            fi
-            sleep $((attempt * 5))
-          done
-          echo "::error::push to main failed after 3 attempts"
-          exit 1
+      - name: Sign release pin asset
+        env:
+          ASSET: ${{ steps.pin.outputs.asset-path }}
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes --bundle "${ASSET}.sigstore.json" "$ASSET"
 
-  # Deploy to staging automatically after images are tagged
+      - name: Upload release pin asset to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          VERSION: ${{ needs.release.outputs.new_version }}
+          ASSET: ${{ steps.pin.outputs.asset-path }}
+        run: |
+          set -euo pipefail
+          # Release assets are immutable: no --clobber, fail loud on re-run.
+          gh release upload "v${VERSION}" \
+            "$ASSET" "${ASSET}.sigstore.json" \
+            --repo "${{ github.repository }}"
+
   deploy-staging:
     needs: [release, tag-images]
     if: needs.release.outputs.released == 'true'
@@ -199,7 +213,6 @@ jobs:
       deploy-proxy: false
     secrets: inherit
 
-  # Trigger production deployment (approval happens in deploy-prod.yml)
   deploy-production:
     needs: [release, deploy-staging]
     if: needs.release.outputs.released == 'true'

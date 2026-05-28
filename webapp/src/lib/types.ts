@@ -12,7 +12,7 @@ export type CustomUIDataTypes = Record<string, unknown>;
 
 /**
  * Token usage block — mirror of {@code UIMessageChunk.FinishMetadata.Usage} on the Java side
- * (server/application-server/.../mentor/chat/wire/UIMessageChunk.java). Every field is optional
+ * (server/.../mentor/chat/wire/UIMessageChunk.java). Every field is optional
  * because Pi providers vary in what they report (e.g. gpt-oss-120b returns input+output+totalTokens
  * but no cache fields).
  */

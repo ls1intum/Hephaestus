@@ -175,7 +175,7 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 3. **Local config file** – copy the template that lives alongside the tests:
 
     ```bash
-    cd server/application-server/src/test/resources
+    cd server/src/test/resources
     cp application-live-local.example.yml application-live-local.yml
     ```
 
@@ -195,7 +195,7 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 
 ### Running the suite
 
-From `server/application-server/` run:
+From `server/` run:
 
 ```bash
 ./mvnw test -Plive-tests
@@ -212,7 +212,7 @@ The run takes roughly two minutes and prints the GitHub artefacts it provisions.
 1. Extend `AbstractGitHubLiveSyncIntegrationTest` (or fall back to `BaseGitHubLiveIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
 2. Use the supplied helpers to create and track temporary GitHub artefacts. They automatically register clean-up handlers via `@AfterEach`, so add new resources to the provided lists instead of implementing manual deletion logic.
 3. Keep tests deterministic: rely on `databaseTestUtils.cleanDatabase()` in `@BeforeEach` (already invoked by the base), and generate unique slugs via `nextEphemeralSlug("suffix")` when naming repositories, branches, or teams.
-4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/application-server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
+4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
 
 ### Troubleshooting
 

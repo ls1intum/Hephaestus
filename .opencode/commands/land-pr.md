@@ -21,9 +21,8 @@ git diff --name-only HEAD
 
 Map paths to components (mirrors CI's dorny/paths-filter config):
 - `webapp/**` → webapp changed
-- `server/application-server/**` OR `scripts/db-utils.sh` → app-server changed
-- `server/webhook-ingest/**` → webhook changed
-- `package.json` OR `package-lock.json` OR `.node-version` → webapp + webhook changed
+- `server/**` OR `scripts/db-utils.sh` → app-server changed (includes webhook receiver since ADR 0008)
+- `package.json` OR `package-lock.json` OR `.node-version` → webapp changed
 - `docs/**` → docs-only (skip all validation if nothing else changed)
 
 ## 3. Format
@@ -59,25 +58,9 @@ pnpm run db:draft-changelog
 pnpm run db:generate-erd-docs
 ```
 
-## 6. Build Affected TS Services
-
-If webhook changed:
-
-```bash
-pnpm run build:webhook-ingest
-```
-
-Build failures catch path alias and import issues that typecheck alone misses.
-
-## 7. Unit Tests for Affected Components
+## 6. Unit Tests for Affected Components
 
 Run ONLY tests for changed components. Order: fastest first.
-
-If webhook changed:
-
-```bash
-pnpm run test:webhook-ingest
-```
 
 If webapp changed:
 
@@ -88,12 +71,12 @@ pnpm run test:webapp
 If app-server changed (and mvn available):
 
 ```bash
-cd server/application-server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
+cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
 ```
 
 ALL tests must pass before proceeding.
 
-## 8. OpenAPI Sync Check
+## 7. OpenAPI Sync Check
 
 If app-server changed:
 
@@ -104,7 +87,7 @@ git diff --quiet || echo "WARNING: OpenAPI specs were out of sync - staging chan
 
 Stage any drift that was caught.
 
-## 9. Final Validation Pass
+## 8. Final Validation Pass
 
 Regeneration can produce unformatted code. Run one final pass:
 
@@ -115,7 +98,7 @@ pnpm run check
 
 Both must pass.
 
-## 10. Create Branch (if on main)
+## 9. Create Branch (if on main)
 
 ```bash
 git branch --show-current
@@ -129,7 +112,7 @@ git checkout -b <type>/<description>
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `ci`, `chore`
 
-## 11. Commit
+## 10. Commit
 
 ```bash
 git add -A
@@ -138,23 +121,23 @@ git commit -m "<type>(<scope>): <description>"
 
 **Scopes:**
 
-- Service: `webapp`, `server`, `ai`, `webhooks`, `docs`
+- Service: `webapp`, `server`, `docs`
 - Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 - Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
-## 12. Push
+## 11. Push
 
 ```bash
 git push -u origin HEAD
 ```
 
-## 13. Check if PR Exists
+## 12. Check if PR Exists
 
 ```bash
 PAGER=cat gh pr view --json number,url 2>/dev/null && echo "PR exists - skip creation" || echo "No PR - create one"
 ```
 
-## 14. Create PR (if needed)
+## 13. Create PR (if needed)
 
 Skip if step 13 showed "PR exists".
 
@@ -170,7 +153,7 @@ PAGER=cat gh pr create --base main \
 <steps to verify, or 'CI covers this'>"
 ```
 
-## 15. Verify
+## 14. Verify
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
