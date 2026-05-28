@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/users")
 @Tag(name = "Admin", description = "Super-admin account management")
-@PreAuthorize("hasAuthority('SCOPE_app_admin')")
+@PreAuthorize("hasAuthority('admin')")
 public class AccountAdminController {
 
     private final AccountService accountService;

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,6 +30,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
 
     private final AccountProvisioningService provisioningService;
     private final HephaestusJwtIssuer jwtIssuer;
+    private final JwtPrincipalFactory principalFactory;
     private final AuthIntentCookie authIntentCookie;
     private final AuthProperties authProperties;
     private final Clock clock;
@@ -36,12 +38,14 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     public HephaestusAuthSuccessHandler(
         AccountProvisioningService provisioningService,
         HephaestusJwtIssuer jwtIssuer,
+        JwtPrincipalFactory principalFactory,
         AuthIntentCookie authIntentCookie,
         AuthProperties authProperties,
         Clock clock
     ) {
         this.provisioningService = provisioningService;
         this.jwtIssuer = jwtIssuer;
+        this.principalFactory = principalFactory;
         this.authIntentCookie = authIntentCookie;
         this.authProperties = authProperties;
         this.clock = clock;
@@ -75,8 +79,11 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
 
         Account account = provisioningService.resolveOrProvision(registrationId, subject, principal, intent);
 
-        String scope = account.getAppRole() == Account.AppRole.APP_ADMIN ? "user app_admin" : "user";
-        HephaestusJwtIssuer.Token issued = jwtIssuer.issue(account.getId(), scope, /* impersonator */ null, request);
+        HephaestusJwtIssuer.Token issued = jwtIssuer.issue(
+            principalFactory.forAccount(account),
+            /* impersonator */ null,
+            request
+        );
         setAccessCookie(response, issued.value(), issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond());
 
         String redirectTo = (intent != null) ? ReturnToValidator.safeOrFallback(intent.returnTo()) : "/";

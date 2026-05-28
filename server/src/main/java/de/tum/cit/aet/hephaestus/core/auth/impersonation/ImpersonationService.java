@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
@@ -36,6 +37,7 @@ public class ImpersonationService {
 
     private final AccountRepository accountRepository;
     private final HephaestusJwtIssuer jwtIssuer;
+    private final JwtPrincipalFactory principalFactory;
     private final IssuedJwtRepository issuedJwtRepository;
     private final AuthEventLogger authEventLogger;
     private final Clock clock;
@@ -43,12 +45,14 @@ public class ImpersonationService {
     public ImpersonationService(
         AccountRepository accountRepository,
         HephaestusJwtIssuer jwtIssuer,
+        JwtPrincipalFactory principalFactory,
         IssuedJwtRepository issuedJwtRepository,
         AuthEventLogger authEventLogger,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
         this.jwtIssuer = jwtIssuer;
+        this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
         this.authEventLogger = authEventLogger;
         this.clock = clock;
@@ -80,8 +84,14 @@ public class ImpersonationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot impersonate yourself");
         }
 
-        // Target always impersonated at USER scope — impersonation must never escalate.
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(target.getId(), "user", operator.getId(), request);
+        // Impersonate with the target's own roles so the operator sees the target's view;
+        // ImpersonationGuard makes the session read-only regardless. The act claim records
+        // the operator. Issued via the principal factory so preferred_username = target login.
+        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+            principalFactory.forAccount(target),
+            operator.getId(),
+            request
+        );
 
         authEventLogger
             .event(AuthEvent.EventType.IMPERSONATION_BEGIN, AuthEvent.Result.SUCCESS)
@@ -102,20 +112,20 @@ public class ImpersonationService {
     @Transactional
     public Result exit(Long operatorAccountId, Long targetAccountId, UUID currentJti, HttpServletRequest request) {
         issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT);
-        Account operator = accountRepository
-            .findById(operatorAccountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "operator account not found"));
-        String scope = operator.getAppRole() == Account.AppRole.APP_ADMIN ? "user app_admin" : "user";
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(operator.getId(), scope, null, request);
+        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+            principalFactory.forAccountId(operatorAccountId),
+            null,
+            request
+        );
 
         authEventLogger
             .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
             .account(targetAccountId)
-            .actingAccount(operator.getId())
+            .actingAccount(operatorAccountId)
             .record();
-        log.info("auth.impersonation: operator={} exited impersonation of target={}", operator.getId(), targetAccountId);
+        log.info("auth.impersonation: operator={} exited impersonation of target={}", operatorAccountId, targetAccountId);
 
-        return new Result(token, operator.getId(), null);
+        return new Result(token, operatorAccountId, null);
     }
 
     private static String escape(String s) {

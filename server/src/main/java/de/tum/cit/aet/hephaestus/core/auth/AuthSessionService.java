@@ -3,12 +3,11 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,11 +15,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Owns the access-token cookie lifecycle: logout, refresh, and the low-level
@@ -31,7 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 @WorkspaceAgnostic("Session lifecycle is account-scoped, not workspace-scoped")
 public class AuthSessionService {
 
-    private final AccountRepository accountRepository;
+    private final JwtPrincipalFactory principalFactory;
     private final IssuedJwtRepository issuedJwtRepository;
     private final HephaestusJwtIssuer jwtIssuer;
     private final AuthEventLogger authEventLogger;
@@ -39,14 +36,14 @@ public class AuthSessionService {
     private final Clock clock;
 
     public AuthSessionService(
-        AccountRepository accountRepository,
+        JwtPrincipalFactory principalFactory,
         IssuedJwtRepository issuedJwtRepository,
         HephaestusJwtIssuer jwtIssuer,
         AuthEventLogger authEventLogger,
         AuthProperties properties,
         Clock clock
     ) {
-        this.accountRepository = accountRepository;
+        this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
         this.jwtIssuer = jwtIssuer;
         this.authEventLogger = authEventLogger;
@@ -71,12 +68,12 @@ public class AuthSessionService {
         HttpServletRequest request,
         HttpServletResponse response
     ) {
-        Account account = accountRepository
-            .findById(accountId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "account not found"));
         issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
-        String scope = account.getAppRole() == Account.AppRole.APP_ADMIN ? "user app_admin" : "user";
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(accountId, scope, impersonatorId, request);
+        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+            principalFactory.forAccountId(accountId),
+            impersonatorId,
+            request
+        );
         authEventLogger.event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS).account(accountId).record();
         setCookie(response, token);
     }

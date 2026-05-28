@@ -69,40 +69,44 @@ public class HephaestusJwtIssuer {
     }
 
     /**
-     * Mint a new access JWT for {@code accountId} with the given {@code scope} string and
-     * (optional) impersonator id. Records the {@code jti} in {@code issued_jwt}.
+     * Mint a new access JWT for {@code principal} (optionally under impersonation). Records
+     * the {@code jti} in {@code issued_jwt} in the same transaction.
      *
-     * @param accountId       Hephaestus account id; populates {@code sub}.
-     * @param scope           space-delimited scope claim (app role + feature flag keys).
-     * @param impersonatorId  if non-null, sets the RFC 8693 {@code act} claim.
-     * @param request         used to capture {@code user_agent} + remote IP into the revocation row.
+     * <p>Emits a Keycloak-compatible claim set so the token is a drop-in replacement:
+     * {@code preferred_username} = login, {@code given_name} = first name,
+     * {@code realm_access.roles} = roles. Plus {@code sub} = account id and {@code jti} for
+     * the Hephaestus-native endpoints + revocation.
+     *
+     * @param principal      account id + login + roles to bake in.
+     * @param impersonatorId if non-null, sets the RFC 8693 {@code act} claim.
+     * @param request        used to capture {@code user_agent} + remote IP into the revocation row.
      */
     @Transactional
-    public Token issue(
-        Long accountId,
-        String scope,
-        @Nullable Long impersonatorId,
-        @Nullable HttpServletRequest request
-    ) {
+    public Token issue(JwtPrincipal principal, @Nullable Long impersonatorId, @Nullable HttpServletRequest request) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(properties.accessTtl());
         UUID jti = UUID.randomUUID();
         JWK signingKey = keyService.currentSigningKey();
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
             .issuer(properties.issuer().toString())
-            .subject(String.valueOf(accountId))
+            .subject(String.valueOf(principal.accountId()))
             .audience(java.util.List.of(properties.audience()))
             .id(jti.toString())
             .issuedAt(now)
             .expiresAt(expiresAt)
-            .claim("scope", scope);
+            // Keycloak-compatible claims consumed by SecurityUtils + the authority converter.
+            .claim("preferred_username", principal.login())
+            .claim("realm_access", java.util.Map.of("roles", java.util.List.copyOf(principal.roles())));
+        if (principal.givenName() != null) {
+            claims.claim("given_name", principal.givenName());
+        }
         if (impersonatorId != null) {
             claims.claim("act", java.util.Map.of("sub", String.valueOf(impersonatorId)));
         }
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
         Jwt jwt = encoder.encode(JwtEncoderParameters.from(header, claims.build()));
 
-        IssuedJwt row = new IssuedJwt(jti, accountId, expiresAt);
+        IssuedJwt row = new IssuedJwt(jti, principal.accountId(), expiresAt);
         if (request != null) {
             String ua = request.getHeader("User-Agent");
             if (ua != null && ua.length() > 512) {

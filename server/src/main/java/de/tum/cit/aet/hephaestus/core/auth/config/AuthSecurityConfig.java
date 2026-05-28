@@ -91,6 +91,7 @@ public class AuthSecurityConfig {
     public HephaestusAuthSuccessHandler hephaestusAuthSuccessHandler(
         AccountProvisioningService provisioningService,
         HephaestusJwtIssuer jwtIssuer,
+        de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory principalFactory,
         AuthIntentCookie authIntentCookie,
         AuthProperties properties,
         Clock authClock
@@ -98,6 +99,7 @@ public class AuthSecurityConfig {
         return new HephaestusAuthSuccessHandler(
             provisioningService,
             jwtIssuer,
+            principalFactory,
             authIntentCookie,
             properties,
             authClock
