@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.achievement.AchievementService;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import java.time.Duration;
@@ -48,11 +49,21 @@ public class CacheConfig {
     /** TTL for mentor aspect caches. Short enough to be invisible per-turn, long enough to be warm across consecutive turns. */
     private static final Duration MENTOR_ASPECT_TTL = Duration.ofMinutes(5);
 
+    /**
+     * TTL for the JWT revocation lookup. Short by design — NATS will invalidate on revocation
+     * (later commit); Caffeine TTL is only the safety net. 1 minute keeps a stale-cached
+     * revoked-token window under 60s without thrashing the DB.
+     */
+    private static final Duration AUTH_JWT_REVOKED_TTL = Duration.ofMinutes(1);
+
     /** Max entries for the long-lived caches. */
     private static final long LONG_MAX = 1000L;
 
     /** Max entries for mentor aspect caches — bounded per active user, not per workspace. */
     private static final long MENTOR_MAX = 512L;
+
+    /** Max entries for the JWT revocation cache — bounded per active session. */
+    private static final long AUTH_JWT_REVOKED_MAX = 10_000L;
 
     /**
      * Declarative cache specs. Order doesn't matter at runtime — the manager owns the lookup
@@ -60,6 +71,7 @@ public class CacheConfig {
      */
     static final List<CacheSpec> SPECS = List.of(
         new CacheSpec(AchievementService.ACHIEVEMENT_PROGRESS_CACHE, LONG_TTL, LONG_MAX),
+        new CacheSpec(RevocationAwareJwtDecoder.CACHE_NAME, AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
         new CacheSpec("contributors", LONG_TTL, LONG_MAX),
         new CacheSpec("mentor_findings_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("mentor_practice_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
