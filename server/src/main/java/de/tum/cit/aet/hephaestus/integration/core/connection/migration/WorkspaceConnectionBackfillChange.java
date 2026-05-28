@@ -125,8 +125,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             Statement st = conn.createStatement();
             ResultSet rs = st.executeQuery(
                 "SELECT id, git_provider_mode, installation_id, account_login, server_url, " +
-                "personal_access_token, gitlab_group_id, gitlab_webhook_id " +
-                "FROM workspace"
+                    "personal_access_token, gitlab_group_id, gitlab_webhook_id " +
+                    "FROM workspace"
             )
         ) {
             while (rs.next()) {
@@ -309,7 +309,12 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         String plaintext = decryptLegacy(encryptedValue, key);
         BearerToken bundle = new BearerToken(plaintext, null);
         byte[] bundleJson = MAPPER.writeValueAsBytes(bundle);
-        EncryptionContext ctx = new EncryptionContext(workspaceId, kind, instanceKey, "connection.credentials_encrypted");
+        EncryptionContext ctx = new EncryptionContext(
+            workspaceId,
+            kind,
+            instanceKey,
+            "connection.credentials_encrypted"
+        );
         return encryptV2(bundleJson, key, ctx.toAad());
     }
 
@@ -333,11 +338,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         System.arraycopy(combined, GCM_IV_LENGTH, cipherText, 0, cipherText.length);
 
         Cipher cipher = Cipher.getInstance(ALGORITHM);
-        cipher.init(
-            Cipher.DECRYPT_MODE,
-            new SecretKeySpec(keyBytes, "AES"),
-            new GCMParameterSpec(GCM_TAG_LENGTH, iv)
-        );
+        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(keyBytes, "AES"), new GCMParameterSpec(GCM_TAG_LENGTH, iv));
         return new String(cipher.doFinal(cipherText), StandardCharsets.UTF_8);
     }
 
@@ -352,11 +353,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
         byte[] iv = new byte[GCM_IV_LENGTH];
         IV_GENERATOR.nextBytes(iv);
         Cipher cipher = Cipher.getInstance(ALGORITHM);
-        cipher.init(
-            Cipher.ENCRYPT_MODE,
-            new SecretKeySpec(keyBytes, "AES"),
-            new GCMParameterSpec(GCM_TAG_LENGTH, iv)
-        );
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(keyBytes, "AES"), new GCMParameterSpec(GCM_TAG_LENGTH, iv));
         cipher.updateAAD(aad);
         byte[] cipherText = cipher.doFinal(plaintext);
 
@@ -387,8 +384,8 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             if (cachedKey == null) {
                 throw new IllegalStateException(
                     "WorkspaceConnectionBackfillChange found an encrypted credential to rewrap, " +
-                    "but hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is not set. " +
-                    "Re-run Liquibase with the same 32-character key the running application uses."
+                        "but hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is not set. " +
+                        "Re-run Liquibase with the same 32-character key the running application uses."
                 );
             }
             return cachedKey;

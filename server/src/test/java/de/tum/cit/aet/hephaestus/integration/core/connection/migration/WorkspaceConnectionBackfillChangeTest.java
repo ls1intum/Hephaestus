@@ -37,12 +37,19 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
             // EncryptedStringConverter writes ENC:<base64> for encrypted values but tolerates
             // legacy unencrypted plaintext for pre-encryption rows. Match that behaviour so
             // a workspace with a plaintext PAT (dev-mode, no key set) still migrates.
-            assertThat(WorkspaceConnectionBackfillChange.decryptLegacy("plain-token", KEY_BYTES)).isEqualTo("plain-token");
+            assertThat(WorkspaceConnectionBackfillChange.decryptLegacy("plain-token", KEY_BYTES)).isEqualTo(
+                "plain-token"
+            );
         }
 
         @Test
         void rejectsCiphertextShorterThanTheIv() {
-            assertThatThrownBy(() -> WorkspaceConnectionBackfillChange.decryptLegacy("ENC:" + Base64.getEncoder().encodeToString(new byte[5]), KEY_BYTES)).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() ->
+                WorkspaceConnectionBackfillChange.decryptLegacy(
+                    "ENC:" + Base64.getEncoder().encodeToString(new byte[5]),
+                    KEY_BYTES
+                )
+            ).isInstanceOf(IllegalStateException.class);
         }
     }
 
@@ -63,14 +70,26 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
             // — hardcoding a literal would drift from the discriminator on the sealed type.
             String bundleJson;
             try {
-                bundleJson = tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build().writeValueAsString(new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken("ghp_xyz", null));
+                bundleJson = tools.jackson.databind.json.JsonMapper.builder()
+                    .findAndAddModules()
+                    .build()
+                    .writeValueAsString(
+                        new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken(
+                            "ghp_xyz",
+                            null
+                        )
+                    );
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
 
             byte[] blob;
             try {
-                blob = WorkspaceConnectionBackfillChange.encryptV2(bundleJson.getBytes(StandardCharsets.UTF_8), KEY_BYTES, ctx.toAad());
+                blob = WorkspaceConnectionBackfillChange.encryptV2(
+                    bundleJson.getBytes(StandardCharsets.UTF_8),
+                    KEY_BYTES,
+                    ctx.toAad()
+                );
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
@@ -81,8 +100,12 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
             // writes blobs the converter cannot read, every PAT-mode workspace breaks at
             // first request post-deploy.
             var decrypted = converter.decrypt(blob, ctx);
-            assertThat(decrypted).isInstanceOf(de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken.class);
-            assertThat(((de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken) decrypted).token()).isEqualTo("ghp_xyz");
+            assertThat(decrypted).isInstanceOf(
+                de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken.class
+            );
+            assertThat(
+                ((de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken) decrypted).token()
+            ).isEqualTo("ghp_xyz");
         }
 
         @Test
@@ -104,14 +127,25 @@ class WorkspaceConnectionBackfillChangeTest extends BaseUnitTest {
             String bundleJson;
             byte[] blob;
             try {
-                bundleJson = tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build().writeValueAsString(new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken("x", null));
-                blob = WorkspaceConnectionBackfillChange.encryptV2(bundleJson.getBytes(StandardCharsets.UTF_8), KEY_BYTES, writeCtx.toAad());
+                bundleJson = tools.jackson.databind.json.JsonMapper.builder()
+                    .findAndAddModules()
+                    .build()
+                    .writeValueAsString(
+                        new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken("x", null)
+                    );
+                blob = WorkspaceConnectionBackfillChange.encryptV2(
+                    bundleJson.getBytes(StandardCharsets.UTF_8),
+                    KEY_BYTES,
+                    writeCtx.toAad()
+                );
             } catch (Exception e) {
                 throw new AssertionError(e);
             }
 
             // Cross-row substitution must fail — this is the CVE the v2 AAD format closed.
-            assertThatThrownBy(() -> converter.decrypt(blob, readCtx)).isInstanceOf(de.tum.cit.aet.hephaestus.core.security.EncryptionException.class);
+            assertThatThrownBy(() -> converter.decrypt(blob, readCtx)).isInstanceOf(
+                de.tum.cit.aet.hephaestus.core.security.EncryptionException.class
+            );
         }
     }
 
