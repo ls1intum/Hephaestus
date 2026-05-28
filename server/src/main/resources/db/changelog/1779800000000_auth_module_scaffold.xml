@@ -1,0 +1,319 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        core.auth module scaffold — replaces Keycloak with Spring Security 7 native auth.
+        See ADR 0017 for full rationale + docs/auth-glossary.md for ubiquitous language.
+
+        Tables created in this changelog (entities live under
+        de.tum.cit.aet.hephaestus.core.auth.*):
+
+          1. account              — Hephaestus-native principal (one per human who signs in)
+          2. identity_link        — federated-login association per Issue #1200 (incl. team_id)
+          3. account_feature      — per-account feature opt-ins (replaces Keycloak realm roles)
+          4. auth_event           — append-only auth audit; monthly partitioned via pg_partman
+          5. issued_jwt           — revocation list for our own cookie JWTs
+          6. jwt_signing_key      — our ES256 signing key set; rotatable via NATS push
+
+        Extensions enabled (required, not optional):
+          - citext     — case-insensitive primary_email
+          - pg_partman — monthly rotation of auth_event (parent registered below)
+
+        Subsequent commits in this PR add behavior; this commit ships schema only.
+    -->
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-1-extensions">
+        <sql splitStatements="false"><![CDATA[
+            CREATE EXTENSION IF NOT EXISTS citext;
+        ]]></sql>
+        <comment>Enable citext extension for account.primary_email case-insensitive uniqueness. Idempotent via IF NOT EXISTS.</comment>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-2-account">
+        <preConditions onFail="MARK_RAN" onFailMessage="account table already present">
+            <not><tableExists tableName="account"/></not>
+        </preConditions>
+        <createTable tableName="account">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="display_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="primary_email" type="CITEXT"/>
+            <column name="primary_email_verified_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="app_role" type="VARCHAR(16)" defaultValue="USER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="VARCHAR(16)" defaultValue="HUMAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(16)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="version" type="BIGINT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql><![CDATA[
+            ALTER TABLE account ADD CONSTRAINT ck_account_app_role
+                CHECK (app_role IN ('USER', 'APP_ADMIN'));
+            ALTER TABLE account ADD CONSTRAINT ck_account_type
+                CHECK (type IN ('HUMAN', 'SERVICE'));
+            ALTER TABLE account ADD CONSTRAINT ck_account_status
+                CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETING', 'DELETED'));
+            CREATE UNIQUE INDEX uq_account_primary_email_active
+                ON account (primary_email)
+                WHERE primary_email IS NOT NULL AND deleted_at IS NULL;
+            CREATE INDEX ix_account_status_nonactive
+                ON account (status)
+                WHERE status <> 'ACTIVE';
+        ]]></sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-3-identity-link">
+        <preConditions onFail="MARK_RAN" onFailMessage="identity_link already present">
+            <not><tableExists tableName="identity_link"/></not>
+        </preConditions>
+        <createTable tableName="identity_link">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="account_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_identity_link_account"
+                             referencedTableName="account"
+                             referencedColumnNames="id"
+                             deleteCascade="true"/>
+            </column>
+            <column name="git_provider_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_identity_link_git_provider"
+                             referencedTableName="git_provider"
+                             referencedColumnNames="id"/>
+            </column>
+            <column name="subject" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="team_id" type="VARCHAR(255)"/>
+            <column name="external_actor_id" type="BIGINT"/>
+            <column name="username_at_signup" type="VARCHAR(255)"/>
+            <column name="email_at_signup" type="VARCHAR(320)"/>
+            <column name="display_name" type="VARCHAR(255)"/>
+            <column name="avatar_url" type="TEXT"/>
+            <column name="profile_url" type="TEXT"/>
+            <column name="linked_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="linked_via" type="VARCHAR(16)" defaultValue="OAUTH_LOGIN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_login_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="disabled_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+        <sql><![CDATA[
+            ALTER TABLE identity_link ADD CONSTRAINT ck_identity_link_linked_via
+                CHECK (linked_via IN ('OAUTH_LOGIN', 'MANUAL_LINK', 'WEBHOOK_MIRROR'));
+            -- One IdP user maps to one Hephaestus account globally. team_id is part of the key
+            -- so Slack workspaces (or future multi-tenant IdPs) don't collide.
+            CREATE UNIQUE INDEX uq_identity_link_provider_subject_team
+                ON identity_link (git_provider_id, subject, COALESCE(team_id, ''));
+            -- One ACTIVE identity per (account, provider, team) — disabled rows excluded.
+            CREATE UNIQUE INDEX uq_identity_link_active_per_provider
+                ON identity_link (account_id, git_provider_id, COALESCE(team_id, ''))
+                WHERE disabled_at IS NULL;
+            CREATE INDEX ix_identity_link_account ON identity_link (account_id);
+            CREATE INDEX ix_identity_link_external_actor ON identity_link (external_actor_id)
+                WHERE external_actor_id IS NOT NULL;
+        ]]></sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-4-account-feature">
+        <preConditions onFail="MARK_RAN" onFailMessage="account_feature already present">
+            <not><tableExists tableName="account_feature"/></not>
+        </preConditions>
+        <createTable tableName="account_feature">
+            <column name="account_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_account_feature_account"
+                             referencedTableName="account"
+                             referencedColumnNames="id"
+                             deleteCascade="true"/>
+            </column>
+            <column name="flag" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enabled_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enabled_by_account_id" type="BIGINT">
+                <constraints foreignKeyName="fk_account_feature_enabled_by"
+                             referencedTableName="account"
+                             referencedColumnNames="id"
+                             deleteSetNull="true"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="account_feature" columnNames="account_id, flag"
+                       constraintName="pk_account_feature"/>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-5-jwt-signing-key">
+        <preConditions onFail="MARK_RAN" onFailMessage="jwt_signing_key already present">
+            <not><tableExists tableName="jwt_signing_key"/></not>
+        </preConditions>
+        <createTable tableName="jwt_signing_key">
+            <column name="kid" type="VARCHAR(64)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="algorithm" type="VARCHAR(16)" defaultValue="ES256">
+                <constraints nullable="false"/>
+            </column>
+            <column name="public_key_pem" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="private_key_pem" type="BYTEA">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="rotated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="encryption_key_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql><![CDATA[
+            CREATE INDEX ix_jwt_signing_key_active ON jwt_signing_key (active) WHERE active = true;
+        ]]></sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-6-issued-jwt">
+        <preConditions onFail="MARK_RAN" onFailMessage="issued_jwt already present">
+            <not><tableExists tableName="issued_jwt"/></not>
+        </preConditions>
+        <createTable tableName="issued_jwt">
+            <column name="jti" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="account_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_issued_jwt_account"
+                             referencedTableName="account"
+                             referencedColumnNames="id"
+                             deleteCascade="true"/>
+            </column>
+            <column name="issued_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="revoked_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="revoked_reason" type="VARCHAR(32)"/>
+            <column name="user_agent" type="VARCHAR(512)"/>
+            <column name="ip_inet" type="INET"/>
+        </createTable>
+        <sql><![CDATA[
+            CREATE INDEX ix_issued_jwt_account_active
+                ON issued_jwt (account_id) WHERE revoked_at IS NULL;
+            CREATE INDEX ix_issued_jwt_expires_at ON issued_jwt (expires_at);
+        ]]></sql>
+    </changeSet>
+
+    <!--
+        auth_event is partitioned by occurred_at (monthly). Two-step bootstrap:
+          a) Create the parent table + ck constraints. We cannot use Liquibase's createTable
+             because it doesn't emit PARTITION BY, so we hand-roll the SQL.
+          b) Register with pg_partman so it auto-creates child partitions on insert and prunes
+             after 12 months. If the extension is missing, the changeset MARK_RANs and a
+             follow-up scheduled job ships in a later commit as the fallback.
+    -->
+    <changeSet author="FelixTJDietrich" id="1779800000000-7-auth-event-parent">
+        <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent already present">
+            <not><tableExists tableName="auth_event"/></not>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE auth_event (
+                id                 BIGSERIAL,
+                occurred_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                account_id         BIGINT REFERENCES account(id) ON DELETE SET NULL,
+                acting_account_id  BIGINT REFERENCES account(id) ON DELETE SET NULL,
+                event_type         VARCHAR(48) NOT NULL,
+                result             VARCHAR(16) NOT NULL,
+                failure_reason     VARCHAR(64),
+                git_provider_id    BIGINT REFERENCES git_provider(id),
+                workspace_id       BIGINT REFERENCES workspace(id) ON DELETE SET NULL,
+                identity_link_id   BIGINT REFERENCES identity_link(id) ON DELETE SET NULL,
+                ip_inet            INET NOT NULL,
+                user_agent         VARCHAR(512),
+                session_hash       BYTEA,
+                request_id         UUID,
+                details            JSONB,
+                CONSTRAINT pk_auth_event PRIMARY KEY (id, occurred_at),
+                CONSTRAINT ck_auth_event_result CHECK (result IN ('SUCCESS', 'FAILURE')),
+                CONSTRAINT ck_auth_event_event_type CHECK (event_type IN (
+                    'LOGIN', 'LOGIN_FAILED', 'LOGOUT', 'TOKEN_REFRESH', 'JWT_REVOKED',
+                    'IDENTITY_LINKED', 'IDENTITY_UNLINKED',
+                    'IMPERSONATION_BEGIN', 'IMPERSONATION_END',
+                    'ACCOUNT_DELETED', 'ACCOUNT_DELETION_CANCELLED',
+                    'EXPORT_REQUESTED', 'FEATURE_FLAG_CHANGED'
+                ))
+            ) PARTITION BY RANGE (occurred_at);
+
+            CREATE INDEX ix_auth_event_account_occurred
+                ON auth_event (account_id, occurred_at DESC) WHERE account_id IS NOT NULL;
+            CREATE INDEX ix_auth_event_occurred ON auth_event (occurred_at);
+            CREATE INDEX ix_auth_event_failure_ip
+                ON auth_event (ip_inet) WHERE result = 'FAILURE';
+        ]]></sql>
+    </changeSet>
+
+    <changeSet author="FelixTJDietrich" id="1779800000000-8-auth-event-pg-partman">
+        <preConditions onFail="MARK_RAN"
+                       onFailMessage="pg_partman unavailable or already registered — fallback scheduled sweep activates">
+            <sqlCheck expectedResult="t">
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_available_extensions WHERE name = 'pg_partman'
+                )
+            </sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE EXTENSION IF NOT EXISTS pg_partman;
+            -- Bootstrap parent + register monthly rotation with 12-month retention.
+            -- partman.create_parent signature is variadic across versions; we use named-arg
+            -- form for v4/v5 compatibility. Idempotent thanks to the changeset preconditions
+            -- above (the parent table is created exactly once).
+            SELECT partman.create_parent(
+                p_parent_table => 'public.auth_event',
+                p_control      => 'occurred_at',
+                p_interval     => '1 month',
+                p_premake      => 4
+            );
+            UPDATE partman.part_config
+               SET retention            = '12 months',
+                   retention_keep_table = false,
+                   infinite_time_partitions = true
+             WHERE parent_table = 'public.auth_event';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM partman.part_config WHERE parent_table = 'public.auth_event';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

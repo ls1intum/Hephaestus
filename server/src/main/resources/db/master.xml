@@ -76,4 +76,5 @@
     <include file="./changelog/1779173113243_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779520390544_worker_runtime_substrate.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1779790459343_unified_integration_framework.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1779800000000_auth_module_scaffold.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
