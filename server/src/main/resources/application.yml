@@ -63,6 +63,29 @@ spring:
             resourceserver:
                 jwt:
                     issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
+            client:
+                # Default IdPs visible to every workspace. Workspace-scoped self-hosted
+                # GitLab / GHE registrations layer on top via a composite
+                # ClientRegistrationRepository (later commit) reading Connection rows
+                # with kind=OIDC_LOGIN_*.
+                registration:
+                    github:
+                        provider: github
+                        client-id: ${GITHUB_OAUTH_CLIENT_ID:}
+                        client-secret: ${GITHUB_OAUTH_CLIENT_SECRET:}
+                        scope: read:user,user:email
+                    gitlab-lrz:
+                        provider: gitlab-lrz
+                        client-id: ${GITLAB_LRZ_OAUTH_CLIENT_ID:}
+                        client-secret: ${GITLAB_LRZ_OAUTH_CLIENT_SECRET:}
+                        scope: openid,profile,email,read_user
+                        client-name: gitlab.lrz.de
+                provider:
+                    gitlab-lrz:
+                        authorization-uri: https://gitlab.lrz.de/oauth/authorize
+                        token-uri: https://gitlab.lrz.de/oauth/token
+                        user-info-uri: https://gitlab.lrz.de/api/v4/user
+                        user-name-attribute: username
 
     # Disable Mustache template location check as we don't use Mustache templates
     mustache:
@@ -133,6 +156,13 @@ springdoc:
     writer-with-order-by-keys: true
 
 hephaestus:
+    auth:
+        issuer: ${HEPHAESTUS_AUTH_ISSUER:http://localhost:38080}
+        audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
+        access-ttl: ${HEPHAESTUS_AUTH_ACCESS_TTL:15m}
+        cookie-name: ${HEPHAESTUS_AUTH_COOKIE_NAME:__Host-HEPHAESTUS_AT}
+        state-cookie-key: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:}
+
     host-url: https://hephaestus.ase.cit.tum.de/
 
     # ═══════════════════════════════════════════════════════════════════════════
