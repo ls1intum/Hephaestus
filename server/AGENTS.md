@@ -4,12 +4,12 @@ Spring Boot 4 backend providing the REST API for Hephaestus.
 
 ## Local development loop
 
-From the repo root: `pnpm dev`. It brings compose up with healthchecks, then runs `mvn spring-boot:run` + `pnpm --filter webapp dev` in parallel.
+From the repo root: `pnpm dev`. It launches `mprocs` with the server and webapp in separate panes (each with its own clean log stream); the Postgres/Keycloak containers come up automatically. For plain terminals, run `pnpm dev:server` and `pnpm dev:webapp` yourself.
 
 ### Conventions
 
 - **No devtools.** Hot reload uses JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with *Update Classes and Resources* on save (or *On Frame Deactivation*). Method-body edits reload; signature changes, new methods, and `@Configuration` edits require a full restart ([Spring Boot 4 hot-swapping ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
-- **`ddl-auto: validate`** for local. Liquibase owns DDL. If the validator fails on boot, your DB has drifted — recreate with `docker compose down -v && docker compose up -d`.
+- **`ddl-auto: validate`** for local. Liquibase owns DDL. If the validator fails on boot, your DB has drifted — recreate with `pnpm dev:reset` (the Postgres folder is bind-mounted, so `docker compose down -v` alone does not clear it).
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`, `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step regressions in CI.
 - **Maven build cache** is opt-in: `-Dmaven.build.cache.enabled=true` (CI does this). Default off until [MBUILDCACHE-118](https://issues.apache.org/jira/browse/MBUILDCACHE-118) lands.
 - **Pre-commit hook** (optional, install manually): `printf '#!/usr/bin/env sh\npnpm run format:check\n' > .husky/pre-commit && chmod +x .husky/pre-commit`. The existing `pre-push` hook runs the heavier `format:check && check` chain.
@@ -19,7 +19,7 @@ From the repo root: `pnpm dev`. It brings compose up with healthchecks, then run
 | Task              | Command                                          |
 | ----------------- | ------------------------------------------------ |
 | Run full stack    | `pnpm dev` (from repo root)                      |
-| Run server only   | `mvn spring-boot:run` (in `server/`) |
+| Run server only   | `pnpm dev:server` (infra + Spring Boot) |
 | Unit tests        | `mvn test`                                       |
 | Integration tests | `mvn verify`                                     |
 | Live GitHub tests | `mvn test -Plive-tests`                          |
