@@ -1,4 +1,4 @@
 import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext";
-import keycloakService from "./keycloak";
+import { authClient, csrfHeaders, type CurrentUser, type UserProfile } from "./authClient";
 
-export { type AuthContextType, AuthProvider, keycloakService, useAuth };
+export { type AuthContextType, AuthProvider, authClient, csrfHeaders, type CurrentUser, type UserProfile, useAuth };

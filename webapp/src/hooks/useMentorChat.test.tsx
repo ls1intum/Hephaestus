@@ -22,9 +22,7 @@ vi.mock("@/hooks/use-active-workspace", () => ({
 }));
 
 vi.mock("@/integrations/auth", () => ({
-	keycloakService: {
-		getToken: vi.fn(() => "mock-token"),
-	},
+	csrfHeaders: vi.fn(() => ({ "X-XSRF-TOKEN": "mock-csrf" })),
 }));
 
 vi.mock("@/environment", () => ({

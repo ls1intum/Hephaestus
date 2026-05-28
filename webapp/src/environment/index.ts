@@ -20,9 +20,6 @@ interface RuntimeEnvVars {
 	APPLICATION_SERVER_URL?: string;
 	SENTRY_ENVIRONMENT?: string;
 	SENTRY_DSN?: string;
-	KEYCLOAK_URL?: string;
-	KEYCLOAK_REALM?: string;
-	KEYCLOAK_CLIENT_ID?: string;
 	POSTHOG_ENABLED?: string;
 	POSTHOG_PROJECT_API_KEY?: string;
 	POSTHOG_API_HOST?: string;
@@ -40,9 +37,6 @@ const defaults: RuntimeEnvVars = {
 	APPLICATION_SERVER_URL: "http://localhost:8080",
 	SENTRY_ENVIRONMENT: "local",
 	SENTRY_DSN: "https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3",
-	KEYCLOAK_URL: "http://localhost:8081",
-	KEYCLOAK_REALM: "hephaestus",
-	KEYCLOAK_CLIENT_ID: "hephaestus",
 	POSTHOG_ENABLED: "false",
 	POSTHOG_PROJECT_API_KEY: "",
 	POSTHOG_API_HOST: "",
@@ -69,12 +63,6 @@ const environment = {
 	sentry: {
 		environment: env("SENTRY_ENVIRONMENT"),
 		dsn: env("SENTRY_DSN"),
-	},
-
-	keycloak: {
-		url: env("KEYCLOAK_URL"),
-		realm: env("KEYCLOAK_REALM"),
-		clientId: env("KEYCLOAK_CLIENT_ID"),
 	},
 
 	posthog: {
