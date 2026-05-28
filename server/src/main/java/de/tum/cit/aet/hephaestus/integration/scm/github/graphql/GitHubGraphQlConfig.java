@@ -5,15 +5,6 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.config.FragmentMergingDocumentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubActorMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubIssueMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2FieldConfigurationMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2ItemContentMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2ItemFieldValueMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2OwnerMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubPullRequestMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRepositoryOwnerMixin;
-import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRequestedReviewerMixin;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHActor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssue;
@@ -24,6 +15,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepositoryOwner;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRequestedReviewer;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubActorMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubIssueMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2FieldConfigurationMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2ItemContentMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2ItemFieldValueMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2OwnerMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubPullRequestMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRepositoryOwnerMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRequestedReviewerMixin;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;

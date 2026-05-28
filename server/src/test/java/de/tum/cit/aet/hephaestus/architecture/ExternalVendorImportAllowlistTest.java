@@ -28,7 +28,7 @@ class ExternalVendorImportAllowlistTest extends HephaestusArchitectureTest {
             )
             .because(
                 "External modules reach vendor adapters through SPI ports in integration.core.spi " +
-                "or Spring ApplicationEvents — never via direct import."
+                    "or Spring ApplicationEvents — never via direct import."
             );
         rule.check(classes);
     }
