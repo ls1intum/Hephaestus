@@ -1,0 +1,5 @@
+procs:
+  server:
+    shell: pnpm dev:server
+  webapp:
+    shell: pnpm dev:webapp

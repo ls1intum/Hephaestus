@@ -4,12 +4,12 @@ Spring Boot 4 backend providing the REST API for Hephaestus.
 
 ## Local development loop
 
-From the repo root: `pnpm dev`. It brings compose up with healthchecks, then runs `mvn spring-boot:run` + `pnpm --filter webapp dev` in parallel.
+From the repo root: `pnpm dev`. It launches `mprocs` with the server and webapp in separate panes; the Postgres/Keycloak containers come up automatically. For plain terminals, run `pnpm dev:server` and `pnpm dev:webapp` yourself.
 
 ### Conventions
 
 - **No devtools.** Hot reload uses JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with *Update Classes and Resources* on save (or *On Frame Deactivation*). Method-body edits reload; signature changes, new methods, and `@Configuration` edits require a full restart ([Spring Boot 4 hot-swapping ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
-- **`ddl-auto: validate`** for local. Liquibase owns DDL. If the validator fails on boot, your DB has drifted — recreate with `docker compose down -v && docker compose up -d`.
+- **`ddl-auto: validate`** for local. Liquibase owns DDL. If the validator fails on boot, your DB has drifted — recreate with `pnpm dev:reset` (the Postgres folder is bind-mounted, so `docker compose down -v` alone does not clear it).
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`, `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step regressions in CI.
 - **Maven build cache** is opt-in: `-Dmaven.build.cache.enabled=true` (CI does this). Default off until [MBUILDCACHE-118](https://issues.apache.org/jira/browse/MBUILDCACHE-118) lands.
 - **Pre-commit hook** (optional, install manually): `printf '#!/usr/bin/env sh\npnpm run format:check\n' > .husky/pre-commit && chmod +x .husky/pre-commit`. The existing `pre-push` hook runs the heavier `format:check && check` chain.
@@ -19,18 +19,18 @@ From the repo root: `pnpm dev`. It brings compose up with healthchecks, then run
 | Task              | Command                                          |
 | ----------------- | ------------------------------------------------ |
 | Run full stack    | `pnpm dev` (from repo root)                      |
-| Run server only   | `mvn spring-boot:run` (in `server/`) |
-| Unit tests        | `mvn test`                                       |
-| Integration tests | `mvn verify`                                     |
-| Live GitHub tests | `mvn test -Plive-tests`                          |
+| Run server only   | `pnpm dev:server` (infra + Spring Boot)          |
+| Unit tests        | `./mvnw test`                                    |
+| Integration tests | `./mvnw verify`                                  |
+| Live GitHub tests | `./mvnw test -Plive-tests`                       |
 | Format            | `pnpm run format:java`                           |
 | Generate OpenAPI  | `pnpm run generate:api:application-server:specs` |
 | Startup timeline  | `curl http://localhost:8080/actuator/startup`    |
-| Build prod image  | `mvn spring-boot:build-image`                    |
+| Build prod image  | `./mvnw spring-boot:build-image`                 |
 
 ### Container image
 
-Built with Paketo Cloud Native Buildpacks (Application CDS enabled); `pom.xml` `<image>` pins builder + run image by digest. See `docs/admin/buildpacks-cds-decision.md`. No `Dockerfile` — local builds use `mvn spring-boot:build-image`.
+Built with Paketo Cloud Native Buildpacks (Application CDS enabled); `pom.xml` `<image>` pins builder + run image by digest. See `docs/admin/buildpacks-cds-decision.md`. No `Dockerfile` — local builds use `./mvnw spring-boot:build-image`.
 
 ### JPA conventions
 
@@ -49,7 +49,7 @@ Liquibase 5.x logs a warning but continues when `DATABASECHANGELOG` references u
 The `generate:api:application-server:specs` script (springdoc) starts the app on port **8080** to download the spec. If port 8080 is occupied (e.g. by Coolify proxy), override with environment variables — **never stop other services**:
 
 ```bash
-SERVER_PORT=8090 MANAGEMENT_SERVER_PORT=8092 mvn verify -DskipTests=true -Dapp.profiles=specs
+SERVER_PORT=8090 MANAGEMENT_SERVER_PORT=8092 ./mvnw verify -DskipTests=true -Dapp.profiles=specs
 ```
 
 Then regenerate the client:
@@ -62,7 +62,7 @@ pnpm run generate:api:application-server:client
 
 ### Always
 
-- Run `mvn test` before committing
+- Run `./mvnw test` before committing
 - Use constructor injection (via `@RequiredArgsConstructor`)
 - Return `ResponseEntity` with proper status codes
 - Tag tests appropriately (`@Tag("unit")`, etc.)
@@ -156,11 +156,11 @@ public record UserDTO(
 
 ### Test Tiers (JUnit 5 Tags)
 
-| Tag                   | Purpose                           | Base Class            | Command                 |
-| --------------------- | --------------------------------- | --------------------- | ----------------------- |
-| `@Tag("unit")`        | Fast, no Spring context           | `BaseUnitTest`        | `mvn test`              |
-| `@Tag("integration")` | Full Spring Boot + Testcontainers | `BaseIntegrationTest` | `mvn verify`            |
-| `@Tag("live")`        | Real GitHub API calls             | -                     | `mvn test -Plive-tests` |
+| Tag                   | Purpose                           | Base Class            | Command                    |
+| --------------------- | --------------------------------- | --------------------- | -------------------------- |
+| `@Tag("unit")`        | Fast, no Spring context           | `BaseUnitTest`        | `./mvnw test`              |
+| `@Tag("integration")` | Full Spring Boot + Testcontainers | `BaseIntegrationTest` | `./mvnw verify`            |
+| `@Tag("live")`        | Real GitHub API calls             | -                     | `./mvnw test -Plive-tests` |
 
 ### Test Structure (AAA Pattern)
 

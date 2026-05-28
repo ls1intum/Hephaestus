@@ -5,6 +5,7 @@ import jakarta.validation.constraints.AssertTrue;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.boot.context.properties.bind.Name;
 import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
@@ -70,7 +71,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "hephaestus.workspace")
 public record WorkspaceProperties(
     @DefaultValue("false") boolean initDefault,
-    @Valid DefaultProperties defaultProperties,
+    @Name("default") @Valid DefaultProperties defaultProperties,
     @DefaultValue("false") boolean initGitlabDefault,
     @Valid GitLabDefaultProperties gitlabDefault
 ) {
@@ -115,20 +116,6 @@ public record WorkspaceProperties(
                 );
             }
         }
-    }
-
-    /**
-     * Alias getter required so Spring Boot can bind configuration expressed under
-     * the {@code default} key (since "default" is a reserved word in Java).
-     *
-     * @return the default workspace properties
-     * @deprecated use {@link #defaultProperties()} instead; this method exists only
-     *             for YAML binding compatibility
-     */
-    @Deprecated(forRemoval = false)
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    public DefaultProperties getDefault() {
-        return defaultProperties;
     }
 
     /**
