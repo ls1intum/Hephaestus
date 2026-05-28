@@ -30,8 +30,8 @@ public interface ProfilePullRequestQueryRepository extends JpaRepository<PullReq
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
         WHERE p.author.login ILIKE :authorLogin
             AND p.state IN :states
-            AND (:since IS NULL OR p.createdAt >= :since)
-            AND (:until IS NULL OR p.createdAt < :until)
+            AND (CAST(:since AS Instant) IS NULL OR p.createdAt >= :since)
+            AND (CAST(:until AS Instant) IS NULL OR p.createdAt < :until)
             AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
         """
