@@ -21,17 +21,21 @@
           2.  feedback_post cross-vendor edit-in-place tracking.
           3.  agent_job classification columns (integration_kind, subject_class)
               + (kind, subject, created_at) index.
-          4.  practice capability gating (required_capabilities, required_aspects,
-              required_family).
-          5.  slack_channel + slack_message persistence (ToS-compliant, see
+          4.  slack_channel + slack_message persistence (ToS-compliant, see
               SlackMessage javadoc).
-          6.  outline_collection + outline_document persistence.
-          7.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
-          8.  oauth_state_nonce (with code_verifier PKCE column declared from the
+          5.  outline_collection + outline_document persistence.
+          6.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
+          7.  oauth_state_nonce (with code_verifier PKCE column declared from the
               start) — single-use nonce + RFC 7636 S256 verifier storage.
-          9.  Unconditional drop of the eleven legacy Workspace columns superseded
-              by the Connection registry. account_login is intentionally KEPT —
-              40+ join sites depend on it as a denormalised org/group lookup column.
+          8.  WorkspaceConnectionBackfillChange (Java customChange) — copies the
+              legacy Workspace integration columns into Connection rows with the
+              new sealed JSONB config and per-row AAD-bound AES-GCM credentials.
+              Idempotent (ON CONFLICT DO NOTHING) so re-runs are safe and a fresh
+              DB silently no-ops.
+          9.  Unconditional drop of the eleven legacy Workspace columns now that
+              section 8 has migrated their content. account_login is intentionally
+              KEPT — 40+ join sites depend on it as a denormalised org/group
+              lookup column.
          10.  user.keycloak_subject column + partial-unique index — Stage A of the
               identity refactor (ADR 0016). Seeds the column so a follow-up PR can
               flip WorkspaceContextFilter from preferred_username → sub lookups
@@ -46,10 +50,14 @@
          actually ship: SCM User is authoritative, keycloak_subject is the
          persisted stable join key.
 
-        Decision — no data backfill: the branch ships as a clean migration. The
-        interim WorkspaceConnectionBackfillChange customChange that moved data
-        from the legacy columns into Connection rows was retired together with
-        the columns it sourced from.
+        Migration safety — section 8 is the data-preservation seam. It reads the
+        eleven legacy Workspace columns BEFORE section 9 drops them, re-encrypts
+        the PAT + Slack token under the new ConnectionCredentialConverter v2 AAD
+        format, and inserts one Connection row per (workspace, integration kind).
+        The backfill is idempotent via ON CONFLICT (workspace_id, kind,
+        instance_key) DO NOTHING — re-applying against a partially-migrated DB
+        skips rows that already exist. On a fresh DB (no workspace rows) the
+        backfill no-ops in zero queries.
 
         Preconditions strategy — every changeset uses onFail="MARK_RAN" so
         re-applying against a partially-migrated environment (e.g. someone manually
@@ -58,23 +66,12 @@
         style; they no-op on a fresh DB where the column was never created, and
         apply on an existing DB where the column is still present.
 
-        OPERATOR WARNING — DATA-LOSS GUARD INTENTIONALLY OMITTED on the DROP COLUMN
-        block (section 9 below):
-          * ON FRESH DB: legacy Workspace columns are empty by construction; the
-            drops are no-ops on column-content. Safe.
-          * ON IN-FLIGHT DB carrying real student-facing data: the eleven dropped
-            columns (installation_id, personal_access_token, git_provider_mode,
-            slack_token, slack_signing_secret, gitlab_group_id, gitlab_webhook_id,
-            server_url, leaderboard_notification_team,
-            leaderboard_notification_channel_id, installation_linked_at) WILL be
-            destroyed without warning. Their successor — rows in the {@code
-            connection} table — must be backfilled OUT-OF-BAND BEFORE this
-            migration runs. The interim WorkspaceConnectionBackfillChange
-            customChange that previously performed the backfill in-Liquibase
-            was retired with the legacy columns. Operators upgrading a live
-            environment must replicate that logic externally (script or admin
-            task) and verify the connection table is populated before applying
-            this changelog.
+        Encryption key requirement — section 8 needs hephaestus.security.encryption-key
+        (system property) or HEPHAESTUS_ENCRYPTION_KEY (env var) to be set to the
+        same 32-char key the application uses, so legacy PATs/tokens can be
+        decrypted and re-encrypted. If the key is missing AND a workspace carries
+        an encrypted PAT, the migration fails fast with a clear message rather
+        than silently dropping the credential.
     -->
 
     <!-- ───────────────────────────────────────────────────────────────────────
@@ -338,75 +335,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         4. practice capability gating (UI surface filter).
-         ─────────────────────────────────────────────────────────────────────── -->
-
-    <changeSet author="hephaestus-1198" id="1779790459343-12">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.required_capabilities already present">
-            <not><columnExists tableName="practice" columnName="required_capabilities"/></not>
-        </preConditions>
-        <comment>UI gating set of integration.spi.Capability names.</comment>
-        <addColumn tableName="practice">
-            <column name="required_capabilities" type="jsonb" defaultValueComputed="'[]'::jsonb">
-                <constraints nullable="false"/>
-            </column>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="practice" columnName="required_capabilities"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-1198" id="1779790459343-13">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.required_aspects already present">
-            <not><columnExists tableName="practice" columnName="required_aspects"/></not>
-        </preConditions>
-        <comment>Context aspects unioned across enabled practices.</comment>
-        <addColumn tableName="practice">
-            <column name="required_aspects" type="jsonb" defaultValueComputed="'[]'::jsonb">
-                <constraints nullable="false"/>
-            </column>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="practice" columnName="required_aspects"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-1198" id="1779790459343-14">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.required_family already present">
-            <not><columnExists tableName="practice" columnName="required_family"/></not>
-        </preConditions>
-        <comment>Narrow practice to a single IntegrationFamily.Family (SCM, MESSAGING, ...). Null = family-agnostic.</comment>
-        <addColumn tableName="practice">
-            <column name="required_family" type="varchar(32)"/>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="practice" columnName="required_family"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-1198" id="1779790459343-15">
-        <preConditions onFail="MARK_RAN" onFailMessage="required_family backfill already applied">
-            <and>
-                <columnExists tableName="practice" columnName="required_family"/>
-                <sqlCheck expectedResult="0">
-                    SELECT COUNT(*) FROM practice WHERE required_family IS NOT NULL
-                </sqlCheck>
-            </and>
-        </preConditions>
-        <comment>
-            One-time backfill required_family = 'SCM' for every existing practice — today's
-            catalog is exclusively code-review practices that apply to pull/merge requests.
-        </comment>
-        <sql>
-            UPDATE practice SET required_family = 'SCM' WHERE required_family IS NULL;
-        </sql>
-        <rollback>
-            <!-- Backfill is data-only; the schema rollback is on the addColumn changeset. -->
-        </rollback>
-    </changeSet>
-
-    <!-- ───────────────────────────────────────────────────────────────────────
-         5. Slack persistence (channels + messages).
+         4. Slack persistence (channels + messages).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-16">
@@ -510,7 +439,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         6. Outline persistence (collections + documents).
+         5. Outline persistence (collections + documents).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-18">
@@ -602,7 +531,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         7. ShedLock distributed-lock table.
+         6. ShedLock distributed-lock table.
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-20">
@@ -633,7 +562,7 @@
     </changeSet>
 
     <!-- ───────────────────────────────────────────────────────────────────────
-         8. OAuth state nonce store (with PKCE code_verifier from the start).
+         7. OAuth state nonce store (with PKCE code_verifier from the start).
          ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21">
@@ -668,6 +597,44 @@
         </createIndex>
         <rollback>
             <dropTable tableName="oauth_state_nonce"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ───────────────────────────────────────────────────────────────────────
+         8. Backfill Connection rows from the legacy Workspace integration columns
+            BEFORE section 9 drops them. Idempotent (ON CONFLICT DO NOTHING) and
+            a true no-op when there are no workspace rows (fresh DB / CI).
+
+            The Java customChange handles:
+              * GitHub App: kind=GITHUB, instance_key=installation_id, App config,
+                no credentials (App mints installation tokens via JWT at runtime).
+              * GitHub PAT: kind=GITHUB, instance_key='pat', PAT re-encrypted under
+                the new per-row AAD-bound v2 ConnectionCredential format.
+              * GitLab PAT: kind=GITLAB, instance_key='<serverUrl>:<groupId>',
+                PAT re-encrypted, SigningMode=PLAINTEXT.
+              * Slack:      kind=SLACK,  instance_key=teamId (or 'legacy' when null),
+                Bot token re-encrypted; notification team + channel preserved.
+
+            Preconditions: changeset is skipped when the {@code workspace} table is
+            empty (the {@code sqlCheck} drops out cheaply on fresh DBs, no class
+            loading).
+         ─────────────────────────────────────────────────────────────────────── -->
+
+    <changeSet author="hephaestus-1198" id="1779790459343-21b" runOnChange="false">
+        <preConditions onFail="MARK_RAN" onFailMessage="no workspace rows to backfill from (fresh DB)">
+            <sqlCheck expectedResult="t">
+                SELECT EXISTS (SELECT 1 FROM workspace)
+            </sqlCheck>
+        </preConditions>
+        <comment>
+            Lift legacy Workspace integration columns into Connection rows BEFORE the
+            section-9 column drops. See WorkspaceConnectionBackfillChange javadoc for
+            per-mode mapping. Re-runnable: skips rows already inserted by an earlier run.
+        </comment>
+        <customChange class="de.tum.cit.aet.hephaestus.integration.core.connection.migration.WorkspaceConnectionBackfillChange"/>
+        <rollback>
+            <!-- Data-only customChange. Schema rollback is owned by section 1
+                 (Connection table) and section 9 (legacy column re-add). -->
         </rollback>
     </changeSet>
 
