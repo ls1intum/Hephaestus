@@ -2,16 +2,18 @@ import { InfoIcon } from "@primer/octicons-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ProviderType } from "@/lib/provider";
+import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
-import { type ActivityLegendItem, getActivityLegendItems } from "./activity-badge-metadata";
+import { type ActivityBadgeMetadata, getActivityBadgeMetadata } from "./activity-badge-metadata";
 import { ScoringExplanationDialog } from "./ScoringExplanationDialog";
 
 export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: ProviderType }) {
 	const [showScoringModal, setShowScoringModal] = useState(false);
-	const legendItems = getActivityLegendItems(providerType);
-	const scoredItems = legendItems.filter((item) => item.countsTowardScore);
-	const contextItems = legendItems.filter((item) => !item.countsTowardScore);
+	const badges = getActivityBadgeMetadata(providerType);
+	const scoredBadges = badges.filter((badge) => badge.countsTowardScore);
+	const contextBadges = badges.filter((badge) => !badge.countsTowardScore);
+	const { icon: ReviewedPullRequestIcon } = getPullRequestStateIcon(providerType, "OPEN");
+	const reviewedLabel = `Reviewed ${getProviderTerms(providerType).pullRequests.toLowerCase()}`;
 
 	return (
 		<>
@@ -27,8 +29,18 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 						<div className="space-y-2">
 							<p className="text-sm font-medium">Counts toward score</p>
 							<div className="grid grid-cols-1 gap-2">
-								{scoredItems.map((item) => (
-									<LegendItem key={item.key} item={item} />
+								<LegendRow
+									icon={ReviewedPullRequestIcon}
+									colorClass="text-provider-muted-foreground"
+									label={reviewedLabel}
+								/>
+								{scoredBadges.map((badge) => (
+									<LegendRow
+										key={badge.key}
+										icon={badge.icon}
+										colorClass={badge.colorClass}
+										label={badge.label}
+									/>
 								))}
 							</div>
 						</div>
@@ -36,8 +48,13 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 						<div className="space-y-2 pt-2 border-t">
 							<p className="text-sm font-medium">Also shown</p>
 							<div className="grid grid-cols-1 gap-2">
-								{contextItems.map((item) => (
-									<LegendItem key={item.key} item={item} />
+								{contextBadges.map((badge) => (
+									<LegendRow
+										key={badge.key}
+										icon={badge.icon}
+										colorClass={badge.colorClass}
+										label={badge.label}
+									/>
 								))}
 							</div>
 						</div>
@@ -68,13 +85,17 @@ export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: 
 	);
 }
 
-function LegendItem({ item }: { item: ActivityLegendItem }) {
-	const Icon = item.icon;
+interface LegendRowProps {
+	icon: ActivityBadgeMetadata["icon"];
+	colorClass: string;
+	label: string;
+}
 
+function LegendRow({ icon: Icon, colorClass, label }: LegendRowProps) {
 	return (
-		<div className={cn("flex items-center gap-2", item.colorClass)}>
+		<div className={cn("flex items-center gap-2", colorClass)}>
 			<Icon className="h-4 w-4" size={16} />
-			<span>{item.label}</span>
+			<span>{label}</span>
 		</div>
 	);
 }

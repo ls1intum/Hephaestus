@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 import {
-	type ActivityBadgeCounts,
+	type ActivityBadgeKey,
 	type ActivityBadgeMetadata,
 	getActivityBadgeMetadata,
 } from "./activity-badge-metadata";
@@ -46,7 +46,7 @@ export function ActivityBadges({
 	isLoading = false,
 	providerType = "GITHUB",
 }: ActivityBadgesProps) {
-	const counts: ActivityBadgeCounts = {
+	const counts: Record<ActivityBadgeKey, number> = {
 		changeRequests,
 		approvals,
 		comments,
