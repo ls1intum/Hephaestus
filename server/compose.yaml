@@ -64,6 +64,22 @@ services:
       retries: 12
       start_period: 30s
 
+  # Available for opt-in agent/webhook pipeline work (set the relevant hephaestus.*.nats.enabled
+  # in application-local.yml). Idle otherwise — no Spring connection opens unless enabled.
+  nats:
+    image: nats:alpine
+    command: ['-js', '-m', '8222']
+    ports:
+      - '${NATS_PORT:-4222}:4222'
+    networks:
+      - app-network
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '--quiet', 'http://localhost:8222/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
 networks:
   app-network:
     driver: bridge
