@@ -1,6 +1,5 @@
-# Local development stack. From the repo root: `pnpm dev` runs `docker compose up -d --wait`
-# then starts the server + webapp. After .env or realm-config changes:
-# `docker compose down -v && docker compose up -d`.
+# Local development stack (PostgreSQL + Keycloak), started by `pnpm dev` / `pnpm dev:compose`.
+# Reset the DB with `pnpm dev:reset` — Postgres is a bind mount, so `docker compose down -v` won't clear it.
 
 services:
   postgres:

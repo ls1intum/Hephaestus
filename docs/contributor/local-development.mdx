@@ -12,9 +12,9 @@ Hephaestus supports full-stack development across Java and TypeScript. This guid
 Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
-2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
+2. **Docker Desktop** – Used for the PostgreSQL and Keycloak containers.
 3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
-4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
+4. **NATS CLI (optional)** – Helpful when inspecting the agent job stream (NATS is disabled by default locally).
 
 ## Recommended IDE setup
 
@@ -32,7 +32,7 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 ### Maven profiles and local configuration
 
-We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
+We ship three Maven profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
 
 Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
@@ -49,7 +49,7 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    pnpm dev
    ```
 
-   This launches an `mprocs` session with the server and webapp in separate panes — each keeps its own clean log stream (switch panes with the arrow keys). The PostgreSQL and Keycloak containers are brought up automatically.
+   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL and Keycloak containers are brought up automatically.
 
    Prefer plain terminals? Run the two sides yourself:
 
