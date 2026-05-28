@@ -12,10 +12,10 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationSuspensionTracker;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ProjectIntegrityHook;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events.RepositoryAboutToBeDeletedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,7 +75,7 @@ public class WorkspaceRepositoryMonitorService {
     private final Map<IntegrationKind, InstallationSuspensionTracker> suspensionTrackers;
     private final Map<IntegrationKind, InstallationRepositoryEnumerator> installationEnumerators;
     private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
-    private final List<ProjectIntegrityHook> projectIntegrityHooks;
+    private final ApplicationEventPublisher eventPublisher;
 
     // Authoritative source for provider mode and credentials
     private final ConnectionService connectionService;
@@ -92,7 +93,7 @@ public class WorkspaceRepositoryMonitorService {
         List<InstallationSuspensionTracker> suspensionTrackerList,
         List<InstallationRepositoryEnumerator> installationEnumeratorList,
         List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
-        List<ProjectIntegrityHook> projectIntegrityHookList
+        ApplicationEventPublisher eventPublisher
     ) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
@@ -103,6 +104,7 @@ public class WorkspaceRepositoryMonitorService {
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitRepositoryManager = gitRepositoryManager;
         this.connectionService = connectionService;
+        this.eventPublisher = eventPublisher;
 
         Map<IntegrationKind, InstallationSuspensionTracker> suspensionMap = new EnumMap<>(IntegrationKind.class);
         for (InstallationSuspensionTracker t : suspensionTrackerList) {
@@ -121,8 +123,6 @@ public class WorkspaceRepositoryMonitorService {
             triggerMap.put(t.kind(), t);
         }
         this.dataSyncTriggers = triggerMap;
-
-        this.projectIntegrityHooks = List.copyOf(projectIntegrityHookList);
     }
 
     // ========================================================================
@@ -589,21 +589,10 @@ public class WorkspaceRepositoryMonitorService {
                 // Clean up local git clone before deleting the DB entity
                 gitRepositoryManager.deleteClone(repoId);
 
-                // Cascade-delete vendor-specific dependents (e.g. GitHub Projects v2 rows)
-                // BEFORE deleting the repository — broadcast across registered hooks. Each
-                // adapter owns the cleanup for its own tables; hooks for kinds with no
-                // dependents are simply no-ops.
-                for (ProjectIntegrityHook hook : projectIntegrityHooks) {
-                    int deletedProjects = hook.cascadeDeleteForRepository(repoId);
-                    if (deletedProjects > 0) {
-                        log.debug(
-                            "Cascade deleted projects for orphaned repository: repoId={}, repoName={}, projectCount={}",
-                            repoId,
-                            LoggingUtils.sanitizeForLog(nameWithOwner),
-                            deletedProjects
-                        );
-                    }
-                }
+                // Synchronous publish — listeners run in this transaction so any vendor-
+                // owned dependents (GitHub Projects V2 polymorphic ownership rows) are gone
+                // before the repository delete fires.
+                eventPublisher.publishEvent(new RepositoryAboutToBeDeletedEvent(repoId));
 
                 repositoryRepository.delete(repository);
                 log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));

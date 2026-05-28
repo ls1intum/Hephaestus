@@ -35,10 +35,10 @@ public class GitLabWorkspaceProviderAvailability implements WorkspaceProviderAva
     }
 
     @Override
-    public Optional<ConnectionHint> connectionHint() {
+    public Optional<String> hintUrl() {
         if (!featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)) {
             return Optional.empty();
         }
-        return Optional.of(new ConnectionHint(gitLabProperties.defaultServerUrl()));
+        return Optional.of(gitLabProperties.defaultServerUrl());
     }
 }

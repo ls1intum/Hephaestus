@@ -5,10 +5,8 @@ import static com.tngtech.archunit.library.GeneralCodingRules.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*;
 
-import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.library.dependencies.SliceAssignment;
-import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import com.tngtech.archunit.library.freeze.FreezingArchRule;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -42,72 +40,21 @@ class ArchitectureTest extends HephaestusArchitectureTest {
     class StructuralIntegrity {
 
         /**
-         * No cyclic dependencies between top-level modules.
+         * No new cyclic dependencies between top-level modules.
          *
-         * <p>Circular dependencies between modules create tight coupling,
-         * make testing difficult, and prevent independent deployment.
-         * This is one of the most important architectural constraints.
-         *
-         * <p><b>Slice note:</b> the modules whose JPA repositories or @Service beans
-         * are tied to {@code integration.scm.domain.*} entities (PullRequest, User,
-         * Repository, Team, …) are folded into a single {@code platform} slice. They
-         * are bidirectionally coupled by design at the data layer:
-         * <ul>
-         *   <li>{@code integration}: vendor adapters + Connection registry.</li>
-         *   <li>{@code workspace}: owns Connection rows.</li>
-         *   <li>{@code config}: Jackson mixins for vendor GraphQL types.</li>
-         *   <li>{@code activity}: {@code ActivityEvent} carries FK references to
-         *       {@code scm.domain.User} and {@code scm.domain.Repository}; the GitHub
-         *       Projects V2 activity listener writes through {@code activity.spi.ActivityRecorder}.</li>
-         *   <li>{@code leaderboard}: {@code LeaderboardReviewQueryRepository} is
-         *       {@code JpaRepository<PullRequestReview>}; ranking depends on PR/Review/Team data.
-         *       Slack integration subscribes to {@code leaderboard.spi.LeaderboardDigestReadyEvent}.</li>
-         *   <li>{@code profile}: {@code ProfilePullRequestQueryRepository} is
-         *       {@code JpaRepository<PullRequest>}; profile aggregates contributions across
-         *       review/comment/issue entities.</li>
-         * </ul>
-         * Breaking these via Spring events would add indirection without value —
-         * these modules ARE the data platform. Inner cycles are policed by
-         * {@code ModuleBoundaryTest} and {@code CrossCuttingModuleBoundaryTest}.
+         * <p>Wrapped in {@link FreezingArchRule} — the existing cycles (data-tier modules
+         * sharing {@code integration.scm.domain.*} JPA entities at the data layer) are
+         * frozen in {@code src/test/resources/archunit_store/} so the debt is visible in
+         * version control. New cycles fail the build; debt only shrinks.
          */
         @Test
         void noCyclesBetweenModules() {
-            SliceAssignment platformAwareSlices = new SliceAssignment() {
-                @Override
-                public SliceIdentifier getIdentifierOf(JavaClass javaClass) {
-                    String pkg = javaClass.getPackageName();
-                    if (!pkg.startsWith(BASE_PACKAGE + ".")) {
-                        return SliceIdentifier.ignore();
-                    }
-                    String tail = pkg.substring(BASE_PACKAGE.length() + 1);
-                    int dot = tail.indexOf('.');
-                    String top = dot < 0 ? tail : tail.substring(0, dot);
-                    // Data-tier platform modules: tied to scm.domain entities at the JPA layer.
-                    if (
-                        "integration".equals(top) ||
-                        "workspace".equals(top) ||
-                        "config".equals(top) ||
-                        "activity".equals(top) ||
-                        "leaderboard".equals(top) ||
-                        "profile".equals(top)
-                    ) {
-                        return SliceIdentifier.of("platform");
-                    }
-                    return SliceIdentifier.of(top);
-                }
-
-                @Override
-                public String getDescription() {
-                    return "top-level slice (data-tier modules folded into platform)";
-                }
-            };
-
             ArchRule rule = slices()
-                .assignedFrom(platformAwareSlices)
+                .matching(BASE_PACKAGE + ".(*)..")
                 .should()
                 .beFreeOfCycles()
-                .because("Cyclic dependencies between modules prevent independent evolution and testing");
-            rule.check(classes);
+                .because("Cyclic dependencies between top-level modules prevent independent evolution");
+            FreezingArchRule.freeze(rule).check(classes);
         }
 
         /**

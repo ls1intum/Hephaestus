@@ -6,77 +6,31 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-        #1198 Unified Integration Framework — consolidated branch-scoped changelog.
+        #1198 Unified Integration Framework — single branch-scoped changelog.
 
-        This single file replaces twelve incremental changesets that accreted across
-        the long #1198 audit loop. The branch is the unit of release: collapsing the
-        history into one timestamped file with each table declared in its FINAL shape
-        is cheaper to review and removes the obsolete two-phase (backfill → cutover)
-        plumbing the iteration carried.
+        Sections:
+          1.  connection + connection_audit (+ format-version + partial uniques).
+          2.  feedback_post.
+          3.  agent_job.{integration_kind, subject_class} + composite index.
+          4.  slack_channel + slack_message.
+          5.  outline_collection + outline_document.
+          6.  shedlock.
+          7.  oauth_state_nonce (incl. PKCE code_verifier from the start).
+          8.  WorkspaceConnectionBackfillChange (Java customChange) — idempotent
+              backfill of legacy Workspace columns into connection rows.
+          8b. HALT guard — prevents section-9 drops on a populated workspace
+              table with empty connection table.
+          9.  Drop of eleven superseded Workspace columns; account_login stays.
+          10. user.keycloak_subject + partial unique (ADR 0016 Stage A).
 
-        Logical contents:
+        Section 8 needs hephaestus.security.encryption-key (system property) or
+        HEPHAESTUS_ENCRYPTION_KEY (env var) — the same 32-char key the app uses.
+        Missing key + an encrypted PAT in scope → fail-fast, no silent drop.
 
-          1.  Connection aggregate + audit + partial-unique for NULL instance_key
-              + partial-unique enforcing "one ACTIVE SCM Connection per workspace".
-          2.  feedback_post cross-vendor edit-in-place tracking.
-          3.  agent_job classification columns (integration_kind, subject_class)
-              + (kind, subject, created_at) index.
-          4.  slack_channel + slack_message persistence (ToS-compliant, see
-              SlackMessage javadoc).
-          5.  outline_collection + outline_document persistence.
-          6.  shedlock distributed-lock table (JdbcTemplateLockProvider schema).
-          7.  oauth_state_nonce (with code_verifier PKCE column declared from the
-              start) — single-use nonce + RFC 7636 S256 verifier storage.
-          8.  WorkspaceConnectionBackfillChange (Java customChange) — copies the
-              legacy Workspace integration columns into Connection rows with the
-              new sealed JSONB config and per-row AAD-bound AES-GCM credentials.
-              Idempotent (ON CONFLICT DO NOTHING) so re-runs are safe and a fresh
-              DB silently no-ops.
-          9.  Unconditional drop of the eleven legacy Workspace columns now that
-              section 8 has migrated their content. account_login is intentionally
-              KEPT — 40+ join sites depend on it as a denormalised org/group
-              lookup column.
-         10.  user.keycloak_subject column + partial-unique index — Stage A of the
-              identity refactor (ADR 0016). Seeds the column so a follow-up PR can
-              flip WorkspaceContextFilter from preferred_username → sub lookups
-              without a backfill window. Partial index covers only non-null rows
-              so synced bots/orgs keep coexisting with NULL subjects.
-
-         Note: the hephaestus_user + integration_identity tables that appeared in
-         earlier revisions of this changelog were removed before merge — the
-         Java entities, repositories, and JpaUserDirectory wiring were never
-         consumed in production. See ADR 0011 (now historical) + the
-         "unified-identity-keycloak-as-truth" ADR (0016) for the model we
-         actually ship: SCM User is authoritative, keycloak_subject is the
-         persisted stable join key.
-
-        Migration safety — section 8 is the data-preservation seam. It reads the
-        eleven legacy Workspace columns BEFORE section 9 drops them, re-encrypts
-        the PAT + Slack token under the new ConnectionCredentialConverter v2 AAD
-        format, and inserts one Connection row per (workspace, integration kind).
-        The backfill is idempotent via ON CONFLICT (workspace_id, kind,
-        instance_key) DO NOTHING — re-applying against a partially-migrated DB
-        skips rows that already exist. On a fresh DB (no workspace rows) the
-        backfill no-ops in zero queries.
-
-        Preconditions strategy — every changeset uses onFail="MARK_RAN" so
-        re-applying against a partially-migrated environment (e.g. someone manually
-        applied a subset of the old 12 files locally) stays forward-only safe. The
-        DROP COLUMN changesets carry preconditions in the same belt-and-braces
-        style; they no-op on a fresh DB where the column was never created, and
-        apply on an existing DB where the column is still present.
-
-        Encryption key requirement — section 8 needs hephaestus.security.encryption-key
-        (system property) or HEPHAESTUS_ENCRYPTION_KEY (env var) to be set to the
-        same 32-char key the application uses, so legacy PATs/tokens can be
-        decrypted and re-encrypted. If the key is missing AND a workspace carries
-        an encrypted PAT, the migration fails fast with a clear message rather
-        than silently dropping the credential.
+        Every changeset uses onFail="MARK_RAN" preconditions so re-apply against
+        a partially-migrated DB stays forward-only safe.
     -->
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         1. Connection aggregate + audit + format-version + NULL-collision guard.
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-1">
         <preConditions onFail="MARK_RAN" onFailMessage="connection table already present">
@@ -128,12 +82,7 @@
             ALTER TABLE connection ADD CONSTRAINT ck_connection_state
                 CHECK (state IN ('PENDING','ACTIVE','SUSPENDED','UNINSTALLED'));
         </sql>
-        <!--
-            ix_connection_workspace_kind: unfiltered (workspace_id, kind) lookup
-            index for the by-(workspace, kind) read path. Name reflects what the
-            index actually covers — an earlier draft mis-named it ix_connection_active
-            even though it has no state predicate.
-        -->
+        <!-- Unfiltered (workspace_id, kind) lookup index. -->
         <createIndex tableName="connection" indexName="ix_connection_workspace_kind">
             <column name="workspace_id"/>
             <column name="kind"/>
@@ -237,9 +186,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         2. feedback_post cross-vendor edit-in-place tracking.
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-6">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_post already present">
@@ -286,9 +232,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         3. agent_job classification columns + index.
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-9">
         <preConditions onFail="MARK_RAN" onFailMessage="agent_job.integration_kind already present">
@@ -334,9 +277,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         4. Slack persistence (channels + messages).
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-16">
         <preConditions onFail="MARK_RAN" onFailMessage="slack_channel table already present">
@@ -438,9 +378,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         5. Outline persistence (collections + documents).
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-18">
         <preConditions onFail="MARK_RAN" onFailMessage="outline_collection table already present">
@@ -530,9 +467,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         6. ShedLock distributed-lock table.
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-20">
         <preConditions onFail="MARK_RAN" onFailMessage="shedlock table already present">
@@ -561,9 +495,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         7. OAuth state nonce store (with PKCE code_verifier from the start).
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21">
         <preConditions onFail="MARK_RAN" onFailMessage="oauth_state_nonce table already present">
@@ -600,25 +531,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         8. Backfill Connection rows from the legacy Workspace integration columns
-            BEFORE section 9 drops them. Idempotent (ON CONFLICT DO NOTHING) and
-            a true no-op when there are no workspace rows (fresh DB / CI).
-
-            The Java customChange handles:
-              * GitHub App: kind=GITHUB, instance_key=installation_id, App config,
-                no credentials (App mints installation tokens via JWT at runtime).
-              * GitHub PAT: kind=GITHUB, instance_key='pat', PAT re-encrypted under
-                the new per-row AAD-bound v2 ConnectionCredential format.
-              * GitLab PAT: kind=GITLAB, instance_key='<serverUrl>:<groupId>',
-                PAT re-encrypted, SigningMode=PLAINTEXT.
-              * Slack:      kind=SLACK,  instance_key=teamId (or 'legacy' when null),
-                Bot token re-encrypted; notification team + channel preserved.
-
-            Preconditions: changeset is skipped when the {@code workspace} table is
-            empty (the {@code sqlCheck} drops out cheaply on fresh DBs, no class
-            loading).
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21b" runOnChange="false">
         <preConditions onFail="MARK_RAN" onFailMessage="no workspace rows to backfill from (fresh DB)">
@@ -638,14 +550,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         8b. Cross-section data-loss guard. HALT (not MARK_RAN) if section 9 is
-             about to drop legacy columns on a workspace-populated DB without
-             backfilled connection rows — protects against the rare scenario
-             where section 8 was skipped via {@code liquibase changelogSync}
-             or a sibling operator process. Skips cleanly on fresh DBs (no
-             workspace rows) and on already-cutover DBs (legacy columns gone).
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-21c" runOnChange="false">
         <preConditions onFail="HALT" onFailMessage="ABORTED: workspace rows exist but no connection rows were backfilled before the section-9 column drops. Section 8 (WorkspaceConnectionBackfillChange) must succeed before legacy columns are dropped. Verify hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is set, inspect the migration logs, then re-run.">
@@ -671,14 +575,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         9. Unconditional drop of legacy Workspace columns superseded by the
-             Connection registry. account_login is intentionally KEPT.
-
-             Preconditions guard against re-applying against an environment where
-             a sibling worktree (e.g. main) doesn't carry these columns at all —
-             onFail="MARK_RAN" makes the drop forward-only safe.
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-22">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.installation_id already dropped">
@@ -812,12 +708,6 @@
         </rollback>
     </changeSet>
 
-    <!-- ───────────────────────────────────────────────────────────────────────
-         10. user.keycloak_subject column + partial-unique index (ADR 0016
-             Stage A). Only authenticated upserts populate the column; synced
-             rows stay NULL. The "user" table name stays double-quoted because
-             USER is a SQL reserved word in PostgreSQL.
-         ─────────────────────────────────────────────────────────────────────── -->
 
     <changeSet author="hephaestus-1198" id="1779790459343-33">
         <preConditions onFail="MARK_RAN" onFailMessage="user.keycloak_subject already present">

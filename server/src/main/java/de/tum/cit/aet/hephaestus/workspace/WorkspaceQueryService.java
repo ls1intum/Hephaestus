@@ -107,19 +107,13 @@ public class WorkspaceQueryService {
         var github =
             providerAvailability.getOrDefault(IntegrationKind.GITHUB, null) instanceof
                 WorkspaceProviderAvailability ghAvail
-                ? ghAvail
-                      .connectionHint()
-                      .map(h -> new WorkspaceProvidersDTO.GitHubProviderDTO(h.hintUrl()))
-                      .orElse(null)
+                ? ghAvail.hintUrl().map(WorkspaceProvidersDTO.GitHubProviderDTO::new).orElse(null)
                 : null;
 
         var gitlab =
             providerAvailability.getOrDefault(IntegrationKind.GITLAB, null) instanceof
                 WorkspaceProviderAvailability glAvail
-                ? glAvail
-                      .connectionHint()
-                      .map(h -> new WorkspaceProvidersDTO.GitLabProviderDTO(h.hintUrl()))
-                      .orElse(null)
+                ? glAvail.hintUrl().map(WorkspaceProvidersDTO.GitLabProviderDTO::new).orElse(null)
                 : null;
 
         return new WorkspaceProvidersDTO(github, gitlab);

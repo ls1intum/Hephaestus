@@ -58,15 +58,11 @@ import tools.jackson.databind.json.JsonMapper;
  *       PAT re-encrypted as above.</li>
  * </ul>
  *
- * <p><b>What it intentionally does NOT migrate — Slack.</b> The legacy
- * {@code workspace.slack_token} column was dead at runtime on {@code main}
- * ({@code SlackMessageService} read from the global
- * {@code hephaestus.slack.token} bean, not the per-workspace column), and the
- * new {@link ConnectionConfig.SlackConfig} requires a {@code teamId} that
- * legacy rows do not carry. The new Slack OAuth flow shipped in this PR
- * provisions {@code SLACK} connections from scratch — leaving legacy
- * {@code slack_token} / {@code slack_signing_secret} / leaderboard fields to
- * drop in section 9 is a clean cut, not data loss.
+ * <p><b>Slack is intentionally not migrated.</b> Legacy {@code slack_token} was
+ * dead at runtime (SlackMessageService read from a global property bean), and
+ * the new {@link ConnectionConfig.SlackConfig} requires a {@code teamId} that
+ * legacy rows do not carry. The new OAuth flow provisions SLACK connections
+ * from scratch, so dropping the legacy columns in section 9 is a clean cut.
  *
  * <p><b>Idempotency.</b> Every insert is {@code ON CONFLICT (workspace_id, kind,
  * instance_key) DO NOTHING} against {@code uq_connection}. Re-runs of the
@@ -99,14 +95,10 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
     }
 
     @Override
-    public void setUp() throws SetupException {
-        // No setup required.
-    }
+    public void setUp() throws SetupException {}
 
     @Override
-    public void setFileOpener(ResourceAccessor resourceAccessor) {
-        // Unused — no classpath resources are read by this change.
-    }
+    public void setFileOpener(ResourceAccessor resourceAccessor) {}
 
     @Override
     public ValidationErrors validate(Database database) {

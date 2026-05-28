@@ -354,8 +354,7 @@ public class WorkspaceProvisioningService {
             );
         }
         return gitLabAvailability
-            .connectionHint()
-            .map(WorkspaceProviderAvailability.ConnectionHint::hintUrl)
+            .hintUrl()
             .orElseThrow(() ->
                 new IllegalStateException(
                     "GitLab provider availability has no connection hint; default server URL unavailable"

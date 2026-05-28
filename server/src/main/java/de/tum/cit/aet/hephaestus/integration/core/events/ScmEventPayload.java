@@ -36,13 +36,7 @@ public final class ScmEventPayload {
 
     private ScmEventPayload() {}
 
-    // ========================================================================
-    // Issue Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of an Issue for event handling.
-     */
     public record IssueData(
         @NonNull Long id,
         int number,
@@ -77,13 +71,7 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Pull Request Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of a PullRequest for event handling.
-     */
     public record PullRequestData(
         @NonNull Long id,
         int number,
@@ -128,13 +116,7 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Label Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of a Label for event handling.
-     */
     public record LabelData(
         @NonNull Long id,
         @NonNull String name,
@@ -146,13 +128,7 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Milestone Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of a Milestone for event handling.
-     */
     public record MilestoneData(
         @NonNull Long id,
         int number,
@@ -171,9 +147,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Issue Type Event Payload
-    // ========================================================================
 
     public record IssueTypeData(@NonNull String id, @NonNull String name, @Nullable String description) {
         public static IssueTypeData from(IssueType issueType) {
@@ -181,9 +154,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Comment Event Payload
-    // ========================================================================
 
     public record CommentData(
         @NonNull Long id,
@@ -209,9 +179,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Pull Request Review Event Payload
-    // ========================================================================
 
     public record ReviewData(
         @NonNull Long id,
@@ -246,9 +213,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Pull Request Review Comment Event Payload
-    // ========================================================================
 
     public record ReviewCommentData(
         @NonNull Long id,
@@ -280,9 +244,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Pull Request Review Thread Event Payload
-    // ========================================================================
 
     public record ReviewThreadData(
         @NonNull Long id,
@@ -303,9 +264,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Team Event Payload
-    // ========================================================================
 
     public record TeamData(
         @NonNull Long id,
@@ -325,9 +283,6 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // User Event Payload
-    // ========================================================================
 
     public record UserData(@NonNull Long id, @NonNull String login, @Nullable String name, @Nullable String avatarUrl) {
         public static UserData from(User user) {
@@ -335,20 +290,8 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // GitHub Projects V2 payloads moved to
-    // integration.scm.github.events.GitHubProjectEventPayload — GitHub-only
-    // concept (no GitLab equivalent), kept out of core to satisfy the
-    // IntegrationCoreVendorNeutralityTest arch pin.
-    // ========================================================================
 
-    // ========================================================================
-    // Commit Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of a Commit for event handling.
-     */
     public record CommitData(
         @NonNull Long id,
         @NonNull String sha,
@@ -379,13 +322,7 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Discussion Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of a Discussion for event handling.
-     */
     public record DiscussionData(
         @NonNull Long id,
         int number,
@@ -426,13 +363,7 @@ public final class ScmEventPayload {
         }
     }
 
-    // ========================================================================
-    // Discussion Comment Event Payload
-    // ========================================================================
 
-    /**
-     * Immutable snapshot of a DiscussionComment for event handling.
-     */
     public record DiscussionCommentData(
         @NonNull Long id,
         @Nullable String body,

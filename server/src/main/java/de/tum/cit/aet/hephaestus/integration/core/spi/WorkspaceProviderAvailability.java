@@ -20,18 +20,9 @@ public interface WorkspaceProviderAvailability {
     IntegrationKind kind();
 
     /**
-     * Returns the connection hint exposed to the workspace creation wizard, or empty if
-     * the provider cannot be used for new workspaces.
-     *
-     * <p>The {@code hintUrl} carries vendor semantics:
-     * <ul>
-     *   <li>GitHub App: the installation URL ({@code https://github.com/apps/.../installations/new})</li>
-     *   <li>GitLab PAT: the default server URL ({@code https://gitlab.com})</li>
-     * </ul>
-     * Callers must not parse the URL — it is consumed verbatim by the wizard.
+     * Vendor URL exposed to the workspace creation wizard, or empty if the provider
+     * cannot be used for new workspaces. Consumed verbatim — wizard does not parse it.
+     * GitHub App returns the installation URL; GitLab PAT returns the default server URL.
      */
-    Optional<ConnectionHint> connectionHint();
-
-    /** Provider-creation hint for the workspace wizard. */
-    record ConnectionHint(String hintUrl) {}
+    Optional<String> hintUrl();
 }

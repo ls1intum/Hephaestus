@@ -7,24 +7,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the vendor-neutrality of {@code integration.core.**}. The "unified
- * integration framework" only delivers on its name if the core packages
- * (registry, SPI, event substrate, OAuth, webhook ingest, consumer fleet,
- * handler dispatch, feedback) never import from a vendor adapter
- * ({@code integration.scm.github.**}, {@code integration.scm.gitlab.**},
- * {@code integration.slack.**}, {@code integration.outline.**}).
- *
- * <p>The historic leak that drove this pin: {@code core/events/EventPayload}
- * imported {@code scm.github.project.{Project, ProjectItem, ProjectStatusUpdate}}
- * to expose their nested enums as record fields, silently transitively pulling
- * GitHub vendor types into every consumer of the "neutral" event surface. That
- * was extracted to {@code integration.scm.github.events.GitHubProjectEventPayload}
- * — this rule prevents the regression.
- *
- * <p>The {@code integration.scm.domain.**} package is intentionally allowed:
- * it is the SCM-shared domain layer (Issue, PullRequest, Repository, User, …)
- * consumed by both GitHub and GitLab adapters and the in-process event substrate.
- * Its presence in core is a feature, not a leak.
+ * Pins vendor-neutrality of {@code integration.core.**}. {@code integration.scm.domain.**}
+ * is intentionally allowed — it is the cross-vendor SCM domain layer.
  */
 class IntegrationCoreVendorNeutralityTest extends HephaestusArchitectureTest {
 

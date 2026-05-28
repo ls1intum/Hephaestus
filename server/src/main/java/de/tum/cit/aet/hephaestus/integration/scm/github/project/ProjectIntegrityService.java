@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events.RepositoryAboutToBeDeletedEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,15 +103,16 @@ public class ProjectIntegrityService {
     }
 
     /**
-     * Deletes all projects owned by the specified repository.
-     * <p>
-     * Call this method when a repository is being deleted to prevent orphaned
-     * projects. Note: Repository-owned projects are less common than organization-owned
-     * projects in GitHub's model.
-     *
-     * @param repositoryId the repository's database ID
-     * @return the number of projects deleted
+     * Subscribes to {@link RepositoryAboutToBeDeletedEvent} — runs synchronously in the
+     * publisher's transaction so the project rows are gone before
+     * {@code repository.delete(...)} commits. Idempotent / no-op when the repo owns
+     * no projects.
      */
+    @EventListener
+    public void onRepositoryAboutToBeDeleted(RepositoryAboutToBeDeletedEvent event) {
+        cascadeDeleteProjectsForRepository(event.repositoryId());
+    }
+
     @Transactional
     public int cascadeDeleteProjectsForRepository(Long repositoryId) {
         if (repositoryId == null) {

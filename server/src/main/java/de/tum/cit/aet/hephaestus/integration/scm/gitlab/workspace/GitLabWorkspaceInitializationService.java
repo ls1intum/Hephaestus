@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsum
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceCreatedEvent;
+import org.springframework.context.event.EventListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
@@ -128,14 +130,18 @@ public class GitLabWorkspaceInitializationService {
         this.monitoringExecutor = monitoringExecutor;
     }
 
+    /** Subscribes to workspace-creation events and dispatches GitLab-side init for GITLAB rows. */
+    @EventListener
+    public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
+        if (event.kind() == IntegrationKind.GITLAB) {
+            initializeAsync(event.workspaceId());
+        }
+    }
+
     /**
-     * Triggers GitLab workspace initialization asynchronously.
-     *
-     * <p>Used at workspace creation time so the HTTP response returns immediately
-     * while discovery runs in the background. Also starts the NATS consumer after
-     * initialization so webhook events for the new workspace are processed.
-     *
-     * @param workspaceId the ID of the newly created GITLAB_PAT workspace
+     * Triggers GitLab workspace initialization asynchronously. Returns immediately so the
+     * caller's HTTP response is not blocked; discovery + NATS consumer start run on the
+     * monitoring executor.
      */
     public void initializeAsync(Long workspaceId) {
         monitoringExecutor.submit(() -> {

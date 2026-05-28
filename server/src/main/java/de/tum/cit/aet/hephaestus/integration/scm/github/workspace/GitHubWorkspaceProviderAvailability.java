@@ -27,9 +27,9 @@ public class GitHubWorkspaceProviderAvailability implements WorkspaceProviderAva
     }
 
     @Override
-    public Optional<ConnectionHint> connectionHint() {
+    public Optional<String> hintUrl() {
         if (gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null) {
-            return Optional.of(new ConnectionHint(gitHubProperties.app().installationUrl()));
+            return Optional.of(gitHubProperties.app().installationUrl());
         }
         return Optional.empty();
     }

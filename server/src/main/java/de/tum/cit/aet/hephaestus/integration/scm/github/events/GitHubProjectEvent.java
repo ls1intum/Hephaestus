@@ -5,14 +5,9 @@ import java.util.Set;
 import org.springframework.lang.Nullable;
 
 /**
- * Sealed domain events for GitHub Projects V2 — the project, item, and
- * status-update lifecycles. Lives in the GitHub-vendor package because GitLab
- * has no equivalent concept; the {@code IntegrationCoreVendorNeutralityTest}
- * arch test forbids GitHub vendor types in {@code integration.core.events}.
- *
- * <p>Each sub-hierarchy is independently sealed so {@code @TransactionalEventListener}
- * subscribers can listen to the umbrella ({@code ProjectEvent}) and pattern-match
- * exhaustively on the variants.
+ * Sealed events for GitHub Projects V2 — project, item, and status-update
+ * lifecycles. GitLab has no equivalent product, so these live in the GitHub
+ * package rather than in the cross-vendor SCM event hierarchy.
  */
 public final class GitHubProjectEvent {
 
@@ -48,7 +43,7 @@ public final class GitHubProjectEvent {
         EventContext context
     ) implements ProjectEvent {}
 
-    /** Deleted event - entity no longer exists, only ID and title available. */
+    /** Entity no longer exists; only ID + title survive for downstream cleanup. */
     public record ProjectDeleted(Long projectId, String projectTitle, EventContext context) implements ProjectEvent {
         @Override
         public GitHubProjectEventPayload.ProjectData project() {
@@ -99,7 +94,6 @@ public final class GitHubProjectEvent {
         EventContext context
     ) implements ProjectItemEvent {}
 
-    /** Deleted event - entity no longer exists, only ID available. */
     public record ProjectItemDeleted(Long itemId, Long projectId, EventContext context) implements ProjectItemEvent {
         @Override
         public GitHubProjectEventPayload.ProjectItemData item() {
@@ -107,14 +101,12 @@ public final class GitHubProjectEvent {
         }
     }
 
-    /** Converted event - draft issue converted to a real issue. */
     public record ProjectItemConverted(
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,
         EventContext context
     ) implements ProjectItemEvent {}
 
-    /** Reordered event - item position changed in project view. */
     public record ProjectItemReordered(
         GitHubProjectEventPayload.ProjectItemData item,
         Long projectId,

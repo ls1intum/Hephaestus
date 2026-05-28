@@ -4,49 +4,18 @@ import java.util.Set;
 import org.springframework.lang.Nullable;
 
 /**
- * Type-safe domain events with sealed hierarchies per entity type.
- *
- * <h2>Design Principles</h2>
- * <ul>
- *   <li><b>No JPA entities</b> - Events use {@link ScmEventPayload} DTOs to avoid
- *       LazyInitializationException in async handlers</li>
- *   <li><b>Immutable</b> - All events are Java records</li>
- *   <li><b>Sealed hierarchies</b> - Enable exhaustive pattern matching</li>
- *   <li><b>Event metadata</b> - All events carry {@link EventContext} with
- *       timestamps, correlation IDs, and source information</li>
- * </ul>
- *
- * <h2>Usage</h2>
- * <pre>{@code
- * // Type-safe event handling with pattern matching
- * @EventListener
- * public void onPullRequestEvent(ScmDomainEvent.PullRequestEvent event) {
- *     switch (event) {
- *         case PullRequestCreated e -> handleCreated(e.pullRequest());
- *         case PullRequestMerged e -> handleMerged(e.pullRequest());
- *         // Compiler ensures all cases are handled
- *     }
- * }
- *
- * // Async-safe - no LazyInitializationException risk
- * @Async
- * @TransactionalEventListener(phase = AFTER_COMMIT)
- * public void onPullRequestCreated(ScmDomainEvent.PullRequestCreated event) {
- *     var pr = event.pullRequest();  // ScmEventPayload.PullRequestData, not JPA entity
- *     log.info("PR #{} created: {}", pr.number(), pr.title());
- * }
- * }</pre>
+ * Sealed SCM domain events published in-process after vendor processors commit.
+ * Records (not JPA entities) keep async handlers safe from
+ * {@code LazyInitializationException}.
  */
 public final class ScmDomainEvent {
 
     private ScmDomainEvent() {}
 
     /**
-     * Canonical trigger event names used for practice matching.
-     * <p>
-     * These must match exactly the strings stored in the {@code trigger_events} JSONB column
-     * of the {@code practice} table. Practices are matched by comparing their trigger events
-     * against these constants in {@code PracticeReviewDetectionGate.findMatchingPractices()}.
+     * Trigger event names persisted in {@code practice.trigger_events} JSONB; these
+     * literals are the join key for {@code PracticeReviewDetectionGate}. Must match
+     * the stored strings exactly — renaming requires a data migration.
      */
     public static final class TriggerEventNames {
 
@@ -58,16 +27,6 @@ public final class ScmDomainEvent {
         private TriggerEventNames() {}
     }
 
-    // ========================================================================
-    // Common base interfaces
-    // ========================================================================
-
-    /**
-     * Marker for vendor-neutral SCM domain events. GitHub Projects V2 events
-     * live in {@code integration.scm.github.events.GitHubProjectEvent} — they
-     * are GitHub-only (no GitLab equivalent) and listeners pattern-match on
-     * those hierarchies directly.
-     */
     public sealed interface Event
         permits
             IssueEvent,
@@ -83,16 +42,10 @@ public final class ScmDomainEvent {
             DiscussionEvent,
             DiscussionCommentEvent {}
 
-    /** Events that carry context information. */
     public interface ContextualEvent {
         EventContext context();
     }
 
-    // ========================================================================
-    // Issue Events
-    // ========================================================================
-
-    /** All issue-related events. Subscribe to handle any issue event. */
     public sealed interface IssueEvent
         extends Event, ContextualEvent
         permits
@@ -129,7 +82,7 @@ public final class ScmDomainEvent {
     public record IssueDeleted(Long issueId, EventContext context) implements IssueEvent {
         @Override
         public ScmEventPayload.IssueData issue() {
-            return null; // Entity no longer exists
+            return null;
         }
     }
 
@@ -157,11 +110,7 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements IssueEvent {}
 
-    // ========================================================================
-    // Pull Request Events
-    // ========================================================================
 
-    /** All pull request-related events. Subscribe to handle any PR event. */
     public sealed interface PullRequestEvent
         extends Event, ContextualEvent
         permits
@@ -233,11 +182,7 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements PullRequestEvent {}
 
-    // ========================================================================
-    // Label Events
-    // ========================================================================
 
-    /** All label-related events. */
     public sealed interface LabelEvent
         extends Event, ContextualEvent
         permits LabelCreated, LabelUpdated, LabelDeleted {}
@@ -248,11 +193,7 @@ public final class ScmDomainEvent {
 
     public record LabelDeleted(Long labelId, String labelName, EventContext context) implements LabelEvent {}
 
-    // ========================================================================
-    // Milestone Events
-    // ========================================================================
 
-    /** All milestone-related events. */
     public sealed interface MilestoneEvent
         extends Event, ContextualEvent
         permits MilestoneCreated, MilestoneUpdated, MilestoneDeleted {}
@@ -269,11 +210,7 @@ public final class ScmDomainEvent {
 
     public record MilestoneDeleted(Long milestoneId, String title, EventContext context) implements MilestoneEvent {}
 
-    // ========================================================================
-    // Comment Events
-    // ========================================================================
 
-    /** All comment-related events. */
     public sealed interface CommentEvent
         extends Event, ContextualEvent
         permits CommentCreated, CommentUpdated, CommentDeleted
@@ -296,9 +233,6 @@ public final class ScmDomainEvent {
 
     public record CommentDeleted(Long commentId, Long issueId, EventContext context) implements CommentEvent {}
 
-    // ========================================================================
-    // Pull Request Review Events
-    // ========================================================================
 
     public sealed interface ReviewEvent
         extends Event, ContextualEvent
@@ -317,9 +251,6 @@ public final class ScmDomainEvent {
 
     public record ReviewDismissed(ScmEventPayload.ReviewData review, EventContext context) implements ReviewEvent {}
 
-    // ========================================================================
-    // Pull Request Review Comment Events
-    // ========================================================================
 
     public sealed interface ReviewCommentEvent
         extends Event, ContextualEvent
@@ -347,9 +278,6 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements ReviewCommentEvent {}
 
-    // ========================================================================
-    // Pull Request Review Thread Events
-    // ========================================================================
 
     public sealed interface ReviewThreadEvent
         extends Event, ContextualEvent
@@ -368,9 +296,6 @@ public final class ScmDomainEvent {
         EventContext context
     ) implements ReviewThreadEvent {}
 
-    // ========================================================================
-    // Team Events
-    // ========================================================================
 
     public sealed interface TeamEvent extends Event, ContextualEvent permits TeamCreated, TeamUpdated, TeamDeleted {
         Long teamId();
@@ -401,17 +326,6 @@ public final class ScmDomainEvent {
         }
     }
 
-    // ========================================================================
-    // GitHub Projects V2 events moved to
-    // integration.scm.github.events.GitHubProjectEvent — GitHub-only feature,
-    // pinned out of core by IntegrationCoreVendorNeutralityTest.
-    // ========================================================================
-
-    // ========================================================================
-    // Commit Events
-    // ========================================================================
-
-    /** All commit-related events. */
     public sealed interface CommitEvent extends Event, ContextualEvent permits CommitCreated, CommitAuthorsReconciled {
         @Nullable
         ScmEventPayload.CommitData commit();
@@ -433,11 +347,7 @@ public final class ScmDomainEvent {
         }
     }
 
-    // ========================================================================
-    // Discussion Events
-    // ========================================================================
 
-    /** All discussion-related events. Subscribe to handle any discussion event. */
     public sealed interface DiscussionEvent
         extends Event, ContextualEvent
         permits
@@ -483,15 +393,11 @@ public final class ScmDomainEvent {
     public record DiscussionDeleted(Long discussionId, EventContext context) implements DiscussionEvent {
         @Override
         public ScmEventPayload.DiscussionData discussion() {
-            return null; // Entity no longer exists
+            return null;
         }
     }
 
-    // ========================================================================
-    // Discussion Comment Events
-    // ========================================================================
 
-    /** All discussion comment-related events. Subscribe to handle any discussion comment event. */
     public sealed interface DiscussionCommentEvent
         extends Event, ContextualEvent
         permits DiscussionCommentCreated, DiscussionCommentEdited, DiscussionCommentDeleted

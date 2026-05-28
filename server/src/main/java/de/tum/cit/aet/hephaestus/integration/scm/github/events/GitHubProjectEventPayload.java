@@ -9,16 +9,9 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 /**
- * Immutable event payload DTOs for GitHub Projects V2 events. GitLab has no
- * equivalent product feature, so these payloads live in the GitHub-vendor
- * package rather than in {@code integration.core.events} — keeping the core
- * event substrate vendor-neutral and pinning the leak with
- * {@code IntegrationCoreVendorNeutralityTest}.
- *
- * <p>Records mirror the GitHub Projects V2 GraphQL surface: {@link
- * ProjectData} ↔ {@code Project}, {@link ProjectItemData} ↔ {@code ProjectItem}
- * (drafts / issues / PRs / pull-requests), {@link ProjectStatusUpdateData} ↔
- * {@code ProjectStatusUpdate} (per-project status notes).
+ * Async-safe payload DTOs mirroring the GitHub Projects V2 GraphQL surface
+ * ({@code Project}, {@code ProjectItem}, {@code ProjectStatusUpdate}). GitHub-only
+ * — GitLab has no equivalent product.
  */
 public final class GitHubProjectEventPayload {
 

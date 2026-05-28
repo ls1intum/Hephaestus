@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceInitializationHook;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -14,14 +13,14 @@ import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.exception.*;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
-import java.util.EnumMap;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceCreatedEvent;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,11 +75,8 @@ public class WorkspaceService {
     private final WorkspaceMembershipService workspaceMembershipService;
     private final ConnectionService connectionService;
 
-    /**
-     * Per-kind post-create initialization hooks (currently: GitLab discovery). Dispatched
-     * after the workspace row commits so async vendor flows can find the row in the DB.
-     */
-    private final Map<IntegrationKind, WorkspaceInitializationHook> initializationHooks;
+    /** Fires {@link WorkspaceCreatedEvent} after workspace commit; vendor adapters subscribe. */
+    private final ApplicationEventPublisher eventPublisher;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
@@ -90,7 +86,7 @@ public class WorkspaceService {
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService,
         ConnectionService connectionService,
-        List<WorkspaceInitializationHook> initializationHookList
+        ApplicationEventPublisher eventPublisher
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -99,11 +95,7 @@ public class WorkspaceService {
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
         this.connectionService = connectionService;
-        Map<IntegrationKind, WorkspaceInitializationHook> map = new EnumMap<>(IntegrationKind.class);
-        for (WorkspaceInitializationHook h : initializationHookList) {
-            map.put(h.kind(), h);
-        }
-        this.initializationHooks = map;
+        this.eventPublisher = eventPublisher;
     }
 
     // ========================================================================
@@ -258,10 +250,7 @@ public class WorkspaceService {
         // setup). The @Transactional createWorkspace() has already committed by the time we
         // dispatch, so the async thread can find the workspace. Hooks are kind-keyed so
         // adding a new SCM is a matter of registering an impl, not editing this class.
-        WorkspaceInitializationHook hook = initializationHooks.get(request.kind());
-        if (hook != null) {
-            hook.initializeAsync(workspace.getId());
-        }
+        eventPublisher.publishEvent(new WorkspaceCreatedEvent(workspace.getId(), request.kind()));
 
         return workspace;
     }
