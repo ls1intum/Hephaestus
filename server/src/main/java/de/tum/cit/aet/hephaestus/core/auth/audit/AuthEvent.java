@@ -121,6 +121,46 @@ public class AuthEvent {
         FAILURE,
     }
 
+    /**
+     * Factory used by {@link AuthEventLogger} — the only sanctioned construction path.
+     * Keeps the entity {@code @Getter}-only (append-only invariant) while allowing the
+     * logger to populate every field in one call.
+     */
+    public static AuthEvent create(
+        Long id,
+        Instant occurredAt,
+        EventType eventType,
+        Result result,
+        @Nullable Long accountId,
+        @Nullable Long actingAccountId,
+        @Nullable String failureReason,
+        @Nullable Long gitProviderId,
+        @Nullable Long workspaceId,
+        @Nullable Long identityLinkId,
+        String ipInet,
+        @Nullable String userAgent,
+        @Nullable UUID requestId,
+        @Nullable byte[] sessionHash,
+        @Nullable String details
+    ) {
+        AuthEvent e = new AuthEvent();
+        e.id = new Id(id, occurredAt);
+        e.eventType = eventType;
+        e.result = result;
+        e.accountId = accountId;
+        e.actingAccountId = actingAccountId;
+        e.failureReason = failureReason;
+        e.gitProviderId = gitProviderId;
+        e.workspaceId = workspaceId;
+        e.identityLinkId = identityLinkId;
+        e.ipInet = ipInet;
+        e.userAgent = userAgent;
+        e.requestId = requestId;
+        e.sessionHash = sessionHash;
+        e.details = details;
+        return e;
+    }
+
     @Embeddable
     @Getter
     @NoArgsConstructor

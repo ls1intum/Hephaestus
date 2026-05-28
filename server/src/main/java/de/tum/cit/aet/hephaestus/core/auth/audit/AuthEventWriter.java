@@ -1,0 +1,85 @@
+package de.tum.cit.aet.hephaestus.core.auth.audit;
+
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+/**
+ * Transactional sink for {@link AuthEvent} rows. Separate bean (not a method on
+ * {@link AuthEventLogger}) so the {@code REQUIRES_NEW} boundary is honoured — a
+ * self-invocation from {@code AuthEventLogger.Draft} would bypass the proxy.
+ *
+ * <p>Allocates the id from the sequence, captures request IP + user agent, persists.
+ * Swallows its own failures: an audit write must never break the business flow.
+ */
+@Component
+public class AuthEventWriter {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthEventWriter.class);
+
+    private final AuthEventRepository repository;
+    private final AuthEventSequence sequence;
+    private final Clock clock;
+
+    public AuthEventWriter(AuthEventRepository repository, AuthEventSequence sequence, Clock clock) {
+        this.repository = repository;
+        this.sequence = sequence;
+        this.clock = clock;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void write(AuthEventLogger.AuthEventData data) {
+        try {
+            AuthEvent event = AuthEvent.create(
+                sequence.next(),
+                clock.instant(),
+                data.type(),
+                data.result(),
+                data.accountId(),
+                data.actingAccountId(),
+                data.failureReason(),
+                data.gitProviderId(),
+                data.workspaceId(),
+                data.identityLinkId(),
+                captureIp(),
+                captureUserAgent(),
+                /* requestId */ null,
+                /* sessionHash */ null,
+                data.details()
+            );
+            repository.save(event);
+        } catch (RuntimeException e) {
+            log.error("auth.audit: failed to persist {} event", data.type(), e);
+        }
+    }
+
+    private static String captureIp() {
+        HttpServletRequest req = currentRequest();
+        return req == null ? "0.0.0.0" : req.getRemoteAddr();
+    }
+
+    @Nullable
+    private static String captureUserAgent() {
+        HttpServletRequest req = currentRequest();
+        if (req == null) {
+            return null;
+        }
+        String ua = req.getHeader("User-Agent");
+        return (ua != null && ua.length() > 512) ? ua.substring(0, 512) : ua;
+    }
+
+    @Nullable
+    private static HttpServletRequest currentRequest() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
+            return attrs.getRequest();
+        }
+        return null;
+    }
+}
