@@ -87,6 +87,13 @@ spring:
                         user-info-uri: https://gitlab.lrz.de/api/v4/user
                         user-name-attribute: username
 
+    # RFC 9457 Problem Details for all framework-raised errors (ResponseStatusException,
+    # validation, etc.). Set explicitly so the contract survives a Boot upgrade. The
+    # core.exception.GlobalControllerAdvice supplies richer bodies for domain exceptions.
+    mvc:
+        problemdetails:
+            enabled: true
+
     # Disable Mustache template location check as we don't use Mustache templates
     mustache:
         check-template-location: false
