@@ -47,4 +47,23 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
         @Param("kind") IntegrationKind kind,
         @Param("state") IntegrationState state
     );
+
+    /**
+     * All ACTIVE Connections in a given {@code family}, across workspaces. Used by the
+     * core.auth composite ClientRegistrationRepository to materialize workspace-scoped
+     * OIDC login providers (family IDENTITY) into Spring ClientRegistrations. Joined fetch
+     * on workspace avoids N+1 when building the registration ids.
+     *
+     * <p>Intentionally cross-tenant: the login picker enumerates providers across the
+     * workspace the user is signing in to; per-workspace scoping happens one layer up via
+     * the registration-id naming ({@code gl-ws-{connectionId}}).
+     */
+    @WorkspaceAgnostic("core.auth materializes IDENTITY-family Connections into login ClientRegistrations")
+    @Query(
+        "SELECT c FROM Connection c JOIN FETCH c.workspace WHERE c.kind IN :kinds AND c.state = :state"
+    )
+    List<Connection> findByKindInAndStateWithWorkspace(
+        @Param("kinds") List<IntegrationKind> kinds,
+        @Param("state") IntegrationState state
+    );
 }

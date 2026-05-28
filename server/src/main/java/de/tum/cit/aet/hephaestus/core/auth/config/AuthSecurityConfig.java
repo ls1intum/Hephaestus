@@ -6,19 +6,27 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.LoginClientRegistrationRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.RegistrationToGitProviderResolver;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import java.time.Clock;
 import java.security.SecureRandom;
 import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientPropertiesMapper;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -48,9 +56,28 @@ import org.springframework.security.web.SecurityFilterChain;
  * {@code RevocationAwareJwtDecoder} and Keycloak is deleted.
  */
 @Configuration
+@EnableConfigurationProperties(OAuth2ClientProperties.class)
 public class AuthSecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthSecurityConfig.class);
+
+    /**
+     * Composite registration repository: env-configured defaults (github, gitlab-lrz)
+     * overlaid with workspace-scoped OIDC login Connections (family IDENTITY). Replaces
+     * Spring Boot's auto-configured InMemoryClientRegistrationRepository (which backs off
+     * once this bean is present).
+     */
+    @Bean
+    public LoginClientRegistrationRepository clientRegistrationRepository(
+        OAuth2ClientProperties properties,
+        ConnectionRepository connectionRepository,
+        CredentialBundleConverter credentialConverter
+    ) {
+        java.util.List<ClientRegistration> registrations = new java.util.ArrayList<>(
+            new OAuth2ClientPropertiesMapper(properties).asClientRegistrations().values()
+        );
+        return new LoginClientRegistrationRepository(registrations, connectionRepository, credentialConverter);
+    }
 
     @Bean
     public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(AuthProperties properties) {
