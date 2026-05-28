@@ -45,22 +45,38 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         /**
          * No cyclic dependencies between bounded contexts.
          *
-         * <p>The integration framework and the modules that share its persistence model
-         * form a single bounded context — the SCM data platform. {@code Connection} rows
-         * are owned by {@code Workspace}; the GitHub/GitLab workspace bridges operate on
-         * {@code Workspace}/{@code RepositoryToMonitor} entities; {@code ActivityEvent},
-         * leaderboard ranking, and profile aggregation all reference the shared
-         * {@code integration.scm.domain.*} JPA entities (User, Repository, PullRequest,
-         * Team). These packages are bidirectionally coupled at the entity layer by design
-         * — separating them would mean relocating the {@code Workspace} aggregate, which
-         * is neither desirable nor in scope.
+         * <p>Six top-level packages fold into one {@code scm-data-platform} slice. The set
+         * is derived from the actual cycle paths, and each member is here for a specific,
+         * documented reason — not a blanket "they share entities" claim:
          *
-         * <p>This rule therefore treats that data platform as ONE slice and asserts the
-         * top-level module graph (platform + agent + mentor + practices + account +
-         * notification + gamification + …) is acyclic. There is no frozen baseline: the
-         * rule passes cleanly. Finer boundaries inside the platform are policed by
-         * {@code ModuleBoundaryTest}, {@code CrossCuttingModuleBoundaryTest},
-         * {@code IntegrationCoreVendorNeutralityTest}, and {@code ExternalVendorImportAllowlistTest}.
+         * <ul>
+         *   <li><b>integration ↔ workspace</b> — the one irreducible cycle. {@code Connection}
+         *       (integration.core) and {@code Workspace} are a single aggregate: Connection
+         *       rows are workspace-owned and the GitHub/GitLab workspace bridges mutate
+         *       {@code Workspace}/{@code RepositoryToMonitor}. Splitting them means relocating
+         *       the Workspace aggregate — wrong and out of scope.</li>
+         *   <li><b>activity, leaderboard</b> — folded by a structural tension between two rules,
+         *       NOT entity sharing. {@code ExternalVendorImportAllowlistTest} forces vendor code
+         *       (the Slack leaderboard publisher, the GitHub Projects-v2 activity listener) to
+         *       live inside {@code integration}; that bridge code legitimately reads feature data
+         *       (the leaderboard digest, the activity write SPI), giving {@code integration →
+         *       leaderboard} and {@code integration → activity}. With the normal {@code feature →
+         *       integration} direction this is a cycle no relocation removes — the vendor code can
+         *       neither leave integration (allowlist) nor stop reading feature data (its job). The
+         *       only escapes are a neutral cross-module event bus or per-sub-package slicing, both
+         *       larger dedicated changes tracked as follow-ups.</li>
+         *   <li><b>config, profile</b> — transitive collateral of the single {@code integration →
+         *       leaderboard} edge ({@code config → integration → leaderboard → config};
+         *       {@code profile → integration → leaderboard → profile}). They leave this slice
+         *       automatically once that edge is broken.</li>
+         * </ul>
+         *
+         * <p>No frozen baseline — the rule passes cleanly and still fails on any NEW cycle that
+         * pulls a genuinely-independent module (agent, mentor, practices, account, notification,
+         * achievement, analytics, …) into the platform or into each other. Finer boundaries inside
+         * the platform stay policed by {@code ModuleBoundaryTest},
+         * {@code CrossCuttingModuleBoundaryTest}, {@code IntegrationCoreVendorNeutralityTest}, and
+         * {@code ExternalVendorImportAllowlistTest}.
          */
         @Test
         void noCyclesBetweenModules() {

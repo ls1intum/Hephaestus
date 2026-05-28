@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.config;
+package de.tum.cit.aet.hephaestus.integration.core.graphql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

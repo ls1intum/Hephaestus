@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.config;
+package de.tum.cit.aet.hephaestus.integration.core.graphql;
 
 import java.io.IOException;
 import java.io.InputStream;

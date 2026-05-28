@@ -32,8 +32,6 @@
         "workspace::spi",
         "workspace::events",
         "workspace::dto",
-        // GraphQL config moved from cross-cutting config; FragmentMergingDocumentSource lives there.
-        "config",
         // Provider availability gated by FeatureFlagService.
         "feature",
     }
