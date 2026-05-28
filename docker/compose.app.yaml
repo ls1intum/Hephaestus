@@ -5,10 +5,6 @@ services:
       APPLICATION_VERSION: ${IMAGE_TAG}
       APPLICATION_CLIENT_URL: https://${APP_HOSTNAME}
       APPLICATION_SERVER_URL: https://${APP_HOSTNAME}/api
-      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
-      KEYCLOAK_REALM: hephaestus
-      KEYCLOAK_CLIENT_ID: hephaestus
-      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN}
       # Imprint/privacy source. Leave unset and bind-mount a host directory
       # onto /usr/share/nginx/html/legal-overrides for forks. Use "tumaet" only
       # for the canonical AET deployment. See docs/admin/legal-pages.mdx.
@@ -109,12 +105,13 @@ services:
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       NATS_SERVER: nats://nats-server:4222
-      KEYCLOAK_URL: https://${APP_HOSTNAME}/keycloak
-      KEYCLOAK_REALM: hephaestus
-      # Internal base URL (includes /keycloak) for container-to-container JWKS fetches
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/keycloak
-      KEYCLOAK_CLIENT_ID: hephaestus-confidential
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}
+      # Auth (Hephaestus-native; ADR 0017). State-cookie key MUST be base64 32-byte AES.
+      HEPHAESTUS_AUTH_ISSUER: https://${APP_HOSTNAME}
+      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
+      GITLAB_LRZ_OAUTH_CLIENT_ID: ${GITLAB_LRZ_OAUTH_CLIENT_ID:-}
+      GITLAB_LRZ_OAUTH_CLIENT_SECRET: ${GITLAB_LRZ_OAUTH_CLIENT_SECRET:-}
       GH_APP_ID: ${GH_APP_ID}
       GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY}
       GH_APP_PRIVATE_KEY_LOCATION: ${GH_APP_PRIVATE_KEY_LOCATION:-}

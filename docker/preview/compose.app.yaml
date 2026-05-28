@@ -29,7 +29,7 @@
 #
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
-#   - keycloak: Authentication
+#   (auth is Hephaestus-native — no Keycloak; ADR 0017)
 #
 # IMPORTANT: This preview stack does not validate the full GitLab practice-review
 # rollout by default. GitLab IdP, sandbox execution, git checkout, and agent job
@@ -203,12 +203,13 @@ services:
       NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
       # Shared Keycloak
       # Public URL for issuer validation (must match token's iss claim)
-      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
-      KEYCLOAK_REALM: hephaestus
-      # Internal URL for direct container-to-container JWKS fetches (no /keycloak - Keycloak serves at root)
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
-      KEYCLOAK_CLIENT_ID: hephaestus-confidential
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
+      # Auth (Hephaestus-native; ADR 0017).
+      HEPHAESTUS_AUTH_ISSUER: https://${PREVIEW_DOMAIN:?Required}
+      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Required}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
+      GITLAB_LRZ_OAUTH_CLIENT_ID: ${GITLAB_LRZ_OAUTH_CLIENT_ID:-}
+      GITLAB_LRZ_OAUTH_CLIENT_SECRET: ${GITLAB_LRZ_OAUTH_CLIENT_SECRET:-}
       # GitHub integration
       GH_APP_ID: ${GH_APP_ID:?Required}
       GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY:?Required}
@@ -272,10 +273,6 @@ services:
       # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
       APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
       # Shared Keycloak
-      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
-      KEYCLOAK_REALM: hephaestus
-      KEYCLOAK_CLIENT_ID: hephaestus
-      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-true}
       # Optional
       SENTRY_ENVIRONMENT: preview
