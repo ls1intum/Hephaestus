@@ -607,6 +607,15 @@ spring:
             # never needs to parse compose.yaml.
             enabled: false
 
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    # Pair jwk-set-uri with issuer-uri so the decoder is lazy: it skips the startup
+                    # discovery ping, so a boot before Keycloak is ready doesn't fail and auth
+                    # self-heals on first token use (iss is still validated against issuer-uri).
+                    jwk-set-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus/protocol/openid-connect/certs
+
 hephaestus:
     sandbox:
         # On by default for local dev. Boots without Docker or an LLM key (image pull is
