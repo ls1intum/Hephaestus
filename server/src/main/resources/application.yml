@@ -19,7 +19,7 @@ spring:
     datasource:
         url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/hephaestus
         username: ${DB_USERNAME:root}
-        password: ${DB_PASSWORD:}
+        password: ${DB_PASSWORD:root}
         hikari:
             connection-timeout: 45000
             idle-timeout: 600000
