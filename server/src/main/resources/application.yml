@@ -607,6 +607,12 @@ spring:
             # never needs to parse compose.yaml.
             enabled: false
 
+hephaestus:
+    sandbox:
+        # On by default for local dev. Boots without Docker or an LLM key (image pull is
+        # skipped/lazy); workspaces supply provider credentials at runtime, stored in the DB.
+        enabled: ${SANDBOX_ENABLED:true}
+
 management:
     endpoints:
         web:
