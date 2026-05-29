@@ -90,6 +90,12 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
 
     @AfterEach
     void tearDown() throws Exception {
+        // The column-DROP is the FIRST action and the system-property restore is in the finally, so
+        // a DDL failure can no longer skip the property restore (it always runs) and the drop is no
+        // longer ordered after a step that could throw before it. Previously both shared one
+        // try/finally where the DROP sat in the try guarding only the property restore; any earlier
+        // throw inside that try left the legacy columns on the shared schema until the class-level
+        // @DirtiesContext recycled the context — polluting any sibling test that ran in between.
         try {
             // NOTE: account_login is a live current column — do NOT drop it here.
             executeDdl(
@@ -102,11 +108,15 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
                     "DROP COLUMN IF EXISTS gitlab_webhook_id"
             );
         } finally {
-            if (savedSystemProperty == null) {
-                System.clearProperty(SYSTEM_PROPERTY);
-            } else {
-                System.setProperty(SYSTEM_PROPERTY, savedSystemProperty);
-            }
+            restoreSystemProperty();
+        }
+    }
+
+    private void restoreSystemProperty() {
+        if (savedSystemProperty == null) {
+            System.clearProperty(SYSTEM_PROPERTY);
+        } else {
+            System.setProperty(SYSTEM_PROPERTY, savedSystemProperty);
         }
     }
 
@@ -151,6 +161,13 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         assertThat(row.credentialBlob()[0])
             .as("v2 format version byte")
             .isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
+        // Prove a real rewrap happened rather than a passthrough store of the legacy bytes: the
+        // persisted v2 blob must NOT be byte-equal to the legacy v1 ciphertext. (Distinct formats —
+        // v1 is the ENC:base64 string, v2 is the binary FORMAT_VERSION_V2 envelope under the row's
+        // AAD — so equality here would mean the migration copied bytes blindly.)
+        assertThat(row.credentialBlob())
+            .as("v2 blob is a fresh AAD-bound rewrap, not a copy of the legacy v1 ciphertext")
+            .isNotEqualTo(legacyEncryptedPat.getBytes(StandardCharsets.UTF_8));
 
         // Decrypt with the production converter under the row's AAD — proves the
         // customChange writes blobs the running app can read.

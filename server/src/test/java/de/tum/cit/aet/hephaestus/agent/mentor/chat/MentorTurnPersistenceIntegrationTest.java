@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
@@ -40,6 +41,12 @@ import tools.jackson.databind.node.ObjectNode;
  * reaper sweep.
  */
 @TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
+// This class performs raw schema DDL against the SHARED singleton Testcontainer in @BeforeEach:
+// it DROPs and re-ADDs chk_chat_message_status and creates a partial unique index on chat_message.
+// Those mutations survive on the shared schema and would pollute any sibling class that touches
+// chat_message (same bug class fixed in WorkspaceConnectionBackfillChangeIntegrationTest). Recycle
+// the context after this class so ddl-auto rebuilds a clean schema for everyone after us.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
