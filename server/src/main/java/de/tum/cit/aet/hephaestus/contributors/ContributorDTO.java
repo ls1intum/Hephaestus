@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.contributors;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Data transfer object representing a GitHub contributor.

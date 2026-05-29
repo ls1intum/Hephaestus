@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Audit-log entry returned by {@code GET /api/v1/workspaces/{workspaceId}/connections/{id}/audit}.

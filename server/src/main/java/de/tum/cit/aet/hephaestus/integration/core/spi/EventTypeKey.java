@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Two-axis key for the unified {@code IntegrationMessageHandlerRegistry}.

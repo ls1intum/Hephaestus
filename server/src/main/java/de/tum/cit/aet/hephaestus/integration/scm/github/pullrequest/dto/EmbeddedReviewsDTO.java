@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.Gi
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for embedded reviews fetched inline with pull requests.

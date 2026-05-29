@@ -7,11 +7,11 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -198,8 +198,7 @@ public class GitLabGraphQlClientProvider {
     }
 
     /** Gets the rate limit reset time. */
-    @Nullable
-    public java.time.Instant getRateLimitResetAt(Long scopeId) {
+    public java.time.@Nullable Instant getRateLimitResetAt(Long scopeId) {
         return rateLimitTracker.getResetAt(scopeId);
     }
 }

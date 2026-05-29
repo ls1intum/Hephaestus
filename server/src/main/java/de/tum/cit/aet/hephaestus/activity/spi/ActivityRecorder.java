@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Narrow seam through which non-{@code activity} modules append rows to the activity

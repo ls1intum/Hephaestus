@@ -12,7 +12,7 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Domain DTO for GitHub Projects V2 status updates.
@@ -47,8 +47,7 @@ public record GitHubProjectStatusUpdateDTO(
      *
      * @return the status enum value, or null if status is null or unrecognized
      */
-    @Nullable
-    public ProjectStatusUpdate.Status getStatusEnum() {
+    public ProjectStatusUpdate.@Nullable Status getStatusEnum() {
         if (status == null) {
             return null;
         }

@@ -14,10 +14,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

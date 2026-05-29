@@ -9,8 +9,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "Detailed information about a pull request")

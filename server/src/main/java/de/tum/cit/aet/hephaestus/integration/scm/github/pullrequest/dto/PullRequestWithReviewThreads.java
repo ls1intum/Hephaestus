@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.EmbeddedProjectItemsDTO;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Container for a Pull Request DTO with its embedded reviews, review threads, and project items.

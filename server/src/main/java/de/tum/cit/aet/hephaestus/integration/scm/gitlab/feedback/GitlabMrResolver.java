@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import java.time.Duration;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**

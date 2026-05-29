@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Information about a label from a repository")
 public record LabelInfoDTO(

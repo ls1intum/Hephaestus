@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequ
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for embedded review threads fetched inline with pull requests.

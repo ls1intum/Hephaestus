@@ -22,7 +22,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Entity
 @Table(
@@ -43,7 +43,7 @@ public class PullRequestReview extends BaseGitServiceEntity {
     // We handle dismissed in a separate field to keep the original state
     @NonNull
     @Enumerated(EnumType.STRING)
-    private PullRequestReview.State state;
+    private State state;
 
     private boolean isDismissed;
 

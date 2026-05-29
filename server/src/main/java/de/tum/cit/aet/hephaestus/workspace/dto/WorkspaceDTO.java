@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Complete workspace information including configuration and settings")
 public record WorkspaceDTO(

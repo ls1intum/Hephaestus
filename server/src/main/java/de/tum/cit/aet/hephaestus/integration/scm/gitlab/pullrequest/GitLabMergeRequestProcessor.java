@@ -34,11 +34,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -495,8 +495,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
      * Looks up the current state of an existing PR before processing a webhook event.
      * Returns null if the PR does not exist yet.
      */
-    @Nullable
-    private Issue.State getExistingState(GitLabMergeRequestEventDTO event, ProcessingContext context) {
+    private Issue.@Nullable State getExistingState(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         if (event.objectAttributes() == null || event.objectAttributes().iid() == null) {
             return null;
         }

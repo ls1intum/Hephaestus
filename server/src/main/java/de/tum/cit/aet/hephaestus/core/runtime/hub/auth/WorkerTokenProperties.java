@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
 
 import java.time.Duration;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.lang.Nullable;
 
 /**
  * Bound to {@code hephaestus.worker.hub.token.*}. JWK rotation: list every key (active + previous)

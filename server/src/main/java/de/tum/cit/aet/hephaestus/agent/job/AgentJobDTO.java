@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Agent job execution record (job_token intentionally omitted)")
 public record AgentJobDTO(

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.config;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.lang.Nullable;
 
 /**
  * Configuration properties for Keycloak identity provider integration.

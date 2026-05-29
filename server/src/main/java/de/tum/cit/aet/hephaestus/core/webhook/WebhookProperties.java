@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.webhook;
 
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.lang.Nullable;
 
 /**
  * Shared webhook configuration bound to {@code hephaestus.webhook.*}. The same {@code secret} is

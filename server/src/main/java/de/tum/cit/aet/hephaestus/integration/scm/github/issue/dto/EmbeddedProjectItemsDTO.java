@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjec
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for embedded project items fetched inline with issues/PRs.
@@ -134,7 +134,7 @@ public record EmbeddedProjectItemsDTO(
          */
         @Nullable
         public static EmbeddedProjectReference fromProjectV2(
-            @Nullable de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2 project
+            de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.@Nullable GHProjectV2 project
         ) {
             if (project == null || project.getId() == null) {
                 return null;

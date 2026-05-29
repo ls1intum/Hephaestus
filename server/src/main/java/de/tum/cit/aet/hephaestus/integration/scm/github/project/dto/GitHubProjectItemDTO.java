@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Domain DTO for GitHub Projects V2 items.
@@ -132,8 +132,7 @@ public record GitHubProjectItemDTO(
     /**
      * Get the content type as an enum.
      */
-    @Nullable
-    public ProjectItem.ContentType getContentTypeEnum() {
+    public ProjectItem.@Nullable ContentType getContentTypeEnum() {
         if (contentType == null) {
             return null;
         }

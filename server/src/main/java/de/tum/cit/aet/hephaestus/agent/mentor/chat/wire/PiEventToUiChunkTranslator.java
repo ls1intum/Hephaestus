@@ -6,9 +6,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -420,8 +420,7 @@ public class PiEventToUiChunkTranslator {
      * {@code STOP} would mask provider regressions (e.g. an upstream change dropping
      * {@code aborted}) and the AI-SDK schema accepts {@code finishReason} as optional.
      */
-    @Nullable
-    static UIMessageChunk.FinishReason mapStopReason(@Nullable String piStopReason) {
+    static UIMessageChunk.@Nullable FinishReason mapStopReason(@Nullable String piStopReason) {
         if (piStopReason == null) return null;
         return switch (piStopReason) {
             case "stop" -> UIMessageChunk.FinishReason.STOP;

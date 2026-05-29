@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub installation_target webhook events.

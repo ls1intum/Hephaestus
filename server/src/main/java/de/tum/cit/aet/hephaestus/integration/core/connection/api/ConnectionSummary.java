@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.time.Instant;
 import java.util.Set;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wire shape returned by the {@code GET /api/v1/workspaces/{workspaceId}/connections}

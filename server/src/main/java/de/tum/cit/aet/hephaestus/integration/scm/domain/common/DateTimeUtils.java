@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
 import java.net.URI;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Utility class for null-safe type conversions commonly used in GitHub DTO mappings.

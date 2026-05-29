@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitLab project webhook events (project lifecycle changes).

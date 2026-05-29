@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.organization.dto.GitHubO
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub Projects V2 webhook events.

@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**

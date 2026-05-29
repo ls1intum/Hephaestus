@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Domain DTO for GitHub Discussions.

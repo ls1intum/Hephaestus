@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.profile.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Aggregated activity statistics with XP scores for a user profile")
 public record ProfileActivityStatsDTO(

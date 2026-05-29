@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabExceptionClassifier.Category;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabExceptionClassifier.ClassificationResult;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**

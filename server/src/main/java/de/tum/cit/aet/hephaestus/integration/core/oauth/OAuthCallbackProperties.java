@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.lang.Nullable;
 
 /**
  * Configuration for the OAuth callback ingress. Browsers get 302 redirects on both

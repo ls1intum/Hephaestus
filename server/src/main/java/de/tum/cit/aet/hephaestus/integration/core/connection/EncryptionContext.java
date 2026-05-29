@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * AES-GCM Additional Authenticated Data context bound to a single {@link Connection}

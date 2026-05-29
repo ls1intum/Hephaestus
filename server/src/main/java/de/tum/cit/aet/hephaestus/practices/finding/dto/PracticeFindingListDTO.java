@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * List-view DTO for practice findings. Omits large text fields (guidance, reasoning)

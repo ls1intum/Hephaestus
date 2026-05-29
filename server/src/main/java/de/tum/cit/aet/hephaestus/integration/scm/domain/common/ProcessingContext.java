@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Unified context for processing git provider data from any source (sync or webhook).

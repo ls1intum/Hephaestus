@@ -28,10 +28,10 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -469,8 +469,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * Converts a GitHub API state reason string to Issue.StateReason enum.
      * Returns UNKNOWN for unrecognized values to preserve data integrity.
      */
-    @Nullable
-    private Issue.StateReason convertStateReason(String stateReason) {
+    private Issue.@Nullable StateReason convertStateReason(String stateReason) {
         if (stateReason == null) {
             return null;
         }

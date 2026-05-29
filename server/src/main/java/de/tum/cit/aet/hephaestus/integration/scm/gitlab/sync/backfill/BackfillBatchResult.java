@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Result of a single backfill batch (one pagination round) for a repository.

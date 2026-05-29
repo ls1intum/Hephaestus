@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** Per-kind webhook signature verification. */
 public interface WebhookSignatureVerifier {

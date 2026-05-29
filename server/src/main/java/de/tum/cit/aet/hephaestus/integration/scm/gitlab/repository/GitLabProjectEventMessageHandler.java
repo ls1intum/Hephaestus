@@ -226,8 +226,8 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
     /**
      * Extracts the parent group path from a project's path_with_namespace.
      */
-    @org.springframework.lang.Nullable
-    private static String extractGroupPath(@org.springframework.lang.Nullable String pathWithNamespace) {
+    @org.jspecify.annotations.Nullable
+    private static String extractGroupPath(@org.jspecify.annotations.Nullable String pathWithNamespace) {
         if (pathWithNamespace == null || pathWithNamespace.isBlank()) {
             return null;
         }

@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.mentor;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** Lightweight thread row for the list endpoint — no messages, no session_jsonl BYTEA. */
 @Schema(description = "Mentor chat thread summary (no messages).")

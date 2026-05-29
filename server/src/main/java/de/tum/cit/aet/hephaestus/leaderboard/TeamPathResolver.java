@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 /**

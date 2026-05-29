@@ -4,9 +4,9 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.lang.Nullable;
 
 /**
  * Bound to {@code hephaestus.worker.*}. {@code capacity.{review,mentor}Max} accept an integer or

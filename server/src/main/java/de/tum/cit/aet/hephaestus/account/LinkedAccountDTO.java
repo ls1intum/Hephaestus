@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.account;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Schema(description = "An identity provider account that can be linked to the user")
 public record LinkedAccountDTO(

@@ -5,8 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /** DTO for GitLab note webhook events ({@code object_kind: "note"}). */
 @JsonIgnoreProperties(ignoreUnknown = true)

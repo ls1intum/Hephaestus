@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.github;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**

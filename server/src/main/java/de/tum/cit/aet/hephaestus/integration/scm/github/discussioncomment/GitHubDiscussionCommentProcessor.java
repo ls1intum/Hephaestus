@@ -20,8 +20,8 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

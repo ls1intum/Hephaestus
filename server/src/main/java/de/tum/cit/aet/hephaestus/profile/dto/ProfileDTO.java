@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "User profile header: identity, league standing, contribution surface, XP")

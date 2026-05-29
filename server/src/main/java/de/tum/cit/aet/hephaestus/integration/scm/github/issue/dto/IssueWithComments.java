@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto;
 
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssue;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Container for an Issue DTO and its embedded comments and project items.

@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.workspace;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.context.properties.bind.Name;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**

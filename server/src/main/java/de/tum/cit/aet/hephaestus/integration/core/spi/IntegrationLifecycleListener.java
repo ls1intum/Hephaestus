@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-kind lifecycle hooks bridging vendor events to Connection state transitions

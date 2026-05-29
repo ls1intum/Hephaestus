@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Set;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Detailed information about a team including members, repositories, and labels")
 public record TeamInfoDTO(

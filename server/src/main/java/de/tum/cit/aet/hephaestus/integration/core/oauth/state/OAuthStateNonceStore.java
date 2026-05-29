@@ -50,7 +50,7 @@ public class OAuthStateNonceStore {
         long workspaceId,
         IntegrationKind kind,
         Instant issuedAt,
-        @org.springframework.lang.Nullable String codeVerifier
+        @org.jspecify.annotations.Nullable String codeVerifier
     ) {
         if (nonce == null || nonce.isEmpty()) {
             throw new IllegalArgumentException("nonce must be non-empty");
@@ -122,7 +122,7 @@ public class OAuthStateNonceStore {
             return new ConsumeResult(false, java.util.Optional.empty());
         }
 
-        public static ConsumeResult consumed(@org.springframework.lang.Nullable String verifier) {
+        public static ConsumeResult consumed(@org.jspecify.annotations.Nullable String verifier) {
             return new ConsumeResult(true, java.util.Optional.ofNullable(verifier));
         }
     }

@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.leaderboard.spi;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-workspace digest emitted by the weekly task; vendor adapters subscribe to publish.

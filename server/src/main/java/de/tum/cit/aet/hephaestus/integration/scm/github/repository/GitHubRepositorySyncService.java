@@ -29,11 +29,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHReposito
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 import java.time.Instant;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;

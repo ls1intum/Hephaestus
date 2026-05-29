@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto;
 
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitLab milestones used by both sync and webhook paths.

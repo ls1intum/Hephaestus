@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Anchor for an inline finding. Sealed so new variants force every consumer to handle

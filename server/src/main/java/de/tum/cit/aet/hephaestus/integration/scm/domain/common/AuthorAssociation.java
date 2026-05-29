@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 
 /**
  * How the author is associated with the repository.

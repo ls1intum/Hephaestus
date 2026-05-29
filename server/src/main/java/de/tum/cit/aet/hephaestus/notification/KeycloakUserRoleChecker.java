@@ -10,13 +10,13 @@ import jakarta.ws.rs.ProcessingException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.jspecify.annotations.NonNull;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 /**

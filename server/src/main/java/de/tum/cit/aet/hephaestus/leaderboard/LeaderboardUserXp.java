@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /** Immutable leaderboard XP + activity breakdown for a single user. Use {@link Builder} to hydrate from multiple projections. */
 public record LeaderboardUserXp(

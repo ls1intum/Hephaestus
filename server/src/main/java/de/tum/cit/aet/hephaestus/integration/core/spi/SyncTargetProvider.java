@@ -147,7 +147,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         String displayName,
         String accountLogin,
         Long installationId,
-        @org.springframework.lang.Nullable String serverUrl,
+        @org.jspecify.annotations.Nullable String serverUrl,
         List<SyncTarget> syncTargets,
         SyncContextProvider.SyncContext syncContext
     ) {}

@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPu
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub pull_request_review webhook events.

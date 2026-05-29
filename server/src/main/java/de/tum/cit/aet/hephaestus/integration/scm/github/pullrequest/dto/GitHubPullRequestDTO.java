@@ -26,7 +26,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Domain DTO for GitHub pull requests.

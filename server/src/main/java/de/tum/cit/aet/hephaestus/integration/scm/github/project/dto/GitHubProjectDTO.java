@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Domain DTO for GitHub Projects V2.

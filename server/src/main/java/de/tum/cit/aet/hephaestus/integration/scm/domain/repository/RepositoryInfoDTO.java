@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepositoryPermission;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Information about a git repository.

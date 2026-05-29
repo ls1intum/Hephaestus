@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.net.URI;
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inbound payload for {@code POST /api/v1/workspaces/{workspaceId}/connections}.

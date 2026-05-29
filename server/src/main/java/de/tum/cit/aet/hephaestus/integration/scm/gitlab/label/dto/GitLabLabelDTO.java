@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto;
 
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitLab labels from GraphQL sync responses.
