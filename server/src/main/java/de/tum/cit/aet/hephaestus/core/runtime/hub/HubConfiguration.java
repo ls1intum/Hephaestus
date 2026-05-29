@@ -11,11 +11,15 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistServic
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenProperties;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import tools.jackson.databind.ObjectMapper;
 
@@ -30,6 +34,8 @@ import tools.jackson.databind.ObjectMapper;
 @EnableWebSocket
 public class HubConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(HubConfiguration.class);
+
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(FrameCodec.class)
     FrameCodec frameCodec(ObjectMapper objectMapper) {
@@ -42,8 +48,22 @@ public class HubConfiguration {
     }
 
     @Bean
-    WorkerKeyRing workerKeyRing(WorkerTokenProperties properties) {
-        return WorkerKeyRing.fromConfig(properties);
+    WorkerKeyRing workerKeyRing(WorkerTokenProperties properties, Environment environment) {
+        WorkerKeyRing ring = WorkerKeyRing.fromConfig(properties);
+        if (ring.active().ephemeral()) {
+            // Ephemeral keys are fine for dev but unsafe in prod (worker reconnects across pod
+            // restarts must verify already-issued JWTs), so only the prod profile warns.
+            if (environment.acceptsProfiles(Profiles.of("prod"))) {
+                log.warn(
+                    "Worker JWT is using an EPHEMERAL signing key (kid={}). Configure a stable key via " +
+                        "hephaestus.worker.hub.token.keys[*].private-key for production.",
+                    ring.active().kid()
+                );
+            } else {
+                log.info("Worker JWT using ephemeral signing key (kid={}) — fine for dev.", ring.active().kid());
+            }
+        }
+        return ring;
     }
 
     @Bean

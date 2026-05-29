@@ -43,6 +43,25 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
     List<UserAchievement> findByUserId(@Param("userId") Long userId);
 
     /**
+     * Acquire a transaction-scoped advisory lock serializing achievement evaluation for one user.
+     *
+     * <p>Held until the surrounding transaction ends (auto-released on commit <em>or</em> rollback,
+     * so {@code @Retryable} re-acquires cleanly on each fresh-transaction attempt). Acquired before
+     * any read so the versioned {@link UserAchievement} row can't change under us — this is what
+     * prevents the {@code ObjectOptimisticLockingFailureException} (and the {@code HHH100503} batch
+     * aborts it caused). Cluster-wide, so it remains correct if the service is scaled out.
+     *
+     * <p>Uses the two-integer key space ({@code classId=1313}, the issue number, as a namespace) so
+     * it cannot collide with {@code UserRepository#acquireLoginLock}, which uses the single-bigint
+     * key space — the two spaces are disjoint in Postgres. The id is masked to 31 bits (rather than
+     * cast, which would throw on overflow); a collision would need two user ids 2^31 apart.
+     *
+     * @param userId the user whose achievement evaluation should be serialized
+     */
+    @Query(value = "SELECT pg_advisory_xact_lock(1313, CAST(:userId & 2147483647 AS integer))", nativeQuery = true)
+    void acquireUserLock(@Param("userId") long userId);
+
+    /**
      * Find a specific achievement unlock for a user.
      *
      * @param userId the user's ID

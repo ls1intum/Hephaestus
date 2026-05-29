@@ -58,7 +58,7 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
             return;
         }
 
-        log.info(
+        log.debug(
             "Received member event: action={}, userLogin={}, repoName={}",
             event.action(),
             sanitizeForLog(memberDto.login()),

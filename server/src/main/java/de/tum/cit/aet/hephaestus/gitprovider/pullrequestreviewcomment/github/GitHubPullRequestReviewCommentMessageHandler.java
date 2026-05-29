@@ -64,7 +64,7 @@ public class GitHubPullRequestReviewCommentMessageHandler
             return;
         }
 
-        log.info(
+        log.debug(
             "Received pull_request_review_comment event: action={}, prNumber={}, commentId={}, repoName={}",
             event.action(),
             prDto.number(),

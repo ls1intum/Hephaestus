@@ -110,7 +110,8 @@ public class AchievementRecalculationService {
                 try {
                     achievementService.checkAndUnlock(savedEvent);
                 } catch (ObjectOptimisticLockingFailureException e) {
-                    log.error(
+                    // Advisory lock + @Retryable should prevent this; a lost increment self-heals on the next event.
+                    log.warn(
                         "Optimistic locking conflict during recalculation (after retries exhausted) " +
                             "for user {}, eventId={}: {}. This event's progress increment was lost.",
                         LoggingUtils.sanitizeForLog(user.getLogin()),

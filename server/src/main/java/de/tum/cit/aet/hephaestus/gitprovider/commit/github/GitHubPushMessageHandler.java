@@ -103,7 +103,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             return;
         }
 
-        log.info(
+        log.debug(
             "Received push event: branch={}, commitCount={}, forced={}, repoName={}",
             getBranchName(event.ref()),
             event.commits().size(),

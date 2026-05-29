@@ -807,12 +807,14 @@ public class GitHubTeamSyncService {
             retryAttempt = 0;
         }
 
-        // Check for overflow
+        // edges vs totalCount; GitHub over-reports team.members.totalCount for inherited members,
+        // so a gap after full pagination (hasNextPage==false) is benign.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "teamMembers",
                 allMemberEdges.size(),
                 reportedTotalCount,
+                hasNextPage,
                 "teamSlug=" + teamSlug
             );
         }

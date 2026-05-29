@@ -76,7 +76,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         String accountLogin = account != null ? account.login() : null;
         Long installationId = installation.id();
 
-        log.info(
+        log.debug(
             "Received installation event: action={}, installationId={}, accountLogin={}",
             event.action(),
             installationId,

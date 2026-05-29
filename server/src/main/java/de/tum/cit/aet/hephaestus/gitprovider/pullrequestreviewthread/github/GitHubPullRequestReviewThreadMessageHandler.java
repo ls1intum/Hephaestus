@@ -65,7 +65,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
         // Thread ID is the first comment's database ID (see GitHubPullRequestReviewCommentSyncService)
         Long threadId = threadDto.getFirstCommentId();
 
-        log.info(
+        log.debug(
             "Received pull_request_review_thread event: action={}, prNumber={}, threadId={}, repoName={}",
             event.action(),
             prDto.number(),

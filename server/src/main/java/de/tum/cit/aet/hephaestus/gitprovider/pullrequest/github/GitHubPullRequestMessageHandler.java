@@ -51,7 +51,7 @@ public class GitHubPullRequestMessageHandler extends GitHubMessageHandler<GitHub
             return;
         }
 
-        log.info(
+        log.debug(
             "Received pull_request event: action={}, prNumber={}, repoName={}",
             event.action(),
             prDto.number(),

@@ -51,7 +51,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
             return;
         }
 
-        log.info(
+        log.debug(
             "Received label event: action={}, labelName={}, repoName={}",
             event.action(),
             sanitizeForLog(labelDto.name()),

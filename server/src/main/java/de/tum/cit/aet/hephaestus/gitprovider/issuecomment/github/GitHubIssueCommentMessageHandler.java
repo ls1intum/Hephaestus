@@ -66,7 +66,7 @@ public class GitHubIssueCommentMessageHandler extends GitHubMessageHandler<GitHu
             return;
         }
 
-        log.info(
+        log.debug(
             "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}, isPullRequest={}",
             event.action(),
             issueDto.number(),

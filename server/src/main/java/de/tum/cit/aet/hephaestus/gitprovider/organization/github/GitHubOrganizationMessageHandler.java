@@ -73,7 +73,7 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
             return;
         }
 
-        log.info(
+        log.debug(
             "Received organization event: action={}, orgId={}, orgLogin={}",
             event.action(),
             orgDto.id(),

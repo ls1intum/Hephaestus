@@ -277,6 +277,10 @@ public class GitHubIssueSyncService {
         }
 
         int totalIssuesSynced = 0;
+        // Raw nodes received across all pages — the apples-to-apples count for issues.totalCount.
+        // (totalIssuesSynced is post-filter: it omits skipped/unparseable nodes, so it would
+        // report a phantom gap even on a fully-paginated sync.)
+        int issuesReceived = 0;
         int totalCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
         int reportedTotalCount = -1;
@@ -415,6 +419,8 @@ public class GitHubIssueSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+
+                issuesReceived += connection.getNodes().size();
 
                 // Process the page within its own transaction to keep transactions short
                 final Long repoId = repositoryId;
@@ -567,11 +573,17 @@ public class GitHubIssueSyncService {
             }
         }
 
-        // Check for overflow: did we fetch fewer items than GitHub reported?
-        // Only meaningful during full sync — during incremental sync we intentionally fetch
-        // only recently-updated items, so fetchedCount < totalCount is expected by design.
+        // Full-sync only; compare raw nodes received (not the post-filter count) against totalCount.
+        // Stopped early = aborted OR hit the page cap (both leave pages unfetched).
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            GraphQlConnectionOverflowDetector.check("issues", totalIssuesSynced, reportedTotalCount, safeNameWithOwner);
+            boolean stoppedEarly = abortReason != null || pageCount >= MAX_PAGINATION_PAGES;
+            GraphQlConnectionOverflowDetector.checkPaginated(
+                "issues",
+                issuesReceived,
+                reportedTotalCount,
+                stoppedEarly,
+                safeNameWithOwner
+            );
         }
 
         // Fetch remaining comments for issues with >10 comments (using cursor for efficient continuation)

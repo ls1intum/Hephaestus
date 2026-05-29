@@ -58,7 +58,7 @@ public class GitLabSubgroupMessageHandler extends GitLabMessageHandler<GitLabSub
     @Override
     protected void handleEvent(GitLabSubgroupEventDTO event) {
         String safeFullPath = sanitizeForLog(event.fullPath());
-        log.info(
+        log.debug(
             "Received subgroup event: eventName={}, fullPath={}, groupId={}, parentGroupId={}",
             event.eventName(),
             safeFullPath,

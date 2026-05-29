@@ -51,7 +51,7 @@ public class GitHubIssueMessageHandler extends GitHubMessageHandler<GitHubIssueE
             return;
         }
 
-        log.info(
+        log.debug(
             "Received issue event: action={}, issueNumber={}, repoName={}",
             event.action(),
             issueDto.number(),
