@@ -69,8 +69,8 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/workspace.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("workspace").get("slug").asText()).isEqualTo("acme");
-        assertThat(root.get("workspace").get("displayName").asText()).isEqualTo("Acme");
+        assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
+        assertThat(root.get("workspace").get("displayName").asString()).isEqualTo("Acme");
         assertThat(root.get("recentSessions").isArray()).isTrue();
         assertThat(root.get("assignedIssues").isArray()).isTrue();
         assertThat(root.get("pendingReviewRequests").isArray()).isTrue();

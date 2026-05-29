@@ -189,7 +189,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         ChatMessage userMessage = chatMessageRepository.findById(cookie.userMessageId()).orElseThrow();
         assertThat(userMessage.getRole()).isEqualTo(ChatMessage.Role.USER);
-        assertThat(userMessage.getParts().get(0).path("text").asText()).isEqualTo("hello mentor");
+        assertThat(userMessage.getParts().get(0).path("text").asString()).isEqualTo("hello mentor");
     }
 
     @Test
@@ -300,8 +300,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.completed);
         JsonNode meta = assistant.getMetadata();
-        assertThat(meta.path("finishReason").asText()).isEqualTo("stop");
-        assertThat(meta.path("model").asText()).isEqualTo("openai/gpt-oss-120b");
+        assertThat(meta.path("finishReason").asString()).isEqualTo("stop");
+        assertThat(meta.path("model").asString()).isEqualTo("openai/gpt-oss-120b");
         // Nested wire shape — must match UIMessageChunk.MessageMetadata + webapp MessageMetadata
         // so a rehydrated thread renders identically to the live stream.
         assertThat(meta.path("usage").path("input").asLong()).isEqualTo(123);
@@ -309,7 +309,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(meta.path("usage").path("totalTokens").asLong()).isEqualTo(168);
         assertThat(meta.has("inputTokens")).as("flat keys retired").isFalse();
         assertThat(assistant.getParts().isArray()).isTrue();
-        assertThat(assistant.getParts().get(0).path("text").asText()).isEqualTo("Hello there!");
+        assertThat(assistant.getParts().get(0).path("text").asString()).isEqualTo("Hello there!");
     }
 
     @Test
@@ -412,7 +412,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(assistant.getMetadata().path("error").asText()).isEqualTo("upstream timeout");
+        assertThat(assistant.getMetadata().path("error").asString()).isEqualTo("upstream timeout");
     }
 
     @Test
@@ -449,7 +449,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // After the failed save attempt, the row in the DB still reflects the reaper's verdict.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(finalState.getMetadata().path("error").asText()).isEqualTo("server restart");
+        assertThat(finalState.getMetadata().path("error").asString()).isEqualTo("server restart");
     }
 
     @Test
@@ -470,7 +470,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(updatedSweep).isEqualTo(1);
         ChatMessage reaped = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(reaped.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(reaped.getMetadata().path("error").asText()).isEqualTo("server restart");
+        assertThat(reaped.getMetadata().path("error").asString()).isEqualTo("server restart");
     }
 
     @Test

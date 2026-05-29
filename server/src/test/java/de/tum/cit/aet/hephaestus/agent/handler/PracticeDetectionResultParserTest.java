@@ -314,7 +314,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(f.reasoning()).isEqualTo("Some reasoning");
             assertThat(f.guidance()).isEqualTo("Some guidance");
             assertThat(f.evidence()).isNotNull();
-            assertThat(f.evidence().get("key").asText()).isEqualTo("value");
+            assertThat(f.evidence().get("key").asString()).isEqualTo("value");
         }
 
         @Test

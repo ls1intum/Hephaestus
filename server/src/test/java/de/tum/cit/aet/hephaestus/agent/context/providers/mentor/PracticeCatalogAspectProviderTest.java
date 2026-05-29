@@ -58,13 +58,13 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/practice_catalog.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("workspace").get("slug").asText()).isEqualTo("acme");
+        assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
         assertThat(root.get("practices").isArray()).isTrue();
         assertThat(root.get("practices")).hasSize(1);
         JsonNode entry = root.get("practices").get(0);
-        assertThat(entry.get("slug").asText()).isEqualTo("error-state-handling");
-        assertThat(entry.get("displayName").asText()).isEqualTo("Error State Handling");
-        assertThat(entry.get("criteria").asText()).contains("Show an error view");
+        assertThat(entry.get("slug").asString()).isEqualTo("error-state-handling");
+        assertThat(entry.get("displayName").asString()).isEqualTo("Error State Handling");
+        assertThat(entry.get("criteria").asString()).contains("Show an error view");
         assertThat(entry.has("description")).isFalse();
     }
 }

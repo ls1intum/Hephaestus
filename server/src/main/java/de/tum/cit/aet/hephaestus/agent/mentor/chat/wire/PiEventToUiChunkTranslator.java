@@ -35,7 +35,7 @@ public class PiEventToUiChunkTranslator {
             log.debug("Skipping malformed Pi event (missing type): {}", piEvent);
             return List.of();
         }
-        String type = piEvent.get("type").asText();
+        String type = piEvent.get("type").asString();
         return switch (type) {
             case "message_start" -> handleMessageStart(piEvent, state);
             case "message_update" -> handleMessageUpdate(piEvent, state);
@@ -172,7 +172,7 @@ public class PiEventToUiChunkTranslator {
      * snapshot on {@code message_end.message.usage}, which is the authoritative source.
      */
     private List<UIMessageChunk> handleAssistantMessageEvent(JsonNode ame, JsonNode parent, TranslatorState state) {
-        String innerType = ame.get("type").asText();
+        String innerType = ame.get("type").asString();
         // Best-effort usage + model capture from `partial.usage` / `partial.model`. message_end
         // overwrites with the final snapshot. agent_end has no usage on the event itself.
         capturePartialUsage(ame.path("partial"), state);
@@ -245,8 +245,8 @@ public class PiEventToUiChunkTranslator {
         if (messageNode == null || messageNode.isMissingNode() || !messageNode.isObject()) {
             return;
         }
-        if (messageNode.has("model") && messageNode.get("model").isTextual()) {
-            state.observeModel(messageNode.get("model").asText());
+        if (messageNode.has("model") && messageNode.get("model").isString()) {
+            state.observeModel(messageNode.get("model").asString());
         }
         JsonNode usage = messageNode.path("usage");
         if (usage.isObject()) {
@@ -340,8 +340,8 @@ public class PiEventToUiChunkTranslator {
         JsonNode content = event.path("result").path("content");
         if (content.isArray() && !content.isEmpty()) {
             JsonNode first = content.get(0);
-            if (first.isObject() && first.path("text").isTextual()) {
-                return first.get("text").asText();
+            if (first.isObject() && first.path("text").isString()) {
+                return first.get("text").asString();
             }
         }
         return null;
@@ -459,7 +459,7 @@ public class PiEventToUiChunkTranslator {
             errorText = optionalString(event, "error");
         }
         if (errorText == null) {
-            errorText = event.get("type").asText();
+            errorText = event.get("type").asString();
         }
         // Close any open text/reasoning block before the terminal error chunk: the AI SDK
         // reducer crashes on an `error` chunk that follows an unmatched `*-start` (vercel/ai #11700).
@@ -480,7 +480,7 @@ public class PiEventToUiChunkTranslator {
     private static String optionalString(@Nullable JsonNode node, String field) {
         if (node == null || !node.has(field)) return null;
         JsonNode value = node.get(field);
-        if (value == null || value.isNull() || !value.isTextual()) return null;
-        return value.asText();
+        if (value == null || value.isNull() || !value.isString()) return null;
+        return value.asString();
     }
 }

@@ -208,11 +208,13 @@ class PracticeRunnerLiveLlmTest {
         for (int i = 0; i < findings.size(); i++) {
             JsonNode finding = findings.get(i);
             String tag = "finding[" + i + "]";
-            assertThat(finding.path("practiceSlug").asText()).as(tag + ".practiceSlug").isEqualTo("hardcoded-secrets");
-            assertThat(finding.path("verdict").asText())
+            assertThat(finding.path("practiceSlug").asString())
+                .as(tag + ".practiceSlug")
+                .isEqualTo("hardcoded-secrets");
+            assertThat(finding.path("verdict").asString())
                 .as(tag + ".verdict")
                 .isIn("POSITIVE", "NEGATIVE", "NOT_APPLICABLE");
-            assertThat(finding.path("severity").asText())
+            assertThat(finding.path("severity").asString())
                 .as(tag + ".severity")
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
             double confidence = finding.path("confidence").asDouble(-1.0);
@@ -227,8 +229,8 @@ class PracticeRunnerLiveLlmTest {
         boolean foundNegative = false;
         for (JsonNode finding : findings) {
             if (
-                "hardcoded-secrets".equals(finding.path("practiceSlug").asText()) &&
-                "NEGATIVE".equals(finding.path("verdict").asText())
+                "hardcoded-secrets".equals(finding.path("practiceSlug").asString()) &&
+                "NEGATIVE".equals(finding.path("verdict").asString())
             ) {
                 foundNegative = true;
                 break;

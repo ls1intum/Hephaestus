@@ -392,7 +392,7 @@ class PullRequestCommentPoster {
 
         JsonNode configSnapshot = job.getConfigSnapshot();
         if (configSnapshot != null && configSnapshot.has("model_name")) {
-            String modelName = configSnapshot.get("model_name").asText();
+            String modelName = configSnapshot.get("model_name").asString();
             if (!modelName.isBlank()) {
                 sb.append(" &middot; ").append(escapeHtml(modelName));
             }
@@ -432,7 +432,7 @@ class PullRequestCommentPoster {
         if (node == null || node.isNull()) {
             throw new JobDeliveryException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     @Nullable
@@ -444,7 +444,7 @@ class PullRequestCommentPoster {
         if (node == null || node.isNull()) {
             return null;
         }
-        return node.asText();
+        return node.asString();
     }
 
     static int requireMetadataInt(@Nullable JsonNode metadata, String field) {

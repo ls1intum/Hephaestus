@@ -132,7 +132,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             assertThat(files).containsKey("context/target/metadata.json");
             JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
             assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
-            assertThat(metadataJson.get("repository_full_name").asText()).isEqualTo("owner/repo");
+            assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadataJson.get("enriched").asBoolean()).isFalse();
         }
 
@@ -156,8 +156,8 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
             JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
             assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
-            assertThat(metadataJson.get("title").asText()).isEqualTo("Fix authentication bug");
-            assertThat(metadataJson.get("author").asText()).isEqualTo("testuser");
+            assertThat(metadataJson.get("title").asString()).isEqualTo("Fix authentication bug");
+            assertThat(metadataJson.get("author").asString()).isEqualTo("testuser");
             assertThat(metadataJson.get("additions").asInt()).isEqualTo(10);
         }
 
@@ -188,8 +188,8 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
             JsonNode comments = objectMapper.readTree(files.get("context/target/comments.json"));
             assertThat(comments).hasSize(2);
-            assertThat(comments.get(0).get("created_at").asText()).isEqualTo("2025-06-01T12:00:00Z");
-            assertThat(comments.get(0).get("author").asText()).isEqualTo("reviewer");
+            assertThat(comments.get(0).get("created_at").asString()).isEqualTo("2025-06-01T12:00:00Z");
+            assertThat(comments.get(0).get("author").asString()).isEqualTo("reviewer");
             assertThat(comments.get(1).has("author")).isFalse();
         }
 
@@ -213,7 +213,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
             JsonNode commentsJson = objectMapper.readTree(files.get("context/target/comments.json"));
             assertThat(commentsJson).hasSize(PullRequestContentProvider.MAX_COMMENTS);
-            assertThat(commentsJson.get(0).get("body").asText()).isEqualTo("Comment 100");
+            assertThat(commentsJson.get(0).get("body").asString()).isEqualTo("Comment 100");
         }
     }
 

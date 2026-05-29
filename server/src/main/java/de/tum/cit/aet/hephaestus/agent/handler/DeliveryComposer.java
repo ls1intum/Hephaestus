@@ -397,8 +397,8 @@ class DeliveryComposer {
         JsonNode first = locations.get(0);
         if (!first.isObject()) return null;
         JsonNode pathNode = first.get("path");
-        if (pathNode == null || !pathNode.isTextual()) return null;
-        String path = pathNode.asText();
+        if (pathNode == null || !pathNode.isString()) return null;
+        String path = pathNode.asString();
         JsonNode startLineNode = first.get("startLine");
         if (startLineNode != null && startLineNode.isNumber()) {
             return path + ":" + startLineNode.asInt();
@@ -412,7 +412,7 @@ class DeliveryComposer {
         if (evidence == null || evidence.isNull()) return null;
         JsonNode snippets = evidence.get("snippets");
         if (snippets == null || !snippets.isArray() || snippets.isEmpty()) return null;
-        String snippet = snippets.get(0).asText();
+        String snippet = snippets.get(0).asString();
         return (snippet != null && !snippet.isBlank()) ? snippet.strip() : null;
     }
 
@@ -484,7 +484,7 @@ class DeliveryComposer {
             if (!loc.isObject()) continue;
             JsonNode pathNode = loc.get("path");
             JsonNode startLineNode = loc.get("startLine");
-            if (pathNode == null || !pathNode.isTextual()) continue;
+            if (pathNode == null || !pathNode.isString()) continue;
             if (startLineNode == null || !startLineNode.isNumber()) continue;
             int startLine = startLineNode.asInt();
             if (startLine <= 0) continue;
@@ -497,7 +497,7 @@ class DeliveryComposer {
 
             String body = composeDiffNoteBody(f);
             if (body != null && !body.isBlank()) {
-                notes.add(new DiffNote(pathNode.asText(), startLine, endLine, body));
+                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body));
             }
         }
 

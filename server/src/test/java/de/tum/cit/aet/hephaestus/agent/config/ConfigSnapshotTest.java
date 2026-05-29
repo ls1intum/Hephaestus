@@ -134,7 +134,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
             assertThat(json.has("configId")).isTrue();
             assertThat(json.get("configId").asLong()).isEqualTo(42L);
             assertThat(json.has("configName")).isTrue();
-            assertThat(json.get("configName").asText()).isEqualTo("my-agent");
+            assertThat(json.get("configName").asString()).isEqualTo("my-agent");
         }
 
         @Test

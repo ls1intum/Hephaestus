@@ -71,7 +71,7 @@ class UserAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/user.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("user").get("login").asText()).isEqualTo("octo");
+        assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
         assertThat(root.get("thisWeek").get("prsOpen").asLong()).isEqualTo(2L);
         assertThat(root.get("thisWeek").get("prsMerged").asLong()).isEqualTo(5L);
         assertThat(root.get("lastWeek").get("prsMerged").asLong()).isEqualTo(3L);

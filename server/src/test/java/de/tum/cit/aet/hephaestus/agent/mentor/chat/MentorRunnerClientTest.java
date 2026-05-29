@@ -76,7 +76,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
         // Drain the sent frame and respond with a matching id.
         JsonNode request = sandbox.takeFrame();
         long id = request.get("id").asLong();
-        assertThat(request.get("method").asText()).isEqualTo("hello");
+        assertThat(request.get("method").asString()).isEqualTo("hello");
 
         sandbox.pushFrame(responseOf(id, mapper.createObjectNode().put("protocolVersion", 1)));
 
@@ -134,7 +134,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(notification);
 
         assertThat(events).hasSize(1);
-        assertThat(events.get(0).get("type").asText()).isEqualTo("runner_ready");
+        assertThat(events.get(0).get("type").asString()).isEqualTo("runner_ready");
     }
 
     @Test
@@ -174,8 +174,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(callback);
 
         JsonNode response = sandbox.takeFrame();
-        assertThat(response.get("id").isTextual()).as("id must remain a string").isTrue();
-        assertThat(response.get("id").asText()).isEqualTo(callbackId);
+        assertThat(response.get("id").isString()).as("id must remain a string").isTrue();
+        assertThat(response.get("id").asString()).isEqualTo(callbackId);
         assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
     }
 
@@ -191,8 +191,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(callback);
 
         JsonNode response = sandbox.takeFrame();
-        assertThat(response.get("id").isTextual()).isTrue();
-        assertThat(response.get("id").asText()).isEqualTo(callbackId);
+        assertThat(response.get("id").isString()).isTrue();
+        assertThat(response.get("id").asString()).isEqualTo(callbackId);
         assertThat(response.get("error").get("code").asInt()).isEqualTo(-32600);
     }
 

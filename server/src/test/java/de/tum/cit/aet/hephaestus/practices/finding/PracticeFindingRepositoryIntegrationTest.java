@@ -198,7 +198,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
             assertThat(found.getEvidence()).isNotNull();
-            assertThat(found.getEvidence().get("files").get(0).asText()).isEqualTo("src/Main.java");
+            assertThat(found.getEvidence().get("files").get(0).asString()).isEqualTo("src/Main.java");
             assertThat(found.getEvidence().get("diff_lines").asInt()).isEqualTo(42);
         }
     }

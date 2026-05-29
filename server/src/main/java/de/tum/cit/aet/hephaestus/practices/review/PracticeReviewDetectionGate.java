@@ -258,7 +258,7 @@ public class PracticeReviewDetectionGate {
             return false;
         }
         for (JsonNode node : triggerEvents) {
-            if (eventName.equals(node.asText())) {
+            if (eventName.equals(node.asString())) {
                 return true;
             }
         }

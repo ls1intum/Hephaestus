@@ -46,12 +46,12 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
         String eventType;
         if (event != null && event.isObject()) {
             JsonNode chan = event.get("channel");
-            if (chan != null && chan.isTextual()) {
-                channelId = sanitizeToken(chan.asText());
+            if (chan != null && chan.isString()) {
+                channelId = sanitizeToken(chan.asString());
             }
             JsonNode evType = event.get("type");
             eventType =
-                evType != null && evType.isTextual() ? sanitizeToken(evType.asText()) : textOrUnknown(payload, "type");
+                evType != null && evType.isString() ? sanitizeToken(evType.asString()) : textOrUnknown(payload, "type");
         } else {
             eventType = textOrUnknown(payload, "type");
         }
@@ -70,8 +70,8 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
     private static String textOrUnknown(JsonNode root, String field) {
         if (root == null) return UNKNOWN;
         JsonNode n = root.get(field);
-        if (n == null || !n.isTextual() || n.asText().isBlank()) return UNKNOWN;
-        return sanitizeToken(n.asText());
+        if (n == null || !n.isString() || n.asString().isBlank()) return UNKNOWN;
+        return sanitizeToken(n.asString());
     }
 
     private static String sanitizeToken(String value) {

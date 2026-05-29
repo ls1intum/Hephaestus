@@ -78,7 +78,7 @@ public class PiResultParser {
             if (totalCalls <= 0) {
                 return null;
             }
-            String model = usageNode.path("model").isTextual() ? usageNode.path("model").asText() : null;
+            String model = usageNode.path("model").isString() ? usageNode.path("model").asString() : null;
             Integer inputTokens = usageNode.has("inputTokens") ? usageNode.path("inputTokens").asInt(0) : null;
             Integer outputTokens = usageNode.has("outputTokens") ? usageNode.path("outputTokens").asInt(0) : null;
             Integer cacheReadTokens = usageNode.has("cacheReadTokens")

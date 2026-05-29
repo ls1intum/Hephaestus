@@ -58,9 +58,9 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     @MethodSource("gitlabFixtures")
     void gitlabFixtureSubjectMatchesConsumerPrefix(Path fixture) throws IOException {
         JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
-        String pathWithNamespace = payload.path("project").path("path_with_namespace").asText("");
+        String pathWithNamespace = payload.path("project").path("path_with_namespace").asString("");
         if (pathWithNamespace.isEmpty()) {
-            pathWithNamespace = payload.path("path_with_namespace").asText("");
+            pathWithNamespace = payload.path("path_with_namespace").asString("");
         }
         if (!pathWithNamespace.contains("/")) {
             return;
@@ -77,8 +77,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     void githubFixtureSubjectMatchesConsumerPrefix(Path fixture) throws IOException {
         JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
         JsonNode repository = payload.path("repository");
-        String owner = repository.path("owner").path("login").asText("");
-        String repo = repository.path("name").asText("");
+        String owner = repository.path("owner").path("login").asString("");
+        String repo = repository.path("name").asString("");
         if (owner.isEmpty() || repo.isEmpty()) {
             return;
         }

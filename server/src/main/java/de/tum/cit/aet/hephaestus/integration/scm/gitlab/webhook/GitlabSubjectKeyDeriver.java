@@ -135,7 +135,7 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
     private static String textOrEmpty(JsonNode node, String field) {
         if (node == null || node.isMissingNode() || node.isNull()) return "";
         JsonNode v = node.path(field);
-        return v.isMissingNode() || v.isNull() ? "" : v.asText("");
+        return v.isMissingNode() || v.isNull() ? "" : v.asString("");
     }
 
     private static String firstNonBlank(String... values) {

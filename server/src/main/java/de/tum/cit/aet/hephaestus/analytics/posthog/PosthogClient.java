@@ -114,10 +114,10 @@ public class PosthogClient {
 
     private String extractPersonId(JsonNode personNode) {
         if (personNode.hasNonNull("uuid")) {
-            return personNode.get("uuid").asText();
+            return personNode.get("uuid").asString();
         }
         if (personNode.hasNonNull("id")) {
-            return personNode.get("id").asText();
+            return personNode.get("id").asString();
         }
         return null;
     }
