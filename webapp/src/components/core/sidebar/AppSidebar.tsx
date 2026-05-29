@@ -21,6 +21,7 @@ import { NavDashboards } from "./NavDashboards";
 import { NavFooter } from "./NavFooter";
 import { NavMentor } from "./NavMentor";
 import { NavMentorThreads } from "./NavMentorThreads";
+import { NavSuperAdmin } from "./NavSuperAdmin";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export type SidebarContext = "main" | "mentor";
@@ -28,6 +29,8 @@ export type SidebarContext = "main" | "mentor";
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	username: string;
 	isAdmin: boolean;
+	/** Application-wide super-admin (APP_ADMIN). Gates the cross-workspace Admin nav group. */
+	isAppAdmin: boolean;
 	hasMentorAccess: boolean;
 	context: SidebarContext;
 	workspaces: WorkspaceListItem[];
@@ -44,6 +47,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({
 	username,
 	isAdmin,
+	isAppAdmin,
 	hasMentorAccess,
 	context,
 	workspaces,
@@ -121,6 +125,7 @@ export function AppSidebar({
 						practicesEnabled={activeWorkspace.practicesEnabled}
 					/>
 				)}
+				{isAppAdmin && <NavSuperAdmin />}
 			</>
 		);
 	}

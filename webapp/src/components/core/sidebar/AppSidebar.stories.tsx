@@ -38,6 +38,7 @@ const meta = {
 	args: {
 		username: "johnDoe",
 		isAdmin: false,
+		isAppAdmin: false,
 		hasMentorAccess: false,
 		context: "main",
 		workspaces: [mockWorkspace],
@@ -89,6 +90,7 @@ export const AdminUser: Story = {
 	args: {
 		username: "admin",
 		isAdmin: true,
+		isAppAdmin: true,
 		hasMentorAccess: true,
 		context: "main",
 		activeWorkspace: mockWorkspace,

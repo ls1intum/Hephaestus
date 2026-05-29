@@ -67,3 +67,6 @@ allowBuilds:
   # Denied: postinstall scripts only print ads / collect telemetry
   core-js: false
   protobufjs: false
+  # Trusted: msw's postinstall copies the service worker into node_modules; the
+  # worker we serve from public/ is generated via `msw init` (see webapp/public).
+  msw: true

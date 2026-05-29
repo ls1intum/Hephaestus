@@ -6,6 +6,7 @@ import {
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
+import { LoginProvidersSettings } from "./login-providers/LoginProvidersSettings";
 
 // Use the RepositoryItem type from the AdminRepositoriesSettings component
 type RepositoryItem = {
@@ -36,6 +37,8 @@ export interface AdminSettingsPageProps {
 	slackTeamLabel?: string;
 	slackNotificationsEnabled: boolean;
 	onSlackSaved: () => void;
+	/** API origin used to build OAuth callback URLs for self-hosted login providers. */
+	apiOrigin: string;
 }
 
 export function AdminSettingsPage({
@@ -60,6 +63,7 @@ export function AdminSettingsPage({
 	slackTeamLabel,
 	slackNotificationsEnabled,
 	onSlackSaved,
+	apiOrigin,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -83,6 +87,10 @@ export function AdminSettingsPage({
 					onAddRepository={onAddRepository}
 					onRemoveRepository={onRemoveRepository}
 				/>
+
+				{workspaceId != null && (
+					<LoginProvidersSettings workspaceId={workspaceId} apiOrigin={apiOrigin} />
+				)}
 
 				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />

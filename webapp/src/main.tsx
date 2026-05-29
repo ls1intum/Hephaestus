@@ -2,11 +2,8 @@ import * as Sentry from "@sentry/react";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
 import ReactDOM from "react-dom/client";
-
-import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
-import "./integrations/sentry";
-
 import { client } from "@/api/client.gen";
+import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
@@ -14,6 +11,7 @@ import { StrictMode } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, csrfHeaders, useAuth } from "@/integrations/auth";
+import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
 import { PostHogIdentity } from "@/integrations/posthog";
 import {
@@ -21,6 +19,7 @@ import {
 	posthogApiHost,
 	posthogProjectApiKey,
 } from "@/integrations/posthog/config";
+import { initSentry } from "@/integrations/sentry";
 import { ThemeProvider } from "@/integrations/theme";
 import reportWebVitals from "./reportWebVitals";
 
@@ -70,6 +69,55 @@ function WrappedRouterProvider() {
 	return <RouterProvider router={router} context={{ ...TanstackQuery.getContext(), auth }} />;
 }
 
+/**
+ * App root. Tracking integrations are consent-gated (ADR 0017 cookie consent):
+ *  - Sentry initializes only once error-monitoring consent is granted (and a DSN is configured).
+ *  - PostHog is only mounted (PostHogProvider) when analytics consent is granted AND PostHog is
+ *    enabled via its env flag. The PostHogProvider already opts out of capturing by default and
+ *    PostHogIdentity gates opt-in on the per-user research setting, so consent is an ADDITIONAL,
+ *    ANDed gate. When consent is withdrawn the provider unmounts on the next decision.
+ */
+function Root() {
+	const consent = useCookieConsent();
+
+	// Initialize Sentry when (and only when) error-monitoring consent is granted. initSentry is
+	// idempotent, so re-running on consent change is safe.
+	if (consent?.errorMonitoring) {
+		initSentry();
+	}
+
+	const analyticsEnabled = isPosthogEnabled && consent?.analytics === true;
+
+	const app = (
+		<TanstackQuery.Provider>
+			<AuthProvider>
+				{analyticsEnabled ? <PostHogIdentity /> : null}
+				<ThemeProvider defaultTheme="dark" storageKey="theme">
+					<WrappedRouterProvider />
+					<TanstackDevtools router={router} />
+				</ThemeProvider>
+			</AuthProvider>
+		</TanstackQuery.Provider>
+	);
+
+	if (analyticsEnabled) {
+		return (
+			<PostHogProvider
+				apiKey={posthogProjectApiKey}
+				options={{
+					api_host: posthogApiHost || undefined,
+					cross_subdomain_cookie: false,
+					opt_out_capturing_by_default: true,
+				}}
+			>
+				{app}
+			</PostHogProvider>
+		);
+	}
+
+	return app;
+}
+
 // Render the app
 const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
@@ -85,35 +133,7 @@ if (rootElement && !rootElement.innerHTML) {
 	});
 	root.render(
 		<StrictMode>
-			{isPosthogEnabled ? (
-				<PostHogProvider
-					apiKey={posthogProjectApiKey}
-					options={{
-						api_host: posthogApiHost || undefined,
-						cross_subdomain_cookie: false,
-						opt_out_capturing_by_default: true,
-					}}
-				>
-					<TanstackQuery.Provider>
-						<AuthProvider>
-							<PostHogIdentity />
-							<ThemeProvider defaultTheme="dark" storageKey="theme">
-								<WrappedRouterProvider />
-								<TanstackDevtools router={router} />
-							</ThemeProvider>
-						</AuthProvider>
-					</TanstackQuery.Provider>
-				</PostHogProvider>
-			) : (
-				<TanstackQuery.Provider>
-					<AuthProvider>
-						<ThemeProvider defaultTheme="dark" storageKey="theme">
-							<WrappedRouterProvider />
-							<TanstackDevtools router={router} />
-						</ThemeProvider>
-					</AuthProvider>
-				</TanstackQuery.Provider>
-			)}
+			<Root />
 		</StrictMode>,
 	);
 }

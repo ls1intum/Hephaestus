@@ -27,8 +27,8 @@ const meta = {
 		researchProps: {
 			description: "Props for the ResearchParticipationSection component",
 		},
-		accountProps: {
-			description: "Props for the AccountSection component",
+		onAccountDeleted: {
+			description: "Called after the account is deleted (logout + redirect)",
 		},
 		isLoading: {
 			control: "boolean",
@@ -41,16 +41,20 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const defaultLinkedAccountsProps = {
-	accounts: [
-		{ providerAlias: "github", providerName: "GitHub", connected: true, linkedUsername: "octocat" },
+	identities: [
 		{
-			providerAlias: "gitlab-lrz",
-			providerName: "GitLab LRZ",
-			connected: false,
+			id: 1,
+			providerType: "GITHUB",
+			username: "octocat",
+			displayName: "The Octocat",
+			lastLoginAt: new Date("2026-05-20T10:00:00Z"),
 		},
 	],
+	providers: [
+		{ registrationId: "github", displayName: "GitHub", providerType: "GITHUB" },
+		{ registrationId: "gitlab-lrz", displayName: "GitLab LRZ", providerType: "GITLAB" },
+	],
 	onLink: fn(),
-	onUnlink: fn(),
 };
 
 /**
@@ -69,9 +73,7 @@ export const Default: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
-		accountProps: {
-			onDeleteAccount: fn(),
-		},
+		onAccountDeleted: fn(),
 		isLoading: false,
 	},
 };
@@ -92,9 +94,7 @@ export const AllTogglesDisabled: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
-		accountProps: {
-			onDeleteAccount: fn(),
-		},
+		onAccountDeleted: fn(),
 		isLoading: false,
 	},
 };
@@ -115,9 +115,7 @@ export const Loading: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
-		accountProps: {
-			onDeleteAccount: fn(),
-		},
+		onAccountDeleted: fn(),
 		isLoading: true,
 	},
 };
@@ -138,9 +136,7 @@ export const AiReviewHidden: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
-		accountProps: {
-			onDeleteAccount: fn(),
-		},
+		onAccountDeleted: fn(),
 		isLoading: false,
 	},
 };
@@ -161,9 +157,7 @@ export const ResearchHidden: Story = {
 			onToggleResearch: fn(),
 		},
 		linkedAccountsProps: defaultLinkedAccountsProps,
-		accountProps: {
-			onDeleteAccount: fn(),
-		},
+		onAccountDeleted: fn(),
 		isLoading: false,
 	},
 };

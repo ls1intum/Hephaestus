@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ComponentPropsWithoutRef } from "react";
-import { getIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
-import type { IdentityProvider } from "@/api/types.gen";
+import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
+import type { IdentityProviderView } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { GitHubSignInButton } from "./GitHubSignInButton";
@@ -47,13 +47,15 @@ function HeaderProviderButton({
 	onSignIn,
 	disabled,
 }: {
-	provider: IdentityProvider;
+	provider: IdentityProviderView;
 	onSignIn: (idpHint: string) => void;
 	disabled?: boolean;
 }) {
-	const handleClick = () => onSignIn(provider.alias);
-	const isGitHub = provider.type === "github";
-	const isGitLab = provider.alias.startsWith("gitlab");
+	const registrationId = provider.registrationId ?? "";
+	const label = provider.displayName ?? registrationId;
+	const handleClick = () => onSignIn(registrationId);
+	const isGitHub = provider.providerType === "github";
+	const isGitLab = registrationId.startsWith("gitlab");
 
 	const brandClass = isGitHub
 		? "bg-github-black text-github-white dark:bg-github-white dark:text-github-black hover:shadow-lg hover:shadow-github-black/20 dark:hover:shadow-github-white/20"
@@ -81,11 +83,9 @@ function HeaderProviderButton({
 				}
 			>
 				{icon}
-				<span className="hidden sm:inline text-sm font-semibold tracking-tight">
-					{provider.displayName}
-				</span>
+				<span className="hidden sm:inline text-sm font-semibold tracking-tight">{label}</span>
 			</TooltipTrigger>
-			<TooltipContent className="sm:hidden">Sign in with {provider.displayName}</TooltipContent>
+			<TooltipContent className="sm:hidden">Continue with {label}</TooltipContent>
 		</Tooltip>
 	);
 }
@@ -97,26 +97,30 @@ function ProviderButton({
 	size,
 	className,
 }: {
-	provider: IdentityProvider;
+	provider: IdentityProviderView;
 	onSignIn: (idpHint: string) => void;
 	disabled?: boolean;
 	size?: ButtonSize;
 	className?: string;
 }) {
-	const handleClick = () => onSignIn(provider.alias);
+	const registrationId = provider.registrationId ?? "";
+	const label = provider.displayName ?? registrationId;
+	const handleClick = () => onSignIn(registrationId);
 
-	if (provider.type === "github") {
+	if (provider.providerType === "github") {
 		return (
 			<GitHubSignInButton
 				onClick={handleClick}
 				disabled={disabled}
 				size={size}
 				className={className}
-			/>
+			>
+				Continue with {label}
+			</GitHubSignInButton>
 		);
 	}
 
-	if (provider.alias.startsWith("gitlab")) {
+	if (registrationId.startsWith("gitlab")) {
 		return (
 			<GitLabSignInButton
 				onClick={handleClick}
@@ -124,14 +128,14 @@ function ProviderButton({
 				size={size}
 				className={className}
 			>
-				Sign in with {provider.displayName}
+				Continue with {label}
 			</GitLabSignInButton>
 		);
 	}
 
 	return (
 		<Button onClick={handleClick} disabled={disabled} size={size} className={className}>
-			Sign in with {provider.displayName}
+			Continue with {label}
 		</Button>
 	);
 }
@@ -146,7 +150,7 @@ function ProviderButton({
  */
 export function SignInButtons({ onSignIn, disabled, size, className, header }: SignInButtonsProps) {
 	const { data: providers, isLoading } = useQuery({
-		...getIdentityProvidersOptions(),
+		...listIdentityProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
 
@@ -179,7 +183,7 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 			<div className="flex items-center gap-2">
 				{providers.map((provider) => (
 					<HeaderProviderButton
-						key={provider.alias}
+						key={provider.registrationId ?? provider.displayName}
 						provider={provider}
 						onSignIn={onSignIn}
 						disabled={disabled}
@@ -193,7 +197,7 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 		<div className="flex flex-wrap items-center gap-2">
 			{providers.map((provider) => (
 				<ProviderButton
-					key={provider.alias}
+					key={provider.registrationId ?? provider.displayName}
 					provider={provider}
 					onSignIn={onSignIn}
 					disabled={disabled}

@@ -10,6 +10,8 @@ import {
 import type React from "react";
 import { Toaster } from "sonner";
 import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
+import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
@@ -67,6 +69,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		return (
 			<>
+				<ImpersonationBanner />
 				<ProviderColorScope>
 					<SidebarProvider>
 						<AppSidebarContainer />
@@ -89,6 +92,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
 				<FeatureFlagDevTools />
+				<CookieConsentBanner />
 			</>
 		);
 	},
@@ -232,7 +236,7 @@ function ProviderColorScope({ children }: { children: React.ReactNode }) {
 
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
-	const { isAuthenticated, username } = useAuth();
+	const { isAuthenticated, username, isAppAdmin } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const navigate = useNavigate();
 	const workspaceAccess = useWorkspaceAccess();
@@ -276,6 +280,7 @@ function AppSidebarContainer() {
 		<AppSidebar
 			username={username}
 			isAdmin={workspaceAccess.isAdmin}
+			isAppAdmin={isAppAdmin}
 			hasMentorAccess={hasMentorAccess}
 			context={sidebarContext}
 			workspaces={workspaceList}

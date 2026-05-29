@@ -1,7 +1,21 @@
 import * as Sentry from "@sentry/react";
 import environment from "@/environment";
+import { hasErrorMonitoringConsent } from "@/integrations/consent";
 
-if (environment.sentry?.dsn) {
+let initialized = false;
+
+/**
+ * Initialize Sentry, gated on BOTH a configured DSN and explicit error-monitoring consent.
+ * Idempotent: safe to call again after the user grants consent. Without consent (or a DSN) this
+ * is a no-op, so no Sentry client is created and no events are sent.
+ */
+export function initSentry() {
+	if (initialized) {
+		return;
+	}
+	if (!environment.sentry?.dsn || !hasErrorMonitoringConsent()) {
+		return;
+	}
 	Sentry.init({
 		dsn: environment.sentry.dsn,
 		environment: environment.sentry.environment,
@@ -10,4 +24,5 @@ if (environment.sentry?.dsn) {
 		// account; data subjects are TUM students covered by the project DPA.
 		sendDefaultPii: true,
 	});
+	initialized = true;
 }

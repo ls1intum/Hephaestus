@@ -1,0 +1,69 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface ErrorSearch {
+	code?: string;
+}
+
+/** PII-free, friendly copy keyed by the server's auth-failure codes. */
+const ERROR_COPY: Record<string, { title: string; description: string }> = {
+	oauth_failure: {
+		title: "Sign-in didn't complete",
+		description:
+			"We couldn't finish signing you in with that provider. Please try again from the sign-in page.",
+	},
+	token_exchange: {
+		title: "Sign-in couldn't be verified",
+		description:
+			"There was a problem confirming your identity with the provider. Please try signing in again.",
+	},
+	idp_unavailable: {
+		title: "Provider unavailable",
+		description:
+			"The identity provider couldn't be reached right now. Please try again in a few moments.",
+	},
+	already_linked: {
+		title: "Account already linked",
+		description:
+			"That provider identity is already linked to another account. Sign in with the original account instead.",
+	},
+};
+
+function describe(code: string | undefined): { title: string; description: string } {
+	if (code && ERROR_COPY[code]) {
+		return ERROR_COPY[code];
+	}
+	return {
+		title: "Something went wrong",
+		description: "We hit an unexpected problem signing you in. Please try again.",
+	};
+}
+
+export const Route = createFileRoute("/auth/error")({
+	validateSearch: (search): ErrorSearch => ({
+		code: typeof search.code === "string" ? search.code : undefined,
+	}),
+	component: AuthErrorPage,
+});
+
+function AuthErrorPage() {
+	const { code } = Route.useSearch();
+	const { title, description } = describe(code);
+
+	return (
+		<div className="flex min-h-[100dvh] items-center justify-center p-4">
+			<Card className="w-full max-w-md text-center">
+				<CardHeader>
+					<CardTitle className="text-2xl">{title}</CardTitle>
+					<CardDescription>{description}</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<Button render={<Link to="/login" />} className="w-full">
+						Back to sign in
+					</Button>
+				</CardContent>
+			</Card>
+		</div>
+	);
+}

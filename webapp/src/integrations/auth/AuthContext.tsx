@@ -9,6 +9,8 @@ export interface AuthContextType {
 	isLoading: boolean;
 	username: string | undefined;
 	userRoles: string[];
+	/** True when the current account is an application super-admin (APP_ADMIN or `admin` role). */
+	isAppAdmin: boolean;
 	userProfile: UserProfile | undefined;
 	login: (idpHint?: string) => Promise<void>;
 	linkAccount: (providerAlias: string) => Promise<void>;
@@ -21,6 +23,10 @@ export interface AuthContextType {
 	getUserProfileUrl: () => string;
 	/** Whether the user has a linked GitLab identity (logged in via GitLab or account linked) */
 	hasGitLabIdentity: boolean;
+	/** True when the current session is impersonating another account. */
+	isImpersonating: boolean;
+	/** Display name of the impersonated account (the current user) while impersonating. */
+	impersonatedDisplayName: string | undefined;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,6 +73,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 	const userProfile = useMemo(() => (user ? toUserProfile(user) : undefined), [user]);
 
+	const isAppAdmin = useMemo(
+		() => user?.appRole === "APP_ADMIN" || (user?.roles ?? []).includes("admin"),
+		[user],
+	);
+
 	const login = useCallback(async (idpHint?: string) => {
 		authClient.login(idpHint);
 	}, []);
@@ -82,7 +93,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	const hasRole = useCallback((role: string) => (user?.roles ?? []).includes(role), [user]);
 
 	const isCurrentUser = useCallback(
-		(login?: string) => !!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase(),
+		(login?: string) =>
+			!!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase(),
 		[user],
 	);
 
@@ -108,6 +120,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 			isLoading,
 			username: user?.username ?? undefined,
 			userRoles: user?.roles ?? [],
+			isAppAdmin,
 			userProfile,
 			login,
 			linkAccount,
@@ -119,10 +132,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 			getUserProfilePictureUrl,
 			getUserProfileUrl,
 			hasGitLabIdentity: user?.hasGitLabIdentity ?? false,
+			isImpersonating: user?.impersonating ?? false,
+			impersonatedDisplayName: user?.displayName ?? undefined,
 		}),
 		[
 			user,
 			isLoading,
+			isAppAdmin,
 			userProfile,
 			login,
 			linkAccount,

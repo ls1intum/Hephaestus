@@ -2,12 +2,10 @@ import { type DefaultError, useMutation, useQuery, useQueryClient } from "@tanst
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	deleteUserMutation,
-	getLinkedAccountsOptions,
-	getLinkedAccountsQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
-	unlinkAccountMutation,
+	listIdentityProvidersOptions,
+	listLinkedIdentitiesOptions,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Options } from "@/api/sdk.gen";
@@ -40,24 +38,14 @@ function RouteComponent() {
 		retry: 1,
 	});
 
-	// Query for linked accounts
-	const linkedAccountsQuery = useQuery({
-		...getLinkedAccountsOptions({}),
+	// Query for the account's federated identities (read-only in this view).
+	const linkedIdentitiesQuery = useQuery({
+		...listLinkedIdentitiesOptions({}),
 	});
 
-	// Mutation for unlinking an account
-	const unlinkMutation = useMutation({
-		...unlinkAccountMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
-			toast.success("Account disconnected");
-		},
-		onError: (error) => {
-			console.error("Failed to unlink account:", {
-				message: error instanceof Error ? error.message : "Unknown error",
-			});
-			toast.error("Failed to disconnect account. You must have at least one connected provider.");
-		},
+	// Query for the sign-in providers available to link.
+	const identityProvidersQuery = useQuery({
+		...listIdentityProvidersOptions({}),
 	});
 
 	// Mutation for updating user settings
@@ -95,19 +83,6 @@ function RouteComponent() {
 		},
 	});
 
-	// Mutation for deleting account
-	const deleteAccountMutation = useMutation({
-		...deleteUserMutation(),
-		onSuccess: async () => {
-			await logout();
-			navigate({ to: "/" });
-		},
-		onError: (error) => {
-			console.error("Failed to delete user account:", error);
-			toast.error("Failed to delete account. Please try again later.");
-		},
-	});
-
 	// Spread-based helper: reads latest cache to avoid stale-closure race under rapid toggling
 	const updateSetting = (patch: Partial<UserSettings>) => {
 		const current = queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
@@ -122,18 +97,18 @@ function RouteComponent() {
 	const handleResearchToggle = (checked: boolean) =>
 		updateSetting({ participateInResearch: checked });
 
-	// Handle account deletion
-	const handleDeleteAccount = () => {
-		deleteAccountMutation.mutate({});
+	// After deletion: end the session and send the user to the login page.
+	const handleAccountDeleted = async () => {
+		await logout();
+		navigate({ to: "/login" });
 	};
 
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
-		accounts: linkedAccountsQuery.data ?? [],
+		identities: linkedIdentitiesQuery.data ?? [],
+		providers: identityProvidersQuery.data ?? [],
 		onLink: linkAccount,
-		onUnlink: (providerAlias) => unlinkMutation.mutate({ path: { providerAlias } }),
-		isUnlinking: unlinkMutation.isPending,
-		isLoading: linkedAccountsQuery.isLoading,
-		isError: linkedAccountsQuery.isError,
+		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
+		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 	};
 
 	return (
@@ -152,10 +127,7 @@ function RouteComponent() {
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			linkedAccountsProps={linkedAccountsProps}
-			accountProps={{
-				onDeleteAccount: handleDeleteAccount,
-				isDeleting: deleteAccountMutation.isPending,
-			}}
+			onAccountDeleted={handleAccountDeleted}
 		/>
 	);
 }

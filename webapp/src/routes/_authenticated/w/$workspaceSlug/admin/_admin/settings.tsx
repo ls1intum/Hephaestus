@@ -13,6 +13,7 @@ import {
 import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
+import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/settings")({
@@ -196,6 +197,7 @@ function AdminSettings() {
 			onSlackSaved={() =>
 				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
 			}
+			apiOrigin={environment.serverUrl}
 		/>
 	);
 }

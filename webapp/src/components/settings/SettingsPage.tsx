@@ -1,11 +1,12 @@
 import { Separator } from "@/components/ui/separator";
-import { AccountSection, type AccountSectionProps } from "./AccountSection";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
+import { DangerZoneSection } from "./DangerZoneSection";
 import { LinkedAccountsSection, type LinkedAccountsSectionProps } from "./LinkedAccountsSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
 } from "./ResearchParticipationSection";
+import { SessionsSection } from "./SessionsSection";
 
 export interface SettingsPageProps {
 	/**
@@ -29,9 +30,9 @@ export interface SettingsPageProps {
 	 */
 	linkedAccountsProps: LinkedAccountsSectionProps;
 	/**
-	 * Props for the AccountSection component
+	 * Called after the account is deleted (logout + redirect).
 	 */
-	accountProps: AccountSectionProps;
+	onAccountDeleted: () => void | Promise<void>;
 	/**
 	 * Whether the settings are still loading
 	 */
@@ -48,19 +49,15 @@ export function SettingsPage({
 	researchProps,
 	showResearchSection,
 	linkedAccountsProps,
-	accountProps,
+	onAccountDeleted,
 	isLoading = false,
 }: SettingsPageProps) {
 	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: linkedLoading = false, ...linkedRest } = linkedAccountsProps;
-	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
 	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
-	const accountPending = isLoading || accountLoading;
-	const showLinkedAccounts =
-		linkedRest.isError || linkedLoading || isLoading || linkedRest.accounts.length > 1;
 
 	return (
 		<div className="w-full max-w-3xl mx-auto space-y-8">
@@ -85,16 +82,14 @@ export function SettingsPage({
 				</>
 			)}
 
-			{showLinkedAccounts && (
-				<>
-					<Separator />
-					<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
-				</>
-			)}
+			<Separator />
+			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
 
 			<Separator />
+			<SessionsSection />
 
-			<AccountSection {...accountRest} isLoading={accountPending} />
+			<Separator />
+			<DangerZoneSection onAccountDeleted={onAccountDeleted} />
 		</div>
 	);
 }
