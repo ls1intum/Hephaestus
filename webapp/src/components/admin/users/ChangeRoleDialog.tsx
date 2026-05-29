@@ -26,7 +26,7 @@ export interface ChangeRoleDialogProps {
  * Confirms toggling a single account between USER and APP_ADMIN. Granting APP_ADMIN is an
  * elevation, so it is surfaced as a destructive-styled confirmation; revoking is neutral.
  *
- * <p>The API ({@code UpdateAccountRequest}) only supports {@code appRole} today — there are
+ * The API (`UpdateAccountRequest`) only supports `appRole` today — there are
  * no status or feature-flag fields to expose, so this is intentionally a single binary
  * confirmation rather than a multi-field form.
  */

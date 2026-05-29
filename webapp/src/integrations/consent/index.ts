@@ -3,13 +3,13 @@
  *
  * Essential cookies (session, CSRF, OAuth-state) are always on and not represented here — they
  * are informational only. The two optional categories are opt-in:
- *  - {@code analytics}        → PostHog
- *  - {@code errorMonitoring}  → Sentry
+ *  - `analytics`        → PostHog
+ *  - `errorMonitoring`  → Sentry
  *
- * The decision is persisted in {@code localStorage} under {@link CONSENT_STORAGE_KEY}. Until a
- * decision is made ({@link getStoredConsent} returns {@code null}) the banner is shown and both
- * optional integrations stay disabled. Consumers subscribe via {@link subscribeConsent} (used by
- * the {@code useState}/{@code useSyncExternalStore}-style hook in this module).
+ * The decision is persisted in `localStorage` under `CONSENT_STORAGE_KEY`. Until a
+ * decision is made (`getStoredConsent` returns `null`) the banner is shown and both
+ * optional integrations stay disabled. Consumers subscribe via `subscribeConsent` (used by
+ * the `useSyncExternalStore`-based hook in this module).
  */
 
 import { useSyncExternalStore } from "react";
@@ -35,16 +35,14 @@ function emitChange() {
 	}
 }
 
-/** Read the stored consent, or {@code null} when no decision has been made yet. */
-export function getStoredConsent(): CookieConsent | null {
-	if (typeof window === "undefined") {
-		return null;
-	}
+// Snapshot cache: useSyncExternalStore requires getSnapshot to return a referentially-stable value
+// while the underlying store is unchanged — otherwise it re-renders every commit (infinite loop).
+// We memoise the parsed object by the raw localStorage string and only re-parse when it changes.
+let cachedRaw: string | null = null;
+let cachedConsent: CookieConsent | null = null;
+
+function parseConsent(raw: string): CookieConsent | null {
 	try {
-		const raw = window.localStorage.getItem(CONSENT_STORAGE_KEY);
-		if (!raw) {
-			return null;
-		}
 		const parsed = JSON.parse(raw) as Partial<CookieConsent>;
 		if (typeof parsed?.analytics !== "boolean" || typeof parsed?.errorMonitoring !== "boolean") {
 			return null;
@@ -57,6 +55,25 @@ export function getStoredConsent(): CookieConsent | null {
 	} catch {
 		return null;
 	}
+}
+
+/** Read the stored consent, or `null` when no decision has been made yet. */
+export function getStoredConsent(): CookieConsent | null {
+	if (typeof window === "undefined") {
+		return null;
+	}
+	let raw: string | null;
+	try {
+		raw = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+	} catch {
+		return null;
+	}
+	if (raw === cachedRaw) {
+		return cachedConsent;
+	}
+	cachedRaw = raw;
+	cachedConsent = raw ? parseConsent(raw) : null;
+	return cachedConsent;
 }
 
 /** Persist a consent decision and notify subscribers (and other tabs via the storage event). */
@@ -92,14 +109,9 @@ export function subscribeConsent(listener: ConsentListener): () => void {
 	};
 }
 
-/** React hook returning the current consent (or {@code null} until a decision is made). */
+/** React hook returning the current consent (or `null` until a decision is made). */
 export function useCookieConsent(): CookieConsent | null {
 	return useSyncExternalStore(subscribeConsent, getStoredConsent, () => null);
-}
-
-/** Whether analytics (PostHog) consent has been granted. */
-export function hasAnalyticsConsent(): boolean {
-	return getStoredConsent()?.analytics === true;
 }
 
 /** Whether error-monitoring (Sentry) consent has been granted. */

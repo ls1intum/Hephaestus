@@ -48,7 +48,7 @@ export interface LinkedAccountsSectionProps {
  * Settings section for federated identities (ADR 0017 native auth).
  *
  * Linked identities are read-only — there is no unlink endpoint. To add another
- * identity the user re-runs sign-in with that provider via {@link onLink}, which
+ * identity the user re-runs sign-in with that provider via `onLink`, which
  * links the resulting identity to the current account.
  */
 export function LinkedAccountsSection({

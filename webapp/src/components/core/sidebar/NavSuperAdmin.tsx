@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/sidebar";
 
 /**
- * Application-wide (super-admin / APP_ADMIN) navigation. Distinct from {@link NavAdmin},
+ * Application-wide (super-admin / APP_ADMIN) navigation. Distinct from `NavAdmin`,
  * which is scoped to the active workspace. Rendered only when the signed-in user is an
- * application admin (see {@code AppSidebar.isAppAdmin}).
+ * application admin (see `AppSidebar.isAppAdmin`).
  */
 export function NavSuperAdmin() {
 	return (

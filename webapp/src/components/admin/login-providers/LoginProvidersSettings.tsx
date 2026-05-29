@@ -35,8 +35,8 @@ export interface LoginProvidersSettingsProps {
  * Workspace-admin surface for self-hosted OIDC *login* providers (ADR 0017): a workspace
  * bringing its own GitHub Enterprise / self-hosted GitLab as a sign-in provider.
  *
- * <p>Wraps the generic `/api/v1/workspaces/{workspaceId}/connections` registry, filtering
- * client-side to the IDENTITY family (kinds {@code OIDC_LOGIN_GITHUB} / {@code OIDC_LOGIN_GITLAB})
+ * Wraps the generic `/api/v1/workspaces/{workspaceId}/connections` registry, filtering
+ * client-side to the IDENTITY family (kinds `OIDC_LOGIN_GITHUB` / `OIDC_LOGIN_GITLAB`)
  * so the Slack/SCM connections that share the endpoint don't leak onto this screen.
  */
 export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvidersSettingsProps) {

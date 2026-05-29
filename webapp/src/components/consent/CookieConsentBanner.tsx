@@ -13,7 +13,7 @@ import { setStoredConsent, useCookieConsent } from "@/integrations/consent";
  *  - Analytics (opt-in): PostHog.
  *  - Error monitoring (opt-in): Sentry.
  *
- * Storing a decision gates initialization of PostHog and Sentry (see {@code main.tsx}). Offers
+ * Storing a decision gates initialization of PostHog and Sentry (see `main.tsx`). Offers
  * "Accept all", "Reject non-essential", and per-category toggles before saving.
  */
 export function CookieConsentBanner() {
@@ -24,6 +24,20 @@ export function CookieConsentBanner() {
 	const descriptionId = useId();
 	const analyticsId = useId();
 	const errorMonitoringId = useId();
+
+	// Saving a decision unmounts the banner; without intervention focus falls back to <body>,
+	// stranding keyboard/AT users. Move focus to the main landmark (or its first focusable child)
+	// before the unmount so the next Tab lands somewhere sensible.
+	const decideAndRestoreFocus = (choice: { analytics: boolean; errorMonitoring: boolean }) => {
+		const main = document.querySelector<HTMLElement>("main");
+		setStoredConsent(choice);
+		if (main) {
+			if (main.tabIndex < 0 && !main.hasAttribute("tabindex")) {
+				main.tabIndex = -1;
+			}
+			main.focus();
+		}
+	};
 
 	// A decision has been made — banner stays hidden until consent is cleared.
 	if (consent !== null) {
@@ -93,17 +107,19 @@ export function CookieConsentBanner() {
 					<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
 						<Button
 							variant="outline"
-							onClick={() => setStoredConsent({ analytics: false, errorMonitoring: false })}
+							onClick={() => decideAndRestoreFocus({ analytics: false, errorMonitoring: false })}
 						>
 							Reject non-essential
 						</Button>
 						<Button
 							variant="outline"
-							onClick={() => setStoredConsent({ analytics, errorMonitoring })}
+							onClick={() => decideAndRestoreFocus({ analytics, errorMonitoring })}
 						>
 							Save choices
 						</Button>
-						<Button onClick={() => setStoredConsent({ analytics: true, errorMonitoring: true })}>
+						<Button
+							onClick={() => decideAndRestoreFocus({ analytics: true, errorMonitoring: true })}
+						>
 							Accept all
 						</Button>
 					</div>

@@ -24,7 +24,7 @@ export interface ImpersonateDialogProps {
 
 /**
  * Collects the mandatory audit reason before starting impersonation. The server contract
- * ({@code ImpersonateRequest}) requires a non-empty {@code reason}, so the confirm button is
+ * (`ImpersonateRequest`) requires a non-empty `reason`, so the confirm button is
  * disabled until one is provided.
  */
 export function ImpersonateDialog({

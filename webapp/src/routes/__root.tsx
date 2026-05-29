@@ -269,7 +269,9 @@ function AppSidebarContainer() {
 		selectWorkspace(ws.workspaceSlug);
 		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
 		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		navigate({ to: target as never, replace: true });
+		// Runtime-built internal path (slug + preserved subpath): use the typed `href` field
+		// rather than `to as never` — relative href stays an SPA navigation.
+		navigate({ href: target, replace: true });
 	};
 
 	const handleAddWorkspace = () => {

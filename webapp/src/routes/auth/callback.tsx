@@ -29,7 +29,9 @@ function AuthCallbackPage() {
 		// Wait for the cookie-session probe (GET /user) to settle so the target route
 		// paints with the correct auth state.
 		if (isLoading) return;
-		navigate({ to: safeReturnTo(returnTo) as never, replace: true });
+		// `href` (not `to`) carries the runtime-validated internal path while keeping the typed
+		// navigate API: safeReturnTo only returns relative paths, so this stays an SPA navigation.
+		navigate({ href: safeReturnTo(returnTo), replace: true });
 	}, [isLoading, returnTo, navigate]);
 
 	return (

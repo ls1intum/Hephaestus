@@ -18,8 +18,8 @@ export const PROVIDER_LABELS: Record<LoginProviderKind, string> = {
 
 /**
  * Spring's OAuth callback registration id prefix per kind. The server builds the redirect
- * URI as {@code <baseUrl>/login/oauth2/code/{prefix}-ws-{connectionId}} and serves it under
- * the {@code /api} context path (see application.yml). The admin must register THIS URL in
+ * URI as `<baseUrl>/login/oauth2/code/{prefix}-ws-{connectionId}` and serves it under
+ * the `/api` context path (see application.yml). The admin must register THIS URL in
  * their IdP's OAuth app.
  */
 const CALLBACK_PREFIX: Record<LoginProviderKind, string> = {
@@ -75,10 +75,10 @@ export function stateLabel(state: ConnectionState | undefined): string {
 /**
  * Extract a human-readable message from a thrown request error.
  *
- * The generated client (with {@code throwOnError}) throws the parsed response body on a
+ * The generated client (with `throwOnError`) throws the parsed response body on a
  * non-2xx. For the issuer-discovery probe failures the server returns RFC 9457 problem+json
- * ({@code { type, title, status, detail }}); we prefer {@code detail}, then {@code title},
- * then the controller's legacy {@code { error }} shape, then a generic fallback.
+ * (`{ type, title, status, detail }`); we prefer `detail`, then `title`,
+ * then the controller's legacy `{ error }` shape, then a generic fallback.
  */
 export function problemDetailOf(err: unknown): string {
 	if (typeof err === "string") {

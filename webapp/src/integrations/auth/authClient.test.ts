@@ -1,0 +1,89 @@
+import { describe, expect, it } from "vitest";
+import { type CurrentUser, toUserProfile } from "./authClient";
+
+// Object-mother for a CurrentUser (server CurrentUserView). Tests override only what they assert.
+function makeCurrentUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
+	return {
+		id: 7,
+		displayName: "Ada Lovelace",
+		appRole: "USER",
+		status: "ACTIVE",
+		roles: ["user"],
+		hasGitLabIdentity: false,
+		impersonating: false,
+		...overrides,
+	};
+}
+
+// `toUserProfile` adapts the server CurrentUserView into the legacy UserProfile shape the
+// useAuth() consumers still read. The name-splitting and provider-id branches are the parts
+// most likely to regress.
+describe("toUserProfile", () => {
+	it("maps the core CurrentUserView fields onto UserProfile", () => {
+		const profile = toUserProfile(
+			makeCurrentUser({
+				id: 42,
+				displayName: "Ada Lovelace",
+				username: "ada",
+				primaryEmail: "ada@example.com",
+				roles: ["user", "admin"],
+				identityProvider: "GITHUB",
+				gitProviderId: "1001",
+			}),
+		);
+
+		expect(profile.id).toBe("42");
+		expect(profile.username).toBe("ada");
+		expect(profile.email).toBe("ada@example.com");
+		expect(profile.name).toBe("Ada Lovelace");
+		expect(profile.firstName).toBe("Ada");
+		expect(profile.lastName).toBe("Lovelace");
+		expect(profile.roles).toEqual(["user", "admin"]);
+		expect(profile.identityProvider).toBe("GITHUB");
+	});
+
+	it("maps gitProviderId to githubId only for GITHUB", () => {
+		const profile = toUserProfile(
+			makeCurrentUser({ identityProvider: "GITHUB", gitProviderId: "1001" }),
+		);
+		expect(profile.githubId).toBe("1001");
+		expect(profile.gitlabId).toBeUndefined();
+	});
+
+	it("maps gitProviderId to gitlabId only for GITLAB", () => {
+		const profile = toUserProfile(
+			makeCurrentUser({ identityProvider: "GITLAB", gitProviderId: "2002" }),
+		);
+		expect(profile.gitlabId).toBe("2002");
+		expect(profile.githubId).toBeUndefined();
+	});
+
+	it("falls back to username for the name when displayName is missing, and defaults missing fields", () => {
+		// `displayName` is typed required on CurrentUser, but the server CurrentUserView types it
+		// optional; exercise the `?? username` fallback by omitting it as the server can.
+		const profile = toUserProfile(
+			makeCurrentUser({
+				displayName: undefined,
+				username: "solo",
+				primaryEmail: undefined,
+				roles: undefined,
+				identityProvider: undefined,
+				gitProviderId: undefined,
+			}),
+		);
+		expect(profile.name).toBe("solo");
+		expect(profile.firstName).toBe("solo");
+		expect(profile.lastName).toBe("");
+		expect(profile.email).toBe("");
+		expect(profile.roles).toEqual([]);
+		expect(profile.identityProvider).toBeUndefined();
+		expect(profile.githubId).toBeUndefined();
+		expect(profile.gitlabId).toBeUndefined();
+	});
+
+	it("treats a single-word display name as the first name with empty last name", () => {
+		const profile = toUserProfile(makeCurrentUser({ displayName: "Cher" }));
+		expect(profile.firstName).toBe("Cher");
+		expect(profile.lastName).toBe("");
+	});
+});

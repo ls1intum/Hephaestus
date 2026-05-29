@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
@@ -155,16 +155,14 @@ function GitLabWizardPage() {
 
 	const canAdvanceFromStep1 = state.preflightResult?.valid === true;
 	const canAdvanceFromStep2 = state.selectedGroup !== null;
-	const canSubmit = useMemo(
-		() =>
-			state.step === 3 &&
-			state.selectedGroup !== null &&
-			workspaceDetailsSchema.safeParse({
-				displayName: state.displayName,
-				workspaceSlug: state.workspaceSlug,
-			}).success,
-		[state.step, state.selectedGroup, state.displayName, state.workspaceSlug],
-	);
+	// React Compiler handles memoization; no manual useMemo (see webapp/AGENTS.md).
+	const canSubmit =
+		state.step === 3 &&
+		state.selectedGroup !== null &&
+		workspaceDetailsSchema.safeParse({
+			displayName: state.displayName,
+			workspaceSlug: state.workspaceSlug,
+		}).success;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state.step is an intentional trigger to refocus heading on step change
 	useEffect(() => {
@@ -214,7 +212,7 @@ function GitLabWizardPage() {
 	};
 
 	const meta = STEP_META[state.step - 1];
-	const wizardContextValue = useMemo(() => ({ state, dispatch }), [state]);
+	const wizardContextValue = { state, dispatch };
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
 	if (providersLoading) {

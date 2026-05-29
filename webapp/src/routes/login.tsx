@@ -20,24 +20,27 @@ export const Route = createFileRoute("/login")({
 	beforeLoad: async ({ context, search }) => {
 		const user = await resolveCurrentUser(context.queryClient);
 		if (user) {
-			throw redirect({ to: safeReturnTo(search.returnTo) as never });
+			// `href` (not `to`) is the typed escape hatch for a runtime-validated internal path:
+			// it keeps type-checking on the target and, because safeReturnTo only ever returns a
+			// relative path, the router treats it as an SPA navigation (no full reload).
+			throw redirect({ href: safeReturnTo(search.returnTo) });
 		}
 	},
 	component: LoginPage,
 });
 
 function LoginPage() {
-	const { error } = Route.useSearch();
+	const { error, returnTo } = Route.useSearch();
 	const { login } = useAuth();
 
-	// The server kickoff (/auth/login) reads returnTo from the current URL, so the ?returnTo=
-	// param is already carried along when login() triggers the top-level redirect.
+	// Pass the validated ?returnTo destination through to the kickoff so the server echoes it
+	// back into the SPA callback — without this the user would be returned to /login itself.
 	return (
 		<LoginCard
 			title="Sign in to Hephaestus"
 			description="Continue with your Git provider to access your workspaces."
 			error={error}
-			onSignIn={(registrationId) => login(registrationId)}
+			onSignIn={(registrationId) => login(registrationId, returnTo)}
 		/>
 	);
 }

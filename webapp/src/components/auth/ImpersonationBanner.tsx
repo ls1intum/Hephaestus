@@ -8,7 +8,7 @@ import { useAuth } from "@/integrations/auth/AuthContext";
 /**
  * Persistent amber banner shown across the top of the app while the current session is
  * impersonating another account. Reads impersonation state from the current user (via
- * {@link useAuth}); renders nothing when not impersonating, so it is safe to always mount.
+ * `useAuth`); renders nothing when not impersonating, so it is safe to always mount.
  *
  * Amber (not red) is intentional: red is reserved for errors. "Stop impersonating" exits via
  * the server mutation and does a full reload so the session cookie and current-user re-resolve

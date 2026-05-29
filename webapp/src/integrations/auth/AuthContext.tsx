@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { authClient, type CurrentUser, toUserProfile, type UserProfile } from "./authClient";
 
 export type { UserProfile } from "./authClient";
@@ -12,7 +12,7 @@ export interface AuthContextType {
 	/** True when the current account is an application super-admin (APP_ADMIN or `admin` role). */
 	isAppAdmin: boolean;
 	userProfile: UserProfile | undefined;
-	login: (idpHint?: string) => Promise<void>;
+	login: (idpHint?: string, returnTo?: string) => Promise<void>;
 	linkAccount: (providerAlias: string) => Promise<void>;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
@@ -71,38 +71,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		};
 	}, []);
 
-	const userProfile = useMemo(() => (user ? toUserProfile(user) : undefined), [user]);
+	// No manual memoization: the project runs React Compiler, which memoizes these derived
+	// values and stable callbacks automatically (see webapp/AGENTS.md).
+	const userProfile = user ? toUserProfile(user) : undefined;
 
-	const isAppAdmin = useMemo(
-		() => user?.appRole === "APP_ADMIN" || (user?.roles ?? []).includes("admin"),
-		[user],
-	);
+	const isAppAdmin = user?.appRole === "APP_ADMIN" || (user?.roles ?? []).includes("admin");
 
-	const login = useCallback(async (idpHint?: string) => {
-		authClient.login(idpHint);
-	}, []);
+	const login = async (idpHint?: string, returnTo?: string) => {
+		authClient.login(idpHint, returnTo);
+	};
 
-	const linkAccount = useCallback(async (providerAlias: string) => {
+	const linkAccount = async (providerAlias: string) => {
 		authClient.linkAccount(providerAlias);
-	}, []);
+	};
 
-	const logout = useCallback(async () => {
+	const logout = async () => {
 		await authClient.logout();
-	}, []);
+	};
 
-	const hasRole = useCallback((role: string) => (user?.roles ?? []).includes(role), [user]);
+	const hasRole = (role: string) => (user?.roles ?? []).includes(role);
 
-	const isCurrentUser = useCallback(
-		(login?: string) =>
-			!!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase(),
-		[user],
-	);
+	const isCurrentUser = (login?: string) =>
+		!!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase();
 
-	const getUserId = useCallback(() => (user ? String(user.id) : undefined), [user]);
+	const getUserId = () => (user ? String(user.id) : undefined);
 
-	const getGitProviderId = useCallback(() => user?.gitProviderId ?? undefined, [user]);
+	const getGitProviderId = () => user?.gitProviderId ?? undefined;
 
-	const getUserProfilePictureUrl = useCallback(() => {
+	const getUserProfilePictureUrl = () => {
 		if (user?.avatarUrl) {
 			return user.avatarUrl;
 		}
@@ -110,47 +106,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
 			return `https://avatars.githubusercontent.com/u/${user.gitProviderId}`;
 		}
 		return "";
-	}, [user]);
+	};
 
-	const getUserProfileUrl = useCallback(() => user?.profileUrl ?? "", [user]);
+	const getUserProfileUrl = () => user?.profileUrl ?? "";
 
-	const value = useMemo<AuthContextType>(
-		() => ({
-			isAuthenticated: user !== null,
-			isLoading,
-			username: user?.username ?? undefined,
-			userRoles: user?.roles ?? [],
-			isAppAdmin,
-			userProfile,
-			login,
-			linkAccount,
-			logout,
-			hasRole,
-			isCurrentUser,
-			getUserId,
-			getGitProviderId,
-			getUserProfilePictureUrl,
-			getUserProfileUrl,
-			hasGitLabIdentity: user?.hasGitLabIdentity ?? false,
-			isImpersonating: user?.impersonating ?? false,
-			impersonatedDisplayName: user?.displayName ?? undefined,
-		}),
-		[
-			user,
-			isLoading,
-			isAppAdmin,
-			userProfile,
-			login,
-			linkAccount,
-			logout,
-			hasRole,
-			isCurrentUser,
-			getUserId,
-			getGitProviderId,
-			getUserProfilePictureUrl,
-			getUserProfileUrl,
-		],
-	);
+	const value: AuthContextType = {
+		isAuthenticated: user !== null,
+		isLoading,
+		username: user?.username ?? undefined,
+		userRoles: user?.roles ?? [],
+		isAppAdmin,
+		userProfile,
+		login,
+		linkAccount,
+		logout,
+		hasRole,
+		isCurrentUser,
+		getUserId,
+		getGitProviderId,
+		getUserProfilePictureUrl,
+		getUserProfileUrl,
+		hasGitLabIdentity: user?.hasGitLabIdentity ?? false,
+		isImpersonating: user?.impersonating ?? false,
+		impersonatedDisplayName: user?.displayName ?? undefined,
+	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

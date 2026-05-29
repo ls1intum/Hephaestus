@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ShieldCheck, ShieldOff, UserCog, Users } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
 import {
 	adminListUsersInfiniteOptions,
@@ -48,20 +48,17 @@ function AdminUsersPage() {
 			lastPage.length === PAGE_SIZE ? allPages.length : undefined,
 	});
 
-	const allUsers = useMemo<AdminAccountView[]>(
-		() => listQuery.data?.pages.flat() ?? [],
-		[listQuery.data],
-	);
+	// React Compiler memoizes these derivations; no manual useMemo (see webapp/AGENTS.md).
+	const allUsers: AdminAccountView[] = listQuery.data?.pages.flat() ?? [];
 
-	const filteredUsers = useMemo(() => {
-		const term = deferredSearch.trim().toLowerCase();
-		if (!term) return allUsers;
-		return allUsers.filter((u) =>
-			[u.displayName, u.primaryEmail, u.appRole, u.status, String(u.id ?? "")]
-				.filter(Boolean)
-				.some((field) => field?.toLowerCase().includes(term)),
-		);
-	}, [allUsers, deferredSearch]);
+	const term = deferredSearch.trim().toLowerCase();
+	const filteredUsers = term
+		? allUsers.filter((u) =>
+				[u.displayName, u.primaryEmail, u.appRole, u.status, String(u.id ?? "")]
+					.filter(Boolean)
+					.some((field) => field?.toLowerCase().includes(term)),
+			)
+		: allUsers;
 
 	const invalidateList = () =>
 		queryClient.invalidateQueries({

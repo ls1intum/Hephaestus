@@ -136,6 +136,10 @@ export function SessionsSection() {
 				<div className="space-y-3">
 					{sessions.map((session) => {
 						const lastSeen = formatTimestamp(session.issuedAt);
+						// Scope the pending state to the row actually being revoked so a single revoke
+						// doesn't disable/spin every other session's button (mirrors LoginProvidersSettings).
+						const isRevokingThis =
+							revokeOne.isPending && revokeOne.variables?.path.jti === session.jti;
 						return (
 							<div
 								key={session.jti ?? `${session.userAgent}:${session.ip}`}
@@ -170,11 +174,11 @@ export function SessionsSection() {
 									<Button
 										variant="outline"
 										size="sm"
-										disabled={revokeOne.isPending || !session.jti}
+										disabled={isRevokingThis || !session.jti}
 										onClick={() => session.jti && revokeOne.mutate({ path: { jti: session.jti } })}
 										aria-label="Revoke this session"
 									>
-										{revokeOne.isPending ? <Spinner className="mr-1.5" /> : null}
+										{isRevokingThis ? <Spinner className="mr-1.5" /> : null}
 										Revoke
 									</Button>
 								)}

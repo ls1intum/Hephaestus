@@ -20,7 +20,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { type LoginProviderKind, PROVIDER_LABELS } from "./loginProviders";
+import { IDENTITY_LOGIN_KINDS, type LoginProviderKind, PROVIDER_LABELS } from "./loginProviders";
 
 export interface AddLoginProviderPayload {
 	kind: LoginProviderKind;
@@ -34,19 +34,18 @@ export interface AddLoginProviderDialogProps {
 	onSubmit: (payload: AddLoginProviderPayload) => void;
 }
 
-const KIND_OPTIONS: Array<{ value: LoginProviderKind; label: string }> = [
-	{ value: "OIDC_LOGIN_GITHUB", label: PROVIDER_LABELS.OIDC_LOGIN_GITHUB },
-	{ value: "OIDC_LOGIN_GITLAB", label: PROVIDER_LABELS.OIDC_LOGIN_GITLAB },
-];
+const KIND_OPTIONS: Array<{ value: LoginProviderKind; label: string }> = IDENTITY_LOGIN_KINDS.map(
+	(kind) => ({ value: kind, label: PROVIDER_LABELS[kind] }),
+);
 
 type FieldKey = "issuerUrl" | "clientId" | "clientSecret" | "displayName";
 
 /**
- * Add-provider form rendered inside the parent {@code <Dialog>}. Collects the inline
- * credentials the OIDC-login ConnectionStrategy requires: {@code issuer_url}, {@code client_id},
- * {@code client_secret}, {@code display_name}, plus optional {@code scopes}. Submitting fires
+ * Add-provider form rendered inside the parent `<Dialog>`. Collects the inline
+ * credentials the OIDC-login ConnectionStrategy requires: `issuer_url`, `client_id`,
+ * `client_secret`, `display_name`, plus optional `scopes`. Submitting fires
  * the `initiate` mutation; the synchronous SSRF-protected issuer probe either creates the
- * connection or returns a 400 whose `detail` is shown via {@code submitError}.
+ * connection or returns a 400 whose `detail` is shown via `submitError`.
  */
 export function AddLoginProviderDialog({
 	isSubmitting,
