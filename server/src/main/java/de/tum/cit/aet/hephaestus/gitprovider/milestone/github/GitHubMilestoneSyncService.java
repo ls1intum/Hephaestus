@@ -110,7 +110,7 @@ public class GitHubMilestoneSyncService {
             ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             Set<Integer> syncedNumbers = new HashSet<>();
             int totalSynced = 0;
-            int milestonesReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+            int milestonesReceived = 0;
             int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;

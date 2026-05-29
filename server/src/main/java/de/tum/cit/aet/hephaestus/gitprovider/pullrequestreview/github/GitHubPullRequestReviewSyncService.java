@@ -191,7 +191,7 @@ public class GitHubPullRequestReviewSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
-        int reviewsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int reviewsReceived = 0;
         int reportedTotalCount = -1;
         String cursor = startCursor;
         boolean hasMore = true;
