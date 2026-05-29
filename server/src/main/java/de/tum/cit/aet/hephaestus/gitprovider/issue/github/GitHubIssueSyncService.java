@@ -573,10 +573,11 @@ public class GitHubIssueSyncService {
             }
         }
 
-        // Full-sync only; compare raw nodes received (not the post-filter count) against totalCount.
-        // Stopped early = aborted OR hit the page cap (both leave pages unfetched).
+        // Full-sync only; compare raw issue nodes received (not the post-filter count) vs totalCount.
+        // hasMore stays true on every early break (error/rate-limit, page cap, empty/null page) and is
+        // false only after clean exhaustion — so it is the complete early-stop signal.
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            boolean stoppedEarly = abortReason != null || pageCount >= MAX_PAGINATION_PAGES;
+            boolean stoppedEarly = abortReason != null || hasMore;
             GraphQlConnectionOverflowDetector.checkPaginated(
                 "issues",
                 issuesReceived,

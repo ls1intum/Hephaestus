@@ -147,7 +147,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             int totalSynced = 0;
             // Threads received across all pages — the apples-to-apples count for
             // reviewThreads.totalCount. (totalSynced counts comments, a different unit.)
-            int threadsProcessed = 0;
+            int threadsReceived = 0;
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
@@ -270,7 +270,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     reportedTotalCount = response.getTotalCount();
                 }
 
-                threadsProcessed += response.getNodes().size();
+                threadsReceived += response.getNodes().size();
                 for (var graphQlThread : response.getNodes()) {
                     int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
@@ -286,7 +286,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
                     "reviewThreads",
-                    threadsProcessed,
+                    threadsReceived,
                     reportedTotalCount,
                     hasNextPage,
                     "prNumber=" + pullRequest.getNumber()

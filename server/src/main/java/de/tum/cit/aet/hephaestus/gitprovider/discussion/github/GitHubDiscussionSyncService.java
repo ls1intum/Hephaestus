@@ -238,7 +238,7 @@ public class GitHubDiscussionSyncService {
         final boolean incrementalSync = isIncrementalSync;
 
         int totalDiscussionsSynced = 0;
-        int discussionsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int discussionsReceived = 0;
         int totalCommentsSynced = 0;
         List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination = new ArrayList<>();
         List<CommentWithReplyCursor> commentsNeedingReplyPagination = new ArrayList<>();
