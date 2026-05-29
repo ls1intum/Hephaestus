@@ -36,6 +36,8 @@
             CREATE EXTENSION IF NOT EXISTS citext;
         ]]></sql>
         <comment>Enable citext extension for account.primary_email case-insensitive uniqueness. Idempotent via IF NOT EXISTS.</comment>
+        <!-- Intentionally empty: never DROP EXTENSION on rollback — other schema may depend on citext. -->
+        <rollback/>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1779800000000-2-account">
@@ -85,6 +87,11 @@
                 ON account (status)
                 WHERE status <> 'ACTIVE';
         ]]></sql>
+        <rollback>
+            <!-- Explicit: the inline <sql> indexes/constraints have no auto-rollback; dropping the
+                 table cascades them. -->
+            <dropTable tableName="account"/>
+        </rollback>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1779800000000-3-identity-link">
@@ -142,6 +149,9 @@
             CREATE INDEX ix_identity_link_external_actor ON identity_link (external_actor_id)
                 WHERE external_actor_id IS NOT NULL;
         ]]></sql>
+        <rollback>
+            <dropTable tableName="identity_link"/>
+        </rollback>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1779800000000-4-account-feature">
@@ -204,6 +214,9 @@
         <sql><![CDATA[
             CREATE INDEX ix_jwt_signing_key_active ON jwt_signing_key (active) WHERE active = true;
         ]]></sql>
+        <rollback>
+            <dropTable tableName="jwt_signing_key"/>
+        </rollback>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1779800000000-6-issued-jwt">
@@ -237,6 +250,9 @@
                 ON issued_jwt (account_id) WHERE revoked_at IS NULL;
             CREATE INDEX ix_issued_jwt_expires_at ON issued_jwt (expires_at);
         ]]></sql>
+        <rollback>
+            <dropTable tableName="issued_jwt"/>
+        </rollback>
     </changeSet>
 
     <!--
@@ -290,6 +306,13 @@
             CREATE INDEX ix_auth_event_failure_ip
                 ON auth_event (ip_inet) WHERE result = 'FAILURE';
         ]]></sql>
+        <rollback>
+            <!-- Raw CREATE TABLE has no auto-rollback. CASCADE drops the child partitions
+                 (bootstrapped in -8) + all indexes with the parent. -->
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE IF EXISTS auth_event CASCADE;
+            ]]></sql>
+        </rollback>
     </changeSet>
 
     <!--
@@ -360,6 +383,98 @@
             DROP INDEX IF EXISTS uq_user_keycloak_subject;
             ALTER TABLE "user" DROP COLUMN IF EXISTS keycloak_subject;
         ]]></sql>
+        <rollback>
+            <!-- Re-add the dropped column + its partial unique index (matching 1779790459343). -->
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE "user" ADD COLUMN IF NOT EXISTS keycloak_subject VARCHAR(255);
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_user_keycloak_subject
+                    ON "user" (keycloak_subject)
+                    WHERE keycloak_subject IS NOT NULL;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        ── Consolidated below per CLAUDE.md §5 (one changelog file per branch) ──
+        The auth_rate_limit_bucket + account_export changeSets were originally separate files
+        (1779850000000_*, 1779860000000_*); they are folded in here as additional changeSets.
+        Their ids are kept verbatim. Liquibase keys DATABASECHANGELOG on id+author+filename, so a
+        dev DB that already ran the old files sees these as "new" rows under the new filename — the
+        MARK_RAN preconditions short-circuit on the existing tables, so no DDL re-executes.
+    -->
+
+    <!--
+        Backing table for Bucket4j Postgres ProxyManager (SELECT … FOR UPDATE) used by the
+        auth rate limiter (core.auth.ratelimit, ADR 0017 hardening). Distributed token-bucket
+        state shared across replicas — no Redis. Schema is fixed by Bucket4j:
+          - id        : the bucket key (VARCHAR — PrimaryKeyMapper.STRING).
+          - state     : serialized bucket state (BYTEA).
+          - expires_at: epoch-millis expiry (BIGINT), nullable.
+        Not a JPA entity (managed by the Bucket4j library, like the shedlock table).
+    -->
+    <changeSet author="FelixTJDietrich" id="1779850000000-1-auth-rate-limit-bucket">
+        <preConditions onFail="MARK_RAN" onFailMessage="auth_rate_limit_bucket already present">
+            <not><tableExists tableName="auth_rate_limit_bucket"/></not>
+        </preConditions>
+        <createTable tableName="auth_rate_limit_bucket">
+            <column name="id" type="VARCHAR(255)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="state" type="BYTEA"/>
+            <column name="expires_at" type="BIGINT"/>
+        </createTable>
+        <rollback>
+            <dropTable tableName="auth_rate_limit_bucket"/>
+        </rollback>
+    </changeSet>
+
+    <!--
+        account_export — GDPR Art. 20 ("right to data portability") self-service export.
+        One row per "download my data" request (entity: core.auth.export.AccountExport).
+        Account-scoped. Lifecycle PENDING → PROCESSING → READY → EXPIRED (or → FAILED); the JSON
+        bundle is stored inline in `payload` (BYTEA). The payload never contains tokens,
+        credential blobs, or signing keys — see ExportBundle (the disclosure contract).
+    -->
+    <changeSet author="FelixTJDietrich" id="1779860000000-1-account-export">
+        <preConditions onFail="MARK_RAN" onFailMessage="account_export already present">
+            <not><tableExists tableName="account_export"/></not>
+        </preConditions>
+        <createTable tableName="account_export">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="account_id" type="BIGINT">
+                <constraints nullable="false"
+                             foreignKeyName="fk_account_export_account"
+                             referencedTableName="account"
+                             referencedColumnNames="id"
+                             deleteCascade="true"/>
+            </column>
+            <column name="status" type="VARCHAR(16)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+            <column name="requested_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="completed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="expires_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="failure_reason" type="VARCHAR(128)"/>
+            <column name="payload" type="BYTEA"/>
+        </createTable>
+        <sql><![CDATA[
+            ALTER TABLE account_export ADD CONSTRAINT ck_account_export_status
+                CHECK (status IN ('PENDING', 'PROCESSING', 'READY', 'FAILED', 'EXPIRED'));
+            -- Hot path: "my exports" listing + the ownership-scoped (id, account_id) lookup.
+            CREATE INDEX ix_account_export_account ON account_export (account_id);
+            -- Backs the retention sweep: READY rows past expiry.
+            CREATE INDEX ix_account_export_ready_expiry
+                ON account_export (expires_at)
+                WHERE status = 'READY';
+        ]]></sql>
+        <rollback>
+            <!-- dropTable cascades the check constraint + both indexes. -->
+            <dropTable tableName="account_export"/>
+        </rollback>
     </changeSet>
 
 </databaseChangeLog>

@@ -32,7 +32,13 @@ public class AccountAdminController {
         this.accountService = accountService;
     }
 
-    public record AdminAccountViewDTO(Long id, String displayName, String primaryEmail, String appRole, String status) {}
+    public record AdminAccountViewDTO(
+        Long id,
+        String displayName,
+        String primaryEmail,
+        String appRole,
+        String status
+    ) {}
 
     public record UpdateAccountRequestDTO(@Nullable String appRole) {}
 
@@ -52,7 +58,10 @@ public class AccountAdminController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update an account's app role", operationId = "adminUpdateUser")
-    public ResponseEntity<AdminAccountViewDTO> update(@PathVariable Long id, @RequestBody UpdateAccountRequestDTO body) {
+    public ResponseEntity<AdminAccountViewDTO> update(
+        @PathVariable Long id,
+        @RequestBody UpdateAccountRequestDTO body
+    ) {
         Account account = accountService.adminSetRole(id, body.appRole(), CurrentAccount.requireId());
         return ResponseEntity.ok(toView(account));
     }

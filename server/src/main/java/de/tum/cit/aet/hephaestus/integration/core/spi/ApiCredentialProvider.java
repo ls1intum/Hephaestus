@@ -41,8 +41,7 @@ public interface ApiCredentialProvider {
             @JsonSubTypes.Type(value = OAuthClientSecret.class, name = "OAUTH_CLIENT_SECRET"),
         }
     )
-    sealed interface CredentialBundle
-        permits BearerToken, InstallationCredential, OAuthSession, OAuthClientSecret {}
+    sealed interface CredentialBundle permits BearerToken, InstallationCredential, OAuthSession, OAuthClientSecret {}
 
     /**
      * Long-lived or short-lived bearer (PAT, Slack xoxb, OAuth access token).

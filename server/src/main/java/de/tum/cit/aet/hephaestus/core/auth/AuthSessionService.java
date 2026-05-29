@@ -5,14 +5,13 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
@@ -68,7 +67,15 @@ public class AuthSessionService {
         HttpServletRequest request,
         HttpServletResponse response
     ) {
-        issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
+        // Atomically revoke the presenting token. The conditional UPDATE (revokedAt IS NULL) affects
+        // 0 rows when a concurrent refresh/logout already rotated this jti — in that race we must NOT
+        // mint a fresh token (it would resurrect a session the other request meant to end). No-op and
+        // clear the cookie so the client re-authenticates.
+        int revoked = issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
+        if (revoked == 0) {
+            clearCookie(response);
+            return;
+        }
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(
             principalFactory.forAccountId(accountId),
             impersonatorId,
@@ -92,12 +99,7 @@ public class AuthSessionService {
 
     /** Active (non-revoked, non-expired) sessions for an account. */
     public List<IssuedJwt> activeSessions(Long accountId) {
-        Instant now = clock.instant();
-        return issuedJwtRepository
-            .findAll()
-            .stream()
-            .filter(j -> j.getAccountId().equals(accountId) && j.getRevokedAt() == null && j.getExpiresAt().isAfter(now))
-            .toList();
+        return issuedJwtRepository.findActiveByAccountId(accountId, clock.instant());
     }
 
     /** Revoke a single session, only if it belongs to {@code accountId}. */
@@ -112,12 +114,12 @@ public class AuthSessionService {
     /** Sign out everywhere except the presenting session. */
     @Transactional
     public void revokeAllExcept(Long accountId, UUID currentJti) {
-        Instant now = clock.instant();
-        issuedJwtRepository
-            .findAll()
-            .stream()
-            .filter(j -> j.getAccountId().equals(accountId) && j.getRevokedAt() == null && !j.getJti().equals(currentJti))
-            .forEach(j -> issuedJwtRepository.revoke(j.getJti(), now, RevokedReason.SIGN_OUT_EVERYWHERE));
+        issuedJwtRepository.revokeAllForAccountExcept(
+            accountId,
+            currentJti,
+            clock.instant(),
+            RevokedReason.SIGN_OUT_EVERYWHERE
+        );
     }
 
     public void clearCookie(HttpServletResponse response) {

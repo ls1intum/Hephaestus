@@ -59,9 +59,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
      * the registration-id naming ({@code gl-ws-{connectionId}}).
      */
     @WorkspaceAgnostic("core.auth materializes IDENTITY-family Connections into login ClientRegistrations")
-    @Query(
-        "SELECT c FROM Connection c JOIN FETCH c.workspace WHERE c.kind IN :kinds AND c.state = :state"
-    )
+    @Query("SELECT c FROM Connection c JOIN FETCH c.workspace WHERE c.kind IN :kinds AND c.state = :state")
     List<Connection> findByKindInAndStateWithWorkspace(
         @Param("kinds") List<IntegrationKind> kinds,
         @Param("state") IntegrationState state

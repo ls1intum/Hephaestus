@@ -169,6 +169,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         return endpoint.namespace + ":ip:" + clientIp(request);
     }
 
+    /** Number of reverse-proxy hops the deployment owns and therefore trusts at the right of XFF. */
+    int trustedProxyCount() {
+        return properties.trustedProxyCount();
+    }
+
     private static Optional<String> currentSubject() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken token) {
@@ -179,18 +184,41 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Resolves the client IP. Trusts {@code X-Forwarded-For} (first hop) because the app always sits
-     * behind the Coolify reverse proxy in every deployed topology; {@code getRemoteAddr()} otherwise
-     * yields the proxy address and collapses every client into one bucket.
+     * Resolves the client IP for IP-keyed buckets, bounded to the trusted reverse-proxy topology.
+     *
+     * <p><strong>XFF-spoof defence.</strong> {@code X-Forwarded-For} is appended left→right
+     * ({@code client, proxy1, …, edge}). A naive "first hop wins" trusts an attacker-controlled
+     * value: a client can send {@code X-Forwarded-For: <victim-or-random>} and our edge proxy merely
+     * appends its own address, so the leftmost entry is fully spoofable — letting an attacker rotate
+     * the spoofed value to mint unlimited fresh IP buckets and bypass the pre-auth limit on
+     * {@code /oauth2/authorization/*}.
+     *
+     * <p>Each trusted proxy appends the address of its immediate peer, so a legitimate chain of
+     * {@code trustedProxyCount} proxies produces exactly that many trustworthy rightmost entries; the
+     * first of those (counting from the right) — at index {@code length - trustedProxyCount} — is the
+     * real client. Any entries further left were supplied by the client and are NOT trusted. With the
+     * default single Coolify hop the client sits at index {@code length - 1} (the rightmost entry).
+     * If the header has too few hops to account for the trusted proxies (or is absent / disabled via
+     * {@code trustedProxyCount=0}), we fall back to {@code getRemoteAddr()} — the only value the
+     * client cannot forge. Standard rightmost-untrusted-IP handling (cf. OWASP, Spring's own
+     * {@code X-Forwarded-For} support).
      */
-    static String clientIp(HttpServletRequest request) {
+    String clientIp(HttpServletRequest request) {
+        int trusted = properties.trustedProxyCount();
         String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            int comma = forwarded.indexOf(',');
-            String first = (comma >= 0 ? forwarded.substring(0, comma) : forwarded).trim();
-            if (!first.isEmpty()) {
-                return first;
+        if (trusted > 0 && forwarded != null && !forwarded.isBlank()) {
+            String[] hops = forwarded.split(",");
+            // The trusted proxies contribute the rightmost `trusted` entries; the real client is the
+            // entry immediately to their left.
+            int idx = hops.length - trusted;
+            if (idx >= 0 && idx < hops.length) {
+                String candidate = hops[idx].trim();
+                if (!candidate.isEmpty()) {
+                    return candidate;
+                }
             }
+            // Too few hops to clear the trusted proxies → the header was not produced by our full
+            // proxy chain; do not trust it. Fall through to getRemoteAddr().
         }
         String remote = request.getRemoteAddr();
         return remote != null ? remote : "unknown";
@@ -198,10 +226,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     /** Builds a Bucket4j configuration: one bandwidth, interval refill (fresh budget per window). */
     private static BucketConfiguration configFor(AuthRateLimitProperties.Limit limit) {
-        Bandwidth bandwidth = Bandwidth.classic(
-            limit.capacity(),
-            Refill.intervally(limit.capacity(), limit.period())
-        );
+        Bandwidth bandwidth = Bandwidth.classic(limit.capacity(), Refill.intervally(limit.capacity(), limit.period()));
         return BucketConfiguration.builder().addLimit(bandwidth).build();
     }
 

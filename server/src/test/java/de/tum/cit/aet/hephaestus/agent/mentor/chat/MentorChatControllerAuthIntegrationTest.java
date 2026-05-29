@@ -72,8 +72,12 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     }
 
     @Test
-    @DisplayName("unauthenticated POST → 401 (filter rejects before controller handler runs)")
-    void unauthenticated_returnsUnauthorized() {
+    @DisplayName("unauthenticated cookie-style POST → 403 (CSRF rejects before the controller runs)")
+    void unauthenticated_returnsForbidden() {
+        // ADR 0017 enabled stateless double-submit CSRF on the resource-server chain. A cookie-style
+        // (non-bearer) state-changing request with no X-XSRF-TOKEN is rejected 403 by the CSRF filter
+        // before it reaches the controller (the request is unauthenticated at that point, so the
+        // AccessDenied resolves to 403). Detailed 403-vs-401 semantics live in CsrfProtectionIntegrationTest.
         webTestClient
             .post()
             .uri("/workspaces/{workspaceSlug}/mentor/chat", "any-slug")
@@ -81,7 +85,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
             .bodyValue(validBody())
             .exchange()
             .expectStatus()
-            .isUnauthorized();
+            .isForbidden();
     }
 
     @Test

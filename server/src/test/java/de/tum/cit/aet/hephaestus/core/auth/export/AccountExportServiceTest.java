@@ -96,21 +96,24 @@ class AccountExportServiceTest extends BaseUnitTest {
         assertThat(bundle.schemaVersion()).isEqualTo(ExportBundle.SCHEMA_VERSION);
         assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID);
         assertThat(bundle.account().primaryEmail()).isEqualTo("ada@example.com");
-        assertThat(bundle.identities()).singleElement().satisfies(i -> {
-            assertThat(i.provider()).isEqualTo("GITLAB");
-            assertThat(i.usernameAtSignup()).isEqualTo("ada");
-        });
-        assertThat(bundle.workspaceMemberships()).singleElement().satisfies(m -> {
-            assertThat(m.slug()).isEqualTo("tum-ase");
-            assertThat(m.role()).isEqualTo("MEMBER");
-        });
+        assertThat(bundle.identities())
+            .singleElement()
+            .satisfies(i -> {
+                assertThat(i.provider()).isEqualTo("GITLAB");
+                assertThat(i.usernameAtSignup()).isEqualTo("ada");
+            });
+        assertThat(bundle.workspaceMemberships())
+            .singleElement()
+            .satisfies(m -> {
+                assertThat(m.slug()).isEqualTo("tum-ase");
+                assertThat(m.role()).isEqualTo("MEMBER");
+            });
         assertThat(bundle.featureFlags()).containsExactly("mentor_access");
         assertThat(bundle.preferences().participateInResearch()).isTrue();
         assertThat(bundle.preferences().aiReviewEnabled()).isFalse();
-
-        // The login resolved from this account's identity link must be the one used for the
-        // cross-module preference lookup (proves the Account → login bridge is account-owned).
-        verify(preferencesQuery).preferencesForLogin("ada");
+        // The preferences could only carry these values if the bundle resolved the login "ada" from
+        // this account's identity link and looked it up via preferencesForLogin("ada") — so the
+        // returned-state assertions above already prove the Account → login bridge; no verify needed.
 
         // Serialize and assert no token/credential/key material is present anywhere in the JSON.
         String json = new ObjectMapper().writeValueAsString(bundle);

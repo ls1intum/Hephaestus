@@ -3,9 +3,6 @@ package de.tum.cit.aet.hephaestus.notification;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRoleQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
-import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -22,8 +19,6 @@ import org.springframework.stereotype.Component;
 @WorkspaceAgnostic("Role checks are user-scoped (login → account → account_feature)")
 public class AccountFeatureRoleChecker implements UserRoleChecker {
 
-    private static final Logger log = LoggerFactory.getLogger(AccountFeatureRoleChecker.class);
-
     private final AccountRoleQuery accountRoleQuery;
 
     public AccountFeatureRoleChecker(AccountRoleQuery accountRoleQuery) {
@@ -32,11 +27,7 @@ public class AccountFeatureRoleChecker implements UserRoleChecker {
 
     @Override
     public boolean hasRole(@NonNull String username, @NonNull String roleName) {
-        Objects.requireNonNull(username, "username must not be null");
-        Objects.requireNonNull(roleName, "roleName must not be null");
-        if (roleName.isBlank()) {
-            throw new IllegalArgumentException("roleName must not be blank");
-        }
+        // Fail-closed per the SPI contract: AccountRoleQuery null-guards and never throws.
         return accountRoleQuery.hasFeatureFlag(username, roleName);
     }
 

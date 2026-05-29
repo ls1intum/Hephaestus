@@ -55,11 +55,7 @@ public class AccountService {
     }
 
     public List<IdentityLink> activeIdentities(Long accountId) {
-        return identityLinkRepository
-            .findAll()
-            .stream()
-            .filter(il -> il.getAccount().getId().equals(accountId) && il.getDisabledAt() == null)
-            .toList();
+        return identityLinkRepository.findActiveByAccountId(accountId);
     }
 
     /**
@@ -74,7 +70,10 @@ public class AccountService {
         account.setDeletedAt(clock.instant());
         accountRepository.save(account);
         issuedJwtRepository.revokeAllForAccount(accountId, clock.instant(), IssuedJwt.RevokedReason.ACCOUNT_DELETED);
-        authEventLogger.event(AuthEvent.EventType.ACCOUNT_DELETED, AuthEvent.Result.SUCCESS).account(accountId).record();
+        authEventLogger
+            .event(AuthEvent.EventType.ACCOUNT_DELETED, AuthEvent.Result.SUCCESS)
+            .account(accountId)
+            .record();
     }
 
     public List<Account> adminList(int page, int size) {

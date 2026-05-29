@@ -88,7 +88,11 @@ public class AccountPreferencesService {
                     log.warn("No PostHog person matched provided identifiers: userLogin={}", user.getLogin());
                 }
             } catch (PosthogClientException exception) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to revoke analytics consent", exception);
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Failed to revoke analytics consent",
+                    exception
+                );
             }
         }
         return toDTO(preferences);

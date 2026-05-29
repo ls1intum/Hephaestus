@@ -13,12 +13,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -41,7 +41,8 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
  * listener in a later commit; the TTL is the safety net.
  */
 public class LoginClientRegistrationRepository
-    implements ClientRegistrationRepository, Iterable<ClientRegistration>, IdentityProviderCatalog {
+    implements ClientRegistrationRepository, Iterable<ClientRegistration>, IdentityProviderCatalog
+{
 
     private static final Logger log = LoggerFactory.getLogger(LoginClientRegistrationRepository.class);
     private static final String CALLBACK_TEMPLATE = "{baseUrl}/login/oauth2/code/{registrationId}";

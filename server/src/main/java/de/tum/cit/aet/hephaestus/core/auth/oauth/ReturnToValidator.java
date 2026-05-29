@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
+import java.util.Locale;
 import org.springframework.lang.Nullable;
 
 /**
@@ -36,7 +37,8 @@ public final class ReturnToValidator {
             }
         }
         // Reject dangerous URI schemes — case insensitive, defensive lower().
-        String lower = trimmed.toLowerCase();
+        // Locale.ROOT so a Turkish-locale 'I'→'ı' fold can never let "JAVASCRIPT:" slip past.
+        String lower = trimmed.toLowerCase(Locale.ROOT);
         if (
             lower.startsWith("javascript:") ||
             lower.startsWith("data:") ||

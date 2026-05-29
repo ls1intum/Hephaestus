@@ -63,8 +63,9 @@ class AuthEventPartitionLiquibaseTest {
         // partition behaviour, not XSD conformance, so skip changelog XML validation here.
         System.setProperty("liquibase.validateXmlChangelogFiles", "false");
         try (Connection connection = newConnection()) {
-            Database database = DatabaseFactory.getInstance()
-                .findCorrectDatabaseImplementation(new JdbcConnection(connection));
+            Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(
+                new JdbcConnection(connection)
+            );
             try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
                 liquibase.update(new Contexts());
             }
@@ -91,13 +92,13 @@ class AuthEventPartitionLiquibaseTest {
             long id = nextAuthEventId(statement);
             String insert =
                 "INSERT INTO auth_event (id, occurred_at, event_type, result, ip_inet) " +
-                "VALUES (" + id + ", now(), 'LOGIN', 'SUCCESS', '203.0.113.7')";
+                "VALUES (" +
+                id +
+                ", now(), 'LOGIN', 'SUCCESS', '203.0.113.7')";
             int inserted = statement.executeUpdate(insert);
             assertThat(inserted).isEqualTo(1);
 
-            try (ResultSet rs = statement.executeQuery(
-                "SELECT event_type, result FROM auth_event WHERE id = " + id
-            )) {
+            try (ResultSet rs = statement.executeQuery("SELECT event_type, result FROM auth_event WHERE id = " + id)) {
                 assertThat(rs.next()).as("inserted auth_event row must be readable back").isTrue();
                 assertThat(rs.getString("event_type")).isEqualTo("LOGIN");
                 assertThat(rs.getString("result")).isEqualTo("SUCCESS");
@@ -122,33 +123,29 @@ class AuthEventPartitionLiquibaseTest {
     }
 
     private static boolean isPartitioned(Statement statement, String table) throws Exception {
-        try (ResultSet rs = statement.executeQuery(
-            "SELECT relkind FROM pg_class WHERE relname = '" + table + "'"
-        )) {
+        try (ResultSet rs = statement.executeQuery("SELECT relkind FROM pg_class WHERE relname = '" + table + "'")) {
             return rs.next() && "p".equals(rs.getString(1)); // 'p' = partitioned table
         }
     }
 
     private static boolean relationExists(Statement statement, String relation) throws Exception {
-        try (ResultSet rs = statement.executeQuery(
-            "SELECT 1 FROM pg_class WHERE relname = '" + relation + "'"
-        )) {
+        try (ResultSet rs = statement.executeQuery("SELECT 1 FROM pg_class WHERE relname = '" + relation + "'")) {
             return rs.next();
         }
     }
 
     private static boolean currentMonthPartitionExists(Statement statement) throws Exception {
-        try (ResultSet rs = statement.executeQuery(
-            "SELECT 1 FROM pg_class WHERE relname = 'auth_event_p' || to_char(now(), 'YYYYMM')"
-        )) {
+        try (
+            ResultSet rs = statement.executeQuery(
+                "SELECT 1 FROM pg_class WHERE relname = 'auth_event_p' || to_char(now(), 'YYYYMM')"
+            )
+        ) {
             return rs.next();
         }
     }
 
     private static boolean extensionInstalled(Statement statement, String extension) throws Exception {
-        try (ResultSet rs = statement.executeQuery(
-            "SELECT 1 FROM pg_extension WHERE extname = '" + extension + "'"
-        )) {
+        try (ResultSet rs = statement.executeQuery("SELECT 1 FROM pg_extension WHERE extname = '" + extension + "'")) {
             return rs.next();
         }
     }

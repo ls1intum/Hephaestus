@@ -14,7 +14,9 @@ import org.springframework.stereotype.Repository;
  * {@link JpaRepository} provides (those methods are simply never called on the auth path).
  */
 @Repository
-@WorkspaceAgnostic("Auth audit events are account/system-scoped; workspace is an optional reference, not a tenant scope")
+@WorkspaceAgnostic(
+    "Auth audit events are account/system-scoped; workspace is an optional reference, not a tenant scope"
+)
 public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.Id> {
     /**
      * Auth events about the given account at or after {@code since}, newest first. Backs the GDPR

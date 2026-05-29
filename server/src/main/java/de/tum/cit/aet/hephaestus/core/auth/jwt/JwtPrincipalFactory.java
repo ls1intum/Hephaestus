@@ -71,9 +71,8 @@ public class JwtPrincipalFactory {
      */
     private String resolveLogin(Account account) {
         return identityLinkRepository
-            .findAll()
+            .findActiveByAccountId(account.getId())
             .stream()
-            .filter(il -> il.getAccount().getId().equals(account.getId()) && il.getDisabledAt() == null)
             .filter(il -> il.getUsernameAtSignup() != null && !il.getUsernameAtSignup().isBlank())
             .max(JwtPrincipalFactory::byLastLogin)
             .map(IdentityLink::getUsernameAtSignup)

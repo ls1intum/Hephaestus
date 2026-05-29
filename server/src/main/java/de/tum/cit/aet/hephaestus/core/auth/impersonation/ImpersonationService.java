@@ -10,21 +10,24 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
+import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Impersonation as JWT reissuance with the RFC 8693 {@code act} claim.
  *
  * <p>In a stateless cookie-JWT BFF there is no server session for {@code SwitchUserFilter}
  * to mutate — impersonation is "mint a token for the target carrying the operator's id in
- * {@code act}." {@link de.tum.cit.aet.hephaestus.core.auth.oauth.ImpersonationGuard}
- * enforces read-only-by-default on any request whose JWT carries {@code act}.
+ * {@code act}." {@link de.tum.cit.aet.hephaestus.core.security.ImpersonationGuard}
+ * enforces read-only-by-default on any request whose JWT carries {@code act} (now actually
+ * registered on the resource-server chain — it was previously dead code).
  *
  * <p>Both begin and exit are audited with the {@code (account_id=target,
  * acting_account_id=operator)} pair so every action taken under impersonation is
@@ -40,6 +43,7 @@ public class ImpersonationService {
     private final JwtPrincipalFactory principalFactory;
     private final IssuedJwtRepository issuedJwtRepository;
     private final AuthEventLogger authEventLogger;
+    private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public ImpersonationService(
@@ -48,6 +52,7 @@ public class ImpersonationService {
         JwtPrincipalFactory principalFactory,
         IssuedJwtRepository issuedJwtRepository,
         AuthEventLogger authEventLogger,
+        ObjectMapper objectMapper,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
@@ -55,6 +60,7 @@ public class ImpersonationService {
         this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
         this.authEventLogger = authEventLogger;
+        this.objectMapper = objectMapper;
         this.clock = clock;
     }
 
@@ -97,7 +103,7 @@ public class ImpersonationService {
             .event(AuthEvent.EventType.IMPERSONATION_BEGIN, AuthEvent.Result.SUCCESS)
             .account(target.getId())
             .actingAccount(operator.getId())
-            .details("{\"reason\":\"" + escape(reason) + "\"}")
+            .details(writeReasonJson(reason))
             .record();
         log.info("auth.impersonation: operator={} began impersonating target={}", operator.getId(), target.getId());
 
@@ -123,12 +129,22 @@ public class ImpersonationService {
             .account(targetAccountId)
             .actingAccount(operatorAccountId)
             .record();
-        log.info("auth.impersonation: operator={} exited impersonation of target={}", operatorAccountId, targetAccountId);
+        log.info(
+            "auth.impersonation: operator={} exited impersonation of target={}",
+            operatorAccountId,
+            targetAccountId
+        );
 
         return new Result(token, operatorAccountId, null);
     }
 
-    private static String escape(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    /**
+     * Serialize the audit details via Jackson so control characters ({@code \n}, {@code \t}, …)
+     * and quotes in the operator-supplied {@code reason} are escaped correctly. The previous
+     * hand-rolled {@code escape()} only handled {@code \\} and {@code "}, so a reason containing a
+     * newline produced invalid JSON in {@code auth_event.details}.
+     */
+    private String writeReasonJson(String reason) {
+        return objectMapper.writeValueAsString(Map.of("reason", reason));
     }
 }

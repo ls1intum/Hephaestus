@@ -84,7 +84,11 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             /* impersonator */ null,
             request
         );
-        setAccessCookie(response, issued.value(), issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond());
+        setAccessCookie(
+            response,
+            issued.value(),
+            issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond()
+        );
 
         String redirectTo = (intent != null) ? ReturnToValidator.safeOrFallback(intent.returnTo()) : "/";
         getRedirectStrategy().sendRedirect(request, response, redirectTo);

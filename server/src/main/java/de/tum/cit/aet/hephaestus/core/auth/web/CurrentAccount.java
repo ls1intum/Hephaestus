@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 /**
  * Resolves the current Hephaestus account from the validated JWT in the security context.

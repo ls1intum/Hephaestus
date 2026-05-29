@@ -77,11 +77,13 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     private static OAuth2TokenValidator<Jwt> buildValidator(AuthProperties properties) {
         OAuth2TokenValidator<Jwt> defaults = JwtValidators.createDefault();
         OAuth2TokenValidator<Jwt> timestamp = new JwtTimestampValidator();
-        OAuth2TokenValidator<Jwt> issuer = new JwtClaimValidator<String>(JwtClaimNames.ISS, iss ->
-            iss != null && iss.equals(properties.issuer().toString())
+        OAuth2TokenValidator<Jwt> issuer = new JwtClaimValidator<String>(
+            JwtClaimNames.ISS,
+            iss -> iss != null && iss.equals(properties.issuer().toString())
         );
-        OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<java.util.List<String>>(JwtClaimNames.AUD, aud ->
-            aud != null && aud.contains(properties.audience())
+        OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<java.util.List<String>>(
+            JwtClaimNames.AUD,
+            aud -> aud != null && aud.contains(properties.audience())
         );
         return new DelegatingOAuth2TokenValidator<>(defaults, timestamp, issuer, audience);
     }

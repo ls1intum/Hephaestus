@@ -34,7 +34,9 @@ public record ConnectionDetailDTO(
     Instant updatedAt,
     @Nullable Instant lastActivityAt,
     Set<Capability> capabilities,
-    @Nullable @Schema(type = "object", description = "Opaque, typed connection config tree (no credentials).") JsonNode config
+    @Nullable
+    @Schema(type = "object", description = "Opaque, typed connection config tree (no credentials).")
+    JsonNode config
 ) {
     public static ConnectionDetailDTO from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
         JsonNode configNode = c.getConfig() == null ? null : mapper.valueToTree(c.getConfig());

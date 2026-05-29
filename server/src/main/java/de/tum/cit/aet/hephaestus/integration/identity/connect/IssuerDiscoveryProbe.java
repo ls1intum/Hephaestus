@@ -7,6 +7,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -34,8 +36,15 @@ import tools.jackson.databind.ObjectMapper;
  *       doc that points the actual flow at an internal address).</li>
  * </ol>
  *
- * <p>Redirects are NOT followed ({@link HttpClient.Redirect#NEVER}) — a 30x to an internal
- * address is a classic SSRF bypass.
+ * <h2>DNS-rebind / TOCTOU hardening (OWASP SSRF Prevention Cheat Sheet)</h2>
+ * Validating the host's IP and then letting {@link HttpClient} re-resolve DNS at send time is a
+ * classic TOCTOU bypass: an attacker domain with a very low TTL can answer with a public IP during
+ * {@link #assertPublicHost} and then flip to {@code 169.254.169.254} / {@code 127.0.0.1} for the
+ * actual connection. To collapse that window we resolve the host ONCE, validate every returned
+ * address, and then re-resolve immediately before the send and require the live answer to be a
+ * non-empty subset of the already-vetted public set (re-validating each address again). Any new or
+ * non-public address aborts the request. Combined with {@link HttpClient.Redirect#NEVER} (a 30x to
+ * an internal address is a classic bypass) and a short timeout this leaves no usable rebind window.
  */
 @Component
 public class IssuerDiscoveryProbe {
@@ -49,6 +58,23 @@ public class IssuerDiscoveryProbe {
         .connectTimeout(TIMEOUT)
         .build();
 
+    private final HostResolver resolver;
+
+    public IssuerDiscoveryProbe() {
+        this(InetAddress::getAllByName);
+    }
+
+    /** Test seam: a stub resolver lets the SSRF matrix run without real DNS. */
+    IssuerDiscoveryProbe(HostResolver resolver) {
+        this.resolver = resolver;
+    }
+
+    /** DNS resolution seam (defaults to {@link InetAddress#getAllByName(String)}). */
+    @FunctionalInterface
+    interface HostResolver {
+        InetAddress[] resolve(String host) throws UnknownHostException;
+    }
+
     /** Thrown when the issuer fails any safety or discovery check. Message is user-safe. */
     public static class IssuerValidationException extends RuntimeException {
 
@@ -60,6 +86,7 @@ public class IssuerDiscoveryProbe {
     /** Validates the issuer; returns the parsed discovery document on success. */
     public DiscoveryResult validate(String issuerUrl) {
         URI issuer = parseHttpsUri(issuerUrl, "issuer URL");
+        // First-pass validation; the actual fetch re-resolves and re-checks (DNS-rebind defence).
         assertPublicHost(issuer);
 
         URI discovery = issuer.resolve(stripTrailingSlash(issuer.getPath()) + "/.well-known/openid-configuration");
@@ -75,6 +102,20 @@ public class IssuerDiscoveryProbe {
     }
 
     private JsonNode fetchDiscovery(URI discovery) {
+        // Re-resolve + re-validate immediately before the send so a low-TTL rebind between the
+        // initial assertPublicHost() and now cannot point the connection at an internal address.
+        // The live answer must be a non-empty subset of the vetted public set.
+        Set<String> vetted = assertPublicHost(discovery);
+        Set<String> live = resolveAndValidate(discovery.getHost());
+        if (!vetted.containsAll(live)) {
+            log.warn(
+                "auth.oidc: rejecting discovery — host {} re-resolved to a new/changed address (possible DNS rebind)",
+                discovery.getHost()
+            );
+            throw new IssuerValidationException(
+                "host " + discovery.getHost() + " resolved to a different address on re-check (possible DNS rebind)"
+            );
+        }
         try {
             HttpRequest req = HttpRequest.newBuilder(discovery)
                 .timeout(TIMEOUT)
@@ -114,15 +155,22 @@ public class IssuerDiscoveryProbe {
         return uri;
     }
 
-    private static void assertPublicHost(URI uri) {
-        String host = uri.getHost();
+    /**
+     * Resolve the host and reject if any returned IP is non-public. Returns the set of vetted
+     * address strings (so the caller can pin against a later re-resolution).
+     */
+    private Set<String> assertPublicHost(URI uri) {
+        return resolveAndValidate(uri.getHost());
+    }
+
+    private Set<String> resolveAndValidate(String host) {
         InetAddress[] addresses;
         try {
-            addresses = InetAddress.getAllByName(host);
+            addresses = resolver.resolve(host);
         } catch (UnknownHostException e) {
             throw new IssuerValidationException("host " + host + " does not resolve");
         }
-        if (addresses.length == 0) {
+        if (addresses == null || addresses.length == 0) {
             throw new IssuerValidationException("host " + host + " resolved to no addresses");
         }
         for (InetAddress addr : addresses) {
@@ -139,6 +187,11 @@ public class IssuerDiscoveryProbe {
                 );
             }
         }
+        Set<String> out = new HashSet<>();
+        for (InetAddress addr : addresses) {
+            out.add(addr.getHostAddress());
+        }
+        return out;
     }
 
     /** fc00::/7 — IPv6 unique-local; not covered by isSiteLocalAddress(). */

@@ -49,7 +49,7 @@ import org.springframework.context.annotation.Configuration;
     scheme = "bearer",
     bearerFormat = "JWT",
     description = "Hephaestus-native JWT bearer authentication. The SPA normally authenticates via the " +
-    "`__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent bearer token."
+        "`__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent bearer token."
 )
 public class OpenAPIConfiguration {
 

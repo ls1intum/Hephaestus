@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.lang.Nullable;
 
 /**
@@ -58,7 +60,11 @@ public class IssuedJwt {
     @Nullable
     private String userAgent;
 
+    // Postgres `inet`: bind the String through the INET JDBC type so the driver casts it
+    // explicitly. Without this Hibernate binds a `varchar`, and the insert fails with
+    // "column ip_inet is of type inet but expression is of type character varying".
     @Column(name = "ip_inet", columnDefinition = "inet")
+    @JdbcTypeCode(SqlTypes.INET)
     @Nullable
     private String ipInet;
 

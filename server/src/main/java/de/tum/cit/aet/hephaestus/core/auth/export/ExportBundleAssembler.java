@@ -145,9 +145,7 @@ public class ExportBundleAssembler {
         );
     }
 
-    private static ExportBundle.AuthEvent toAuthEvent(
-        de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent e
-    ) {
+    private static ExportBundle.AuthEvent toAuthEvent(de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent e) {
         return new ExportBundle.AuthEvent(
             e.getId() != null ? e.getId().getOccurredAt() : null,
             e.getEventType() != null ? e.getEventType().name() : null,

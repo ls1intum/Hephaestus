@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.jwt;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -56,6 +57,45 @@ public interface IssuedJwtRepository extends JpaRepository<IssuedJwt, UUID> {
     )
     int revokeAllForAccount(
         @Param("accountId") Long accountId,
+        @Param("now") Instant now,
+        @Param("reason") IssuedJwt.RevokedReason reason
+    );
+
+    /**
+     * Active (non-revoked, non-expired) sessions for an account. Replaces a {@code findAll()}-then-
+     * filter on {@code AuthSessionService.activeSessions} (was a full table scan per /user/sessions
+     * read). Keyed on the indexed {@code account_id} column.
+     */
+    @Query(
+        """
+        SELECT j
+          FROM IssuedJwt j
+         WHERE j.accountId = :accountId
+           AND j.revokedAt IS NULL
+           AND j.expiresAt > :now
+        """
+    )
+    List<IssuedJwt> findActiveByAccountId(@Param("accountId") Long accountId, @Param("now") Instant now);
+
+    /**
+     * Revoke every active session for an account except {@code keepJti} (sign-out-everywhere). A
+     * single bulk UPDATE replaces a {@code findAll()}-then-filter-then-revoke-each loop. Returns the
+     * number of rows revoked.
+     */
+    @Modifying
+    @Query(
+        """
+        UPDATE IssuedJwt j
+           SET j.revokedAt = :now,
+               j.revokedReason = :reason
+         WHERE j.accountId = :accountId
+           AND j.revokedAt IS NULL
+           AND j.jti <> :keepJti
+        """
+    )
+    int revokeAllForAccountExcept(
+        @Param("accountId") Long accountId,
+        @Param("keepJti") UUID keepJti,
         @Param("now") Instant now,
         @Param("reason") IssuedJwt.RevokedReason reason
     );

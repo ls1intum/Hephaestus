@@ -40,7 +40,8 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
  * launch UX; LRU multi-flight cookie can be added if real users hit issues.
  */
 public class CookieOAuth2AuthorizationRequestRepository
-    implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
+    implements AuthorizationRequestRepository<OAuth2AuthorizationRequest>
+{
 
     public static final String COOKIE_NAME = "__Host-OAUTH_STATE";
     private static final String AAD = "oauth2-state";
@@ -54,7 +55,9 @@ public class CookieOAuth2AuthorizationRequestRepository
 
     public CookieOAuth2AuthorizationRequestRepository(byte[] aesKeyBytes) {
         if (aesKeyBytes.length != 32) {
-            throw new IllegalArgumentException("AES-GCM cookie key must be 32 bytes (256-bit), got " + aesKeyBytes.length);
+            throw new IllegalArgumentException(
+                "AES-GCM cookie key must be 32 bytes (256-bit), got " + aesKeyBytes.length
+            );
         }
         this.key = new SecretKeySpec(aesKeyBytes, "AES");
     }
@@ -168,7 +171,10 @@ public class CookieOAuth2AuthorizationRequestRepository
     }
 
     private static byte[] serialize(OAuth2AuthorizationRequest req) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream(); ObjectOutputStream oos = new ObjectOutputStream(out)) {
+        try (
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ObjectOutputStream oos = new ObjectOutputStream(out)
+        ) {
             oos.writeObject(req);
             oos.flush();
             return out.toByteArray();

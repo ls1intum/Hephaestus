@@ -81,7 +81,10 @@ public class AuthEvent {
     @Nullable
     private Long identityLinkId;
 
+    // Bind the String through the INET JDBC type (see IssuedJwt.ipInet) — otherwise Hibernate
+    // emits a varchar and the insert fails against the `inet` column.
     @Column(name = "ip_inet", nullable = false, columnDefinition = "inet")
+    @JdbcTypeCode(SqlTypes.INET)
     private String ipInet;
 
     @Column(name = "user_agent", length = 512)

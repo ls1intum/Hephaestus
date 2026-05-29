@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
+import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSelector;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
-import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
@@ -128,9 +128,7 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     public JWK currentSigningKey() {
         List<JWK> keys = loadJwkSet().getKeys();
         if (keys.isEmpty()) {
-            throw new IllegalStateException(
-                "no active JWT signing key — ensureActiveKey() must run before issuance"
-            );
+            throw new IllegalStateException("no active JWT signing key — ensureActiveKey() must run before issuance");
         }
         return keys.get(0); // ordering enforced by repository.findActive()
     }
@@ -152,11 +150,7 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     }
 
     private JWKSet reload() {
-        List<JWK> jwks = repository
-            .findActive()
-            .stream()
-            .map(JwtSigningKeyService::toJwk)
-            .toList();
+        List<JWK> jwks = repository.findActive().stream().map(JwtSigningKeyService::toJwk).toList();
         return new JWKSet(jwks);
     }
 
@@ -168,10 +162,12 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     private static JWK toJwk(JwtSigningKey row) {
         try {
             byte[] publicDer = stripPem(row.getPublicKeyPem());
-            ECPublicKey publicKey = (ECPublicKey) KeyFactory.getInstance("EC")
-                .generatePublic(new X509EncodedKeySpec(publicDer));
-            ECPrivateKey privateKey = (ECPrivateKey) KeyFactory.getInstance("EC")
-                .generatePrivate(new PKCS8EncodedKeySpec(row.getPrivateKeyPem()));
+            ECPublicKey publicKey = (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(
+                new X509EncodedKeySpec(publicDer)
+            );
+            ECPrivateKey privateKey = (ECPrivateKey) KeyFactory.getInstance("EC").generatePrivate(
+                new PKCS8EncodedKeySpec(row.getPrivateKeyPem())
+            );
             return new ECKey.Builder(Curve.P_256, publicKey)
                 .privateKey(privateKey)
                 .keyID(row.getKid())

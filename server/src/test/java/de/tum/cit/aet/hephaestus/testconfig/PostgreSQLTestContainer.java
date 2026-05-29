@@ -147,7 +147,7 @@ public final class PostgreSQLTestContainer {
         } catch (SQLException exception) {
             throw new IllegalStateException(
                 "Failed to enable required PostgreSQL extension 'citext' on the test database: " +
-                exception.getMessage(),
+                    exception.getMessage(),
                 exception
             );
         }

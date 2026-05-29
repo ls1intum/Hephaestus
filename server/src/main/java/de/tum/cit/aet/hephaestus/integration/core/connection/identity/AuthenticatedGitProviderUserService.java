@@ -72,7 +72,6 @@ public class AuthenticatedGitProviderUserService {
             return Optional.empty();
         }
 
-
         Long gitlabId = jwt.getClaim("gitlab_id");
         if (gitlabId != null) {
             String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
@@ -90,14 +89,7 @@ public class AuthenticatedGitProviderUserService {
 
         Long githubId = jwt.getClaim("github_id");
         if (githubId != null) {
-            Long userId = upsertGitHubUser(
-                githubId,
-                login,
-                login,
-                "",
-                GITHUB_SERVER_URL + "/" + login,
-                User.Type.USER
-            );
+            Long userId = upsertGitHubUser(githubId, login, login, "", GITHUB_SERVER_URL + "/" + login, User.Type.USER);
             return userRepository.findById(userId);
         }
 
@@ -116,19 +108,10 @@ public class AuthenticatedGitProviderUserService {
             throw new IllegalStateException("No JWT found for authenticated user");
         }
 
-
         Long gitlabId = jwt.getClaim("gitlab_id");
         if (gitlabId != null) {
             String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
-            upsertGitLabUser(
-                gitlabId,
-                login,
-                login,
-                "",
-                resolvedUrl + "/" + login,
-                resolvedUrl,
-                User.Type.USER
-            );
+            upsertGitLabUser(gitlabId, login, login, "", resolvedUrl + "/" + login, resolvedUrl, User.Type.USER);
             return;
         }
 

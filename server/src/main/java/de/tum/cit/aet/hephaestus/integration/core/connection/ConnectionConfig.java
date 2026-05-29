@@ -105,11 +105,7 @@ public sealed interface ConnectionConfig
      * @param scopes     OAuth scopes to request (subset of what the IdP supports).
      * @param displayName  Human-friendly label rendered in the SPA login picker.
      */
-    record OidcLoginConfig(
-        String issuerUrl,
-        Set<String> scopes,
-        String displayName
-    ) implements ConnectionConfig {
+    record OidcLoginConfig(String issuerUrl, Set<String> scopes, String displayName) implements ConnectionConfig {
         @Override
         public Set<String> enabledStreams() {
             return Set.of();

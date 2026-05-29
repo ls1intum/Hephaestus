@@ -50,7 +50,12 @@ public class AuthIntentCookie {
     }
 
     /** The pre-OAuth intent — populated from /auth/login query params, consumed in the success handler. */
-    public record Intent(@Nullable String workspaceSlug, @Nullable String returnTo, Mode mode, @Nullable Long linkingAccountId) {
+    public record Intent(
+        @Nullable String workspaceSlug,
+        @Nullable String returnTo,
+        Mode mode,
+        @Nullable Long linkingAccountId
+    ) {
         public enum Mode {
             /** Fresh login — JIT-create Account on first IdP subject we've never seen. */
             LOGIN,

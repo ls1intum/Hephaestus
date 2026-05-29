@@ -21,10 +21,17 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * <p>Set {@code enabled=false} to bypass the filter entirely (e.g. load tests). The limits are
  * shared across replicas when a Postgres-backed {@code ProxyManager} is wired (production); see
  * {@link AuthRateLimitConfig} for the per-replica fallback trade-off.
+ *
+ * <p>{@code trustedProxyCount} bounds how many rightmost {@code X-Forwarded-For} hops the deployment
+ * owns (default 1 — always behind Coolify). The IP-keyed buckets resolve the client as the entry
+ * just left of those trusted hops, so a spoofed leftmost XFF value cannot mint fresh buckets. Set to
+ * the real number of reverse proxies in front of the app; {@code 0} disables XFF trust entirely
+ * (key purely off {@code getRemoteAddr()}).
  */
 @ConfigurationProperties(prefix = "hephaestus.auth.rate-limit")
 public record AuthRateLimitProperties(
     @DefaultValue("true") boolean enabled,
+    @DefaultValue("1") int trustedProxyCount,
     @DefaultValue Limit oauthAuthorization,
     @DefaultValue Limit refresh,
     @DefaultValue Limit impersonate,
@@ -37,6 +44,9 @@ public record AuthRateLimitProperties(
         refresh = refresh != null ? refresh : Limit.of(60, Duration.ofMinutes(1));
         impersonate = impersonate != null ? impersonate : Limit.of(10, Duration.ofMinutes(1));
         deleteUser = deleteUser != null ? deleteUser : Limit.of(3, Duration.ofHours(1));
+        if (trustedProxyCount < 0) {
+            throw new IllegalArgumentException("trustedProxyCount must be >= 0, got: " + trustedProxyCount);
+        }
     }
 
     /**

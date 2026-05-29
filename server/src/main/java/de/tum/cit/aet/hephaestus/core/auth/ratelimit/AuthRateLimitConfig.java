@@ -53,10 +53,7 @@ public class AuthRateLimitConfig {
             .primaryKeyMapper(PrimaryKeyMapper.STRING)
             .table(BUCKET_TABLE)
             .build();
-        log.info(
-            "Auth rate limiting: Postgres-backed (table={}) — limits SHARED across replicas.",
-            BUCKET_TABLE
-        );
+        log.info("Auth rate limiting: Postgres-backed (table={}) — limits SHARED across replicas.", BUCKET_TABLE);
         return (key, config) -> proxyManager.getProxy(key, () -> config);
     }
 
@@ -69,14 +66,14 @@ public class AuthRateLimitConfig {
     BucketResolver inMemoryBucketResolver() {
         log.warn(
             "Auth rate limiting: in-JVM fallback — limits are PER-REPLICA, NOT shared across the " +
-            "cluster. Acceptable for dev / specs / worker-only pods; production must run " +
-            "Postgres-backed (hephaestus.auth.rate-limit.postgres-backed=true with a DataSource)."
+                "cluster. Acceptable for dev / specs / worker-only pods; production must run " +
+                "Postgres-backed (hephaestus.auth.rate-limit.postgres-backed=true with a DataSource)."
         );
         var store = new java.util.concurrent.ConcurrentHashMap<String, io.github.bucket4j.Bucket>();
         return (key, config) ->
-            store.computeIfAbsent(key, k -> io.github.bucket4j.Bucket.builder().addLimit(
-                config.getBandwidths()[0]
-            ).build());
+            store.computeIfAbsent(key, k ->
+                io.github.bucket4j.Bucket.builder().addLimit(config.getBandwidths()[0]).build()
+            );
     }
 
     @Bean

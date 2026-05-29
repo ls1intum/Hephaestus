@@ -105,7 +105,11 @@ public class AuthEventPartitionManager {
         int created = ensurePartitions(current);
         int dropped = dropExpiredPartitions(current);
         if (created > 0 || dropped > 0) {
-            log.info("auth.audit: partition maintenance — created {} partition(s), dropped {} expired", created, dropped);
+            log.info(
+                "auth.audit: partition maintenance — created {} partition(s), dropped {} expired",
+                created,
+                dropped
+            );
         }
     }
 
@@ -199,7 +203,9 @@ public class AuthEventPartitionManager {
         for (YearMonth ym : partitionsToDrop(existing, current)) {
             String name = partitionName(ym);
             try {
-                // DETACH then DROP keeps the parent's locking footprint small; IF EXISTS is idempotent.
+                // Plain DROP: dropping a partition takes a brief ACCESS EXCLUSIVE lock on the parent,
+                // but expired partitions are well outside the write window so contention is negligible.
+                // IF EXISTS is idempotent (a concurrent drop / lost lock race is harmless).
                 jdbcTemplate.execute("DROP TABLE IF EXISTS " + name);
                 dropped++;
                 log.info("auth.audit: dropped expired partition {} (retention {} months)", name, RETENTION_MONTHS);

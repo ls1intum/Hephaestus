@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.domain;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -51,4 +52,20 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
         """
     )
     int touchLastLogin(@Param("id") Long id, @Param("now") Instant now);
+
+    /**
+     * Active (non-disabled) identity links for an account. Replaces a {@code findAll()}-then-filter
+     * on the JWT-issue hot path ({@code JwtPrincipalFactory.resolveLogin}) and the
+     * {@code /user/identities} read ({@code AccountService.activeIdentities}) — both ran a full table
+     * scan per call. The join column is {@code account_id}.
+     */
+    @Query(
+        """
+        SELECT il
+          FROM IdentityLink il
+         WHERE il.account.id = :accountId
+           AND il.disabledAt IS NULL
+        """
+    )
+    List<IdentityLink> findActiveByAccountId(@Param("accountId") Long accountId);
 }

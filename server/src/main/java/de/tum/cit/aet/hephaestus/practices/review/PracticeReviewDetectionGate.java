@@ -279,10 +279,7 @@ public class PracticeReviewDetectionGate {
         // Rate-limit WARN logging to avoid log spam during role-checker outages
         if (Duration.between(lastWarning, now).compareTo(SKIP_WARNING_INTERVAL) >= 0) {
             if (lastSkipWarningTime.compareAndSet(lastWarning, now)) {
-                log.warn(
-                    "Practice review gate skipping due to role checker unhealthy: skippedCount={}",
-                    currentCount
-                );
+                log.warn("Practice review gate skipping due to role checker unhealthy: skippedCount={}", currentCount);
             }
         }
     }

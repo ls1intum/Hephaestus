@@ -2,15 +2,15 @@ package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
-import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.auth.spi.OAuthLoginDefaultsProvider;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
-import java.time.Clock;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -22,11 +22,11 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 /**
  * Wires the OAuth login flow on a dedicated, medium-precedence
@@ -86,7 +86,7 @@ public class AuthSecurityConfig {
         if (registrations.isEmpty()) {
             log.warn(
                 "auth: no default OAuth login providers configured — set hephaestus.auth.github.client-id " +
-                "and/or hephaestus.auth.gitlab-lrz.client-id. Workspace-scoped OIDC Connections may still apply."
+                    "and/or hephaestus.auth.gitlab-lrz.client-id. Workspace-scoped OIDC Connections may still apply."
             );
         }
         return () -> List.copyOf(registrations);
@@ -163,12 +163,7 @@ public class AuthSecurityConfig {
         AuthRateLimitFilter authRateLimitFilter
     ) throws Exception {
         http
-            .securityMatcher(
-                "/oauth2/authorization/**",
-                "/login/oauth2/code/**",
-                "/auth/login",
-                "/auth/error"
-            )
+            .securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(req -> {
@@ -209,7 +204,7 @@ public class AuthSecurityConfig {
         new SecureRandom().nextBytes(ephemeral);
         log.warn(
             "auth: hephaestus.auth.state-cookie-key is unset — generated ephemeral 256-bit key for this boot. " +
-            "In-flight logins will not survive a restart. Set the env var for stable behaviour."
+                "In-flight logins will not survive a restart. Set the env var for stable behaviour."
         );
         return ephemeral;
     }

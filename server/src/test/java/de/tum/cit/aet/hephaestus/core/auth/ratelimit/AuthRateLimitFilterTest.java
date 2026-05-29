@@ -50,9 +50,17 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     }
 
     private static AuthRateLimitProperties props(AuthRateLimitProperties.Limit... overrides) {
+        return propsWithTrustedProxies(1, overrides);
+    }
+
+    private static AuthRateLimitProperties propsWithTrustedProxies(
+        int trustedProxyCount,
+        AuthRateLimitProperties.Limit... overrides
+    ) {
         // Defaults from the spec; tests override specific limits via the canonical constructor.
         return new AuthRateLimitProperties(
             true,
+            trustedProxyCount,
             overrides.length > 0 ? overrides[0] : new AuthRateLimitProperties.Limit(20, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(60, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(10, Duration.ofMinutes(1)),
@@ -92,6 +100,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     void disabledFilterPassesThroughWithoutTouchingBuckets() throws Exception {
         AuthRateLimitProperties disabled = new AuthRateLimitProperties(
             false,
+            1,
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
@@ -250,14 +259,84 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void xForwardedForFirstHopWinsOverRemoteAddr() throws Exception {
+    void singleTrustedProxyTakesRightmostXffHopAsClient() throws Exception {
+        // One Coolify hop: the proxy appends the real client IP, so XFF has exactly one entry which
+        // IS the client. getRemoteAddr() is the proxy and must be ignored.
         AuthRateLimitFilter f = filter(props());
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        req.addHeader("X-Forwarded-For", "203.0.113.9, 10.0.0.1, 10.0.0.2");
+        req.addHeader("X-Forwarded-For", "203.0.113.7");
         req.setRemoteAddr("10.0.0.1");
         f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.9");
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.7");
+    }
+
+    @Test
+    void spoofedLeftmostXffEntriesAreIgnoredWithSingleTrustedProxy() throws Exception {
+        // Attacker prepends bogus hops to forge a fresh bucket: "evil1, evil2, <real-client>".
+        // With one trusted proxy the only trustworthy entry is the rightmost one (the address our
+        // proxy appended). The leftmost spoofed values MUST NOT key the bucket.
+        AuthRateLimitFilter f = filter(props());
+
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        req.addHeader("X-Forwarded-For", "1.1.1.1, 2.2.2.2, 203.0.113.50");
+        req.setRemoteAddr("10.0.0.1");
+        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.50");
+    }
+
+    @Test
+    void spoofedXffCannotMintUnlimitedBucketsAcrossRequests() throws Exception {
+        // capacity 1: an attacker rotating the leftmost spoofed value must still collapse into the
+        // SAME bucket (the rightmost trusted hop) and get 429 on the second attempt.
+        AuthRateLimitFilter f = filter(props(new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1))));
+
+        MockHttpServletRequest first = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        first.addHeader("X-Forwarded-For", "9.9.9.1, 203.0.113.50");
+        first.setRemoteAddr("10.0.0.1");
+        MockHttpServletResponse firstRes = new MockHttpServletResponse();
+        FilterChain firstChain = mock(FilterChain.class);
+        f.doFilter(first, firstRes, firstChain);
+        verify(firstChain, times(1)).doFilter(first, firstRes);
+
+        MockHttpServletRequest second = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        second.addHeader("X-Forwarded-For", "9.9.9.2, 203.0.113.50"); // rotated spoof, same real client
+        second.setRemoteAddr("10.0.0.1");
+        MockHttpServletResponse secondRes = new MockHttpServletResponse();
+        FilterChain secondChain = mock(FilterChain.class);
+        f.doFilter(second, secondRes, secondChain);
+
+        verify(secondChain, never()).doFilter(second, secondRes);
+        assertThat(secondRes.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.50");
+    }
+
+    @Test
+    void tooFewHopsForTrustedProxiesFallsBackToRemoteAddr() throws Exception {
+        // Two trusted proxies configured but only one XFF hop present → the chain is shorter than
+        // claimed, so the header is untrustworthy and we fall back to the unforgeable remote address.
+        AuthRateLimitFilter f = filter(propsWithTrustedProxies(2));
+
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        req.addHeader("X-Forwarded-For", "203.0.113.99");
+        req.setRemoteAddr("198.51.100.200");
+        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:198.51.100.200");
+    }
+
+    @Test
+    void zeroTrustedProxiesAlwaysUsesRemoteAddr() throws Exception {
+        // trustedProxyCount=0 disables XFF trust entirely — only getRemoteAddr() keys the bucket.
+        AuthRateLimitFilter f = filter(propsWithTrustedProxies(0));
+
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        req.addHeader("X-Forwarded-For", "203.0.113.7");
+        req.setRemoteAddr("198.51.100.5");
+        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:198.51.100.5");
     }
 }

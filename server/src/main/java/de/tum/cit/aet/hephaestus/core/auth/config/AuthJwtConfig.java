@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
@@ -12,6 +13,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 
 /**
  * Wires the JWT issuance + verification primitives for our own ES256 cookie-session JWTs
@@ -51,6 +53,16 @@ public class AuthJwtConfig {
         Clock authClock
     ) {
         return new RevocationAwareJwtDecoder(keyService, issuedJwtRepository, properties, cacheManager, authClock);
+    }
+
+    /**
+     * Resource-server bearer-token resolution from the SPA's access-token cookie, with a header
+     * fallback (ADR 0017). Built in the auth module so the root {@code SecurityConfig} depends only on
+     * the framework {@link BearerTokenResolver} interface, not the non-exposed {@code core} internals.
+     */
+    @Bean
+    public BearerTokenResolver hephaestusBearerTokenResolver(AuthProperties properties) {
+        return new CookieBearerTokenResolver(properties);
     }
 
     /**

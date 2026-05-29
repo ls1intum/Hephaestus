@@ -67,7 +67,11 @@ public class AccountProvisioningService {
 
         if (link != null) {
             identityLinkRepository.touchLastLogin(link.getId(), clock.instant());
-            log.info("auth.success: returning login provider={} accountId={}", registrationId, link.getAccount().getId());
+            log.info(
+                "auth.success: returning login provider={} accountId={}",
+                registrationId,
+                link.getAccount().getId()
+            );
             return link.getAccount();
         }
 

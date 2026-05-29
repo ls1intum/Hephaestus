@@ -35,7 +35,9 @@ import org.springframework.lang.Nullable;
  * One <em>active</em> identity per (account, provider, team) — enforced by the partial-unique
  * {@code uq_identity_link_active_per_provider} which only counts rows with {@code disabled_at IS NULL}.
  * Multiple identities of the same provider type for the same account are supported (e.g.
- * personal GitLab + work GitLab) but each must point at a distinct {@code git_provider} row.
+ * personal GitLab + work GitLab) but each must carry a distinct {@link #gitProviderId} (the
+ * scalar FK to the integration-owned {@code git_provider} row — see that field's doc for why it
+ * is not a JPA {@code @ManyToOne} association).
  */
 @Entity
 @Table(name = "identity_link")

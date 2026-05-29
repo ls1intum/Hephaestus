@@ -30,8 +30,12 @@ class AuthEventPartitionManagerTest extends BaseUnitTest {
 
     @Test
     void monthFromPartitionName_parsesMonthlyPartitions() {
-        assertThat(AuthEventPartitionManager.monthFromPartitionName("auth_event_p202605")).isEqualTo(YearMonth.of(2026, 5));
-        assertThat(AuthEventPartitionManager.monthFromPartitionName("auth_event_p202701")).isEqualTo(YearMonth.of(2027, 1));
+        assertThat(AuthEventPartitionManager.monthFromPartitionName("auth_event_p202605")).isEqualTo(
+            YearMonth.of(2026, 5)
+        );
+        assertThat(AuthEventPartitionManager.monthFromPartitionName("auth_event_p202701")).isEqualTo(
+            YearMonth.of(2027, 1)
+        );
     }
 
     @Test
