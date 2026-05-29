@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * <p>Slack issues exactly one signing secret per Slack app, shared across all installations.
  * Resolution order:
  * <ol>
- *   <li>{@code hephaestus.slack.signing-secret} — Slack-specific override
+ *   <li>{@code hephaestus.integration.slack.signing-secret} — Slack-specific override
  *   <li>{@code hephaestus.webhook.secret} — pre-existing shared infrastructure secret
  * </ol>
  *
@@ -29,7 +29,7 @@ public class SlackWebhookSecretSource implements WebhookSecretSource {
     private final String configuredSecret;
 
     public SlackWebhookSecretSource(
-        @Value("${hephaestus.slack.signing-secret:${hephaestus.webhook.secret:}}") String configuredSecret
+        @Value("${hephaestus.integration.slack.signing-secret:${hephaestus.webhook.secret:}}") String configuredSecret
     ) {
         this.configuredSecret = configuredSecret;
     }

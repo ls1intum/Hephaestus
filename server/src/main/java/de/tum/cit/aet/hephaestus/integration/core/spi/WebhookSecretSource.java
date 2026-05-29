@@ -11,7 +11,7 @@ import java.util.Optional;
  *   <li>GitHub: APP_GLOBAL — one shared {@code hephaestus.webhook.secret}
  *   <li>GitLab plaintext: APP_GLOBAL
  *   <li>GitLab {@code whsec_*} HMAC: WORKSPACE — per-Connection in {@code GitLabConfig.signingSecret}
- *   <li>Slack: APP_GLOBAL — one shared {@code hephaestus.slack.signing-secret}
+ *   <li>Slack: APP_GLOBAL — one shared {@code hephaestus.integration.slack.signing-secret}
  * </ul>
  */
 public interface WebhookSecretSource {

@@ -2,14 +2,18 @@
   "groups": [
     {
       "name": "hephaestus.sync",
-      "description": "GitHub data synchronization settings"
+      "description": "Provider-agnostic sync scheduler settings (run-on-startup, cron, cooldown, backfill, filters)"
+    },
+    {
+      "name": "hephaestus.integration.github.sync",
+      "description": "GitHub-specific sync tuning (GraphQL timeouts, incremental buffer, backfill page size)"
     },
     {
       "name": "hephaestus.sync.nats",
       "description": "NATS JetStream integration for real-time event processing"
     },
     {
-      "name": "hephaestus.github",
+      "name": "hephaestus.integration.github",
       "description": "GitHub API authentication and App configuration"
     },
     {
@@ -29,12 +33,8 @@
       "description": "Keycloak identity provider integration"
     },
     {
-      "name": "hephaestus.slack",
-      "description": "App-global Slack secrets (signing secret); per-workspace tokens live on Connection rows"
-    },
-    {
       "name": "hephaestus.integration.slack",
-      "description": "Slack integration toggle + OAuth client credentials"
+      "description": "Slack integration toggle, app-global signing secret, and OAuth client credentials"
     },
     {
       "name": "hephaestus.sentry",
@@ -57,22 +57,22 @@
       "description": "List of bot logins whose PRs are excluded from self-review scoring"
     },
     {
-      "name": "hephaestus.sync.graphql-timeout",
+      "name": "hephaestus.integration.github.sync.graphql-timeout",
       "type": "java.time.Duration",
       "description": "Timeout for standard GraphQL operations (default: 30s). Accepts duration format: 30s, 1m, PT30S"
     },
     {
-      "name": "hephaestus.sync.extended-graphql-timeout",
+      "name": "hephaestus.integration.github.sync.extended-graphql-timeout",
       "type": "java.time.Duration",
       "description": "Extended timeout for complex GraphQL operations like review comments (default: 60s). Accepts duration format: 60s, 1m, PT60S"
     },
     {
-      "name": "hephaestus.sync.pagination-throttle",
+      "name": "hephaestus.integration.github.sync.pagination-throttle",
       "type": "java.time.Duration",
       "description": "Delay between pagination requests to avoid hammering GitHub's API (default: 200ms). Accepts duration format: 200ms, PT0.2S"
     },
     {
-      "name": "hephaestus.sync.incremental-sync-enabled",
+      "name": "hephaestus.integration.github.sync.incremental-sync-enabled",
       "type": "java.lang.Boolean",
       "description": "Whether to use incremental sync based on last sync timestamp"
     },
@@ -162,7 +162,7 @@
       "description": "JWK Set URI for token verification; defaults to standard Keycloak endpoint"
     },
     {
-      "name": "hephaestus.slack.signing-secret",
+      "name": "hephaestus.integration.slack.signing-secret",
       "type": "java.lang.String",
       "description": "Slack signing secret for webhook verification (app-global)"
     },

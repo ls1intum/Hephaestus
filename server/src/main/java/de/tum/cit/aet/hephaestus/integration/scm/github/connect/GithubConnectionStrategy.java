@@ -37,8 +37,8 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     private final OAuthStateService oauthStateService;
 
     public GithubConnectionStrategy(
-        @Value("${hephaestus.github.app.install-url:}") String installUrl,
-        @Value("${hephaestus.github.app.id:}") String appId,
+        @Value("${hephaestus.integration.github.app.install-url:}") String installUrl,
+        @Value("${hephaestus.integration.github.app.id:}") String appId,
         OAuthStateService oauthStateService
     ) {
         this.installUrl = installUrl == null ? "" : installUrl.trim();
@@ -55,7 +55,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
     public ConnectInitiation initiate(InitiateRequest request) {
         if (installUrl.isEmpty()) {
             throw new IllegalStateException(
-                "hephaestus.github.app.install-url is not configured — cannot initiate GitHub App install"
+                "hephaestus.integration.github.app.install-url is not configured — cannot initiate GitHub App install"
             );
         }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB);
@@ -82,7 +82,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
             return new ConnectFinalization.Failed("installation_id is not a valid long: " + installationIdRaw);
         }
         // appId from the configured GitHub App; blank in dev profiles that haven't
-        // wired hephaestus.github.app.id yet. The credential record carries it so
+        // wired hephaestus.integration.github.app.id yet. The credential record carries it so
         // downstream callers (token refresh) can reconstruct the JWT without hitting
         // the DB for an unrelated property.
         InstallationCredential credentials = new InstallationCredential(installationId, appId);

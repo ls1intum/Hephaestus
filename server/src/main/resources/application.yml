@@ -3,6 +3,14 @@ spring:
         name: Hephaestus
         version: "${APP_VERSION:0.0.0-development}"
 
+    # Deploy-role aliases (see docker/compose.core.yaml + ADR 0008). Activating a group
+    # name expands to its member profiles, so SPRING_PROFILES_ACTIVE=webhook-server is
+    # equivalent to prod,webhook (and worker-node to prod,worker).
+    profiles:
+        group:
+            webhook-server: prod,webhook
+            worker-node: prod,worker
+
     config:
         import: optional:file:.env[.properties]
 
@@ -172,17 +180,11 @@ hephaestus:
     tenancy:
         enforcement: ${HEPHAESTUS_TENANCY_ENFORCEMENT:log}
 
-    # GitHub data sync. Per-field rationale (timeouts, incremental buffer, backfill page
-    # size, …) is on GitHubSyncProperties + SyncSchedulerProperties Javadoc, surfaced in the
-    # IDE via spring-configuration-processor.
+    # Provider-agnostic sync scheduler (SyncSchedulerProperties). The GitHub-specific sync
+    # tuning (GraphQL timeouts, incremental buffer, backfill page size) lives under
+    # hephaestus.integration.github.sync (GitHubSyncProperties); per-field rationale is on each
+    # record's Javadoc, surfaced in the IDE via spring-configuration-processor.
     sync:
-        graphql-timeout: ${HEPHAESTUS_SYNC_GRAPHQL_TIMEOUT:60s}
-        extended-graphql-timeout: ${HEPHAESTUS_SYNC_EXTENDED_GRAPHQL_TIMEOUT:120s}
-        pagination-throttle: ${HEPHAESTUS_SYNC_PAGINATION_THROTTLE:200ms}
-        incremental-sync-enabled: ${HEPHAESTUS_SYNC_INCREMENTAL_ENABLED:true}
-        incremental-sync-buffer: ${HEPHAESTUS_SYNC_INCREMENTAL_BUFFER:5m}
-        backfill-graphql-timeout: ${HEPHAESTUS_SYNC_BACKFILL_TIMEOUT:120s}
-        backfill-pr-page-size: ${HEPHAESTUS_SYNC_BACKFILL_PR_PAGE_SIZE:10}
         run-on-startup: true
         timeframe-days: 7
         cron: "0 0 3 * * *"
@@ -368,28 +370,6 @@ hephaestus:
             heartbeat-interval: 25s
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # GITLAB CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Settings for GitLab API integration. Used by GitLab-mode workspaces
-    # (GitProviderMode.GITLAB_PAT). Override default-server-url for self-hosted instances.
-    gitlab:
-        # NOTE: the enable GATE lives under hephaestus.integration.gitlab.enabled (see the
-        # INTEGRATION block below), unified with the github/slack manifests. This block only
-        # binds GitLabProperties (url/timeouts/throttle) via @ConfigurationProperties.
-        # Default GitLab server URL (used when workspace has no custom serverUrl).
-        # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
-        # automatically use the same instance for workspace creation.
-        default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${KEYCLOAK_GITLAB_BASE_URL:https://gitlab.com}}
-        # Timeout for standard GraphQL operations (default: 30s)
-        graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
-        # Extended timeout for complex operations (default: 60s)
-        extended-graphql-timeout: ${GITLAB_EXTENDED_GRAPHQL_TIMEOUT:60s}
-        # Delay between pagination requests (default: 200ms)
-        pagination-throttle: ${GITLAB_PAGINATION_THROTTLE:200ms}
-        # Cache duration for token validation results (default: 5m)
-        token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
-
-    # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
     # Single `hephaestus.webhook` block consumed by both webhook sides (ADR 0008):
@@ -429,29 +409,10 @@ hephaestus:
             max-payload-bytes: 26214400
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # GITHUB AUTHENTICATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Can be any OAuth token, such as the PAT
-    github:
-        app:
-            # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
-            id: ${GH_APP_ID:0}
-            privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
-            privateKey: ${GH_APP_PRIVATE_KEY:}
-            # URL where users install the GitHub App (shown in workspace creation UI)
-            installation-url: ${GH_APP_INSTALLATION_URL:}
-        meta:
-            # DEPRECATED: token used to live here; the Hephaestus-contributor
-            # endpoint now reads hephaestus.contributors.github.auth-token instead.
-            # Binding kept for backwards compatibility — remove once all environments
-            # have been migrated.
-            auth-token: ${GH_AUTH_TOKEN:}
-
-    # ═══════════════════════════════════════════════════════════════════════════
     # CONTRIBUTORS (Hephaestus meta — who built the app)
     # ═══════════════════════════════════════════════════════════════════════════
     # Token used by ContributorService to fetch the ls1intum/Hephaestus contributor
-    # graph. Detached from `hephaestus.github` so SCM-integration code no longer
+    # graph. Detached from `hephaestus.integration.github` so SCM-integration code no longer
     # carries an unrelated PAT. Defaults to the legacy GH_AUTH_TOKEN env var so
     # existing deployments keep working without touching their secrets stores.
     contributors:
@@ -470,17 +431,7 @@ hephaestus:
         client-secret: ${KEYCLOAK_CLIENT_SECRET:hephaestus-dev-secret}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # SLACK INTEGRATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Slack app credentials. The `signing-secret` is app-global and verifies inbound
-    # webhook signatures. The OAuth client-id/client-secret drive the per-workspace
-    # install flow (Slack does NOT support refresh-token rotation for legacy bot tokens,
-    # so we don't ship a refresher for them — see SlackConnectionStrategy).
-    slack:
-        signing-secret: ${SLACK_SIGNING_SECRET:}
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # INTEGRATION FEATURE FLAGS + SLACK OAUTH CLIENT
+    # INTEGRATION FEATURE FLAGS + SCM/SLACK CONFIG
     # ═══════════════════════════════════════════════════════════════════════════
     # Slack and Outline integrations are opt-in. Every bean under
     # integration/slack/** and integration/outline/** carries
@@ -489,12 +440,58 @@ hephaestus:
     # inert. Flip `enabled` to `true` once client-id + client-secret + redirect-uri
     # are configured.
     integration:
+        # ─── GitHub authentication (GitHubProperties) ───
+        # Can be any OAuth token, such as the PAT.
+        github:
+            app:
+                # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+                id: ${GH_APP_ID:0}
+                privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+                privateKey: ${GH_APP_PRIVATE_KEY:}
+                # URL where users install the GitHub App (shown in workspace creation UI)
+                installation-url: ${GH_APP_INSTALLATION_URL:}
+            meta:
+                # DEPRECATED: token used to live here; the Hephaestus-contributor
+                # endpoint now reads hephaestus.contributors.github.auth-token instead.
+                # Binding kept for backwards compatibility — remove once all environments
+                # have been migrated.
+                auth-token: ${GH_AUTH_TOKEN:}
+            # GitHub-specific sync tuning (GitHubSyncProperties). Provider-agnostic scheduler
+            # knobs (run-on-startup, cron, cooldown, backfill, filters, …) stay under
+            # hephaestus.sync (SyncSchedulerProperties).
+            sync:
+                graphql-timeout: ${HEPHAESTUS_SYNC_GRAPHQL_TIMEOUT:60s}
+                extended-graphql-timeout: ${HEPHAESTUS_SYNC_EXTENDED_GRAPHQL_TIMEOUT:120s}
+                pagination-throttle: ${HEPHAESTUS_SYNC_PAGINATION_THROTTLE:200ms}
+                incremental-sync-enabled: ${HEPHAESTUS_SYNC_INCREMENTAL_ENABLED:true}
+                incremental-sync-buffer: ${HEPHAESTUS_SYNC_INCREMENTAL_BUFFER:5m}
+                backfill-graphql-timeout: ${HEPHAESTUS_SYNC_BACKFILL_TIMEOUT:120s}
+                backfill-pr-page-size: ${HEPHAESTUS_SYNC_BACKFILL_PR_PAGE_SIZE:10}
         # GitLab is opt-in (default off). Flip GITLAB_ENABLED=true to load the GitLab beans +
-        # manifest. The gated beans and GitLabManifest both read this unified key.
+        # manifest. The gated beans and GitLabManifest both read the `enabled` gate; the
+        # sibling url/timeout/throttle keys bind GitLabProperties via @ConfigurationProperties.
+        # Used by GitLab-mode workspaces (GitProviderMode.GITLAB_PAT); override default-server-url
+        # for self-hosted instances.
         gitlab:
             enabled: ${GITLAB_ENABLED:false}
+            # Default GitLab server URL (used when workspace has no custom serverUrl).
+            # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
+            # automatically use the same instance for workspace creation.
+            default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${KEYCLOAK_GITLAB_BASE_URL:https://gitlab.com}}
+            # Timeout for standard GraphQL operations (default: 30s)
+            graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
+            # Extended timeout for complex operations (default: 60s)
+            extended-graphql-timeout: ${GITLAB_EXTENDED_GRAPHQL_TIMEOUT:60s}
+            # Delay between pagination requests (default: 200ms)
+            pagination-throttle: ${GITLAB_PAGINATION_THROTTLE:200ms}
+            # Cache duration for token validation results (default: 5m)
+            token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
         slack:
             enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
+            # App-global signing secret — verifies inbound webhook signatures. The OAuth
+            # client-id/client-secret below drive the per-workspace install flow (Slack does
+            # NOT support refresh-token rotation for legacy bot tokens, so no refresher ships).
+            signing-secret: ${SLACK_SIGNING_SECRET:}
             client-id: ${HEPHAESTUS_SLACK_CLIENT_ID:}
             client-secret: ${HEPHAESTUS_SLACK_CLIENT_SECRET:}
             redirect-uri: ${HEPHAESTUS_SLACK_REDIRECT_URI:}
@@ -540,43 +537,7 @@ logging:
         # per-repo sync rollups stay the only INFO. Flip the package to DEBUG to restore the
         # full per-event firehose for diagnosis (no redeploy needed):
         #   logging.level.de.tum.cit.aet.hephaestus.integration.scm: DEBUG
-
-# Local profile (tracked defaults; per-developer secrets stay in gitignored application-local.yml).
----
-spring:
-    config:
-        activate:
-            on-profile: local
-
-    docker:
-        compose:
-            # `pnpm dev` brings compose up explicitly; spring.datasource.url is set, so Spring
-            # never needs to parse compose.yaml.
-            enabled: false
-
-    security:
-        oauth2:
-            resourceserver:
-                jwt:
-                    # Pair jwk-set-uri with issuer-uri so the decoder is lazy: it skips the startup
-                    # discovery ping, so a boot before Keycloak is ready doesn't fail and auth
-                    # self-heals on first token use (iss is still validated against issuer-uri).
-                    jwk-set-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus/protocol/openid-connect/certs
-
-# The Docker sandbox (worker capability) is on by default for local dev via the worker-role
-# gate (hephaestus.runtime.worker.enabled defaults true). It boots without Docker or an LLM
-# key — image pull is lazy/skipped; workspaces supply provider credentials at runtime.
-
-management:
-    endpoints:
-        web:
-            exposure:
-                include: health,info,prometheus,metrics,startup
-    endpoint:
-        startup:
-            access: read_only
-
-logging:
-    level:
-        # Silence SpringDoc's "endpoint enabled by default — disable in production" banner.
-        org.springdoc.core.events.SpringDocAppInitializer: ERROR
+#
+# The `local` profile overlay (docker.compose disable, lazy jwk-set-uri, management exposure,
+# devtools, SpringDoc banner) lives entirely in application-local.yml so this base file carries
+# zero spring.config.activate.on-profile documents.

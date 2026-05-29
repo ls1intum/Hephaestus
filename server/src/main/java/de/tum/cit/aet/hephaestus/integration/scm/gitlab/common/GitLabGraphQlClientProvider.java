@@ -59,7 +59,7 @@ public class GitLabGraphQlClientProvider {
      * WebClient request attribute key for passing scopeId through to exchange filters.
      * This attribute is internal to the HTTP client pipeline — never sent on the wire.
      */
-    public static final String SCOPE_ID_ATTRIBUTE = "hephaestus.gitlab.scopeId";
+    public static final String SCOPE_ID_ATTRIBUTE = "hephaestus.integration.gitlab.scopeId";
 
     private final HttpGraphQlClient baseClient;
     private final GitLabTokenService tokenService;

@@ -62,11 +62,11 @@ import tools.jackson.databind.ObjectMapper;
 @TestPropertySource(
     properties = {
         "hephaestus.integration.gitlab.enabled=true",
-        "hephaestus.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.gitlab.connect-timeout=30s",
-        "hephaestus.gitlab.read-timeout=60s",
-        "hephaestus.gitlab.rate-limit-delay=200ms",
-        "hephaestus.gitlab.sync-page-delay=5m",
+        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
+        "hephaestus.integration.gitlab.connect-timeout=30s",
+        "hephaestus.integration.gitlab.read-timeout=60s",
+        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
+        "hephaestus.integration.gitlab.sync-page-delay=5m",
     }
 )
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {

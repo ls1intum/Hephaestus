@@ -24,7 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Resolves / provisions the SCM {@code User} row for the JWT-authenticated principal.
  *
  * <p>The GitLab default server URL is read directly from the operator-facing
- * {@code hephaestus.gitlab.default-server-url} property (binding to
+ * {@code hephaestus.integration.gitlab.default-server-url} property (binding to
  * {@code GitLabProperties} would couple this vendor-neutral identity service to a
  * vendor adapter, banned by {@code IntegrationCoreVendorNeutralityTest}). The GitHub
  * default is the project-wide constant {@code https://github.com} — GitHub Enterprise
@@ -43,7 +43,7 @@ public class AuthenticatedGitProviderUserService {
     public AuthenticatedGitProviderUserService(
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
-        @Value("${hephaestus.gitlab.default-server-url:https://gitlab.com}") String gitLabDefaultServerUrl
+        @Value("${hephaestus.integration.gitlab.default-server-url:https://gitlab.com}") String gitLabDefaultServerUrl
     ) {
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;

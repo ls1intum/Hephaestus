@@ -105,7 +105,7 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn(
-                "Slack signing secret unconfigured — set hephaestus.slack.signing-secret or hephaestus.webhook.secret"
+                "Slack signing secret unconfigured — set hephaestus.integration.slack.signing-secret or hephaestus.webhook.secret"
             );
             return new VerificationResult.Invalid("signing secret unconfigured");
         }
