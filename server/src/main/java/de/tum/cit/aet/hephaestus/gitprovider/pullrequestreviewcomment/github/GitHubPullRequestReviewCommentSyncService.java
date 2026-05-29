@@ -614,12 +614,14 @@ public class GitHubPullRequestReviewCommentSyncService {
             }
         }
 
-        // Check for overflow
+        // allComments holds the embedded first page + every paginated page (raw), apples-to-apples
+        // with the thread's comments.totalCount.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "threadComments",
                 allComments.size(),
                 reportedTotalCount,
+                hasMore,
                 "threadId=" + threadNodeId
             );
         }

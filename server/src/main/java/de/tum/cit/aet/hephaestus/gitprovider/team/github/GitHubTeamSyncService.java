@@ -152,6 +152,7 @@ public class GitHubTeamSyncService {
             // Maps child team's native ID → parent team's native ID (from GraphQL)
             Map<Long, Long> parentNativeIdByChildNativeId = new HashMap<>();
             int totalSynced = 0;
+            int teamsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
             int totalPermissions = 0;
             String cursor = null;
             boolean hasNextPage = true;
@@ -254,6 +255,7 @@ public class GitHubTeamSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = response.getTotalCount();
                 }
+                teamsReceived += response.getNodes().size();
 
                 for (var graphQlTeam : response.getNodes()) {
                     Team team = processTeam(graphQlTeam, organizationLogin, context);
@@ -289,12 +291,13 @@ public class GitHubTeamSyncService {
                 retryAttempt = 0;
             }
 
-            // Check for overflow
+            // Raw nodes received vs teams.totalCount (totalSynced is post-filter).
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
+                GraphQlConnectionOverflowDetector.checkPaginated(
                     "teams",
-                    totalSynced,
+                    teamsReceived,
                     reportedTotalCount,
+                    hasNextPage,
                     "orgLogin=" + safeOrgLogin
                 );
             }
@@ -955,12 +958,12 @@ public class GitHubTeamSyncService {
             retryAttempt = 0;
         }
 
-        // Check for overflow
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "teamRepositories",
                 allEdges.size(),
                 reportedTotalCount,
+                hasNextPage,
                 "teamSlug=" + teamSlug
             );
         }

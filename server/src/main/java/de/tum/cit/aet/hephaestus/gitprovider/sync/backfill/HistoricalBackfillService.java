@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubTransportErrors;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
@@ -767,12 +766,9 @@ public class HistoricalBackfillService {
             }
         }
 
-        GraphQlConnectionOverflowDetector.check(
-            "issues",
-            totalIssuesSynced,
-            reportedTotalCount,
-            "repo=" + repoNameForLog
-        );
+        // No completeness check: backfill paginates one bounded batch per cycle and resumes from a
+        // saved cursor across cycles, so this batch's count vs the whole-connection totalCount is
+        // meaningless. Real truncation surfaces via the force-pagination/completion logs.
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processIssuesPage when !hasMore)
@@ -975,12 +971,8 @@ public class HistoricalBackfillService {
             }
         }
 
-        GraphQlConnectionOverflowDetector.check(
-            "pullRequests",
-            totalPRsSynced,
-            reportedTotalCount,
-            "repo=" + repoNameForLog
-        );
+        // No completeness check: see the issues batch above — per-batch count vs whole-connection
+        // totalCount is meaningless for a resumable bounded backfill.
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processPullRequestsPage when !hasMore)
