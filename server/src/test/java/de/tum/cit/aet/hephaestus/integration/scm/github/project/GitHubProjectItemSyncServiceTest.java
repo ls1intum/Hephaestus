@@ -549,7 +549,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 null,
                 false,
-                mock(Repository.class),
+                new Repository(),
                 "cursor",
                 PARENT_ISSUE_ID
             );
@@ -564,7 +564,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 "  ",
                 false,
-                mock(Repository.class),
+                new Repository(),
                 "cursor",
                 PARENT_ISSUE_ID
             );
@@ -575,7 +575,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldPaginateThroughRemainingItemsForIssue() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName("GetIssueProjectItems")).thenReturn(requestSpec);
@@ -635,7 +635,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldUsePrSpecificQueryForPullRequests() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName("GetPullRequestProjectItems")).thenReturn(requestSpec);
@@ -669,7 +669,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldStopOnRateLimitCritical() throws InterruptedException {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -698,7 +698,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldHandleEmptyResponseWhenAllItemsInEmbeddedList() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -727,7 +727,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldHandleInvalidGraphQlResponseAndBreak() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -751,7 +751,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldHandleExceptionDuringPaginationAndBreak() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -777,7 +777,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldPaginateThroughMultiplePages() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);

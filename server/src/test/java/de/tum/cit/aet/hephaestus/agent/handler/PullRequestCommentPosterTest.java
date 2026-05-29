@@ -489,8 +489,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
         job.setConfigSnapshot(objectMapper.createObjectNode());
 
-        Workspace workspaceProxy = mock(Workspace.class);
-        lenient().when(workspaceProxy.getId()).thenReturn(1L);
+        Workspace workspaceProxy = new Workspace();
+        workspaceProxy.setId(1L);
         job.setWorkspace(workspaceProxy);
 
         return job;

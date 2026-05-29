@@ -62,9 +62,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     private AgentJob createJobWithApiKey(String apiKey) {
-        var job = mock(AgentJob.class);
-        when(job.getId()).thenReturn(UUID.randomUUID());
-        when(job.getLlmApiKey()).thenReturn(apiKey);
+        var job = new AgentJob();
+        job.setId(UUID.randomUUID());
+        job.setLlmApiKey(apiKey);
         return job;
     }
 

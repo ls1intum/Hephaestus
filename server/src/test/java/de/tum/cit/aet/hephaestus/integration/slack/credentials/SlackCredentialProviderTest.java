@@ -19,7 +19,6 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 class SlackCredentialProviderTest extends BaseUnitTest {
@@ -40,7 +39,8 @@ class SlackCredentialProviderTest extends BaseUnitTest {
     @Test
     void activeConnection_decryptsBotToken() {
         long workspaceId = 17L;
-        Workspace ws = Mockito.mock(Workspace.class);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         Connection connection = new Connection(
             ws,
             IntegrationKind.SLACK,

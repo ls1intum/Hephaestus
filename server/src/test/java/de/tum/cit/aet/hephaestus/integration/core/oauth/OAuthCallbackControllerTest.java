@@ -527,8 +527,8 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         String instanceKey,
         IntegrationState state
     ) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(

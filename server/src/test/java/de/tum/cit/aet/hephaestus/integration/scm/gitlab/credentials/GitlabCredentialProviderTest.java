@@ -76,8 +76,8 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
     }
 
     private static Connection newGitlabConnection(long workspaceId) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         return new Connection(
             ws,
             IntegrationKind.GITLAB,

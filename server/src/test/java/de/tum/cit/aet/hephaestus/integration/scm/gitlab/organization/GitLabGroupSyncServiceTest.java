@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectProcessor;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -71,8 +72,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        GitProvider gitLabProvider = mock(GitProvider.class);
-        lenient().when(gitLabProvider.getId()).thenReturn(TEST_PROVIDER_ID);
+        GitProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, GitProviderType.GITLAB);
         lenient()
             .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com"))
             .thenReturn(Optional.of(gitLabProvider));

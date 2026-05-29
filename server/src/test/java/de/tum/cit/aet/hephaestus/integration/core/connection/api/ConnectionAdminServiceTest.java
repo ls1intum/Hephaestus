@@ -83,8 +83,8 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     @Test
     void findInWorkspaceOrThrow_matchingWorkspace_returns() {
         long workspaceId = 7L;
-        Workspace ws = Mockito.mock(Workspace.class);
-        when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         Connection c = new Connection(
             ws,
             IntegrationKind.GITHUB,
@@ -104,8 +104,8 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
 
     @Test
     void findInWorkspaceOrThrow_wrongWorkspace_throws() {
-        Workspace ws = Mockito.mock(Workspace.class);
-        when(ws.getId()).thenReturn(1L);
+        Workspace ws = new Workspace();
+        ws.setId(1L);
         Connection c = new Connection(
             ws,
             IntegrationKind.GITHUB,
@@ -120,7 +120,7 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
 
     @Test
     void auditForConnection_appliesLimit() {
-        Workspace ws = Mockito.mock(Workspace.class);
+        Workspace ws = new Workspace();
         Connection c = new Connection(
             ws,
             IntegrationKind.GITHUB,
@@ -141,8 +141,8 @@ class ConnectionAdminServiceTest extends BaseUnitTest {
     @Test
     void createInlineConnection_happyPath() {
         long workspaceId = 17L;
-        Workspace workspace = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(workspace.getId()).thenReturn(workspaceId);
+        Workspace workspace = new Workspace();
+        workspace.setId(workspaceId);
         when(workspaceRepository.findById(workspaceId)).thenReturn(Optional.of(workspace));
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> {
             Connection saved = inv.getArgument(0);

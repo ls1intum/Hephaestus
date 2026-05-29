@@ -28,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 class OAuthCallbackServiceTest extends BaseUnitTest {
@@ -110,7 +109,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 any()
             )
         ).thenReturn(Optional.empty());
-        Workspace workspace = Mockito.mock(Workspace.class);
+        Workspace workspace = new Workspace();
         when(workspaceRepository.findById(42L)).thenReturn(Optional.of(workspace));
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -252,8 +251,8 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         String instanceKey,
         IntegrationState state
     ) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(

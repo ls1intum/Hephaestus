@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.identity.Authentica
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,8 +110,7 @@ class WorkspaceProvisioningServiceTest {
         admin.setHtmlUrl("https://example.com/admin");
         admin.setType(User.Type.USER);
 
-        GitProvider githubProvider = org.mockito.Mockito.mock(GitProvider.class);
-        when(githubProvider.getId()).thenReturn(100L);
+        GitProvider githubProvider = TestEntities.gitProvider(100L, GitProviderType.GITHUB);
         when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
             Optional.of(githubProvider)
         );
@@ -164,8 +164,7 @@ class WorkspaceProvisioningServiceTest {
         owner.setHtmlUrl("https://example.com");
         owner.setType(User.Type.USER);
 
-        GitProvider githubProvider = org.mockito.Mockito.mock(GitProvider.class);
-        when(githubProvider.getId()).thenReturn(100L);
+        GitProvider githubProvider = TestEntities.gitProvider(100L, GitProviderType.GITHUB);
         when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
             Optional.of(githubProvider)
         );

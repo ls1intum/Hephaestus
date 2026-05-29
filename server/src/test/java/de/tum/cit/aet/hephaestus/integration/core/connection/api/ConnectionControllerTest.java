@@ -398,10 +398,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         String instanceKey,
         IntegrationState state
     ) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        // lenient: a few tests don't traverse the workspace-id check path — keeping the stub
-        // centralised in the helper is worth more than micromanaging per-test.
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(

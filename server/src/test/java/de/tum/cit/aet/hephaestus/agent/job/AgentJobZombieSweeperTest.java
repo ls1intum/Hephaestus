@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,19 +42,19 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
     }
 
     private AgentJob mockQueuedJob(UUID id, Long workspaceId) {
-        AgentJob job = mock(AgentJob.class);
-        Workspace ws = mock(Workspace.class);
-        lenient().when(ws.getId()).thenReturn(workspaceId);
-        lenient().when(job.getId()).thenReturn(id);
-        lenient().when(job.getWorkspace()).thenReturn(ws);
-        lenient().when(job.getCreatedAt()).thenReturn(Instant.now().minusSeconds(900)); // 15 min ago
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
+        AgentJob job = new AgentJob();
+        job.setId(id);
+        job.setWorkspace(ws);
+        job.setCreatedAt(Instant.now().minusSeconds(900)); // 15 min ago
         return job;
     }
 
     private AgentJob mockRunningJob(UUID id, Instant startedAt, int timeoutSeconds) {
-        AgentJob job = mock(AgentJob.class);
-        lenient().when(job.getId()).thenReturn(id);
-        lenient().when(job.getStartedAt()).thenReturn(startedAt);
+        AgentJob job = new AgentJob();
+        job.setId(id);
+        job.setStartedAt(startedAt);
         ConfigSnapshot snapshot = new ConfigSnapshot(
             1,
             1L,
@@ -69,7 +67,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             timeoutSeconds,
             false
         );
-        lenient().when(job.getConfigSnapshot()).thenReturn(snapshot.toJson(objectMapper));
+        job.setConfigSnapshot(snapshot.toJson(objectMapper));
         return job;
     }
 

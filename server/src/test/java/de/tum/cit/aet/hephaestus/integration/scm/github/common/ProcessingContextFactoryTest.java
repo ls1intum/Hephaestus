@@ -10,10 +10,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -86,9 +86,8 @@ class ProcessingContextFactoryTest {
         void returnsContext_whenRepositoryAllowedAndExists() {
             String repoFullName = "ls1intum/Hephaestus";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
-            Repository repository = mock(Repository.class);
-            when(repository.getOrganization()).thenReturn(null);
-            when(repository.getNameWithOwner()).thenReturn(repoFullName);
+            Repository repository = TestEntities.repository(1L, repoFullName);
+            repository.setOrganization(null);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
@@ -143,11 +142,8 @@ class ProcessingContextFactoryTest {
             Long expectedScopeId = 100L;
 
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
-            Repository repository = mock(Repository.class);
-            Organization org = mock(Organization.class);
-            when(org.getLogin()).thenReturn(orgLogin);
-            when(repository.getOrganization()).thenReturn(org);
-            when(repository.getNameWithOwner()).thenReturn(repoFullName);
+            Repository repository = TestEntities.repository(1L, repoFullName);
+            repository.setOrganization(TestEntities.organization(1L, orgLogin));
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
@@ -169,9 +165,8 @@ class ProcessingContextFactoryTest {
             Long expectedScopeId = 200L;
 
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
-            Repository repository = mock(Repository.class);
-            when(repository.getOrganization()).thenReturn(null); // Personal repo - no org!
-            when(repository.getNameWithOwner()).thenReturn(repoFullName);
+            Repository repository = TestEntities.repository(1L, repoFullName);
+            repository.setOrganization(null); // Personal repo - no org!
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
@@ -196,11 +191,8 @@ class ProcessingContextFactoryTest {
             Long expectedScopeId = 300L;
 
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
-            Repository repository = mock(Repository.class);
-            Organization org = mock(Organization.class);
-            when(org.getLogin()).thenReturn(orgLogin);
-            when(repository.getOrganization()).thenReturn(org);
-            when(repository.getNameWithOwner()).thenReturn(repoFullName);
+            Repository repository = TestEntities.repository(1L, repoFullName);
+            repository.setOrganization(TestEntities.organization(1L, orgLogin));
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
@@ -226,9 +218,8 @@ class ProcessingContextFactoryTest {
             String repoFullName = "unknown/unknown-repo";
 
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
-            Repository repository = mock(Repository.class);
-            when(repository.getOrganization()).thenReturn(null);
-            when(repository.getNameWithOwner()).thenReturn(repoFullName);
+            Repository repository = TestEntities.repository(1L, repoFullName);
+            repository.setOrganization(null);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
             when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(

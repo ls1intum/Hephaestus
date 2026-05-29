@@ -48,8 +48,8 @@ class ConnectionServiceTest extends BaseUnitTest {
         // not a mock stand-in.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
         service = new ConnectionService(connectionRepository, auditRepository, credentialConverter);
-        workspace = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(workspace.getId()).thenReturn(7L);
+        workspace = new Workspace();
+        workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
         Mockito.lenient()
             .when(connectionRepository.save(any(Connection.class)))
