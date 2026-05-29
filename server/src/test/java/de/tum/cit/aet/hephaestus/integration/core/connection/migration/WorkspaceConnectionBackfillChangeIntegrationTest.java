@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.annotation.DirtiesContext;
 
 /**
  * Drives {@link WorkspaceConnectionBackfillChange#execute} against a real PostgreSQL
@@ -44,6 +45,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * the change's separate connection. Cleanup is explicit: {@code cleanDatabase()} in
  * {@link #setUp} and the column drop in {@link #tearDown}.
  */
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTest {
 
     private static final String ENCRYPTION_KEY = "test-encryption-key-32-bytes-aes";
@@ -74,11 +76,11 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
 
         // Re-add legacy columns that section 9 of the unified-framework changelog
         // drops. Required so we can drive the backfill path that production v1 saw.
+        // NOTE: account_login is a live current column — do NOT add/drop it here.
         executeDdl(
             "ALTER TABLE workspace " +
                 "ADD COLUMN IF NOT EXISTS git_provider_mode varchar(64), " +
                 "ADD COLUMN IF NOT EXISTS installation_id bigint, " +
-                "ADD COLUMN IF NOT EXISTS account_login varchar(255), " +
                 "ADD COLUMN IF NOT EXISTS server_url varchar(255), " +
                 "ADD COLUMN IF NOT EXISTS personal_access_token text, " +
                 "ADD COLUMN IF NOT EXISTS gitlab_group_id bigint, " +
@@ -89,11 +91,11 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
     @AfterEach
     void tearDown() throws Exception {
         try {
+            // NOTE: account_login is a live current column — do NOT drop it here.
             executeDdl(
                 "ALTER TABLE workspace " +
                     "DROP COLUMN IF EXISTS git_provider_mode, " +
                     "DROP COLUMN IF EXISTS installation_id, " +
-                    "DROP COLUMN IF EXISTS account_login, " +
                     "DROP COLUMN IF EXISTS server_url, " +
                     "DROP COLUMN IF EXISTS personal_access_token, " +
                     "DROP COLUMN IF EXISTS gitlab_group_id, " +
@@ -233,6 +235,10 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
             PostgresDatabase database = new PostgresDatabase();
             database.setConnection(new JdbcConnection(conn));
             change.execute(database);
+            // Liquibase's JdbcConnection runs with autocommit off; outside the normal
+            // changeset lifecycle we must commit explicitly or the backfilled rows are
+            // rolled back when the connection closes.
+            database.commit();
         }
         entityManager.clear();
     }
@@ -259,10 +265,17 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
             Connection conn = dataSource.getConnection();
             var stmt = conn.prepareStatement(
                 "INSERT INTO workspace (" +
-                    "  slug, name, status, created_at, updated_at, version, " +
+                    "  slug, display_name, status, created_at, updated_at, " +
+                    "  account_type, is_publicly_viewable, " +
+                    "  practices_enabled, mentor_enabled, achievements_enabled, leaderboard_enabled, " +
+                    "  progression_enabled, leagues_enabled, " +
+                    "  practice_review_auto_trigger_enabled, practice_review_manual_trigger_enabled, " +
                     "  git_provider_mode, account_login, installation_id, personal_access_token, " +
                     "  gitlab_group_id, server_url" +
-                    ") VALUES (?, ?, ?, NOW(), NOW(), 0, ?, ?, ?, ?, ?, ?) RETURNING id"
+                    ") VALUES (?, ?, ?, NOW(), NOW(), " +
+                    "  'ORG', false, " +
+                    "  false, false, false, false, false, false, true, true, " +
+                    "  ?, ?, ?, ?, ?, ?) RETURNING id"
             )
         ) {
             String slug = "ws-" + System.nanoTime();
@@ -270,7 +283,9 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
             stmt.setString(2, "Backfill Fixture " + slug);
             stmt.setString(3, "ACTIVE");
             stmt.setString(4, mode);
-            stmt.setString(5, accountLogin);
+            // account_login is NOT NULL in the current schema; some legacy test rows
+            // have no login (e.g. GitLab-only, null-mode skip tests) — use a placeholder.
+            stmt.setString(5, accountLogin != null ? accountLogin : "placeholder");
             if (installationId == null) {
                 stmt.setNull(6, java.sql.Types.BIGINT);
             } else {
