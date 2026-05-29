@@ -15,13 +15,18 @@
           1. account              — Hephaestus-native principal (one per human who signs in)
           2. identity_link        — federated-login association per Issue #1200 (incl. team_id)
           3. account_feature      — per-account feature opt-ins (replaces Keycloak realm roles)
-          4. auth_event           — append-only auth audit; monthly partitioned via pg_partman
+          4. auth_event           — append-only auth audit; monthly RANGE-partitioned on
+                                     occurred_at. Partitions are self-managed in-app by
+                                     AuthEventPartitionManager (create-ahead + 12-month
+                                     retention) — NO pg_partman / custom Postgres image needed.
           5. issued_jwt           — revocation list for our own cookie JWTs
           6. jwt_signing_key      — our ES256 signing key set; rotatable via NATS push
 
-        Extensions enabled (required, not optional):
-          - citext     — case-insensitive primary_email
-          - pg_partman — monthly rotation of auth_event (parent registered below)
+        Extensions enabled:
+          - citext     — case-insensitive primary_email (bundled in official Postgres images)
+
+        No non-stock extensions are required. auth_event partitioning runs entirely in-app
+        on vanilla Postgres 16/17.
 
         Subsequent commits in this PR add behavior; this commit ships schema only.
     -->
@@ -235,12 +240,17 @@
     </changeSet>
 
     <!--
-        auth_event is partitioned by occurred_at (monthly). Two-step bootstrap:
+        auth_event is partitioned by occurred_at (monthly RANGE) and SELF-MANAGED in-app:
           a) Create the parent table + ck constraints. We cannot use Liquibase's createTable
              because it doesn't emit PARTITION BY, so we hand-roll the SQL.
-          b) Register with pg_partman so it auto-creates child partitions on insert and prunes
-             after 12 months. If the extension is missing, the changeset MARK_RANs and a
-             follow-up scheduled job ships in a later commit as the fallback.
+          b) Create a DEFAULT partition (always-safe catch-all) PLUS the previous / current /
+             next month's explicit partitions, so the very first INSERT after migration on a
+             stock Postgres (no pg_partman) lands in a real partition and can NEVER fail with
+             "no partition of relation auth_event found for row".
+          c) Going forward, AuthEventPartitionManager (a @Scheduled, @SchedulerLock'd component,
+             server-role only) creates-ahead the next 1-2 months and DROPs partitions older
+             than 12 months. It runs once on ApplicationReadyEvent and monthly thereafter.
+        This replaces the prior pg_partman dependency entirely — no non-stock extension required.
     -->
     <changeSet author="FelixTJDietrich" id="1779800000000-7-auth-event-parent">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent already present">
@@ -282,36 +292,55 @@
         ]]></sql>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-8-auth-event-pg-partman">
-        <preConditions onFail="MARK_RAN"
-                       onFailMessage="pg_partman unavailable or already registered — fallback scheduled sweep activates">
-            <sqlCheck expectedResult="t">
-                SELECT EXISTS (
-                    SELECT 1 FROM pg_available_extensions WHERE name = 'pg_partman'
-                )
-            </sqlCheck>
+    <!--
+        Bootstrap partitions on stock Postgres (no pg_partman). Creates the DEFAULT catch-all
+        plus the previous/current/next month's explicit monthly partitions so inserts are safe
+        the instant Liquibase finishes — before any scheduler runs. AuthEventPartitionManager
+        takes over create-ahead + retention at runtime. Fully idempotent: IF NOT EXISTS guards
+        every CREATE, and the month names are computed from now() at migration time. Naming
+        convention auth_event_pYYYYMM and auth_event_default MUST match AuthEventPartitionManager.
+    -->
+    <changeSet author="FelixTJDietrich" id="1779800000000-8-auth-event-bootstrap-partitions">
+        <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent missing — partitioning skipped">
+            <tableExists tableName="auth_event"/>
         </preConditions>
         <sql splitStatements="false"><![CDATA[
-            CREATE EXTENSION IF NOT EXISTS pg_partman;
-            -- Bootstrap parent + register monthly rotation with 12-month retention.
-            -- partman.create_parent signature is variadic across versions; we use named-arg
-            -- form for v4/v5 compatibility. Idempotent thanks to the changeset preconditions
-            -- above (the parent table is created exactly once).
-            SELECT partman.create_parent(
-                p_parent_table => 'public.auth_event',
-                p_control      => 'occurred_at',
-                p_interval     => '1 month',
-                p_premake      => 4
-            );
-            UPDATE partman.part_config
-               SET retention            = '12 months',
-                   retention_keep_table = false,
-                   infinite_time_partitions = true
-             WHERE parent_table = 'public.auth_event';
+            DO $auth_event_bootstrap$
+            DECLARE
+                month_start date;
+                part_name   text;
+                offsets     int[] := ARRAY[-1, 0, 1];  -- previous, current, next month
+                off         int;
+            BEGIN
+                -- Always-safe catch-all so an insert can never fail, even before the scheduler runs.
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_class WHERE relname = 'auth_event_default'
+                ) THEN
+                    EXECUTE 'CREATE TABLE auth_event_default PARTITION OF auth_event DEFAULT';
+                END IF;
+
+                -- Pre-create prev / current / next month so normal rows land in a real monthly
+                -- partition rather than the default.
+                FOREACH off IN ARRAY offsets LOOP
+                    month_start := (date_trunc('month', now()) + (off || ' month')::interval)::date;
+                    part_name   := 'auth_event_p' || to_char(month_start, 'YYYYMM');
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_class WHERE relname = part_name
+                    ) THEN
+                        EXECUTE format(
+                            'CREATE TABLE %I PARTITION OF auth_event FOR VALUES FROM (%L) TO (%L)',
+                            part_name,
+                            month_start,
+                            (month_start + interval '1 month')::date
+                        );
+                    END IF;
+                END LOOP;
+            END
+            $auth_event_bootstrap$;
         ]]></sql>
         <rollback>
             <sql splitStatements="false"><![CDATA[
-                DELETE FROM partman.part_config WHERE parent_table = 'public.auth_event';
+                DROP TABLE IF EXISTS auth_event_default;
             ]]></sql>
         </rollback>
     </changeSet>

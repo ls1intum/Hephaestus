@@ -23,7 +23,9 @@
  *   <li><b>{@code WorkspaceMembership}</b> — Account ↔ Workspace ↔ role. Column renamed
  *       {@code user_id → account_id}.</li>
  *   <li><b>{@link de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent AuthEvent}</b>
- *       — append-only auth / impersonation event. Monthly-partitioned via {@code pg_partman}.
+ *       — append-only auth / impersonation event. Monthly RANGE-partitioned on
+ *       {@code occurred_at}, self-managed in-app by {@code AuthEventPartitionManager}
+ *       (create-ahead + 12-month retention) on stock Postgres — no {@code pg_partman}.
  *       Records the impersonation pair {@code (account_id, acting_account_id)} per
  *       {@code SwitchUserFilter}.</li>
  * </ul>

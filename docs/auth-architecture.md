@@ -79,7 +79,8 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
   no session). An app admin mints a target-scoped JWT carrying `act={operatorId}` (RFC 8693).
   `ImpersonationGuard` makes such sessions read-only unless the operator sends an explicit
   confirm-writes header. Every begin/exit is audited.
-- **GDPR.** `auth_event` is an append-only, monthly-partitioned (pg_partman, 12-month)
+- **GDPR.** `auth_event` is an append-only, monthly RANGE-partitioned (self-managed in-app by
+  `AuthEventPartitionManager`, 12-month retention, stock Postgres — no `pg_partman`)
   audit log. Account deletion is a 48-hour soft-delete cooldown → hard cascade +
   `ExternalActor` pseudonymization (Art. 17(3) — preserves activity-graph integrity on
   other users' work).

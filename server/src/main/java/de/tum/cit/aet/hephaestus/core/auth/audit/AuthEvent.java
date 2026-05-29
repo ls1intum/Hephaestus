@@ -19,8 +19,10 @@ import org.hibernate.type.SqlTypes;
 import org.springframework.lang.Nullable;
 
 /**
- * Append-only auth-event log. Monthly partitioned via {@code pg_partman} (12-month retention,
- * oldest auto-dropped). Records the {@code (account_id, acting_account_id)} pair for every
+ * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed
+ * in-app by {@link AuthEventPartitionManager} (create-ahead + 12-month retention, oldest dropped) —
+ * runs on stock Postgres with no {@code pg_partman} / custom image. Records the
+ * {@code (account_id, acting_account_id)} pair for every
  * {@code SwitchUserFilter}-driven impersonation so every action attributable to an impersonator
  * is reconstructible.
  *

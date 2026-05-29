@@ -16,8 +16,12 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
 - [ ] Reverse proxy (Coolify / TUM) verified to NOT inject a `Domain=` on Set-Cookie — a
       `__Host-` cookie with a Domain attribute is silently dropped by browsers → infinite
       redirect loop. Smoke-test the full login on staging behind the real proxy.
-- [ ] `pg_partman` extension available on the Postgres instance (else the `auth_event`
-      changeset MARK_RANs and the fallback monthly-partition job must be enabled).
+- [ ] Stock Postgres 16/17 is sufficient — only the `citext` extension is needed and it ships
+      with the official images. `auth_event` partitioning is self-managed in-app by
+      `AuthEventPartitionManager` (create-ahead + 12-month retention); `pg_partman` is NOT
+      required and must NOT be registered for this table (it would conflict with the in-app
+      manager). Liquibase seeds the DEFAULT + prev/current/next month partitions so the first
+      insert is safe immediately.
 - [ ] `jwt_signing_key` seeded (auto-seeds on first boot via `AuthJwtConfig.seedKeysOnStartup`).
 - [ ] TLS 1.3 + HSTS preload confirmed at the edge.
 
