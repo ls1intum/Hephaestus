@@ -35,7 +35,6 @@ class SandboxContainerManagerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,

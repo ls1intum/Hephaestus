@@ -56,6 +56,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
@@ -136,7 +137,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
-            interactiveSandboxService,
+            sandboxServiceProvider(interactiveSandboxService),
             translator,
             turnLock,
             persistence,
@@ -397,6 +398,31 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     /** Direct (synchronous) ExecutorService — the test thread runs every task before returning. */
+    /** Minimal {@link ObjectProvider} that always yields the supplied sandbox-service mock. */
+    private static ObjectProvider<InteractiveSandboxService> sandboxServiceProvider(InteractiveSandboxService svc) {
+        return new ObjectProvider<>() {
+            @Override
+            public InteractiveSandboxService getObject() {
+                return svc;
+            }
+
+            @Override
+            public InteractiveSandboxService getObject(Object... args) {
+                return svc;
+            }
+
+            @Override
+            public InteractiveSandboxService getIfAvailable() {
+                return svc;
+            }
+
+            @Override
+            public InteractiveSandboxService getIfUnique() {
+                return svc;
+            }
+        };
+    }
+
     private static ExecutorService directExecutor() {
         return new java.util.concurrent.AbstractExecutorService() {
             @Override

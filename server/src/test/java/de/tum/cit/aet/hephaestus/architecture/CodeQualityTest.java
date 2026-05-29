@@ -478,7 +478,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
                 "AccountService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
                 "GitHubWorkspaceDataSyncTrigger", // Lazy-loads GithubDataSyncService + SyncTargetProvider to break the same circular reference WorkspaceProvisioningAdapter handled; the workspace-side trigger sits on the GitHub adapter post-SPI extraction
-                "WorkspaceScopedTables" // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
+                "WorkspaceScopedTables", // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
+                "MentorChatService" // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {

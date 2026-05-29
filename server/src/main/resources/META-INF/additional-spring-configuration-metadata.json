@@ -231,24 +231,6 @@
       ]
     },
     {
-      "name": "hephaestus.sync.nats.consumer.ack-wait",
-      "values": [
-        { "value": "5m", "description": "5 minutes (default)" },
-        { "value": "10m", "description": "10 minutes for slow processing" },
-        { "value": "PT5M", "description": "ISO-8601 format" }
-      ],
-      "providers": [{ "name": "any" }]
-    },
-    {
-      "name": "hephaestus.sync.nats.consumer.idle-heartbeat",
-      "values": [
-        { "value": "30s", "description": "30 seconds (default, good for WAN)" },
-        { "value": "15s", "description": "15 seconds (LAN only)" },
-        { "value": "60s", "description": "60 seconds (high-latency connections)" }
-      ],
-      "providers": [{ "name": "any" }]
-    },
-    {
       "name": "hephaestus.posthog.api-host",
       "values": [
         { "value": "https://app.posthog.com", "description": "PostHog Cloud (default)" },

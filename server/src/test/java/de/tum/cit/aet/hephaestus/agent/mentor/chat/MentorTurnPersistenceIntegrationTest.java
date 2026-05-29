@@ -29,7 +29,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -40,7 +39,6 @@ import tools.jackson.databind.node.ObjectNode;
  * Postgres container: DB unique partial index, JSONB metadata round-trip, status transitions,
  * reaper sweep.
  */
-@TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
 // This class performs raw schema DDL against the SHARED singleton Testcontainer in @BeforeEach:
 // it DROPs and re-ADDs chk_chat_message_status and creates a partial unique index on chat_message.
 // Those mutations survive on the shared schema and would pollute any sibling class that touches
@@ -73,9 +71,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private DataSource dataSource;
 
     /**
-     * {@link MentorChatService} pulls in this collaborator unconditionally; the production bean
-     * is only registered when {@code hephaestus.sandbox.enabled=true} (Docker required). Provide
-     * a mock so the integration context loads — this test never touches the sandbox boundary.
+     * {@link MentorChatService} pulls in this collaborator (via an {@code ObjectProvider}); the
+     * production bean belongs to the worker capability ({@code DockerSandboxConfiguration}, gated
+     * on the worker role, which is off in the test profile). Provide a mock so the integration
+     * context loads — this test never touches the sandbox boundary.
      */
     @MockitoBean
     @SuppressWarnings("unused")

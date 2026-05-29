@@ -51,15 +51,15 @@ spring:
                 jwt:
                     issuer-uri: http://localhost:8081/realms/test
 
-# GitHub configuration for tests (matches actual property)
-github:
-    auth-token: test-token-not-real
-    app:
-        id: 0
-        privateKey: ""
-
 # Disable workspace bootstrapping during tests to prevent API calls
 hephaestus:
+    # Worker role off in tests: the worker capability is the Docker sandbox
+    # (DockerSandboxConfiguration + AgentImagePullBootstrapper), which has no Docker daemon in
+    # CI. Disabling the role keeps those beans out of the context — mentor beans still wire
+    # (they're unconditional) and mock InteractiveSandboxService where they need it.
+    runtime:
+        worker:
+            enabled: false
     # Loud enforcement under test: any unguarded scoped-table query throws.
     # Production runs in 'log' mode for the staging canary period; this override
     # ensures tenancy bugs surface in CI rather than being masked.
@@ -97,9 +97,6 @@ hephaestus:
     git:
         enabled: false
         storage-path: /tmp/hephaestus-test-git-repos
-    detection:
-        legacy:
-            enabled: false
     practice-review:
         cooldown-minutes: 0
 

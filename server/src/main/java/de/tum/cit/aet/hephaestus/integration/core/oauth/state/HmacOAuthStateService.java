@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.nio.charset.StandardCharsets;
@@ -12,7 +13,7 @@ import java.time.Instant;
 import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -56,16 +57,44 @@ public class HmacOAuthStateService implements OAuthStateService {
     }
 
     /**
-     * Spring-injected production constructor. The {@code nonceStore} provides the
-     * single-use guarantee on top of HMAC + TTL.
+     * Spring-injected production constructor. The HMAC secret + TTL bind via
+     * {@link OAuthStateProperties}; the {@code nonceStore} provides the single-use guarantee on
+     * top of HMAC + TTL.
+     *
+     * <p>If {@code hephaestus.integration.oauth-state.secret} is unset, falls back to the shared
+     * {@code hephaestus.webhook.secret} (pre-existing infrastructure secret). Throws if neither is
+     * configured — production should set both explicitly.
+     *
+     * <p>{@code @Autowired} is required to disambiguate from the private core constructor (used by
+     * the static test factories): with two declared constructors and no marker, Spring falls back
+     * to a non-existent no-arg constructor.
      */
+    @Autowired
     public HmacOAuthStateService(
-        @Value("${hephaestus.integration.oauth-state.secret:${hephaestus.webhook.secret:}}") String configuredSecret,
-        @Value("${hephaestus.integration.oauth-state.ttl:PT10M}") Duration ttl,
+        OAuthStateProperties properties,
+        WebhookProperties webhookProperties,
         @Nullable OAuthStateNonceStore nonceStore
     ) {
-        // Fall back to webhook secret if a dedicated key isn't configured — pre-existing
-        // shared infrastructure secret. Production should set both explicitly.
+        this(resolveSecret(properties, webhookProperties), properties.ttl(), nonceStore);
+    }
+
+    private static String resolveSecret(OAuthStateProperties properties, WebhookProperties webhookProperties) {
+        String configured = properties.secret();
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        return webhookProperties.secret();
+    }
+
+    /**
+     * Core constructor (shared by the Spring path and the test factories). Validates that a secret
+     * is present — same fail-fast contract as before.
+     */
+    private HmacOAuthStateService(
+        @Nullable String configuredSecret,
+        @Nullable Duration ttl,
+        @Nullable OAuthStateNonceStore nonceStore
+    ) {
         if (configuredSecret == null || configuredSecret.isBlank()) {
             throw new IllegalStateException(
                 "Set hephaestus.integration.oauth-state.secret (or hephaestus.webhook.secret) — required for OAuth state HMAC."

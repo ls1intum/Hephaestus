@@ -23,7 +23,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -181,7 +180,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         void shouldUseGlobalRuntime() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,
@@ -238,7 +236,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         void shouldIncludeSeccompWhenProvided() {
             ContainerSecurityPolicy policyWithSeccomp = new ContainerSecurityPolicy(
                 new SandboxProperties(
-                    true,
                     "unix:///var/run/docker.sock",
                     false,
                     null,
@@ -457,7 +454,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         void shouldPreventRuntimeDowngrade() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,

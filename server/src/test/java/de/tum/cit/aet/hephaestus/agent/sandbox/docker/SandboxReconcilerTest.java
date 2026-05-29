@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -39,87 +38,10 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        SandboxProperties properties = new SandboxProperties(
-            true,
-            "unix:///var/run/docker.sock",
-            false,
-            null,
-            5,
-            10,
-            60,
-            null,
-            8080,
-            null,
-            209_715_200L,
-            500_000,
-            null
-        );
+        // The reconciler only exists when the worker role is active (DockerSandboxConfiguration is
+        // worker-role-gated); there is no longer a property-level disable, so no SandboxProperties.
         meterRegistry = new SimpleMeterRegistry();
-        reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, properties, meterRegistry);
-    }
-
-    @Nested
-    class DisabledGuard {
-
-        @Test
-        void shouldSkipStartupWhenDisabled() {
-            SandboxProperties disabledProps = new SandboxProperties(
-                false,
-                "unix:///var/run/docker.sock",
-                false,
-                null,
-                5,
-                10,
-                60,
-                null,
-                8080,
-                null,
-                209_715_200L,
-                500_000,
-                null
-            );
-            var disabledReconciler = new SandboxReconciler(
-                jobRepository,
-                containerManager,
-                networkManager,
-                disabledProps,
-                meterRegistry
-            );
-
-            disabledReconciler.onStartup();
-
-            verify(jobRepository, never()).findByStatus(any());
-        }
-
-        @Test
-        void shouldSkipPeriodicWhenDisabled() {
-            SandboxProperties disabledProps = new SandboxProperties(
-                false,
-                "unix:///var/run/docker.sock",
-                false,
-                null,
-                5,
-                10,
-                60,
-                null,
-                8080,
-                null,
-                209_715_200L,
-                500_000,
-                null
-            );
-            var disabledReconciler = new SandboxReconciler(
-                jobRepository,
-                containerManager,
-                networkManager,
-                disabledProps,
-                meterRegistry
-            );
-
-            disabledReconciler.periodicReconciliation();
-
-            verify(jobRepository, never()).findByStatusIn(any());
-        }
+        reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
     }
 
     @Nested

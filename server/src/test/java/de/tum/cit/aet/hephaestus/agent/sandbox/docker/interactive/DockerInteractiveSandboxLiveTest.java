@@ -85,7 +85,6 @@ class DockerInteractiveSandboxLiveTest {
     @BeforeEach
     void setUp() throws Exception {
         SandboxProperties sandboxProperties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,

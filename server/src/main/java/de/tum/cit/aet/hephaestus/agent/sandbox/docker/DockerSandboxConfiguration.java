@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,12 +38,14 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Spring configuration for the Docker sandbox subsystem.
  *
- * <p>Activated only when {@code hephaestus.sandbox.enabled=true}. All sandbox beans are defined
- * here as {@code @Bean} methods so they are only created when the subsystem is active — no
- * component scanning surprises.
+ * <p>The Docker sandbox <em>is</em> the worker capability (ADR 0005), so it is gated solely on the
+ * worker role ({@link RuntimeRole#WORKER_PROPERTY}, {@code matchIfMissing=true} → present in the
+ * single-JVM monolith). A non-worker pod (e.g. a webhook-only container) leaves the gate {@code
+ * false} and these beans never wire. All sandbox beans are declared as {@code @Bean} methods so
+ * they are only created when the role is active — no component-scanning surprises.
  */
 @Configuration
-@ConditionalOnExpression("${hephaestus.sandbox.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")
+@ConditionalOnProperty(name = RuntimeRole.WORKER_PROPERTY, havingValue = "true", matchIfMissing = true)
 @ConditionalOnClass(DockerClient.class)
 @EnableConfigurationProperties({ SandboxProperties.class, InteractiveSandboxProperties.class })
 public class DockerSandboxConfiguration {
@@ -164,10 +166,9 @@ public class DockerSandboxConfiguration {
         AgentJobRepository jobRepository,
         SandboxContainerManager containerManager,
         SandboxNetworkManager networkManager,
-        SandboxProperties properties,
         MeterRegistry meterRegistry
     ) {
-        return new SandboxReconciler(jobRepository, containerManager, networkManager, properties, meterRegistry);
+        return new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
     }
 
     @Bean
