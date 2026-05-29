@@ -24,7 +24,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Drives {@link WorkspaceConnectionBackfillChange#execute} against a real PostgreSQL
@@ -36,8 +35,15 @@ import org.springframework.transaction.annotation.Transactional;
  * temporary fixture row, seed legacy values, and only THEN invoke {@code execute(...)}.
  * The columns are dropped again in {@link #tearDown} so other integration tests are
  * unaffected.
+ *
+ * <p>Deliberately NOT {@code @Transactional}. The change-under-test opens its own
+ * Liquibase JDBC connection; the seed/assert helpers use raw {@code dataSource}
+ * connections in try-with-resources (auto-committing, so the change sees them). A
+ * class-level {@code @Transactional} would hold a JPA connection across the DDL +
+ * backfill and trip HikariCP leak detection, while also hiding the seeded rows from
+ * the change's separate connection. Cleanup is explicit: {@code cleanDatabase()} in
+ * {@link #setUp} and the column drop in {@link #tearDown}.
  */
-@Transactional
 class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTest {
 
     private static final String ENCRYPTION_KEY = "test-encryption-key-32-bytes-aes";
