@@ -114,7 +114,16 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             7,
             null
         );
-        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
+        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
+            true,
+            7,
+            "0 0 3 * * *",
+            15,
+            null,
+            null,
+            null,
+            null
+        );
 
         lenient()
             .doAnswer(invocation -> {
@@ -176,7 +185,16 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             7,
             null
         );
-        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
+        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
+            true,
+            7,
+            "0 0 3 * * *",
+            15,
+            null,
+            null,
+            null,
+            null
+        );
         return new GitLabWorkspaceInitializationService(
             workspaceRepository,
             organizationRepository,

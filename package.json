@@ -50,10 +50,10 @@
 		"prepare": "husky",
 		"dev:compose": "cd server && docker compose up -d --wait",
 		"dev:compose:down": "cd server && docker compose down",
-		"dev:server": "cd server && ./mvnw spring-boot:run",
+		"dev:reset": "cd server && docker compose down -v && node -e \"import('node:fs/promises').then(fs => fs.rm('postgres-data', {recursive: true, force: true}))\" && docker compose up -d --wait",
+		"dev:server": "pnpm dev:compose && cd server && ./mvnw spring-boot:run",
 		"dev:webapp": "pnpm --filter webapp run dev",
-		"dev": "run-s dev:compose dev:run",
-		"dev:run": "run-p dev:server dev:webapp"
+		"dev": "mprocs"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",
@@ -67,6 +67,7 @@
 		"commander": "14.0.3",
 		"graphql": "16.14.0",
 		"husky": "9.1.7",
+		"mprocs": "0.9.3",
 		"npm-run-all2": "8.0.4",
 		"patch-package": "8.0.1",
 		"pg": "8.20.0",

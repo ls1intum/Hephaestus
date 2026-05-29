@@ -19,7 +19,7 @@ spring:
     datasource:
         url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/hephaestus
         username: ${DB_USERNAME:root}
-        password: ${DB_PASSWORD:}
+        password: ${DB_PASSWORD:root}
         hikari:
             connection-timeout: 45000
             idle-timeout: 600000
@@ -212,6 +212,18 @@ hephaestus:
         cron: "0 0 3 * * *"
         # Cooldown in minutes before running the monitoring again
         cooldown-minutes: 15
+        # ═══════════════════════════════════════════════════════════════════════════
+        # FEATURE TOGGLES (disabled by default — currently unused and slow)
+        # ═══════════════════════════════════════════════════════════════════════════
+        # GitHub Discussions sync paginates discussions → comments → replies (three
+        # nested GraphQL levels). GitHub Projects V2 sync walks projects → fields →
+        # status updates → items → item field values. Both are the slowest parts of a
+        # sync and aren't consumed yet, so they're off by default. Flip to true per
+        # environment when the data is actually needed.
+        discussions:
+            enabled: ${HEPHAESTUS_SYNC_DISCUSSIONS_ENABLED:false}
+        projects:
+            enabled: ${HEPHAESTUS_SYNC_PROJECTS_ENABLED:false}
         # ═══════════════════════════════════════════════════════════════════════════
         # BACKFILL CONFIGURATION
         # ═══════════════════════════════════════════════════════════════════════════
@@ -650,6 +662,21 @@ spring:
             # `pnpm dev` brings compose up explicitly; spring.datasource.url is set, so Spring
             # never needs to parse compose.yaml.
             enabled: false
+
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    # Pair jwk-set-uri with issuer-uri so the decoder is lazy: it skips the startup
+                    # discovery ping, so a boot before Keycloak is ready doesn't fail and auth
+                    # self-heals on first token use (iss is still validated against issuer-uri).
+                    jwk-set-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus/protocol/openid-connect/certs
+
+hephaestus:
+    sandbox:
+        # On by default for local dev. Boots without Docker or an LLM key (image pull is
+        # skipped/lazy); workspaces supply provider credentials at runtime, stored in the DB.
+        enabled: ${SANDBOX_ENABLED:true}
 
 management:
     endpoints:

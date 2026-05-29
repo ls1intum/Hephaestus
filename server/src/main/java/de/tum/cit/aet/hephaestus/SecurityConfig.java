@@ -8,9 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -24,6 +23,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -108,23 +108,32 @@ public class SecurityConfig {
     }
 
     /**
-     * Fallback chain when Spring's OAuth2 resource-server autoconfig produces no
-     * {@code JwtDecoder} (worker-only pod, smoke tests, fresh dev box). Mutually exclusive with
-     * {@link #resourceServerSecurityFilterChain(HttpSecurity, Converter)} via the same gate so
-     * only one "any request" chain ever loads at runtime.
+     * Application security chain (fallback after {@link #workerHubSecurityFilterChain}).
      *
-     * <p>Honors {@code hephaestus.dev.trigger-enabled=true} the same way the resource-server
-     * chain does — without this, a fresh dev box has no way to fire the trigger after enabling
-     * the flag, because the lockdown chain owns the {@code anyRequest()} slot.
+     * <p>The {@link JwtDecoder} is resolved via {@link ObjectProvider} when this bean is built, so
+     * it sees the decoder even when it comes from Spring Boot's OAuth2 autoconfig (registered after
+     * user config). {@code @ConditionalOnBean(JwtDecoder)} can't be used here: it evaluates before
+     * the autoconfig decoder is registered and would drop the server role into deny-all.
+     *
+     * <p>Decoder present (server role with Keycloak configured) → wire the OAuth2 resource server
+     * with the full rules. Absent (worker-only pod that excludes the OAuth2 autoconfig, or a box
+     * with no Keycloak) → deny everything. The {@code hephaestus.dev.trigger-enabled} carve-out
+     * applies in both modes.
      */
     @Bean
-    @ConditionalOnMissingBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
-    SecurityFilterChain lockdownSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain appSecurityFilterChain(
+        HttpSecurity http,
+        ObjectProvider<JwtDecoder> jwtDecoderProvider,
+        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
+    ) throws Exception {
         http
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(requests -> {
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+
+        JwtDecoder jwtDecoder = jwtDecoderProvider.getIfAvailable();
+        if (jwtDecoder == null) {
+            http.authorizeHttpRequests(requests -> {
                 requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
                 // OpenAPI / Swagger endpoints are public on the resource-server chain; they must
                 // also be public on the lockdown chain so spec generation works on no-Keycloak boots
@@ -138,27 +147,14 @@ public class SecurityConfig {
                 }
                 requests.anyRequest().denyAll();
             });
-        return http.build();
-    }
+            return http.build();
+        }
 
-    @Bean
-    @ConditionalOnBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
-    SecurityFilterChain resourceServerSecurityFilterChain(
-        HttpSecurity http,
-        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
-    ) throws Exception {
         http.oauth2ResourceServer(resourceServer -> {
             resourceServer.jwt(jwtConfigurer -> {
-                jwtConfigurer.jwtAuthenticationConverter(authenticationConverter);
+                jwtConfigurer.decoder(jwtDecoder).jwtAuthenticationConverter(authenticationConverter);
             });
         });
-
-        http
-            .sessionManagement(sessions -> {
-                sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-            })
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
         http.headers(headers ->
             headers

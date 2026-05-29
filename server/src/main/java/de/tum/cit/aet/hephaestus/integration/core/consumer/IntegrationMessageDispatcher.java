@@ -113,7 +113,9 @@ public class IntegrationMessageDispatcher {
             log.debug("SubjectParser rejected subject '{}': {}", fullSubject, e.getMessage());
             return Optional.empty();
         }
-        return registry.resolve(key);
+        // A handler may declare itself disabled (e.g. its feature flag is off). Filtering
+        // it out here reproduces "disabled → no handler → ack+skip" semantics per-message.
+        return registry.resolve(key).filter(IntegrationMessageHandler::isEnabled);
     }
 
     /** Number of {@link SubjectParser} bindings — one per registered kind. */

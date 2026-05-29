@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 public class StreamBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(StreamBootstrap.class);
-    private static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
+    private static final String[] STREAMS = { "gitlab", "github", "slack" };
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;

@@ -66,7 +66,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..integration.scm.github..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.scm.gitlab..", "..integration.slack..", "..integration.outline..")
+                .resideInAnyPackage("..integration.scm.gitlab..", "..integration.slack..")
                 .because("Cross-kind coupling defeats the SPI. Use the shared integration/spi surface.")
         );
         check(
@@ -75,7 +75,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..integration.scm.gitlab..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..integration.scm.github..", "..integration.slack..", "..integration.outline..")
+                .resideInAnyPackage("..integration.scm.github..", "..integration.slack..")
                 .because("Cross-kind coupling defeats the SPI.")
         );
         check(
@@ -84,20 +84,7 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 .resideInAPackage("..integration.slack..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..integration.scm.github..",
-                    "..integration.scm.gitlab..",
-                    "..integration.outline.."
-                )
-                .because("Cross-kind coupling defeats the SPI.")
-        );
-        check(
-            noClasses()
-                .that()
-                .resideInAPackage("..integration.outline..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..", "..integration.slack..")
+                .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..")
                 .because("Cross-kind coupling defeats the SPI.")
         );
     }

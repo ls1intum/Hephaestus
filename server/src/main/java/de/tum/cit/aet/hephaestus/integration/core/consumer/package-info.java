@@ -2,7 +2,7 @@
  * NATS consumer wiring for the unified integration framework.
  *
  * <p>Routes JetStream messages from per-kind subject namespaces ({@code github.*},
- * {@code gitlab.*}, {@code slack.*}, {@code outline.*}) to the right
+ * {@code gitlab.*}, {@code slack.*}) to the right
  * {@link de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler} via the
  * vendor-agnostic registry. Subject parsing is delegated to the per-kind
  * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser} implementations.

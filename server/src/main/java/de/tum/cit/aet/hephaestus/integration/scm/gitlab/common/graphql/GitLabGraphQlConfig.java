@@ -69,11 +69,17 @@ public class GitLabGraphQlConfig {
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
     public WebClient gitLabGraphQlWebClient(JsonMapper baseObjectMapper) {
+        // Set the buffer limit on the custom decoder too — defaultCodecs().maxInMemorySize()
+        // does not apply to custom-registered codecs, so large responses would otherwise hit
+        // the 256 KB default. Mirrors GitHubGraphQlConfig.
+        JacksonJsonDecoder graphQlJsonDecoder = new JacksonJsonDecoder(baseObjectMapper);
+        graphQlJsonDecoder.setMaxInMemorySize(MAX_BUFFER_SIZE);
+
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
                 config.customCodecs().register(new JacksonJsonEncoder(baseObjectMapper));
-                config.customCodecs().register(new JacksonJsonDecoder(baseObjectMapper));
+                config.customCodecs().register(graphQlJsonDecoder);
             })
             .build();
 

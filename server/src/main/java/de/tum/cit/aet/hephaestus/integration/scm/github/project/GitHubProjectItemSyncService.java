@@ -8,6 +8,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
@@ -73,6 +74,7 @@ public class GitHubProjectItemSyncService {
     private final GitHubProjectItemFieldValueSyncService fieldValueSyncService;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final TransactionTemplate transactionTemplate;
 
@@ -98,6 +100,9 @@ public class GitHubProjectItemSyncService {
         ProcessingContext context,
         Long parentIssueId
     ) {
+        if (!syncSchedulerProperties.projects().enabled()) {
+            return 0;
+        }
         if (embeddedItems == null || embeddedItems.items().isEmpty()) {
             return 0;
         }
@@ -134,6 +139,9 @@ public class GitHubProjectItemSyncService {
         String startCursor,
         Long parentIssueId
     ) {
+        if (!syncSchedulerProperties.projects().enabled()) {
+            return 0;
+        }
         if (issueNodeId == null || issueNodeId.isBlank()) {
             log.warn("Skipped project item pagination: reason=missingNodeId");
             return 0;

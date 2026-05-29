@@ -280,7 +280,11 @@ public class GithubDataSyncScheduler {
 
                 // Sync projects BEFORE repositories so embedded project items can be linked.
                 // Ensure the organization exists before attempting project sync.
-                syncProjects(session);
+                if (syncSchedulerProperties.projects().enabled()) {
+                    syncProjects(session);
+                } else {
+                    log.debug("Skipped project sync: reason=projectsSyncDisabled, scopeId={}", session.scopeId());
+                }
 
                 // Sync repositories (issues/PRs include embedded project items)
                 int reposProcessed = 0;
@@ -319,8 +323,11 @@ public class GithubDataSyncScheduler {
                 // Relink orphaned project items now that issues/PRs have been synced.
                 // Project items created before their referenced issues were synced locally
                 // will have NULL issue_id but a valid content_database_id. This fills
-                // in the FK for any items whose issues now exist.
-                projectSyncService.relinkOrphanedProjectItems();
+                // in the FK for any items whose issues now exist. Skipped when project
+                // sync is disabled — there are no project items to relink.
+                if (syncSchedulerProperties.projects().enabled()) {
+                    projectSyncService.relinkOrphanedProjectItems();
+                }
 
                 // Sync teams AFTER repositories exist (team repo permissions need repos).
                 // This mirrors the startup sync order in GithubDataSyncService.

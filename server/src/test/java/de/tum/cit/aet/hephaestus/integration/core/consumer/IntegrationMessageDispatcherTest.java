@@ -59,16 +59,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     }
 
     @Test
-    void outlineSubjectWithoutHandlerReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
-
-        assertThat(dispatcher.dispatch("outline.workspace.collection.document.publish")).isEmpty();
-    }
-
-    @Test
     void unknownPrefixReturnsEmpty() {
         IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
             new IntegrationMessageHandlerRegistry(List.of()),
@@ -111,6 +101,23 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     }
 
     @Test
+    void dispatchSkipsHandlerThatDeclaresItselfDisabled() {
+        // A handler whose feature flag is off reports isEnabled()=false; the dispatcher must
+        // treat it as no handler so the consumer ACKs and skips (e.g. project/discussion sync
+        // disabled). Mirrors the pre-#1198 GitHubMessageHandlerRegistry getHandler->null gate.
+        RecordingHandler disabled = new RecordingHandler(
+            new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"),
+            false
+        );
+        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
+            new IntegrationMessageHandlerRegistry(List.of(disabled)),
+            ALL_PARSERS
+        );
+
+        assertThat(dispatcher.dispatch("github.acme.foo.issues")).isEmpty();
+    }
+
+    @Test
     void duplicateSubjectParserForSameKindFailsAtConstruction() {
         SubjectParser first = new GithubSubjectParser();
         SubjectParser second = new GithubSubjectParser();
@@ -140,15 +147,26 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     private static class RecordingHandler implements IntegrationMessageHandler {
 
         private final EventTypeKey key;
+        private final boolean enabled;
         private final java.util.List<Message> received = new java.util.ArrayList<>();
 
         RecordingHandler(EventTypeKey key) {
+            this(key, true);
+        }
+
+        RecordingHandler(EventTypeKey key, boolean enabled) {
             this.key = key;
+            this.enabled = enabled;
         }
 
         @Override
         public EventTypeKey key() {
             return key;
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return enabled;
         }
 
         @Override

@@ -12,9 +12,9 @@ Hephaestus supports full-stack development across Java and TypeScript. This guid
 Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
-2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
+2. **Docker Desktop** – Used for the PostgreSQL and Keycloak containers.
 3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
-4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
+4. **NATS CLI (optional)** – Helpful when inspecting the agent job stream (NATS is disabled by default locally).
 
 ## Recommended IDE setup
 
@@ -32,7 +32,7 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 ### Maven profiles and local configuration
 
-We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
+We ship three Maven profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
 
 Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
@@ -40,16 +40,27 @@ Create `server/src/main/resources/application-local.yml` to override defaults. T
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
 :::
 
-### Running the server
+### Running the stack
 
 1. Start Docker Desktop.
-2. From `server`, run:
+2. From the repo root, start everything with one command:
 
    ```bash
-   ./mvnw spring-boot:run
+   pnpm dev
    ```
 
-3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
+   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL and Keycloak containers are brought up automatically.
+
+   Prefer plain terminals? Run the two sides yourself:
+
+   ```bash
+   pnpm dev:server   # terminal 1 — brings up Postgres/Keycloak, then Spring Boot
+   pnpm dev:webapp   # terminal 2 — Vite dev server
+   ```
+
+3. Access the API at `http://localhost:8080` (Swagger UI at `http://localhost:8080/swagger-ui/index.html`) and the webapp at `http://localhost:4200`.
+
+To wipe the local database (e.g. after a bad migration or sync), run `pnpm dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
 
 ### Port overrides
 
@@ -198,15 +209,16 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
 When using GitHub App mode, your app might have access to hundreds of repositories. Use filters to focus on specific orgs/repos during development:
 
 ```yaml
-monitoring:
-  filters:
-    allowed-organizations:
-      - ls1intum
-      - HephaestusTest
-    allowed-repositories:
-      - ls1intum/Hephaestus
-      - ls1intum/Artemis
-      - HephaestusTest/demo-repository
+hephaestus:
+  sync:
+    filters:
+      allowed-organizations:
+        - ls1intum
+        - HephaestusTest
+      allowed-repositories:
+        - ls1intum/Hephaestus
+        - ls1intum/Artemis
+        - HephaestusTest/demo-repository
 ```
 
 Empty lists = no filtering (production behavior). Non-empty = only sync matching items.
@@ -238,7 +250,7 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
    The `KEYCLOAK_CLIENT_SECRET` is pre-configured with a development default (`hephaestus-dev-secret`). You do not need to copy a secret from the Keycloak admin console for local development.
    :::
 
-3. Run the application server with `./mvnw spring-boot:run`. Docker containers (Keycloak, PostgreSQL) start automatically via Spring Boot's Docker Compose support.
+3. Start the stack with `pnpm dev` (or `pnpm dev:server`). The `dev:*` scripts bring up the Keycloak and PostgreSQL containers via Docker Compose.
 4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
 
 #### Troubleshooting Keycloak

@@ -959,13 +959,39 @@ export type ProfileActivityStats = {
 };
 
 /**
- * Complete user profile including contribution history and activity
+ * Configurable activity monitor data for a contributor profile
  */
-export type Profile = {
+export type ProfileActivityMonitor = {
     /**
-     * Aggregated activity stats consistent with leaderboard calculations
+     * Aggregated activity stats after applying monitor filters
      */
     activityStats: ProfileActivityStats;
+    /**
+     * Open pull requests authored in the selected timeframe, after repository filters and limit
+     */
+    authoredPullRequests: Array<PullRequestInfo>;
+    /**
+     * Repositories with monitor-relevant activity in the selected timeframe
+     */
+    repositories: Array<RepositoryInfo>;
+    /**
+     * Review activity entries after applying monitor filters and limit
+     */
+    reviewActivity: Array<ProfileReviewActivity>;
+    /**
+     * Total open authored pull requests after filters, before limit
+     */
+    totalAuthoredPullRequestCount: number;
+    /**
+     * Total review activity entries after filters, before limit
+     */
+    totalReviewActivityCount: number;
+};
+
+/**
+ * User profile header: identity, league standing, contribution surface, XP
+ */
+export type Profile = {
     /**
      * Repositories the user has contributed to
      */
@@ -974,18 +1000,6 @@ export type Profile = {
      * Timestamp of the user's first contribution
      */
     firstContribution?: Date;
-    /**
-     * Currently open pull requests authored by the user
-     */
-    openPullRequests: Array<PullRequestInfo>;
-    /**
-     * Recent scored review activity with XP scores
-     */
-    reviewActivity: Array<ProfileReviewActivity>;
-    /**
-     * Distinct pull requests reviewed by this user
-     */
-    reviewedPullRequests: Array<PullRequestInfo>;
     /**
      * Basic information about the user
      */
@@ -3353,9 +3367,6 @@ export type GetUserProfileData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
         login: string;
     };
     query?: {
@@ -3367,12 +3378,39 @@ export type GetUserProfileData = {
 
 export type GetUserProfileResponses = {
     /**
-     * user profile with open PRs, review activity, league points, etc.
+     * OK
      */
     200: Profile;
 };
 
 export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
+
+export type GetActivityMonitorData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: {
+        after?: Date;
+        before?: Date;
+        repositoryIds?: Array<number>;
+        limit?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/profile/{login}/activity-monitor';
+};
+
+export type GetActivityMonitorResponses = {
+    /**
+     * OK
+     */
+    200: ProfileActivityMonitor;
+};
+
+export type GetActivityMonitorResponse = GetActivityMonitorResponses[keyof GetActivityMonitorResponses];
 
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;
