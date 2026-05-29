@@ -96,7 +96,16 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         NatsProperties natsProperties = new NatsProperties(true, "nats://localhost:4222", null, 7, null);
-        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
+        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
+            true,
+            7,
+            "0 0 3 * * *",
+            15,
+            null,
+            null,
+            null,
+            null
+        );
 
         lenient()
             .doAnswer(invocation -> {
@@ -132,7 +141,16 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     /** Creates a service instance with NATS disabled for testing skip behavior. */
     private GitLabWorkspaceInitializationService createServiceWithNatsDisabled() {
         NatsProperties disabledNats = new NatsProperties(false, "nats://localhost:4222", null, 7, null);
-        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(true, 7, "0 0 3 * * *", 15, null, null);
+        SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
+            true,
+            7,
+            "0 0 3 * * *",
+            15,
+            null,
+            null,
+            null,
+            null
+        );
         return new GitLabWorkspaceInitializationService(
             workspaceRepository,
             organizationRepository,

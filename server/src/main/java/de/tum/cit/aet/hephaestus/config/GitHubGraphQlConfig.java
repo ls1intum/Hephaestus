@@ -127,11 +127,19 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
             .build();
 
+        // The buffer limit must be set on the CUSTOM decoder, not only via
+        // defaultCodecs().maxInMemorySize(): the latter governs the default codecs, but our
+        // custom JacksonJsonDecoder (registered for GitHub's 64-bit databaseId handling) keeps
+        // its own 256 KB default. Without this, large PR pages with embedded reviews/threads
+        // fail with "DataBufferLimitException: Exceeded limit on max bytes to buffer : 262144".
+        JacksonJsonDecoder graphQlJsonDecoder = new JacksonJsonDecoder(graphQlObjectMapper);
+        graphQlJsonDecoder.setMaxInMemorySize(MAX_BUFFER_SIZE);
+
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
                 config.customCodecs().register(new JacksonJsonEncoder(graphQlObjectMapper));
-                config.customCodecs().register(new JacksonJsonDecoder(graphQlObjectMapper));
+                config.customCodecs().register(graphQlJsonDecoder);
             })
             .build();
 

@@ -102,6 +102,16 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             fieldValueSyncService,
             graphQlClientProvider,
             syncProperties,
+            new de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties(
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                null,
+                null,
+                null,
+                new de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties.ProjectsProperties(true)
+            ),
             exceptionClassifier,
             transactionTemplate
         );

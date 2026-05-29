@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
 import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -20,7 +19,8 @@ import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
 import de.tum.cit.aet.hephaestus.gitprovider.user.User;
 import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
-import de.tum.cit.aet.hephaestus.profile.dto.ProfileDTO;
+import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
+import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceContributionActivityService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
@@ -86,10 +86,23 @@ class UserProfileServiceTest {
     private ProfileActivityQueryService profileActivityQueryService;
 
     @Mock
-    private PullRequestRepository pullRequestRepository;
-
-    @Mock
     private ActivityEventRepository activityEventRepository;
+
+    private static final ProfileActivityStatsDTO STATS_STUB = new ProfileActivityStatsDTO(
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+    );
 
     private UserProfileService service;
 
@@ -106,7 +119,6 @@ class UserProfileServiceTest {
             workspaceMembershipService,
             workspaceContributionActivityService,
             profileActivityQueryService,
-            pullRequestRepository,
             activityEventRepository
         );
     }
@@ -125,10 +137,10 @@ class UserProfileServiceTest {
             PullRequestReview review = createReview(400L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // ActivityEvent is the source of truth
             ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW, 15.0);
@@ -148,7 +160,14 @@ class UserProfileServiceTest {
             when(reviewActivityAssembler.assemble(eq(review), eq(15))).thenReturn(createProfileReviewDTO(400L, 15));
 
             // Act
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             // Assert
             assertThat(result).isPresent();
@@ -175,10 +194,10 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // No ActivityEvents in ledger
             when(
@@ -191,7 +210,14 @@ class UserProfileServiceTest {
             ).thenReturn(List.of());
 
             // Act
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             // Assert
             assertThat(result).isPresent();
@@ -215,10 +241,10 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // ActivityEvents for 2 reviews + 1 comment
             ActivityEvent event1 = createActivityEvent(WORKSPACE_ID, USER_ID, 400L, ActivityTargetType.REVIEW, 10.0);
@@ -251,7 +277,7 @@ class UserProfileServiceTest {
             when(reviewActivityAssembler.assemble(eq(comment), eq(5))).thenReturn(createProfileReviewDTO(500L, 5));
 
             // Act
-            service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            service.getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, null);
 
             // Assert: Single batch query for each entity type (no N+1)
             verify(pullRequestReviewRepository, times(1)).findAllByIdWithRelations(any());
@@ -271,10 +297,10 @@ class UserProfileServiceTest {
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             // ActivityEvent exists but entity was deleted
             ActivityEvent event = createActivityEvent(WORKSPACE_ID, USER_ID, 999L, ActivityTargetType.REVIEW, 15.0);
@@ -291,7 +317,14 @@ class UserProfileServiceTest {
             when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(999L))).thenReturn(List.of());
 
             // Act
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             // Assert
             assertThat(result).isPresent();
@@ -311,10 +344,10 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(600L, actor, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(actor));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             ActivityEvent event = createActivityEvent(
                 WORKSPACE_ID,
@@ -338,7 +371,14 @@ class UserProfileServiceTest {
             when(reviewActivityAssembler.assemble(eq(reviewComment), eq(0))).thenReturn(
                 createProfileReviewDTO(600L, 0)
             );
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).hasSize(1);
@@ -355,10 +395,10 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(600L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             ActivityEvent event = createActivityEvent(
                 WORKSPACE_ID,
@@ -380,7 +420,14 @@ class UserProfileServiceTest {
                 List.of(reviewComment)
             );
 
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
@@ -397,10 +444,10 @@ class UserProfileServiceTest {
             IssueComment comment = createIssueComment(500L, user, issue);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             ActivityEvent event = createActivityEvent(
                 WORKSPACE_ID,
@@ -420,7 +467,14 @@ class UserProfileServiceTest {
 
             when(issueCommentRepository.findAllByIdWithRelations(Set.of(500L))).thenReturn(List.of(comment));
 
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
@@ -438,10 +492,10 @@ class UserProfileServiceTest {
             PullRequestReviewComment reviewComment = createReviewComment(700L, user, pr);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
-            when(profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any())).thenReturn(
-                List.of()
-            );
-            when(profileRepositoryQueryRepository.findContributedByLogin(any(), any())).thenReturn(List.of());
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of());
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(STATS_STUB);
 
             ActivityEvent issueCommentEvent = createActivityEvent(
                 WORKSPACE_ID,
@@ -474,7 +528,14 @@ class UserProfileServiceTest {
             ProfileReviewActivityDTO issueCommentDto = createProfileReviewDTO(700L, 0);
             when(reviewActivityAssembler.assemble(eq(issueComment), eq(0))).thenReturn(issueCommentDto);
 
-            Optional<ProfileDTO> result = service.getUserProfile(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE);
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                null,
+                null
+            );
 
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).hasSize(1);
@@ -485,9 +546,160 @@ class UserProfileServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("getActivityMonitor")
+    class ActivityMonitorTests {
+
+        @Test
+        @DisplayName("returns empty when workspaceId is null")
+        void returnsEmptyWhenWorkspaceMissing() {
+            assertThat(service.getActivityMonitor(USER_LOGIN, null, AFTER, BEFORE, null, null)).isEmpty();
+            verifyNoInteractions(
+                userRepository,
+                profilePullRequestQueryRepository,
+                activityEventRepository,
+                profileActivityQueryService
+            );
+        }
+
+        @Test
+        @DisplayName("returns empty when login is unknown")
+        void returnsEmptyWhenLoginUnknown() {
+            when(userRepository.findByLogin("ghost")).thenReturn(Optional.empty());
+
+            assertThat(service.getActivityMonitor("ghost", WORKSPACE_ID, AFTER, BEFORE, null, null)).isEmpty();
+            verifyNoInteractions(profileActivityQueryService);
+        }
+
+        @Test
+        @DisplayName("filters authored PRs and totals by repositoryIds while keeping workspace-wide stats")
+        void filtersByRepositoryAndReusesStats() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repoIncluded = createRepository(10L);
+            repoIncluded.setNameWithOwner("org/included");
+            Repository repoExcluded = createRepository(20L);
+            repoExcluded.setNameWithOwner("org/excluded");
+            PullRequest included = createOpenPullRequest(1001L, user, repoIncluded);
+            PullRequest excluded = createOpenPullRequest(1002L, user, repoExcluded);
+
+            ProfileActivityStatsDTO stats = sampleStats();
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(
+                    eq(USER_LOGIN),
+                    eq(Set.of(Issue.State.OPEN)),
+                    eq(WORKSPACE_ID),
+                    any(),
+                    any()
+                )
+            ).thenReturn(List.of(included, excluded));
+            when(activityEventRepository.findProfileActivityByActorInTimeframe(any(), any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileActivityQueryService.getActivityStats(eq(WORKSPACE_ID), eq(USER_ID), any(), any())).thenReturn(
+                stats
+            );
+
+            Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
+                USER_LOGIN,
+                WORKSPACE_ID,
+                AFTER,
+                BEFORE,
+                Set.of(10L),
+                null
+            );
+
+            assertThat(result).isPresent();
+            ProfileActivityMonitorDTO monitor = result.get();
+            assertThat(monitor.authoredPullRequests()).extracting("id").containsExactly(1001L);
+            assertThat(monitor.totalAuthoredPullRequestCount()).isEqualTo(1);
+            assertThat(monitor.activityStats()).isSameAs(stats);
+            // Repository list covers BOTH repos that had activity in the window (not just the selected one)
+            assertThat(monitor.repositories()).extracting("id").containsExactlyInAnyOrder(10L, 20L);
+        }
+
+        @Test
+        @DisplayName("clamps and defaults the limit and reports pre-limit totals")
+        void clampsLimitAndReportsTotals() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repo = createRepository(30L);
+            List<PullRequest> sevenPrs = java.util.stream.IntStream.rangeClosed(1, 7)
+                .mapToObj(i -> createOpenPullRequest(2000L + i, user, repo))
+                .toList();
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(sevenPrs);
+            when(activityEventRepository.findProfileActivityByActorInTimeframe(any(), any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(sampleStats());
+
+            // null limit → DEFAULT (5)
+            assertThat(
+                service
+                    .getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, null)
+                    .get()
+                    .authoredPullRequests()
+            ).hasSize(5);
+            // 0 → clamped to 1
+            assertThat(
+                service
+                    .getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, 0)
+                    .get()
+                    .authoredPullRequests()
+            ).hasSize(1);
+            // 9999 → clamped to MAX (100), but only 7 items exist
+            ProfileActivityMonitorDTO big = service
+                .getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, 9999)
+                .get();
+            assertThat(big.authoredPullRequests()).hasSize(7);
+            // Total reflects pre-limit count
+            assertThat(big.totalAuthoredPullRequestCount()).isEqualTo(7);
+        }
+
+        @Test
+        @DisplayName("deduplicates repositories when same repo appears in multiple PRs")
+        void deduplicatesRepositories() {
+            User user = createUser(USER_ID, USER_LOGIN);
+            Repository repo = createRepository(40L);
+            repo.setNameWithOwner("org/repo");
+            PullRequest first = createOpenPullRequest(3001L, user, repo);
+            PullRequest second = createOpenPullRequest(3002L, user, repo);
+
+            when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
+            when(
+                profilePullRequestQueryRepository.findAuthoredByLoginAndStates(any(), any(), any(), any(), any())
+            ).thenReturn(List.of(first, second));
+            when(activityEventRepository.findProfileActivityByActorInTimeframe(any(), any(), any(), any())).thenReturn(
+                List.of()
+            );
+            when(profileActivityQueryService.getActivityStats(any(), any(), any(), any())).thenReturn(sampleStats());
+
+            ProfileActivityMonitorDTO monitor = service
+                .getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, null)
+                .get();
+
+            assertThat(monitor.repositories()).hasSize(1);
+            assertThat(monitor.repositories().get(0).id()).isEqualTo(40L);
+        }
+
+        private ProfileActivityStatsDTO sampleStats() {
+            return new ProfileActivityStatsDTO(42, 3, 2, 1, 0, 5, 0, 0, 7, 1, 0, 0, 0);
+        }
+    }
+
     // ========================================================================
     // Helper Methods
     // ========================================================================
+
+    private PullRequest createOpenPullRequest(Long id, User author, Repository repo) {
+        PullRequest pr = createPullRequest(id, author, repo);
+        pr.setState(Issue.State.OPEN);
+        return pr;
+    }
 
     private User createUser(Long id, String login) {
         User user = new User();

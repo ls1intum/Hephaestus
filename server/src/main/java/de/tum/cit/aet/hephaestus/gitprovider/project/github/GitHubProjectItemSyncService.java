@@ -73,6 +73,7 @@ public class GitHubProjectItemSyncService {
     private final GitHubProjectItemFieldValueSyncService fieldValueSyncService;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
+    private final de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final TransactionTemplate transactionTemplate;
 
@@ -98,6 +99,9 @@ public class GitHubProjectItemSyncService {
         ProcessingContext context,
         Long parentIssueId
     ) {
+        if (!syncSchedulerProperties.projects().enabled()) {
+            return 0;
+        }
         if (embeddedItems == null || embeddedItems.items().isEmpty()) {
             return 0;
         }
@@ -134,6 +138,9 @@ public class GitHubProjectItemSyncService {
         String startCursor,
         Long parentIssueId
     ) {
+        if (!syncSchedulerProperties.projects().enabled()) {
+            return 0;
+        }
         if (issueNodeId == null || issueNodeId.isBlank()) {
             log.warn("Skipped project item pagination: reason=missingNodeId");
             return 0;
