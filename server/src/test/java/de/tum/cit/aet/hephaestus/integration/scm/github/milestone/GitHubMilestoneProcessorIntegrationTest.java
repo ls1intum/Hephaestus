@@ -147,7 +147,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Process (Create/Update) Tests ====================
+    // Process (Create/Update) Tests
 
     @Nested
     class ProcessMethod {
@@ -545,7 +545,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Delete Tests ====================
+    // Delete Tests
 
     @Nested
     class DeleteMethod {
@@ -610,7 +610,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestMilestoneEventListener {

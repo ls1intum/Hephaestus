@@ -32,7 +32,7 @@ public record GitHubIssueTypeDTO(
         return id != null ? String.valueOf(id) : null;
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubIssueTypeDTO from a GraphQL GHIssueType model.

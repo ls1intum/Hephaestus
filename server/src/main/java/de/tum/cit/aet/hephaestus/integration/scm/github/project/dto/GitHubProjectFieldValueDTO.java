@@ -66,7 +66,7 @@ public record GitHubProjectFieldValueDTO(
     // Trivial serialization (List<String> → JSON string column); no global mapper config needed.
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubProjectFieldValueDTO from a GraphQL field value.

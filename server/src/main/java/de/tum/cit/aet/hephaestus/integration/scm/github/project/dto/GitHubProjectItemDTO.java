@@ -146,7 +146,7 @@ public record GitHubProjectItemDTO(
         };
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubProjectItemDTO from a GraphQL GHProjectV2Item model.
@@ -252,7 +252,7 @@ public record GitHubProjectItemDTO(
         return result;
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static Long toLong(@Nullable BigInteger value) {

@@ -237,9 +237,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    // ========================================================================
     // Local git path (enriched with line-level diff stats)
-    // ========================================================================
 
     /**
      * Process commits using local git clone/fetch via JGit.
@@ -349,9 +347,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         return true;
     }
 
-    // ========================================================================
     // Webhook-only path (file lists without line-level stats)
-    // ========================================================================
 
     /**
      * Creates Commit entities from the push webhook payload.
@@ -454,9 +450,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         commitRepository.save(commitEntity);
     }
 
-    // ========================================================================
     // Domain event publishing
-    // ========================================================================
 
     private void publishCommitCreated(String sha, Repository repository) {
         Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
@@ -481,9 +475,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitData, context));
     }
 
-    // ========================================================================
     // Scope resolution
-    // ========================================================================
 
     @Nullable
     private Long resolveScopeId(Repository repository) {
@@ -497,9 +489,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
     }
 
-    // ========================================================================
     // Organization linking
-    // ========================================================================
 
     private void ensureOrganizationLinked(Repository repository, String projectPath, GitProvider provider) {
         if (repository.getOrganization() != null) {
@@ -528,9 +518,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    // ========================================================================
     // Utility methods
-    // ========================================================================
 
     @Nullable
     static String extractGroupPath(@Nullable String projectPath) {

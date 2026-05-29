@@ -11,6 +11,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -720,7 +721,7 @@ public class GitHubIssueSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updateIssueSyncCursor(syncTargetId, cursor);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, cursor);
             log.debug("Persisted issue sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }
@@ -736,7 +737,7 @@ public class GitHubIssueSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updateIssueSyncCursor(syncTargetId, null);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, null);
             log.debug("Cleared issue sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }

@@ -157,7 +157,7 @@ public class Commit {
     @Column(name = "parent_count")
     private Integer parentCount;
 
-    // ========== R2: Expanded signature fields ==========
+    // R2: Expanded signature fields
 
     /**
      * The signature verification state from GitHub's GitSignatureState enum.
@@ -184,7 +184,7 @@ public class Commit {
     @Column(name = "signature_signer_login", length = 255)
     private String signatureSignerLogin;
 
-    // ========== R3: Parent commit SHAs ==========
+    // R3: Parent commit SHAs
 
     /**
      * Comma-separated SHAs of parent commits (up to 3 parents fetched).
@@ -195,7 +195,7 @@ public class Commit {
     @Column(name = "parent_shas", columnDefinition = "TEXT")
     private String parentShas;
 
-    // ========== R4: CI status rollup ==========
+    // R4: CI status rollup
 
     /**
      * The aggregated CI status check rollup state for this commit.
@@ -205,7 +205,7 @@ public class Commit {
     @Column(name = "status_check_rollup_state", length = 32)
     private String statusCheckRollupState;
 
-    // ========== R6: Organizational attribution ==========
+    // R6: Organizational attribution
 
     /**
      * The login of the organization on whose behalf this commit was made.
@@ -264,7 +264,7 @@ public class Commit {
         updatedAt = Instant.now();
     }
 
-    // ========== Relationships ==========
+    // Relationships
 
     /**
      * The repository this commit belongs to.
@@ -325,7 +325,7 @@ public class Commit {
     @ToString.Exclude
     private Set<PullRequest> associatedPullRequests = new HashSet<>();
 
-    // ========== Helper Methods ==========
+    // Helper Methods
 
     /**
      * Returns the short SHA (first 7 characters) for display purposes.

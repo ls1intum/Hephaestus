@@ -147,25 +147,6 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void outlineConfig_roundTrips() {
-        ConnectionConfig.OutlineConfig original = new ConnectionConfig.OutlineConfig(
-            "https://outline.example.com",
-            "ws-ext-1",
-            Set.of("documents")
-        );
-        Long id = persistAndClear(IntegrationKind.OUTLINE, "https://outline.example.com", original);
-
-        Connection reloaded = connectionRepository.findById(id).orElseThrow();
-        assertThat(reloaded.getConfig()).isInstanceOf(ConnectionConfig.OutlineConfig.class);
-        ConnectionConfig.OutlineConfig cfg = (ConnectionConfig.OutlineConfig) reloaded.getConfig();
-        assertThat(cfg.serverUrl()).isEqualTo("https://outline.example.com");
-        assertThat(cfg.workspaceExternalId()).isEqualTo("ws-ext-1");
-        assertThat(cfg.enabledStreams()).containsExactly("documents");
-
-        assertDiscriminator(id, "OUTLINE");
-    }
-
-    @Test
     void prePersist_rejectsKindConfigMismatch() {
         ConnectionConfig.GitHubAppConfig wrong = new ConnectionConfig.GitHubAppConfig(1L, "acme", null, Set.of());
         Connection bad = new Connection(workspace, IntegrationKind.GITLAB, "instance-x", wrong);

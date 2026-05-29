@@ -34,9 +34,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("Module Boundaries")
 class ModuleBoundaryTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // SPI (SERVICE PROVIDER INTERFACE) PATTERN
-    // ========================================================================
 
     @Nested
     class SpiPatternTests {
@@ -119,9 +117,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // GITPROVIDER BOUNDED CONTEXT ISOLATION
-    // ========================================================================
 
     @Nested
     @DisplayName("Gitprovider Bounded Context")
@@ -213,9 +209,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DOMAIN EVENT PATTERNS
-    // ========================================================================
 
     @Nested
     class DomainEventPatternTests {
@@ -247,9 +241,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // UTILITY CLASS PATTERNS
-    // ========================================================================
 
     @Nested
     class UtilityClassPatternTests {
@@ -275,9 +267,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DTO PATTERNS
-    // ========================================================================
 
     @Nested
     @DisplayName("DTO Patterns")
@@ -303,9 +293,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // REPOSITORY PATTERNS
-    // ========================================================================
 
     @Nested
     @DisplayName("Repository Patterns")
@@ -335,9 +323,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // EXCEPTION PATTERNS
-    // ========================================================================
 
     @Nested
     @DisplayName("Exception Patterns")
@@ -363,9 +349,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SPI BYPASS DETECTION
-    // ========================================================================
 
     @Nested
     class SpiBypassDetectionTests {
@@ -480,9 +464,7 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // FEATURE MODULE BOUNDARIES
-    // ========================================================================
 
     @Nested
     class FeatureModuleBoundaryTests {

@@ -245,9 +245,7 @@ public class PracticeDetectionResultParser {
         return new DiffNote(filePath, startLine, endLine, body);
     }
 
-    // =========================================================================
     // Finding entry validation
-    // =========================================================================
 
     private ValidatedFinding validateEntry(JsonNode entry, int index) {
         // Required: practiceSlug
@@ -462,9 +460,7 @@ public class PracticeDetectionResultParser {
         }
     }
 
-    // =========================================================================
     // Result types
-    // =========================================================================
 
     /**
      * @param validFindings validated findings from the agent output

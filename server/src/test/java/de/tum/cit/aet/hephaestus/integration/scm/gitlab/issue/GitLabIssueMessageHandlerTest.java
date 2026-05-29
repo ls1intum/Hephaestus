@@ -75,9 +75,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         assertThat(handler.key().eventType()).isEqualTo("issue");
     }
 
-    // ========================================================================
     // Action Routing
-    // ========================================================================
 
     @Nested
     class ActionRouting {
@@ -144,9 +142,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Confidential Issue Handling
-    // ========================================================================
 
     @Nested
     class ConfidentialIssues {
@@ -197,9 +193,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Validation
-    // ========================================================================
 
     @Nested
     class PayloadValidation {
@@ -268,9 +262,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Context Resolution
-    // ========================================================================
 
     @Nested
     class ContextResolution {
@@ -287,9 +279,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private Repository setupRepository() {
         Repository repo = new Repository();

@@ -235,7 +235,7 @@ public class GitHubAppTokenService {
         return appId;
     }
 
-    // ============ Key loading helpers ============
+    // Key loading helpers
 
     private static PrivateKey loadKey(Resource privateKeyRes, String privateKeyPem) {
         try {
@@ -378,7 +378,7 @@ public class GitHubAppTokenService {
         }
     }
 
-    // ============ Installation Status Verification ============
+    // Installation Status Verification
 
     /**
      * Verify the current status of an installation via GitHub REST API.
@@ -429,7 +429,7 @@ public class GitHubAppTokenService {
         }
     }
 
-    // ============ Installation Deletion ============
+    // Installation Deletion
 
     /**
      * Permanently delete a GitHub App installation via {@code DELETE /app/installations/{installation_id}}.
@@ -483,7 +483,7 @@ public class GitHubAppTokenService {
         }
     }
 
-    // ============ DTOs ============
+    // DTOs
 
     public record InstallationToken(String token, Instant expiresAt) {}
 

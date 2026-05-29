@@ -59,18 +59,14 @@ public final class ConsumerSubjectMath {
         "gitlab",
         IntegrationKind.GITLAB,
         "slack",
-        IntegrationKind.SLACK,
-        "outline",
-        IntegrationKind.OUTLINE
+        IntegrationKind.SLACK
     );
 
     private ConsumerSubjectMath() {
         // utility class - no instances
     }
 
-    // -------------------------------------------------------------------------
     // Subject prefix construction (publisher-mirror)
-    // -------------------------------------------------------------------------
 
     /**
      * Builds the NATS subject prefix for a repository identifier.
@@ -119,9 +115,7 @@ public final class ConsumerSubjectMath {
         return streamName + "." + parts[0] + "." + parts[1];
     }
 
-    // -------------------------------------------------------------------------
     // Wildcard subject filters
-    // -------------------------------------------------------------------------
 
     /**
      * Wildcard subject filter that matches every event for a single repository.
@@ -166,7 +160,7 @@ public final class ConsumerSubjectMath {
         }
         return switch (kind) {
             case GITHUB -> buildSubjectPrefix("github", "?/?") + ".>";
-            case GITLAB, SLACK, OUTLINE -> throw new UnsupportedOperationException(
+            case GITLAB, SLACK -> throw new UnsupportedOperationException(
                 "Installation-aware subject filter not yet supported for kind=" +
                     kind +
                     " (only GITHUB publishes installation events today)"
@@ -179,7 +173,7 @@ public final class ConsumerSubjectMath {
      * (GitHub → {@code "github"}, GitLab → {@code "gitlab"}); kinds without a stream return
      * {@link Optional#empty()} so callers can short-circuit without exceptions on the path.
      *
-     * <p>Messaging/knowledge kinds (Slack, Outline) do not have JetStream subscriptions in
+     * <p>Messaging kinds (Slack) do not have JetStream subscriptions in
      * this slice — their events flow through other channels. The empty return is the signal
      * to skip, not an error.
      */
@@ -190,13 +184,11 @@ public final class ConsumerSubjectMath {
         return switch (kind) {
             case GITHUB -> Optional.of("github");
             case GITLAB -> Optional.of("gitlab");
-            case SLACK, OUTLINE -> Optional.empty();
+            case SLACK -> Optional.empty();
         };
     }
 
-    // -------------------------------------------------------------------------
     // Subject → kind
-    // -------------------------------------------------------------------------
 
     /**
      * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns

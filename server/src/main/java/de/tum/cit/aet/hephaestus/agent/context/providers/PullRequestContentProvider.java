@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -56,15 +57,17 @@ public class PullRequestContentProvider implements ContentProvider {
     private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final ContributorHistoryProvider contributorHistoryProvider;
     private final GitDiffOperations gitDiffOperations;
+    private final ConnectionService connectionService;
 
     /**
      * SCM token sources keyed by integration kind. Collected via constructor injection so
      * adding a new SCM (Bitbucket etc.) is a matter of registering a new {@link ScmTokenSource}
      * bean — this class never has to learn the new kind.
      *
-     * <p>Pre-fetch only fires when a token source is available for the workspace's bound kind;
-     * stale repos under workspaces with no active SCM connection still get diffed against the
-     * cached clone, just without a network refresh.
+     * <p>Pre-fetch only fires when a token source is available for the workspace's active SCM
+     * kind (resolved via {@link ConnectionService#findActiveProviderKind}); stale repos under
+     * workspaces with no active SCM connection still get diffed against the cached clone, just
+     * without a network refresh.
      */
     private final Map<IntegrationKind, ScmTokenSource> tokenSources;
 
@@ -75,6 +78,7 @@ public class PullRequestContentProvider implements ContentProvider {
         PullRequestReviewCommentRepository reviewCommentRepository,
         ContributorHistoryProvider contributorHistoryProvider,
         GitDiffOperations gitDiffOperations,
+        ConnectionService connectionService,
         List<ScmTokenSource> tokenSourceList
     ) {
         this.objectMapper = objectMapper;
@@ -83,6 +87,7 @@ public class PullRequestContentProvider implements ContentProvider {
         this.reviewCommentRepository = reviewCommentRepository;
         this.contributorHistoryProvider = contributorHistoryProvider;
         this.gitDiffOperations = gitDiffOperations;
+        this.connectionService = connectionService;
         Map<IntegrationKind, ScmTokenSource> map = new EnumMap<>(IntegrationKind.class);
         for (ScmTokenSource src : tokenSourceList) {
             map.put(src.kind(), src);
@@ -122,9 +127,7 @@ public class PullRequestContentProvider implements ContentProvider {
         computeAndStoreDiffSummary(files);
     }
 
-    // -------------------------------------------------------------------------
     // Repository availability
-    // -------------------------------------------------------------------------
 
     private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
@@ -148,14 +151,21 @@ public class PullRequestContentProvider implements ContentProvider {
         boolean fetched = false;
         try {
             var workspace = job.getWorkspace();
-            // The pre-diff fetch only makes sense for kinds that expose a deterministic
-            // clone URL the agent can derive from {serverUrl, repository_full_name}. Today
-            // that's GitLab; GitHub historical fetches go through GithubDataSyncService instead.
-            ScmTokenSource gitlabSource = workspace == null ? null : tokenSources.get(IntegrationKind.GITLAB);
-            if (gitlabSource != null) {
+            // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
+            // kind from the connection (never hardcode a vendor) and look up its token source.
+            // The fetch only actually fires when that source exposes a deterministic clone URL
+            // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
+            // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
+            // empty serverUrl; its historical fetches go through GithubDataSyncService instead).
+            var kind =
+                workspace == null
+                    ? Optional.<IntegrationKind>empty()
+                    : connectionService.findActiveProviderKind(workspace.getId());
+            ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
+            if (source != null) {
                 Long scopeId = workspace.getId();
-                String serverUrl = gitlabSource.serverUrl(scopeId).orElse(null);
-                String token = gitlabSource.accessToken(scopeId).orElse(null);
+                String serverUrl = source.serverUrl(scopeId).orElse(null);
+                String token = source.accessToken(scopeId).orElse(null);
                 JsonNode metadata = job.getMetadata();
                 String repoFullName =
                     metadata != null && metadata.has("repository_full_name")
@@ -192,9 +202,7 @@ public class PullRequestContentProvider implements ContentProvider {
         return false;
     }
 
-    // -------------------------------------------------------------------------
     // Metadata + comments
-    // -------------------------------------------------------------------------
 
     private void storeMetadataAndComments(
         Map<String, byte[]> files,
@@ -322,9 +330,7 @@ public class PullRequestContentProvider implements ContentProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Contributor history
-    // -------------------------------------------------------------------------
 
     private void storeContributorHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
         if (pullRequest == null || pullRequest.getAuthor() == null || job.getWorkspace() == null) {
@@ -357,9 +363,7 @@ public class PullRequestContentProvider implements ContentProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Diff
-    // -------------------------------------------------------------------------
 
     private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata, AgentJob job) {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asText() : null;
@@ -519,9 +523,7 @@ public class PullRequestContentProvider implements ContentProvider {
         return count;
     }
 
-    // -------------------------------------------------------------------------
     // Metadata field helpers (mirrored from former PullRequestReviewHandler helpers)
-    // -------------------------------------------------------------------------
 
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);

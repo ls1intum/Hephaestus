@@ -338,9 +338,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return issue;
     }
 
-    // ========================================================================
     // Private helpers
-    // ========================================================================
 
     /**
      * Resolves the issue author from a webhook event.

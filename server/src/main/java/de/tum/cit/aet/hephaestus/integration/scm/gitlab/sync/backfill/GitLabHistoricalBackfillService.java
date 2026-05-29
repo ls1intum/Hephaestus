@@ -5,6 +5,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -84,7 +86,7 @@ public class GitLabHistoricalBackfillService {
         GitLabMergeRequestSyncService mrSync = services.getMergeRequestSyncService();
         if (issueSync == null && mrSync == null) return 0;
 
-        List<SyncSession> sessions = syncTargetProvider.getGitLabSyncSessions();
+        List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB);
         if (sessions.isEmpty()) return 0;
 
         int batchSize = syncSchedulerProperties.backfill().batchSize();
@@ -223,7 +225,7 @@ public class GitLabHistoricalBackfillService {
 
         // Save cursor for pagination resumption
         String cursor = (result.complete() && result.nextCursor() == null) ? null : result.nextCursor();
-        syncTargetProvider.updateIssueSyncCursor(target.id(), cursor);
+        syncTargetProvider.updateSyncCursor(target.id(), SyncCursorKind.ISSUE, cursor);
     }
 
     private void updateMrBackfillState(SyncTarget target, BackfillBatchResult result) {
@@ -241,7 +243,7 @@ public class GitLabHistoricalBackfillService {
         syncTargetProvider.updatePullRequestBackfillState(target.id(), highWaterMark, checkpoint, null);
 
         String cursor = (result.complete() && result.nextCursor() == null) ? null : result.nextCursor();
-        syncTargetProvider.updatePullRequestSyncCursor(target.id(), cursor);
+        syncTargetProvider.updateSyncCursor(target.id(), SyncCursorKind.PULL_REQUEST, cursor);
     }
 
     private boolean isOnCooldown(Long syncTargetId) {

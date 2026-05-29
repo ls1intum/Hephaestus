@@ -121,9 +121,7 @@ public class GitHubSubIssueSyncService {
         this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // WEBHOOK EVENT PROCESSING
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Process a sub-issue webhook event.
@@ -220,9 +218,7 @@ public class GitHubSubIssueSyncService {
         log.debug("Updated parent issue summary: issueNumber={}, summary={}", parentIssue.getNumber(), summary);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // GRAPHQL BULK SYNC
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Sync all sub-issue relationships for a scope via GraphQL.

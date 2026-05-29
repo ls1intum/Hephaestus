@@ -108,7 +108,7 @@ public class Discussion extends BaseGitServiceEntity {
      */
     private Instant lastSyncAt;
 
-    // ========== Relationships ==========
+    // Relationships
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id")
@@ -154,7 +154,7 @@ public class Discussion extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
-    // ========== Enums ==========
+    // Enums
 
     /**
      * Discussion state - derived from whether the discussion is closed.

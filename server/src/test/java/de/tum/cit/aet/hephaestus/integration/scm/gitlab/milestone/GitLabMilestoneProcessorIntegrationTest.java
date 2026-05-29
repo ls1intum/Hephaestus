@@ -617,7 +617,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabMilestoneDTO createDto(int iid, String state) {
         return new GitLabMilestoneDTO(
@@ -637,7 +637,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Test Data Setup ====================
+    // Test Data Setup
 
     private void setupTestData() {
         gitlabProvider = gitProviderRepository
@@ -682,7 +682,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace = workspaceRepository.save(testWorkspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestMilestoneEventListener {

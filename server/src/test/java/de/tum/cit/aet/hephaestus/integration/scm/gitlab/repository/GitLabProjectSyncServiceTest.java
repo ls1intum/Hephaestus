@@ -264,7 +264,7 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // -- Helpers --
+    // Helpers
 
     @SuppressWarnings("unchecked")
     private void mockGraphQlProjectResponse(GitLabProjectResponse projectResponse) {

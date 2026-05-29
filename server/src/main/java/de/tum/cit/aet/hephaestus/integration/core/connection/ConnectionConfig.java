@@ -17,7 +17,6 @@ import org.springframework.lang.Nullable;
         @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
         @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
         @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
-        @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
     }
 )
 public sealed interface ConnectionConfig
@@ -25,8 +24,7 @@ public sealed interface ConnectionConfig
         ConnectionConfig.GitHubAppConfig,
         ConnectionConfig.GitHubPatConfig,
         ConnectionConfig.GitLabConfig,
-        ConnectionConfig.SlackConfig,
-        ConnectionConfig.OutlineConfig
+        ConnectionConfig.SlackConfig
 {
     /** Enabled sync streams (subset of the source's catalog). */
     Set<String> enabledStreams();
@@ -87,12 +85,6 @@ public sealed interface ConnectionConfig
         @Nullable String teamName,
         @Nullable String notificationChannelId,
         @Nullable String teamLabel,
-        Set<String> enabledStreams
-    ) implements ConnectionConfig {}
-
-    record OutlineConfig(
-        String serverUrl,
-        @Nullable String workspaceExternalId,
         Set<String> enabledStreams
     ) implements ConnectionConfig {}
 }

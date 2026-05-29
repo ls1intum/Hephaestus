@@ -115,7 +115,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
         assertThat(new String(respond.body(), StandardCharsets.UTF_8)).contains("pong");
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // Helpers
 
     private static GithubWebhookSignatureVerifier newVerifier(String secret) {
         return new GithubWebhookSignatureVerifier(new GithubWebhookSecretSource(propsWithSecret(secret)));
@@ -128,7 +128,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
             secret,
             new WebhookProperties.TokenRotation(7, 90),
             new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-            new WebhookProperties.Stream(Duration.ofMinutes(2), Duration.ofDays(180), 2_000_000L),
+            new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), 2_000_000L),
             new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
             new WebhookProperties.Http(26_214_400L)
         );

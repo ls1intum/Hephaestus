@@ -408,9 +408,7 @@ public class WorkspaceMembershipService {
         return member;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Hidden member methods
-    // ══════════════════════════════════════════════════════════════════════════
 
     /**
      * Toggle the hidden flag for a workspace member.
@@ -440,9 +438,7 @@ public class WorkspaceMembershipService {
         return workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspaceId);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Query methods for controller
-    // ══════════════════════════════════════════════════════════════════════════
 
     /**
      * Gets a workspace membership by workspace and user ID.

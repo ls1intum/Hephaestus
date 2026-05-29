@@ -105,9 +105,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // processFieldValues tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class ProcessFieldValues {
@@ -454,9 +452,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // upsertFieldDefinition tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class UpsertFieldDefinition {
@@ -618,9 +614,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // removeStaleFieldDefinitions tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class RemoveStaleFieldDefinitions {
@@ -649,9 +643,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncRemainingFieldValues tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncRemainingFieldValues {

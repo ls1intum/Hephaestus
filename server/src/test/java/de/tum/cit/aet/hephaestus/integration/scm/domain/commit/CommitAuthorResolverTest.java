@@ -31,7 +31,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         resolver = new CommitAuthorResolver(userRepository);
     }
 
-    // ========== Helper ==========
+    // Helper
 
     private User createUser(Long id) {
         User user = new User();
@@ -39,7 +39,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         return user;
     }
 
-    // ========== extractLoginFromNoreply (static, no mocks needed) ==========
+    // extractLoginFromNoreply (static, no mocks needed)
 
     @Nested
     class ExtractLoginFromNoreply {
@@ -89,7 +89,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
     }
 
-    // ========== resolveByEmail ==========
+    // resolveByEmail
 
     @Nested
     class ResolveByEmail {
@@ -207,7 +207,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
     }
 
-    // ========== resolveByLogin ==========
+    // resolveByLogin
 
     @Nested
     class ResolveByLogin {
@@ -246,7 +246,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
     }
 
-    // ========== Strategy 4: display-name match ==========
+    // Strategy 4: display-name match
 
     @Nested
     class ResolveByEmailDisplayName {
@@ -327,7 +327,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
     }
 
-    // ========== resolveAndBackfillByEmail ==========
+    // resolveAndBackfillByEmail
 
     @Nested
     class ResolveAndBackfillByEmail {
@@ -424,7 +424,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
     }
 
-    // ========== isBackfillEligible (static helper) ==========
+    // isBackfillEligible (static helper)
 
     @Nested
     class IsBackfillEligible {
@@ -464,7 +464,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         }
     }
 
-    // ========== dottedLocalPartToDisplayName (static helper) ==========
+    // dottedLocalPartToDisplayName (static helper)
 
     @Nested
     class DottedLocalPartToDisplayName {

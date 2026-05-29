@@ -269,7 +269,7 @@ public class AgentJobExecutor {
         // Any survivors will be NAK'd on connection close.
     }
 
-    // ── Pull loop ──
+    // Pull loop
 
     private void pullLoop() {
         while (running.get()) {
@@ -321,7 +321,7 @@ public class AgentJobExecutor {
         log.info("Agent job executor pull loop stopped");
     }
 
-    // ── Job execution ──
+    // Job execution
 
     void executeJob(Message msg) {
         Optional<UUID> parsed = parseJobId(msg);
@@ -376,7 +376,7 @@ public class AgentJobExecutor {
      *     {@code false} otherwise.
      */
     private boolean claimAndExecute(UUID jobId, Message msg) {
-        // ── CLAIM (micro-transaction #1) — may throw CannotAcquireLockException ──
+        // CLAIM (micro-transaction #1) — may throw CannotAcquireLockException
         Optional<ClaimResult> claimed;
         try {
             claimed = dispatchClaimResult(jobId, msg, claimJob(jobId));
@@ -398,7 +398,7 @@ public class AgentJobExecutor {
         Instant startTime = Instant.now();
         ScheduledFuture<?> heartbeat = startHeartbeat(msg);
         try {
-            // ── PREPARE + EXECUTE + COMPLETE ──
+            // PREPARE + EXECUTE + COMPLETE
             SandboxResult result = prepareAndExecute(jobId, job, snapshot);
             AgentResult agentResult = practiceAgent.parseResult(result);
 
@@ -613,7 +613,7 @@ public class AgentJobExecutor {
         msg.ack();
     }
 
-    // ── Claim: micro-transaction #1 ──
+    // Claim: micro-transaction #1
 
     /** Sentinel values for claimJob results that require post-transaction NATS actions. */
     private enum ClaimOutcome {
@@ -681,7 +681,7 @@ public class AgentJobExecutor {
         capacityState.ifPresent(WorkerCapacityState::releaseReview);
     }
 
-    // ── Complete: micro-transaction #2 ──
+    // Complete: micro-transaction #2
 
     private void completeJob(
         UUID jobId,

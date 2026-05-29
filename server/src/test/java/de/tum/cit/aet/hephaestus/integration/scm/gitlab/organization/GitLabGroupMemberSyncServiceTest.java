@@ -758,7 +758,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // -- Helpers --
+    // Helpers
 
     private GitLabGroupMemberResponse createMember(String gid, String username, String name, int accessLevel) {
         return new GitLabGroupMemberResponse(

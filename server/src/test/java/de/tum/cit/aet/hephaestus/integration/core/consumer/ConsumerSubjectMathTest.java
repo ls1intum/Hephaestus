@@ -54,9 +54,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
             assertThatThrownBy(() ->
                 ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.SLACK)
             ).isInstanceOf(UnsupportedOperationException.class);
-            assertThatThrownBy(() ->
-                ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.OUTLINE)
-            ).isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
@@ -77,9 +74,6 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
             );
             assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z")).contains(IntegrationKind.GITLAB);
             assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.m")).contains(IntegrationKind.SLACK);
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("outline.w.c.d.publish")).contains(
-                IntegrationKind.OUTLINE
-            );
         }
 
         @Test
@@ -116,11 +110,10 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void nonStreamingKindsReturnEmpty() {
-            // Slack/Outline don't flow through the per-kind JetStream subjects this consumer
+            // Slack doesn't flow through the per-kind JetStream subjects this consumer
             // wires up. Returning Optional.empty() (rather than throwing) lets callers
             // short-circuit without surrounding try/catch on the hot path.
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).isEmpty();
-            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.OUTLINE)).isEmpty();
             assertThat(ConsumerSubjectMath.streamNameFor(null)).isEmpty();
         }
     }

@@ -104,9 +104,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practiceFindingRepository.save(finding);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // POST /{findingId}/feedback
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("POST /{findingId}/feedback")
@@ -259,9 +257,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /{findingId}/feedback
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class GetLatestFeedback {
@@ -336,9 +332,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Workspace isolation
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class WorkspaceIsolation {
@@ -382,9 +376,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /engagement
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class GetEngagement {

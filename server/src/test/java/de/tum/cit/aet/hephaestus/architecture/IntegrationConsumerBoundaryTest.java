@@ -51,7 +51,7 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
         assertThat(violations)
             .as(
-                "integration/scm/sync/ must be empty of production code after Slice D — the unified " +
+                "integration/scm/sync/ must be empty of production code — the unified " +
                     "consumer lives under integration/consumer/ and the per-kind sync drivers live " +
                     "under integration/<kind>/sync/. Sub-packages allowed: %s",
                 ALLOWED_SYNC_SUBPACKAGES

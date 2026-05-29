@@ -175,12 +175,12 @@ class MentorLiveLlmTest {
         driver.prompt(threadId, "Briefly explain unit testing in one sentence.");
         translationDone.get(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
 
-        // ─── Lifecycle invariants ──────────────────────────────────────────────────────
+        // Lifecycle invariants
         assertThat(chunks).isNotEmpty();
         assertThat(chunks.get(0)).as("first chunk is Start").isInstanceOf(UIMessageChunk.Start.class);
         assertThat(chunks.get(chunks.size() - 1)).as("last chunk is Finish").isInstanceOf(UIMessageChunk.Finish.class);
 
-        // ─── Streaming-merge invariant ────────────────────────────────────────────────
+        // Streaming-merge invariant
         // Every TextDelta in the stream must share the same block id as the opening TextStart;
         // a regression here breaks AI SDK's client-side reconciliation (deltas get split into
         // separate parts).
@@ -199,7 +199,7 @@ class MentorLiveLlmTest {
         // when the response is unexpected.
         System.out.printf("[hero] LLM response (%d chars): %s%n", concatenated.length(), trim(concatenated, 200));
 
-        // ─── Usage capture ────────────────────────────────────────────────────────────
+        // Usage capture
         // Pi pumps {input, output, totalTokens, ...} on every message_end. The translator threads
         // them into the Finish chunk's messageMetadata.usage. If `stream_options.include_usage`
         // ever regresses these go to zero — exactly the failure mode this test exists to catch.
@@ -217,7 +217,7 @@ class MentorLiveLlmTest {
             finish.messageMetadata().model()
         );
 
-        // ─── Persistence snapshot ─────────────────────────────────────────────────────
+        // Persistence snapshot
         // partsSnapshot is what lands in chat_message.parts JSONB — a single text part once the
         // turn closes. Asserts that closeTextBlock() actually flushed our text into the array.
         // Note: AI SDK's UIMessage has the text part populated on `text-end`. Pi emits agent_end
@@ -548,9 +548,7 @@ class MentorLiveLlmTest {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // Workspace + process plumbing
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private Path stageWorkspace(LiveLlmCredentials creds) throws IOException {
         Path tmp = Files.createTempDirectory("hephaestus-mentor-live-");
@@ -716,9 +714,7 @@ class MentorLiveLlmTest {
         return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // RunnerDriver — same handshake MentorRunnerClient drives in prod
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private static final class RunnerDriver {
 

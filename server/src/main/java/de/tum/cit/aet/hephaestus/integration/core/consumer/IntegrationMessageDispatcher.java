@@ -53,9 +53,7 @@ public class IntegrationMessageDispatcher {
         "gitlab",
         IntegrationKind.GITLAB,
         "slack",
-        IntegrationKind.SLACK,
-        "outline",
-        IntegrationKind.OUTLINE
+        IntegrationKind.SLACK
     );
 
     private final IntegrationMessageHandlerRegistry registry;

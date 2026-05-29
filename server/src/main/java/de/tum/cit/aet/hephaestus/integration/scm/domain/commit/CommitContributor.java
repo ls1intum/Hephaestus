@@ -85,7 +85,7 @@ public class CommitContributor {
      */
     private int ordinal;
 
-    // ========== Relationships ==========
+    // Relationships
 
     /**
      * The commit this contributor belongs to.
@@ -104,7 +104,7 @@ public class CommitContributor {
     @ToString.Exclude
     private User user;
 
-    // ========== Enums ==========
+    // Enums
 
     /**
      * The role a contributor plays in a commit.

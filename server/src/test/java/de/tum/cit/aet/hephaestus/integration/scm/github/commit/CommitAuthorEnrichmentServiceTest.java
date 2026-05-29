@@ -66,7 +66,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         );
     }
 
-    // ========== Tests ==========
+    // Tests
 
     @Nested
     class SkipConditions {

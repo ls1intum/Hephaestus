@@ -528,7 +528,10 @@ hephaestus:
             max-retries: 5
             retry-base-delay: 200ms
         stream:
-            duplicate-window: 2m # JetStream default; provider redelivery is by delivery-UUID
+            # Must be >= the max vendor replay tolerance (5m: GitLab whsec + Slack v0). GitHub has
+            # no timestamp, so this dedup window keyed on X-GitHub-Delivery is its only replay
+            # defense; 10m also covers provider redelivery horizons. See WebhookProperties.Stream.
+            duplicate-window: 10m
             max-age: 180d
             max-messages: 2000000
         shutdown:

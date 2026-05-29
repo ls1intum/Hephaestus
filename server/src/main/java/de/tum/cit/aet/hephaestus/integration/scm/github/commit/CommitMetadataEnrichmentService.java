@@ -658,9 +658,7 @@ public class CommitMetadataEnrichmentService {
         return null;
     }
 
-    // -----------------------------------------------------------------------
     // Follow-up pagination methods
-    // -----------------------------------------------------------------------
 
     /**
      * Fetches remaining authors for a single commit whose authors connection overflowed.
@@ -1027,9 +1025,7 @@ public class CommitMetadataEnrichmentService {
         return null;
     }
 
-    // -----------------------------------------------------------------------
     // Enrichment metadata
-    // -----------------------------------------------------------------------
 
     /**
      * Extracts enrichment metadata from the GraphQL response and updates the commit.
@@ -1140,9 +1136,7 @@ public class CommitMetadataEnrichmentService {
         );
     }
 
-    // -----------------------------------------------------------------------
     // Utility methods
-    // -----------------------------------------------------------------------
 
     /**
      * Extracts the user's database ID from a GitActor node.

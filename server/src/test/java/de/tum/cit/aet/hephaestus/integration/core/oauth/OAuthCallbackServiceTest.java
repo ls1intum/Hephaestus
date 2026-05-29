@@ -243,7 +243,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         verify(connectionService).transition(eq(pending), any(TransitionRequest.class));
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────
+    // helpers
 
     private static Connection newConnection(
         long id,
@@ -264,7 +264,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 java.util.Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, java.util.Set.of());
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

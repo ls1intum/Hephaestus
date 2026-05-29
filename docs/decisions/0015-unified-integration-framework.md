@@ -20,9 +20,17 @@ integration/
 │   ├── github/  vendor adapter (Phase 2: moved from integration/github/)
 │   ├── gitlab/  vendor adapter (Phase 2)
 │   └── sync/    family-shared orchestrator
-├── slack/       Modulith CLOSED — single vendor, opt-in (matchIfMissing=false)
-└── outline/     Modulith CLOSED — single vendor, opt-in
+└── slack/       Modulith OPEN (empirically required: the leaderboard fan-out
+                 crosses module boundaries at runtime; CLOSED deferred — see
+                 `slack/package-info.java`) — single vendor, opt-in
+                 (matchIfMissing=false)
 ```
+
+> **2026-05-29 Scope note:** `integration/outline/` was removed entirely in this
+> epic as an out-of-scope non-goal (#1198). The live top-level set is
+> `{core, scm, slack}`. Outline integration is deferred to a future epic
+> (#1203). References to Outline in the original Decision text below have been
+> corrected accordingly.
 
 Key non-layout changes from Phase 4:
 - SPI vendor-name purge: `GithubAppCredential` → `InstallationCredential`,
@@ -81,77 +89,97 @@ re-litigate it.
 
 ## Decision
 
-The integration domain lives under `integration/` with the following structure:
+The integration domain lives under `integration/` with the following structure
+(all paths are under `integration/core/` after the Phase 1-4 restructure):
 
-- `integration/spi/` — sole cross-module API surface (`@NamedInterface`).
-- `integration/events/` — in-process `DomainEvent` family via Spring
-  `ApplicationEventPublisher`. Wire-level publication is raw bytes plus
-  vendor headers, in `integration/webhook/PublishRequest`.
-- `integration/connection/` — `Connection` aggregate root, audit log, sealed
-  `ConnectionConfig`, AES-256-GCM `CredentialBundleConverter`,
+- `integration/core/spi/` — sole cross-module API surface (`@NamedInterface`).
+- `integration/core/events/` — in-process `ScmDomainEvent` sealed family via
+  Spring `ApplicationEventPublisher`. Wire-level publication is raw bytes plus
+  vendor headers, in `integration/core/webhook/`. **Scope note:** the event
+  substrate is currently SCM-scoped (`ScmDomainEvent` + 2-value
+  `GitProviderType`). A cross-vendor `IntegrationEvent` envelope is deferred
+  to the Slack/Outline integration epics (#1203/#1204/#1205).
+- `integration/core/connection/` — `Connection` aggregate root, audit log,
+  sealed `ConnectionConfig`, AES-256-GCM `CredentialBundleConverter`,
   `EncryptionContext` AAD. Also hosts the platform-level
   `GitProvider`/`GitProviderType` metadata (vendor identity, not domain).
-- `integration/framework/` — `IntegrationFrameworkBootstrap`,
+- `integration/core/framework/` — `IntegrationFrameworkBootstrap`,
   `IntegrationManifestRegistry`, `WorkspaceCapabilityResolver`. Module
   startup + capability resolution.
-- `integration/webhook/` — unified `WebhookController` (`POST /webhooks/{kind}`),
-  ingest pipeline, JetStream publisher, dedup, payload size filter.
-- `integration/consumer/` — NATS consumer + dispatcher + poison handler.
-- `integration/handler/` — `IntegrationMessageHandler` SPI + `EventTypeKey`
+- `integration/core/webhook/` — unified `WebhookController`
+  (`POST /webhooks/{kind}`), ingest pipeline, JetStream publisher, dedup,
+  payload size filter.
+- `integration/core/consumer/` — NATS consumer + dispatcher + poison handler.
+- `integration/core/handler/` — `IntegrationMessageHandler` SPI + `EventTypeKey`
   registry.
-- `integration/oauth/` — outbound OAuth callback + signed-state nonce store
+- `integration/core/oauth/` — outbound OAuth callback + signed-state nonce store
   (RFC 7636 PKCE-S256 + RFC 9700 single-use state).
-- `integration/feedback/` — `FeedbackPost` table for edit-in-place feedback
+- `integration/core/feedback/` — `FeedbackPost` table for edit-in-place feedback
   identity across vendors.
-- `integration/identity/` — `HephaestusUser` + `IntegrationIdentity` (vendor
-  account ↔ platform user binding).
 - `integration/scm/` — the platform-agnostic SCM domain (formerly
   `gitprovider/`). Subpackages: `commit`, `issue`, `pullrequest`,
   `pullrequestreview`, `pullrequestreviewcomment`, `pullrequestreviewthread`,
   `label`, `milestone`, `team`, `user`, `repository`, `organization`,
   `discussion`, `discussioncomment`, `issuecomment`, `issuetype`, `project`,
   `sync`, `workdir` (filesystem clone manager, NOT git-domain), `common`.
-- `integration/github/`, `integration/gitlab/`, `integration/slack/`,
-  `integration/outline/` — vendor adapters, peers of `scm/`. Each carries
-  its own `webhook/`, `lifecycle/`, `credentials/`, `manifest/`,
-  `connect/` (OAuth/PAT setup) subpackages; GitHub adds `app/`,
-  `installation/`. Slack and Outline are scaffolding for #1204/#1205/#1203.
+- `integration/scm/github/`, `integration/scm/gitlab/` — SCM vendor adapters
+  under the `scm/` family root. Each carries its own `webhook/`, `lifecycle/`,
+  `credentials/`, `manifest/`, `connect/` (OAuth/PAT setup) subpackages;
+  GitHub adds `app/`, `installation/`.
+- `integration/slack/` — Slack vendor adapter (messaging, OAuth connect,
+  webhook, lifecycle, leaderboard fan-out). Ships a live weekly-leaderboard
+  notification path; the `SlackMessage`/`SlackChannel` write-dead persistence
+  layer was removed in this epic (see Consequences). Declared
+  `Type.OPEN` by empirical necessity — the leaderboard fan-out crosses module
+  boundaries; full CLOSED is deferred. Opt-in (matchIfMissing=false).
+- **Outline** was removed from this epic as an out-of-scope non-goal. It does
+  not exist in the shipped tree. Deferred to #1203.
 
 `analytics/` is a sibling of `integration/`, not under it. PostHog is
 product analytics, not a vendor integration. Naming the package after the
 capability avoids the `integration/` vs `integrations/` foot-gun the
 iteration accumulated.
 
-The SPI surface is 23 interfaces across three axes:
+The SPI surface is 30 interfaces in `integration/core/spi/` across three axes
+(42 files total in the package; non-interface types are enums, records, and
+exception classes):
 
-- **Lifecycle** (5): `ProvisioningListener`, `IntegrationLifecycleListener`,
+- **Lifecycle** (6): `ProvisioningListener`, `IntegrationLifecycleListener`,
   `OrganizationMembershipListener`, `TeamMembershipListener`,
-  `ConnectionStrategy`.
-- **Wire** (8): `WebhookSignatureVerifier`, `WebhookSecretSource`,
+  `ConnectionStrategy`, `WorkspaceProvisioningHook`.
+- **Wire** (10): `WebhookSignatureVerifier`, `WebhookSecretSource`,
   `SubjectKeyDeriver`, `SubjectParser`, `ApiCredentialProvider`,
-  `TokenRefresher`, `InstallationTokenProvider`, `ScopeIdResolver`.
-- **Capability** (10): `FeedbackChannel`, `InlineFindingChannel`,
+  `TokenRefresher`, `InstallationTokenProvider`, `ScopeIdResolver`,
+  `ScmTokenSource`, `ScmCommentReactionSink`.
+- **Capability** (14): `FeedbackChannel`, `InlineFindingChannel`,
   `ApprovalChannel`, `BackfillStateProvider`, `SyncContextProvider`,
   `SyncTargetProvider`, `SyncTimestampProvider`, `NatsSubscriptionProvider`,
-  `RepositoryScopeFilter`, `IntegrationManifest`.
+  `RepositoryScopeFilter`, `IntegrationManifest`, `InstallationRepositoryEnumerator`,
+  `InstallationSuspensionTracker`, `WorkspaceDataSyncTrigger`,
+  `WorkspaceProviderAvailability`.
 
-The 23:2 surface looks heavy — only GitHub and GitLab implement most of
-these today; Slack/Outline are scaffolding. Each interface is single-purpose
-and capability-gated: a vendor implements only what its `IntegrationManifest`
-declares. This is intentional. The alternative (one omnibus `IntegrationAdapter`
-interface with optional methods) reproduces the linear cost-per-vendor that
-the epic was designed to eliminate. The next vendor pays only for the
-capabilities it declares.
+The 30:2 surface (30 interfaces, currently only GitHub and GitLab implement
+most) looks heavy. Each interface is single-purpose and capability-gated: a
+vendor implements only what its `IntegrationManifest` declares, so the next
+vendor pays only for the capabilities it declares. Honest caveat: several of
+these interfaces (e.g. `ScmTokenSource`, `ScmCommentReactionSink`,
+`WorkspaceDataSyncTrigger`) are single-implementer dependency-inversion seams
+against `workspace/`, not multi-vendor SPIs in the extensibility sense. The
+count therefore overstates vendor-facing surface area; the interfaces that
+matter for adding a third SCM vendor are roughly the Wire and sync Capability
+axes.
 
 Credentials at rest use AES-256-GCM with AAD bound to
 `(workspaceId, kind, instanceKey, columnFqn)`. The ciphertext envelope is
 `[version-byte | 12-byte IV | ciphertext+16-byte GCM tag]`. Cross-row
 substitution attacks fail because the AAD doesn't match.
 
-The Liquibase migration is one file, `1779790459343_unified_integration_framework.xml`,
-32 changesets. No data backfill — operators upgrading a live environment
-must populate the `connection` table out-of-band before applying. This is
-documented in the changelog header.
+The Liquibase migration is one file, `1779790459343_changelog.xml`,
+32 changesets. Changeset 8 runs an idempotent `WorkspaceConnectionBackfillChange`
+Java customChange that re-wraps legacy `Workspace` credentials into `connection`
+rows with AES-GCM v2 blobs. Changeset 9 drops the legacy `Workspace` columns
+only after verifying that the backfill succeeded. The changelog header documents
+the encryption-key requirement for the backfill step.
 
 ## Consequences
 
@@ -176,22 +204,30 @@ Neutral:
   guidance prefers one file per logical change. Defensible here because
   the file IS the unit of release for this epic — splitting it would
   spread one decision across 12 files for no operational benefit.
-- The 23-SPI surface looks broad. It is — but each is small. The cost is
-  conceptual surface area, not LOC.
+- The 30-interface SPI surface is broader than a pure multi-vendor extensibility
+  count implies (see Decision above — several seams are single-implementer
+  DI boundaries against `workspace/`, not vendor extension points). Each
+  interface is small; the cost is conceptual surface area, not LOC.
 
 Negative:
 
 - The API contract break (`gitProviderMode` → `kind`) requires regenerating
   every client. Webapp regenerated in pass 16; future external API consumers
   must port at adoption time.
-- No data backfill means a stale-DB environment loses the eleven legacy
-  Workspace columns silently. Operator-facing, called out in the changelog
-  header — not in a hidden code path.
-- Slack and Outline ship as scaffolding (manifests, credential providers,
-  OAuth callback, signature verifier). The Connection table accepts SLACK
-  and OUTLINE rows; no business logic consumes them yet. This is intentional
-  — #1203/#1204/#1205 fill in the business logic without re-litigating the
-  SPI surface.
+- The backfill (`WorkspaceConnectionBackfillChange`) requires the encryption
+  key at migration time. If the key is absent the changeset fails loudly
+  (not silently) before any legacy columns are dropped. Operators must ensure
+  `hephaestus.security.encryption-key` is set before applying the migration.
+- Slack ships with a live weekly-leaderboard notification path
+  (`SlackLeaderboardDigestPublisher` → `SlackMessageService`), plus
+  connect/credentials/webhook/OAuth scaffolding. The write-dead Slack
+  persistence layer (`SlackMessage`/`SlackChannel` entities + repos +
+  deletion handler) was removed in this epic; `SlackLifecycleListener` is a
+  no-op stub. The Connection table accepts SLACK rows.
+- Outline was removed from this epic as an out-of-scope non-goal (#1198
+  non-goal). The `integration/outline/` package does not exist in the shipped
+  tree; the Connection table still carries the OUTLINE kind value for forward
+  compatibility. Outline integration is deferred to #1203.
 
 ## Revisit trigger
 

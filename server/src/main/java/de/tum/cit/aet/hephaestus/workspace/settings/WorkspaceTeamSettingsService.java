@@ -71,9 +71,7 @@ public class WorkspaceTeamSettingsService {
         this.labelRepository = labelRepository;
     }
 
-    // ========================================================================
     // Team Visibility (Hidden) Settings
-    // ========================================================================
 
     /**
      * Gets the team settings for a workspace and team.
@@ -151,9 +149,7 @@ public class WorkspaceTeamSettingsService {
         return Optional.of(saved);
     }
 
-    // ========================================================================
     // Repository Contribution Visibility Settings
-    // ========================================================================
 
     /**
      * Gets the repository settings for a workspace, team, and repository.
@@ -299,9 +295,7 @@ public class WorkspaceTeamSettingsService {
         return Optional.of(saved);
     }
 
-    // ========================================================================
     // Label Filter Settings
-    // ========================================================================
 
     /**
      * Gets all labels configured as filters for a team in a workspace.
@@ -490,9 +484,7 @@ public class WorkspaceTeamSettingsService {
         );
     }
 
-    // ========================================================================
     // Utility Methods
-    // ========================================================================
 
     private boolean belongsToWorkspace(Team team, Workspace workspace) {
         if (team == null || workspace == null || workspace.getAccountLogin() == null) {

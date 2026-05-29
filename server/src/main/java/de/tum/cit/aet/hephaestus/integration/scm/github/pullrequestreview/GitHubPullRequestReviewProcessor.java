@@ -309,7 +309,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         };
     }
 
-    // ==================== Private Helper Methods ====================
+    // Private Helper Methods
 
     /**
      * Creates a minimal PullRequest entity from webhook data.

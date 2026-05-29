@@ -98,9 +98,7 @@ public class WorkspaceService {
         this.eventPublisher = eventPublisher;
     }
 
-    // ========================================================================
     // Workspace Lookup
-    // ========================================================================
 
     public Optional<Workspace> getWorkspaceBySlug(String slug) {
         return workspaceRepository.findByWorkspaceSlug(slug);
@@ -132,9 +130,7 @@ public class WorkspaceService {
         return Optional.empty();
     }
 
-    // ========================================================================
     // Workspace Creation
-    // ========================================================================
 
     @Transactional
     public Workspace createWorkspace(
@@ -267,9 +263,7 @@ public class WorkspaceService {
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
-    // ========================================================================
     // Workspace Account Login Management
-    // ========================================================================
 
     @Transactional
     public Workspace updateAccountLogin(Long workspaceId, String accountLogin) {
@@ -285,9 +279,7 @@ public class WorkspaceService {
         return workspace;
     }
 
-    // ========================================================================
     // League Points Recalculation
-    // ========================================================================
 
     /**
      * Reset and recalculate league points for all users by replaying their
@@ -326,9 +318,7 @@ public class WorkspaceService {
         leaguePointsRecalculator.recalculate(workspace);
     }
 
-    // ========================================================================
     // Settings Delegation
-    // ========================================================================
 
     public Workspace updateSchedule(String slug, Integer day, String time) {
         Workspace workspace = requireWorkspace(slug);
@@ -380,9 +370,7 @@ public class WorkspaceService {
         return updateFeatures(requireSlug(workspaceContext), request);
     }
 
-    // ========================================================================
     // Slug Renaming
-    // ========================================================================
 
     @Transactional
     public Workspace renameSlug(WorkspaceContext workspaceContext, String newSlug) {
@@ -438,9 +426,7 @@ public class WorkspaceService {
         return saved;
     }
 
-    // ========================================================================
     // Helper Methods
-    // ========================================================================
 
     private Workspace requireWorkspace(String slug) {
         if (isBlank(slug)) {

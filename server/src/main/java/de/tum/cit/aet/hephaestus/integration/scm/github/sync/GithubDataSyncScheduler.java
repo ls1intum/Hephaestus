@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
@@ -173,7 +174,7 @@ public class GithubDataSyncScheduler {
         SyncStatistics stats = syncTargetProvider.getSyncStatistics();
 
         // Get sync sessions (already filtered by status and monitoring scope)
-        List<SyncSession> sessions = syncTargetProvider.getSyncSessions();
+        List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB);
 
         if (sessions.isEmpty()) {
             log.info(

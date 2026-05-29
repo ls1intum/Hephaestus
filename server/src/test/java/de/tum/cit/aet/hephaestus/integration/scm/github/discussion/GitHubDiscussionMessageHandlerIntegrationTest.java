@@ -162,7 +162,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         setupTestData();
     }
 
-    // ==================== Event Key Tests ====================
+    // Event Key Tests
 
     @Nested
     class EventType {
@@ -173,7 +173,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Basic Lifecycle Events ====================
+    // Basic Lifecycle Events
 
     @Nested
     class BasicLifecycleEvents {
@@ -334,7 +334,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Answer Events ====================
+    // Answer Events
 
     @Nested
     class AnswerEvents {
@@ -378,7 +378,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Label Events ====================
+    // Label Events
 
     @Nested
     class LabelEvents {
@@ -422,7 +422,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Lock Events ====================
+    // Lock Events
 
     @Nested
     class LockEvents {
@@ -468,7 +468,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Pin Events ====================
+    // Pin Events
 
     @Nested
     class PinEvents {
@@ -502,7 +502,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Category Changed Event ====================
+    // Category Changed Event
 
     @Nested
     class CategoryChangedEvent {
@@ -529,7 +529,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -608,7 +608,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         }
     }
 
-    // ==================== Helper Methods ====================
+    // Helper Methods
 
     private GitHubDiscussionEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
@@ -672,7 +672,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             .collect(Collectors.toSet());
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestEventListener {

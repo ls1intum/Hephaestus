@@ -43,7 +43,7 @@ class PullRequestCommentPoster {
     /** Marker appended to summary posts so {@code FeedbackPostService} can locate and edit them. */
     static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus-agent-feedback:";
 
-    // ── Sanitization patterns ──
+    // Sanitization patterns
 
     /** Matches @mentions (e.g., @username) — backtick-escaped to prevent notification spam.
      *  Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
@@ -221,7 +221,7 @@ class PullRequestCommentPoster {
         }
     }
 
-    // ── Vendor dispatch ──
+    // Vendor dispatch
 
     private FeedbackChannel requireChannel(IntegrationKind kind) {
         FeedbackChannel channel = channels.get(kind);
@@ -262,7 +262,7 @@ class PullRequestCommentPoster {
         return SUMMARY_MARKER_PREFIX + job.getId() + " -->";
     }
 
-    // ── Sanitization ──
+    // Sanitization
 
     /**
      * Sanitizes untrusted agent output for safe inclusion in git provider comments.
@@ -353,7 +353,7 @@ class PullRequestCommentPoster {
         return result;
     }
 
-    // ── Formatting ──
+    // Formatting
 
     /**
      * Formats a sanitized review comment with bot disclaimer, collapsible body, and metadata footer.
@@ -422,7 +422,7 @@ class PullRequestCommentPoster {
         return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
-    // ── Metadata helpers ──
+    // Metadata helpers
 
     static String requireMetadataText(@Nullable JsonNode metadata, String field) {
         if (metadata == null) {

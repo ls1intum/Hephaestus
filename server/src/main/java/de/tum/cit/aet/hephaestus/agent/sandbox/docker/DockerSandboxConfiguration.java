@@ -178,9 +178,7 @@ public class DockerSandboxConfiguration {
         return new DockerHealthIndicator(containerManager, properties);
     }
 
-    // -------------------------------------------------------------------------
     // Interactive (mentor) sandbox — sibling of SandboxManager.
-    // -------------------------------------------------------------------------
 
     @Bean
     public InteractiveSandboxMetrics interactiveSandboxMetrics(MeterRegistry meterRegistry) {
@@ -259,9 +257,7 @@ public class DockerSandboxConfiguration {
         return executor;
     }
 
-    // -------------------------------------------------------------------------
     // Internal helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Load a seccomp profile from the classpath once at startup.

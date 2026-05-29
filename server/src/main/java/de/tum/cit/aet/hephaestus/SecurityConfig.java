@@ -174,7 +174,7 @@ public class SecurityConfig {
             // Webhook endpoints — authenticated by HMAC (GitHub) or shared-token (GitLab) at the
             // pipeline layer. Spring Security must not block these or external providers can
             // never reach the receiver. See integration.webhook.* and ADR 0008. The unified
-            // {@code /webhooks/{kind}} entry point serves GitHub, GitLab, Slack and Outline.
+            // {@code /webhooks/{kind}} entry point serves GitHub, GitLab and Slack.
             requests.requestMatchers(HttpMethod.POST, "/webhooks/**").permitAll();
             // OAuth vendor callbacks — authenticated by HMAC-signed state parameter at the
             // controller layer (see OAuthCallbackController). The vendor redirect arrives

@@ -62,9 +62,7 @@ public class WorkspaceTeamSettingsController {
         this.workspaceResolver = workspaceResolver;
     }
 
-    // ========================================================================
     // Team Visibility Settings
-    // ========================================================================
 
     /**
      * Get the settings for a team in the workspace.
@@ -139,9 +137,7 @@ public class WorkspaceTeamSettingsController {
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // ========================================================================
     // Repository Contribution Visibility Settings
-    // ========================================================================
 
     /**
      * Get the settings for a repository within a team in the workspace.
@@ -228,9 +224,7 @@ public class WorkspaceTeamSettingsController {
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // ========================================================================
     // Label Filter Settings
-    // ========================================================================
 
     /**
      * Get all label filters configured for a team in the workspace.

@@ -11,6 +11,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -925,7 +926,7 @@ public class GitHubPullRequestSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updatePullRequestSyncCursor(syncTargetId, cursor);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, cursor);
             log.debug("Persisted PR sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }
@@ -941,7 +942,7 @@ public class GitHubPullRequestSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updatePullRequestSyncCursor(syncTargetId, null);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, null);
             log.debug("Cleared PR sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }

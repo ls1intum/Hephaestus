@@ -99,7 +99,7 @@ public record GitHubProjectFieldDTO(
         }
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubProjectFieldDTO from a GraphQL field configuration.

@@ -206,7 +206,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         assertThat(eventListener.getUpdatedEvents()).isEmpty();
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabIssueCommentProcessor.SyncNoteData buildData(String body, String createdAt, String updatedAt) {
         return new GitLabIssueCommentProcessor.SyncNoteData(
@@ -279,7 +279,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace = workspaceRepository.save(workspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestCommentEventListener {

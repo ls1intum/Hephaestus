@@ -35,9 +35,7 @@ import org.junit.jupiter.api.Test;
  */
 class ArchitectureTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // STRUCTURAL INTEGRITY - Critical architectural invariants
-    // ========================================================================
 
     @Nested
     class StructuralIntegrity {
@@ -135,9 +133,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // MODULE BOUNDARIES - SPI patterns (main isolation tests in ModuleBoundaryTest)
-    // ========================================================================
 
     @Nested
     class ModuleBoundaries {
@@ -168,9 +164,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SPRING BEST PRACTICES - Framework patterns
-    // ========================================================================
 
     @Nested
     class SpringBestPractices {
@@ -231,9 +225,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CODING STANDARDS - Core quality rules
-    // ========================================================================
 
     @Nested
     class CodingStandardsCore {
@@ -272,9 +264,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CODING STANDARDS - Logging and dependencies
-    // ========================================================================
 
     @Nested
     class CodingStandardsLogging {
@@ -325,9 +315,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // NAMING CONVENTIONS - Consistency and discoverability
-    // ========================================================================
 
     @Nested
     class NamingConventions {

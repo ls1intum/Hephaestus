@@ -25,9 +25,7 @@ public final class GitLabSyncConstants {
         // Utility class - prevent instantiation
     }
 
-    // ========================================================================
     // API Configuration
-    // ========================================================================
 
     /** Default GitLab server URL (gitlab.com SaaS). */
     public static final String GITLAB_DEFAULT_SERVER_URL = "https://gitlab.com";
@@ -35,9 +33,7 @@ public final class GitLabSyncConstants {
     /** Path to the GitLab GraphQL API endpoint. */
     public static final String GITLAB_GRAPHQL_PATH = "/api/graphql";
 
-    // ========================================================================
     // Rate Limit Headers
-    // ========================================================================
 
     /** Header containing the remaining rate limit points. */
     public static final String HEADER_RATE_LIMIT_REMAINING = "RateLimit-Remaining";
@@ -51,9 +47,7 @@ public final class GitLabSyncConstants {
     /** Header containing the points consumed by the current request. */
     public static final String HEADER_RATE_LIMIT_OBSERVED = "RateLimit-Observed";
 
-    // ========================================================================
     // Rate Limit Thresholds
-    // ========================================================================
 
     /**
      * Default rate limit for GitLab GraphQL API (100 points per minute).
@@ -80,9 +74,7 @@ public final class GitLabSyncConstants {
      */
     public static final int CRITICAL_REMAINING_THRESHOLD = 5;
 
-    // ========================================================================
     // Pagination
-    // ========================================================================
 
     /**
      * Default page size for GitLab GraphQL queries (100 items per page).
@@ -141,9 +133,7 @@ public final class GitLabSyncConstants {
      */
     public static final int MAX_PAGINATION_PAGES = 1000;
 
-    // ========================================================================
     // Transport Retry Configuration
-    // ========================================================================
 
     /** Maximum retries for transport-level errors. */
     public static final int TRANSPORT_MAX_RETRIES = 3;
@@ -157,9 +147,7 @@ public final class GitLabSyncConstants {
     /** Jitter factor for retry backoff (0.0 to 1.0). */
     public static final double JITTER_FACTOR = 0.5;
 
-    // ========================================================================
     // GitLab Global ID Parsing
-    // ========================================================================
 
     /**
      * Pattern for GitLab Global IDs: {@code gid://gitlab/<Type>/<numericId>}.
@@ -228,9 +216,7 @@ public final class GitLabSyncConstants {
         return Long.parseLong(matcher.group(1));
     }
 
-    // ========================================================================
     // Adaptive Page Sizing
-    // ========================================================================
 
     /**
      * Returns an adjusted page size based on current rate-limit budget.

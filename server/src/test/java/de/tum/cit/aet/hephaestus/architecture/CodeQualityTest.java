@@ -34,9 +34,7 @@ import org.junit.jupiter.api.Test;
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // GOD CLASS DETECTION
-    // ========================================================================
 
     @Nested
     class GodClassTests {
@@ -111,9 +109,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // METHOD COMPLEXITY LIMITS
-    // ========================================================================
 
     @Nested
     class MethodComplexityTests {
@@ -281,9 +277,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SECURITY PATTERNS
-    // ========================================================================
 
     @Nested
     @DisplayName("Security Patterns")
@@ -341,9 +335,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // INTERFACE SEGREGATION PRINCIPLE (merged from SolidPrinciplesTest)
-    // ========================================================================
 
     @Nested
     class InterfaceSegregationTests {
@@ -405,18 +397,30 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         /**
          * SPI interfaces should be particularly focused.
          *
-         * <p>Service Provider Interfaces define module contracts -
-         * they should be minimal.
+         * <p>Service Provider Interfaces define module contracts - they should be minimal.
+         *
+         * <p><b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
+         * methods would let an interface hide its true surface behind {@code default} no-op
+         * bodies — a default no-op is still part of the contract every caller can invoke, so it
+         * counts toward ISP width exactly like an abstract method. Static and private (helper)
+         * methods are excluded — they are not part of the implementable contract.
+         *
+         * <p>Applies to every interface under {@code ..spi..} with no exemptions.
          */
         @Test
         void spiInterfacesAreFocused() {
-            ArchCondition<JavaClass> beFocused = new ArchCondition<>("have at most " + MAX_SPI_METHODS + " methods") {
+            ArchCondition<JavaClass> beFocused = new ArchCondition<>(
+                "have at most " + MAX_SPI_METHODS + " abstract+default methods"
+            ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
-                        .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
+                        // Implementable contract surface: every non-static, non-private instance
+                        // method a caller can invoke or an implementer can override — abstract OR default.
+                        .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
+                        .filter(m -> !m.getModifiers().contains(JavaModifier.PRIVATE))
                         .count();
 
                     if (methodCount > MAX_SPI_METHODS) {
@@ -424,7 +428,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                             SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "SPI %s has %d methods (max %d) - split interface",
+                                    "SPI %s has %d abstract+default methods (max %d) - split interface",
                                     javaClass.getSimpleName(),
                                     methodCount,
                                     MAX_SPI_METHODS
@@ -441,15 +445,14 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .and()
                 .resideInAPackage("..spi..")
                 .should(beFocused)
+                .allowEmptyShould(false) // strict: ..spi.. is populated; an empty match would mean the rule silently stopped seeing SPIs
                 .because("SPI interfaces should be minimal");
 
             rule.check(classes);
         }
     }
 
-    // ========================================================================
     // DEPENDENCY INVERSION (merged from SolidPrinciplesTest)
-    // ========================================================================
 
     @Nested
     class DependencyInversionTests {
@@ -506,9 +509,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // LISKOV SUBSTITUTION PRINCIPLE (merged from SolidPrinciplesTest)
-    // ========================================================================
 
     @Nested
     class LiskovSubstitutionTests {

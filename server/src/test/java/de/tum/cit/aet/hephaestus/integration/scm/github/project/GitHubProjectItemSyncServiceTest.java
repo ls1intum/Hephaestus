@@ -105,9 +105,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Helper methods
-    // ═══════════════════════════════════════════════════════════════
 
     private Project createProject() {
         Project project = new Project();
@@ -177,9 +175,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         return ghProject;
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // processEmbeddedItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class ProcessEmbeddedItems {
@@ -524,9 +520,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncRemainingProjectItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncRemainingProjectItems {

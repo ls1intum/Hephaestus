@@ -10,6 +10,8 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -213,7 +215,7 @@ public class GitHubHistoricalBackfillService {
 
         SyncSchedulerProperties.BackfillProperties backfillProps = syncSchedulerProperties.backfill();
 
-        List<SyncSession> sessions = syncTargetProvider.getSyncSessions();
+        List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB);
         if (sessions.isEmpty()) {
             log.trace("No scopes available for backfill");
             return BackfillCycleResult.nothingToDo();
@@ -1131,7 +1133,7 @@ public class GitHubHistoricalBackfillService {
 
             // Persist cursor INSIDE the same transaction as data processing.
             // This ensures atomicity: either both data AND cursor are saved, or neither.
-            backfillStateProvider.updateIssueSyncCursor(syncTargetId, nextCursor);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, nextCursor);
 
             // Normalize min/max if no items were processed
             if (issueCount == 0) {
@@ -1230,7 +1232,7 @@ public class GitHubHistoricalBackfillService {
 
             // Persist cursor INSIDE the same transaction as data processing.
             // This ensures atomicity: either both data AND cursor are saved, or neither.
-            backfillStateProvider.updatePullRequestSyncCursor(syncTargetId, nextCursor);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.PULL_REQUEST, nextCursor);
 
             // Normalize min/max if no items were processed
             if (prCount == 0) {
@@ -1350,9 +1352,7 @@ public class GitHubHistoricalBackfillService {
         }
     }
 
-    // ========================================================================
     // Cooldown Management for 5xx Errors
-    // ========================================================================
 
     /**
      * Checks if a repository is currently in cooldown after experiencing errors.
@@ -1524,9 +1524,7 @@ public class GitHubHistoricalBackfillService {
         }
     }
 
-    // ========================================================================
     // Transport Retry Logic
-    // ========================================================================
 
     /**
      * Creates a retry specification for transport-level errors during body streaming.
@@ -1580,9 +1578,7 @@ public class GitHubHistoricalBackfillService {
         return rateLimitAdjusted;
     }
 
-    // ========================================================================
     // Exception Types
-    // ========================================================================
 
     /**
      * Exception thrown when backfill encounters a transient error that exhausted retries.

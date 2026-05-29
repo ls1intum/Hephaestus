@@ -52,9 +52,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private ChatThreadRepository chatThreadRepository;
 
-    // -------------------------------------------------------------------------
     // Helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Creates a GitLab workspace with typical associated data for purge testing.
@@ -127,9 +125,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return workspace;
     }
 
-    // -------------------------------------------------------------------------
     // Data cleanup completeness
-    // -------------------------------------------------------------------------
 
     @Nested
     class DataCleanup {
@@ -194,9 +190,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Idempotency
-    // -------------------------------------------------------------------------
 
     @Nested
     class Idempotency {
@@ -229,9 +223,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Shared entity protection
-    // -------------------------------------------------------------------------
 
     @Nested
     class SharedEntityProtection {
@@ -253,9 +245,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Credential and sensitive field clearing
-    // -------------------------------------------------------------------------
 
     @Nested
     class SensitiveFieldClearing {
@@ -339,9 +329,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Authorization
-    // -------------------------------------------------------------------------
 
     @Nested
     class Authorization {

@@ -337,7 +337,7 @@ class ScopedRateLimitTrackerTest extends BaseUnitTest {
         }
     }
 
-    // ========== Helper Methods ==========
+    // Helper Methods
 
     private ClientGraphQlResponse mockResponseWithRateLimit(
         int remaining,

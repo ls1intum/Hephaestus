@@ -121,8 +121,17 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
             log.warn("GitLab plaintext verifier: no shared secret available");
             return new VerificationResult.Invalid("missing-secret");
         }
-        byte[] tokenBytes = tokenHeader.getBytes(StandardCharsets.UTF_8);
-        if (MessageDigest.isEqual(tokenBytes, secret.get())) {
+        // Hash both sides to fixed-width 32-byte digests before the constant-time compare.
+        // A raw MessageDigest.isEqual over the byte arrays loops over the presented token's
+        // length, so timing would leak the attacker-controlled token length (and a length
+        // mismatch is trivially distinguishable) — narrowing brute-force. Hashing first makes
+        // both inputs equal-length regardless of secret length, removing that side channel.
+        byte[] tokenDigest = sha256(tokenHeader.getBytes(StandardCharsets.UTF_8));
+        byte[] secretDigest = sha256(secret.get());
+        if (tokenDigest == null || secretDigest == null) {
+            return new VerificationResult.Invalid("hash-init-failed");
+        }
+        if (MessageDigest.isEqual(tokenDigest, secretDigest)) {
             return new VerificationResult.Verified();
         }
         return new VerificationResult.Invalid("token-mismatch");
@@ -200,6 +209,16 @@ public class GitlabWebhookSignatureVerifier implements WebhookSignatureVerifier 
             }
         }
         return new VerificationResult.Invalid("signature-mismatch");
+    }
+
+    /** SHA-256 digest, or {@code null} if the algorithm is somehow unavailable (never on a JRE). */
+    @Nullable
+    private static byte[] sha256(byte[] input) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(input);
+        } catch (NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 
     @Nullable

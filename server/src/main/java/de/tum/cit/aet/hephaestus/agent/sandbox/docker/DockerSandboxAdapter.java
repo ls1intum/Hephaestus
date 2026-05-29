@@ -165,7 +165,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         log.info("Starting sandbox execution: image={}", spec.image());
 
         try {
-            // ── PHASE 1: PREPARE ──
+            // PHASE 1: PREPARE
             checkCancelled(cancelled, jobId);
 
             // Create isolated network
@@ -239,7 +239,7 @@ public class DockerSandboxAdapter implements SandboxManager {
                 log.debug("Injected {} directories into container", spec.volumeMounts().size());
             }
 
-            // ── PHASE 2: EXECUTE ──
+            // PHASE 2: EXECUTE
             containerManager.startContainer(containerId);
             log.info("Container started");
 
@@ -251,7 +251,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             // the caller would see a normal result instead of SandboxCancelledException.
             checkCancelled(cancelled, jobId);
 
-            // ── PHASE 3: COLLECT ──
+            // PHASE 3: COLLECT
             // Collect output regardless of exit code or timeout — agent may have written partial results
             Map<String, byte[]> outputFiles = workspaceManager.collectOutput(containerId, spec.outputPath());
 
@@ -292,7 +292,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             log.error("Unexpected error during sandbox execution", e);
             throw new SandboxException("Sandbox execution failed for job: " + jobId, e);
         } finally {
-            // ── PHASE 4: CLEANUP ──
+            // PHASE 4: CLEANUP
             // Remove from activeContainers FIRST to prevent cancel() from calling
             // stopContainer() on a container that cleanup is about to force-remove.
             activeContainers.remove(jobId);
@@ -332,14 +332,12 @@ public class DockerSandboxAdapter implements SandboxManager {
         return containerManager.ping();
     }
 
-    // -------------------------------------------------------------------------
     // Internal helpers
-    // -------------------------------------------------------------------------
 
     private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
         Map<String, String> env = new HashMap<>();
 
-        // ── User environment ──
+        // User environment
         // User env vars are copied first; security values are injected below and will
         // overwrite any collisions. This is defense-in-depth — most dangerous vars are
         // already blocked by SandboxEnvBlocklist, but the ordering ensures new security
@@ -352,7 +350,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             }
         }
 
-        // ── Git security ──
+        // Git security
         // Env-based config has HIGHEST precedence in git — overrides .git/config in any repo
         // the agent clones or that was injected via volume mounts. Always injected regardless of
         // whether volume mounts are present, since the agent can git-clone repos at runtime.

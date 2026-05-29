@@ -216,7 +216,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Test Data Setup ====================
+    // Test Data Setup
 
     private void setupTestData() {
         GitProvider provider = gitProviderRepository
@@ -261,7 +261,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace = workspaceRepository.save(testWorkspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestLabelEventListener {

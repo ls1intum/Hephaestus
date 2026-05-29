@@ -24,7 +24,6 @@ public interface SubjectKeyDeriver {
      *   <li>GitHub: {@code "github-" + X-GitHub-Delivery}
      *   <li>GitLab: {@code "gitlab-" + (Idempotency-Key | X-Gitlab-Event-UUID | sha256)}
      *   <li>Slack: {@code "slack-" + X-Slack-Request-Id}
-     *   <li>Outline: {@code "outline-" + <webhook id>}
      * </ul>
      */
     String deriveDedupKey(byte[] body, Map<String, String> headers);

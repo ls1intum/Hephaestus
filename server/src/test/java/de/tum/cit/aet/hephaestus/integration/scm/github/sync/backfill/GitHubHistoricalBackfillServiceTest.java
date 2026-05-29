@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerPropert
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.FilterProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
@@ -139,9 +140,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             });
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Test construction helpers
-    // ═══════════════════════════════════════════════════════════════
 
     private GitHubHistoricalBackfillService createService(SyncSchedulerProperties schedulerProps) {
         return new GitHubHistoricalBackfillService(
@@ -291,9 +290,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // isEnabled
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class IsEnabled {
@@ -313,9 +310,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // runBackfillCycle - disabled / no work
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class RunBackfillCycle {
@@ -334,7 +329,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnNothingToDoWhenNoSessions() {
             service = createService(enabledSchedulerProperties);
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of());
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of());
 
             BackfillCycleResult result = service.runBackfillCycle();
 
@@ -348,7 +343,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             service = createService(enabledSchedulerProperties);
             SyncTarget target = createTargetWithIncrementalComplete(SYNC_TARGET_ID_A, "org/repo-a");
             SyncSession session = createSession(List.of(target));
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             // Rate limit below threshold (100)
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
             when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID)).thenReturn(Instant.now().plusSeconds(300));
@@ -365,7 +360,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget completeTarget = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
             SyncTarget incompleteTarget = createTargetWithIncrementalComplete(SYNC_TARGET_ID_B, "org/repo-b");
             SyncSession session = createSession(List.of(completeTarget, incompleteTarget));
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
             when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID)).thenReturn(Instant.now().plusSeconds(300));
 
@@ -381,7 +376,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             service = createService(enabledSchedulerProperties);
             SyncTarget completeTarget = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
             SyncSession session = createSession(List.of(completeTarget));
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
 
             BackfillCycleResult result = service.runBackfillCycle();
@@ -396,7 +391,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             service = createService(enabledSchedulerProperties);
             SyncTarget pendingTarget = createTargetPendingIncrementalSync(SYNC_TARGET_ID_A, "org/repo-a");
             SyncSession session = createSession(List.of(pendingTarget));
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             // Rate limit is checked before per-repo iteration; stub it above threshold
             // so we reach the per-repo incremental sync gate
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
@@ -416,7 +411,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget repoB = createTargetPendingIncrementalSync(SYNC_TARGET_ID_B, "org/repo-b");
             SyncSession session = createSession(List.of(repoA, repoB));
 
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             // Rate limit is always checked; stub above threshold to reach per-repo iteration
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
             // repoA passes incremental check, enters backfillRepository but not found in DB
@@ -438,7 +433,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget repoB = createTargetWithIncrementalComplete(SYNC_TARGET_ID_B, "org/repo-b");
             SyncSession session = createSession(List.of(repoA, repoB));
 
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             // First call: above threshold (scope-level check passes)
             // Second call (re-check before repo A): still above threshold
             // Third call (re-check before repo B): below threshold
@@ -457,9 +452,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // backfillRepository (package-private)
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class BackfillRepository {
@@ -512,9 +505,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // BackfillCycleResult
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class BackfillCycleResultTests {
@@ -538,9 +529,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // BackfillProgress
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class BackfillProgressTests {
@@ -616,9 +605,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // SyncTarget convenience methods
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncTargetBackfillState {
@@ -733,9 +720,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // getProgress
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class GetProgress {
@@ -765,9 +750,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Multiple sessions
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class MultipleSessions {
@@ -816,7 +799,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 new SyncContextProvider.SyncContext(scopeId2, "workspace-2", "Workspace 2", installationId2)
             );
 
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session1, session2));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session1, session2));
             // Rate limit is always checked per scope; stub above threshold to reach per-repo iteration
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
             when(graphQlClientProvider.getRateLimitRemaining(scopeId2)).thenReturn(5000);
@@ -830,9 +813,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Mixed target states in single session
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class MixedTargetStates {
@@ -847,7 +828,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget eligibleRepo = createTargetWithIncrementalComplete(SYNC_TARGET_ID_C, "org/repo-eligible");
 
             SyncSession session = createSession(List.of(completeRepo, pendingRepo, eligibleRepo));
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             // Rate limit is always checked; stub above threshold to reach per-repo iteration
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
             // eligibleRepo passes incremental check, enters backfillRepository but not in DB
@@ -871,7 +852,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             SyncTarget eligibleRepo = createTargetWithIncrementalComplete(SYNC_TARGET_ID_B, "org/repo-eligible");
 
             SyncSession session = createSession(List.of(completeRepo, eligibleRepo));
-            when(syncTargetProvider.getSyncSessions()).thenReturn(List.of(session));
+            when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
             // eligibleRepo enters the per-repo loop and calls backfillRepository
             when(repositoryRepository.findByNameWithOwner("org/repo-eligible")).thenReturn(Optional.empty());

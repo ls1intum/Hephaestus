@@ -241,6 +241,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
 
         eventPublisher.publishEvent(
             new BotCommandReceivedEvent(
+                IntegrationKind.GITLAB,
                 context.repository().getId(),
                 mr.iid(),
                 event.objectAttributes().note(),

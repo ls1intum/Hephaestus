@@ -251,7 +251,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         }
     }
 
-    // ── Cancel endpoint tests ──
+    // Cancel endpoint tests
 
     @Test
     @WithAdminUser

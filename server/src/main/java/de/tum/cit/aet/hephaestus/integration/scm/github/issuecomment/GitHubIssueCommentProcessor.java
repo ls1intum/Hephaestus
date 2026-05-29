@@ -321,7 +321,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             });
     }
 
-    // ==================== Private Helper Methods ====================
+    // Private Helper Methods
 
     /**
      * Creates a minimal Issue or PullRequest entity from webhook data, with retry on conflict.

@@ -614,7 +614,7 @@ public class WorkspaceProvisioningService {
         @JsonProperty("html_url") String htmlUrl
     ) {}
 
-    // ============ DTOs for GitLab REST API ============
+    // DTOs for GitLab REST API
 
     private record GitLabTokenUserResponse(
         Long id,

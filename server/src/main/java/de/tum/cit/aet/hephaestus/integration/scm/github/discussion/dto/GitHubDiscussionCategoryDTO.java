@@ -25,7 +25,7 @@ public record GitHubDiscussionCategoryDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubDiscussionCategoryDTO from a GraphQL DiscussionCategory model.

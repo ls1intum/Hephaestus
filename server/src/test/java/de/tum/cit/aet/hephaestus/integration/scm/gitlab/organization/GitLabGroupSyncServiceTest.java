@@ -455,7 +455,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
         }
 
-        // -- Reconciliation Tests (GitLab #33419 workaround) --
+        // Reconciliation Tests (GitLab #33419 workaround)
 
         @Test
         void reconciliation_recoversDroppedDirectProjects() {
@@ -632,7 +632,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             assertThat(result.projectsReconciled()).isZero();
         }
 
-        // -- SyncGroupProjects Helpers --
+        // SyncGroupProjects Helpers
 
         private static Repository createTestRepository(long nativeId) {
             Repository repo = new Repository();
@@ -722,7 +722,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // -- Helpers --
+    // Helpers
 
     private HttpGraphQlClient mockClient() {
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);

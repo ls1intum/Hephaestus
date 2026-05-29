@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandboxState;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.EvictionReason;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -37,8 +38,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     private static final String MDC_CONTAINER_ID = "mentor.containerId";
 
     private final UUID sessionId;
-    private final String userId;
-    private final String workspaceId;
+    private final SandboxIdentity identity;
     private final String containerId;
     private final String networkId;
 
@@ -87,8 +87,7 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         Consumer<DockerAttachedSandboxAdapter> onClosed
     ) {
         this.sessionId = sessionId;
-        this.userId = userId;
-        this.workspaceId = workspaceId;
+        this.identity = new SandboxIdentity(sessionId, userId, workspaceId);
         this.containerId = containerId;
         this.networkId = networkId;
         this.process = process;
@@ -136,18 +135,8 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     }
 
     @Override
-    public UUID sessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public String userId() {
-        return userId;
-    }
-
-    @Override
-    public String workspaceId() {
-        return workspaceId;
+    public SandboxIdentity identity() {
+        return identity;
     }
 
     public AttachedSandboxState state() {

@@ -158,9 +158,7 @@ public class GitLabGraphQlClientProvider {
             .build();
     }
 
-    // ========================================================================
     // Rate Limit Tracking (Per-Scope)
-    // ========================================================================
 
     /**
      * Updates the rate limit tracker from HTTP response headers.

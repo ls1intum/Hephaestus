@@ -79,13 +79,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         // Unified integration framework
         "Connection", // has direct Workspace field
         "ConnectionAudit", // through Connection.workspace
-        "FeedbackPost", // through Connection.workspace
-        // Slack + Outline persistence (#1204/#1205 runtime tables)
-        // Workspace-scoped via Connection.workspace; deletion rules + ToS contract in entity Javadoc.
-        "SlackChannel",
-        "SlackMessage",
-        "OutlineDocument",
-        "OutlineCollection"
+        "FeedbackPost" // through Connection.workspace
     );
 
     /**
@@ -104,9 +98,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "WorkerTokenDenylist" // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
     );
 
-    // ========================================================================
     // ENTITY WORKSPACE RELATIONSHIPS
-    // ========================================================================
 
     @Nested
     class EntityWorkspaceRelationshipTests {
@@ -209,9 +201,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DTO WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
     class DtoWorkspaceContextTests {
@@ -290,9 +280,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // REPOSITORY RETURN TYPE SAFETY
-    // ========================================================================
 
     @Nested
     class RepositoryReturnTypeSafetyTests {
@@ -424,9 +412,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CASCADE DELETE WORKSPACE SAFETY
-    // ========================================================================
 
     @Nested
     class CascadeDeleteSafetyTests {

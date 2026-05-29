@@ -57,9 +57,7 @@ public class WorkspaceTeamLabelService {
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
     }
 
-    // ========================================================================
     // User/Team Queries
-    // ========================================================================
 
     public List<UserTeamsDTO> getUsersWithTeams(String slug) {
         Workspace workspace = requireWorkspace(slug);
@@ -83,9 +81,7 @@ public class WorkspaceTeamLabelService {
         return getUsersWithTeams(requireSlug(workspaceContext));
     }
 
-    // ========================================================================
     // Label Management
-    // ========================================================================
 
     /**
      * Adds a label as a filter for a team in a workspace.
@@ -167,9 +163,7 @@ public class WorkspaceTeamLabelService {
         return removeLabelFromTeam(requireSlug(workspaceContext), teamId, labelId);
     }
 
-    // ========================================================================
     // Helper Methods
-    // ========================================================================
 
     /**
      * Creates a TeamInfoDTO with workspace-scoped settings applied.

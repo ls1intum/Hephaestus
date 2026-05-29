@@ -112,7 +112,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         setupTestData();
     }
 
-    // ==================== Event Type ====================
+    // Event Type
 
     @Nested
     class EventTypeTest {
@@ -123,7 +123,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Basic Lifecycle ====================
+    // Basic Lifecycle
 
     @Nested
     class BasicLifecycleEvents {
@@ -190,7 +190,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -248,7 +248,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabMilestoneEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
@@ -299,7 +299,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.save(workspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestMilestoneWebhookEventListener {

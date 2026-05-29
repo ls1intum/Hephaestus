@@ -456,9 +456,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         verify(requestSpec).variable(eq("updatedAfter"), eq(null));
     }
 
-    // ------------------------------------------------------------------------
     // Helpers
-    // ------------------------------------------------------------------------
 
     private HttpGraphQlClient mockClient() {
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);

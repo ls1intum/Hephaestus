@@ -97,9 +97,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
      */
     static final Set<String> WORKSPACE_AGNOSTIC_METHODS = Set.of();
 
-    // ========================================================================
     // REPOSITORY WORKSPACE FILTERING
-    // ========================================================================
 
     @Nested
     class RepositoryWorkspaceFilteringTests {
@@ -380,9 +378,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SCHEDULED JOB WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
     class ScheduledJobContextTests {
@@ -545,9 +541,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // EVENT LISTENER WORKSPACE VALIDATION
-    // ========================================================================
 
     @Nested
     class EventListenerContextTests {
@@ -744,9 +738,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SERVICE LAYER WORKSPACE AWARENESS
-    // ========================================================================
 
     @Nested
     class ServiceWorkspaceAwarenessTests {
@@ -847,9 +839,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CONTROLLER WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
     class ControllerWorkspaceContextTests {

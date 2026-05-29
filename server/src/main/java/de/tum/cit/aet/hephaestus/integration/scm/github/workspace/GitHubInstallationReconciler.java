@@ -243,7 +243,7 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         };
     }
 
-    // ============ DTOs for GitHub REST API ============
+    // DTOs for GitHub REST API
 
     private record AppInfoResponse(long id, String name, String slug, OwnerDto owner) {}
 

@@ -126,7 +126,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         return ProcessingContext.forSync(testWorkspace.getId(), testRepository);
     }
 
-    // ==================== Process (Create/Update) Tests ====================
+    // Process (Create/Update) Tests
 
     @Nested
     class ProcessMethod {
@@ -324,7 +324,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Delete Tests ====================
+    // Delete Tests
 
     @Nested
     class DeleteMethod {
@@ -384,7 +384,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestLabelEventListener {

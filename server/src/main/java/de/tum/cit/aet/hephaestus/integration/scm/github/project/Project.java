@@ -311,7 +311,7 @@ public class Project extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<ProjectStatusUpdate> statusUpdates = new HashSet<>();
 
-    // ==================== Bidirectional Relationship Helpers ====================
+    // Bidirectional Relationship Helpers
 
     /**
      * Adds an item to this project and maintains bidirectional consistency.

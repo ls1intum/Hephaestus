@@ -314,7 +314,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     /**
      * Bridges the legacy {@link ProvisioningListener.AccountType} enum (GitHub-shaped, 2 values)
      * to the framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, includes
-     * {@code TEAM_WORKSPACE} for Slack/Outline). The third value is unreachable from the GitHub
+     * {@code TEAM_WORKSPACE} for Slack). The third value is unreachable from the GitHub
      * SPI surface, hence the simple binary mapping.
      */
     private static IntegrationLifecycleListener.AccountKind mapAccountKind(ProvisioningListener.AccountType type) {

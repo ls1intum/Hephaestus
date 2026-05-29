@@ -190,7 +190,7 @@ public class AgentJob {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    // -- LLM usage aggregates (populated at job completion from agent-reported usage) --
+    // LLM usage aggregates (populated at job completion from agent-reported usage)
 
     @Column(name = "llm_model", length = 100)
     private String llmModel;

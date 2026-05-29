@@ -192,7 +192,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Critical: getDatabaseId() Fallback Tests ====================
+    // Critical: getDatabaseId() Fallback Tests
 
     @Nested
     class GetDatabaseIdFallback {
@@ -312,7 +312,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process (Create) Tests ====================
+    // Process (Create) Tests
 
     @Nested
     class ProcessMethodCreate {
@@ -580,7 +580,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process (Update) Tests ====================
+    // Process (Update) Tests
 
     @Nested
     class ProcessMethodUpdate {
@@ -971,7 +971,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== State Transition Tests ====================
+    // State Transition Tests
 
     @Nested
     class StateTransitions {
@@ -1148,7 +1148,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Delete Tests ====================
+    // Delete Tests
 
     @Nested
     class DeleteMethod {
@@ -1268,7 +1268,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -1442,7 +1442,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestDiscussionEventListener {

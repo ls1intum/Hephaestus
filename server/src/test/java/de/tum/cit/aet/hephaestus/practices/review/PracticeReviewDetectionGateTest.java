@@ -72,7 +72,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         );
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // Helpers
 
     private PullRequest createPullRequest() {
         PullRequest pr = new PullRequest();
@@ -132,7 +132,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return workspace;
     }
 
-    // ── Gate Check Tests ────────────────────────────────────────────────────
+    // Gate Check Tests
 
     @Nested
     class DraftGateTests {

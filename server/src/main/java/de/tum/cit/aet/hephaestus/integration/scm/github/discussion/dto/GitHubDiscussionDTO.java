@@ -61,7 +61,7 @@ public record GitHubDiscussionDTO(
         return "closed".equalsIgnoreCase(state);
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubDiscussionDTO from a GraphQL Discussion model.
@@ -101,7 +101,7 @@ public record GitHubDiscussionDTO(
         );
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static String convertStateReason(@Nullable GHDiscussionStateReason stateReason) {

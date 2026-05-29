@@ -30,7 +30,7 @@ public record GitHubMilestoneDTO(
     @JsonProperty("updated_at") Instant updatedAt,
     @JsonProperty("closed_at") Instant closedAt
 ) {
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubMilestoneDTO from a GraphQL GHMilestone model.

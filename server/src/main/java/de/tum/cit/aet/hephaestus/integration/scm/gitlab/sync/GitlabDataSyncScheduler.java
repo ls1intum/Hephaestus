@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
@@ -123,7 +124,7 @@ public class GitlabDataSyncScheduler {
     @Scheduled(cron = "${hephaestus.sync.cron}")
     @SchedulerLock(name = "gitlab-data-sync", lockAtMostFor = "PT4H", lockAtLeastFor = "PT1M")
     public void syncDataCron() {
-        List<SyncSession> sessions = syncTargetProvider.getGitLabSyncSessions();
+        List<SyncSession> sessions = syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB);
 
         if (sessions.isEmpty()) {
             log.debug("No active GitLab workspaces to sync");

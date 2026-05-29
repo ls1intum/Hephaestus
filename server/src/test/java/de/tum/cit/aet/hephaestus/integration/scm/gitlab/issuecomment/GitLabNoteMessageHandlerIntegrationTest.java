@@ -132,14 +132,14 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         setupTestData();
     }
 
-    // ==================== Event Type ====================
+    // Event Type
 
     @Test
     void returnsCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("note");
     }
 
-    // ==================== Issue Notes ====================
+    // Issue Notes
 
     @Nested
     class IssueNotes {
@@ -185,7 +185,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== MR Notes ====================
+    // MR Notes
 
     @Nested
     class MergeRequestNotes {
@@ -227,7 +227,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== System Notes ====================
+    // System Notes
 
     @Nested
     class SystemNotes {
@@ -241,7 +241,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Confidential Notes ====================
+    // Confidential Notes
 
     @Nested
     class ConfidentialNotes {
@@ -255,7 +255,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -310,7 +310,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabNoteEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
@@ -396,7 +396,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.save(workspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class GitLabNoteTestEventListener {

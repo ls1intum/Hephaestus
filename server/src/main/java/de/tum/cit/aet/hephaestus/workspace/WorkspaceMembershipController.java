@@ -169,9 +169,7 @@ public class WorkspaceMembershipController {
         return ResponseEntity.noContent().build();
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Helper methods - throw proper exceptions for consistent RFC-7807 responses
-    // ══════════════════════════════════════════════════════════════════════════
 
     private User requireCurrentUser() {
         return userRepository

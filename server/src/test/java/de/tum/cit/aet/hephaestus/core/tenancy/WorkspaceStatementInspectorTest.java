@@ -34,7 +34,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         return new WorkspaceStatementInspector(scopedTables, mode, reporter, parseFailureCounter);
     }
 
-    // ── short-circuits ─────────────────────────────────────────────────────
+    // short-circuits
 
     @Test
     void offModeSkipsEverything() {
@@ -61,7 +61,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         verifyNoInteractions(reporter, scopedTables);
     }
 
-    // ── regex fast-path ────────────────────────────────────────────────────
+    // regex fast-path
 
     @Test
     void predicateMatchShortCircuitsParser() {
@@ -91,7 +91,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         verifyNoInteractions(reporter, scopedTables);
     }
 
-    // ── table extraction ───────────────────────────────────────────────────
+    // table extraction
 
     @Test
     void unguardedScopedTableIsReported() {
@@ -129,7 +129,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         verify(reporter, never()).report(any(), any(), any());
     }
 
-    // ── DML semantics ──────────────────────────────────────────────────────
+    // DML semantics
 
     @Test
     void insertOnScopedTableIsAllowed() {

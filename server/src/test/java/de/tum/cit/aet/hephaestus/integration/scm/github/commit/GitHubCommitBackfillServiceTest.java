@@ -78,7 +78,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    // ========== Helpers ==========
+    // Helpers
 
     private static SyncTarget createSyncTarget(AuthMode authMode) {
         return new SyncTarget(
@@ -162,7 +162,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         return commit;
     }
 
-    // ========== Tests ==========
+    // Tests
 
     @Nested
     class SkipConditions {

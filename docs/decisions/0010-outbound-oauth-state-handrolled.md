@@ -7,7 +7,8 @@
 ## Context
 
 Hephaestus opens outbound OAuth Authorization Code flows from per-workspace admin pages
-("Connect GitHub", "Connect GitLab", "Connect Slack", "Connect Outline"). The framework
+("Connect GitHub", "Connect GitLab", "Connect Slack"; Outline integration was
+removed from this epic — see ADR 0015). The framework
 must:
 
 - Survive multi-step flows that may take **minutes** and span **tab close / reopen** (GitHub
@@ -83,8 +84,10 @@ nothing and reduce future drift:
 - Keep the PKCE primitive we landed in Wave 4 (`issueWithPkce` → `IssuedState`).
 - Reference Spring's PKCE primitive in Javadoc so future readers know we matched it
   deliberately rather than reinvented it.
-- ArchUnit pins remain: the OAuth state SPI lives under `integration/oauth/state/`
-  (Wave 1 packaging move from `manifest/` to `oauth/state/`).
+- ArchUnit pins remain: the OAuth state SPI lives under
+  `integration/core/oauth/state/` (Wave 1 packaging move from `manifest/` to
+  `oauth/state/`; Phase 1 restructure move from `integration/oauth/state/` to
+  `integration/core/oauth/state/`).
 
 ## Consequences
 

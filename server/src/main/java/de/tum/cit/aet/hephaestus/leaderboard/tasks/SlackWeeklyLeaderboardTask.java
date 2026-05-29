@@ -45,8 +45,8 @@ import org.springframework.stereotype.Component;
  * <p>NOTE: This task remains a {@link LeaderboardNotificationTask} so the existing cron
  * wiring in {@code LeaderboardTaskScheduler} picks it up unchanged. The class is still
  * gated on {@code hephaestus.integration.slack.enabled} because publishing leaderboard
- * digest events that no subscriber listens to would be wasted work — the gate keeps the
- * cron firing pattern identical to the pre-flip behaviour.
+ * digest events that no subscriber listens to would be wasted work. When the gate is off
+ * the cron still fires but the task short-circuits before assembling a payload.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)

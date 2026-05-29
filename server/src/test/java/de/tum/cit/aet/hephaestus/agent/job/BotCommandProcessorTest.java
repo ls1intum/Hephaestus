@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -221,10 +222,10 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
     }
 
-    // -- Test helpers --
+    // Test helpers
 
     private BotCommandReceivedEvent event(String noteBody) {
-        return new BotCommandReceivedEvent(REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null);
+        return new BotCommandReceivedEvent(IntegrationKind.GITLAB, REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null);
     }
 
     private PullRequest createOpenPr() {

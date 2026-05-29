@@ -36,9 +36,9 @@ identity row — only the AAD does.
   that should be authenticated but not encrypted" — exactly the use case.
 - **Vault Transit's `derived` and `context` parameters** serve the same purpose. We
   don't run Vault, but the pattern is industry-standard.
-- The legacy `BackfillStateProvider` and OAuth-callback paths must still be able to
-  read v1 blobs during the cutover window — read tolerance is required, write must
-  be v2-only.
+- The shipped format is v2-only (write and read). The version byte in the blob
+  header allows future formats to be rejected with a clear error rather than
+  silently misinterpreted. There is no v1 dual-read path in the shipped code.
 
 ## Decision
 
@@ -69,20 +69,26 @@ Runtime API:
 
 ```java
 byte[] encrypt(CredentialBundle, EncryptionContext);    // writes v2 only
-CredentialBundle decrypt(byte[], EncryptionContext);    // tolerant of v1 + v2
+CredentialBundle decrypt(byte[], EncryptionContext);    // v2 only; rejects all other versions
 ```
 
 All runtime writes go through
-`Connection.setCredentials(bundle, converter)` → `encrypt()` → v2 blob; v1 is
-read-only legacy and produced nowhere in current code. (An interim Liquibase
-`WorkspaceConnectionBackfillChange` customChange wrote v1 during the iterative
-migration; it was retired in pass 16/stage 2 when the branch consolidated to a
-clean, no-backfill migration. See
-`server/src/main/resources/db/changelog/1779790459343_unified_integration_framework.xml`
-for the consolidated changelog and its operator-warning header.)
+`Connection.setCredentials(bundle, converter)` → `encrypt()` → v2 blob.
+`decrypt()` rejects any blob whose first byte is not `FORMAT_VERSION_V2`
+(0x02) with an `EncryptionException`. There is **no v1 reader** — the format
+is v2-only today. The version byte is the first byte of the blob itself
+(see `CredentialBundleConverter.FORMAT_VERSION_V2 = 0x02`); it is **not**
+mirrored in a separate `credentials_format_version` column. The version byte
+enables future format evolution via `unsupportedVersion()` rejection, but
+there is no dual-read and no KEK/DEK envelope — key rotation means a bulk
+re-encrypt of all connection rows with the new key.
 
-A `credentials_format_version` column on the `connection` table mirrors the blob
-version byte. Unknown versions are rejected with a typed `EncryptionException` — no
+The consolidated Liquibase migration
+(`1779790459343_changelog.xml`) runs an idempotent
+`WorkspaceConnectionBackfillChange` customChange (changeset 8) that migrates
+legacy `Workspace` credential columns into AES-GCM v2 blobs in new
+`connection` rows. Changeset 9 verifies and then drops the legacy columns.
+Unknown versions are rejected with a typed `EncryptionException` — no
 fallback, no silent migration.
 
 ## Rejected alternatives
@@ -111,9 +117,11 @@ fallback, no silent migration.
    Rejected because GitHub orgs and GitLab groups can be renamed; AAD must be over
    stable identifiers only.
 
-5. **Delete v1 readers immediately, force re-encrypt on next access.** Rejected:
-   would break the Liquibase backfill window. v2-only write + v1-tolerant read is
-   the minimum-disruption cutover.
+5. **Keep v1 readers for a cutover window, re-encrypt lazily.** Not applicable: the
+   Liquibase `WorkspaceConnectionBackfillChange` writes all credentials as v2 blobs
+   before the legacy columns are dropped. No v1 blobs ever reach the running
+   application — the backfill converts them at migration time. The shipped code is
+   therefore v2-only for both read and write.
 
 6. **Store AAD bytes alongside the blob** — defeats the purpose. AAD bytes that
    travel with the ciphertext are tamper-able by the same DB-write attacker; binding
@@ -129,8 +137,9 @@ fallback, no silent migration.
   louder change visible in audit logs.
 - Key rotation is simpler: rotate the encryption key, re-encrypt with the same AAD;
   the AAD is reproducible from the row.
-- v1 blobs continue to decrypt cleanly during the cutover window via the legacy
-  static AAD; one-shot re-encrypt cleans them up.
+- Key rotation is a bulk re-encrypt: decrypt each row with the old key, re-encrypt
+  with the new key using the same AAD (reproducible from row columns). No
+  separate DEK/KEK envelope is needed.
 
 **Negative:**
 
@@ -159,9 +168,10 @@ Re-open this decision if any of the following land:
 
 ## References
 
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/registry/EncryptionContext.java`
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/registry/CredentialBundleConverter.java`
-- `server/src/main/resources/db/changelog/1779700900000_credentials_format_version.xml`
+- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContext.java`
+- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/CredentialBundleConverter.java`
+- `server/src/main/resources/db/changelog/1779790459343_changelog.xml`
+  (changesets 8–9: backfill + legacy column drop)
 - AWS Database Encryption SDK — Concepts (record identity): https://docs.aws.amazon.com/database-encryption-sdk/latest/devguide/concepts.html
 - AWS KMS — Encryption Context: https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html
 - NIST SP 800-38D — GCM/GMAC: https://csrc.nist.gov/pubs/sp/800/38/d/final

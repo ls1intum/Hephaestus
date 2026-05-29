@@ -507,7 +507,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    // ── Helpers ──
+    // Helpers
 
     private void setupFullExecution() {
         SandboxResult successResult = new SandboxResult(0, Map.of(), "success", false, Duration.ofMinutes(2));

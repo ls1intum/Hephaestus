@@ -201,7 +201,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
         assertThat(event.baseUrl()).isEqualTo("https://app.test");
     }
 
-    // ─── Test helpers ─────────────────────────────────────────────────────────
+    // Test helpers
 
     private static Workspace workspace(long id, String slug, boolean notificationsEnabled) {
         Workspace w = new Workspace();

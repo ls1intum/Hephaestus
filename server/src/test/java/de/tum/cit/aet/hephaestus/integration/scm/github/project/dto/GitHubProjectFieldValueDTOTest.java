@@ -496,7 +496,7 @@ class GitHubProjectFieldValueDTOTest extends BaseUnitTest {
         }
     }
 
-    // ========== Helper Methods ==========
+    // Helper Methods
 
     private GHProjectV2Field createField(String id) {
         GHProjectV2Field field = new GHProjectV2Field();

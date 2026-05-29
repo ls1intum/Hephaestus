@@ -4,7 +4,7 @@
 **Date:** 2026-05-25
 **Authors:** Live-run audit (#1198 pass 13)
 
-> **2026-05-27 supersede — three-layer identity model deleted.** The principal-engineer cleanup pass on #1198 (PE-DB + PE-IDM) confirmed the audit conclusion this ADR carries forward (`hephaestus_user`/`integration_identity` empty in every environment, zero callers, Stage B never landed) and acted on it: the entire `integration.identity` package — `HephaestusUser`, `IntegrationIdentity`, `JpaUserDirectory`, the two repositories, the `UserDirectory` SPI — was deleted, and the Liquibase create steps were removed from the unmerged `1779790459343_unified_integration_framework.xml` changelog. The auth model we actually ship is documented in [ADR 0016](0016-unified-identity-keycloak-as-truth.md): SCM `User` is the authoritative person row, Keycloak `sub` is persisted on `User.keycloak_subject` as the stable join key. This ADR remains in the tree as the historical record of the "we tried, we deferred, then we deleted" arc.
+> **2026-05-27 supersede — three-layer identity model deleted.** The principal-engineer cleanup pass on #1198 (PE-DB + PE-IDM) confirmed the audit conclusion this ADR carries forward (`hephaestus_user`/`integration_identity` empty in every environment, zero callers, Stage B never landed) and acted on it: the entire `integration.identity` package — `HephaestusUser`, `IntegrationIdentity`, `JpaUserDirectory`, the two repositories, the `UserDirectory` SPI — was deleted, and the Liquibase create steps were removed from the unmerged `1779790459343_changelog.xml` changelog. The auth model we actually ship is documented in [ADR 0016](0016-unified-identity-keycloak-as-truth.md): SCM `User` is the authoritative person row, Keycloak `sub` is persisted on `User.keycloak_subject` as the stable join key. This ADR remains in the tree as the historical record of the "we tried, we deferred, then we deleted" arc.
 
 > **2026-05-26 amendment — AC#6 dropped from #1198.** The pre-workspace bind
 > surface (`github_installation_unbound` table + `GithubInstallationBindingService`
@@ -126,8 +126,12 @@ Stage B is non-trivial because:
 
 - Wave-1198 pass 13 PE audit (live run against `gitlab.lrz.de/hephaestustest`,
   2026-05-25), finding §3
-- `integration/identity/JpaUserDirectory.java:35` — the `upsertFromVendor`
-  entry point that needs to be called from sync
+- `integration.identity.JpaUserDirectory` — the `upsertFromVendor` entry point
+  that needed to be called from sync. **Note:** the entire `integration.identity`
+  package (`HephaestusUser`, `IntegrationIdentity`, `JpaUserDirectory`, and
+  both repositories) was deleted in the PE-DB cleanup pass (see the 2026-05-27
+  supersede note at the top of this ADR). The class no longer exists in the
+  tree.
 - ~~`integration/github/installation/GithubInstallationBindingService.java` —
   the consumer of `IntegrationIdentityRepository.findByKindAndExternalId`
   that depends on Stage B being shipped~~ **Deleted 2026-05-26 (AC#6 drop):**

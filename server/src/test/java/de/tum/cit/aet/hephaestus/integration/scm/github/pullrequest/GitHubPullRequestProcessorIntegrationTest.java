@@ -207,7 +207,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Critical: getDatabaseId() Fallback Tests ====================
+    // Critical: getDatabaseId() Fallback Tests
 
     @Nested
     class GetDatabaseIdFallback {
@@ -372,7 +372,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Issue Type Promotion Tests ====================
+    // Issue Type Promotion Tests
 
     @Nested
     class IssueTypePromotion {
@@ -431,7 +431,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process (Create/Update) Tests ====================
+    // Process (Create/Update) Tests
 
     @Nested
     class ProcessMethodCreate {
@@ -600,7 +600,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process Closed Tests ====================
+    // Process Closed Tests
 
     @Nested
     class ProcessClosed {
@@ -715,7 +715,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process Ready For Review Tests ====================
+    // Process Ready For Review Tests
 
     @Nested
     class ProcessReadyForReview {
@@ -812,7 +812,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process Converted To Draft Tests ====================
+    // Process Converted To Draft Tests
 
     @Nested
     class ProcessConvertedToDraft {
@@ -870,7 +870,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process Synchronize Tests ====================
+    // Process Synchronize Tests
 
     @Nested
     class ProcessSynchronize {
@@ -928,7 +928,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process Labeled/Unlabeled Tests ====================
+    // Process Labeled/Unlabeled Tests
 
     @Nested
     class ProcessLabelEvents {
@@ -1097,7 +1097,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestPullRequestEventListener {

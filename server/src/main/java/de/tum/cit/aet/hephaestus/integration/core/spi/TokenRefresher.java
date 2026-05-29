@@ -19,7 +19,6 @@ public interface TokenRefresher {
      *
      * <p>For GitHub App: signs a JWT, calls {@code POST /app/installations/{id}/access_tokens}.
      * For Slack: calls {@code oauth.v2.access} with refresh token.
-     * For Outline: same OAuth refresh.
      */
     BearerToken refresh(IntegrationRef ref, CredentialBundle source);
 }

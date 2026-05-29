@@ -37,9 +37,7 @@ import org.springframework.web.bind.annotation.*;
 @DisplayName("Spring & DDD Architecture")
 class AdvancedArchitectureTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // LAYERED ARCHITECTURE - Strict dependency direction
-    // ========================================================================
 
     @Nested
     class LayeredArchitectureTests {
@@ -81,9 +79,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DTO BOUNDARIES - Protect domain from data transfer objects
-    // ========================================================================
 
     @Nested
     @DisplayName("DTO Boundaries")
@@ -156,9 +152,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SECURITY - Ensure all endpoints are protected
-    // ========================================================================
 
     @Nested
     class SecurityTests {
@@ -184,9 +178,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DOMAIN-DRIVEN DESIGN - Aggregate and event patterns
-    // ========================================================================
 
     @Nested
     @DisplayName("DDD Patterns")
@@ -326,9 +318,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CONTROLLER PATTERNS - Thin controllers
-    // ========================================================================
 
     @Nested
     @DisplayName("Controller Patterns")
@@ -411,9 +401,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // PACKAGE STRUCTURE - Consistent organization
-    // ========================================================================
 
     @Nested
     class PackageStructureTests {
@@ -491,9 +479,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // TEST ARCHITECTURE - Tests follow patterns
-    // ========================================================================
 
     @Nested
     class TestArchitectureTests {

@@ -181,9 +181,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Helper methods
-    // ═══════════════════════════════════════════════════════════════
 
     private Organization createOrganization() {
         GitProvider provider = new GitProvider();
@@ -273,9 +271,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         return connection;
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncProjectsForOrganization tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncProjectsForOrganization {
@@ -616,9 +612,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncProjectItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncProjectItems {
@@ -702,9 +696,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.itemsSynced()).isTrue();
         }
 
-        // ═══════════════════════════════════════════════════
         // Issue/PR field value backfill tests
-        // ═══════════════════════════════════════════════════
 
         /**
          * Creates a GHProjectV2Item of ISSUE type with optional field values.
@@ -1114,9 +1106,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // getProjectsNeedingItemSync tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class GetProjectsNeedingItemSync {

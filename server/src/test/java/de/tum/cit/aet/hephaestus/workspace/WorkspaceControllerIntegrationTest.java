@@ -843,9 +843,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .containsKey("workspaceSlug");
     }
 
-    // ========================================================================
     // Feature Flags
-    // ========================================================================
 
     @Test
     @WithAdminUser

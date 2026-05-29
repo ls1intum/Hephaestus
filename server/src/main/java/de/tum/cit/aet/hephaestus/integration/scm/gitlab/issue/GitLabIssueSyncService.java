@@ -553,9 +553,7 @@ public class GitLabIssueSyncService {
         return issue;
     }
 
-    // ========================================================================
     // Milestone extraction
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -575,9 +573,7 @@ public class GitLabIssueSyncService {
         }
     }
 
-    // ========================================================================
     // Nested overflow detection and follow-up pagination
-    // ========================================================================
 
     /**
      * Result of checking a nested GraphQL connection for overflow.

@@ -94,7 +94,7 @@ public class AgentJobEventListener {
         handleReviewEvent(event.review(), event.context());
     }
 
-    // ── PR event handling ───────────────────────────────────────────────────
+    // PR event handling
 
     private void handlePullRequestEvent(
         ScmEventPayload.PullRequestData prData,
@@ -146,7 +146,7 @@ public class AgentJobEventListener {
         }
     }
 
-    // ── Review event handling ───────────────────────────────────────────────
+    // Review event handling
 
     private void handleReviewEvent(ScmEventPayload.ReviewData reviewData, EventContext context) {
         // 1. Skip sync events
@@ -200,7 +200,7 @@ public class AgentJobEventListener {
         }
     }
 
-    // ── Shared helpers ──────────────────────────────────────────────────────
+    // Shared helpers
 
     private boolean hasBranchInfo(PullRequest pr, Long prId) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {

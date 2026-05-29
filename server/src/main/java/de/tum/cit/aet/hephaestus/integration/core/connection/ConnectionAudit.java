@@ -32,10 +32,9 @@ import org.springframework.lang.Nullable;
  * correlation id (manual admin events, some install lifecycle events) would
  * otherwise duplicate under the default NULLS-DISTINCT contract. A JPA
  * {@code @UniqueConstraint} cannot express NULLS NOT DISTINCT, so the
- * contract lives in the migration ({@code 1779790459343_unified_integration_framework.xml},
+ * contract lives in the migration ({@code 1779790459343_changelog.xml},
  * changeset {@code 1779790459343-3}) and is intentionally NOT mirrored as a
- * {@code @Table.uniqueConstraints} annotation here — see ADR 0016 plus the
- * PE-DB pass on #1198.
+ * {@code @Table.uniqueConstraints} annotation here — see ADR 0016.
  */
 @Entity
 @Table(name = "connection_audit")

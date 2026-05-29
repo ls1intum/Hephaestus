@@ -88,7 +88,7 @@ class AccountServiceTest extends BaseUnitTest {
         return preferences;
     }
 
-    // ── getUserSettings ─────────────────────────────────────────────────────
+    // getUserSettings
 
     @Nested
     class GetUserSettings {
@@ -120,7 +120,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── updateUserSettings ──────────────────────────────────────────────────
+    // updateUserSettings
 
     @Nested
     class UpdateUserSettings {
@@ -185,7 +185,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── isAiReviewEnabled ───────────────────────────────────────────────────
+    // isAiReviewEnabled
 
     @Nested
     class IsAiReviewEnabled {
@@ -238,7 +238,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── updateUserSettings + PostHog combination ─────────────────────────────
+    // updateUserSettings + PostHog combination
 
     @Nested
     class UpdateSettingsPosthogInteraction {
@@ -293,7 +293,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── getLinkedAccounts ───────────────────────────────────────────────────
+    // getLinkedAccounts
 
     @Nested
     class GetLinkedAccounts {
@@ -409,7 +409,7 @@ class AccountServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── unlinkAccount ───────────────────────────────────────────────────────
+    // unlinkAccount
 
     @Nested
     class UnlinkAccount {

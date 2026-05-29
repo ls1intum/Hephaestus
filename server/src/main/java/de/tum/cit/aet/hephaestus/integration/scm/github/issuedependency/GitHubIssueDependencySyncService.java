@@ -127,9 +127,7 @@ public class GitHubIssueDependencySyncService {
         this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // WEBHOOK EVENT PROCESSING (for when webhooks become available)
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Process an issue_dependencies webhook event.
@@ -171,9 +169,7 @@ public class GitHubIssueDependencySyncService {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // GRAPHQL BULK SYNC
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Sync all issue dependencies for a scope via GraphQL.
@@ -682,9 +678,7 @@ public class GitHubIssueDependencySyncService {
         return repositoryRepository.findByNameWithOwnerWithOrganization(nameWithOwner).orElse(null);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // HELPER METHODS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     private void addBlockingRelationship(Issue blockedIssue, Issue blockingIssue) {
         if (blockedIssue.getBlockedBy().contains(blockingIssue)) {

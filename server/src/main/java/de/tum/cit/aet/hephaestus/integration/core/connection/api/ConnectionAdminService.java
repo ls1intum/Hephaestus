@@ -201,11 +201,6 @@ public class ConnectionAdminService {
                 /* teamLabel */ null,
                 enabledStreams
             );
-            case OUTLINE -> new ConnectionConfig.OutlineConfig(
-                userInput.getOrDefault("server_url", "https://app.getoutline.com"),
-                instanceKey,
-                enabledStreams
-            );
         };
     }
 

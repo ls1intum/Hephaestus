@@ -171,9 +171,7 @@ public class GitHubGraphQlClientProvider {
         return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
     }
 
-    // ========================================================================
     // Rate Limit Tracking (Per-Scope)
-    // ========================================================================
 
     /**
      * Updates the rate limit tracker from a GraphQL response for a specific scope.

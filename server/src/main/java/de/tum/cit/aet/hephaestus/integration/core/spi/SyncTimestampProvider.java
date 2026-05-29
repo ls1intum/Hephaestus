@@ -23,9 +23,7 @@ import java.util.Optional;
  * @see BackfillStateProvider for backfill tracking operations
  */
 public interface SyncTimestampProvider {
-    // ═══════════════════════════════════════════════════════════════════════════
     // SCOPE SYNC TIMESTAMPS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Gets the sync metadata for a scope (issue types, dependencies, sub-issues).
@@ -54,9 +52,7 @@ public interface SyncTimestampProvider {
         // Default no-op - implementations MUST override to persist timestamps
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // USER SYNC TIMESTAMPS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Gets the user sync state for a scope.
@@ -84,9 +80,7 @@ public interface SyncTimestampProvider {
         // Default no-op - implementations MUST override to persist timestamps
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // TEAM SYNC TIMESTAMPS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Gets the team sync state for a scope.

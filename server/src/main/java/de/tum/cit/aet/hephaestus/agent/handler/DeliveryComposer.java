@@ -338,7 +338,7 @@ class DeliveryComposer {
         return INTERNAL_PATH_PREFIXES.stream().anyMatch(path::startsWith);
     }
 
-    // ── Helpers ──
+    // Helpers
 
     private static final Map<String, String> EXT_TO_LANG = Map.ofEntries(
         Map.entry("swift", "swift"),

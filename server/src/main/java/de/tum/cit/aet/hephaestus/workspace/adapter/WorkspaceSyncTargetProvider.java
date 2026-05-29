@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -181,9 +182,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // USER AND TEAM SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     @Transactional(readOnly = true)
@@ -240,9 +239,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // SYNC TARGET OPERATIONS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     @Transactional(readOnly = true)
@@ -325,90 +322,45 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         repositoryToMonitorRepository.deleteById(syncTargetId);
     }
 
+    /**
+     * Persists the pagination cursor for the given kind onto the RepositoryToMonitor
+     * ({@code syncTargetId}-keyed) row.
+     */
     @Override
     @Transactional
-    public void updateIssueSyncCursor(Long syncTargetId, String cursor) {
+    public void updateSyncCursor(Long syncTargetId, SyncCursorKind kind, String cursor) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
             .ifPresentOrElse(
                 rtm -> {
-                    rtm.setIssueSyncCursor(cursor);
+                    switch (kind) {
+                        case ISSUE -> rtm.setIssueSyncCursor(cursor);
+                        case PULL_REQUEST -> rtm.setPullRequestSyncCursor(cursor);
+                        case DISCUSSION -> rtm.setDiscussionSyncCursor(cursor);
+                    }
                     repositoryToMonitorRepository.save(rtm);
                 },
                 () ->
                     // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
                     log.debug(
-                        "Skipped issue sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
+                        "Skipped sync cursor update: reason=syncTargetNotFound, kind={}, syncTargetId={}",
+                        kind,
                         syncTargetId
                     )
             );
     }
 
-    @Override
-    @Transactional
-    public void updatePullRequestSyncCursor(Long syncTargetId, String cursor) {
-        repositoryToMonitorRepository
-            .findById(syncTargetId)
-            .ifPresentOrElse(
-                rtm -> {
-                    rtm.setPullRequestSyncCursor(cursor);
-                    repositoryToMonitorRepository.save(rtm);
-                },
-                () ->
-                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug(
-                        "Skipped pull request sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
-                        syncTargetId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateDiscussionSyncCursor(Long syncTargetId, String cursor) {
-        repositoryToMonitorRepository
-            .findById(syncTargetId)
-            .ifPresentOrElse(
-                rtm -> {
-                    rtm.setDiscussionSyncCursor(cursor);
-                    repositoryToMonitorRepository.save(rtm);
-                },
-                () ->
-                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug(
-                        "Skipped discussion sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
-                        syncTargetId
-                    )
-            );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     @Transactional(readOnly = true)
-    public List<SyncSession> getSyncSessions() {
+    public List<SyncSession> getSyncSessions(IntegrationKind kind) {
         List<Workspace> allWorkspaces = workspaceRepository.findAll();
 
         return allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITHUB))
-            .filter(workspaceScopeFilter::isWorkspaceAllowed)
-            .map(this::toSyncSession)
-            .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<SyncSession> getGitLabSyncSessions() {
-        List<Workspace> allWorkspaces = workspaceRepository.findAll();
-
-        return allWorkspaces
-            .stream()
-            .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITLAB))
+            .filter(ws -> hasActiveProvider(ws, kind))
             .filter(workspaceScopeFilter::isWorkspaceAllowed)
             .map(this::toSyncSession)
             .toList();

@@ -243,7 +243,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Edge Case Tests ====================
+    // Edge Case Tests
 
     @Nested
     class EdgeCases {
@@ -387,7 +387,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Repository Association Tests ====================
+    // Repository Association Tests
 
     @Nested
     class RepositoryAssociation {
@@ -428,7 +428,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Label-Issue Association Tests ====================
+    // Label-Issue Association Tests
 
     /**
      * Tests that verify label-issue relationships.

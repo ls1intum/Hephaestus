@@ -225,7 +225,7 @@ class WorkspaceConnectionBackfillChangeIntegrationTest extends BaseIntegrationTe
         assertThat(countConnectionRows()).isZero();
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────
+    // helpers
 
     private void runBackfill() throws Exception {
         WorkspaceConnectionBackfillChange change = new WorkspaceConnectionBackfillChange();

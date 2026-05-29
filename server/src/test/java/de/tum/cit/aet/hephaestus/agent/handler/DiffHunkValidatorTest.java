@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class DiffHunkValidatorTest extends BaseUnitTest {
 
-    // ── parseValidLines ─────────────────────────────────────────────────────
+    // parseValidLines
 
     @Nested
     class ParseValidLines {
@@ -191,7 +191,7 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
     }
 
-    // ── validateAndCorrect ──────────────────────────────────────────────────
+    // validateAndCorrect
 
     @Nested
     class ValidateAndCorrect {

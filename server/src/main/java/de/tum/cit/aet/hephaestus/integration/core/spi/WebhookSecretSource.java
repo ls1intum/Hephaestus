@@ -12,8 +12,6 @@ import java.util.Optional;
  *   <li>GitLab plaintext: APP_GLOBAL
  *   <li>GitLab {@code whsec_*} HMAC: WORKSPACE — per-Connection in {@code GitLabConfig.signingSecret}
  *   <li>Slack: APP_GLOBAL — one shared {@code hephaestus.slack.signing-secret}
- *   <li>Outline: SUBSCRIPTION — per-webhook secret store ships with the Outline OAuth
- *       client; until then the source returns empty and verification fails closed.
  * </ul>
  */
 public interface WebhookSecretSource {

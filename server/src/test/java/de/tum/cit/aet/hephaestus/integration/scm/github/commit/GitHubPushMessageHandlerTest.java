@@ -97,7 +97,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         handleEvent.invoke(handler, event);
     }
 
-    // ========== Test Data Builders ==========
+    // Test Data Builders
 
     private static GitHubRepositoryRefDTO createRepoRef(Long id, String fullName) {
         return new GitHubRepositoryRefDTO(

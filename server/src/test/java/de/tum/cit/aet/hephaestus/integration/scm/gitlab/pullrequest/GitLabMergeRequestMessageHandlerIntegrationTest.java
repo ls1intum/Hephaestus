@@ -71,14 +71,14 @@ import tools.jackson.databind.ObjectMapper;
 )
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
-    // ==================== Common Constants ====================
+    // Common Constants
 
     private static final long NATIVE_AUTHOR_ID = 18024L;
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
     private static final String FIXTURE_ORG_LOGIN = "hephaestustest";
     private static final String FIXTURE_REPO_FULL_NAME = "hephaestustest/demo-repository";
 
-    // ==================== MR !3 (open/close/reopen) ====================
+    // MR !3 (open/close/reopen)
 
     private static final long NATIVE_MR3_ID = 334053L;
     private static final int MR3_IID = 3;
@@ -88,13 +88,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private static final String MR3_SOURCE_BRANCH = "feature/test-close-reopen";
     private static final String MR3_TARGET_BRANCH = "main";
 
-    // ==================== MR !2 (merge/update) ====================
+    // MR !2 (merge/update)
 
     private static final long NATIVE_MR2_ID = 334047L;
     private static final int MR2_IID = 2;
     private static final String MR2_TITLE = "Implement OAuth authentication";
 
-    // ==================== MR !4 (approved/unapproved) ====================
+    // MR !4 (approved/unapproved)
 
     private static final long NATIVE_MR4_ID = 334054L;
     private static final int MR4_IID = 4;
@@ -146,7 +146,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         setupTestData();
     }
 
-    // ==================== Event Type ====================
+    // Event Type
 
     @Nested
     class EventType {
@@ -157,7 +157,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    // ==================== Basic Lifecycle ====================
+    // Basic Lifecycle
 
     @Nested
     class BasicLifecycleEvents {
@@ -276,7 +276,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    // ==================== Approval Events ====================
+    // Approval Events
 
     @Nested
     class ApprovalEvents {
@@ -333,7 +333,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -492,7 +492,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    // ==================== Domain Events ====================
+    // Domain Events
 
     @Nested
     class DomainEvents {
@@ -542,7 +542,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    // ==================== Author Resolution ====================
+    // Author Resolution
 
     @Nested
     class EntityResolution {
@@ -564,7 +564,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabMergeRequestEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
@@ -615,7 +615,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         workspaceRepository.save(workspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class GitLabMergeRequestTestEventListener {

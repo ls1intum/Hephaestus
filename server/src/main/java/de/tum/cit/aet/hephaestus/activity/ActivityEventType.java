@@ -14,9 +14,7 @@ package de.tum.cit.aet.hephaestus.activity;
  * </ul>
  */
 public enum ActivityEventType {
-    // ========================================================================
     // Pull Request Lifecycle (Speed metrics)
-    // ========================================================================
     /** Pull request created - starts the lead time clock */
     PULL_REQUEST_OPENED("pull_request.opened"),
     /** Pull request merged - ends the lead time clock */
@@ -36,9 +34,7 @@ public enum ActivityEventType {
     /** Label removed from pull request - workflow tracking */
     PULL_REQUEST_UNLABELED("pull_request.unlabeled"),
 
-    // ========================================================================
     // Review Lifecycle (Effectiveness metrics)
-    // ========================================================================
     /** Review approved - ends "time to approval" clock */
     REVIEW_APPROVED("review.approved"),
     /** Review requested changes */
@@ -52,9 +48,7 @@ public enum ActivityEventType {
     /** Review edited - state or content changed (e.g., COMMENTED → APPROVED) */
     REVIEW_EDITED("review.edited"),
 
-    // ========================================================================
     // Comments (Collaboration quality - for leaderboard scoring)
-    // ========================================================================
     /** Comment created on issue or pull request (general discussion) */
     COMMENT_CREATED("comment.created"),
     /** Comment updated - audit trail */
@@ -68,17 +62,13 @@ public enum ActivityEventType {
     /** Inline code review comment deleted - audit trail */
     REVIEW_COMMENT_DELETED("review_comment.deleted"),
 
-    // ========================================================================
     // Review Threads (Code review effectiveness metrics)
-    // ========================================================================
     /** Review thread resolved - indicates addressed feedback */
     REVIEW_THREAD_RESOLVED("review_thread.resolved"),
     /** Review thread unresolved - indicates reopened discussion */
     REVIEW_THREAD_UNRESOLVED("review_thread.unresolved"),
 
-    // ========================================================================
     // Issue Lifecycle (Work tracking)
-    // ========================================================================
     /** Issue created - drives work creation */
     ISSUE_CREATED("issue.created"),
     /** Issue closed - work completion signal */
@@ -96,9 +86,7 @@ public enum ActivityEventType {
     /** Issue type removed - work categorization change */
     ISSUE_UNTYPED("issue.untyped"),
 
-    // ========================================================================
     // Project Lifecycle (Project management tracking)
-    // ========================================================================
     /** Project created - new project board started */
     PROJECT_CREATED("project.created"),
     /** Project updated - project settings or metadata changed */
@@ -110,9 +98,7 @@ public enum ActivityEventType {
     /** Project deleted - project removed */
     PROJECT_DELETED("project.deleted"),
 
-    // ========================================================================
     // Project Item Lifecycle (Work item tracking in projects)
-    // ========================================================================
     /** Item added to project - issue/PR/draft added to project board */
     PROJECT_ITEM_CREATED("project_item.created"),
     /** Item updated - field values or status changed */
@@ -128,9 +114,7 @@ public enum ActivityEventType {
     /** Item reordered - item position changed in project view */
     PROJECT_ITEM_REORDERED("project_item.reordered"),
 
-    // ========================================================================
     // Project Status Update Events
-    // ========================================================================
     /** Status update posted to project */
     PROJECT_STATUS_UPDATE_CREATED("project_status_update.created"),
     /** Status update edited */
@@ -138,9 +122,7 @@ public enum ActivityEventType {
     /** Status update deleted */
     PROJECT_STATUS_UPDATE_DELETED("project_status_update.deleted"),
 
-    // ========================================================================
     // Discussion Lifecycle (Community engagement tracking)
-    // ========================================================================
     /** Discussion created - community engagement signal */
     DISCUSSION_CREATED("discussion.created"),
     /** Discussion closed - discussion resolved or archived */
@@ -152,9 +134,7 @@ public enum ActivityEventType {
     /** Discussion deleted - audit trail */
     DISCUSSION_DELETED("discussion.deleted"),
 
-    // ========================================================================
     // Discussion Comment Events (Community engagement tracking)
-    // ========================================================================
     /** Discussion comment created - community engagement signal */
     DISCUSSION_COMMENT_CREATED("discussion_comment.created"),
     /** Discussion comment edited - audit trail */
@@ -162,9 +142,7 @@ public enum ActivityEventType {
     /** Discussion comment deleted - audit trail */
     DISCUSSION_COMMENT_DELETED("discussion_comment.deleted"),
 
-    // ========================================================================
     // Commit Events (Code contribution tracking)
-    // ========================================================================
     /** Commit created (pushed to default branch) */
     COMMIT_CREATED("commit.created");
 

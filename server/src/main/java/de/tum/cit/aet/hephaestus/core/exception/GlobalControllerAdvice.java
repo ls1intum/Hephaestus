@@ -34,9 +34,7 @@ public class GlobalControllerAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalControllerAdvice.class);
 
-    // ========================================================================
     // STANDARD EXCEPTIONS
-    // ========================================================================
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
@@ -74,9 +72,7 @@ public class GlobalControllerAdvice {
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
     }
 
-    // ========================================================================
     // VALIDATION EXCEPTIONS
-    // ========================================================================
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
@@ -121,9 +117,7 @@ public class GlobalControllerAdvice {
         return problem;
     }
 
-    // ========================================================================
     // EXTERNAL SERVICE EXCEPTIONS
-    // ========================================================================
 
     @ExceptionHandler(WebClientRequestException.class)
     ProblemDetail handleWebClientRequestException(WebClientRequestException exception) {
@@ -138,9 +132,7 @@ public class GlobalControllerAdvice {
         );
     }
 
-    // ========================================================================
     // FALLBACK HANDLER
-    // ========================================================================
 
     @ExceptionHandler(TenancyViolationException.class)
     ProblemDetail handleTenancyViolation(TenancyViolationException ex) {
@@ -164,9 +156,7 @@ public class GlobalControllerAdvice {
         );
     }
 
-    // ========================================================================
     // HELPER METHODS
-    // ========================================================================
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);

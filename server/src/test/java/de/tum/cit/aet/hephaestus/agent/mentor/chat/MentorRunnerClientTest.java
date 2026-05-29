@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -195,7 +196,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
         assertThat(response.get("error").get("code").asInt()).isEqualTo(-32600);
     }
 
-    // ─── helpers ─────────────────────────────────────────────────────────────────────────
+    // helpers
 
     private ObjectNode responseOf(long id, JsonNode result) {
         ObjectNode out = mapper.createObjectNode();
@@ -214,18 +215,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         private final CopyOnWriteArrayList<Consumer<JsonNode>> listeners = new CopyOnWriteArrayList<>();
 
         @Override
-        public UUID sessionId() {
-            return sessionId;
-        }
-
-        @Override
-        public String userId() {
-            return "u1";
-        }
-
-        @Override
-        public String workspaceId() {
-            return "w1";
+        public SandboxIdentity identity() {
+            return new SandboxIdentity(sessionId, "u1", "w1");
         }
 
         @Override

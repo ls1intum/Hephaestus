@@ -125,9 +125,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         return IntegrationKind.GITHUB;
     }
 
-    // =========================================================================
     // SPI hooks (IntegrationLifecycleListener)
-    // =========================================================================
 
     /**
      * SPI hook: bridge to {@link #createOrUpdateFromInstallation} by parsing the
@@ -204,9 +202,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
         handleAccountRename(installationId, oldName, newName);
     }
 
-    // =========================================================================
     // Public helpers — called by adapter / provisioning service (non-SPI)
-    // =========================================================================
 
     /**
      * Creates or updates a workspace from a GitHub App installation.
@@ -277,13 +273,12 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             Workspace existingByLogin = workspaceRepository.findByAccountLoginIgnoreCase(accountLogin).orElse(null);
 
             // Refuse cross-vendor attach. A GitHub install for "HephaestusTest" must not
-            // co-tenant onto a workspace whose ACTIVE Connection is GITLAB/SLACK/OUTLINE
+            // co-tenant onto a workspace whose ACTIVE Connection is GITLAB/SLACK
             // — they are separate tenants that happen to share the account-login string.
             if (existingByLogin != null) {
                 boolean hasNonGithubActive =
                     connectionService.findActive(existingByLogin.getId(), IntegrationKind.GITLAB).isPresent() ||
-                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.SLACK).isPresent() ||
-                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.OUTLINE).isPresent();
+                    connectionService.findActive(existingByLogin.getId(), IntegrationKind.SLACK).isPresent();
                 if (hasNonGithubActive) {
                     log.info(
                         "Skipped GitHub App installation cross-attach, workspace has non-GITHUB ACTIVE Connection: workspaceId={}, accountLogin={}, installationId={}",
@@ -548,9 +543,7 @@ public class GithubLifecycleListener implements IntegrationLifecycleListener {
             );
     }
 
-    // =========================================================================
     // Private helpers
-    // =========================================================================
 
     /**
      * Retargets repository monitors from the old login prefix to the new login.

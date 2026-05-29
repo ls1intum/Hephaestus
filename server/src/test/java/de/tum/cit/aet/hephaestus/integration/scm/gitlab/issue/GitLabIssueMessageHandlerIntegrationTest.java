@@ -135,7 +135,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         setupTestData();
     }
 
-    // ==================== Event Type ====================
+    // Event Type
 
     @Nested
     class EventType {
@@ -146,7 +146,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Basic Lifecycle ====================
+    // Basic Lifecycle
 
     @Nested
     class BasicLifecycleEvents {
@@ -242,7 +242,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Confidential Issues ====================
+    // Confidential Issues
 
     @Nested
     class ConfidentialIssues {
@@ -271,7 +271,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Author and Label Resolution ====================
+    // Author and Label Resolution
 
     @Nested
     class EntityResolution {
@@ -308,7 +308,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -360,7 +360,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabIssueEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
@@ -419,7 +419,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .collect(Collectors.toSet());
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class GitLabTestEventListener {

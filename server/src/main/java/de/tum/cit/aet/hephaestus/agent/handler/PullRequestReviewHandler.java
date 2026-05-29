@@ -230,9 +230,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return prompt;
     }
 
-    // -------------------------------------------------------------------------
     // Practice catalog injection (intentionally kept here — per-job, not provider-shaped)
-    // -------------------------------------------------------------------------
 
     /**
      * Inject the practice registry, criteria, and precompute scripts into the workspace. These
@@ -321,9 +319,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Delivery
-    // -------------------------------------------------------------------------
 
     @Override
     public void deliver(AgentJob job) {
@@ -417,9 +413,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         feedbackService.deliverFeedback(job, delivery);
     }
 
-    // -------------------------------------------------------------------------
     // Delivery-phase diff helpers (use GitDiffOperations; no longer duplicated in the handler)
-    // -------------------------------------------------------------------------
 
     private Map<String, TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
         JsonNode metadata = job.getMetadata();
@@ -568,9 +562,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
     }
 
-    // -------------------------------------------------------------------------
     // Metadata field helpers
-    // -------------------------------------------------------------------------
 
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);

@@ -227,7 +227,7 @@ public class Issue extends BaseGitServiceEntity {
         return false;
     }
 
-    // ==================== Bidirectional Relationship Helpers ====================
+    // Bidirectional Relationship Helpers
 
     /**
      * Adds a label to this issue and maintains bidirectional consistency.

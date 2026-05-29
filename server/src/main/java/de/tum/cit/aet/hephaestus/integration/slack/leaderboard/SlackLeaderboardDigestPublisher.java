@@ -185,7 +185,7 @@ public class SlackLeaderboardDigestPublisher {
     }
 
     private String formatDateForURL(Instant instant) {
-        // ISO-8601 for query params (e.g., 2025-01-01T00:00:00Z) — matches the pre-flip task.
+        // ISO-8601 for query params (e.g., 2025-01-01T00:00:00Z); the leaderboard URL expects this format.
         return DateTimeFormatter.ISO_INSTANT.format(instant);
     }
 

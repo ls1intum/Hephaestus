@@ -15,7 +15,6 @@ class IntegrationKindRoutingTest extends BaseUnitTest {
         assertThat(routing.resolve("github")).contains(IntegrationKind.GITHUB);
         assertThat(routing.resolve("gitlab")).contains(IntegrationKind.GITLAB);
         assertThat(routing.resolve("slack")).contains(IntegrationKind.SLACK);
-        assertThat(routing.resolve("outline")).contains(IntegrationKind.OUTLINE);
     }
 
     @Test

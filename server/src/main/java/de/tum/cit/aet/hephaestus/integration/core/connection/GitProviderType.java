@@ -23,7 +23,7 @@ public enum GitProviderType {
         return switch (kind) {
             case GITHUB -> GITHUB;
             case GITLAB -> GITLAB;
-            case SLACK, OUTLINE -> throw new IllegalArgumentException(
+            case SLACK -> throw new IllegalArgumentException(
                 "IntegrationKind " + kind + " is not an SCM kind and has no GitProviderType"
             );
         };

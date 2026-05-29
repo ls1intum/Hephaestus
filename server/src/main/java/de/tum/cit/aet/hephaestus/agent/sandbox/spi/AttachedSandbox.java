@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
 import java.util.function.Consumer;
 import reactor.core.Disposable;
 import tools.jackson.databind.JsonNode;
@@ -15,11 +14,12 @@ import tools.jackson.databind.JsonNode;
  * returns a disposed handle.
  */
 public interface AttachedSandbox extends AutoCloseable {
-    UUID sessionId();
-
-    String userId();
-
-    String workspaceId();
+    /**
+     * Immutable identity of this session: {@code sessionId}, {@code userId}, {@code workspaceId}.
+     * These never change over the session lifetime. Reach the individual keys via
+     * {@code identity().sessionId()} etc.
+     */
+    SandboxIdentity identity();
 
     /**
      * Send a JSON frame to the runner's stdin. Blocks until the write completes or the configured

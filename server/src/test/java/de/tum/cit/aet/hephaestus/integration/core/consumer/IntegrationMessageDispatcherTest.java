@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHand
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
-import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.webhook.GithubSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackSubjectParser;
@@ -26,8 +25,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     private static final List<SubjectParser> ALL_PARSERS = List.of(
         new GithubSubjectParser(),
         new GitlabSubjectParser(),
-        new SlackSubjectParser(),
-        new OutlineSubjectParser()
+        new SlackSubjectParser()
     );
 
     @Test

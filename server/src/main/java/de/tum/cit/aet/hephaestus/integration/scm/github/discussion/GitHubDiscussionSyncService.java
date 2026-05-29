@@ -13,6 +13,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -1209,9 +1210,7 @@ public class GitHubDiscussionSyncService {
         }
     }
 
-    // ========================================================================
     // Cursor Checkpoint Persistence
-    // ========================================================================
 
     /**
      * Persists the cursor checkpoint in a new transaction.
@@ -1224,7 +1223,7 @@ public class GitHubDiscussionSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updateDiscussionSyncCursor(syncTargetId, cursor);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.DISCUSSION, cursor);
             log.debug("Persisted discussion sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }
@@ -1240,7 +1239,7 @@ public class GitHubDiscussionSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updateDiscussionSyncCursor(syncTargetId, null);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.DISCUSSION, null);
             log.debug("Cleared discussion sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }

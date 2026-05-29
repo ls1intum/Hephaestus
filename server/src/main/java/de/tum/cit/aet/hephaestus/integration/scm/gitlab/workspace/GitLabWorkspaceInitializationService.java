@@ -426,9 +426,7 @@ public class GitLabWorkspaceInitializationService {
         return created;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // Full data sync: memberships, issue types, per-repo data, teams
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Runs the full GitLab data sync for a workspace: memberships, issue types,

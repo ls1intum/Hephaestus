@@ -181,7 +181,7 @@ public class GitLabPreflightService {
         return normalized;
     }
 
-    // ============ GitLab REST API Response Records ============
+    // GitLab REST API Response Records
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record GitLabUserResponse(

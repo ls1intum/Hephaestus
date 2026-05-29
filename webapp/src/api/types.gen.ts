@@ -1591,9 +1591,9 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
-     * Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE flow through OAuth, not this endpoint.
+     * Integration kind to provision. Must be GITHUB or GITLAB; SLACK flows through OAuth, not this endpoint.
      */
-    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK';
     /**
      * Deprecated: ignored by the server. The authenticated user always becomes the owner.
      *

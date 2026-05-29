@@ -17,9 +17,7 @@ public enum IntegrationKind {
     /** GitLab.com or self-hosted GitLab (host disambiguates). */
     GITLAB(IntegrationFamily.SCM),
     /** Slack workspace. */
-    SLACK(IntegrationFamily.MESSAGING),
-    /** Outline (getoutline.com) knowledge base. */
-    OUTLINE(IntegrationFamily.KNOWLEDGE);
+    SLACK(IntegrationFamily.MESSAGING);
 
     private final IntegrationFamily family;
 

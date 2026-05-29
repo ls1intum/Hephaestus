@@ -77,7 +77,7 @@ public class AgentJobService {
         this.sandboxManager = sandboxManager;
     }
 
-    // ── Read operations ──
+    // Read operations
 
     @Transactional(readOnly = true)
     public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Long configId, Pageable pageable) {
@@ -100,7 +100,7 @@ public class AgentJobService {
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
-    // ── Submit ──
+    // Submit
 
     /**
      * Lookup a PR by ID, build a review submission request, and submit a job.
@@ -273,7 +273,7 @@ public class AgentJobService {
         });
     }
 
-    // ── Retry delivery ──
+    // Retry delivery
 
     /**
      * Retry delivery for a completed agent job whose delivery failed or was never attempted.
@@ -339,7 +339,7 @@ public class AgentJobService {
         );
     }
 
-    // ── Cancel ──
+    // Cancel
 
     /**
      * Cancel an agent job.
@@ -424,7 +424,7 @@ public class AgentJobService {
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
-    // ── Cooldown helpers ──
+    // Cooldown helpers
 
     /**
      * Extract the PR-scoped prefix from an idempotency key by stripping the commit-SHA segment.

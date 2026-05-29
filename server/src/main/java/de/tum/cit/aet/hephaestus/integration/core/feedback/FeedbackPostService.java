@@ -13,8 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Agent code calls {@link #findExisting} to discover whether a prior post exists
  * for the same subject + kind; if yes, the adapter performs an in-place edit
- * (Slack {@code chat.update}, Outline {@code comments.update}, GitHub PR-comment
- * edit). On post-new, {@link #recordPost} captures the vendor-side handle.
+ * (Slack {@code chat.update}, GitHub PR-comment edit). On post-new,
+ * {@link #recordPost} captures the vendor-side handle.
  */
 @Service
 public class FeedbackPostService {

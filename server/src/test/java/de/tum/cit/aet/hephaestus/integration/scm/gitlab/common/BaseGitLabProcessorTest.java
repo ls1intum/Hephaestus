@@ -90,9 +90,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         testRepo.setProvider(gitLabProvider);
     }
 
-    // ========================================================================
     // Timestamp Parsing
-    // ========================================================================
 
     @Nested
     class TimestampParsing {
@@ -145,9 +143,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // User Resolution
-    // ========================================================================
 
     @Nested
     class WebhookUserResolution {
@@ -238,9 +234,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Label Resolution
-    // ========================================================================
 
     @Nested
     class LabelResolution {
@@ -294,9 +288,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Context Resolution
-    // ========================================================================
 
     @Nested
     class ContextResolution {
@@ -325,9 +317,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // ID Mapping (delegated to GitLabSyncConstants)
-    // ========================================================================
 
     @Nested
     class IdMapping {
@@ -352,9 +342,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Test Processor (exposes protected methods)
-    // ========================================================================
 
     private static class TestProcessor extends BaseGitLabProcessor {
 

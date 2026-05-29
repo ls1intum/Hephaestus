@@ -42,9 +42,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     private final Set<String> selfReviewAuthorLogins;
     private final ExperiencePointProperties properties;
 
-    // ========================================================================
     // Default Experience Point Constants (overridable via properties)
-    // ========================================================================
 
     /**
      * Default XP awarded when a pull request is opened.
@@ -77,9 +75,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             .collect(Collectors.toUnmodifiableSet());
     }
 
-    // ========================================================================
     // XP Accessors (use configured values from properties)
-    // ========================================================================
 
     /**
      * Get XP for pull request opened (configurable).
@@ -165,9 +161,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return properties.xpAwards().discussionCommentCreated();
     }
 
-    // ========================================================================
     // Review Experience Points
-    // ========================================================================
 
     /**
      * Calculate experience points for a list of reviews on the same pull request.
@@ -442,9 +436,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return (10 * weightComment * complexityScore) / (weightComment + complexityScore);
     }
 
-    // ========================================================================
     // Complexity Calculation
-    // ========================================================================
 
     /**
      * Calculate complexity score for a pull request.
@@ -481,9 +473,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return 33; // Overly complex
     }
 
-    // ========================================================================
     // Private Helpers
-    // ========================================================================
 
     /**
      * Calculate code review bonus based on thoroughness.

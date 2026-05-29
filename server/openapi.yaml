@@ -67,6 +67,12 @@ tags:
   name: o-auth-callback-controller
 - description: Authentication discovery (public)
   name: Auth
+- description: Manage practice definitions
+  name: Practice Catalog
+- description: Workspace-scoped team settings management
+  name: Team Settings
+- description: Team management within workspace
+  name: Teams
 - description: |-
     Unified webhook ingest controller.
 
@@ -76,16 +82,10 @@ tags:
      verification, subject derivation and JetStream publication through the per-kind
      {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
      {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
-     GitHub, GitLab, Slack and Outline all share this endpoint.
+     GitHub, GitLab and Slack all share this endpoint.
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Manage practice definitions
-  name: Practice Catalog
-- description: Workspace-scoped team settings management
-  name: Team Settings
-- description: Team management within workspace
-  name: Teams
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data
@@ -3342,13 +3342,12 @@ components:
           minLength: 0
         kind:
           type: string
-          description: "Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE\
-            \ flow through OAuth, not this endpoint."
+          description: "Integration kind to provision. Must be GITHUB or GITLAB; SLACK\
+            \ flows through OAuth, not this endpoint."
           enum:
           - GITHUB
           - GITLAB
           - SLACK
-          - OUTLINE
           example: GITLAB
         ownerUserId:
           type: integer

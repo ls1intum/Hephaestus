@@ -53,6 +53,9 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     @Mock
     private GitDiffOperations gitDiffOperations;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+
     private static final Long WORKSPACE_ID = 99L;
 
     private PullRequestContentProvider provider;
@@ -66,6 +69,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             reviewCommentRepository,
             contributorHistoryProvider,
             gitDiffOperations,
+            connectionService,
             List.of()
         );
     }

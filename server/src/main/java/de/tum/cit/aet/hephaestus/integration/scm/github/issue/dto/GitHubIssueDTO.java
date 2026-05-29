@@ -73,7 +73,7 @@ public record GitHubIssueDTO(
         return databaseId != null ? databaseId : id;
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubIssueDTO from a GraphQL GHIssue model.
@@ -160,7 +160,7 @@ public record GitHubIssueDTO(
         );
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static Long toLong(@Nullable BigInteger value) {

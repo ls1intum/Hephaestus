@@ -40,7 +40,7 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
      * <p>Only {@code WebhookController @PostMapping("/webhooks/{kind}")} should match webhook
      * payloads. The rule fires when a @{@link PostMapping} value is <em>exactly</em>
      * {@code /github}, {@code /gitlab}, {@code /slack}, or {@code /outline} — the legacy
-     * top-level ingress paths that pass 16 removed. Nested paths under a different
+     * top-level ingress paths the unified webhook framework replaced. Nested paths under a different
      * class-level {@code @RequestMapping} (e.g. {@code WorkspaceRegistryController}'s
      * {@code POST /workspaces/gitlab/preflight}) are admin-API surfaces, not webhook
      * ingress, and remain permitted.

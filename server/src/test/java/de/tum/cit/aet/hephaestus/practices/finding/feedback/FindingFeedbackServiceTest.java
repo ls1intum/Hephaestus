@@ -71,7 +71,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         return user;
     }
 
-    // ── Submit Feedback ──────────────────────────────────────────────────
+    // Submit Feedback
 
     @Nested
     class SubmitFeedback {
@@ -184,7 +184,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── Get Latest Feedback ──────────────────────────────────────────────
+    // Get Latest Feedback
 
     @Nested
     class GetLatestFeedback {
@@ -238,7 +238,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── Get Engagement ───────────────────────────────────────────────────
+    // Get Engagement
 
     @Nested
     class GetEngagement {
@@ -297,7 +297,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── Get Latest Feedback By Finding IDs ───────────────────────────────
+    // Get Latest Feedback By Finding IDs
 
     @Nested
     class GetLatestFeedbackByFindingIds {

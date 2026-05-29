@@ -288,7 +288,6 @@ public class Connection {
             case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
             case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
             case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
-            case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
         };
         if (expected != kind) {
             throw new IllegalStateException(

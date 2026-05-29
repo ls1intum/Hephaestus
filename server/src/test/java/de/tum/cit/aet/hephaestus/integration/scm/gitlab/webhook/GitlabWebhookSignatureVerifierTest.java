@@ -35,7 +35,7 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
     private static final Instant NOW = Instant.parse("2026-05-24T12:00:00Z");
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
-    // ── Plaintext path ─────────────────────────────────────────────────────
+    // Plaintext path
 
     @Test
     void plaintextMatchingTokenVerified() {
@@ -75,7 +75,7 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
         assertThat(((VerificationResult.Invalid) result).reason()).isEqualTo("missing-secret");
     }
 
-    // ── whsec_* HMAC path ──────────────────────────────────────────────────
+    // whsec_* HMAC path
 
     @Test
     void whsecMatchingMacVerified() {
@@ -236,7 +236,7 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
         assertThat(((VerificationResult.Invalid) result).reason()).isEqualTo("malformed-whsec-secret");
     }
 
-    // ── Dual-mode priority ────────────────────────────────────────────────
+    // Dual-mode priority
 
     @Test
     void bothHeadersPresentSignatureWins() {
@@ -284,7 +284,7 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
         assertThat(newVerifier(PLAINTEXT_SECRET).kind()).isEqualTo(IntegrationKind.GITLAB);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // Helpers
 
     private static GitlabWebhookSignatureVerifier newVerifier(String secret) {
         return new GitlabWebhookSignatureVerifier(staticSource(secret.getBytes(StandardCharsets.UTF_8)), CLOCK);

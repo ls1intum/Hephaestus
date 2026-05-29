@@ -102,7 +102,7 @@ public class MentorTurnLock {
         final AtomicInteger holders = new AtomicInteger();
     }
 
-    // ─── Sandbox-level FIFO serialisation lock ───────────────────────────────────────────
+    // Sandbox-level FIFO serialisation lock
     //
     // The Pi runner subprocess is shared across all threads of a given (userId, workspaceId)
     // pair (the sandbox registry's key). Pi's `AgentSessionRuntime` is single-session: when

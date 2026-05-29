@@ -50,7 +50,7 @@ public record GitHubIssueCommentEventDTO(
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("updated_at") Instant updatedAt
     ) {
-        // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+        // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
         /**
          * Creates a GitHubCommentDTO from a GraphQL GHIssueComment model.

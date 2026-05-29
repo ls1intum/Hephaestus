@@ -111,9 +111,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return id;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class ListFindings {
@@ -501,9 +499,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings/summary
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class GetSummary {
@@ -630,9 +626,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings/{findingId}
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class GetFindingDetail {
@@ -818,9 +812,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings/pull-request/{prId}
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class GetPullRequestFindings {

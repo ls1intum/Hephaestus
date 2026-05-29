@@ -70,7 +70,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // Helpers
 
     private ScmEventPayload.PullRequestData createPrData(Issue.State state, boolean isDraft, boolean isMerged) {
         return new ScmEventPayload.PullRequestData(
@@ -155,7 +155,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         return pr;
     }
 
-    // ── Test Groups ─────────────────────────────────────────────────────────
+    // Test Groups
 
     @Nested
     class FilteringTests {
