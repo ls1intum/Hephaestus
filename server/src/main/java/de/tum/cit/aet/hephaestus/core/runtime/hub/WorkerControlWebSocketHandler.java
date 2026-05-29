@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtHandshakeInterceptor;
+import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
@@ -165,6 +166,7 @@ public class WorkerControlWebSocketHandler extends TextWebSocketHandler {
             }
             case WorkerWelcome w -> warnUnexpectedFrame(session, w);
             case ForceReconnect f -> warnUnexpectedFrame(session, f);
+            case CancelJob c -> warnUnexpectedFrame(session, c); // hub originates this; never inbound
         }
     }
 

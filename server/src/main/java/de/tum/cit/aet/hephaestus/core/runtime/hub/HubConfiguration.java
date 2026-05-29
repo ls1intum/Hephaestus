@@ -48,6 +48,11 @@ public class HubConfiguration {
     }
 
     @Bean
+    WorkerJobCancelDispatcher workerJobCancelDispatcher(WorkerSessionRegistry registry) {
+        return new WorkerJobCancelDispatcher(registry);
+    }
+
+    @Bean
     WorkerKeyRing workerKeyRing(WorkerTokenProperties properties, Environment environment) {
         WorkerKeyRing ring = WorkerKeyRing.fromConfig(properties);
         if (ring.active().ephemeral()) {

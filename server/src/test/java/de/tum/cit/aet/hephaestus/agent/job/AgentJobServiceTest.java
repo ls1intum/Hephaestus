@@ -95,7 +95,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15),
-            sandboxManager
+            sandboxManager,
+            java.util.Optional.empty()
         );
 
         workspace = new Workspace();

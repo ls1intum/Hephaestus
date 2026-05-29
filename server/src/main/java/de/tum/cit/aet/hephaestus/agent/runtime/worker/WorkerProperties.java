@@ -25,22 +25,33 @@ public record WorkerProperties(
     public static final String AUTO = "auto";
 
     /**
-     * @return the configured worker id, or the container hostname when unset (so compose/K8s
-     *     replicas don't collide in {@code WorkerSessionRegistry}).
+     * Per-process-instance suffix, stable for the JVM's lifetime. Appended to the hostname default so
+     * a worker that crashes and restarts (or a fixed-hostname compose/bare-metal redeploy) gets a
+     * DIFFERENT id than its dead predecessor — otherwise the restarted process would re-heartbeat the
+     * old id and mask its predecessor's orphaned jobs (#1138). K8s pod names are already unique, but
+     * this makes fast orphan recovery hold in every topology.
+     */
+    private static final String INSTANCE_SUFFIX = java.util.UUID.randomUUID().toString().substring(0, 8);
+
+    /**
+     * @return the configured worker id (operator owns its restart semantics), or
+     *     {@code <hostname>-<instance-suffix>} when unset — unique per process instance so a dead
+     *     worker and its restart never share an id.
      */
     public String resolvedWorkerId() {
         if (workerId != null && !workerId.isBlank()) {
             return workerId;
         }
+        String host = "worker";
         try {
             String hostname = InetAddress.getLocalHost().getHostName();
             if (hostname != null && !hostname.isBlank()) {
-                return hostname;
+                host = hostname;
             }
         } catch (UnknownHostException ignored) {
-            // fall through
+            // fall through to the generic prefix
         }
-        return "worker-" + Long.toHexString(System.nanoTime());
+        return host + "-" + INSTANCE_SUFFIX;
     }
 
     @Override

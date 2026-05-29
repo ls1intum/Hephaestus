@@ -10,7 +10,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,7 +27,6 @@ import tools.jackson.databind.ObjectMapper;
 @org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
     "'${hephaestus.worker.control.endpoint:}'.length() > 0"
 )
-@EnableConfigurationProperties(WorkerProperties.class)
 public class WorkerConfiguration {
 
     /**
@@ -123,6 +121,19 @@ public class WorkerConfiguration {
         WorkerProperties properties
     ) {
         return new WorkerControlChannelHealthIndicator(client, properties);
+    }
+
+    /**
+     * Wire hub-originated {@code CancelJob} frames to the executor's local-cancel path (#1138).
+     * Done after singletons are instantiated so the optional executor (only present when agent
+     * NATS is enabled) is resolved without creating a hard dependency cycle.
+     */
+    @Bean
+    org.springframework.beans.factory.SmartInitializingSingleton workerCancelHandlerWiring(
+        WorkerControlClient client,
+        Optional<AgentJobExecutor> executor
+    ) {
+        return () -> executor.ifPresent(e -> client.setCancelHandler(e::cancelLocalJob));
     }
 
     @Bean
