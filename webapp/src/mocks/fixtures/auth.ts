@@ -14,6 +14,21 @@ import type {
 	SessionView,
 } from "@/api/types.gen";
 
+/**
+ * Wire shape of a generated view: the hey-api transformers revive ISO date *strings* into
+ * `Date` objects on the way in, so a view's `Date` fields are strings on the wire. These
+ * fixtures are JSON-serialized by the MSW handlers (or fed to per-story overrides that do the
+ * same), so they must be typed as the wire shape — not the post-transform `Date` shape. This
+ * removes the ~15 `as unknown as Date` casts the post-transform typing forced.
+ */
+type Wire<T> = {
+	[K in keyof T]: T[K] extends Date | undefined
+		? string | undefined
+		: T[K] extends Date
+			? string
+			: T[K];
+};
+
 export const currentUser: CurrentUserView = {
 	id: 42,
 	username: "octocat",
@@ -35,7 +50,7 @@ export const identityProviders: IdentityProviderView[] = [
 	{ registrationId: "gitlab-lrz", displayName: "GitLab LRZ", providerType: "GITLAB" },
 ];
 
-export const linkedIdentities: IdentityView[] = [
+export const linkedIdentities: Wire<IdentityView>[] = [
 	{
 		id: 1,
 		providerType: "GITHUB",
@@ -43,7 +58,7 @@ export const linkedIdentities: IdentityView[] = [
 		displayName: "The Octocat",
 		subject: "583231",
 		avatarUrl: "https://avatars.githubusercontent.com/u/583231?v=4",
-		lastLoginAt: "2026-05-20T10:00:00Z" as unknown as Date,
+		lastLoginAt: "2026-05-20T10:00:00Z",
 	},
 	{
 		id: 2,
@@ -51,34 +66,34 @@ export const linkedIdentities: IdentityView[] = [
 		username: "octocat-lrz",
 		displayName: "Octo (LRZ)",
 		subject: "991122",
-		lastLoginAt: "2026-04-02T08:30:00Z" as unknown as Date,
+		lastLoginAt: "2026-04-02T08:30:00Z",
 	},
 ];
 
-export const sessions: SessionView[] = [
+export const sessions: Wire<SessionView>[] = [
 	{
 		jti: "sess-current-001",
 		current: true,
 		userAgent: "Chrome 124 on macOS",
 		ip: "192.0.2.10",
-		issuedAt: "2026-05-29T09:00:00Z" as unknown as Date,
-		expiresAt: "2026-06-29T09:00:00Z" as unknown as Date,
+		issuedAt: "2026-05-29T09:00:00Z",
+		expiresAt: "2026-06-29T09:00:00Z",
 	},
 	{
 		jti: "sess-other-002",
 		current: false,
 		userAgent: "Firefox 126 on Ubuntu",
 		ip: "198.51.100.23",
-		issuedAt: "2026-05-25T14:12:00Z" as unknown as Date,
-		expiresAt: "2026-06-25T14:12:00Z" as unknown as Date,
+		issuedAt: "2026-05-25T14:12:00Z",
+		expiresAt: "2026-06-25T14:12:00Z",
 	},
 	{
 		jti: "sess-other-003",
 		current: false,
 		userAgent: "Mobile Safari on iOS 18",
 		ip: "203.0.113.77",
-		issuedAt: "2026-05-21T07:45:00Z" as unknown as Date,
-		expiresAt: "2026-06-21T07:45:00Z" as unknown as Date,
+		issuedAt: "2026-05-21T07:45:00Z",
+		expiresAt: "2026-06-21T07:45:00Z",
 	},
 ];
 
@@ -109,7 +124,7 @@ export const adminUsers: AdminAccountView[] = [
 // IDENTITY-family connections backing the workspace login-providers screen. These
 // share the generic `/connections` endpoint with SCM/messaging connections; the UI
 // filters client-side to the OIDC_LOGIN_* kinds.
-export const identityConnections: ConnectionSummary[] = [
+export const identityConnections: Wire<ConnectionSummary>[] = [
 	{
 		id: 501,
 		kind: "OIDC_LOGIN_GITHUB",
@@ -118,9 +133,9 @@ export const identityConnections: ConnectionSummary[] = [
 		instanceKey: "ghe-corp",
 		state: "ACTIVE",
 		capabilities: [],
-		createdAt: "2026-03-01T12:00:00Z" as unknown as Date,
-		updatedAt: "2026-05-01T12:00:00Z" as unknown as Date,
-		lastActivityAt: "2026-05-28T18:30:00Z" as unknown as Date,
+		createdAt: "2026-03-01T12:00:00Z",
+		updatedAt: "2026-05-01T12:00:00Z",
+		lastActivityAt: "2026-05-28T18:30:00Z",
 	},
 	{
 		id: 502,
@@ -131,23 +146,23 @@ export const identityConnections: ConnectionSummary[] = [
 		state: "SUSPENDED",
 		stateReason: "Credentials rotated by admin",
 		capabilities: [],
-		createdAt: "2026-02-14T09:00:00Z" as unknown as Date,
-		updatedAt: "2026-05-10T09:00:00Z" as unknown as Date,
+		createdAt: "2026-02-14T09:00:00Z",
+		updatedAt: "2026-05-10T09:00:00Z",
 	},
 ];
 
 // Sequential export-status snapshots: PENDING on first poll, READY afterwards so a
 // story / test exercising the DangerZone export flow sees the state transition.
-export const exportPending: ExportStatus = {
+export const exportPending: Wire<ExportStatus> = {
 	id: 9001,
 	status: "PENDING",
-	requestedAt: "2026-05-29T10:00:00Z" as unknown as Date,
+	requestedAt: "2026-05-29T10:00:00Z",
 };
 
-export const exportReady: ExportStatus = {
+export const exportReady: Wire<ExportStatus> = {
 	id: 9001,
 	status: "READY",
-	requestedAt: "2026-05-29T10:00:00Z" as unknown as Date,
-	completedAt: "2026-05-29T10:00:05Z" as unknown as Date,
-	expiresAt: "2026-06-05T10:00:05Z" as unknown as Date,
+	requestedAt: "2026-05-29T10:00:00Z",
+	completedAt: "2026-05-29T10:00:05Z",
+	expiresAt: "2026-06-05T10:00:05Z",
 };

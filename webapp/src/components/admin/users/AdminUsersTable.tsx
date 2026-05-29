@@ -28,8 +28,8 @@ export interface AdminUsersTableProps {
 	hasSearch: boolean;
 	/** Total rows loaded from the server (before client-side search filtering). */
 	totalLoaded: number;
-	/** Id of the signed-in admin — used to disable self-impersonation. */
-	currentUserId: number;
+	/** Id of the signed-in admin — used to disable self-impersonation. Undefined until loaded. */
+	currentUserId: number | undefined;
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onLoadMore: () => void;

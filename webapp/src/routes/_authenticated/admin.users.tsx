@@ -28,7 +28,10 @@ type DialogTarget = { user: AdminAccountView } | null;
 function AdminUsersPage() {
 	const queryClient = useQueryClient();
 	const { getUserId } = useAuth();
-	const currentUserId = Number(getUserId());
+	// `getUserId()` is undefined until the current user loads; only coerce a real id so the
+	// self-impersonation guard never compares against NaN during the load window.
+	const userId = getUserId();
+	const currentUserId = userId != null ? Number(userId) : undefined;
 
 	// Server has no search param (AdminListUsersData.query is { page, size } only), so we
 	// filter the already-loaded rows client-side. useDeferredValue debounces the heavy

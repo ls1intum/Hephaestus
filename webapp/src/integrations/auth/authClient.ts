@@ -49,6 +49,28 @@ export interface UserProfile {
 
 const serverUrl = () => environment.serverUrl.replace(/\/$/, "");
 
+/**
+ * Narrow an untrusted `GET /user` body to `CurrentUser`.
+ *
+ * The endpoint can only be reached with a valid session, but the response is still
+ * untrusted JSON at the boundary. We require the handful of fields `CurrentUser` marks
+ * required (`id`, `displayName`, `appRole`, `status`) before trusting the shape — a blind
+ * `as CurrentUser` cast would let a malformed/partial body flow into the auth state and
+ * surface as `NaN`/`undefined` reads downstream.
+ */
+function isCurrentUser(value: unknown): value is CurrentUser {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+	const v = value as Record<string, unknown>;
+	return (
+		typeof v.id === "number" &&
+		typeof v.displayName === "string" &&
+		typeof v.appRole === "string" &&
+		typeof v.status === "string"
+	);
+}
+
 /** Read a cookie value by name (used for the CSRF double-submit token). */
 function readCookie(name: string): string | undefined {
 	const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -76,7 +98,8 @@ export const authClient = {
 			if (!res.ok) {
 				return null;
 			}
-			return (await res.json()) as CurrentUser;
+			const body: unknown = await res.json();
+			return isCurrentUser(body) ? body : null;
 		} catch {
 			return null;
 		}
@@ -125,8 +148,14 @@ export const authClient = {
 	},
 };
 
-/** Build the preserved `UserProfile` from a `CurrentUser` (server `CurrentUserView`). */
-export function toUserProfile(user: CurrentUser): UserProfile {
+/**
+ * Build the preserved `UserProfile` from the server's `CurrentUserView`.
+ *
+ * Accepts the raw generated view (every field optional) rather than the narrowed
+ * `CurrentUser`, so the TanStack-Query-backed `useAuth()` can feed the query result
+ * straight in without an unsafe cast. All reads are null-safe with `??` fallbacks.
+ */
+export function toUserProfile(user: CurrentUserView): UserProfile {
 	const name = user.displayName ?? user.username ?? "";
 	const [firstName, ...rest] = name.split(" ");
 	return {

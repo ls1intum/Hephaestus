@@ -1,6 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
-import { authClient, type CurrentUser, toUserProfile, type UserProfile } from "./authClient";
+import { createContext, useContext } from "react";
+import { getCurrentUserOptions } from "@/api/@tanstack/react-query.gen";
+import { authClient, toUserProfile, type UserProfile } from "./authClient";
 
 export type { UserProfile } from "./authClient";
 
@@ -13,7 +15,7 @@ export interface AuthContextType {
 	isAppAdmin: boolean;
 	userProfile: UserProfile | undefined;
 	login: (idpHint?: string, returnTo?: string) => Promise<void>;
-	linkAccount: (providerAlias: string) => Promise<void>;
+	linkAccount: (providerAlias: string, returnTo?: string) => Promise<void>;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
 	isCurrentUser: (login?: string) => boolean;
@@ -44,32 +46,28 @@ interface AuthProviderProps {
 }
 
 /**
- * Cookie-session auth provider (ADR 0017). On mount it reads GET /user (the session cookie is
- * sent automatically); a 401 means unauthenticated. The useAuth() API is unchanged from the
- * former keycloak-js implementation so existing consumers keep working.
+ * Cookie-session auth provider (ADR 0017).
+ *
+ * Backed by the SAME TanStack Query (`getCurrentUserOptions()`, key `getCurrentUser`) that the
+ * route guards read via `resolveCurrentUser`, so there is ONE shared cache — no duplicate
+ * `/user` fetch on load and no drift (e.g. an admin changing their own role invalidates this
+ * query and the in-app surface updates with it). A 401/403 makes the query error with no data,
+ * which we treat as unauthenticated. The `useAuth()` API is unchanged from the former
+ * keycloak-js implementation so existing consumers keep working.
  */
 export function AuthProvider({ children }: AuthProviderProps) {
-	const [isLoading, setIsLoading] = useState(true);
-	const [user, setUser] = useState<CurrentUser | null>(null);
+	// Don't retry on auth failure (a 401 is a definitive "not signed in", not a transient error)
+	// and keep the result fresh-enough to avoid a refetch storm; the guards seed the same cache.
+	const userQuery = useQuery({
+		...getCurrentUserOptions(),
+		retry: false,
+		staleTime: 30_000,
+	});
 
-	useEffect(() => {
-		let cancelled = false;
-		authClient
-			.fetchCurrentUser()
-			.then((current) => {
-				if (!cancelled) {
-					setUser(current);
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setIsLoading(false);
-				}
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
+	const user = userQuery.data ?? null;
+	// `isPending` is true only while the very first fetch is in flight (no cached data yet),
+	// matching the previous mount-time loading window.
+	const isLoading = userQuery.isPending;
 
 	// No manual memoization: the project runs React Compiler, which memoizes these derived
 	// values and stable callbacks automatically (see webapp/AGENTS.md).
@@ -81,8 +79,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		authClient.login(idpHint, returnTo);
 	};
 
-	const linkAccount = async (providerAlias: string) => {
-		authClient.linkAccount(providerAlias);
+	const linkAccount = async (providerAlias: string, returnTo?: string) => {
+		// Thread `returnTo` so a link initiated from settings returns to settings (defaulting to
+		// the current page), rather than dumping the user back on `/` after the OAuth dance.
+		const destination =
+			returnTo ?? (typeof window !== "undefined" ? window.location.pathname : undefined);
+		authClient.linkAccount(providerAlias, destination);
 	};
 
 	const logout = async () => {
@@ -94,7 +96,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	const isCurrentUser = (login?: string) =>
 		!!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase();
 
-	const getUserId = () => (user ? String(user.id) : undefined);
+	// Return undefined (never the string "undefined" / a value that coerces to NaN) until the
+	// user is loaded, so callers like `Number(getUserId())` get `NaN` only when there genuinely
+	// is no id — and can guard on `undefined` instead.
+	const getUserId = () => (user?.id != null ? String(user.id) : undefined);
 
 	const getGitProviderId = () => user?.gitProviderId ?? undefined;
 

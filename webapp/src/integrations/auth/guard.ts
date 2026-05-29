@@ -23,17 +23,53 @@ export async function resolveCurrentUser(
 }
 
 /**
+ * Fully percent-decode a value, bounded against malicious double/triple-encoding.
+ *
+ * A single `decodeURIComponent` leaves `%252f` as `%2f`, so a payload like `/%252f%252fevil`
+ * would pass a one-shot decode-then-check yet decode again in a downstream parser. We decode
+ * in a bounded loop until the value is stable (or the cap is hit), so the checks below run on
+ * the value a browser/router would ultimately see. The cap also stops a decode bomb.
+ */
+function fullyDecode(value: string): string {
+	let current = value;
+	for (let i = 0; i < 5; i++) {
+		let decoded: string;
+		try {
+			decoded = decodeURIComponent(current);
+		} catch {
+			// Malformed percent-encoding (e.g. a lone "%") — treat as already fully decoded.
+			return current;
+		}
+		if (decoded === current) {
+			return current;
+		}
+		current = decoded;
+	}
+	return current;
+}
+
+/**
  * Validate a `returnTo` redirect target. Accepts only same-origin absolute paths
  * (a single leading slash, no `//` protocol-relative escape, no scheme), otherwise
  * falls back to `/`. Prevents open-redirect via crafted `?returnTo=` params.
+ *
+ * Checks run on the FULLY DECODED value (decode-then-check), so percent-encoded escapes —
+ * `/%2f%2fevil.com`, `/%09/evil`, `/%20/evil`, `/%5cevil`, `/@evil` — cannot smuggle a
+ * protocol-relative URL, control char, whitespace, or backslash past the same-origin gate.
  */
 export function safeReturnTo(value: string | undefined): string {
 	if (!value) return "/";
-	// Control chars (NUL, tab, newline, DEL, …) can defeat downstream parsers — reject outright.
+	const decoded = fullyDecode(value);
+	// Whitespace (incl. space/tab) and control chars (NUL, newline, DEL, …) can defeat downstream
+	// parsers or hide an escape — reject outright on the decoded value.
 	// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control chars is the point
-	if (/[\x00-\x1f\x7f]/.test(value)) return "/";
-	if (!value.startsWith("/") || value.startsWith("//")) return "/";
-	// Reject anything that smuggles a scheme (e.g. "/\evil" normalises oddly, "/javascript:")
-	if (/^\/[\\]/.test(value) || /^\/+[a-z]+:/i.test(value)) return "/";
+	if (/[\s\x00-\x1f\x7f]/.test(decoded)) return "/";
+	// Must be a rooted path and not a protocol-relative `//host` escape.
+	if (!decoded.startsWith("/") || decoded.startsWith("//")) return "/";
+	// Reject a leading-segment that smuggles a scheme ("/javascript:"), a backslash escape
+	// ("/\evil", which browsers normalise to "//evil"), or a userinfo `@` host trick ("/@evil").
+	if (/^\/[\\]/.test(decoded) || /^\/+[a-z]+:/i.test(decoded) || /^\/@/.test(decoded)) return "/";
+	// Validation ran on the fully-decoded value; return the ORIGINAL so legitimate encoded
+	// segments (e.g. a `%26` in a query string) are preserved exactly as the caller intended.
 	return value;
 }

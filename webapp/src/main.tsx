@@ -7,7 +7,7 @@ import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, csrfHeaders, useAuth } from "@/integrations/auth";
@@ -19,7 +19,7 @@ import {
 	posthogApiHost,
 	posthogProjectApiKey,
 } from "@/integrations/posthog/config";
-import { initSentry } from "@/integrations/sentry";
+import { disableSentry, initSentry } from "@/integrations/sentry";
 import { ThemeProvider } from "@/integrations/theme";
 import reportWebVitals from "./reportWebVitals";
 
@@ -79,12 +79,20 @@ function WrappedRouterProvider() {
  */
 function Root() {
 	const consent = useCookieConsent();
+	const errorMonitoring = consent?.errorMonitoring === true;
 
-	// Initialize Sentry when (and only when) error-monitoring consent is granted. initSentry is
-	// idempotent, so re-running on consent change is safe.
-	if (consent?.errorMonitoring) {
-		initSentry();
-	}
+	// Sentry follows the consent decision as an effect (never as a render side effect): init when
+	// error-monitoring consent is granted, tear down when it is withdrawn. Both calls are
+	// idempotent, so re-running on any consent change is safe. This mirrors PostHog's
+	// mount/unmount gating below — withdrawing consent must actually STOP capture, not just
+	// avoid the first init.
+	useEffect(() => {
+		if (errorMonitoring) {
+			initSentry();
+		} else {
+			disableSentry();
+		}
+	}, [errorMonitoring]);
 
 	const analyticsEnabled = isPosthogEnabled && consent?.analytics === true;
 
