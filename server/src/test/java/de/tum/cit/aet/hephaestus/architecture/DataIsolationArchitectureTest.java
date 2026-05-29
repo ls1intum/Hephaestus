@@ -109,7 +109,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "AccountFeature", // Per-account feature opt-ins
         "AuthEvent", // Append-only auth audit; references workspace optionally, not scoped by it
         "IssuedJwt", // JWT revocation list; account-scoped
-        "JwtSigningKey" // System-wide signing keys
+        "JwtSigningKey", // System-wide signing keys
+        "AccountExport" // GDPR Art. 20 self-service export; account-scoped, spans workspaces
     );
 
     // ========================================================================

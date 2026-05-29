@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, callbackGet, callbackPost, cancelJob, claimIdentity, computeUserLeagueStats, createConfig, createPractice, createWorkspace, deleteConfig, deletePractice, deleteThread, deleteUser, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUserMembership, getEngagement, getFinding, getFindingsForPullRequest, getIdentityProviders, getJob, getLabelFilters, getLatestFeedback, getLeaderboard, getLinkedAccounts, getMember, getPractice, getProviders, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, ingest, listFindings, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listThreads, listWorkspaces, type Options, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, resetAndRecalculateLeagues, retryDelivery, setActive, submitFeedback, unlinkAccount, updateConfig, updateFeatures, updateMemberVisibility, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CallbackGetData, CallbackGetResponse, CallbackPostData, CallbackPostResponse, CancelJobData, CancelJobResponse, ClaimIdentityData, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeletePracticeData, DeletePracticeResponse, DeleteThreadData, DeleteThreadResponse, DeleteUserData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetIdentityProvidersData, GetIdentityProvidersResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetLinkedAccountsData, GetLinkedAccountsResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, IngestData, IngestResponse, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListThreadsData, ListThreadsResponse, ListWorkspacesData, ListWorkspacesResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, UnlinkAccountData, UpdateConfigData, UpdateConfigResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, adminListUsers, adminUpdateUser, assignRole, audit, callbackGet, callbackPost, cancelJob, computeUserLeagueStats, createConfig, createPractice, createWorkspace, deleteConfig, deleteCurrentUser, deletePractice, deleteThread, disconnect, downloadDataExport, exitImpersonation, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUser, getCurrentUserMembership, getDataExportStatus, getEngagement, getFinding, getFindingsForPullRequest, getJob, getJwks, getLabelFilters, getLatestFeedback, getLeaderboard, getMember, getOpenidConfiguration, getPractice, getProviders, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, impersonate, ingest, initiate, list, listFindings, listGitLabGroups, listGlobalContributors, listIdentityProviders, listJobs, listLinkedIdentities, listMembers, listPractices, listSessions, listThreads, listWorkspaces, logout, type Options, purgeWorkspace, reactivate, read, recalculateUserAchievements, refresh, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, requestDataExport, resetAndRecalculateLeagues, retryDelivery, revokeOtherSessions, revokeSession, setActive, submitFeedback, suspend, updateConfig, updateFeatures, updateMemberVisibility, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, vote } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AdminListUsersData, AdminListUsersResponse, AdminUpdateUserData, AdminUpdateUserResponse, AssignRoleData, AssignRoleResponse, AuditData, AuditResponse, CallbackGetData, CallbackGetResponse, CallbackPostData, CallbackPostResponse, CancelJobData, CancelJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteCurrentUserData, DeletePracticeData, DeletePracticeResponse, DeleteThreadData, DeleteThreadResponse, DisconnectData, DownloadDataExportData, DownloadDataExportResponse, ExitImpersonationData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetCurrentUserResponse, GetDataExportStatusData, GetDataExportStatusResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetJobData, GetJobResponse, GetJwksData, GetJwksResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetOpenidConfigurationData, GetOpenidConfigurationResponse, GetPracticeData, GetPracticeResponse, GetProvidersData, GetProvidersResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ImpersonateData, IngestData, IngestResponse, InitiateData, InitiateResponse, ListData, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListIdentityProvidersData, ListIdentityProvidersResponse, ListJobsData, ListJobsResponse, ListLinkedIdentitiesData, ListLinkedIdentitiesResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListResponse, ListSessionsData, ListSessionsResponse, ListThreadsData, ListThreadsResponse, ListWorkspacesData, ListWorkspacesResponse, LogoutData, PurgeWorkspaceData, PurgeWorkspaceResponse, ReactivateData, ReactivateResponse, ReadData, ReadResponse, RecalculateUserAchievementsData, RefreshData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, RequestDataExportData, RequestDataExportResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, RevokeOtherSessionsData, RevokeSessionData, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, SuspendData, SuspendResponse, UpdateConfigData, UpdateConfigResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteData, VoteResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -39,16 +39,14 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
     return [params];
 };
 
-export const getIdentityProvidersQueryKey = (options?: Options<GetIdentityProvidersData>) => createQueryKey('getIdentityProviders', options);
+export const getJwksQueryKey = (options?: Options<GetJwksData>) => createQueryKey('getJwks', options);
 
 /**
- * List available identity providers
- *
- * Returns all enabled identity providers that can be used for login. Public endpoint — no authentication required.
+ * JWK set (public keys only)
  */
-export const getIdentityProvidersOptions = (options?: Options<GetIdentityProvidersData>) => queryOptions<GetIdentityProvidersResponse, DefaultError, GetIdentityProvidersResponse, ReturnType<typeof getIdentityProvidersQueryKey>>({
+export const getJwksOptions = (options?: Options<GetJwksData>) => queryOptions<GetJwksResponse, DefaultError, GetJwksResponse, ReturnType<typeof getJwksQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getIdentityProviders({
+        const { data } = await getJwks({
             ...options,
             ...queryKey[0],
             signal,
@@ -56,8 +54,286 @@ export const getIdentityProvidersOptions = (options?: Options<GetIdentityProvide
         });
         return data;
     },
-    queryKey: getIdentityProvidersQueryKey(options)
+    queryKey: getJwksQueryKey(options)
 });
+
+export const getOpenidConfigurationQueryKey = (options?: Options<GetOpenidConfigurationData>) => createQueryKey('getOpenidConfiguration', options);
+
+/**
+ * OIDC issuer metadata
+ */
+export const getOpenidConfigurationOptions = (options?: Options<GetOpenidConfigurationData>) => queryOptions<GetOpenidConfigurationResponse, DefaultError, GetOpenidConfigurationResponse, ReturnType<typeof getOpenidConfigurationQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getOpenidConfiguration({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOpenidConfigurationQueryKey(options)
+});
+
+export const adminListUsersQueryKey = (options?: Options<AdminListUsersData>) => createQueryKey('adminListUsers', options);
+
+/**
+ * List accounts (paged)
+ */
+export const adminListUsersOptions = (options?: Options<AdminListUsersData>) => queryOptions<AdminListUsersResponse, DefaultError, AdminListUsersResponse, ReturnType<typeof adminListUsersQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await adminListUsers({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: adminListUsersQueryKey(options)
+});
+
+const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
+    const params = { ...queryKey[0] };
+    if (page.body) {
+        params.body = {
+            ...queryKey[0].body as any,
+            ...page.body as any
+        };
+    }
+    if (page.headers) {
+        params.headers = {
+            ...queryKey[0].headers,
+            ...page.headers
+        };
+    }
+    if (page.path) {
+        params.path = {
+            ...queryKey[0].path as any,
+            ...page.path as any
+        };
+    }
+    if (page.query) {
+        params.query = {
+            ...queryKey[0].query as any,
+            ...page.query as any
+        };
+    }
+    return params as unknown as typeof page;
+};
+
+export const adminListUsersInfiniteQueryKey = (options?: Options<AdminListUsersData>): QueryKey<Options<AdminListUsersData>> => createQueryKey('adminListUsers', options, true);
+
+/**
+ * List accounts (paged)
+ */
+export const adminListUsersInfiniteOptions = (options?: Options<AdminListUsersData>) => infiniteQueryOptions<AdminListUsersResponse, DefaultError, InfiniteData<AdminListUsersResponse>, QueryKey<Options<AdminListUsersData>>, number | Pick<QueryKey<Options<AdminListUsersData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<AdminListUsersData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                page: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await adminListUsers({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: adminListUsersInfiniteQueryKey(options)
+});
+
+/**
+ * Update an account's app role
+ */
+export const adminUpdateUserMutation = (options?: Partial<Options<AdminUpdateUserData>>): UseMutationOptions<AdminUpdateUserResponse, DefaultError, Options<AdminUpdateUserData>> => {
+    const mutationOptions: UseMutationOptions<AdminUpdateUserResponse, DefaultError, Options<AdminUpdateUserData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await adminUpdateUser({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listQueryKey = (options: Options<ListData>) => createQueryKey('list', options);
+
+export const listOptions = (options: Options<ListData>) => queryOptions<ListResponse, DefaultError, ListResponse, ReturnType<typeof listQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await list({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listQueryKey(options)
+});
+
+export const initiateMutation = (options?: Partial<Options<InitiateData>>): UseMutationOptions<InitiateResponse, DefaultError, Options<InitiateData>> => {
+    const mutationOptions: UseMutationOptions<InitiateResponse, DefaultError, Options<InitiateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await initiate({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const readQueryKey = (options: Options<ReadData>) => createQueryKey('read', options);
+
+export const readOptions = (options: Options<ReadData>) => queryOptions<ReadResponse, DefaultError, ReadResponse, ReturnType<typeof readQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await read({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: readQueryKey(options)
+});
+
+export const auditQueryKey = (options: Options<AuditData>) => createQueryKey('audit', options);
+
+export const auditOptions = (options: Options<AuditData>) => queryOptions<AuditResponse, DefaultError, AuditResponse, ReturnType<typeof auditQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await audit({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: auditQueryKey(options)
+});
+
+export const disconnectMutation = (options?: Partial<Options<DisconnectData>>): UseMutationOptions<unknown, DefaultError, Options<DisconnectData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<DisconnectData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await disconnect({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const reactivateMutation = (options?: Partial<Options<ReactivateData>>): UseMutationOptions<ReactivateResponse, DefaultError, Options<ReactivateData>> => {
+    const mutationOptions: UseMutationOptions<ReactivateResponse, DefaultError, Options<ReactivateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reactivate({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const suspendMutation = (options?: Partial<Options<SuspendData>>): UseMutationOptions<SuspendResponse, DefaultError, Options<SuspendData>> => {
+    const mutationOptions: UseMutationOptions<SuspendResponse, DefaultError, Options<SuspendData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await suspend({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Begin impersonating another account
+ */
+export const impersonateMutation = (options?: Partial<Options<ImpersonateData>>): UseMutationOptions<unknown, DefaultError, Options<ImpersonateData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ImpersonateData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await impersonate({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Exit impersonation, restore operator session
+ */
+export const exitImpersonationMutation = (options?: Partial<Options<ExitImpersonationData>>): UseMutationOptions<unknown, DefaultError, Options<ExitImpersonationData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ExitImpersonationData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await exitImpersonation({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Log out — revoke the current token + clear the cookie
+ */
+export const logoutMutation = (options?: Partial<Options<LogoutData>>): UseMutationOptions<unknown, DefaultError, Options<LogoutData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<LogoutData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await logout({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Rotate the access token (new jti, old revoked)
+ */
+export const refreshMutation = (options?: Partial<Options<RefreshData>>): UseMutationOptions<unknown, DefaultError, Options<RefreshData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<RefreshData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await refresh({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const listGlobalContributorsQueryKey = (options?: Options<ListGlobalContributorsData>) => createQueryKey('listGlobalContributors', options);
 
@@ -77,6 +353,24 @@ export const listGlobalContributorsOptions = (options?: Options<ListGlobalContri
         return data;
     },
     queryKey: listGlobalContributorsQueryKey(options)
+});
+
+export const listIdentityProvidersQueryKey = (options?: Options<ListIdentityProvidersData>) => createQueryKey('listIdentityProviders', options);
+
+/**
+ * List available identity providers
+ */
+export const listIdentityProvidersOptions = (options?: Options<ListIdentityProvidersData>) => queryOptions<ListIdentityProvidersResponse, DefaultError, ListIdentityProvidersResponse, ReturnType<typeof listIdentityProvidersQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listIdentityProviders({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listIdentityProvidersQueryKey(options)
 });
 
 export const callbackGetQueryKey = (options: Options<CallbackGetData>) => createQueryKey('callbackGet', options);
@@ -109,14 +403,12 @@ export const callbackPostMutation = (options?: Partial<Options<CallbackPostData>
 };
 
 /**
- * Delete user account
- *
- * Permanently delete the current user's account and all associated data (GDPR)
+ * Delete the current account (GDPR Art. 17)
  */
-export const deleteUserMutation = (options?: Partial<Options<DeleteUserData>>): UseMutationOptions<unknown, DefaultError, Options<DeleteUserData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<DeleteUserData>> = {
+export const deleteCurrentUserMutation = (options?: Partial<Options<DeleteCurrentUserData>>): UseMutationOptions<unknown, DefaultError, Options<DeleteCurrentUserData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<DeleteCurrentUserData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await deleteUser({
+            const { data } = await deleteCurrentUser({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -127,12 +419,83 @@ export const deleteUserMutation = (options?: Partial<Options<DeleteUserData>>): 
     return mutationOptions;
 };
 
+export const getCurrentUserQueryKey = (options?: Options<GetCurrentUserData>) => createQueryKey('getCurrentUser', options);
+
+/**
+ * Get the current user
+ */
+export const getCurrentUserOptions = (options?: Options<GetCurrentUserData>) => queryOptions<GetCurrentUserResponse, DefaultError, GetCurrentUserResponse, ReturnType<typeof getCurrentUserQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getCurrentUser({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getCurrentUserQueryKey(options)
+});
+
+/**
+ * Request a data export (async)
+ */
+export const requestDataExportMutation = (options?: Partial<Options<RequestDataExportData>>): UseMutationOptions<RequestDataExportResponse, DefaultError, Options<RequestDataExportData>> => {
+    const mutationOptions: UseMutationOptions<RequestDataExportResponse, DefaultError, Options<RequestDataExportData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await requestDataExport({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getDataExportStatusQueryKey = (options: Options<GetDataExportStatusData>) => createQueryKey('getDataExportStatus', options);
+
+/**
+ * Get data-export status
+ */
+export const getDataExportStatusOptions = (options: Options<GetDataExportStatusData>) => queryOptions<GetDataExportStatusResponse, DefaultError, GetDataExportStatusResponse, ReturnType<typeof getDataExportStatusQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getDataExportStatus({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getDataExportStatusQueryKey(options)
+});
+
+export const downloadDataExportQueryKey = (options: Options<DownloadDataExportData>) => createQueryKey('downloadDataExport', options);
+
+/**
+ * Download the data-export bundle
+ */
+export const downloadDataExportOptions = (options: Options<DownloadDataExportData>) => queryOptions<DownloadDataExportResponse, DefaultError, DownloadDataExportResponse, ReturnType<typeof downloadDataExportQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await downloadDataExport({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: downloadDataExportQueryKey(options)
+});
+
 export const getUserFeaturesQueryKey = (options?: Options<GetUserFeaturesData>) => createQueryKey('getUserFeatures', options);
 
 /**
  * Get feature flags for the current user
  *
- * Returns all feature flags evaluated for the authenticated user. Combines account feature-flag checks and server-side config toggles.
+ * Returns all feature flags evaluated for the authenticated user. Combines role checks and server-side config toggles.
  */
 export const getUserFeaturesOptions = (options?: Options<GetUserFeaturesData>) => queryOptions<GetUserFeaturesResponse, DefaultError, GetUserFeaturesResponse, ReturnType<typeof getUserFeaturesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -147,16 +510,14 @@ export const getUserFeaturesOptions = (options?: Options<GetUserFeaturesData>) =
     queryKey: getUserFeaturesQueryKey(options)
 });
 
-export const getLinkedAccountsQueryKey = (options?: Options<GetLinkedAccountsData>) => createQueryKey('getLinkedAccounts', options);
+export const listLinkedIdentitiesQueryKey = (options?: Options<ListLinkedIdentitiesData>) => createQueryKey('listLinkedIdentities', options);
 
 /**
  * List linked identity providers
- *
- * Returns all configured identity providers with their connection status for the current user
  */
-export const getLinkedAccountsOptions = (options?: Options<GetLinkedAccountsData>) => queryOptions<GetLinkedAccountsResponse, DefaultError, GetLinkedAccountsResponse, ReturnType<typeof getLinkedAccountsQueryKey>>({
+export const listLinkedIdentitiesOptions = (options?: Options<ListLinkedIdentitiesData>) => queryOptions<ListLinkedIdentitiesResponse, DefaultError, ListLinkedIdentitiesResponse, ReturnType<typeof listLinkedIdentitiesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getLinkedAccounts({
+        const { data } = await listLinkedIdentities({
             ...options,
             ...queryKey[0],
             signal,
@@ -164,18 +525,16 @@ export const getLinkedAccountsOptions = (options?: Options<GetLinkedAccountsData
         });
         return data;
     },
-    queryKey: getLinkedAccountsQueryKey(options)
+    queryKey: listLinkedIdentitiesQueryKey(options)
 });
 
 /**
- * Unlink an identity provider
- *
- * Remove the federated identity link for the given provider. Cannot unlink the last remaining provider.
+ * Revoke all sessions except the current one
  */
-export const unlinkAccountMutation = (options?: Partial<Options<UnlinkAccountData>>): UseMutationOptions<unknown, DefaultError, Options<UnlinkAccountData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<UnlinkAccountData>> = {
+export const revokeOtherSessionsMutation = (options?: Partial<Options<RevokeOtherSessionsData>>): UseMutationOptions<unknown, DefaultError, Options<RevokeOtherSessionsData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<RevokeOtherSessionsData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await unlinkAccount({
+            const { data } = await revokeOtherSessions({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -186,15 +545,31 @@ export const unlinkAccountMutation = (options?: Partial<Options<UnlinkAccountDat
     return mutationOptions;
 };
 
+export const listSessionsQueryKey = (options?: Options<ListSessionsData>) => createQueryKey('listSessions', options);
+
 /**
- * Claim an identity provider from another user
- *
- * Transfers a federated identity from another user to the current user. Used when a user has accidentally created two accounts by logging in with different IdPs. Deletes the orphan account if it has no remaining identities.
+ * List active sessions for the current user
  */
-export const claimIdentityMutation = (options?: Partial<Options<ClaimIdentityData>>): UseMutationOptions<unknown, DefaultError, Options<ClaimIdentityData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ClaimIdentityData>> = {
+export const listSessionsOptions = (options?: Options<ListSessionsData>) => queryOptions<ListSessionsResponse, DefaultError, ListSessionsResponse, ReturnType<typeof listSessionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listSessions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listSessionsQueryKey(options)
+});
+
+/**
+ * Revoke a single session
+ */
+export const revokeSessionMutation = (options?: Partial<Options<RevokeSessionData>>): UseMutationOptions<unknown, DefaultError, Options<RevokeSessionData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<RevokeSessionData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await claimIdentity({
+            const { data } = await revokeSession({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -209,8 +584,6 @@ export const getUserSettingsQueryKey = (options?: Options<GetUserSettingsData>) 
 
 /**
  * Get user settings
- *
- * Get the current user's notification, research participation, and AI review preferences
  */
 export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) => queryOptions<GetUserSettingsResponse, DefaultError, GetUserSettingsResponse, ReturnType<typeof getUserSettingsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -227,8 +600,6 @@ export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) =
 
 /**
  * Update user settings
- *
- * Update the current user's notification, research participation, and AI review preferences
  */
 export const updateUserSettingsMutation = (options?: Partial<Options<UpdateUserSettingsData>>): UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> => {
     const mutationOptions: UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> = {
@@ -486,35 +857,6 @@ export const listJobsOptions = (options: Options<ListJobsData>) => queryOptions<
     },
     queryKey: listJobsQueryKey(options)
 });
-
-const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
-    const params = { ...queryKey[0] };
-    if (page.body) {
-        params.body = {
-            ...queryKey[0].body as any,
-            ...page.body as any
-        };
-    }
-    if (page.headers) {
-        params.headers = {
-            ...queryKey[0].headers,
-            ...page.headers
-        };
-    }
-    if (page.path) {
-        params.path = {
-            ...queryKey[0].path as any,
-            ...page.path as any
-        };
-    }
-    if (page.query) {
-        params.query = {
-            ...queryKey[0].query as any,
-            ...page.query as any
-        };
-    }
-    return params as unknown as typeof page;
-};
 
 export const listJobsInfiniteQueryKey = (options: Options<ListJobsData>): QueryKey<Options<ListJobsData>> => createQueryKey('listJobs', options, true);
 
@@ -804,7 +1146,7 @@ export const getCurrentUserMembershipQueryKey = (options: Options<GetCurrentUser
  * Get the current user's membership in this workspace.
  *
  * Get the current user's membership in this workspace.
- * Super admins (the admin app role) have their effective role elevated to ADMIN
+ * Super admins (the <code>admin</code> app role, APP_ADMIN) have their effective role elevated to ADMIN
  * if their database role is lower, matching the runtime authorization behaviour in
  * {@link WorkspaceAccessService WorkspaceAccessService}.
  */

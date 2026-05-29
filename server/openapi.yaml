@@ -19,19 +19,12 @@ tags:
   name: Achievements
 - description: Global contributor information
   name: Contributors
-- description: |-
-    Workspace registry endpoints that operate outside of a specific workspace slug.
-     These routes stay under the classic /workspaces base path while slugged routes
-     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
-  name: workspace-registry-controller
-- description: Read-only access to practice evaluation findings
-  name: Practice Findings
+- description: User preferences
+  name: Account
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
-- description: Up/down votes on mentor assistant messages
-  name: Mentor Votes
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -57,16 +50,6 @@ tags:
   name: connection-controller
 - description: "User account management (settings, deletion)"
   name: Account
-- description: Slack admin connectivity probe — test-message dispatch.
-  name: slack-connection-admin-controller
-- description: |-
-    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
-     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
-     on both success and failure; only <code>Accept: application/json</code> requests get
-     4xx JSON.
-  name: o-auth-callback-controller
-- description: Authentication discovery (public)
-  name: Auth
 - description: |-
     Unified webhook ingest controller.
 
@@ -80,19 +63,144 @@ tags:
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Manage practice definitions
-  name: Practice Catalog
-- description: Workspace-scoped team settings management
-  name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: Super-admin account management
+  name: Admin
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
   name: Leaderboard
+- description: Session lifecycle
+  name: Auth
+- description: Active sessions
+  name: Account
+- description: |-
+    Workspace registry endpoints that operate outside of a specific workspace slug.
+     These routes stay under the classic /workspaces base path while slugged routes
+     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
+  name: workspace-registry-controller
+- description: Read-only access to practice evaluation findings
+  name: Practice Findings
+- description: Up/down votes on mentor assistant messages
+  name: Mentor Votes
+- description: GDPR Art. 20 self-service data export
+  name: Account
+- description: Slack admin connectivity probe — test-message dispatch.
+  name: slack-connection-admin-controller
+- description: OIDC issuer metadata (public)
+  name: Auth discovery
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
+     on both success and failure; only <code>Accept: application/json</code> requests get
+     4xx JSON.
+  name: o-auth-callback-controller
+- description: Manage practice definitions
+  name: Practice Catalog
+- description: Workspace-scoped team settings management
+  name: Team Settings
+- description: Identity provider discovery (public)
+  name: Auth discovery
+- description: |-
+    GitLab-specific REST endpoints used during the workspace creation wizard:
+     <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
+     lists accessible groups for one. Split from <code>WorkspaceRegistryController</code> so the
+     workspace module no longer imports {@link GitLabPreflightService GitLabPreflightService}; the routes keep the
+     existing <code>/workspaces/gitlab/*</code> URL space for API stability.
+
+     <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
+     <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
+  name: git-lab-preflight-controller
+- description: "Current user identity, linked accounts, deletion"
+  name: Account
 paths:
+  /.well-known/jwks.json:
+    get:
+      operationId: getJwks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: OK
+      summary: JWK set (public keys only)
+      tags:
+      - Auth discovery
+  /.well-known/openid-configuration:
+    get:
+      operationId: getOpenidConfiguration
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: OK
+      summary: OIDC issuer metadata
+      tags:
+      - Auth discovery
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAccountView"
+          description: OK
+      summary: List accounts (paged)
+      tags:
+      - Admin
+  /admin/users/{id}:
+    patch:
+      operationId: adminUpdateUser
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountView"
+          description: OK
+      summary: Update an account's app role
+      tags:
+      - Admin
   /api/v1/workspaces/{workspaceId}/connections:
     get:
       operationId: list
@@ -292,21 +400,46 @@ paths:
           description: OK
       tags:
       - connection
-  /auth/identity-providers:
-    get:
-      description: Returns all enabled identity providers that can be used for login.
-        Public endpoint — no authentication required.
-      operationId: getIdentityProviders
+  /auth/impersonate:
+    post:
+      operationId: impersonate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImpersonateRequest"
+        required: true
       responses:
         "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/IdentityProvider"
           description: OK
-      summary: List available identity providers
+      summary: Begin impersonating another account
+      tags:
+      - Auth
+  /auth/impersonate:exit:
+    post:
+      operationId: exitImpersonation
+      responses:
+        "200":
+          description: OK
+      summary: "Exit impersonation, restore operator session"
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      operationId: logout
+      responses:
+        "200":
+          description: OK
+      summary: Log out — revoke the current token + clear the cookie
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      operationId: refresh
+      responses:
+        "200":
+          description: OK
+      summary: "Rotate the access token (new jti, old revoked)"
       tags:
       - Auth
   /contributors:
@@ -326,6 +459,21 @@ paths:
       summary: List global contributors
       tags:
       - Contributors
+  /identity-providers:
+    get:
+      operationId: listIdentityProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdentityProviderView"
+          description: OK
+      summary: List available identity providers
+      tags:
+      - Auth discovery
   /oauth/callback/{kind}:
     get:
       operationId: callbackGet
@@ -407,19 +555,89 @@ paths:
       - o-auth-callback
   /user:
     delete:
-      description: Permanently delete the current user's account and all associated
-        data (GDPR)
-      operationId: deleteUser
+      operationId: deleteCurrentUser
+      parameters:
+      - in: header
+        name: X-Confirm-Delete
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: OK
-      summary: Delete user account
+      summary: Delete the current account (GDPR Art. 17)
+      tags:
+      - Account
+    get:
+      operationId: getCurrentUser
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserView"
+          description: OK
+      summary: Get the current user
+      tags:
+      - Account
+  /user/exports:
+    post:
+      operationId: requestDataExport
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportCreated"
+          description: OK
+      summary: Request a data export (async)
+      tags:
+      - Account
+  /user/exports/{id}:
+    get:
+      operationId: getDataExportStatus
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportStatus"
+          description: OK
+      summary: Get data-export status
+      tags:
+      - Account
+  /user/exports/{id}/download:
+    get:
+      operationId: downloadDataExport
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+                format: byte
+          description: OK
+      summary: Download the data-export bundle
       tags:
       - Account
   /user/features:
     get:
       description: Returns all feature flags evaluated for the authenticated user.
-        Combines account feature-flag checks and server-side config toggles.
+        Combines role checks and server-side config toggles.
       operationId: getUserFeatures
       responses:
         "200":
@@ -431,11 +649,9 @@ paths:
       summary: Get feature flags for the current user
       tags:
       - Account
-  /user/linked-accounts:
+  /user/identities:
     get:
-      description: Returns all configured identity providers with their connection
-        status for the current user
-      operationId: getLinkedAccounts
+      operationId: listLinkedIdentities
       responses:
         "200":
           content:
@@ -443,53 +659,52 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LinkedAccount"
+                  $ref: "#/components/schemas/IdentityView"
           description: OK
       summary: List linked identity providers
       tags:
       - Account
-  /user/linked-accounts/{providerAlias}:
+  /user/sessions:
     delete:
-      description: Remove the federated identity link for the given provider. Cannot
-        unlink the last remaining provider.
-      operationId: unlinkAccount
-      parameters:
-      - in: path
-        name: providerAlias
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9-]{1,64}$"
+      operationId: revokeOtherSessions
       responses:
         "200":
           description: OK
-      summary: Unlink an identity provider
+      summary: Revoke all sessions except the current one
       tags:
       - Account
-  /user/linked-accounts/{providerAlias}/claim:
-    post:
-      description: Transfers a federated identity from another user to the
-        current user. Used when a user has accidentally created two accounts by logging
-        in with different IdPs. Deletes the orphan account if it has no remaining
-        identities.
-      operationId: claimIdentity
+    get:
+      operationId: listSessions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionView"
+          description: OK
+      summary: List active sessions for the current user
+      tags:
+      - Account
+  /user/sessions/{jti}:
+    delete:
+      operationId: revokeSession
       parameters:
       - in: path
-        name: providerAlias
+        name: jti
         required: true
         schema:
           type: string
-          pattern: "^[a-z0-9-]{1,64}$"
+          format: uuid
       responses:
         "200":
           description: OK
-      summary: Claim an identity provider from another user
+      summary: Revoke a single session
       tags:
       - Account
   /user/settings:
     get:
-      description: "Get the current user's notification, research participation, and\
-        \ AI review preferences"
       operationId: getUserSettings
       responses:
         "200":
@@ -502,8 +717,6 @@ paths:
       tags:
       - Account
     post:
-      description: "Update the current user's notification, research participation,\
-        \ and AI review preferences"
       operationId: updateUserSettings
       requestBody:
         content:
@@ -592,7 +805,7 @@ paths:
           description: Accessible groups
       summary: List GitLab groups accessible to a PAT
       tags:
-      - workspace-registry
+      - git-lab-preflight
   /workspaces/gitlab/preflight:
     post:
       operationId: gitLabPreflight
@@ -611,7 +824,7 @@ paths:
           description: Validation result
       summary: Validate a GitLab PAT before workspace creation
       tags:
-      - workspace-registry
+      - git-lab-preflight
   /workspaces/providers:
     get:
       description: Returns available workspace providers with their configuration.
@@ -1184,7 +1397,7 @@ paths:
     get:
       description: |-
         Get the current user's membership in this workspace.
-         Super admins (the admin app role) have their effective role elevated to ADMIN
+         Super admins (the <code>admin</code> app role, APP_ADMIN) have their effective role elevated to ADMIN
          if their database role is lower, matching the runtime authorization behaviour in
          {@link WorkspaceAccessService WorkspaceAccessService}.
       operationId: getCurrentUserMembership
@@ -2833,6 +3046,20 @@ components:
           type: string
       required:
       - type
+    AdminAccountView:
+      type: object
+      properties:
+        appRole:
+          type: string
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        primaryEmail:
+          type: string
+        status:
+          type: string
     AgentConfig:
       type: object
       description: Agent configuration for a workspace (API key redacted)
@@ -3108,6 +3335,172 @@ components:
           format: uuid
         title:
           type: string
+    ConnectionAuditEntry:
+      type: object
+      description: |-
+        Audit-log entry returned by <code>GET /api/v1/workspaces/{workspaceId</code>/connections/{id}/audit}.
+
+         <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
+         to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+         want to serialize on every response.
+      properties:
+        actorKind:
+          type: string
+        actorRef:
+          type: string
+        correlationId:
+          type: string
+        eventType:
+          type: string
+        fromState:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        occurredAt:
+          type: string
+          format: date-time
+        toState:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+    ConnectionDetail:
+      type: object
+      description: |-
+        Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
+         typed config serialized as a tree node. NEVER carries credentials; the encrypted
+         blob stays inside the entity and is not exposed by this DTO.
+
+         <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+         the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
+         object.
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+            - WEBHOOK_INGEST
+            - URL_VERIFICATION_HANDSHAKE
+            - REPLAY_PROTECTION
+            - TOKEN_REFRESH
+            - FEEDBACK_DELIVERY
+            - INLINE_FINDINGS
+            - APPROVAL_WORKFLOW
+            - SCOPE_CHANGES
+          uniqueItems: true
+        config:
+          type: string
+          description: "Opaque, typed connection config tree (no credentials)."
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        family:
+          type: string
+          enum:
+          - SCM
+          - MESSAGING
+          - KNOWLEDGE
+          - IDENTITY
+        id:
+          type: integer
+          format: int64
+        instanceKey:
+          type: string
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+          - OIDC_LOGIN_GITHUB
+          - OIDC_LOGIN_GITLAB
+        lastActivityAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        stateReason:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    ConnectionSummary:
+      type: object
+      description: |-
+        Wire shape returned by the <code>GET /api/v1/workspaces/{workspaceId</code>/connections}
+         list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+         credentials, no audit. Capabilities are looked up from the per-kind manifest at
+         response build time so adding/removing a capability needs no DB migration.
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+            - WEBHOOK_INGEST
+            - URL_VERIFICATION_HANDSHAKE
+            - REPLAY_PROTECTION
+            - TOKEN_REFRESH
+            - FEEDBACK_DELIVERY
+            - INLINE_FINDINGS
+            - APPROVAL_WORKFLOW
+            - SCOPE_CHANGES
+          uniqueItems: true
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        family:
+          type: string
+          enum:
+          - SCM
+          - MESSAGING
+          - KNOWLEDGE
+          - IDENTITY
+        id:
+          type: integer
+          format: int64
+        instanceKey:
+          type: string
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+          - OIDC_LOGIN_GITHUB
+          - OIDC_LOGIN_GITLAB
+        lastActivityAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        stateReason:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -3339,6 +3732,8 @@ components:
           - GITLAB
           - SLACK
           - OUTLINE
+          - OIDC_LOGIN_GITHUB
+          - OIDC_LOGIN_GITLAB
           example: GITLAB
         ownerUserId:
           type: integer
@@ -3370,6 +3765,73 @@ components:
       - displayName
       - kind
       - workspaceSlug
+    CurrentUserView:
+      type: object
+      properties:
+        appRole:
+          type: string
+        avatarUrl:
+          type: string
+        displayName:
+          type: string
+        gitProviderId:
+          type: string
+        hasGitLabIdentity:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        identityProvider:
+          type: string
+        impersonating:
+          type: boolean
+        impersonatorId:
+          type: integer
+          format: int64
+        primaryEmail:
+          type: string
+        profileUrl:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        username:
+          type: string
+    ExportCreated:
+      type: object
+      description: |-
+        Small acknowledgement body returned by <code>POST /user/exports</code> alongside the
+         <code>202 Accepted</code> + <code>Location</code> header. The client polls the status endpoint next.
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          type: string
+    ExportStatus:
+      type: object
+      description: |-
+        Status view for <code>GET /user/exports/{id</code>}. <code>status</code> ∈
+         PENDING/PROCESSING/READY/FAILED/EXPIRED. Timestamps are null until the corresponding lifecycle
+         transition occurs.
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        requestedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
     FeatureFlags:
       type: object
       description: Feature flags evaluated for the current user
@@ -3528,22 +3990,82 @@ components:
           type: string
           description: Default GitLab server URL
           example: https://gitlab.lrz.de
-    IdentityProvider:
+    IdentityProviderView:
       type: object
-      description: An enabled identity provider available for login
+      description: One row per sign-in option. <code>providerType</code> drives the
+        SPA's icon choice.
       properties:
-        alias:
-          type: string
-          description: "Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')"
         displayName:
           type: string
-          description: Display name of the identity provider
+        providerType:
+          type: string
+        registrationId:
+          type: string
+    IdentityView:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        lastLoginAt:
+          type: string
+          format: date-time
+        providerType:
+          type: string
+        subject:
+          type: string
+        username:
+          type: string
+    ImpersonateRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+        targetAccountId:
+          type: integer
+          format: int64
+      required:
+      - reason
+      - targetAccountId
+    InitiateConnectionRequest:
+      type: object
+      description: |-
+        Inbound payload for <code>POST /api/v1/workspaces/{workspaceId</code>/connections}.
+
+         <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
+         implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
+         <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
+         Validation is the strategy's responsibility — invalid input surfaces as a 400 via
+         <code>IllegalArgumentException</code>.
+      properties:
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+          - OIDC_LOGIN_GITHUB
+          - OIDC_LOGIN_GITLAB
+        redirectAfter:
+          type: string
+          format: uri
+        userInput:
+          type: object
+          additionalProperties:
+            type: string
+    InitiateConnectionResponse:
+      discriminator:
+        propertyName: type
+      properties:
         type:
           type: string
-          description: "Provider type (e.g. 'github', 'oidc')"
       required:
-      - alias
-      - displayName
       - type
     LabelInfo:
       type: object
@@ -3698,26 +4220,14 @@ components:
       required:
       - current
       - target
-    LinkedAccount:
-      type: object
-      description: An identity provider account that can be linked to the user
-      properties:
-        connected:
-          type: boolean
-          description: Whether the user has linked this provider
-        linkedUsername:
-          type: string
-          description: "Username on the external provider, if connected"
-        providerAlias:
-          type: string
-          description: "Identity provider alias (e.g. 'github', 'gitlab-lrz')"
-        providerName:
-          type: string
-          description: Display name of the identity provider
-      required:
-      - connected
-      - providerAlias
-      - providerName
+    Linked:
+      allOf:
+      - $ref: "#/components/schemas/InitiateConnectionResponse"
+      - type: object
+        properties:
+          connectionId:
+            type: integer
+            format: int64
     PageAgentJob:
       type: object
       properties:
@@ -4333,6 +4843,23 @@ components:
       - number
       - state
       - title
+    ReasonRequest:
+      type: object
+      description: "Lifecycle-action body — reason is optional, applied to both suspend\
+        \ and reactivate."
+      properties:
+        reason:
+          type: string
+    Redirect:
+      allOf:
+      - $ref: "#/components/schemas/InitiateConnectionResponse"
+      - type: object
+        properties:
+          state:
+            type: string
+          vendorUrl:
+            type: string
+            format: uri
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -4380,6 +4907,35 @@ components:
       - id
       - name
       - nameWithOwner
+    SessionView:
+      type: object
+      properties:
+        current:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        ip:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        jti:
+          type: string
+          format: uuid
+        userAgent:
+          type: string
+    SlackTestMessageResponse:
+      type: object
+      description: Result of the Slack test-message probe; carries the Slack error
+        code on failure.
+      properties:
+        channelId:
+          type: string
+        ok:
+          type: boolean
+        slackError:
+          type: string
     SortObject:
       type: object
       properties:
@@ -4492,6 +5048,11 @@ components:
       - hidden
       - id
       - name
+    UpdateAccountRequest:
+      type: object
+      properties:
+        appRole:
+          type: string
     UpdateAgentConfigRequest:
       type: object
       description: Request to update an existing agent configuration (all fields optional
@@ -5071,7 +5632,8 @@ components:
   securitySchemes:
     bearerAuth:
       bearerFormat: JWT
-      description: Hephaestus-native JWT bearer authentication. The SPA normally uses the
-        __Host-HEPHAESTUS_AT session cookie; this documents the equivalent bearer token.
+      description: Hephaestus-native JWT bearer authentication. The SPA normally authenticates
+        via the `__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent
+        bearer token.
       scheme: bearer
       type: http

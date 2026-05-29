@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationReques
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.LoginClientRegistrationRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
+import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
+import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import java.time.Clock;
@@ -22,6 +24,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
@@ -160,7 +163,8 @@ public class AuthSecurityConfig {
     public SecurityFilterChain oauthLoginSecurityFilterChain(
         HttpSecurity http,
         CookieOAuth2AuthorizationRequestRepository cookieRepo,
-        HephaestusAuthSuccessHandler successHandler
+        HephaestusAuthSuccessHandler successHandler,
+        AuthRateLimitFilter authRateLimitFilter
     ) throws Exception {
         http
             .securityMatcher(
@@ -180,6 +184,12 @@ public class AuthSecurityConfig {
                 oauth.successHandler(successHandler);
                 oauth.failureUrl("/auth/error?code=oauth_failure");
             });
+
+        // Same header set as the resource-server chain — this chain serves /auth/error to the SPA.
+        SecurityHeaders.apply(http);
+        // Rate-limit GET /oauth2/authorization/* (keyed by client IP). The filter no-ops on the
+        // other paths this chain matches.
+        http.addFilterBefore(authRateLimitFilter, AuthorizationFilter.class);
         return http.build();
     }
 

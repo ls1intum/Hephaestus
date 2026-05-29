@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus;
 
 import de.tum.cit.aet.hephaestus.config.CorsProperties;
+import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
+import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.observability.ReplicaIdentityFilter;
 import java.util.Collection;
@@ -26,6 +28,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -146,7 +149,8 @@ public class SecurityConfig {
     @ConditionalOnBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
     SecurityFilterChain resourceServerSecurityFilterChain(
         HttpSecurity http,
-        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter
+        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
+        AuthRateLimitFilter authRateLimitFilter
     ) throws Exception {
         http.oauth2ResourceServer(resourceServer -> {
             resourceServer.jwt(jwtConfigurer -> {
@@ -161,12 +165,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()));
 
-        http.headers(headers ->
-            headers
-                .frameOptions(frameOptions -> frameOptions.deny())
-                .contentTypeOptions(contentType -> {})
-                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
-        );
+        SecurityHeaders.apply(http);
+
+        // Token-bucket rate limiting on the hot auth endpoints (/auth/refresh, /auth/impersonate,
+        // DELETE /user). Registered after authentication so the account principal is resolvable;
+        // it no-ops on every other path. /oauth2/authorization/* is rate-limited on the oauth2Login
+        // chain (AuthSecurityConfig), which owns that path.
+        http.addFilterBefore(authRateLimitFilter, AuthorizationFilter.class);
 
         http.authorizeHttpRequests(requests -> {
             // CORS preflight requests must be permitted for cross-origin requests to work.

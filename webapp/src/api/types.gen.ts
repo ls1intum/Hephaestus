@@ -590,6 +590,10 @@ export type UpdateAgentConfigRequest = {
     timeoutSeconds?: number;
 };
 
+export type UpdateAccountRequest = {
+    appRole?: string;
+};
+
 /**
  * Detailed information about a team including members, repositories, and labels
  */
@@ -710,6 +714,15 @@ export type SortObject = {
     unsorted?: boolean;
 };
 
+export type SessionView = {
+    current?: boolean;
+    expiresAt?: Date;
+    ip?: string;
+    issuedAt?: Date;
+    jti?: string;
+    userAgent?: string;
+};
+
 /**
  * Request to rename a workspace's URL slug
  */
@@ -718,6 +731,23 @@ export type RenameWorkspaceSlugRequest = {
      * New URL-friendly identifier for the workspace
      */
     newSlug: string;
+};
+
+export type Redirect = Omit<InitiateConnectionResponse, 'type'> & {
+    state?: string;
+    vendorUrl?: string;
+    type: 'Redirect';
+};
+
+export type InitiateConnectionResponse = {
+    type: string;
+};
+
+/**
+ * Lifecycle-action body — reason is optional, applied to both suspend and reactivate.
+ */
+export type ReasonRequest = {
+    reason?: string;
 };
 
 /**
@@ -1295,26 +1325,9 @@ export type AgentJob = {
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
 };
 
-/**
- * An identity provider account that can be linked to the user
- */
-export type LinkedAccount = {
-    /**
-     * Whether the user has linked this provider
-     */
-    connected: boolean;
-    /**
-     * Username on the external provider, if connected
-     */
-    linkedUsername?: string;
-    /**
-     * Identity provider alias (e.g. 'github', 'gitlab-lrz')
-     */
-    providerAlias: string;
-    /**
-     * Display name of the identity provider
-     */
-    providerName: string;
+export type Linked = Omit<InitiateConnectionResponse, 'type'> & {
+    connectionId?: number;
+    type: 'Linked';
 };
 
 /**
@@ -1413,21 +1426,44 @@ export type LeaderboardEntry = {
 };
 
 /**
- * An enabled identity provider available for login
+ * Inbound payload for <code>POST /api/v1/workspaces/{workspaceId</code>/connections}.
+ *
+ * <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
+ * implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
+ * <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
+ * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
+ * <code>IllegalArgumentException</code>.
  */
-export type IdentityProvider = {
-    /**
-     * Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')
-     */
-    alias: string;
-    /**
-     * Display name of the identity provider
-     */
-    displayName: string;
-    /**
-     * Provider type (e.g. 'github', 'oidc')
-     */
-    type: string;
+export type InitiateConnectionRequest = {
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    redirectAfter?: string;
+    userInput?: {
+        [key: string]: string;
+    };
+};
+
+export type ImpersonateRequest = {
+    reason: string;
+    targetAccountId: number;
+};
+
+export type IdentityView = {
+    avatarUrl?: string;
+    displayName?: string;
+    id?: number;
+    lastLoginAt?: Date;
+    providerType?: string;
+    subject?: string;
+    username?: string;
+};
+
+/**
+ * One row per sign-in option. <code>providerType</code> drives the SPA's icon choice.
+ */
+export type IdentityProviderView = {
+    displayName?: string;
+    providerType?: string;
+    registrationId?: string;
 };
 
 /**
@@ -1575,6 +1611,45 @@ export type FeatureFlags = {
 };
 
 /**
+ * Status view for <code>GET /user/exports/{id</code>}. <code>status</code> ∈
+ * PENDING/PROCESSING/READY/FAILED/EXPIRED. Timestamps are null until the corresponding lifecycle
+ * transition occurs.
+ */
+export type ExportStatus = {
+    completedAt?: Date;
+    expiresAt?: Date;
+    id?: number;
+    requestedAt?: Date;
+    status?: string;
+};
+
+/**
+ * Small acknowledgement body returned by <code>POST /user/exports</code> alongside the
+ * <code>202 Accepted</code> + <code>Location</code> header. The client polls the status endpoint next.
+ */
+export type ExportCreated = {
+    id?: number;
+    status?: string;
+};
+
+export type CurrentUserView = {
+    appRole?: string;
+    avatarUrl?: string;
+    displayName?: string;
+    gitProviderId?: string;
+    hasGitLabIdentity?: boolean;
+    id?: number;
+    identityProvider?: string;
+    impersonating?: boolean;
+    impersonatorId?: number;
+    primaryEmail?: string;
+    profileUrl?: string;
+    roles?: Array<string>;
+    status?: string;
+    username?: string;
+};
+
+/**
  * Request to create a new workspace
  */
 export type CreateWorkspaceRequest = {
@@ -1593,7 +1668,7 @@ export type CreateWorkspaceRequest = {
     /**
      * Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE flow through OAuth, not this endpoint.
      */
-    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
     /**
      * Deprecated: ignored by the server. The authenticated user always becomes the owner.
      *
@@ -1769,6 +1844,70 @@ export type Contributor = {
 };
 
 /**
+ * Wire shape returned by the <code>GET /api/v1/workspaces/{workspaceId</code>/connections}
+ * list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+ * credentials, no audit. Capabilities are looked up from the per-kind manifest at
+ * response build time so adding/removing a capability needs no DB migration.
+ */
+export type ConnectionSummary = {
+    capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    createdAt?: Date;
+    displayName?: string;
+    family?: 'SCM' | 'MESSAGING' | 'KNOWLEDGE' | 'IDENTITY';
+    id?: number;
+    instanceKey?: string;
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    lastActivityAt?: Date;
+    state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    stateReason?: string;
+    updatedAt?: Date;
+};
+
+/**
+ * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
+ * typed config serialized as a tree node. NEVER carries credentials; the encrypted
+ * blob stays inside the entity and is not exposed by this DTO.
+ *
+ * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+ * the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
+ * object.
+ */
+export type ConnectionDetail = {
+    capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    /**
+     * Opaque, typed connection config tree (no credentials).
+     */
+    config?: string;
+    createdAt?: Date;
+    displayName?: string;
+    family?: 'SCM' | 'MESSAGING' | 'KNOWLEDGE' | 'IDENTITY';
+    id?: number;
+    instanceKey?: string;
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    lastActivityAt?: Date;
+    state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    stateReason?: string;
+    updatedAt?: Date;
+};
+
+/**
+ * Audit-log entry returned by <code>GET /api/v1/workspaces/{workspaceId</code>/connections/{id}/audit}.
+ *
+ * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
+ * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+ * want to serialize on every response.
+ */
+export type ConnectionAuditEntry = {
+    actorKind?: string;
+    actorRef?: string;
+    correlationId?: string;
+    eventType?: string;
+    fromState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    occurredAt?: Date;
+    toState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+};
+
+/**
  * Mentor chat thread summary (no messages).
  */
 export type ChatThreadSummary = {
@@ -1903,6 +2042,14 @@ export type AgentConfig = {
     updatedAt?: Date;
 };
 
+export type AdminAccountView = {
+    appRole?: string;
+    displayName?: string;
+    id?: number;
+    primaryEmail?: string;
+    status?: string;
+};
+
 export type AchievementId = 'commit.common.1' | 'commit.common.2' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.rare' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'commit.special.itsy_bitsy' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.epic' | 'issue.close.legendary' | 'issue.close.rare' | 'issue.close.uncommon' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.open.rare' | 'issue.open.uncommon' | 'issue.special.hive_mind' | 'issue.special.necromancer' | 'issue.special.oracle' | 'milestone.all_epic' | 'milestone.all_legendary' | 'milestone.all_rare' | 'milestone.first_action' | 'milestone.long_time_return' | 'milestone.night_owl' | 'milestone.polyglot' | 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.merged.rare' | 'pr.merged.uncommon' | 'pr.special.speedster' | 'review.common.1' | 'review.common.2' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'review.rare' | 'review.uncommon.1' | 'review.uncommon.2';
 
 /**
@@ -1943,21 +2090,263 @@ export type Achievement = {
     unlockedAt: Date;
 };
 
-export type GetIdentityProvidersData = {
+export type GetJwksData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/auth/identity-providers';
+    url: '/.well-known/jwks.json';
 };
 
-export type GetIdentityProvidersResponses = {
+export type GetJwksResponses = {
     /**
      * OK
      */
-    200: Array<IdentityProvider>;
+    200: {
+        [key: string]: unknown;
+    };
 };
 
-export type GetIdentityProvidersResponse = GetIdentityProvidersResponses[keyof GetIdentityProvidersResponses];
+export type GetJwksResponse = GetJwksResponses[keyof GetJwksResponses];
+
+export type GetOpenidConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/.well-known/openid-configuration';
+};
+
+export type GetOpenidConfigurationResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type GetOpenidConfigurationResponse = GetOpenidConfigurationResponses[keyof GetOpenidConfigurationResponses];
+
+export type AdminListUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/admin/users';
+};
+
+export type AdminListUsersResponses = {
+    /**
+     * OK
+     */
+    200: Array<AdminAccountView>;
+};
+
+export type AdminListUsersResponse = AdminListUsersResponses[keyof AdminListUsersResponses];
+
+export type AdminUpdateUserData = {
+    body: UpdateAccountRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}';
+};
+
+export type AdminUpdateUserResponses = {
+    /**
+     * OK
+     */
+    200: AdminAccountView;
+};
+
+export type AdminUpdateUserResponse = AdminUpdateUserResponses[keyof AdminUpdateUserResponses];
+
+export type ListData = {
+    body?: never;
+    path: {
+        workspaceId: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections';
+};
+
+export type ListResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionSummary>;
+};
+
+export type ListResponse = ListResponses[keyof ListResponses];
+
+export type InitiateData = {
+    body: InitiateConnectionRequest;
+    path: {
+        workspaceId: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections';
+};
+
+export type InitiateResponses = {
+    /**
+     * OK
+     */
+    200: Linked | Redirect;
+};
+
+export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
+
+export type ReadData = {
+    body?: never;
+    path: {
+        workspaceId: number;
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections/{id}';
+};
+
+export type ReadResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionDetail;
+};
+
+export type ReadResponse = ReadResponses[keyof ReadResponses];
+
+export type AuditData = {
+    body?: never;
+    path: {
+        workspaceId: number;
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/audit';
+};
+
+export type AuditResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionAuditEntry>;
+};
+
+export type AuditResponse = AuditResponses[keyof AuditResponses];
+
+export type DisconnectData = {
+    body?: never;
+    path: {
+        workspaceId: number;
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/disconnect';
+};
+
+export type DisconnectResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ReactivateData = {
+    body?: ReasonRequest;
+    path: {
+        workspaceId: number;
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/reactivate';
+};
+
+export type ReactivateResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionSummary;
+};
+
+export type ReactivateResponse = ReactivateResponses[keyof ReactivateResponses];
+
+export type SuspendData = {
+    body?: ReasonRequest;
+    path: {
+        workspaceId: number;
+        id: number;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/suspend';
+};
+
+export type SuspendResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionSummary;
+};
+
+export type SuspendResponse = SuspendResponses[keyof SuspendResponses];
+
+export type ImpersonateData = {
+    body: ImpersonateRequest;
+    path?: never;
+    query?: never;
+    url: '/auth/impersonate';
+};
+
+export type ImpersonateResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ExitImpersonationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/impersonate:exit';
+};
+
+export type ExitImpersonationResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type LogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/logout';
+};
+
+export type LogoutResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type RefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/refresh';
+};
+
+export type RefreshResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type ListGlobalContributorsData = {
     body?: never;
@@ -1974,6 +2363,22 @@ export type ListGlobalContributorsResponses = {
 };
 
 export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
+
+export type ListIdentityProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/identity-providers';
+};
+
+export type ListIdentityProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<IdentityProviderView>;
+};
+
+export type ListIdentityProvidersResponse = ListIdentityProvidersResponses[keyof ListIdentityProvidersResponses];
 
 export type CallbackGetData = {
     body?: never;
@@ -2029,19 +2434,90 @@ export type CallbackPostResponses = {
 
 export type CallbackPostResponse = CallbackPostResponses[keyof CallbackPostResponses];
 
-export type DeleteUserData = {
+export type DeleteCurrentUserData = {
+    body?: never;
+    headers?: {
+        'X-Confirm-Delete'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/user';
+};
+
+export type DeleteCurrentUserResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetCurrentUserData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/user';
 };
 
-export type DeleteUserResponses = {
+export type GetCurrentUserResponses = {
     /**
      * OK
      */
-    200: unknown;
+    200: CurrentUserView;
 };
+
+export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
+
+export type RequestDataExportData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/exports';
+};
+
+export type RequestDataExportResponses = {
+    /**
+     * OK
+     */
+    200: ExportCreated;
+};
+
+export type RequestDataExportResponse = RequestDataExportResponses[keyof RequestDataExportResponses];
+
+export type GetDataExportStatusData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/user/exports/{id}';
+};
+
+export type GetDataExportStatusResponses = {
+    /**
+     * OK
+     */
+    200: ExportStatus;
+};
+
+export type GetDataExportStatusResponse = GetDataExportStatusResponses[keyof GetDataExportStatusResponses];
+
+export type DownloadDataExportData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/user/exports/{id}/download';
+};
+
+export type DownloadDataExportResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type DownloadDataExportResponse = DownloadDataExportResponses[keyof DownloadDataExportResponses];
 
 export type GetUserFeaturesData = {
     body?: never;
@@ -2059,48 +2535,62 @@ export type GetUserFeaturesResponses = {
 
 export type GetUserFeaturesResponse = GetUserFeaturesResponses[keyof GetUserFeaturesResponses];
 
-export type GetLinkedAccountsData = {
+export type ListLinkedIdentitiesData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/user/linked-accounts';
+    url: '/user/identities';
 };
 
-export type GetLinkedAccountsResponses = {
+export type ListLinkedIdentitiesResponses = {
     /**
      * OK
      */
-    200: Array<LinkedAccount>;
+    200: Array<IdentityView>;
 };
 
-export type GetLinkedAccountsResponse = GetLinkedAccountsResponses[keyof GetLinkedAccountsResponses];
+export type ListLinkedIdentitiesResponse = ListLinkedIdentitiesResponses[keyof ListLinkedIdentitiesResponses];
 
-export type UnlinkAccountData = {
+export type RevokeOtherSessionsData = {
     body?: never;
-    path: {
-        providerAlias: string;
-    };
+    path?: never;
     query?: never;
-    url: '/user/linked-accounts/{providerAlias}';
+    url: '/user/sessions';
 };
 
-export type UnlinkAccountResponses = {
+export type RevokeOtherSessionsResponses = {
     /**
      * OK
      */
     200: unknown;
 };
 
-export type ClaimIdentityData = {
+export type ListSessionsData = {
     body?: never;
-    path: {
-        providerAlias: string;
-    };
+    path?: never;
     query?: never;
-    url: '/user/linked-accounts/{providerAlias}/claim';
+    url: '/user/sessions';
 };
 
-export type ClaimIdentityResponses = {
+export type ListSessionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SessionView>;
+};
+
+export type ListSessionsResponse = ListSessionsResponses[keyof ListSessionsResponses];
+
+export type RevokeSessionData = {
+    body?: never;
+    path: {
+        jti: string;
+    };
+    query?: never;
+    url: '/user/sessions/{jti}';
+};
+
+export type RevokeSessionResponses = {
     /**
      * OK
      */

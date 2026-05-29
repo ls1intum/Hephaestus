@@ -86,6 +86,7 @@
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
         <shedlock.version>5.16.0</shedlock.version>
+        <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
     <dependencies>
         <dependency>
@@ -383,6 +384,24 @@
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
             <version>${jgit.version}</version>
+        </dependency>
+        <!--
+            Bucket4j token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
+            Library-only (no Spring Boot starter): the community starter
+            `com.giffing.bucket4j.spring.boot.starter` does not yet declare Boot 4.0 compatibility,
+            and Bucket4j itself is framework-agnostic, so we wire a small OncePerRequestFilter by
+            hand. JDK17 classifier artifacts (8.16.0+ split by JDK). The postgresql module backs a
+            SELECT … FOR UPDATE ProxyManager so limits are SHARED across replicas (no Redis).
+        -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-postgresql</artifactId>
+            <version>${bucket4j.version}</version>
         </dependency>
     </dependencies>
     <dependencyManagement>
@@ -966,7 +985,7 @@
                           - shedlock: ShedLock distributed lock table (managed by the
                             ShedLock library via JdbcTemplateLockProvider, not JPA).
                     -->
-                    <diffExcludeObjects>table:shedlock</diffExcludeObjects>
+                    <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket</diffExcludeObjects>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>

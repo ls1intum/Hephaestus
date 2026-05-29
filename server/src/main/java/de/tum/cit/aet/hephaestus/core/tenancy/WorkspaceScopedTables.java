@@ -62,6 +62,8 @@ public class WorkspaceScopedTables {
         "auth_event",
         "issued_jwt",
         "jwt_signing_key",
+        // GDPR Art. 20 self-service export — account-scoped, spans a principal's data across workspaces.
+        "account_export",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

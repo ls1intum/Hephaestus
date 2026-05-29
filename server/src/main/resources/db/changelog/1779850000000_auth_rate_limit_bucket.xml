@@ -1,0 +1,35 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Backing table for Bucket4j Postgres ProxyManager (SELECT … FOR UPDATE) used by the
+        auth rate limiter (core.auth.ratelimit, ADR 0017 hardening). Distributed token-bucket
+        state shared across replicas — no Redis. Schema is fixed by Bucket4j:
+          - id        : the bucket key (VARCHAR — we use PrimaryKeyMapper.STRING; keys are
+                        "<namespace>:ip:<addr>" / "<namespace>:acct:<id>").
+          - state     : serialized bucket state (BYTEA).
+          - expires_at: epoch-millis expiry (BIGINT); set when an expire-policy is configured,
+                        nullable otherwise. Kept so a future expirationAfterWrite needs no DDL.
+
+        Not a JPA entity (managed entirely by the Bucket4j library, like the shedlock table),
+        so it's excluded from the Liquibase Hibernate diff via the plugin's diffExcludeObjects
+        is not needed here because there is no entity to diff against — this table simply exists.
+    -->
+    <changeSet author="FelixTJDietrich" id="1779850000000-1-auth-rate-limit-bucket">
+        <preConditions onFail="MARK_RAN" onFailMessage="auth_rate_limit_bucket already present">
+            <not><tableExists tableName="auth_rate_limit_bucket"/></not>
+        </preConditions>
+        <createTable tableName="auth_rate_limit_bucket">
+            <column name="id" type="VARCHAR(255)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="state" type="BYTEA"/>
+            <column name="expires_at" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

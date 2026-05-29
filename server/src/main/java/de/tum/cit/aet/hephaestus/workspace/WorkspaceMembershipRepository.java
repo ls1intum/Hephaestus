@@ -72,6 +72,21 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
 
     List<WorkspaceMembership> findByUser_Id(Long userId);
 
+    /**
+     * All memberships for the given SCM logins, with the workspace eagerly fetched. Used by the
+     * {@code core.auth} GDPR data-export to flatten a principal's workspace memberships without
+     * the auth module importing workspace domain types. Login match is case-insensitive.
+     */
+    @Query(
+        """
+            SELECT wm FROM WorkspaceMembership wm
+            JOIN FETCH wm.workspace
+            JOIN wm.user u
+            WHERE LOWER(u.login) IN :logins
+        """
+    )
+    List<WorkspaceMembership> findAllWithWorkspaceByUserLoginInLowercase(@Param("logins") Collection<String> logins);
+
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
 
     @Query("SELECT wm.user.id FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.hidden = true")

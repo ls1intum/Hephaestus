@@ -158,6 +158,30 @@ hephaestus:
             client-id: ${GITLAB_LRZ_OAUTH_CLIENT_ID:}
             client-secret: ${GITLAB_LRZ_OAUTH_CLIENT_SECRET:}
             base-url: ${GITLAB_LRZ_BASE_URL:https://gitlab.lrz.de}
+        # Token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
+        # Buckets are SHARED across replicas via a Postgres ProxyManager (no Redis) when
+        # postgres-backed=true (default) and a DataSource is present; otherwise an in-JVM
+        # PER-REPLICA fallback is used (logged at startup). Each limit: `capacity` requests
+        # per `period` (interval refill — a fresh budget per window).
+        rate-limit:
+            enabled: ${HEPHAESTUS_AUTH_RATE_LIMIT_ENABLED:true}
+            postgres-backed: ${HEPHAESTUS_AUTH_RATE_LIMIT_POSTGRES_BACKED:true}
+            # GET /oauth2/authorization/* — keyed by client IP
+            oauth-authorization:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_OAUTH_CAPACITY:20}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_OAUTH_PERIOD:1m}
+            # POST /auth/refresh — keyed by account (JWT sub), IP fallback
+            refresh:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_REFRESH_CAPACITY:60}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_REFRESH_PERIOD:1m}
+            # POST /auth/impersonate — keyed by admin account, IP fallback
+            impersonate:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_IMPERSONATE_CAPACITY:10}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_IMPERSONATE_PERIOD:1m}
+            # DELETE /user — keyed by account, IP fallback
+            delete-user:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_DELETE_USER_CAPACITY:3}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_DELETE_USER_PERIOD:1h}
 
     host-url: https://hephaestus.ase.cit.tum.de/
 
