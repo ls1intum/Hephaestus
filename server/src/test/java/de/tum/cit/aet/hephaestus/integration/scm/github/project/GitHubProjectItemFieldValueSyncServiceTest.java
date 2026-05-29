@@ -748,7 +748,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             when(response2.field("node.fieldValues")).thenReturn(field2);
             when(field2.toEntity(GHProjectV2ItemFieldValueConnection.class)).thenReturn(page2);
 
-            when(requestSpec.execute()).thenReturn(Mono.just(response1), Mono.just(response2));
+            when(requestSpec.execute()).thenReturn(Mono.just(response1)).thenReturn(Mono.just(response2));
 
             when(projectItemRepository.existsById(42L)).thenReturn(true);
             when(projectFieldRepository.existsById(anyString())).thenReturn(true);

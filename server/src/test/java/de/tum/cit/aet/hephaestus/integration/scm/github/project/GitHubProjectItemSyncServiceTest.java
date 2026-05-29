@@ -819,7 +819,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(response2.field("node.projectItems")).thenReturn(field2);
             when(field2.toEntity(GHProjectV2ItemConnection.class)).thenReturn(page2);
 
-            when(requestSpec.execute()).thenReturn(Mono.just(response1), Mono.just(response2));
+            when(requestSpec.execute()).thenReturn(Mono.just(response1)).thenReturn(Mono.just(response2));
 
             // Mock transaction template
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
