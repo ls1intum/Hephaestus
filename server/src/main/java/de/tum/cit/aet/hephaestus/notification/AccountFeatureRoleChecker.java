@@ -10,8 +10,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
- * DB-backed {@link UserRoleChecker} — the post-Keycloak replacement for
- * {@code KeycloakUserRoleChecker}.
+ * DB-backed {@link UserRoleChecker} that resolves roles from {@code account_feature}
+ * (replaces the former Keycloak-backed role checker; ADR 0017).
  *
  * <p>Delegates to {@link AccountRoleQuery} (the {@code core.auth} SPI) so role membership is
  * resolved from {@code account_feature} without this adapter reaching into the auth module's

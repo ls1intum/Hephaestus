@@ -43,7 +43,7 @@ const STEP_META = [
 
 /**
  * Prompts the user to link their GitLab account. Offers two paths:
- * 1. "Link GitLab" — standard Keycloak account linking (works when no conflict)
+ * 1. "Link GitLab" — re-login linking via the GitLab identity provider (works when no conflict)
  * 2. "Claim GitLab Identity" — transfers the identity from an orphan account (handles the
  *    case where the user previously logged in via GitLab directly, creating a separate account)
  */

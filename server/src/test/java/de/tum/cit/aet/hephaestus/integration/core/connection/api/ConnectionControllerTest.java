@@ -104,10 +104,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
         when(manifests.capabilitiesFor(IntegrationKind.GITLAB)).thenReturn(Set.of(Capability.WEBHOOK_INGEST));
 
-        ResponseEntity<List<ConnectionSummary>> response = controller.list(workspaceId);
+        ResponseEntity<List<ConnectionSummaryDTO>> response = controller.list(workspaceId);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        List<ConnectionSummary> body = response.getBody();
+        List<ConnectionSummaryDTO> body = response.getBody();
         assertThat(body).hasSize(2);
         assertThat(body.get(0).id()).isEqualTo(11L);
         assertThat(body.get(0).kind()).isEqualTo(IntegrationKind.GITHUB);
@@ -143,12 +143,12 @@ class ConnectionControllerTest extends BaseUnitTest {
         URI vendor = URI.create("https://github.com/apps/x/installations/new?state=abc");
         githubStrategy.nextInitiation = new ConnectInitiation.RedirectToVendor(vendor, "abc");
 
-        InitiateConnectionRequest req = new InitiateConnectionRequest(IntegrationKind.GITHUB, Map.of(), null);
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.GITHUB, Map.of(), null);
         ResponseEntity<InitiateConnectionResponse> response = controller.initiate(7L, req, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).isInstanceOf(InitiateConnectionResponse.Redirect.class);
-        InitiateConnectionResponse.Redirect redirect = (InitiateConnectionResponse.Redirect) response.getBody();
+        assertThat(response.getBody()).isInstanceOf(InitiateConnectionResponse.RedirectDTO.class);
+        InitiateConnectionResponse.RedirectDTO redirect = (InitiateConnectionResponse.RedirectDTO) response.getBody();
         assertThat(redirect.vendorUrl()).isEqualTo(vendor);
         assertThat(redirect.state()).isEqualTo("abc");
         verify(admin, never()).createInlineConnection(anyLong(), any(), any(), any(), any(), any());
@@ -171,7 +171,7 @@ class ConnectionControllerTest extends BaseUnitTest {
             )
         ).thenReturn(saved);
 
-        InitiateConnectionRequest req = new InitiateConnectionRequest(
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(
             IntegrationKind.GITLAB,
             Map.of("pat", "glpat-fake", "group_id", "200", "server_url", "https://gitlab.com"),
             null
@@ -180,7 +180,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         ResponseEntity<InitiateConnectionResponse> response = controller.initiate(workspaceId, req, auth);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        InitiateConnectionResponse.Linked linked = (InitiateConnectionResponse.Linked) response.getBody();
+        InitiateConnectionResponse.LinkedDTO linked = (InitiateConnectionResponse.LinkedDTO) response.getBody();
         assertThat(linked.connectionId()).isEqualTo(99L);
 
         verify(admin).createInlineConnection(
@@ -197,7 +197,7 @@ class ConnectionControllerTest extends BaseUnitTest {
     @DisplayName("initiate with no registered strategy returns 400")
     void initiate_unknownKind_throws400() {
         ConnectionController bare = new ConnectionController(admin, connectionService, objectMapper, List.of());
-        InitiateConnectionRequest req = new InitiateConnectionRequest(IntegrationKind.SLACK, Map.of(), null);
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.SLACK, Map.of(), null);
         assertThatThrownBy(() -> bare.initiate(1L, req, null)).satisfies(e ->
             assertThat(((org.springframework.web.server.ResponseStatusException) e).getStatusCode().value()).isEqualTo(
                 400
@@ -218,10 +218,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<ConnectionSummary> response = controller.suspend(
+        ResponseEntity<ConnectionSummaryDTO> response = controller.suspend(
             workspaceId,
             7L,
-            new ConnectionController.ReasonRequest("scheduled maintenance"),
+            new ConnectionController.ReasonRequestDTO("scheduled maintenance"),
             null
         );
 
@@ -249,7 +249,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<ConnectionSummary> response = controller.reactivate(workspaceId, 7L, null, null);
+        ResponseEntity<ConnectionSummaryDTO> response = controller.reactivate(workspaceId, 7L, null, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.ACTIVE);
@@ -326,7 +326,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
         when(admin.auditForConnection(eq(7L), anyInt())).thenReturn(List.of(a2, a1));
 
-        ResponseEntity<List<ConnectionAuditEntry>> response = controller.audit(workspaceId, 7L);
+        ResponseEntity<List<ConnectionAuditEntryDTO>> response = controller.audit(workspaceId, 7L);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).hasSize(2);

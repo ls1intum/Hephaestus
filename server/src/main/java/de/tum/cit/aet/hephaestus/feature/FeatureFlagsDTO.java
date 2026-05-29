@@ -22,7 +22,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @Schema(description = "Feature flags evaluated for the current user")
 public record FeatureFlagsDTO(
-    // ── Authorization flags (Keycloak realm roles) ──────────────────────
+    // ── Authorization flags (account_feature role flags) ──────────────────────
     @Schema(description = "User has access to the AI Mentor feature") boolean MENTOR_ACCESS,
     @Schema(description = "User can receive notifications") boolean NOTIFICATION_ACCESS,
     @Schema(description = "User's PRs trigger practice review") boolean RUN_PRACTICE_REVIEW,

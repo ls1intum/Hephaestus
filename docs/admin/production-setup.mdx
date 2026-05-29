@@ -15,7 +15,7 @@ The production stack consists of:
 - **Webhook server** (same Spring Boot artifact, `webhook` profile → NATS JetStream)
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
-- **Keycloak** (with GitHub and optional GitLab identity providers)
+- **Hephaestus-native auth** (Spring Security `oauth2Login` federating to GitHub + optional gitlab.lrz.de, issuing cookie-session JWTs — ADR 0017)
 
 ## Environment variables
 
@@ -24,12 +24,10 @@ Set the following secrets before starting the stack:
 | Variable | Purpose |
 | --- | --- |
 | `WEBHOOK_SECRET` | HMAC secret for GitHub and GitLab webhooks (prefer SHA-256; e.g., `openssl rand -hex 32`) |
-| `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
-| `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
-| `KEYCLOAK_GITHUB_ADMIN_USERNAME` | GitHub username that should receive Keycloak admin rights |
-| `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
-| `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
-| `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
+| `GITHUB_OAUTH_CLIENT_ID` | GitHub OAuth app client ID (callback `https://<host>/api/login/oauth2/code/github`) |
+| `GITHUB_OAUTH_CLIENT_SECRET` | GitHub OAuth app client secret |
+| `HEPHAESTUS_AUTH_ISSUER` | Public issuer origin, e.g. `https://<host>` (sets the JWT `iss` + `/.well-known` issuer) |
+| `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | Base64 32-byte AES key sealing the OAuth state cookies (`openssl rand -base64 32`) |
 | `HEPHAESTUS_INTEGRATION_SLACK_ENABLED` | Optional: enables the Slack OAuth admin surface (per-workspace connect) |
 | `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID` | Optional: Slack app client ID used by the OAuth flow |
 | `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET` | Optional: Slack app client secret used by the OAuth flow |
@@ -60,11 +58,9 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 
 | Variable | Purpose |
 | --- | --- |
-| `KEYCLOAK_GITLAB_ENABLED` | Enables the GitLab identity provider in Keycloak |
-| `KEYCLOAK_GITLAB_CLIENT_ID` | GitLab OAuth application client ID |
-| `KEYCLOAK_GITLAB_CLIENT_SECRET` | GitLab OAuth application client secret |
-| `KEYCLOAK_GITLAB_BASE_URL` | Base URL of the GitLab instance used for login and default workspace server selection |
-| `KEYCLOAK_GITLAB_ADMIN_USERNAME` | Optional GitLab username that should receive Keycloak admin rights on first login |
+| `GITLAB_LRZ_OAUTH_CLIENT_ID` | gitlab.lrz.de OAuth application client ID (callback `https://<host>/api/login/oauth2/code/gitlab-lrz`) |
+| `GITLAB_LRZ_OAUTH_CLIENT_SECRET` | gitlab.lrz.de OAuth application client secret |
+| `GITLAB_DEFAULT_SERVER_URL` | Default GitLab instance for workspace creation / SCM sync (not auth) |
 | `GITLAB_ENABLED` | Enables server-side GitLab beans in the application server |
 | `GITLAB_WORKSPACE_CREATION` | Enables GitLab workspace creation in the UI and API |
 | `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration |
@@ -72,7 +68,7 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 
 Create the GitLab OAuth application with these settings:
 
-- Redirect URI: `https://<hostname>/keycloak/realms/hephaestus/broker/gitlab-lrz/endpoint`
+- Redirect URI: `https://<hostname>/api/login/oauth2/code/gitlab-lrz` · Scopes: `openid profile email read_user`
 - Scopes: `openid`, `profile`, `email`
 - Confidential client: enabled
 
@@ -143,16 +139,15 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 ## Deployment steps
 
 1. **Provision infrastructure:** Ensure PostgreSQL, Redis (if used), and storage volumes are ready.
-2. **Configure Keycloak:**
-   - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
-   - Copy `server/.env.example` to `server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+2. **Configure authentication:**
+   - Copy `server/.env.example` to `server/.env`, then populate `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `HEPHAESTUS_AUTH_ISSUER`, and `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`. The GitHub OAuth app's callback must be `https://<host>/api/login/oauth2/code/github`.
    - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
-   - If rolling out GitLab login, also configure the GitLab identity provider and apply the manual Keycloak adjustments for first broker login, automatic account linking, relaxed name validation, and clock skew tolerance.
+   - If rolling out GitLab login, set `GITLAB_LRZ_OAUTH_CLIENT_ID/SECRET` (callback `.../api/login/oauth2/code/gitlab-lrz`). Workspaces may also bring their own self-hosted GitLab/GHE OAuth app via Settings → Connections (`kind=OIDC_LOGIN_*`).
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
 4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
 5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.
 6. **Verify integrations:**
-   - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
+   - Sign in via GitHub, then grant the first super-admin by setting `app_role = 'APP_ADMIN'` on that `account` row (SQL or a one-off Liquibase change); subsequent admins are managed from `/admin/users`.
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub or GitLab to validate the ingest pipeline.
    - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` are all present in the deployed environment before testing GitLab practice review.
@@ -160,9 +155,8 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 
 ## Global admin privileges
 
-Users configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` receive the `admin` realm role automatically on first GitHub login. This grants them:
+Accounts with `app_role = 'APP_ADMIN'` carry the `admin` authority in their JWT. This grants them:
 
-- Full Keycloak admin console access (`realm-management` → `realm-admin` client role)
 - Automatic workspace ADMIN privileges for workspaces where they have membership (they are auto-elevated to workspace ADMIN level)
 - Ability to manage workspace settings, members, and repositories in their member workspaces
 - **Cannot** perform OWNER-only operations (e.g., workspace ownership transfer) unless explicitly granted the OWNER role in that workspace
@@ -173,7 +167,7 @@ This allows platform administrators to troubleshoot and manage workspaces where 
 ## Operational tips
 
 - Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
-- Schedule regular backups for PostgreSQL and Keycloak.
+- Schedule regular backups for PostgreSQL (it now holds auth state — accounts, identity links, sessions — in addition to application data).
 - Review weekly leaderboard Slack posts to ensure the automation is active.
 - Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent NATS settings.
 

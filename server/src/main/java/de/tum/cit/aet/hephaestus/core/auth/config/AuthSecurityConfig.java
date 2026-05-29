@@ -11,12 +11,11 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import java.time.Clock;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientProperties;
-import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientPropertiesMapper;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -24,7 +23,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -48,33 +48,82 @@ import org.springframework.security.web.SecurityFilterChain;
  * cookie — the standard {@code HttpSessionOAuth2AuthorizationRequestRepository} would
  * silently create a session that the callback request on a different pod could not see.
  *
- * <p>Until the cutover commit, this chain coexists with the Keycloak-backed
- * resource-server chain — everything outside the URLs above continues to validate
- * Keycloak JWTs. After cutover, the resource-server chain switches to our own
- * {@code RevocationAwareJwtDecoder} and Keycloak is deleted.
+ * <p>Everything outside the URLs above is handled by the resource-server chain, which
+ * validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder} (replaces the former
+ * Keycloak setup; ADR 0017).
  */
 @Configuration
-@EnableConfigurationProperties(OAuth2ClientProperties.class)
 public class AuthSecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthSecurityConfig.class);
+    private static final String GITHUB_REGISTRATION_ID = "github";
+    private static final String GITLAB_LRZ_REGISTRATION_ID = "gitlab-lrz";
+    private static final String REDIRECT_URI_TEMPLATE = "{baseUrl}/login/oauth2/code/{registrationId}";
 
     /**
      * Composite registration repository: env-configured defaults (github, gitlab-lrz)
      * overlaid with workspace-scoped OIDC login Connections (family IDENTITY). Replaces
      * Spring Boot's auto-configured InMemoryClientRegistrationRepository (which backs off
      * once this bean is present).
+     *
+     * <p>Default providers are built from {@link AuthProperties} rather than
+     * {@code spring.security.oauth2.client.*} so that a provider with no configured client id
+     * is simply omitted — Boot's {@code OAuth2ClientProperties} validation would otherwise
+     * reject the empty client id and abort the context (breaking CI, specs and worker pods).
      */
     @Bean
     public LoginClientRegistrationRepository clientRegistrationRepository(
-        OAuth2ClientProperties properties,
+        AuthProperties authProperties,
         ConnectionRepository connectionRepository,
         CredentialBundleConverter credentialConverter
     ) {
-        java.util.List<ClientRegistration> registrations = new java.util.ArrayList<>(
-            new OAuth2ClientPropertiesMapper(properties).asClientRegistrations().values()
-        );
+        List<ClientRegistration> registrations = new ArrayList<>();
+        if (authProperties.github().configured()) {
+            registrations.add(buildGithubRegistration(authProperties.github()));
+        }
+        if (authProperties.gitlabLrz().configured()) {
+            registrations.add(buildGitlabLrzRegistration(authProperties.gitlabLrz()));
+        }
+        if (registrations.isEmpty()) {
+            log.warn(
+                "auth: no default OAuth login providers configured — set hephaestus.auth.github.client-id " +
+                "and/or hephaestus.auth.gitlab-lrz.client-id. Workspace-scoped OIDC Connections may still apply."
+            );
+        }
         return new LoginClientRegistrationRepository(registrations, connectionRepository, credentialConverter);
+    }
+
+    private static ClientRegistration buildGithubRegistration(AuthProperties.GithubLogin github) {
+        return ClientRegistration.withRegistrationId(GITHUB_REGISTRATION_ID)
+            .clientId(github.clientId())
+            .clientSecret(github.clientSecret())
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri(REDIRECT_URI_TEMPLATE)
+            .scope("read:user", "user:email")
+            .authorizationUri("https://github.com/login/oauth/authorize")
+            .tokenUri("https://github.com/login/oauth/access_token")
+            .userInfoUri("https://api.github.com/user")
+            .userNameAttributeName("id")
+            .clientName("GitHub")
+            .build();
+    }
+
+    private static ClientRegistration buildGitlabLrzRegistration(AuthProperties.GitlabLrzLogin gitlab) {
+        String base = gitlab.baseUrl().toString().replaceAll("/+$", "");
+        return ClientRegistration.withRegistrationId(GITLAB_LRZ_REGISTRATION_ID)
+            .clientId(gitlab.clientId())
+            .clientSecret(gitlab.clientSecret())
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri(REDIRECT_URI_TEMPLATE)
+            .scope("openid", "profile", "email", "read_user")
+            .authorizationUri(base + "/oauth/authorize")
+            .tokenUri(base + "/oauth/token")
+            .userInfoUri(base + "/api/v4/user")
+            .userNameAttributeName("username")
+            .clientName("gitlab.lrz.de")
+            .build();
     }
 
     @Bean

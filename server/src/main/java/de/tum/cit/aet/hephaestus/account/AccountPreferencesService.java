@@ -19,8 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * User preferences (notification / research / AI-review opt-ins) + GDPR analytics deletion.
  *
- * <p>Post-Keycloak: the federated-identity operations (list / link / unlink / claim) that
- * used to live here moved to the {@code core.auth} module (Account + IdentityLink). This
+ * <p>The federated-identity operations (list / link / unlink / claim) live in the
+ * {@code core.auth} module (Account + IdentityLink), not here. This
  * service keeps only the preference + PostHog-consent surface, which never depended on the
  * identity provider. Named {@code AccountPreferencesService} (not {@code AccountService}) to
  * avoid a bean-name clash with {@code core.auth.AccountService}.
@@ -59,7 +59,7 @@ public class AccountPreferencesService {
 
     /**
      * Update preferences. {@code subjectId} is the authenticated principal's subject (the
-     * Hephaestus account id post-cutover) used as the PostHog distinct id when revoking
+     * Hephaestus account id) used as the PostHog distinct id when revoking
      * analytics consent.
      */
     @Transactional

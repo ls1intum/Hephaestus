@@ -26,7 +26,7 @@ public class TestSecurityConfig {
     /**
      * Mock JWT decoder that creates a valid JWT for testing.
      * This decoder will be used by the main SecurityConfig's OAuth2 resource server configuration.
-     * The JWT contains the same realm_access structure as a real Keycloak token.
+     * The JWT carries the same flat `roles` claim the Hephaestus issuer emits (ADR 0017).
      *
      * It dynamically determines the user based on the token value pattern:
      * - "mock-jwt-token-for-mentor-user" -> mentor user
@@ -78,11 +78,9 @@ public class TestSecurityConfig {
                 claims.put("identity_provider", "gitlab-lrz");
             }
 
-            // Add realm_access with roles (same structure as Keycloak)
+            // Flat `roles` claim — same shape the Hephaestus issuer emits (ADR 0017).
             if (roles.length > 0) {
-                Map<String, Object> realmAccess = new HashMap<>();
-                realmAccess.put("roles", Arrays.asList(roles));
-                claims.put("realm_access", realmAccess);
+                claims.put("roles", Arrays.asList(roles));
             }
 
             return Jwt.withTokenValue(token)

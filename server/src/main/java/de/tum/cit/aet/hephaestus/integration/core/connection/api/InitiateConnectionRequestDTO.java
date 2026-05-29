@@ -14,7 +14,7 @@ import org.springframework.lang.Nullable;
  * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
  * {@code IllegalArgumentException}.
  */
-public record InitiateConnectionRequest(
+public record InitiateConnectionRequestDTO(
     IntegrationKind kind,
     Map<String, String> userInput,
     @Nullable URI redirectAfter

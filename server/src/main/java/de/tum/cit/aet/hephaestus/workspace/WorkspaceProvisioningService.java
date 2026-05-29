@@ -302,7 +302,7 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Ensures the currently authenticated Keycloak user has a corresponding git provider
+     * Ensures the currently authenticated account has a corresponding git provider
      * {@link User} entity so they can be assigned as workspace owner.
      *
      * <p>Reads identity from JWT claims to determine the user's provider:
@@ -318,7 +318,7 @@ public class WorkspaceProvisioningService {
      * @param gitLabServerUrl the GitLab server URL for GitLab users (resolved to default if blank)
      */
     /**
-     * Ensures the currently authenticated Keycloak user has a corresponding git provider
+     * Ensures the currently authenticated account has a corresponding git provider
      * {@link User} entity so they can be assigned as workspace owner.
      *
      * <p>For GitLab workspaces, the user must have a linked GitLab identity ({@code gitlab_id}

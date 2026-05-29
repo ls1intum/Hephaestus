@@ -5,14 +5,14 @@ package de.tum.cit.aet.hephaestus.feature;
  * <p>
  * This enum is the single source of truth for feature flag names.
  * Each flag is tagged with its {@link Kind} to indicate whether it maps
- * to a Keycloak realm role or a Spring Boot configuration property.
+ * to an {@code account_feature} role flag or a Spring Boot configuration property.
  * <p>
  * <strong>Adding a new flag:</strong>
  * <ol>
  *   <li>Add the enum constant here with the correct kind and key</li>
  *   <li>Add a corresponding field to {@link FeatureFlagsDTO} and wire it in {@code from()}</li>
- *   <li>For {@code ROLE} flags: add the role to the Keycloak realm config
- *       and optionally to the {@code admin} composite role</li>
+ *   <li>For {@code ROLE} flags: grant the {@code account_feature} flag to accounts
+ *       (e.g. via /admin/users); the {@code admin} app role implies all of them</li>
  *   <li>For {@code CONFIG} flags: add the property under
  *       {@code hephaestus.features.flags.<key>} in {@code application.yml}</li>
  *   <li>Run {@code npm run openapi-ts} to update the TypeScript client types</li>
@@ -22,7 +22,7 @@ package de.tum.cit.aet.hephaestus.feature;
  * @see FeatureFlagsDTO
  */
 public enum FeatureFlag {
-    // ── Authorization flags (Keycloak realm roles) ──────────────────────
+    // ── Authorization flags (account_feature role flags) ──────────────────────
     MENTOR_ACCESS(Kind.ROLE, "mentor_access"),
     NOTIFICATION_ACCESS(Kind.ROLE, "notification_access"),
     RUN_PRACTICE_REVIEW(Kind.ROLE, "run_practice_review"),
@@ -53,11 +53,11 @@ public enum FeatureFlag {
     }
 
     /**
-     * Indicates whether a flag is backed by a Keycloak realm role
+     * Indicates whether a flag is backed by an {@code account_feature} role flag
      * or a Spring Boot configuration property.
      */
     public enum Kind {
-        /** Flag backed by a Keycloak realm role on the user's JWT. */
+        /** Flag backed by an {@code account_feature} role flag, surfaced on the user's JWT. */
         ROLE,
         /** Flag backed by a Spring Boot configuration property. */
         CONFIG,

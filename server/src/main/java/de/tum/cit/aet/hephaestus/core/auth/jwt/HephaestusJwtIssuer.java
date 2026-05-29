@@ -72,10 +72,9 @@ public class HephaestusJwtIssuer {
      * Mint a new access JWT for {@code principal} (optionally under impersonation). Records
      * the {@code jti} in {@code issued_jwt} in the same transaction.
      *
-     * <p>Emits a Keycloak-compatible claim set so the token is a drop-in replacement:
-     * {@code preferred_username} = login, {@code given_name} = first name,
-     * {@code realm_access.roles} = roles. Plus {@code sub} = account id and {@code jti} for
-     * the Hephaestus-native endpoints + revocation.
+     * <p>Claim set: {@code preferred_username} = login (standard OIDC), {@code given_name} =
+     * first name, {@code roles} = flat string array, plus {@code sub} = account id and
+     * {@code jti} for the Hephaestus-native endpoints + revocation.
      *
      * @param principal      account id + login + roles to bake in.
      * @param impersonatorId if non-null, sets the RFC 8693 {@code act} claim.
@@ -94,9 +93,10 @@ public class HephaestusJwtIssuer {
             .id(jti.toString())
             .issuedAt(now)
             .expiresAt(expiresAt)
-            // Keycloak-compatible claims consumed by SecurityUtils + the authority converter.
+            // Claims consumed by SecurityUtils + the authority converter. preferred_username is
+            // the standard OIDC claim; roles is a flat string array (our own — no nested realm_access).
             .claim("preferred_username", principal.login())
-            .claim("realm_access", java.util.Map.of("roles", java.util.List.copyOf(principal.roles())));
+            .claim("roles", java.util.List.copyOf(principal.roles()));
         if (principal.givenName() != null) {
             claims.claim("given_name", principal.givenName());
         }

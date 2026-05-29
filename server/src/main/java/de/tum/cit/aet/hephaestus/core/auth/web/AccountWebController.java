@@ -34,7 +34,7 @@ public class AccountWebController {
         this.accountService = accountService;
     }
 
-    public record CurrentUserView(
+    public record CurrentUserViewDTO(
         Long id,
         String displayName,
         @Nullable String primaryEmail,
@@ -52,7 +52,7 @@ public class AccountWebController {
         java.util.List<String> roles
     ) {}
 
-    public record IdentityView(
+    public record IdentityViewDTO(
         Long id,
         String providerType,
         String subject,
@@ -64,7 +64,7 @@ public class AccountWebController {
 
     @GetMapping
     @Operation(summary = "Get the current user", operationId = "getCurrentUser")
-    public ResponseEntity<CurrentUserView> currentUser() {
+    public ResponseEntity<CurrentUserViewDTO> currentUser() {
         Account account = accountService.requireById(CurrentAccount.requireId());
         Long impersonatorId = CurrentAccount.impersonatorId();
         var identities = accountService.activeIdentities(account.getId());
@@ -74,7 +74,7 @@ public class AccountWebController {
             .stream()
             .anyMatch(il -> il.getGitProvider() != null && "GITLAB".equals(il.getGitProvider().getType().name()));
         return ResponseEntity.ok(
-            new CurrentUserView(
+            new CurrentUserViewDTO(
                 account.getId(),
                 account.getDisplayName(),
                 account.getPrimaryEmail(),
@@ -97,8 +97,8 @@ public class AccountWebController {
 
     @GetMapping("/identities")
     @Operation(summary = "List linked identity providers", operationId = "listLinkedIdentities")
-    public ResponseEntity<List<IdentityView>> identities() {
-        List<IdentityView> views = accountService
+    public ResponseEntity<List<IdentityViewDTO>> identities() {
+        List<IdentityViewDTO> views = accountService
             .activeIdentities(CurrentAccount.requireId())
             .stream()
             .map(AccountWebController::toView)
@@ -122,9 +122,9 @@ public class AccountWebController {
         return ResponseEntity.noContent().build();
     }
 
-    private static IdentityView toView(IdentityLink il) {
+    private static IdentityViewDTO toView(IdentityLink il) {
         String providerType = il.getGitProvider() != null ? il.getGitProvider().getType().name() : "OIDC";
-        return new IdentityView(
+        return new IdentityViewDTO(
             il.getId(),
             providerType,
             il.getSubject(),

@@ -37,7 +37,7 @@ public class SlackConnectionAdminController {
     }
 
     @PostMapping("/test-message")
-    public ResponseEntity<SlackTestMessageResponse> sendTestMessage(@PathVariable Long workspaceId) {
+    public ResponseEntity<SlackTestMessageResponseDTO> sendTestMessage(@PathVariable Long workspaceId) {
         var config = connectionService
             .findSlackNotificationConfig(workspaceId)
             .orElseThrow(() ->
@@ -60,7 +60,7 @@ public class SlackConnectionAdminController {
                 List.of(),
                 "Hephaestus test message — your Slack integration is wired up."
             );
-            return ResponseEntity.ok(new SlackTestMessageResponse(true, channelId, null));
+            return ResponseEntity.ok(new SlackTestMessageResponseDTO(true, channelId, null));
         } catch (SlackSendException e) {
             log.warn(
                 "Slack test message failed: workspaceId={}, channelId={}, error={}",
@@ -69,7 +69,7 @@ public class SlackConnectionAdminController {
                 e.slackError()
             );
             return ResponseEntity.status(statusForSlackError(e.slackError())).body(
-                new SlackTestMessageResponse(false, channelId, e.slackError())
+                new SlackTestMessageResponseDTO(false, channelId, e.slackError())
             );
         }
     }

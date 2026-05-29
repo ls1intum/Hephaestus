@@ -17,7 +17,7 @@ This file governs the entire repository. Each service has its own `AGENTS.md` wi
 
 - **Node.js**: Use the exact version from `.node-version` (currently 24.15.0). The repo uses pnpm 11 with `pnpm-lock.yaml` and pnpm workspaces (`pnpm-workspace.yaml`). The webapp is the only TypeScript package.
 - **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/`.
-- **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
+- **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
 ## 3. Quality gates & routine commands
 

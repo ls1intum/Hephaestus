@@ -65,7 +65,6 @@ public class AuthenticatedGitProviderUserService {
             return Optional.empty();
         }
 
-        String keycloakSubject = jwt.getSubject();
 
         Long gitlabId = jwt.getClaim("gitlab_id");
         if (gitlabId != null) {
@@ -77,8 +76,7 @@ public class AuthenticatedGitProviderUserService {
                 "",
                 resolvedUrl + "/" + login,
                 resolvedUrl,
-                User.Type.USER,
-                keycloakSubject
+                User.Type.USER
             );
             return userRepository.findById(userId);
         }
@@ -91,8 +89,7 @@ public class AuthenticatedGitProviderUserService {
                 login,
                 "",
                 GITHUB_SERVER_URL + "/" + login,
-                User.Type.USER,
-                keycloakSubject
+                User.Type.USER
             );
             return userRepository.findById(userId);
         }
@@ -112,7 +109,6 @@ public class AuthenticatedGitProviderUserService {
             throw new IllegalStateException("No JWT found for authenticated user");
         }
 
-        String keycloakSubject = jwt.getSubject();
 
         Long gitlabId = jwt.getClaim("gitlab_id");
         if (gitlabId != null) {
@@ -124,8 +120,7 @@ public class AuthenticatedGitProviderUserService {
                 "",
                 resolvedUrl + "/" + login,
                 resolvedUrl,
-                User.Type.USER,
-                keycloakSubject
+                User.Type.USER
             );
             return;
         }
@@ -173,14 +168,13 @@ public class AuthenticatedGitProviderUserService {
         String name,
         String avatarUrl,
         String webUrl,
-        User.Type userType,
-        @Nullable String keycloakSubject
+        User.Type userType
     ) {
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, GITHUB_SERVER_URL)));
 
-        return upsertUser(nativeId, login, name, avatarUrl, webUrl, userType, provider, keycloakSubject);
+        return upsertUser(nativeId, login, name, avatarUrl, webUrl, userType, provider);
     }
 
     private Long upsertGitLabUser(
@@ -190,8 +184,7 @@ public class AuthenticatedGitProviderUserService {
         String avatarUrl,
         String webUrl,
         String serverUrl,
-        User.Type userType,
-        @Nullable String keycloakSubject
+        User.Type userType
     ) {
         String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
         GitProvider provider = gitProviderRepository
@@ -201,7 +194,7 @@ public class AuthenticatedGitProviderUserService {
                 return gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, serverUrl));
             });
 
-        return upsertUser(nativeId, login, name, safeAvatar, webUrl, userType, provider, keycloakSubject);
+        return upsertUser(nativeId, login, name, safeAvatar, webUrl, userType, provider);
     }
 
     private Long upsertUser(
@@ -211,8 +204,7 @@ public class AuthenticatedGitProviderUserService {
         String avatarUrl,
         String webUrl,
         User.Type userType,
-        GitProvider provider,
-        @Nullable String keycloakSubject
+        GitProvider provider
     ) {
         String safeName = name != null ? name : login;
         String safeAvatar = avatarUrl != null ? avatarUrl : "";
@@ -240,22 +232,9 @@ public class AuthenticatedGitProviderUserService {
             provider.getType(),
             userType
         );
-        Long userId = userRepository
+        return userRepository
             .findByLoginAndProviderId(login, providerId)
             .map(User::getId)
             .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
-
-        if (keycloakSubject != null && !keycloakSubject.isBlank()) {
-            int updated = userRepository.setKeycloakSubjectIfChanged(userId, keycloakSubject);
-            if (updated > 0) {
-                log.info(
-                    "Seeded Keycloak subject on SCM User row: userId={}, userLogin={}, providerType={}",
-                    userId,
-                    LoggingUtils.sanitizeForLog(login),
-                    provider.getType()
-                );
-            }
-        }
-        return userId;
     }
 }

@@ -32,17 +32,17 @@ public class AccountAdminController {
         this.accountService = accountService;
     }
 
-    public record AdminAccountView(Long id, String displayName, String primaryEmail, String appRole, String status) {}
+    public record AdminAccountViewDTO(Long id, String displayName, String primaryEmail, String appRole, String status) {}
 
-    public record UpdateAccountRequest(@Nullable String appRole) {}
+    public record UpdateAccountRequestDTO(@Nullable String appRole) {}
 
     @GetMapping
     @Operation(summary = "List accounts (paged)", operationId = "adminListUsers")
-    public ResponseEntity<List<AdminAccountView>> list(
+    public ResponseEntity<List<AdminAccountViewDTO>> list(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size
     ) {
-        List<AdminAccountView> views = accountService
+        List<AdminAccountViewDTO> views = accountService
             .adminList(page, size)
             .stream()
             .map(AccountAdminController::toView)
@@ -52,13 +52,13 @@ public class AccountAdminController {
 
     @PatchMapping("/{id}")
     @Operation(summary = "Update an account's app role", operationId = "adminUpdateUser")
-    public ResponseEntity<AdminAccountView> update(@PathVariable Long id, @RequestBody UpdateAccountRequest body) {
+    public ResponseEntity<AdminAccountViewDTO> update(@PathVariable Long id, @RequestBody UpdateAccountRequestDTO body) {
         Account account = accountService.adminSetRole(id, body.appRole(), CurrentAccount.requireId());
         return ResponseEntity.ok(toView(account));
     }
 
-    private static AdminAccountView toView(Account a) {
-        return new AdminAccountView(
+    private static AdminAccountViewDTO toView(Account a) {
+        return new AdminAccountViewDTO(
             a.getId(),
             a.getDisplayName(),
             a.getPrimaryEmail(),

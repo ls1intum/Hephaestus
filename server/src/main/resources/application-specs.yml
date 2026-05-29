@@ -46,11 +46,6 @@ hephaestus:
             client-secret: "specs-only-placeholder-client-secret"
     workspace:
         init-default: false
-    keycloak:
-        url: http://localhost:8081
-        realm: hephaestus
-        client-id: hephaestus-confidential
-        client-secret: dummy
     mail:
         enabled: false
         sender: noreply@example.com

@@ -64,7 +64,7 @@ export const deleteUser = <ThrowOnError extends boolean = false>(options?: Optio
 /**
  * Get feature flags for the current user
  *
- * Returns all feature flags evaluated for the authenticated user. Combines Keycloak role checks and server-side config toggles.
+ * Returns all feature flags evaluated for the authenticated user. Combines account feature-flag checks and server-side config toggles.
  */
 export const getUserFeatures = <ThrowOnError extends boolean = false>(options?: Options<GetUserFeaturesData, ThrowOnError>) => (options?.client ?? client).get<GetUserFeaturesResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -97,7 +97,7 @@ export const unlinkAccount = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Claim an identity provider from another user
  *
- * Transfers a federated identity from another Keycloak user to the current user. Used when a user has accidentally created two accounts by logging in with different IdPs. Deletes the orphan account if it has no remaining identities.
+ * Transfers a federated identity from another user to the current user. Used when a user has accidentally created two accounts by logging in with different IdPs. Deletes the orphan account if it has no remaining identities.
  */
 export const claimIdentity = <ThrowOnError extends boolean = false>(options: Options<ClaimIdentityData, ThrowOnError>) => (options.client ?? client).post<ClaimIdentityResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -359,7 +359,7 @@ export const assignRole = <ThrowOnError extends boolean = false>(options: Option
  * Get the current user's membership in this workspace.
  *
  * Get the current user's membership in this workspace.
- * Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+ * Super admins (the admin app role) have their effective role elevated to ADMIN
  * if their database role is lower, matching the runtime authorization behaviour in
  * {@link WorkspaceAccessService WorkspaceAccessService}.
  */

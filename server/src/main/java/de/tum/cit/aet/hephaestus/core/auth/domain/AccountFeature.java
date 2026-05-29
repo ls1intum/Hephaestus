@@ -16,8 +16,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.springframework.lang.Nullable;
 
 /**
- * Per-account feature opt-ins. Replaces the Keycloak realm-role mechanism (where
- * {@code mentor_access}, {@code run_practice_review} etc. lived as realm roles).
+ * Per-account feature opt-ins. These are the app's authorization flags (where
+ * {@code mentor_access}, {@code run_practice_review} etc. live; replaces the former
+ * Keycloak realm roles, ADR 0017).
  *
  * <p>Composite PK {@code (account_id, flag)} — natural fit for "is this flag enabled
  * for this account?" lookups. The {@code FeatureFlag} enum remains the canonical

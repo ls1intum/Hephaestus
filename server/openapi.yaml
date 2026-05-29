@@ -419,7 +419,7 @@ paths:
   /user/features:
     get:
       description: Returns all feature flags evaluated for the authenticated user.
-        Combines Keycloak role checks and server-side config toggles.
+        Combines account feature-flag checks and server-side config toggles.
       operationId: getUserFeatures
       responses:
         "200":
@@ -468,7 +468,7 @@ paths:
       - Account
   /user/linked-accounts/{providerAlias}/claim:
     post:
-      description: Transfers a federated identity from another Keycloak user to the
+      description: Transfers a federated identity from another user to the
         current user. Used when a user has accidentally created two accounts by logging
         in with different IdPs. Deletes the orphan account if it has no remaining
         identities.
@@ -1184,7 +1184,7 @@ paths:
     get:
       description: |-
         Get the current user's membership in this workspace.
-         Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+         Super admins (the admin app role) have their effective role elevated to ADMIN
          if their database role is lower, matching the runtime authorization behaviour in
          {@link WorkspaceAccessService WorkspaceAccessService}.
       operationId: getCurrentUserMembership
@@ -5071,7 +5071,7 @@ components:
   securitySchemes:
     bearerAuth:
       bearerFormat: JWT
-      description: JWT authentication via Keycloak. Obtain a token from your Keycloak
-        instance.
+      description: Hephaestus-native JWT bearer authentication. The SPA normally uses the
+        __Host-HEPHAESTUS_AT session cookie; this documents the equivalent bearer token.
       scheme: bearer
       type: http

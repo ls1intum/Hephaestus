@@ -46,7 +46,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
 
     @Test
     void sendTestMessage_happyPath_returns200() {
-        ResponseEntity<SlackTestMessageResponse> response = controller.sendTestMessage(1L);
+        ResponseEntity<SlackTestMessageResponseDTO> response = controller.sendTestMessage(1L);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -99,7 +99,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
             .when(slackMessageService)
             .sendForWorkspace(anyLong(), anyString(), any(), anyString());
 
-        ResponseEntity<SlackTestMessageResponse> response = controller.sendTestMessage(1L);
+        ResponseEntity<SlackTestMessageResponseDTO> response = controller.sendTestMessage(1L);
 
         assertThat(response.getStatusCode().value()).isEqualTo(expectedStatus);
         assertThat(response.getBody()).isNotNull();

@@ -182,7 +182,7 @@ export const LoadingWorkspaces: Story = {
 	},
 };
 
-/** User has the MENTOR_ACCESS Keycloak role but the workspace toggle is off — link hidden. */
+/** User has the MENTOR_ACCESS feature flag but the workspace toggle is off — link hidden. */
 export const MentorRoleButFeatureDisabled: Story = {
 	args: {
 		hasMentorAccess: true,

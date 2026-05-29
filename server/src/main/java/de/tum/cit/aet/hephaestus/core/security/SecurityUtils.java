@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.security;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,7 +41,7 @@ public final class SecurityUtils {
 
     /**
      * Get the first name (given_name) from a JWT token.
-     * This is the standard OIDC claim for first name used by Keycloak.
+     * This is the standard OIDC {@code given_name} claim, carried on our own issued JWT.
      *
      * @param jwt The JWT token
      * @return The given_name claim value, or empty if not present
@@ -59,12 +58,12 @@ public final class SecurityUtils {
     }
 
     /**
-     * Check if the current user has the super admin realm role.
-     * Users with the admin realm role (configured via KEYCLOAK_GITHUB_ADMIN_USERNAME)
+     * Check if the current user has the super admin app role.
+     * Users with the {@code admin} app role (APP_ADMIN, granted via /admin/users)
      * can be elevated to workspace admin level by the authorization layer, but only for workspaces
-     * where they are members. This method itself only checks for the presence of the realm role.
+     * where they are members. This method itself only checks for the presence of the role.
      *
-     * @return true if the current user has the admin realm role
+     * @return true if the current user has the {@code admin} app role
      */
     public static boolean isSuperAdmin() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -72,13 +71,8 @@ public final class SecurityUtils {
             return false;
         }
 
-        // Extract realm_access.roles from JWT claims (following SecurityConfig pattern)
-        var realmAccessObj = jwt.getClaims().get("realm_access");
-        if (!(realmAccessObj instanceof Map<?, ?> realmAccess)) {
-            return false;
-        }
-
-        var rolesObj = realmAccess.get("roles");
+        // Flat `roles` claim on the Hephaestus-issued JWT (ADR 0017).
+        var rolesObj = jwt.getClaims().get("roles");
         return rolesObj instanceof List<?> roles && roles.contains("admin");
     }
 }

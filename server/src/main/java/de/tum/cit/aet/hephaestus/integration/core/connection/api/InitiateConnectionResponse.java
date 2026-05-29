@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.net.URI;
 
 /**
@@ -9,9 +10,9 @@ import java.net.URI;
  *
  * <p>Two variants discriminated by the {@code type} property:
  * <ul>
- *   <li>{@link Redirect} — for OAuth / App-install flows (GitHub, Slack, Outline).
+ *   <li>{@link RedirectDTO} — for OAuth / App-install flows (GitHub, Slack, Outline).
  *       Carries the vendor URL to bounce the browser to plus the signed OAuth state.</li>
- *   <li>{@link Linked} — for inline-credential flows (GitLab PAT paste). Carries the
+ *   <li>{@link LinkedDTO} — for inline-credential flows (GitLab PAT paste). Carries the
  *       newly-created {@code Connection} id; no further round-trip is needed.</li>
  * </ul>
  *
@@ -22,14 +23,18 @@ import java.net.URI;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes(
     {
-        @JsonSubTypes.Type(value = InitiateConnectionResponse.Redirect.class, name = "redirect"),
-        @JsonSubTypes.Type(value = InitiateConnectionResponse.Linked.class, name = "linked"),
+        @JsonSubTypes.Type(value = InitiateConnectionResponse.RedirectDTO.class, name = "redirect"),
+        @JsonSubTypes.Type(value = InitiateConnectionResponse.LinkedDTO.class, name = "linked"),
     }
 )
+// Schema name carries the DTO suffix so the OpenAPI customizer (which keeps only DTO-suffixed
+// schemas) retains it; the Java type stays suffix-free since arch rules reserve the DTO suffix
+// for records / nested classes / dto packages, and this is a top-level sealed interface.
+@Schema(name = "InitiateConnectionResponseDTO")
 public sealed interface InitiateConnectionResponse
-    permits InitiateConnectionResponse.Redirect, InitiateConnectionResponse.Linked
+    permits InitiateConnectionResponse.RedirectDTO, InitiateConnectionResponse.LinkedDTO
 {
-    record Redirect(URI vendorUrl, String state) implements InitiateConnectionResponse {}
+    record RedirectDTO(URI vendorUrl, String state) implements InitiateConnectionResponse {}
 
-    record Linked(Long connectionId) implements InitiateConnectionResponse {}
+    record LinkedDTO(Long connectionId) implements InitiateConnectionResponse {}
 }

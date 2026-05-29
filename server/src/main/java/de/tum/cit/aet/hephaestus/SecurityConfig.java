@@ -49,10 +49,11 @@ public class SecurityConfig {
 
     @SuppressWarnings("unchecked")
     @Bean
-    AuthoritiesConverter realmRolesAuthoritiesConverter() {
+    AuthoritiesConverter rolesAuthoritiesConverter() {
         return claims -> {
-            final var realmAccess = Optional.ofNullable((Map<String, Object>) claims.get("realm_access"));
-            final var roles = realmAccess.flatMap(map -> Optional.ofNullable((List<String>) map.get("roles")));
+            // Flat `roles` claim on the Hephaestus-issued JWT (ADR 0017). The role strings
+            // ("admin", "mentor_access", …) map 1:1 to granted authorities consumed by @PreAuthorize.
+            final var roles = Optional.ofNullable((List<String>) claims.get("roles"));
             return roles
                 .map(List::stream)
                 .orElse(Stream.empty())
@@ -79,11 +80,11 @@ public class SecurityConfig {
      * by {@link de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerKeyRing}, HMAC/token at
      * the controller layer for webhooks, or no auth at all for health/info — and must NOT be
      * processed by the user-facing OAuth2 resource server. Running BearerTokenAuthenticationFilter
-     * on the worker JWT triggers a Keycloak round-trip that either fails (issuer unreachable) or
-     * rejects (different signer), masking the real auth.
+     * on the worker JWT runs it through the resource-server's ES256 decoder, which either fails
+     * (signing key unavailable) or rejects (different signer), masking the real auth.
      *
-     * <p>Always present (even when Keycloak isn't configured), so a dev / worker-only pod can
-     * boot without any Keycloak realm.
+     * <p>Always present, so a dev / worker-only pod can
+     * boot without the resource-server JWT decoder configured.
      */
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -127,7 +128,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(requests -> {
                 requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
                 // OpenAPI / Swagger endpoints are public on the resource-server chain; they must
-                // also be public on the lockdown chain so spec generation works on no-Keycloak boots
+                // also be public on the lockdown chain so spec generation works on no-JWT-decoder boots
                 // (the `specs` profile boots without a JwtDecoder and would otherwise 403 on
                 // `mvn verify -Dapp.profiles=specs`).
                 requests
@@ -199,7 +200,7 @@ public class SecurityConfig {
             requests.requestMatchers("/oauth2/authorization/**", "/login/oauth2/code/**").permitAll();
             // Public workspace provider discovery (workspace creation UI)
             requests.requestMatchers(HttpMethod.GET, "/workspaces/providers").permitAll();
-            // Mentor endpoints gated by the MENTOR_ACCESS realm role. MUST be matched BEFORE the
+            // Mentor endpoints gated by the MENTOR_ACCESS feature flag. MUST be matched BEFORE the
             // generic `/workspaces/*/**` permitAll below; otherwise the public-GET rule wins and
             // mentor reads become unauthenticated (feature-flag bypass — see #1071).
             requests.requestMatchers("/workspaces/*/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());

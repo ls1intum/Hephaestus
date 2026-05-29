@@ -15,7 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Builds the {@link JwtPrincipal} (login + roles + given name) for an account at token-issue
- * time. Centralises the "what goes into the realm-compatible claims" logic so the issuer
+ * time. Centralises the "what goes into the JWT claims" logic so the issuer
  * stays a thin signer and every issue path (login, refresh, impersonation) is consistent.
  *
  * <h2>Login resolution</h2>
@@ -26,8 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
  *
  * <h2>Role resolution</h2>
  * {@code admin} when the account is {@link Account.AppRole#APP_ADMIN}, plus every enabled
- * {@code account_feature} flag (these replace the former Keycloak realm roles like
- * {@code mentor_access}, {@code run_practice_review}).
+ * {@code account_feature} flag (e.g. {@code mentor_access}, {@code run_practice_review}).
  */
 @Service
 @WorkspaceAgnostic("JWT principal assembly is account-scoped")

@@ -9,19 +9,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.time.Instant;
 import java.util.Set;
 import org.springframework.lang.Nullable;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
- * Detailed view of a single Connection — extends {@link ConnectionSummary} with the
- * typed config serialized as a tree node. NEVER carries credentials; the encrypted
- * blob stays inside the entity and is not exposed by this DTO.
- *
- * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
- * the JSON shape flat — the API consumer sees one record, not a nested {@code summary}
- * object.
+ * Wire shape returned by the {@code GET /api/v1/workspaces/{workspaceId}/connections}
+ * list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+ * credentials, no audit. Capabilities are looked up from the per-kind manifest at
+ * response build time so adding/removing a capability needs no DB migration.
  */
-public record ConnectionDetail(
+public record ConnectionSummaryDTO(
     Long id,
     IntegrationKind kind,
     IntegrationFamily family,
@@ -32,12 +27,10 @@ public record ConnectionDetail(
     Instant createdAt,
     Instant updatedAt,
     @Nullable Instant lastActivityAt,
-    Set<Capability> capabilities,
-    @Nullable JsonNode config
+    Set<Capability> capabilities
 ) {
-    public static ConnectionDetail from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
-        JsonNode configNode = c.getConfig() == null ? null : mapper.valueToTree(c.getConfig());
-        return new ConnectionDetail(
+    public static ConnectionSummaryDTO from(Connection c, IntegrationManifestRegistry manifests) {
+        return new ConnectionSummaryDTO(
             c.getId(),
             c.getKind(),
             c.getKind().family(),
@@ -48,8 +41,7 @@ public record ConnectionDetail(
             c.getCreatedAt(),
             c.getUpdatedAt(),
             c.getLastActivityAt(),
-            manifests.capabilitiesFor(c.getKind()),
-            configNode
+            manifests.capabilitiesFor(c.getKind())
         );
     }
 }

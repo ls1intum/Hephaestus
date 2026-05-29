@@ -6,17 +6,23 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Set;
 import org.springframework.lang.Nullable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Wire shape returned by the {@code GET /api/v1/workspaces/{workspaceId}/connections}
- * list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
- * credentials, no audit. Capabilities are looked up from the per-kind manifest at
- * response build time so adding/removing a capability needs no DB migration.
+ * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO} with the
+ * typed config serialized as a tree node. NEVER carries credentials; the encrypted
+ * blob stays inside the entity and is not exposed by this DTO.
+ *
+ * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+ * the JSON shape flat — the API consumer sees one record, not a nested {@code summary}
+ * object.
  */
-public record ConnectionSummary(
+public record ConnectionDetailDTO(
     Long id,
     IntegrationKind kind,
     IntegrationFamily family,
@@ -27,10 +33,12 @@ public record ConnectionSummary(
     Instant createdAt,
     Instant updatedAt,
     @Nullable Instant lastActivityAt,
-    Set<Capability> capabilities
+    Set<Capability> capabilities,
+    @Nullable @Schema(type = "object", description = "Opaque, typed connection config tree (no credentials).") JsonNode config
 ) {
-    public static ConnectionSummary from(Connection c, IntegrationManifestRegistry manifests) {
-        return new ConnectionSummary(
+    public static ConnectionDetailDTO from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
+        JsonNode configNode = c.getConfig() == null ? null : mapper.valueToTree(c.getConfig());
+        return new ConnectionDetailDTO(
             c.getId(),
             c.getKind(),
             c.getKind().family(),
@@ -41,7 +49,8 @@ public record ConnectionSummary(
             c.getCreatedAt(),
             c.getUpdatedAt(),
             c.getLastActivityAt(),
-            manifests.capabilitiesFor(c.getKind())
+            manifests.capabilitiesFor(c.getKind()),
+            configNode
         );
     }
 }

@@ -13,7 +13,7 @@ export interface SettingsPageProps {
 	 */
 	aiReviewProps: AiReviewSectionProps;
 	/**
-	 * Whether to show the AI review section (feature-flagged via Keycloak role)
+	 * Whether to show the AI review section (feature-flagged via account_feature flag)
 	 */
 	showAiReviewSection: boolean;
 	/**

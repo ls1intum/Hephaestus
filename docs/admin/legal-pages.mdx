@@ -96,7 +96,7 @@ If `LEGAL_PROFILE` is empty and no overrides are mounted, the webapp serves a cl
 
 Use Art. 13 GDPR as the outline. Hephaestus processes personal data in at least the following categories, which your privacy statement must cover:
 
-- **Identity and authentication** — Keycloak-federated identity provider (GitHub / LRZ GitLab / anything you enable), associated user ID, login, email, display name.
+- **Identity and authentication** — Hephaestus-native auth federating to GitHub / LRZ GitLab; per federated identity we store the provider, stable subject id, login, email-at-signup, and display name (ADR 0017).
 - **Repository synchronisation** — for every configured repository: pull/merge requests, issues, reviews, review comments, commit metadata, profile information of the authors.
 - **Account settings and notification email** — user preferences, notification subscriptions, optional self-provided notification email.
 - **AI-assisted features** — if enabled: messages sent to the configured LLM provider, persisted conversations, generated findings.

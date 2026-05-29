@@ -35,7 +35,7 @@ public class AuthLifecycleController {
         this.impersonationService = impersonationService;
     }
 
-    public record ImpersonateRequest(@NotNull Long targetAccountId, @NotBlank String reason) {}
+    public record ImpersonateRequestDTO(@NotNull Long targetAccountId, @NotBlank String reason) {}
 
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
@@ -63,7 +63,7 @@ public class AuthLifecycleController {
     @PreAuthorize("hasAuthority('admin')")
     @Operation(summary = "Begin impersonating another account", operationId = "impersonate")
     public ResponseEntity<Void> impersonate(
-        @RequestBody ImpersonateRequest body,
+        @RequestBody ImpersonateRequestDTO body,
         HttpServletRequest request,
         HttpServletResponse response
     ) {

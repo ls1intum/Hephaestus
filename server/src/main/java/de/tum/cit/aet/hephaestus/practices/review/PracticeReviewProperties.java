@@ -12,7 +12,7 @@ import org.springframework.validation.annotation.Validated;
  * <p>Binds to the {@code hephaestus.practice-review} prefix in application configuration.
  *
  * @param runForAllUsers      whether to run practice review for all PRs (true) or only for users
- *                            with the {@code run_practice_review} Keycloak role (false)
+ *                            with the {@code run_practice_review} feature flag (false)
  * @param skipDrafts          whether to skip practice review for draft PRs
  * @param deliverToMerged     whether to deliver feedback to already-merged PRs
  * @param appBaseUrl          base URL of the Hephaestus application (for preferences footer link);

@@ -93,25 +93,25 @@ public class ConnectionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ConnectionSummary>> list(@PathVariable Long workspaceId) {
-        List<ConnectionSummary> summaries = admin
+    public ResponseEntity<List<ConnectionSummaryDTO>> list(@PathVariable Long workspaceId) {
+        List<ConnectionSummaryDTO> summaries = admin
             .listForWorkspace(workspaceId)
             .stream()
-            .map(c -> ConnectionSummary.from(c, admin.manifests()))
+            .map(c -> ConnectionSummaryDTO.from(c, admin.manifests()))
             .toList();
         return ResponseEntity.ok(summaries);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ConnectionDetail> read(@PathVariable Long workspaceId, @PathVariable Long id) {
+    public ResponseEntity<ConnectionDetailDTO> read(@PathVariable Long workspaceId, @PathVariable Long id) {
         Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
-        return ResponseEntity.ok(ConnectionDetail.from(connection, admin.manifests(), objectMapper));
+        return ResponseEntity.ok(ConnectionDetailDTO.from(connection, admin.manifests(), objectMapper));
     }
 
     @PostMapping
     public ResponseEntity<InitiateConnectionResponse> initiate(
         @PathVariable Long workspaceId,
-        @RequestBody @NotNull InitiateConnectionRequest body,
+        @RequestBody @NotNull InitiateConnectionRequestDTO body,
         @Nullable Authentication authentication
     ) {
         if (body == null || body.kind() == null) {
@@ -139,7 +139,7 @@ public class ConnectionController {
 
         return switch (initiation) {
             case ConnectInitiation.RedirectToVendor r -> ResponseEntity.ok(
-                new InitiateConnectionResponse.Redirect(r.vendorUrl(), r.oauthState())
+                new InitiateConnectionResponse.RedirectDTO(r.vendorUrl(), r.oauthState())
             );
             case ConnectInitiation.AcceptInline inline -> {
                 Connection connection = admin.createInlineConnection(
@@ -150,16 +150,16 @@ public class ConnectionController {
                     userInput,
                     actorRef(authentication)
                 );
-                yield ResponseEntity.ok(new InitiateConnectionResponse.Linked(connection.getId()));
+                yield ResponseEntity.ok(new InitiateConnectionResponse.LinkedDTO(connection.getId()));
             }
         };
     }
 
     @PostMapping("/{id}/suspend")
-    public ResponseEntity<ConnectionSummary> suspend(
+    public ResponseEntity<ConnectionSummaryDTO> suspend(
         @PathVariable Long workspaceId,
         @PathVariable Long id,
-        @RequestBody(required = false) @Nullable ReasonRequest body,
+        @RequestBody(required = false) @Nullable ReasonRequestDTO body,
         @Nullable Authentication authentication
     ) {
         Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
@@ -175,14 +175,14 @@ public class ConnectionController {
                 reason
             )
         );
-        return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
+        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
     }
 
     @PostMapping("/{id}/reactivate")
-    public ResponseEntity<ConnectionSummary> reactivate(
+    public ResponseEntity<ConnectionSummaryDTO> reactivate(
         @PathVariable Long workspaceId,
         @PathVariable Long id,
-        @RequestBody(required = false) @Nullable ReasonRequest body,
+        @RequestBody(required = false) @Nullable ReasonRequestDTO body,
         @Nullable Authentication authentication
     ) {
         Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
@@ -198,7 +198,7 @@ public class ConnectionController {
                 reason
             )
         );
-        return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
+        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
     }
 
     @PostMapping("/{id}/disconnect")
@@ -247,14 +247,14 @@ public class ConnectionController {
     }
 
     @GetMapping("/{id}/audit")
-    public ResponseEntity<List<ConnectionAuditEntry>> audit(@PathVariable Long workspaceId, @PathVariable Long id) {
+    public ResponseEntity<List<ConnectionAuditEntryDTO>> audit(@PathVariable Long workspaceId, @PathVariable Long id) {
         // findInWorkspaceOrThrow enforces the workspace scope before we expose audit history,
         // so cross-workspace audit reads return 404 rather than leaking a partial trail.
         admin.findInWorkspaceOrThrow(workspaceId, id);
-        List<ConnectionAuditEntry> entries = admin
+        List<ConnectionAuditEntryDTO> entries = admin
             .auditForConnection(id, AUDIT_PAGE_CAP)
             .stream()
-            .map(ConnectionAuditEntry::from)
+            .map(ConnectionAuditEntryDTO::from)
             .toList();
         return ResponseEntity.ok(entries);
     }
@@ -265,8 +265,8 @@ public class ConnectionController {
     }
 
     /** Lifecycle-action body — reason is optional, applied to both suspend and reactivate. */
-    @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequest")
-    public record ReasonRequest(@Nullable String reason) {}
+    @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequestDTO")
+    public record ReasonRequestDTO(@Nullable String reason) {}
 
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> handleNotFound(NoSuchElementException e) {

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 /**
  * Service for evaluating workspace-level access permissions based on user roles.
  * Uses role hierarchy: OWNER > ADMIN > MEMBER
- * Global admins (users with Keycloak 'admin' realm role) are automatically elevated to workspace ADMIN level.
+ * Global admins (users with the {@code admin} app role, APP_ADMIN) are automatically elevated to workspace ADMIN level.
  */
 @Service
 public class WorkspaceAccessService {
@@ -27,7 +27,7 @@ public class WorkspaceAccessService {
     /**
      * Check if the current user has at least the specified role in the current workspace.
      * Uses role hierarchy: if user has OWNER, they also satisfy ADMIN and MEMBER checks.
-     * Super admins (Keycloak admin realm role) are automatically elevated to ADMIN level
+     * Super admins (the {@code admin} app role, APP_ADMIN) are automatically elevated to ADMIN level
      * for workspaces where they have membership, but cannot satisfy OWNER checks (ownership remains explicit).
      *
      * @param requiredRole Minimum required role

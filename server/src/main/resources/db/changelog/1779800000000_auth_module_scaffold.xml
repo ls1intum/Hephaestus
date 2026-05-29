@@ -316,4 +316,21 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Drop the legacy user.keycloak_subject column + its unique index (ADR 0016 Stage A,
+        added in 1779790459343). Superseded by ADR 0017: identity now lives on
+        account + identity_link; the SCM user row no longer carries an IdP subject, and the
+        auth lookup is login → preferred_username, never this column. No backward compat.
+        Idempotent (IF EXISTS) so it's safe whether or not 1779790459343 reached the DB.
+    -->
+    <changeSet author="FelixTJDietrich" id="1779800000000-9-drop-keycloak-subject">
+        <preConditions onFail="MARK_RAN" onFailMessage="user.keycloak_subject already removed">
+            <columnExists tableName="user" columnName="keycloak_subject"/>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            DROP INDEX IF EXISTS uq_user_keycloak_subject;
+            ALTER TABLE "user" DROP COLUMN IF EXISTS keycloak_subject;
+        ]]></sql>
+    </changeSet>
+
 </databaseChangeLog>

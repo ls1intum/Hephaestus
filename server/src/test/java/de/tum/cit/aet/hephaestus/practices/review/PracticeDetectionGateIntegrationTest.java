@@ -45,7 +45,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Primary integration value: workspace resolver heuristic, agent config existence check,
  * and JSONB containment query ({@code triggerEvents @> ?}) against real PostgreSQL.
  *
- * <p>Mocks only the external-facing SPI ({@link UserRoleChecker} for Keycloak).
+ * <p>Mocks only the role-check SPI ({@link UserRoleChecker}).
  * Label/draft/assignee checks operate on the in-memory PR object passed to the gate
  * (matching production behavior where the PR is loaded once by the caller).
  */

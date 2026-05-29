@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
  * Controller for retrieving the current user's feature flags.
  * <p>
  * Returns a server-authoritative evaluation of all {@link FeatureFlag} values,
- * combining Keycloak role checks (from the JWT) and Spring Boot config flags
+ * combining role checks (from the JWT) and Spring Boot config flags
  * into a single response. The endpoint is extremely cheap: it reads JWT
  * authorities (already parsed) and in-memory config properties — no DB or
- * Keycloak API calls.
+ * external calls.
  *
  * @see FeatureFlagService
  * @see FeatureFlagsDTO
@@ -37,7 +37,7 @@ public class FeatureFlagController {
     @Operation(
         summary = "Get feature flags for the current user",
         description = "Returns all feature flags evaluated for the authenticated user. " +
-            "Combines Keycloak role checks and server-side config toggles."
+            "Combines role checks and server-side config toggles."
     )
     @ApiResponse(responseCode = "200", description = "Feature flags evaluated successfully")
     public ResponseEntity<FeatureFlagsDTO> getUserFeatures() {

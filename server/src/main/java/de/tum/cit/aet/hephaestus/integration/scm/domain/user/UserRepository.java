@@ -292,31 +292,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Transactional
     @Query(value = "UPDATE \"user\" SET email = :email WHERE id = :userId AND email IS NULL", nativeQuery = true)
     int backfillEmailIfNull(@Param("userId") Long userId, @Param("email") String email);
-
-    /**
-     * Sets the Keycloak {@code sub} claim on a user row, only when it is currently NULL
-     * or differs from the supplied value.
-     *
-     * <p>Called from {@link de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService} after an authenticated
-     * upsert so the SCM {@code User} row gains the stable IdP-side identifier. Sync
-     * paths (which observe vendor users we have not yet authenticated) must NOT call
-     * this — they would clobber a real subject with NULL.
-     *
-     * <p>The {@code uq_user_keycloak_subject} partial unique index (defined in
-     * {@code 1779862439263_user_keycloak_subject.xml}) guarantees one row per real
-     * authenticated person while leaving the sync-only rows untouched.
-     *
-     * @return number of rows updated (0 when no change was needed)
-     */
-    @Modifying
-    @Transactional
-    @Query(
-        value = """
-        UPDATE "user" SET keycloak_subject = :keycloakSubject
-        WHERE id = :userId
-          AND (keycloak_subject IS NULL OR keycloak_subject <> :keycloakSubject)
-        """,
-        nativeQuery = true
-    )
-    int setKeycloakSubjectIfChanged(@Param("userId") Long userId, @Param("keycloakSubject") String keycloakSubject);
 }

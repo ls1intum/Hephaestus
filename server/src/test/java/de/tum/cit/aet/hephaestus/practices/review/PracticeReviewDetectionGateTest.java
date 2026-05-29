@@ -444,10 +444,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    class CircuitBreakerTests {
+    class RoleCheckerHealthTests {
 
         @Test
-        void skipWhenCircuitBreakerOpen() {
+        void skipWhenRoleCheckerUnhealthy() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
             setupThroughPracticeMatching(pr, practice);
@@ -460,7 +460,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("keycloak circuit breaker open");
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("role checker unhealthy");
             verify(userRoleChecker, never()).hasRole(anyString(), anyString());
         }
     }

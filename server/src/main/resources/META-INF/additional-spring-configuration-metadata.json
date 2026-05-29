@@ -25,10 +25,6 @@
       "description": "Activity event tracking and XP scoring settings"
     },
     {
-      "name": "hephaestus.keycloak",
-      "description": "Keycloak identity provider integration"
-    },
-    {
       "name": "hephaestus.slack",
       "description": "App-global Slack secrets (signing secret); per-workspace tokens live on Connection rows"
     },
@@ -130,36 +126,6 @@
       "name": "hephaestus.workspace.init-default",
       "type": "java.lang.Boolean",
       "description": "Whether to bootstrap a PAT-based workspace on startup (for local development)"
-    },
-    {
-      "name": "hephaestus.keycloak.url",
-      "type": "java.lang.String",
-      "description": "Keycloak server URL"
-    },
-    {
-      "name": "hephaestus.keycloak.realm",
-      "type": "java.lang.String",
-      "description": "Keycloak realm"
-    },
-    {
-      "name": "hephaestus.keycloak.client-id",
-      "type": "java.lang.String",
-      "description": "Keycloak client ID"
-    },
-    {
-      "name": "hephaestus.keycloak.client-secret",
-      "type": "java.lang.String",
-      "description": "Keycloak client secret (use environment variable in production)"
-    },
-    {
-      "name": "hephaestus.keycloak.internal-url",
-      "type": "java.lang.String",
-      "description": "Internal Keycloak URL for container-to-container access; defaults to public URL"
-    },
-    {
-      "name": "hephaestus.keycloak.jwk-set-uri",
-      "type": "java.lang.String",
-      "description": "JWK Set URI for token verification; defaults to standard Keycloak endpoint"
     },
     {
       "name": "hephaestus.slack.signing-secret",

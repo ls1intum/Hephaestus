@@ -30,7 +30,7 @@ public class SessionWebController {
         this.sessionService = sessionService;
     }
 
-    public record SessionView(
+    public record SessionViewDTO(
         UUID jti,
         Instant issuedAt,
         Instant expiresAt,
@@ -41,13 +41,13 @@ public class SessionWebController {
 
     @GetMapping
     @Operation(summary = "List active sessions for the current user", operationId = "listSessions")
-    public ResponseEntity<List<SessionView>> list() {
+    public ResponseEntity<List<SessionViewDTO>> list() {
         UUID currentJti = CurrentAccount.requireJti();
-        List<SessionView> views = sessionService
+        List<SessionViewDTO> views = sessionService
             .activeSessions(CurrentAccount.requireId())
             .stream()
             .map(j ->
-                new SessionView(
+                new SessionViewDTO(
                     j.getJti(),
                     j.getIssuedAt(),
                     j.getExpiresAt(),

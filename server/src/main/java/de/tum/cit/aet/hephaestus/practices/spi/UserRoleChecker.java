@@ -5,9 +5,9 @@ import org.springframework.lang.NonNull;
 /**
  * Service Provider Interface for checking user roles.
  * <p>
- * This abstraction decouples the activity module from identity provider
- * implementations (Keycloak, etc.), allowing role checks without direct
- * dependency on security infrastructure.
+ * This abstraction decouples the activity module from the role-storage
+ * implementation (the {@code account_feature} table), allowing role checks
+ * without direct dependency on security infrastructure.
  * <p>
  * Role name constants should be defined at call sites, not in this interface,
  * to keep the SPI generic and prevent method proliferation per role.
@@ -24,14 +24,14 @@ import org.springframework.lang.NonNull;
  */
 public interface UserRoleChecker {
     /**
-     * Checks if a user has a specific realm role.
+     * Checks if a user has a specific role.
      * <p>
      * Returns {@code false} on any error (network failure, auth misconfiguration,
      * circuit breaker open) — never throws. This fail-closed behavior ensures that
      * callers can safely use the result without wrapping in try-catch.
      *
      * @param username the username (login) to check — must not be null
-     * @param roleName the realm role name to check for (e.g., "run_practice_review") — must not be null or blank
+     * @param roleName the role name to check for (e.g., "run_practice_review") — must not be null or blank
      * @return true if the user has the specified role, false otherwise (including on error)
      */
     boolean hasRole(@NonNull String username, @NonNull String roleName);

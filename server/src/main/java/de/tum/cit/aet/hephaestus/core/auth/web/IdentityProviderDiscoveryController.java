@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Public discovery of the identity providers a user can sign in with. Replaces the
- * Keycloak-backed {@code /auth/identity-providers} (deleted at cutover). The SPA login
+ * Public discovery of the identity providers a user can sign in with (replaces the former
+ * Keycloak {@code /auth/identity-providers}; ADR 0017). The SPA login
  * page renders one button per entry; each button targets
  * {@code /auth/login?provider={registrationId}}.
  *
@@ -34,16 +34,16 @@ public class IdentityProviderDiscoveryController {
     }
 
     /** One row per sign-in option. {@code providerType} drives the SPA's icon choice. */
-    public record IdentityProviderView(String registrationId, String displayName, String providerType) {}
+    public record IdentityProviderViewDTO(String registrationId, String displayName, String providerType) {}
 
     @GetMapping("/identity-providers")
     @PreAuthorize("permitAll()")
     @Operation(summary = "List available identity providers", operationId = "listIdentityProviders")
-    public ResponseEntity<List<IdentityProviderView>> list() {
-        List<IdentityProviderView> views = new ArrayList<>();
+    public ResponseEntity<List<IdentityProviderViewDTO>> list() {
+        List<IdentityProviderViewDTO> views = new ArrayList<>();
         for (ClientRegistration reg : registrationRepository) {
             views.add(
-                new IdentityProviderView(
+                new IdentityProviderViewDTO(
                     reg.getRegistrationId(),
                     reg.getClientName() != null ? reg.getClientName() : reg.getRegistrationId(),
                     providerTypeOf(reg.getRegistrationId())

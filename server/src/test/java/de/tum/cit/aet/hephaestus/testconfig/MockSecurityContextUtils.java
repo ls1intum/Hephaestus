@@ -42,11 +42,9 @@ public class MockSecurityContextUtils {
         claims.put("iss", "https://test-issuer");
         claims.put("aud", "test-audience");
 
-        // Add realm access with roles
+        // Flat `roles` claim (ADR 0017)
         if (authorities.length > 0) {
-            Map<String, Object> realmAccess = new HashMap<>();
-            realmAccess.put("roles", Arrays.asList(authorities));
-            claims.put("realm_access", realmAccess);
+            claims.put("roles", Arrays.asList(authorities));
         }
 
         // Create mock JWT with specified token value

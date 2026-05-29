@@ -16,9 +16,8 @@ import org.springframework.http.HttpStatus;
  * {@code act} (impersonator id). This is the single place those are parsed so controllers
  * stay declarative.
  *
- * <p>Becomes live at cutover (commit 16): until then the resource-server chain validates
- * Keycloak tokens whose {@code sub} is a UUID, not an account id — these accessors will
- * 401 on a Keycloak token, which is the expected pre-cutover behaviour for the new endpoints.
+ * <p>The resource-server chain validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder},
+ * whose {@code sub} is the decimal account id; these accessors parse it directly.
  */
 public final class CurrentAccount {
 
@@ -48,15 +47,13 @@ public final class CurrentAccount {
         }
     }
 
-    /** Realm roles from the JWT ({@code realm_access.roles}); empty if absent. */
-    @SuppressWarnings("unchecked")
+    /** Roles from the JWT's flat {@code roles} claim; empty if absent. */
     public static java.util.List<String> roles() {
         Jwt jwt = jwtOrNull();
         if (jwt == null) {
             return java.util.List.of();
         }
-        Object realmAccess = jwt.getClaims().get("realm_access");
-        if (realmAccess instanceof java.util.Map<?, ?> map && map.get("roles") instanceof java.util.List<?> roles) {
+        if (jwt.getClaims().get("roles") instanceof java.util.List<?> roles) {
             return roles.stream().filter(String.class::isInstance).map(String.class::cast).toList();
         }
         return java.util.List.of();

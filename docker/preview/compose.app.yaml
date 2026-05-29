@@ -201,9 +201,8 @@ services:
       NATS_SERVER: nats://nats-server:4222
       NATS_ENABLED: ${NATS_ENABLED:-true}
       NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
-      # Shared Keycloak
-      # Public URL for issuer validation (must match token's iss claim)
       # Auth (Hephaestus-native; ADR 0017).
+      # Public URL for issuer validation (must match token's iss claim).
       HEPHAESTUS_AUTH_ISSUER: https://${PREVIEW_DOMAIN:?Required}
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Required}
       GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
@@ -272,7 +271,6 @@ services:
       GIT_COMMIT: ${SOURCE_COMMIT:-}
       # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
       APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
-      # Shared Keycloak
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-true}
       # Optional
       SENTRY_ENVIRONMENT: preview

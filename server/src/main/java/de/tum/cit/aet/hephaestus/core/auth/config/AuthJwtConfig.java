@@ -14,9 +14,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Wires the JWT issuance + verification primitives. Replaces the prior Keycloak-backed
- * {@code JwtDecoderConfig} (deleted in the cutover commit). For now this lives alongside it;
- * the {@code @Primary} role flip happens when we activate {@code oauth2Login}.
+ * Wires the JWT issuance + verification primitives for our own ES256 cookie-session JWTs
+ * (replaces the former Keycloak setup; ADR 0017).
  *
  * <h2>Boot order</h2>
  * {@link #seedKeysOnStartup} runs in {@code @PostConstruct} after the JPA EntityManagerFactory

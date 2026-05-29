@@ -29,11 +29,9 @@ public class WithMockUserSecurityContextFactory implements WithSecurityContextFa
         claims.put("iss", "https://test-issuer");
         claims.put("aud", "test-audience");
 
-        // Add realm access with roles
+        // Flat `roles` claim (ADR 0017)
         if (annotation.authorities().length > 0) {
-            Map<String, Object> realmAccess = new HashMap<>();
-            realmAccess.put("roles", Arrays.asList(annotation.authorities()));
-            claims.put("realm_access", realmAccess);
+            claims.put("roles", Arrays.asList(annotation.authorities()));
         }
 
         // Create mock JWT
