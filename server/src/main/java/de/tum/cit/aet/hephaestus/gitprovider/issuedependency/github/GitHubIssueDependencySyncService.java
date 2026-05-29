@@ -142,7 +142,7 @@ public class GitHubIssueDependencySyncService {
      */
     @Transactional
     public void processIssueDependencyEvent(long blockedIssueId, long blockingIssueId, boolean isBlock) {
-        log.info(
+        log.debug(
             "Received issue dependency event: blockedIssueId={}, blockingIssueId={}, isBlock={}",
             blockedIssueId,
             blockingIssueId,
@@ -299,6 +299,9 @@ public class GitHubIssueDependencySyncService {
         String after = null;
         boolean hasNextPage = true;
         int totalSynced = 0;
+        // Raw issue nodes received across all pages — apples-to-apples with issues.totalCount.
+        // (totalSynced counts dependency relationships, which most issues don't have at all.)
+        int issuesReceived = 0;
         int reportedTotalCount = -1;
         int pageCount = 0;
         int retryAttempt = 0;
@@ -407,6 +410,8 @@ public class GitHubIssueDependencySyncService {
                 reportedTotalCount = issueConnection.getTotalCount();
             }
 
+            issuesReceived += issueConnection.getNodes().size();
+
             var pageInfo = issueConnection.getPageInfo();
             if (pageInfo == null) {
                 log.debug("Received null pageInfo during dependency sync: repoName={}", safeNameWithOwner);
@@ -420,12 +425,13 @@ public class GitHubIssueDependencySyncService {
             totalSynced += self.processIssueDependenciesPage(issueConnection, repo, scopeId);
         }
 
-        // Check for overflow
+        // Raw issue nodes received (not dependency relationships synced) vs issues.totalCount.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "issues",
-                totalSynced,
+                issuesReceived,
                 reportedTotalCount,
+                hasNextPage,
                 "repoName=" + safeNameWithOwner
             );
         }

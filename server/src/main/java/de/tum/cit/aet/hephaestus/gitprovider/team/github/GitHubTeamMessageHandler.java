@@ -78,7 +78,7 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
 
         String orgLogin = event.organization() != null ? event.organization().login() : null;
 
-        log.info(
+        log.debug(
             "Received team event: action={}, teamName={}, orgLogin={}",
             event.action(),
             sanitizeForLog(teamDto.name()),

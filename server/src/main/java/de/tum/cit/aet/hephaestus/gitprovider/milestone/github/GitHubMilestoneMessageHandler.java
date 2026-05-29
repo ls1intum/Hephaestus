@@ -51,7 +51,7 @@ public class GitHubMilestoneMessageHandler extends GitHubMessageHandler<GitHubMi
             return;
         }
 
-        log.info(
+        log.debug(
             "Received milestone event: action={}, milestoneTitle={}, repoName={}",
             event.action(),
             sanitizeForLog(milestoneDto.title()),

@@ -55,7 +55,7 @@ public class GitHubSubIssuesMessageHandler extends GitHubMessageHandler<GitHubSu
             return;
         }
 
-        log.info(
+        log.debug(
             "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}, repoName={}",
             event.action(),
             parentIssueDto.number(),

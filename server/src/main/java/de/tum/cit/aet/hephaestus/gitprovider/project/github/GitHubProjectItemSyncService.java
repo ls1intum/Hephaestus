@@ -149,6 +149,7 @@ public class GitHubProjectItemSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
+        int itemsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
         int reportedTotalCount = -1;
         String cursor = startCursor;
         boolean hasMore = true;
@@ -249,6 +250,7 @@ public class GitHubProjectItemSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+                itemsReceived += connection.getNodes().size();
 
                 // Process this page of items in its own transaction
                 Integer pageSynced = transactionTemplate.execute(status -> {
@@ -290,12 +292,13 @@ public class GitHubProjectItemSyncService {
             }
         }
 
-        // Check for overflow
+        // Raw nodes received vs items.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "projectItems",
-                totalSynced,
+                itemsReceived,
                 reportedTotalCount,
+                hasMore,
                 "itemNodeId=" + issueNodeId
             );
         }

@@ -421,7 +421,7 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
-        log.info(
+        log.debug(
             "Received ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
             reviewData.id(),
             reviewData.state(),

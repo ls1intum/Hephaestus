@@ -85,7 +85,7 @@ public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHub
         Project.OwnerType ownerType = event.detectOwnerType();
         String ownerIdentifier = event.getOwnerIdentifier();
 
-        log.info(
+        log.debug(
             "Received projects_v2_item event: action={}, itemNodeId={}, ownerType={}, owner={}",
             event.action(),
             itemDto.nodeId() != null ? sanitizeForLog(itemDto.nodeId()) : "unknown",

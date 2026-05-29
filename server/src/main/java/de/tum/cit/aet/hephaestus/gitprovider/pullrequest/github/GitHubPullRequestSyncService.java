@@ -646,10 +646,15 @@ public class GitHubPullRequestSyncService {
         // The force-pagination above should have handled most cases, but if GitHub
         // returned empty pages (truly can't serve more data), we fall back to state splitting.
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            boolean overflowDetected = GraphQlConnectionOverflowDetector.check(
+            // Keep totalPRsSynced as the comparand: the fallback below is defined in terms of it.
+            // checkPaginated returns true only on a real early-stop gap (empty page after
+            // force-pagination), suppressing the benign over-report that previously triggered a
+            // spurious state-split.
+            boolean overflowDetected = GraphQlConnectionOverflowDetector.checkPaginated(
                 "pullRequests",
                 totalPRsSynced,
                 reportedTotalCount,
+                abortReason != null || hasMore,
                 safeNameWithOwner
             );
             if (overflowDetected && states == null && !stoppedByIncrementalSync) {

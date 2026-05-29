@@ -145,6 +145,9 @@ public class GitHubPullRequestReviewCommentSyncService {
         int retryAttempt = 0;
         try {
             int totalSynced = 0;
+            // Threads received across all pages — the apples-to-apples count for
+            // reviewThreads.totalCount. (totalSynced counts comments, a different unit.)
+            int threadsProcessed = 0;
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
@@ -267,6 +270,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                     reportedTotalCount = response.getTotalCount();
                 }
 
+                threadsProcessed += response.getNodes().size();
                 for (var graphQlThread : response.getNodes()) {
                     int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
@@ -278,12 +282,13 @@ public class GitHubPullRequestReviewCommentSyncService {
                 retryAttempt = 0;
             }
 
-            // Check for overflow
+            // Threads received (not comments synced — a different unit) vs reviewThreads.totalCount.
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
+                GraphQlConnectionOverflowDetector.checkPaginated(
                     "reviewThreads",
-                    totalSynced,
+                    threadsProcessed,
                     reportedTotalCount,
+                    hasNextPage,
                     "prNumber=" + pullRequest.getNumber()
                 );
             }
@@ -609,12 +614,14 @@ public class GitHubPullRequestReviewCommentSyncService {
             }
         }
 
-        // Check for overflow
+        // allComments holds the embedded first page + every paginated page (raw), apples-to-apples
+        // with the thread's comments.totalCount.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "threadComments",
                 allComments.size(),
                 reportedTotalCount,
+                hasMore,
                 "threadId=" + threadNodeId
             );
         }
@@ -1053,7 +1060,6 @@ public class GitHubPullRequestReviewCommentSyncService {
             String cursor = startCursor;
             boolean hasNextPage = true;
             int pageCount = 0;
-            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 // Check for interrupt (e.g., during application shutdown)
@@ -1140,11 +1146,12 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .toEntity(GHPullRequestReviewThreadConnection.class);
 
                 if (response == null || response.getNodes() == null) {
+                    log.warn(
+                        "Remaining thread sync stopped on empty response: repoName={}, prNumber={}",
+                        safeNameWithOwner,
+                        pullRequest.getNumber()
+                    );
                     break;
-                }
-
-                if (reportedTotalCount < 0) {
-                    reportedTotalCount = response.getTotalCount();
                 }
 
                 for (var graphQlThread : response.getNodes()) {
@@ -1157,15 +1164,9 @@ public class GitHubPullRequestReviewCommentSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            // Check for overflow
-            if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
-                    "reviewThreads",
-                    totalSynced,
-                    reportedTotalCount,
-                    "prNumber=" + pullRequest.getNumber()
-                );
-            }
+            // No overflow check here: this continuation only covers the pages after startCursor, so
+            // comparing its partial count against the full reviewThreads.totalCount is meaningless.
+            // Early stops are already logged at their break sites above.
 
             log.debug(
                 "Completed remaining thread sync: repoName={}, prNumber={}, additionalComments={}",

@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -73,8 +74,16 @@ public class AchievementEventListener {
                     unlocked.stream().map(AchievementDefinition::id).toList()
                 );
             }
+        } catch (ObjectOptimisticLockingFailureException e) {
+            // Residual contention past the advisory lock + retries; this increment is lost but
+            // self-heals on the next event, so WARN without a stack trace (not an alert-worthy ERROR).
+            log.warn(
+                "Achievement increment lost to lock contention: userId={}, eventType={}",
+                userId,
+                event.eventType()
+            );
         } catch (Exception e) {
-            // Log but don't rethrow - achievements are non-critical
+            // Unexpected — keep ERROR; achievements are non-critical so we don't rethrow.
             log.error("Failed to evaluate achievements: userId={}, eventType={}", userId, event.eventType(), e);
         }
     }

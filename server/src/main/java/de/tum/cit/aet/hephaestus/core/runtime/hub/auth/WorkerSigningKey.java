@@ -28,7 +28,8 @@ import org.slf4j.LoggerFactory;
  * @param kid       JWT {@code kid} header — non-empty, opaque to the protocol
  * @param publicKey verification side
  * @param privateKey signing side
- * @param ephemeral {@code true} when the key was generated at boot (logged as a warning)
+ * @param ephemeral {@code true} when the key was generated at boot rather than loaded from config;
+ *                  the wiring layer warns about this only under the prod profile
  */
 public record WorkerSigningKey(String kid, RSAPublicKey publicKey, RSAPrivateKey privateKey, boolean ephemeral) {
     private static final Logger log = LoggerFactory.getLogger(WorkerSigningKey.class);
@@ -83,7 +84,8 @@ public record WorkerSigningKey(String kid, RSAPublicKey publicKey, RSAPrivateKey
             KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
             gen.initialize(2048);
             KeyPair pair = gen.generateKeyPair();
-            log.warn("Generated ephemeral signing key (kid={}). Stable key required for prod.", kid);
+            // Caller (HubConfiguration) decides WARN-vs-INFO by profile; the record can't see it.
+            log.debug("Generated ephemeral worker signing key (kid={})", kid);
             return new WorkerSigningKey(kid, (RSAPublicKey) pair.getPublic(), (RSAPrivateKey) pair.getPrivate(), true);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("RSA key generation unavailable", e);

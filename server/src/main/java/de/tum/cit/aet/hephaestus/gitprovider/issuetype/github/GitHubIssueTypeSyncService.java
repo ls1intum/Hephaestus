@@ -242,9 +242,15 @@ public class GitHubIssueTypeSyncService {
                 retryAttempt = 0;
             }
 
-            // Check for overflow: did we fetch fewer items than GitHub reported?
+            // totalSynced is the raw node count here (incremented per node, no filter).
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check("issueTypes", totalSynced, reportedTotalCount, safeOrgLogin);
+                GraphQlConnectionOverflowDetector.checkPaginated(
+                    "issueTypes",
+                    totalSynced,
+                    reportedTotalCount,
+                    hasNextPage,
+                    safeOrgLogin
+                );
             }
 
             removeDeletedIssueTypes(organization.getId(), syncedIds);

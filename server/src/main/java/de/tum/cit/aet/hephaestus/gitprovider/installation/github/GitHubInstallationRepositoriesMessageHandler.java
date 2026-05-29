@@ -60,7 +60,7 @@ public class GitHubInstallationRepositoriesMessageHandler
         List<GitHubRepositoryRefDTO> removed =
             event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
 
-        log.info(
+        log.debug(
             "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
             event.action(),
             installation.id(),

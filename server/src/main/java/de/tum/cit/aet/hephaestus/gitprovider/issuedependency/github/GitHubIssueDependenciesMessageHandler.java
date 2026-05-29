@@ -88,7 +88,7 @@ public class GitHubIssueDependenciesMessageHandler extends GitHubMessageHandler<
             return;
         }
 
-        log.info(
+        log.debug(
             "Received issue_dependencies event: action={}, blockedIssueNumber={}, blockingIssueNumber={}, repoName={}",
             event.action(),
             blockedIssueDto.number(),

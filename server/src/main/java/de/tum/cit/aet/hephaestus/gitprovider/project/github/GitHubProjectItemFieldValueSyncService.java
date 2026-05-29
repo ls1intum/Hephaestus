@@ -299,12 +299,13 @@ public class GitHubProjectItemFieldValueSyncService {
             }
         }
 
-        // Check for overflow
+        // totalSynced is the raw node count; completedNormally is false only on a page-cap/error stop.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "fieldValues",
                 totalSynced,
                 reportedTotalCount,
+                !completedNormally,
                 "itemId=" + itemNodeId
             );
         }

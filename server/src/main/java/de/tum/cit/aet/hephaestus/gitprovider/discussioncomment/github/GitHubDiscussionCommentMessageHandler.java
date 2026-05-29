@@ -61,7 +61,7 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
             return;
         }
 
-        log.info(
+        log.debug(
             "Received discussion_comment event: action={}, discussionNumber={}, commentId={}, repoName={}",
             event.action(),
             discussionDto.number(),
