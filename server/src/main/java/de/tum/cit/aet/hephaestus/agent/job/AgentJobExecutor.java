@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.RejectedExecutionException;
@@ -115,8 +116,16 @@ public class AgentJobExecutor {
      * deregister. Survives thread restarts and exception paths via the try-finally.
      */
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
+    /**
+     * Job ids this worker is currently executing. Source of truth for job-scoped cancellation
+     * (#1138): drain and hub-initiated cancels act only on jobs in this set, never on sibling
+     * workers' jobs. Populated on claim, removed in the {@code executeJob} finally block.
+     */
+    private final Set<UUID> localRunningJobs = ConcurrentHashMap.newKeySet();
     private final java.util.Optional<WorkerCapacityState> capacityState;
     private final java.util.Optional<WorkerProperties> workerProperties;
+    /** This worker's identity (null only when the worker role is off); stamped on claimed jobs to fence terminal writes. */
+    private final String workerId;
 
     public AgentJobExecutor(
         @Qualifier("agentNatsConnection") Connection natsConnection,
@@ -146,6 +155,7 @@ public class AgentJobExecutor {
         this.meterRegistry = meterRegistry;
         this.capacityState = capacityState;
         this.workerProperties = workerProperties;
+        this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
 
         // Internal scheduler for NATS InProgress heartbeats — not a @Bean to avoid
         // blocking Spring's TaskScheduler auto-configuration (ConditionalOnMissingBean).
@@ -174,8 +184,9 @@ public class AgentJobExecutor {
         pullThread = Thread.ofPlatform().name("agent-nats-pull").daemon(true).start(this::pullLoop);
 
         log.info(
-            "Agent job executor started: consumer={}, maxAckPending={}",
+            "Agent job executor started: consumer={}, workerId={}, maxAckPending={}",
             natsProperties.consumerName(),
+            workerId,
             natsProperties.maxAckPending()
         );
     }
@@ -226,34 +237,51 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Transition every job currently {@link AgentJobStatus#RUNNING} on this worker to
-     * {@link AgentJobStatus#CANCELLED} with the given reason. The in-flight sandbox tasks
-     * continue running locally but their terminal-state write will fail the {@code IN :fromStatuses}
-     * guard and the result will be discarded; NATS holds the message unack'd and redelivers to
-     * the next worker.
-     *
-     * <p>{@code RUNNING} is shared across workers in principle, but in practice the JetStream
-     * WorkQueue + {@code maxAckPending} bound ensures only this worker holds RUNNING messages.
+     * Transition the jobs THIS worker is currently running to {@link AgentJobStatus#CANCELLED}
+     * with the given reason, and stop their containers promptly. Scoped to {@link #localRunningJobs}
+     * so sibling workers' jobs are untouched — this is the fix for #1138 that makes running more
+     * than one worker replica safe.
      */
     public void cancelInFlight(AgentJobCancellationReason reason) {
-        // TODO(#1138): scope to RUNNING jobs claimed by THIS worker once
-        // the dispatcher claim loop lands. Until then, do not scale worker
-        // replicas above 1 — sibling workers' jobs will be mass-cancelled.
-        java.util.List<AgentJob> running = jobRepository.findByStatus(AgentJobStatus.RUNNING);
-        if (running.isEmpty()) {
+        Set<UUID> snapshot = Set.copyOf(localRunningJobs);
+        if (snapshot.isEmpty()) {
             return;
         }
-        log.info("Cancelling {} in-flight job(s) with reason {}", running.size(), reason);
+        log.info("Cancelling {} in-flight job(s) owned by this worker with reason {}", snapshot.size(), reason);
         Instant now = Instant.now();
         String error = "worker draining";
-        for (AgentJob job : running) {
+        for (UUID jobId : snapshot) {
             try {
                 transactionTemplate.executeWithoutResult(status ->
-                    jobRepository.transitionToCancelled(job.getId(), now, error, reason, Set.of(AgentJobStatus.RUNNING))
+                    jobRepository.transitionToCancelled(jobId, now, error, reason, Set.of(AgentJobStatus.RUNNING))
                 );
+                // Stop the container so drain doesn't wait for the agent to finish naturally.
+                sandboxManager.cancel(jobId);
             } catch (Exception e) {
-                log.warn("Failed to cancel in-flight job {}: {}", job.getId(), e.getClass().getSimpleName());
+                log.warn("Failed to cancel in-flight job {}: {}", jobId, e.getClass().getSimpleName());
             }
+        }
+    }
+
+    /**
+     * Promptly stop a locally-running job's container in response to a hub-initiated cancel
+     * (the authoritative {@code agent_job} status transition is performed hub-side before the
+     * {@code CancelJob} frame is dispatched). No-op if this worker does not own the job, which is
+     * how job-scoped cancellation stays safe across replicas.
+     *
+     * @return {@code true} if this worker owns the job and a stop was requested
+     */
+    public boolean cancelLocalJob(UUID jobId, String reason) {
+        if (!localRunningJobs.contains(jobId)) {
+            return false;
+        }
+        log.info("Hub-initiated cancel for locally-running job {}: {}", jobId, reason);
+        try {
+            sandboxManager.cancel(jobId);
+            return true;
+        } catch (Exception e) {
+            log.warn("Local cancel failed for job {}: {}", jobId, e.getClass().getSimpleName());
+            return false;
         }
     }
 
@@ -277,8 +305,11 @@ public class AgentJobExecutor {
                 StreamContext streamContext = natsConnection.getStreamContext(natsProperties.streamName());
                 ConsumerContext consumerContext = streamContext.getConsumerContext(natsProperties.consumerName());
 
+                // Pull only a worker-local batch (not the cluster-wide maxAckPending) so a single
+                // replica doesn't claim the whole unacked budget and starve siblings (#1138). The
+                // pool-full path NAKs-with-delay, returning surplus to other replicas.
                 FetchConsumeOptions fetchOptions = FetchConsumeOptions.builder()
-                    .maxMessages(natsProperties.maxAckPending())
+                    .maxMessages(natsProperties.fetchBatchSize())
                     .expiresIn(Duration.ofSeconds(30).toMillis())
                     .build();
 
@@ -348,6 +379,7 @@ public class AgentJobExecutor {
             if (claimed) {
                 releaseCapacity();
             }
+            localRunningJobs.remove(jobId);
             MDC.remove(MDC_JOB_ID);
             MDC.remove(MDC_JOB_TYPE);
         }
@@ -569,15 +601,9 @@ public class AgentJobExecutor {
 
     /** Handle a job cancelled during sandbox execution. */
     private void handleCancellation(UUID jobId, Message msg) {
-        transactionTemplate.executeWithoutResult(status -> {
-            jobRepository.transitionStatus(
-                jobId,
-                AgentJobStatus.CANCELLED,
-                Instant.now(),
-                "Cancelled during execution",
-                Set.of(AgentJobStatus.RUNNING)
-            );
-        });
+        transactionTemplate.executeWithoutResult(status ->
+            transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution")
+        );
         msg.ack();
         log.info("Agent job cancelled: jobId={}", jobId);
     }
@@ -601,15 +627,9 @@ public class AgentJobExecutor {
         String errorMessage = truncateErrorMessage(e.getMessage());
         log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
 
-        transactionTemplate.executeWithoutResult(status -> {
-            jobRepository.transitionStatus(
-                jobId,
-                AgentJobStatus.FAILED,
-                Instant.now(),
-                errorMessage,
-                Set.of(AgentJobStatus.RUNNING)
-            );
-        });
+        transactionTemplate.executeWithoutResult(status ->
+            transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage)
+        );
         msg.ack();
     }
 
@@ -664,13 +684,14 @@ public class AgentJobExecutor {
                 }
             }
 
-            // Transition to RUNNING
+            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
             job.setStatus(AgentJobStatus.RUNNING);
             job.setStartedAt(Instant.now());
+            job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, and terminal-write fencing (#1138)
             jobRepository.save(job);
 
-            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-
+            // Track locally so drain / hub-initiated cancels target only this worker's jobs.
+            localRunningJobs.add(jobId);
             capacityState.ifPresent(WorkerCapacityState::claimReview);
             return new ClaimResult(job, snapshot);
         });
@@ -679,6 +700,21 @@ public class AgentJobExecutor {
     /** Release the review-capacity slot on any terminal transition (success/failure/cancel/timeout). */
     private void releaseCapacity() {
         capacityState.ifPresent(WorkerCapacityState::releaseReview);
+    }
+
+    /**
+     * Terminal RUNNING→{@code status} transition, fenced to this worker's ownership when a worker id
+     * is known (#1138): if the job was orphan-requeued to a sibling, this worker's late write finds a
+     * different {@code worker_id} and no-ops instead of clobbering the sibling's run. Falls back to an
+     * unfenced transition only when no worker identity exists (worker role off) — where there are no
+     * siblings to fence against.
+     *
+     * @return rows updated (0 if no longer RUNNING or no longer owned by this worker)
+     */
+    private int transitionTerminal(UUID jobId, AgentJobStatus status, Instant now, String error) {
+        return workerId != null
+            ? jobRepository.transitionStatusOwnedBy(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING), workerId)
+            : jobRepository.transitionStatus(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING));
     }
 
     // Complete: micro-transaction #2
@@ -691,8 +727,14 @@ public class AgentJobExecutor {
         AgentJob job
     ) {
         AgentJobStatus terminalStatus = determineTerminalStatus(sandboxResult, agentResult);
-        persistTerminalState(jobId, agentResult, sandboxResult, terminalStatus);
-        deliverResults(jobId, terminalStatus, handler);
+        // persistTerminalState returns false when we lost the fence (cancelled / orphan-requeued); we
+        // must not deliver then, or a stuck-then-recovered worker would double-post the sibling's findings.
+        boolean persisted = persistTerminalState(jobId, agentResult, sandboxResult, terminalStatus);
+        if (persisted) {
+            deliverResults(jobId, terminalStatus, handler);
+        } else {
+            log.info("Skipping delivery: job no longer owned/RUNNING (requeued or cancelled): jobId={}", jobId);
+        }
     }
 
     /**
@@ -747,10 +789,12 @@ public class AgentJobExecutor {
     }
 
     /**
-     * Persist terminal status and output within a single transaction.
-     * Ensures cancelled jobs don't get output persisted.
+     * Persist terminal status and output within a single transaction, fenced to this worker.
+     *
+     * @return {@code true} if this worker won the terminal write (still RUNNING-and-owned); {@code false}
+     *     if the job was cancelled or orphan-requeued to a sibling, in which case the caller must NOT deliver.
      */
-    private void persistTerminalState(
+    private boolean persistTerminalState(
         UUID jobId,
         AgentResult agentResult,
         SandboxResult sandboxResult,
@@ -762,19 +806,14 @@ public class AgentJobExecutor {
             default -> null;
         };
 
-        transactionTemplate.executeWithoutResult(status -> {
-            int updated = jobRepository.transitionStatus(
-                jobId,
-                terminalStatus,
-                Instant.now(),
-                errorMessage,
-                Set.of(AgentJobStatus.RUNNING)
-            );
+        Boolean persisted = transactionTemplate.execute(status -> {
+            int updated = transitionTerminal(jobId, terminalStatus, Instant.now(), errorMessage);
 
             if (updated == 0) {
-                // Job was cancelled during execution — skip output persist
-                log.info("Job was cancelled during execution, skipping output persist: jobId={}", jobId);
-                return;
+                // No longer RUNNING-and-ours: cancelled during execution, or orphan-requeued to a
+                // sibling (fence). Skip output persist so we don't clobber the new owner's run.
+                log.info("Job no longer owned/RUNNING, skipping output persist: jobId={}", jobId);
+                return false;
             }
 
             AgentJob freshJob = jobRepository.findById(jobId).orElse(null);
@@ -836,7 +875,9 @@ public class AgentJobExecutor {
                 }
                 jobRepository.saveAndFlush(freshJob);
             }
+            return true;
         });
+        return Boolean.TRUE.equals(persisted);
     }
 
     /**

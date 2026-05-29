@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 
 /**
@@ -86,6 +87,21 @@ public final class TestEntities {
     public static Workspace workspace(Long id, String slug) {
         Workspace ws = workspace(id);
         ws.setWorkspaceSlug(slug);
+        return ws;
+    }
+
+    /**
+     * A persistable {@link Workspace} (no id; all NOT NULL columns populated) for integration tests
+     * that save the entity. Status defaults to ACTIVE.
+     */
+    public static Workspace activeWorkspace(String slug) {
+        Workspace ws = new Workspace();
+        ws.setWorkspaceSlug(slug);
+        ws.setDisplayName("Workspace " + slug);
+        ws.setAccountLogin(slug + "-org");
+        ws.setAccountType(AccountType.ORG);
+        ws.setIsPubliclyViewable(true);
+        ws.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         return ws;
     }
 

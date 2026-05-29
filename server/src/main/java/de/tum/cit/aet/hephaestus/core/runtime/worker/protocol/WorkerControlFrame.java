@@ -12,7 +12,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = Heartbeat.class, name = "Heartbeat"),
         @JsonSubTypes.Type(value = CapacityReport.class, name = "CapacityReport"),
         @JsonSubTypes.Type(value = ForceReconnect.class, name = "ForceReconnect"),
+        @JsonSubTypes.Type(value = CancelJob.class, name = "CancelJob"),
     }
 )
 public sealed interface WorkerControlFrame
-    permits WorkerHello, WorkerWelcome, Heartbeat, CapacityReport, ForceReconnect {}
+    permits WorkerHello, WorkerWelcome, Heartbeat, CapacityReport, ForceReconnect, CancelJob {}

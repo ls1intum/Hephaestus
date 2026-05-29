@@ -494,7 +494,10 @@ hephaestus:
             # Must exceed max container timeout (1hr) + buffer
             ack-wait: 70m
             max-deliver: 5
-            max-ack-pending: 5
+            # Cluster-wide unacked bound across all worker replicas. Set ≈ replicas × per-worker
+            # concurrency; the per-replica pull is capped by fetch-batch-size so no replica starves siblings.
+            max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
+            fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
             heartbeat-interval: 25s
 
     # ═══════════════════════════════════════════════════════════════════════════

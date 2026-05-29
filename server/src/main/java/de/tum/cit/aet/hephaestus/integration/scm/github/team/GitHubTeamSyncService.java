@@ -156,7 +156,7 @@ public class GitHubTeamSyncService {
             // Maps child team's native ID → parent team's native ID (from GraphQL)
             Map<Long, Long> parentNativeIdByChildNativeId = new HashMap<>();
             int totalSynced = 0;
-            int teamsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+            int teamsReceived = 0;
             int totalPermissions = 0;
             String cursor = null;
             boolean hasNextPage = true;

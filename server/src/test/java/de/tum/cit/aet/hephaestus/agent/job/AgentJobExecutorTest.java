@@ -40,6 +40,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -92,6 +93,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         "hephaestus-agent-executor",
         Duration.ofMinutes(70),
         5,
+        16,
         5,
         Duration.ofSeconds(25)
     );
@@ -179,6 +181,67 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
+    @DisplayName("Job-scoped cancellation (#1138)")
+    class ScopedCancellation {
+
+        @Test
+        @DisplayName("cancelLocalJob returns false and does not touch the sandbox for a job this worker doesn't run")
+        void cancelLocalJobUnknownIsNoOp() {
+            boolean cancelled = executor.cancelLocalJob(UUID.randomUUID(), "user-cancel");
+
+            org.assertj.core.api.Assertions.assertThat(cancelled).isFalse();
+            verify(sandboxManager, never()).cancel(any());
+        }
+
+        @Test
+        @DisplayName("cancelInFlight on a worker with no local jobs cancels nothing (no DB-wide sweep)")
+        void cancelInFlightEmptyIsNoOp() {
+            executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+
+            verify(sandboxManager, never()).cancel(any());
+            verify(jobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
+            // Critically: never queries all RUNNING jobs cluster-wide.
+            verify(jobRepository, never()).findByStatus(AgentJobStatus.RUNNING);
+        }
+
+        @Test
+        @DisplayName("does NOT deliver when the fenced terminal write loses ownership (orphan-requeued)")
+        void doesNotDeliverWhenFencedOut() {
+            // Worker has identity "test-worker" → terminal writes are fenced to the owner.
+            executor = new AgentJobExecutor(
+                natsConnection,
+                NATS_PROPS,
+                jobRepository,
+                configRepository,
+                handlerRegistry,
+                practiceAgent,
+                sandboxManager,
+                sandboxExecutor,
+                transactionTemplate,
+                objectMapper,
+                meterRegistry,
+                Optional.empty(),
+                Optional.of(workerPropsWithLlm(null, null))
+            );
+
+            Message msg = createMessage(jobId);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
+            when(configRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(config));
+            when(jobRepository.countByConfigIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            JobTypeHandler handler = setupFullExecution();
+            // Fence loses: another worker owns the job now (it was orphan-requeued mid-execution).
+            when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(0);
+
+            executor.executeJob(msg);
+
+            // The job is no longer ours — we must not double-deliver the sibling's findings.
+            verify(handler, never()).deliver(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Claim phase")
     class ClaimPhase {
 
         @Test
@@ -218,7 +281,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.executeJob(msg);
 
-            verify(jobRepository).save(any(AgentJob.class));
+            // Assert the actual claim contract, not just "save was called": status flips to RUNNING.
+            ArgumentCaptor<AgentJob> claimed = ArgumentCaptor.forClass(AgentJob.class);
+            verify(jobRepository).save(claimed.capture());
+            assertThat(claimed.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+            assertThat(claimed.getValue().getStartedAt()).isNotNull();
         }
     }
 
@@ -448,7 +515,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             freshJob.prePersist();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-            when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+            // Worker identity is set ("test-worker"), so the terminal write is fenced to the owner.
+            when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(1);
 
             executor.executeJob(msg);
 
@@ -494,7 +562,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             freshJob.prePersist();
             when(jobRepository.findById(any(UUID.class))).thenReturn(Optional.of(freshJob));
             when(jobRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-            when(jobRepository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+            // Worker identity is set ("test-worker"), so the terminal write is fenced to the owner.
+            when(jobRepository.transitionStatusOwnedBy(any(), any(), any(), any(), any(), any())).thenReturn(1);
 
             executor.executeJob(msg);
 
@@ -509,12 +578,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     // Helpers
 
-    private void setupFullExecution() {
+    private JobTypeHandler setupFullExecution() {
         SandboxResult successResult = new SandboxResult(0, Map.of(), "success", false, Duration.ofMinutes(2));
-        setupFullExecution(successResult);
+        return setupFullExecution(successResult);
     }
 
-    private void setupFullExecution(SandboxResult sandboxResult) {
+    private JobTypeHandler setupFullExecution(SandboxResult sandboxResult) {
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
         when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
@@ -533,6 +602,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         when(practiceAgent.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
 
         when(sandboxManager.execute(any())).thenReturn(sandboxResult);
+        return handler;
     }
 
     private static WorkerProperties workerPropsWithLlm(String baseUrl, String apiKey) {

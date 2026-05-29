@@ -181,6 +181,15 @@ public class AgentJob {
     @Column(name = "retry_count", nullable = false)
     private int retryCount = 0;
 
+    /**
+     * Worker that owns this job while {@link #status} is {@link AgentJobStatus#RUNNING} (#1138).
+     * Soft reference to {@code worker_registry.worker_id} (no FK: a finished job must survive its
+     * worker row being reaped). Set on claim; routes cancels to the owner, detects jobs orphaned by a
+     * dead worker, and fences terminal writes so a requeued job's original worker can't clobber it.
+     */
+    @Column(name = "worker_id", length = 255)
+    private String workerId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

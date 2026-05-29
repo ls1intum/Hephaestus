@@ -216,7 +216,7 @@ public class GitHubProjectSyncService {
 
         Set<Long> syncedProjectIds = new HashSet<>();
         int totalSynced = 0;
-        int projectsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int projectsReceived = 0;
         int totalSkipped = 0;
         String cursor = null;
         boolean hasMore = true;
@@ -719,7 +719,7 @@ public class GitHubProjectSyncService {
         // Track items needing follow-up field value pagination (items with >20 field values)
         List<ItemWithFieldValueCursor> itemsNeedingFieldValuePagination = new ArrayList<>();
         int totalSynced = 0;
-        int itemsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int itemsReceived = 0;
         int totalSkipped = 0; // Items skipped due to incremental sync
         boolean hasMore = true;
         int pageCount = 0;
@@ -1037,7 +1037,6 @@ public class GitHubProjectSyncService {
             }
         }
 
-        // Check for overflow
         // Raw nodes received vs items.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
@@ -1168,7 +1167,7 @@ public class GitHubProjectSyncService {
 
         Long projectId = project.getId();
         List<String> allSyncedFieldIds = new ArrayList<>();
-        int fieldsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int fieldsReceived = 0;
         boolean completedNormally = false;
 
         try {
@@ -1395,7 +1394,7 @@ public class GitHubProjectSyncService {
 
         try {
             List<String> syncedStatusUpdateNodeIds = new ArrayList<>();
-            int statusUpdatesReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+            int statusUpdatesReceived = 0;
             String cursor = null;
             boolean hasMore = true;
             int pageCount = 0;

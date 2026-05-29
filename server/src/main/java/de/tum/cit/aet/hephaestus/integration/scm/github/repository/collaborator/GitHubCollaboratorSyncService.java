@@ -110,7 +110,7 @@ public class GitHubCollaboratorSyncService {
         try {
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
             int totalSynced = 0;
-            int collaboratorsReceived = 0; // raw edges received, for the apples-to-apples completeness check
+            int collaboratorsReceived = 0;
             int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;

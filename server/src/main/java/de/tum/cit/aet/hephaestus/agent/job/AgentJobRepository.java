@@ -101,6 +101,28 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
+     * Terminal transition fenced to the owning worker (#1138): like {@link #transitionStatus} but also
+     * requires {@code worker_id = :workerId}, so a worker whose job was orphan-requeued to a sibling
+     * cannot clobber the sibling's run with its own late terminal write.
+     *
+     * @return rows updated (0 or 1)
+     */
+    @WorkspaceAgnostic("ID-based fenced transition; job ID + owner from worker-local execution context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = :newStatus, j.completedAt = :now, j.errorMessage = :error " +
+            "WHERE j.id = :id AND j.status IN :fromStatuses AND j.workerId = :workerId"
+    )
+    int transitionStatusOwnedBy(
+        @Param("id") UUID id,
+        @Param("newStatus") AgentJobStatus newStatus,
+        @Param("now") Instant now,
+        @Param("error") String error,
+        @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses,
+        @Param("workerId") String workerId
+    );
+
+    /**
      * Conditional transition to {@link AgentJobStatus#CANCELLED} that also records the
      * cancellation reason. Used by the worker drain coordinator and explicit user-cancel paths.
      *
@@ -121,15 +143,56 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("fromStatuses") Collection<AgentJobStatus> fromStatuses
     );
 
-    /** Zombie sweeper: find QUEUED jobs older than cutoff (never picked up by NATS consumer). */
+    /**
+     * Zombie sweeper: QUEUED jobs older than cutoff (never picked up by the NATS consumer). Returns a
+     * projection (not entities) so the sweeper can re-publish outside any transaction — without it the
+     * lazy {@code workspace} access would force the publish loop to hold a DB connection across NATS I/O.
+     */
     @WorkspaceAgnostic("Cross-workspace zombie recovery; caller is @WorkspaceAgnostic sweeper")
-    @Query("SELECT j FROM AgentJob j WHERE j.status = 'QUEUED' AND j.createdAt < :cutoff")
-    List<AgentJob> findStaleQueuedJobs(@Param("cutoff") Instant cutoff);
+    @Query(
+        "SELECT j.id AS jobId, j.workspace.id AS workspaceId, j.retryCount AS retryCount " +
+            "FROM AgentJob j WHERE j.status = 'QUEUED' AND j.createdAt < :cutoff"
+    )
+    List<OrphanedJobRef> findStaleQueuedJobs(@Param("cutoff") Instant cutoff);
 
     /** Stale RUNNING reaper: find RUNNING jobs that exceeded their expected lifetime. */
     @WorkspaceAgnostic("Cross-workspace stale job reaper; caller is @WorkspaceAgnostic sweeper")
     @Query("SELECT j FROM AgentJob j WHERE j.status = 'RUNNING' AND j.startedAt < :cutoff")
     List<AgentJob> findStaleRunningJobs(@Param("cutoff") Instant cutoff);
+
+    /**
+     * Orphan recovery (#1138): RUNNING jobs whose owning worker has no fresh heartbeat (crashed /
+     * partitioned / gone). Native so the liveness comparison stays on the DB clock both sides —
+     * {@code last_heartbeat} is written with the DB {@code now()}, and the cutoff is
+     * {@code now() - leaseTtlSeconds}, so no app/DB skew enters the alive/dead decision. The
+     * {@code startedAt < :graceCutoff} startup grace is app-clock on both sides (started_at is set
+     * app-side at claim); clock skew there only shifts grace timing and cannot cause a false orphan.
+     */
+    @WorkspaceAgnostic("Cross-workspace orphan recovery; caller is @WorkspaceAgnostic sweeper")
+    @Query(
+        value = "SELECT j.id AS jobId, j.workspace_id AS workspaceId, j.retry_count AS retryCount " +
+            "FROM agent_job j WHERE j.status = 'RUNNING' AND j.worker_id IS NOT NULL " +
+            "AND j.started_at < :graceCutoff " +
+            "AND NOT EXISTS (SELECT 1 FROM worker_registry w WHERE w.worker_id = j.worker_id " +
+            "AND w.last_heartbeat >= now() - make_interval(secs => :leaseTtlSeconds))",
+        nativeQuery = true
+    )
+    List<OrphanedJobRef> findOrphanedRunningJobs(
+        @Param("graceCutoff") Instant graceCutoff,
+        @Param("leaseTtlSeconds") long leaseTtlSeconds
+    );
+
+    /**
+     * CAS requeue of an orphaned job: RUNNING → QUEUED, clear ownership, bump retry_count. Returns 1
+     * if this caller won the race (so it should re-publish), 0 if another sweeper already moved it.
+     */
+    @WorkspaceAgnostic("ID-based orphan requeue; caller is @WorkspaceAgnostic sweeper")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = 'QUEUED', j.workerId = null, " +
+            "j.startedAt = null, j.retryCount = j.retryCount + 1 WHERE j.id = :id AND j.status = 'RUNNING'"
+    )
+    int requeueOrphan(@Param("id") UUID id);
 
     // Delivery tracking (issue #748)
 

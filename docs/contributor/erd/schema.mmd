@@ -77,6 +77,7 @@ erDiagram
         VARCHAR(32) cancellation_reason
         VARCHAR(48) integration_kind
         VARCHAR(48) subject_class
+        VARCHAR(255) worker_id
     }
 
     ChatMessage {
@@ -783,6 +784,12 @@ erDiagram
         BIGINT user_id FK,UK "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
         BOOLEAN ai_review_enabled "NOT NULL"
+    }
+
+    WorkerRegistry {
+        VARCHAR(255) worker_id PK
+        TIMESTAMPTZ last_heartbeat "NOT NULL"
+        TIMESTAMPTZ registered_at "NOT NULL"
     }
 
     WorkerTokenDenylist {

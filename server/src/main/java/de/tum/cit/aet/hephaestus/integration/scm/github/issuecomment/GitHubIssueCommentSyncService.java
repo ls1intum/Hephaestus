@@ -112,7 +112,7 @@ public class GitHubIssueCommentSyncService {
         ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalSynced = 0;
-        int commentsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int commentsReceived = 0;
         String cursor = null;
         boolean hasMore = true;
         int pageCount = 0;
@@ -346,7 +346,7 @@ public class GitHubIssueCommentSyncService {
         ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalSynced = 0;
-        int commentsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
+        int commentsReceived = 0;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
