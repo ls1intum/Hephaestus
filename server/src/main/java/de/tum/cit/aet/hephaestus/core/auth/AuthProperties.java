@@ -22,6 +22,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        cookie and the auth-intent cookie. Required in non-dev profiles.
  *                        Bean wiring will generate an ephemeral key (and log a warning)
  *                        if this is left blank — fine for local dev, fatal in prod.
+ * @param deleteCooldown  GDPR Art. 17 soft-delete cooldown. A DELETING account is invisible but
+ *                        recoverable for this window; once {@code deleted_at} is older than this,
+ *                        {@code AccountHardDeleteSweeper} hard-deletes the account (cascading its
+ *                        auth rows) and flips status to DELETED. Default 48h.
  * @param github          Default GitHub OAuth login app. The login registration is built
  *                        only when a client id is configured (blank = provider omitted, no
  *                        crash) — unlike {@code spring.security.oauth2.client.*}, which fails
@@ -35,6 +39,7 @@ public record AuthProperties(
     @DefaultValue("15m") Duration accessTtl,
     @DefaultValue("__Host-HEPHAESTUS_AT") String cookieName,
     @DefaultValue("") String stateCookieKey,
+    @DefaultValue("48h") Duration deleteCooldown,
     @DefaultValue GithubLogin github,
     @DefaultValue GitlabLrzLogin gitlabLrz
 ) {

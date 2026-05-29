@@ -22,11 +22,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * shared across replicas when a Postgres-backed {@code ProxyManager} is wired (production); see
  * {@link AuthRateLimitConfig} for the per-replica fallback trade-off.
  *
- * <p>{@code trustedProxyCount} bounds how many rightmost {@code X-Forwarded-For} hops the deployment
- * owns (default 1 — always behind Coolify). The IP-keyed buckets resolve the client as the entry
- * just left of those trusted hops, so a spoofed leftmost XFF value cannot mint fresh buckets. Set to
- * the real number of reverse proxies in front of the app; {@code 0} disables XFF trust entirely
- * (key purely off {@code getRemoteAddr()}).
+ * <p>{@code trustedProxyCount} is retained for backward compatibility but is no longer used to parse
+ * {@code X-Forwarded-For} in the filter: proxy trust is owned by the servlet container via
+ * {@code server.forward-headers-strategy: native} (prod), which rewrites {@code getRemoteAddr()} to
+ * the real client before the filter runs. The filter keys IP buckets purely off {@code getRemoteAddr()}.
+ * Configure the trusted-proxy topology through {@code server.tomcat.remoteip.*} instead. (Validation of
+ * {@code >= 0} is kept so a stray negative value still fails fast.)
  */
 @ConfigurationProperties(prefix = "hephaestus.auth.rate-limit")
 public record AuthRateLimitProperties(

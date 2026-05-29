@@ -88,8 +88,10 @@ public class Account {
     private Instant updatedAt;
 
     /**
-     * Set when the account enters {@link Status#DELETING} (start of the 48h GDPR-cooldown
-     * window). Hard-delete cascades through related tables once the cooldown expires.
+     * Set when the account enters {@link Status#DELETING} (start of the GDPR-cooldown window,
+     * {@code hephaestus.auth.delete-cooldown}, default 48h). Once it is older than the cooldown,
+     * {@code AccountHardDeleteSweeper} purges the account's personal/auth child rows and flips the
+     * row to {@link Status#DELETED}.
      */
     @Column(name = "deleted_at")
     @Nullable

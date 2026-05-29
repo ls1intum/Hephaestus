@@ -56,6 +56,13 @@ public class JwtPrincipalFactory {
 
     @Transactional(readOnly = true)
     public JwtPrincipal forAccount(Account account) {
+        // Defense-in-depth account-status gate (ADR 0017). Every JWT-issue path funnels through here
+        // (login success handler, token refresh, impersonation). A SUSPENDED / DELETING / DELETED
+        // account must never be minted a principal — even if a caller forgot the upstream check. The
+        // OAuth success handler rejects earlier with a friendly redirect; this is the last line.
+        if (account.getStatus() != Account.Status.ACTIVE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account is not active");
+        }
         String login = resolveLogin(account);
         Set<String> roles = new HashSet<>(accountFeatureRepository.findFlagsByAccountId(account.getId()));
         if (account.getAppRole() == Account.AppRole.APP_ADMIN) {

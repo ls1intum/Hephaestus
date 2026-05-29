@@ -59,9 +59,12 @@ public class AccountService {
     }
 
     /**
-     * GDPR Art. 17 soft-delete: status → DELETING + deleted_at (48h cooldown start), revoke
-     * all sessions immediately. The hard cascade + ExternalActor pseudonymization runs in a
-     * scheduled sweep once the cooldown expires.
+     * GDPR Art. 17 soft-delete: status → DELETING + deleted_at (start of the cooldown window), and
+     * revoke all sessions immediately. Once {@code deleted_at} is older than
+     * {@code hephaestus.auth.delete-cooldown} (default 48h), {@link AccountHardDeleteSweeper} purges
+     * the account's personal/auth child rows (identity_link, account_feature, issued_jwt,
+     * account_export) and flips the row to DELETED. Retained, lawful-basis audit data (auth_event,
+     * Art. 30) and the read-only git-activity mirror (Art. 17(3)) are intentionally kept.
      */
     @Transactional
     public void softDelete(Long accountId) {

@@ -1,14 +1,23 @@
 package de.tum.cit.aet.hephaestus.integration.identity.connect;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -37,26 +46,32 @@ import tools.jackson.databind.ObjectMapper;
  * </ol>
  *
  * <h2>DNS-rebind / TOCTOU hardening (OWASP SSRF Prevention Cheat Sheet)</h2>
- * Validating the host's IP and then letting {@link HttpClient} re-resolve DNS at send time is a
+ * Validating the host's IP and then letting a high-level HTTP client re-resolve DNS at send time is a
  * classic TOCTOU bypass: an attacker domain with a very low TTL can answer with a public IP during
  * {@link #assertPublicHost} and then flip to {@code 169.254.169.254} / {@code 127.0.0.1} for the
- * actual connection. To collapse that window we resolve the host ONCE, validate every returned
- * address, and then re-resolve immediately before the send and require the live answer to be a
- * non-empty subset of the already-vetted public set (re-validating each address again). Any new or
- * non-public address aborts the request. Combined with {@link HttpClient.Redirect#NEVER} (a 30x to
- * an internal address is a classic bypass) and a short timeout this leaves no usable rebind window.
+ * actual connection (the {@code java.net.http.HttpClient} does its OWN, un-pinnable DNS lookup at
+ * connect time). To CLOSE that window — not merely narrow it — we do not connect by hostname at all:
+ * <ol>
+ *   <li>Resolve the host ONCE and validate every returned address is public.</li>
+ *   <li>Re-resolve immediately before connecting and require the live answer to be a non-empty subset
+ *       of the vetted set (re-validating each address), so a flip between the two resolutions aborts.</li>
+ *   <li>Open the TLS socket to a vetted IP <em>literal</em> via {@link #pinnedHttpsGet} — the kernel
+ *       connects to exactly that address, with no further DNS lookup the attacker could race. TLS SNI
+ *       and endpoint identification are still set to the original hostname, so certificate hostname
+ *       verification is fully preserved.</li>
+ * </ol>
+ * Redirects are NOT followed (a 30x to an internal address is a classic bypass): any non-200 is
+ * rejected. A short connect/read timeout bounds slow-loris and blind-SSRF probing.
  */
 @Component
 public class IssuerDiscoveryProbe {
 
     private static final Logger log = LoggerFactory.getLogger(IssuerDiscoveryProbe.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
+    private static final int TIMEOUT_MS = (int) TIMEOUT.toMillis();
+    /** Cap the discovery body we will buffer (a JSON metadata doc is tiny; reject runaway responses). */
+    private static final int MAX_BODY_BYTES = 256 * 1024;
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.NEVER)
-        .connectTimeout(TIMEOUT)
-        .build();
 
     private final HostResolver resolver;
 
@@ -102,12 +117,16 @@ public class IssuerDiscoveryProbe {
     }
 
     private JsonNode fetchDiscovery(URI discovery) {
-        // Re-resolve + re-validate immediately before the send so a low-TTL rebind between the
+        // Re-resolve + re-validate immediately before the connect so a low-TTL rebind between the
         // initial assertPublicHost() and now cannot point the connection at an internal address.
         // The live answer must be a non-empty subset of the vetted public set.
         Set<String> vetted = assertPublicHost(discovery);
-        Set<String> live = resolveAndValidate(discovery.getHost());
-        if (!vetted.containsAll(live)) {
+        List<InetAddress> live = resolveValidated(discovery.getHost());
+        Set<String> liveStrings = new HashSet<>();
+        for (InetAddress a : live) {
+            liveStrings.add(a.getHostAddress());
+        }
+        if (!vetted.containsAll(liveStrings)) {
             log.warn(
                 "auth.oidc: rejecting discovery — host {} re-resolved to a new/changed address (possible DNS rebind)",
                 discovery.getHost()
@@ -116,19 +135,12 @@ public class IssuerDiscoveryProbe {
                 "host " + discovery.getHost() + " resolved to a different address on re-check (possible DNS rebind)"
             );
         }
+        // Connect to the vetted IP LITERAL (no further DNS lookup), with SNI + hostname verification
+        // pinned to the original hostname. This is the step that actually closes the rebind window.
+        InetAddress pinned = live.get(0);
         try {
-            HttpRequest req = HttpRequest.newBuilder(discovery)
-                .timeout(TIMEOUT)
-                .header("Accept", "application/json")
-                .GET()
-                .build();
-            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() != 200) {
-                throw new IssuerValidationException(
-                    "OIDC discovery at " + discovery + " returned HTTP " + resp.statusCode()
-                );
-            }
-            return MAPPER.readTree(resp.body());
+            String body = pinnedHttpsGet(pinned, discovery);
+            return MAPPER.readTree(body);
         } catch (IssuerValidationException e) {
             throw e;
         } catch (java.io.InterruptedIOException e) {
@@ -137,6 +149,80 @@ public class IssuerDiscoveryProbe {
         } catch (Exception e) {
             throw new IssuerValidationException("OIDC discovery at " + discovery + " failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * HTTP/1.1 GET over a TLS socket connected to {@code pinnedIp} (the already-vetted address), while
+     * setting the TLS SNI and endpoint-identification host to {@code target}'s hostname so certificate
+     * hostname verification still applies. No DNS lookup happens here — the connection goes to exactly
+     * the address we validated, eliminating the rebind window. Redirects are not followed: any non-200
+     * status is rejected by the caller via the parsed body never being produced.
+     */
+    private String pinnedHttpsGet(InetAddress pinnedIp, URI target) throws Exception {
+        String host = target.getHost();
+        int port = target.getPort() != -1 ? target.getPort() : 443;
+        String path = target.getRawPath();
+        if (path == null || path.isEmpty()) {
+            path = "/";
+        }
+        if (target.getRawQuery() != null) {
+            path = path + "?" + target.getRawQuery();
+        }
+
+        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        try (SSLSocket socket = (SSLSocket) factory.createSocket()) {
+            socket.connect(new InetSocketAddress(pinnedIp, port), TIMEOUT_MS);
+            socket.setSoTimeout(TIMEOUT_MS);
+
+            // Pin TLS verification to the HOSTNAME (not the IP literal): SNI + HTTPS endpoint
+            // identification make the handshake fail unless the cert is valid for `host`.
+            SSLParameters params = socket.getSSLParameters();
+            params.setServerNames(List.of(new SNIHostName(host)));
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            socket.setSSLParameters(params);
+            socket.startHandshake();
+
+            String request =
+                "GET " + path + " HTTP/1.1\r\n" +
+                "Host: " + host + "\r\n" +
+                "Accept: application/json\r\n" +
+                "User-Agent: Hephaestus-IssuerDiscoveryProbe\r\n" +
+                "Connection: close\r\n\r\n";
+            OutputStream out = socket.getOutputStream();
+            out.write(request.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+
+            return readHttpResponseBody(socket.getInputStream(), target);
+        }
+    }
+
+    /** Minimal HTTP/1.1 response reader: enforces a 200 status, then returns the (bounded) body. */
+    private String readHttpResponseBody(InputStream in, URI target) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+        String statusLine = reader.readLine();
+        if (statusLine == null) {
+            throw new IssuerValidationException("OIDC discovery at " + target + " returned an empty response");
+        }
+        // "HTTP/1.1 200 OK" — reject anything that is not 200 (covers 30x redirect bypass attempts).
+        String[] statusParts = statusLine.split(" ", 3);
+        if (statusParts.length < 2 || !"200".equals(statusParts[1])) {
+            throw new IssuerValidationException("OIDC discovery at " + target + " returned: " + statusLine.trim());
+        }
+        // Skip headers up to the blank line.
+        String line;
+        while ((line = reader.readLine()) != null && !line.isEmpty()) {
+            // headers ignored — we read until EOF (Connection: close) and bound the size below
+        }
+        StringBuilder body = new StringBuilder();
+        char[] buf = new char[8192];
+        int n;
+        while ((n = reader.read(buf)) != -1) {
+            body.append(buf, 0, n);
+            if (body.length() > MAX_BODY_BYTES) {
+                throw new IssuerValidationException("OIDC discovery at " + target + " body exceeded the size limit");
+            }
+        }
+        return body.toString();
     }
 
     private static URI parseHttpsUri(String value, String field) {
@@ -164,6 +250,18 @@ public class IssuerDiscoveryProbe {
     }
 
     private Set<String> resolveAndValidate(String host) {
+        Set<String> out = new HashSet<>();
+        for (InetAddress addr : resolveValidated(host)) {
+            out.add(addr.getHostAddress());
+        }
+        return out;
+    }
+
+    /**
+     * Resolve the host and reject if ANY returned IP is non-public; returns the validated
+     * {@link InetAddress} list so the caller can pin the connection to a vetted literal.
+     */
+    private List<InetAddress> resolveValidated(String host) {
         InetAddress[] addresses;
         try {
             addresses = resolver.resolve(host);
@@ -187,11 +285,7 @@ public class IssuerDiscoveryProbe {
                 );
             }
         }
-        Set<String> out = new HashSet<>();
-        for (InetAddress addr : addresses) {
-            out.add(addr.getHostAddress());
-        }
-        return out;
+        return List.of(addresses);
     }
 
     /** fc00::/7 — IPv6 unique-local; not covered by isSiteLocalAddress(). */

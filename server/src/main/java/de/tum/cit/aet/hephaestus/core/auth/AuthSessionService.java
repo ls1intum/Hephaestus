@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,6 +31,7 @@ public class AuthSessionService {
 
     private final JwtPrincipalFactory principalFactory;
     private final IssuedJwtRepository issuedJwtRepository;
+    private final AccountRepository accountRepository;
     private final HephaestusJwtIssuer jwtIssuer;
     private final AuthEventLogger authEventLogger;
     private final AuthProperties properties;
@@ -37,6 +40,7 @@ public class AuthSessionService {
     public AuthSessionService(
         JwtPrincipalFactory principalFactory,
         IssuedJwtRepository issuedJwtRepository,
+        AccountRepository accountRepository,
         HephaestusJwtIssuer jwtIssuer,
         AuthEventLogger authEventLogger,
         AuthProperties properties,
@@ -44,6 +48,7 @@ public class AuthSessionService {
     ) {
         this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
+        this.accountRepository = accountRepository;
         this.jwtIssuer = jwtIssuer;
         this.authEventLogger = authEventLogger;
         this.properties = properties;
@@ -73,6 +78,15 @@ public class AuthSessionService {
         // clear the cookie so the client re-authenticates.
         int revoked = issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
         if (revoked == 0) {
+            clearCookie(response);
+            return;
+        }
+        // Account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must not be able to
+        // rotate its session into a fresh JWT — that would keep a suspended/deleting principal alive
+        // indefinitely. The presenting token is already revoked above; we simply do NOT re-mint, clear
+        // the cookie, and end the session. (forAccountId would also reject as defense-in-depth.)
+        Account account = accountRepository.findById(accountId).orElse(null);
+        if (account == null || account.getStatus() != Account.Status.ACTIVE) {
             clearCookie(response);
             return;
         }

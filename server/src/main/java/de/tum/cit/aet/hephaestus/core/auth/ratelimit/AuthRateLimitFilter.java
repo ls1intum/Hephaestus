@@ -169,11 +169,6 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         return endpoint.namespace + ":ip:" + clientIp(request);
     }
 
-    /** Number of reverse-proxy hops the deployment owns and therefore trusts at the right of XFF. */
-    int trustedProxyCount() {
-        return properties.trustedProxyCount();
-    }
-
     private static Optional<String> currentSubject() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken token) {
@@ -184,42 +179,21 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Resolves the client IP for IP-keyed buckets, bounded to the trusted reverse-proxy topology.
+     * Resolves the client IP for IP-keyed buckets from {@code getRemoteAddr()} — and ONLY that.
      *
-     * <p><strong>XFF-spoof defence.</strong> {@code X-Forwarded-For} is appended left→right
-     * ({@code client, proxy1, …, edge}). A naive "first hop wins" trusts an attacker-controlled
-     * value: a client can send {@code X-Forwarded-For: <victim-or-random>} and our edge proxy merely
-     * appends its own address, so the leftmost entry is fully spoofable — letting an attacker rotate
-     * the spoofed value to mint unlimited fresh IP buckets and bypass the pre-auth limit on
-     * {@code /oauth2/authorization/*}.
+     * <p><strong>Why not parse X-Forwarded-For here.</strong> Production runs with
+     * {@code server.forward-headers-strategy: native} (see {@code application-prod.yml}), so Tomcat's
+     * {@code RemoteIpValve} runs BEFORE this filter: it consumes {@code X-Forwarded-For}, validates it
+     * against the configured trusted-proxy set, and rewrites {@code getRemoteAddr()} to the real client
+     * address. A second, bespoke XFF re-parse in this filter would then double-count the proxy hops and
+     * key the bucket off the wrong (or a spoofable) entry — defeating the very pre-auth limit it guards.
+     * Delegating to the container is the single source of truth for proxy trust; {@code getRemoteAddr()}
+     * is the only value a client cannot forge once the valve has run.
      *
-     * <p>Each trusted proxy appends the address of its immediate peer, so a legitimate chain of
-     * {@code trustedProxyCount} proxies produces exactly that many trustworthy rightmost entries; the
-     * first of those (counting from the right) — at index {@code length - trustedProxyCount} — is the
-     * real client. Any entries further left were supplied by the client and are NOT trusted. With the
-     * default single Coolify hop the client sits at index {@code length - 1} (the rightmost entry).
-     * If the header has too few hops to account for the trusted proxies (or is absent / disabled via
-     * {@code trustedProxyCount=0}), we fall back to {@code getRemoteAddr()} — the only value the
-     * client cannot forge. Standard rightmost-untrusted-IP handling (cf. OWASP, Spring's own
-     * {@code X-Forwarded-For} support).
+     * <p>In dev (no forward-headers strategy) {@code getRemoteAddr()} is the direct socket peer, which
+     * is also correct: there is no trusted proxy to attribute the request through.
      */
     String clientIp(HttpServletRequest request) {
-        int trusted = properties.trustedProxyCount();
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (trusted > 0 && forwarded != null && !forwarded.isBlank()) {
-            String[] hops = forwarded.split(",");
-            // The trusted proxies contribute the rightmost `trusted` entries; the real client is the
-            // entry immediately to their left.
-            int idx = hops.length - trusted;
-            if (idx >= 0 && idx < hops.length) {
-                String candidate = hops[idx].trim();
-                if (!candidate.isEmpty()) {
-                    return candidate;
-                }
-            }
-            // Too few hops to clear the trusted proxies → the header was not produced by our full
-            // proxy chain; do not trust it. Fall through to getRemoteAddr().
-        }
         String remote = request.getRemoteAddr();
         return remote != null ? remote : "unknown";
     }

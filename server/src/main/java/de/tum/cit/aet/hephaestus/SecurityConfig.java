@@ -321,7 +321,21 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(corsProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
         configuration.setAllowedHeaders(
-            List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
+            // X-XSRF-TOKEN: the SPA is cross-origin in dev and echoes the double-submit CSRF token on
+            //   every state-changing request (see SpaCsrfTokenRequestHandler + webapp/src/main.tsx).
+            //   Without it the preflight Access-Control-Allow-Headers omits the header and the browser
+            //   blocks every cookie-auth write cross-origin.
+            // X-Impersonation-Allow-Writes: opt-in guardrail header for impersonation write requests
+            //   (see ImpersonationGuard) — must survive preflight for the same cross-origin reason.
+            List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "Origin",
+                "X-XSRF-TOKEN",
+                "X-Impersonation-Allow-Writes"
+            )
         );
         configuration.setExposedHeaders(List.of(ReplicaIdentityFilter.HEADER_NAME));
         configuration.setAllowCredentials(true);

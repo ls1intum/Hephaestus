@@ -32,6 +32,13 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Safe methods (GET / HEAD / OPTIONS) always pass — impersonation is primarily a
  * "see what they see" tool.
  *
+ * <p><strong>Threat-model honesty.</strong> This is an <em>accidental-write guardrail</em>, not a
+ * hardened authorization control. An operator who holds an impersonation token already wields the
+ * target's full privileges; the header merely forces a deliberate, audited second step so a stray
+ * write during a "view as user" session does not happen by reflex. It does not — and cannot — defend
+ * against a malicious operator, who can simply send the header. The real controls are who may mint an
+ * impersonation token ({@code ImpersonationService}, admin-gated) and the audit trail.
+ *
  * <p>Registered on the resource-server chain in {@code SecurityConfig} via
  * {@code addFilterAfter(impersonationGuard, AuthorizationFilter.class)} — i.e. it runs after
  * authentication so the {@link SecurityContextHolder} already holds the validated
