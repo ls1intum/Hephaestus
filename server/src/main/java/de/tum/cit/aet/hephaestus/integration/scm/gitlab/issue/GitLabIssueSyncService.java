@@ -36,7 +36,7 @@ import org.springframework.stereotype.Service;
  * {@code count} fields and follow-up pagination when the initial page is insufficient.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabIssueSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueSyncService.class);

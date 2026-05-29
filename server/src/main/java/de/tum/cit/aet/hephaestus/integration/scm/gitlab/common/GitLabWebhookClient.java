@@ -29,7 +29,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * @see <a href="https://docs.gitlab.com/ee/api/group_level_webhooks.html">GitLab Group Webhooks API</a>
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabWebhookClient {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabWebhookClient.class);

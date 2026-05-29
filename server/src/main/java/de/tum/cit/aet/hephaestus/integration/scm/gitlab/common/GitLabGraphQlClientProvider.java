@@ -52,7 +52,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGraphQlClientProvider {
 
     /**

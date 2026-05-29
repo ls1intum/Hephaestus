@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Deterministic review IDs prevent collisions with GitHub review IDs.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestProcessor.class);

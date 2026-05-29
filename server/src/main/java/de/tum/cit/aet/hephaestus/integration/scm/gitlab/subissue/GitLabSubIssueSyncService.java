@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  * No webhook support — runs only during scheduled sync.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabSubIssueSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabSubIssueSyncService.class);

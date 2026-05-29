@@ -39,7 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * invisible, allowing removed users to retain access until the next restart.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandler<GitLabMemberEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMemberMessageHandler.class);

@@ -232,7 +232,7 @@ public class ResilienceConfig {
      * GitLab API failure patterns are similar enough that the same thresholds apply.
      */
     @Bean
-    @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+    @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
     public CircuitBreaker gitlabGraphQlCircuitBreaker(CircuitBreakerRegistry registry) {
         CircuitBreaker breaker = registry.circuitBreaker(GITLAB_GRAPHQL_CIRCUIT_BREAKER);
         registerEventListeners(breaker);

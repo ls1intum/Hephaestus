@@ -51,7 +51,7 @@ import org.springframework.stereotype.Service;
  * workspace bootstrap).
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabCommitMergeRequestLinker {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitMergeRequestLinker.class);

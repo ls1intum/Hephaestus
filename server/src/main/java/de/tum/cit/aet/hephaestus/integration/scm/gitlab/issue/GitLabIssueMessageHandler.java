@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * </ul>
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler<GitLabIssueEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueMessageHandler.class);

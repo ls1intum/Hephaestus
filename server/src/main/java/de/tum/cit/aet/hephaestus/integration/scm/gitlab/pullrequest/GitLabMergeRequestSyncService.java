@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
  * overflow detection via {@code count} fields and follow-up pagination.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMergeRequestSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestSyncService.class);

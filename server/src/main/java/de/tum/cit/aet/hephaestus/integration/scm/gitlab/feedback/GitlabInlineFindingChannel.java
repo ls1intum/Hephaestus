@@ -30,11 +30,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed.
  *
- * <p>Gated on {@code hephaestus.gitlab.enabled=true} to track
+ * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider}.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabInlineFindingChannel.class);

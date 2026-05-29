@@ -63,7 +63,7 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("GitLab Issue Message Handler")
 @TestPropertySource(
     properties = {
-        "hephaestus.gitlab.enabled=true",
+        "hephaestus.integration.gitlab.enabled=true",
         "hephaestus.gitlab.default-server-url=https://gitlab.lrz.de",
         "hephaestus.gitlab.connect-timeout=30s",
         "hephaestus.gitlab.read-timeout=60s",

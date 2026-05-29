@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Confidential issues are skipped entirely (not stored in the database).
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueProcessor.class);

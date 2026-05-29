@@ -38,7 +38,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * This service handles idempotency, entity updates, and error handling.
  *
  * <p>Dependencies are injected via {@link ObjectProvider} to gracefully handle cases
- * where GitLab integration is disabled ({@code hephaestus.gitlab.enabled=false}).
+ * where GitLab integration is disabled ({@code hephaestus.integration.gitlab.enabled=false}).
  */
 @Service
 public class GitLabWebhookService {
@@ -180,7 +180,9 @@ public class GitLabWebhookService {
 
         var client = webhookClientProvider.getIfAvailable();
         if (client == null) {
-            return WebhookSetupResult.skipped("GitLab webhook client unavailable (gitlab.enabled=false)");
+            return WebhookSetupResult.skipped(
+                "GitLab webhook client unavailable (hephaestus.integration.gitlab.enabled=false)"
+            );
         }
 
         Long scopeId = workspace.getId();

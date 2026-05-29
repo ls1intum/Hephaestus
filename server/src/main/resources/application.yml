@@ -503,8 +503,9 @@ hephaestus:
     # Settings for GitLab API integration. Used by GitLab-mode workspaces
     # (GitProviderMode.GITLAB_PAT). Override default-server-url for self-hosted instances.
     gitlab:
-        # Set to true to enable GitLab integration (loads all GitLab beans)
-        enabled: ${GITLAB_ENABLED:false}
+        # NOTE: the enable GATE lives under hephaestus.integration.gitlab.enabled (see the
+        # INTEGRATION block below), unified with the github/slack manifests. This block only
+        # binds GitLabProperties (url/timeouts/throttle) via @ConfigurationProperties.
         # Default GitLab server URL (used when workspace has no custom serverUrl).
         # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
         # automatically use the same instance for workspace creation.
@@ -618,6 +619,10 @@ hephaestus:
     # inert. Flip `enabled` to `true` once client-id + client-secret + redirect-uri
     # are configured.
     integration:
+        # GitLab is opt-in (default off). Flip GITLAB_ENABLED=true to load the GitLab beans +
+        # manifest. The gated beans and GitLabManifest both read this unified key.
+        gitlab:
+            enabled: ${GITLAB_ENABLED:false}
         slack:
             enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
             client-id: ${HEPHAESTUS_SLACK_CLIENT_ID:}

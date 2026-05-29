@@ -45,7 +45,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * Runs only during scheduled sync.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabIssueDependencySyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueDependencySyncService.class);

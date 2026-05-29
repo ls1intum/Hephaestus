@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * cascade-clear memberships and repo permissions.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHandler<GitLabSubgroupEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabSubgroupMessageHandler.class);

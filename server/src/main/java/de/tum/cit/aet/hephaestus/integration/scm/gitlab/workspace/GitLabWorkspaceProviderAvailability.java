@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  * Exposes the GitLab default server URL to the workspace creation wizard.
  *
  * <p>Gated by the {@link FeatureFlag#GITLAB_WORKSPACE_CREATION} flag. {@code GitLabProperties}
- * is always-on (the {@code hephaestus.gitlab.enabled=false} branch still binds the record
+ * is always-on (the {@code hephaestus.integration.gitlab.enabled=false} branch still binds the record
  * via Spring's default-value semantics), so the availability check is purely flag-driven.
  */
 @Component

@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 
 /** Syncs GitLab notes (comments) via GraphQL API. */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabNoteSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabNoteSyncService.class);

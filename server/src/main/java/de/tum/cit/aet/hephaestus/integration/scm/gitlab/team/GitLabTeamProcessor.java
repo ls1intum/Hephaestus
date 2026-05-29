@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabTeamProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabTeamProcessor.class);

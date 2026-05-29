@@ -26,7 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Handles GitLab note webhook events, routing to the appropriate processor by noteable type. */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<GitLabNoteEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabNoteMessageHandler.class);

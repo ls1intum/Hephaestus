@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * pull request review comments. Each diff note belongs to a discussion (thread).
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabPullRequestReviewCommentProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabPullRequestReviewCommentProcessor.class);

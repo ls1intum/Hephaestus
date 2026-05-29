@@ -29,11 +29,11 @@ import org.springframework.stereotype.Component;
  * agent layer already sanitises in {@code PullRequestCommentPoster.sanitize} before
  * calling here — this is belt-and-suspenders for callers that might bypass that path.
  *
- * <p>Gated on {@code hephaestus.gitlab.enabled=true} to track
+ * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider}.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitlabFeedbackChannel implements FeedbackChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabFeedbackChannel.class);

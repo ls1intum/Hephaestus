@@ -20,10 +20,10 @@ import org.springframework.stereotype.Component;
  * GitLab adapter for {@link ApprovalChannel}: approves an MR via the
  * {@code ApproveMergeRequest} mutation. Optional message goes as a regular MR note —
  * {@code mergeRequestApprove} does not accept a body. Gated on
- * {@code hephaestus.gitlab.enabled=true} to track {@link GitLabGraphQlClientProvider}.
+ * {@code hephaestus.integration.gitlab.enabled=true} to track {@link GitLabGraphQlClientProvider}.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitlabApprovalChannel implements ApprovalChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabApprovalChannel.class);

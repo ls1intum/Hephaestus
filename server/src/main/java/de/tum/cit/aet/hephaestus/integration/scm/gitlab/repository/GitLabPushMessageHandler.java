@@ -61,7 +61,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * and will be resolved during the next scheduled sync.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<GitLabPushEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabPushMessageHandler.class);

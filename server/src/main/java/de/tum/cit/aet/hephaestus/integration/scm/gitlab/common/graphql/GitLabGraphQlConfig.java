@@ -43,12 +43,12 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Configuration for GitLab GraphQL API client.
  * <p>
- * Only loaded when {@code hephaestus.gitlab.enabled=true}. Creates a base
+ * Only loaded when {@code hephaestus.integration.gitlab.enabled=true}. Creates a base
  * {@link WebClient} and {@link HttpGraphQlClient} for GitLab API access.
  * No hardcoded base URL — URLs are per-workspace (self-hosted support).
  */
 @Configuration
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGraphQlConfig {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabGraphQlConfig.class);

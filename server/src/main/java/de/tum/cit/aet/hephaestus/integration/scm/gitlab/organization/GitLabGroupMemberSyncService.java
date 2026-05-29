@@ -55,7 +55,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * constraint violations on login renames.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGroupMemberSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabGroupMemberSyncService.class);

@@ -56,7 +56,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 @WorkspaceAgnostic("System-wide rate limit tracking — tracks GitLab API limits per-scope across all workspaces")
 public class GitLabRateLimitTracker {
 

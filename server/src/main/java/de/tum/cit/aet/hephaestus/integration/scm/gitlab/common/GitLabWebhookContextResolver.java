@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  * so that all GitLab message handlers use the same logic without duplication.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabWebhookContextResolver {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabWebhookContextResolver.class);

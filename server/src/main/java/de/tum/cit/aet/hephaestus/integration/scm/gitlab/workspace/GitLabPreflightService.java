@@ -19,7 +19,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * Pre-creation validation service for GitLab workspace setup.
  *
  * <p>Validates PATs and lists accessible groups <b>before</b> a workspace entity exists.
- * This service is always available (not gated by {@code hephaestus.gitlab.enabled})
+ * This service is always available (not gated by {@code hephaestus.integration.gitlab.enabled})
  * because it serves the workspace creation wizard, not sync operations.
  *
  * <h2>Token Validation Flow</h2>

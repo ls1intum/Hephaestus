@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  * pages and adjusting page size when the budget is low.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGroupSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabGroupSyncService.class);

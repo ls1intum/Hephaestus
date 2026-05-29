@@ -42,7 +42,7 @@ import org.springframework.stereotype.Service;
  * Each cycle processes one batch per repository, respecting cooldowns between runs.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabHistoricalBackfillService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabHistoricalBackfillService.class);
