@@ -54,6 +54,8 @@ public class WorkspaceScopedTables {
         "model_pricing",
         // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
         "worker_token_denylist",
+        // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
+        "worker_registry",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"
