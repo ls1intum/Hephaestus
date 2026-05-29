@@ -77,12 +77,13 @@ public class InteractiveSandboxRegistry {
      */
     public RegistrationOutcome tryRegister(DockerAttachedSandboxAdapter sandbox) {
         Objects.requireNonNull(sandbox, "sandbox");
-        SessionKey key = new SessionKey(sandbox.userId(), sandbox.workspaceId());
+        var id = sandbox.identity();
+        SessionKey key = new SessionKey(id.userId(), id.workspaceId());
 
         // Per-user atomic reservation: increment only when a slot is available.
         java.util.concurrent.atomic.AtomicReference<RegistrationOutcome> userResult =
             new java.util.concurrent.atomic.AtomicReference<>();
-        sessionsPerUser.compute(sandbox.userId(), (u, prev) -> {
+        sessionsPerUser.compute(id.userId(), (u, prev) -> {
             AtomicInteger c = prev != null ? prev : new AtomicInteger();
             if (c.get() >= properties.maxSessionsPerUser()) {
                 userResult.set(RegistrationOutcome.MAX_SESSIONS_PER_USER);
@@ -95,37 +96,38 @@ public class InteractiveSandboxRegistry {
         if (userResult.get() != null) {
             return userResult.get();
         }
-        AtomicInteger userCount = sessionsPerUser.get(sandbox.userId());
+        AtomicInteger userCount = sessionsPerUser.get(id.userId());
 
         if (sessions.size() >= properties.maxSessionsTotal()) {
-            decrementUser(sandbox.userId(), userCount);
+            decrementUser(id.userId(), userCount);
             return RegistrationOutcome.MAX_SESSIONS_TOTAL;
         }
         if (sessions.putIfAbsent(key, sandbox) != null) {
-            decrementUser(sandbox.userId(), userCount);
+            decrementUser(id.userId(), userCount);
             return RegistrationOutcome.DUPLICATE;
         }
         // Race: concurrent putIfAbsent calls may have pushed total over the cap. Roll back if so.
         if (sessions.size() > properties.maxSessionsTotal()) {
             sessions.remove(key, sandbox);
-            decrementUser(sandbox.userId(), userCount);
+            decrementUser(id.userId(), userCount);
             return RegistrationOutcome.MAX_SESSIONS_TOTAL;
         }
-        watchdog.register(sandbox.sessionId(), sandbox);
+        watchdog.register(id.sessionId(), sandbox);
         return RegistrationOutcome.REGISTERED;
     }
 
     /** Identity-based remove avoids races with re-register. */
     void onSandboxClosed(DockerAttachedSandboxAdapter sandbox) {
-        SessionKey key = new SessionKey(sandbox.userId(), sandbox.workspaceId());
+        var id = sandbox.identity();
+        SessionKey key = new SessionKey(id.userId(), id.workspaceId());
         boolean removed = sessions.remove(key, sandbox);
         if (removed) {
-            AtomicInteger userCount = sessionsPerUser.get(sandbox.userId());
+            AtomicInteger userCount = sessionsPerUser.get(id.userId());
             if (userCount != null) {
-                decrementUser(sandbox.userId(), userCount);
+                decrementUser(id.userId(), userCount);
             }
         }
-        watchdog.unregister(sandbox.sessionId());
+        watchdog.unregister(id.sessionId());
     }
 
     /** Atomic decrement-and-conditional-remove (compute holds the per-key lock). */
@@ -152,7 +154,7 @@ public class InteractiveSandboxRegistry {
             if (sandbox.idleFor().compareTo(ttl) > 0) {
                 log.info(
                     "Reaping idle sandbox: sessionId={}, idleFor={}s",
-                    sandbox.sessionId(),
+                    sandbox.identity().sessionId(),
                     sandbox.idleFor().toSeconds()
                 );
                 // Fire and forget: the reaper shares Spring's single-thread scheduler with the

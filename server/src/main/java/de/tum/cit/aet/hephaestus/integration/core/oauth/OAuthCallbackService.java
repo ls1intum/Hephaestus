@@ -151,7 +151,6 @@ public class OAuthCallbackService {
                 new HashSet<>()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, new HashSet<>());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, new HashSet<>());
             // OIDC_LOGIN_* are inbound user-login providers, configured inline via the
             // ConnectionController (issuer + client creds), never through this outbound
             // integration-install callback path.

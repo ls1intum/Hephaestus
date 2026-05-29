@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAuditRepository;
@@ -14,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import jakarta.persistence.EntityNotFoundException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -123,7 +123,7 @@ public class ConnectionAdminService {
     ) {
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace not found: id=" + workspaceId));
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
 
         ConnectionConfig config = buildConfigForInlineKind(kind, userInput, instanceKey);
         Connection connection = new Connection(workspace, kind, instanceKey, config);
@@ -199,11 +199,6 @@ public class ConnectionAdminService {
                 /* teamName */ null,
                 /* notificationChannelId */ null,
                 /* teamLabel */ null,
-                enabledStreams
-            );
-            case OUTLINE -> new ConnectionConfig.OutlineConfig(
-                userInput.getOrDefault("server_url", "https://app.getoutline.com"),
-                instanceKey,
                 enabledStreams
             );
             case OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> {

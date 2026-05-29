@@ -216,6 +216,7 @@ public class GitHubProjectSyncService {
 
         Set<Long> syncedProjectIds = new HashSet<>();
         int totalSynced = 0;
+        int projectsReceived = 0;
         int totalSkipped = 0;
         String cursor = null;
         boolean hasMore = true;
@@ -314,6 +315,7 @@ public class GitHubProjectSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = response.getTotalCount();
                 }
+                projectsReceived += response.getNodes().size();
 
                 // Process this page of projects in its own transaction
                 // Respect cooldown: only UPDATE projects that are new or past cooldown
@@ -516,12 +518,13 @@ public class GitHubProjectSyncService {
             }
         }
 
-        // Check for overflow
+        // Raw nodes received vs projectsV2.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "projects",
-                totalSynced,
+                projectsReceived,
                 reportedTotalCount,
+                hasMore || abortReason != null,
                 "orgLogin=" + safeOrgLogin
             );
         }
@@ -716,6 +719,7 @@ public class GitHubProjectSyncService {
         // Track items needing follow-up field value pagination (items with >20 field values)
         List<ItemWithFieldValueCursor> itemsNeedingFieldValuePagination = new ArrayList<>();
         int totalSynced = 0;
+        int itemsReceived = 0;
         int totalSkipped = 0; // Items skipped due to incremental sync
         boolean hasMore = true;
         int pageCount = 0;
@@ -836,6 +840,7 @@ public class GitHubProjectSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = itemsConnection.getTotalCount();
                 }
+                itemsReceived += itemsConnection.getNodes().size();
 
                 // Process this page of items in its own transaction
                 // All item types (Draft Issue, Issue, PR) are created/updated from the project side
@@ -1032,12 +1037,13 @@ public class GitHubProjectSyncService {
             }
         }
 
-        // Check for overflow
+        // Raw nodes received vs items.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "projectItems",
-                totalSynced,
+                itemsReceived,
                 reportedTotalCount,
+                hasMore || abortReason != null,
                 "projectId=" + projectId
             );
         }
@@ -1161,6 +1167,7 @@ public class GitHubProjectSyncService {
 
         Long projectId = project.getId();
         List<String> allSyncedFieldIds = new ArrayList<>();
+        int fieldsReceived = 0;
         boolean completedNormally = false;
 
         try {
@@ -1264,6 +1271,7 @@ public class GitHubProjectSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = fieldsConnection.getTotalCount();
                 }
+                fieldsReceived += fieldsConnection.getNodes().size();
 
                 // Process this page of fields in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
@@ -1304,12 +1312,13 @@ public class GitHubProjectSyncService {
             // This preserves true if already set via early break, otherwise uses hasMore state
             completedNormally = completedNormally || !hasMore;
 
-            // Check for overflow
+            // Raw nodes received vs fields.totalCount (allSyncedFieldIds is post-filter).
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
+                GraphQlConnectionOverflowDetector.checkPaginated(
                     "projectFields",
-                    allSyncedFieldIds.size(),
+                    fieldsReceived,
                     reportedTotalCount,
+                    !completedNormally,
                     "projectId=" + project.getId()
                 );
             }
@@ -1385,6 +1394,7 @@ public class GitHubProjectSyncService {
 
         try {
             List<String> syncedStatusUpdateNodeIds = new ArrayList<>();
+            int statusUpdatesReceived = 0;
             String cursor = null;
             boolean hasMore = true;
             int pageCount = 0;
@@ -1477,6 +1487,7 @@ public class GitHubProjectSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = statusUpdatesConnection.getTotalCount();
                 }
+                statusUpdatesReceived += statusUpdatesConnection.getNodes().size();
 
                 // Process this page of status updates in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
@@ -1520,12 +1531,13 @@ public class GitHubProjectSyncService {
             // This preserves true if already set via early break, otherwise uses hasMore state
             completedNormally = completedNormally || !hasMore;
 
-            // Check for overflow
+            // Raw nodes received vs statusUpdates.totalCount (syncedStatusUpdateNodeIds is post-filter).
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
+                GraphQlConnectionOverflowDetector.checkPaginated(
                     "statusUpdates",
-                    syncedStatusUpdateNodeIds.size(),
+                    statusUpdatesReceived,
                     reportedTotalCount,
+                    !completedNormally,
                     "projectId=" + project.getId()
                 );
             }

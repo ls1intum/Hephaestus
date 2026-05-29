@@ -31,9 +31,7 @@ import org.junit.jupiter.api.Test;
  */
 class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // ACTIVITY MODULE ISOLATION
-    // ========================================================================
 
     @Nested
     class ActivityModuleIsolationTests {
@@ -132,9 +130,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // PRACTICES MODULE ISOLATION
-    // ========================================================================
 
     @Nested
     class PracticesModuleTests {
@@ -159,9 +155,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // ACTIVITY SCORING ISOLATION
-    // ========================================================================
 
     @Nested
     @DisplayName("Activity Scoring Isolation")
@@ -201,9 +195,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // PRACTICES MODULE CONTROLLER ISOLATION
-    // ========================================================================
 
     @Nested
     class PracticesControllerTests {

@@ -29,9 +29,7 @@ import java.util.List;
  * @see BackfillStateProvider
  */
 public interface SyncTargetProvider extends SyncTimestampProvider, BackfillStateProvider {
-    // ═══════════════════════════════════════════════════════════════════════════
     // CORE SYNC TARGET OPERATIONS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * Gets all active sync targets (repositories) across all scopes.
@@ -98,27 +96,21 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      */
     void removeSyncTarget(Long syncTargetId);
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Gets sync sessions for batch synchronization.
+     * Gets sync sessions for batch synchronization, scoped to a single provider kind.
      * Each session contains all sync targets for a scope with its sync context.
+     * <p>
+     * The {@code kind} argument keeps this SPI vendor-neutral: the caller (a GitHub or GitLab
+     * scheduler/backfill service) passes the provider it already drives, instead of the SPI
+     * exposing a vendor-named method per provider. Implementations filter active scopes by the
+     * scope's configured provider kind.
      *
-     * @return list of sync sessions
+     * @param kind the provider kind to gather sessions for (must not be null)
+     * @return list of sync sessions for scopes whose active provider matches {@code kind}
      */
-    default List<SyncSession> getSyncSessions() {
-        return List.of();
-    }
-
-    /**
-     * Gets sync sessions for GitLab batch synchronization.
-     * Each session contains all sync targets for a GitLab scope with its sync context.
-     *
-     * @return list of GitLab sync sessions
-     */
-    default List<SyncSession> getGitLabSyncSessions() {
+    default List<SyncSession> getSyncSessions(IntegrationKind kind) {
         return List.of();
     }
 
@@ -131,9 +123,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         return new SyncStatistics(0, 0, 0, 0, false);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // RECORDS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * A batch of sync targets for a single scope, used for parallel processing.

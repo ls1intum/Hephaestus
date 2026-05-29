@@ -28,7 +28,7 @@ public record FeatureFlagsDTO(
     @Schema(description = "User's PRs trigger practice review") boolean RUN_PRACTICE_REVIEW,
     @Schema(description = "User has admin privileges") boolean ADMIN,
 
-    // ── Operational/development flags (Spring Boot config) ──────────────
+    // Operational/development flags (Spring Boot config)
     @Schema(description = "Practice review runs for all users regardless of role") boolean PRACTICE_REVIEW_FOR_ALL,
     @Schema(description = "GitLab workspace creation feature is enabled") boolean GITLAB_WORKSPACE_CREATION
 ) {

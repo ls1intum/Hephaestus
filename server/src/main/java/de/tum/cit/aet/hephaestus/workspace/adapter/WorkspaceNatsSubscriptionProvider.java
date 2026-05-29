@@ -51,7 +51,7 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
                 switch (kind) {
                     case GITHUB -> "github";
                     case GITLAB -> "gitlab";
-                    case SLACK, OUTLINE, OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> "github";
+                    case SLACK, OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> "github";
                 }
             )
             .orElse("github");

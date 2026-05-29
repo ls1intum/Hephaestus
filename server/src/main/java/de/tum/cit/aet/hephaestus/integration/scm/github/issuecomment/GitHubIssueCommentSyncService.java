@@ -112,6 +112,7 @@ public class GitHubIssueCommentSyncService {
         ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalSynced = 0;
+        int commentsReceived = 0;
         String cursor = null;
         boolean hasMore = true;
         int pageCount = 0;
@@ -231,6 +232,7 @@ public class GitHubIssueCommentSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+                commentsReceived += connection.getNodes().size();
 
                 for (var graphQlComment : connection.getNodes()) {
                     GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
@@ -288,12 +290,13 @@ public class GitHubIssueCommentSyncService {
             }
         }
 
-        // Check for overflow
+        // Raw nodes received vs comments.totalCount (totalSynced is post-filter).
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "issueComments",
-                totalSynced,
+                commentsReceived,
                 reportedTotalCount,
+                hasMore,
                 "issueNumber=" + issue.getNumber()
             );
         }
@@ -343,6 +346,7 @@ public class GitHubIssueCommentSyncService {
         ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
 
         int totalSynced = 0;
+        int commentsReceived = 0;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
@@ -468,6 +472,7 @@ public class GitHubIssueCommentSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+                commentsReceived += connection.getNodes().size();
 
                 for (var graphQlComment : connection.getNodes()) {
                     GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
@@ -522,12 +527,13 @@ public class GitHubIssueCommentSyncService {
             }
         }
 
-        // Check for overflow
+        // Raw nodes received vs comments.totalCount (totalSynced is post-filter).
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "issueComments",
-                totalSynced,
+                commentsReceived,
                 reportedTotalCount,
+                hasMore,
                 "issueNumber=" + issue.getNumber()
             );
         }

@@ -8,7 +8,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSync
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.config.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
@@ -43,12 +43,12 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Configuration for GitLab GraphQL API client.
  * <p>
- * Only loaded when {@code hephaestus.gitlab.enabled=true}. Creates a base
+ * Only loaded when {@code hephaestus.integration.gitlab.enabled=true}. Creates a base
  * {@link WebClient} and {@link HttpGraphQlClient} for GitLab API access.
  * No hardcoded base URL — URLs are per-workspace (self-hosted support).
  */
 @Configuration
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGraphQlConfig {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabGraphQlConfig.class);
@@ -69,11 +69,17 @@ public class GitLabGraphQlConfig {
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
     public WebClient gitLabGraphQlWebClient(JsonMapper baseObjectMapper) {
+        // Set the buffer limit on the custom decoder too — defaultCodecs().maxInMemorySize()
+        // does not apply to custom-registered codecs, so large responses would otherwise hit
+        // the 256 KB default. Mirrors GitHubGraphQlConfig.
+        JacksonJsonDecoder graphQlJsonDecoder = new JacksonJsonDecoder(baseObjectMapper);
+        graphQlJsonDecoder.setMaxInMemorySize(MAX_BUFFER_SIZE);
+
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
                 config.customCodecs().register(new JacksonJsonEncoder(baseObjectMapper));
-                config.customCodecs().register(new JacksonJsonDecoder(baseObjectMapper));
+                config.customCodecs().register(graphQlJsonDecoder);
             })
             .build();
 

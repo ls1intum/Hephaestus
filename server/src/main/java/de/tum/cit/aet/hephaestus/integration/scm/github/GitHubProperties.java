@@ -12,30 +12,31 @@ import org.springframework.validation.annotation.Validated;
  * Configuration properties for GitHub integration.
  *
  * <p>This record consolidates all GitHub-related configuration under the
- * {@code hephaestus.github} prefix. It supports GitHub App authentication
+ * {@code hephaestus.integration.github} prefix. It supports GitHub App authentication
  * and metadata API access.
  *
  * <p>Example configuration:
  * <pre>{@code
  * hephaestus:
- *   github:
- *     app:
- *       id: 123456
- *       private-key-location: classpath:github-app-private-key.pem
- *       # or inline:
- *       private-key: |
- *         -----BEGIN RSA PRIVATE KEY-----
- *         ...
- *         -----END RSA PRIVATE KEY-----
- *     meta:
- *       auth-token: ghp_xxxxxxxxxxxx
+ *   integration:
+ *     github:
+ *       app:
+ *         id: 123456
+ *         private-key-location: classpath:github-app-private-key.pem
+ *         # or inline:
+ *         private-key: |
+ *           -----BEGIN RSA PRIVATE KEY-----
+ *           ...
+ *           -----END RSA PRIVATE KEY-----
+ *       meta:
+ *         auth-token: ghp_xxxxxxxxxxxx
  * }</pre>
  *
  * @param app  GitHub App configuration for installation-based authentication
  * @param meta metadata API configuration (e.g., for fetching contributor avatars)
  */
 @Validated
-@ConfigurationProperties(prefix = "hephaestus.github")
+@ConfigurationProperties(prefix = "hephaestus.integration.github")
 public record GitHubProperties(@Valid App app, @Valid Meta meta) {
     /**
      * Compact constructor ensuring nested records are never null.

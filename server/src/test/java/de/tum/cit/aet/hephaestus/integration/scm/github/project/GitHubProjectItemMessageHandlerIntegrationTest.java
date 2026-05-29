@@ -134,9 +134,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         testProject = projectRepository.save(testProject);
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Helper methods
-    // ═══════════════════════════════════════════════════════════════
 
     private ProjectItem createAndSaveTestItem(
         Long id,
@@ -156,9 +154,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         return projectItemRepository.saveAndFlush(item);
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Basic handler tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Test
     void shouldReturnCorrectEventType() {
@@ -216,9 +212,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(eventListener.getArchivedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Edge case / guard-clause tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Test
     void shouldSkipEventWhenOrganizationNotFound() throws Exception {
@@ -251,9 +245,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(eventListener.getCreatedEvents()).isEmpty();
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Create / Edit / Convert / Restore / Reorder tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Test
     void shouldHandleItemCreatedEvent() throws Exception {

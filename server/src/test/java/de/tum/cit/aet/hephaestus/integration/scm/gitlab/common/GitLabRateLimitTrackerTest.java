@@ -286,7 +286,7 @@ class GitLabRateLimitTrackerTest extends BaseUnitTest {
         }
     }
 
-    // ========== Helper Methods ==========
+    // Helper Methods
 
     private HttpHeaders createHeaders(int remaining, int limit, Instant resetAt, int observed) {
         HttpHeaders headers = new HttpHeaders();

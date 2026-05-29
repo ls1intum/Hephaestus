@@ -80,9 +80,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         assertThat(handler.key().eventType()).isEqualTo("merge_request");
     }
 
-    // ========================================================================
     // Action Routing
-    // ========================================================================
 
     @Nested
     class ActionRouting {
@@ -223,9 +221,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Confidential Merge Request Handling
-    // ========================================================================
 
     @Nested
     class ConfidentialMergeRequests {
@@ -276,9 +272,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Validation
-    // ========================================================================
 
     @Nested
     class PayloadValidation {
@@ -354,9 +348,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Context Resolution
-    // ========================================================================
 
     @Nested
     class ContextResolution {
@@ -373,9 +365,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private Repository setupRepository() {
         Repository repo = new Repository();

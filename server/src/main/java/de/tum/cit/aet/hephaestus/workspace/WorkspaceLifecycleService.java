@@ -293,9 +293,7 @@ public class WorkspaceLifecycleService {
         return slug;
     }
 
-    // -------------------------------------------------------------------------
     // NATS consumer lifecycle helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Stop NATS consumer for a workspace.

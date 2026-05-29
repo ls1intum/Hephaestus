@@ -10,7 +10,7 @@ import org.springframework.lang.Nullable;
  * Per-kind connection lifecycle strategy.
  *
  * <p>Drives the user-visible "Connect X" + "Disconnect X" flows. Vendor specifics
- * (GitHub App install click vs GitLab PAT paste vs Slack OAuth vs Outline OAuth)
+ * (GitHub App install click vs GitLab PAT paste vs Slack OAuth)
  * live in per-kind implementations; the orchestrator stays vendor-neutral.
  */
 public interface ConnectionStrategy {

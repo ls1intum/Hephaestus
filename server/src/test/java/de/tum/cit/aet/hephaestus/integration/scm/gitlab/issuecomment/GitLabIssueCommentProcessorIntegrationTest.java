@@ -43,12 +43,12 @@ import org.springframework.test.context.TestPropertySource;
 @DisplayName("GitLab Issue Comment Processor — sync path")
 @TestPropertySource(
     properties = {
-        "hephaestus.gitlab.enabled=true",
-        "hephaestus.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.gitlab.connect-timeout=30s",
-        "hephaestus.gitlab.read-timeout=60s",
-        "hephaestus.gitlab.rate-limit-delay=200ms",
-        "hephaestus.gitlab.sync-page-delay=5m",
+        "hephaestus.integration.gitlab.enabled=true",
+        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
+        "hephaestus.integration.gitlab.connect-timeout=30s",
+        "hephaestus.integration.gitlab.read-timeout=60s",
+        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
+        "hephaestus.integration.gitlab.sync-page-delay=5m",
     }
 )
 @Import(GitLabIssueCommentProcessorIntegrationTest.TestCommentEventListener.class)
@@ -206,7 +206,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         assertThat(eventListener.getUpdatedEvents()).isEmpty();
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabIssueCommentProcessor.SyncNoteData buildData(String body, String createdAt, String updatedAt) {
         return new GitLabIssueCommentProcessor.SyncNoteData(
@@ -279,7 +279,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace = workspaceRepository.save(workspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestCommentEventListener {

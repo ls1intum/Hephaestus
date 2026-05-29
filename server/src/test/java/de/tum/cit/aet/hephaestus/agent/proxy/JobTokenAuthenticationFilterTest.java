@@ -375,8 +375,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     }
 
     private AgentJob createRunningJob() {
-        var job = mock(AgentJob.class);
-        when(job.getJobToken()).thenReturn(VALID_TOKEN);
+        var job = new AgentJob();
+        job.setJobToken(VALID_TOKEN);
         return job;
     }
 }

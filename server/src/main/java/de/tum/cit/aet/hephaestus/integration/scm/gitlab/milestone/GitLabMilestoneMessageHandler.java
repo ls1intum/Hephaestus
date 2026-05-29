@@ -30,7 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * are cleaned up by the GraphQL sync service's stale removal logic.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMilestoneMessageHandler extends AbstractIntegrationMessageHandler<GitLabMilestoneEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMilestoneMessageHandler.class);

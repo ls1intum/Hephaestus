@@ -2,25 +2,24 @@
 
 **Status:** Accepted
 **Date:** 2026-05-25
-**Authors:** Integration framework polish (#1198), Wave 9 CVE fix
 
 ## Context
 
-Pass 1 (commit `e1af1fdaf`) introduced AES-GCM credential encryption with a *static
-context string* as AAD:
+The first AES-GCM credential-encryption implementation (commit `e1af1fdaf`) used a
+*static context string* as AAD:
 
 ```
 CONTEXT_AAD = "hephaestus-credential-bundle-v1"
 ```
 
-A pass-3 audit caught that this AAD is **shared across every row in the database**.
-An attacker with DB write access to the `connection` table (compromised replication
-slot, leaked Postgres super-user, etc.) can copy ciphertext from workspace A's
-`credentials_encrypted` column into workspace B's row, and the converter decrypts it
-cleanly — the GitHub installation token / OAuth session silently moves tenants.
+That AAD is **shared across every row in the database**. An attacker with DB write
+access to the `connection` table (compromised replication slot, leaked Postgres
+super-user, etc.) can copy ciphertext from workspace A's `credentials_encrypted`
+column into workspace B's row, and the converter decrypts it cleanly — the GitHub
+installation token / OAuth session silently moves tenants.
 
-Pass 9 (`420dee0d5`) closed the gap by binding AAD per row. This ADR records what
-shipped, what was rejected, and the operational implications.
+The fix (commit `420dee0d5`) closed the gap by binding AAD per row. This ADR records
+what shipped, what was rejected, and the operational implications.
 
 The threat model: an attacker who can write to the database but does NOT have the
 application's encryption key. AES-GCM's authentication tag prevents direct ciphertext
@@ -29,16 +28,13 @@ identity row — only the AAD does.
 
 ## Decision drivers
 
-- **AWS Database Encryption SDK** and **AWS KMS encryption context** both bind
-  ciphertext to record identity via AAD; this is the documented pattern for
-  multi-tenant credential storage at rest.
-- **NIST SP 800-38D § 5.2.1.1** describes AAD as the binding for "additional context
-  that should be authenticated but not encrypted" — exactly the use case.
-- **Vault Transit's `derived` and `context` parameters** serve the same purpose. We
-  don't run Vault, but the pattern is industry-standard.
-- The legacy `BackfillStateProvider` and OAuth-callback paths must still be able to
-  read v1 blobs during the cutover window — read tolerance is required, write must
-  be v2-only.
+- Binding ciphertext to record identity via AAD is the documented pattern for
+  multi-tenant credential storage at rest (AWS Database Encryption SDK, AWS KMS
+  encryption context, Vault Transit `context`). NIST SP 800-38D § 5.2.1.1 frames
+  AAD as exactly this: context authenticated but not encrypted.
+- The shipped format is v2-only (write and read). The version byte in the blob
+  header allows future formats to be rejected with a clear error rather than
+  silently misinterpreted. There is no v1 dual-read path in the shipped code.
 
 ## Decision
 
@@ -69,56 +65,46 @@ Runtime API:
 
 ```java
 byte[] encrypt(CredentialBundle, EncryptionContext);    // writes v2 only
-CredentialBundle decrypt(byte[], EncryptionContext);    // tolerant of v1 + v2
+CredentialBundle decrypt(byte[], EncryptionContext);    // v2 only; rejects all other versions
 ```
 
 All runtime writes go through
-`Connection.setCredentials(bundle, converter)` → `encrypt()` → v2 blob; v1 is
-read-only legacy and produced nowhere in current code. (An interim Liquibase
-`WorkspaceConnectionBackfillChange` customChange wrote v1 during the iterative
-migration; it was retired in pass 16/stage 2 when the branch consolidated to a
-clean, no-backfill migration. See
-`server/src/main/resources/db/changelog/1779790459343_unified_integration_framework.xml`
-for the consolidated changelog and its operator-warning header.)
+`Connection.setCredentials(bundle, converter)` → `encrypt()` → v2 blob.
+`decrypt()` rejects any blob whose first byte is not `FORMAT_VERSION_V2`
+(0x02) with an `EncryptionException`. There is **no v1 reader** and no
+`credentials_format_version` column — the leading version byte is the only
+discriminator. It enables future format evolution via `unsupportedVersion()`
+rejection, but there is no dual-read and no KEK/DEK envelope: key rotation is a
+bulk re-encrypt of all connection rows with the new key (the AAD is
+reproducible from the row, so the same context applies).
 
-A `credentials_format_version` column on the `connection` table mirrors the blob
-version byte. Unknown versions are rejected with a typed `EncryptionException` — no
+The consolidated Liquibase migration
+(`1779790459343_changelog.xml`) runs an idempotent
+`WorkspaceConnectionBackfillChange` customChange (changeset 8) that migrates
+legacy `Workspace` credential columns into AES-GCM v2 blobs in new
+`connection` rows. Changeset 9 verifies and then drops the legacy columns.
+Unknown versions are rejected with a typed `EncryptionException` — no
 fallback, no silent migration.
 
-## Rejected alternatives
+## Considered options
 
 1. **Bind AAD to `(workspaceId)` only** — protects against cross-workspace
    substitution but allows cross-row substitution **within** a workspace (e.g.
    substituting a workspace's GitHub PAT ciphertext into its Slack row). Rejected
-   because real-world threat is "attacker with DB write access who wants any
+   because the real-world threat is "attacker with DB write access who wants any
    credential to be reusable", not specifically cross-tenant.
 
 2. **Bind AAD to `(workspaceId, kind, connection_id)`** where `connection_id` is the
-   primary key — would be ideal because PK is row-unique, but PK is auto-generated by
+   primary key — ideal because the PK is row-unique, but it is auto-generated by
    Postgres `BIGSERIAL` and not known at `encrypt()` time for inserts. The cutover
    path is `INSERT … RETURNING id` then `UPDATE … SET credentials_encrypted = ?`
    which doubles round-trips. Rejected for now; **revisit** if/when `connectionId` is
    threadable through the encrypt path. `instanceKey` is the chosen surrogate —
    non-null after `finalizeConnect()`, unique within `(workspace, kind)`.
 
-3. **Per-key encryption (KMS-style data-key envelope)** — wrap a fresh data key per
-   row with a master key, store the wrapped key alongside the ciphertext. Stronger,
-   but adds key-derivation latency to every encrypt/decrypt and requires KMS
-   integration. Rejected for #1198; revisit when Vault Transit becomes a real
-   dependency (separate epic).
-
-4. **Bind AAD to mutable display fields** (e.g. `account_login`, `org_name`).
-   Rejected because GitHub orgs and GitLab groups can be renamed; AAD must be over
-   stable identifiers only.
-
-5. **Delete v1 readers immediately, force re-encrypt on next access.** Rejected:
-   would break the Liquibase backfill window. v2-only write + v1-tolerant read is
-   the minimum-disruption cutover.
-
-6. **Store AAD bytes alongside the blob** — defeats the purpose. AAD bytes that
-   travel with the ciphertext are tamper-able by the same DB-write attacker; binding
-   to row columns (which the attacker must also tamper to break the binding, and
-   which are independently auditable) is the standard pattern.
+The shipped choice binds AAD to `(workspaceId, kind, instanceKey, columnFqn)`,
+which sits between these two: row-distinct in practice without depending on the
+not-yet-assigned PK.
 
 ## Consequences
 
@@ -127,21 +113,19 @@ fallback, no silent migration.
 - Cross-row credential substitution requires the attacker to also tamper with one of
   `workspaceId`, `kind`, or `instanceKey` on the destination row — which is a much
   louder change visible in audit logs.
-- Key rotation is simpler: rotate the encryption key, re-encrypt with the same AAD;
-  the AAD is reproducible from the row.
-- v1 blobs continue to decrypt cleanly during the cutover window via the legacy
-  static AAD; one-shot re-encrypt cleans them up.
+- Key rotation is a bulk re-encrypt: decrypt each row with the old key, re-encrypt
+  with the new key using the same AAD (reproducible from row columns). No
+  separate DEK/KEK envelope is needed.
 
 **Negative:**
 
 - AAD computation adds a small fixed cost on every encrypt and decrypt — bounded
   (one allocation + four UTF-8 encodes + length-prefixed concat). Negligible at
   webhook-rate traffic.
-- The `instanceKey` is null for `PENDING` rows pre-`finalizeConnect()`. Two PENDING
-  rows in the same `(workspace, kind)` share an AAD (both `instance_key = ""`).
-  Acceptable: PENDING rows are short-lived (10-min OAuth state TTL) and contain no
-  credential bytes yet — they only have credentials after `finalizeConnect()` which
-  always populates `instanceKey`.
+- The `instanceKey` is null for `PENDING` rows pre-`finalizeConnect()`, so two
+  PENDING rows in the same `(workspace, kind)` share an AAD (`instance_key = ""`).
+  Acceptable: PENDING rows are short-lived (10-min OAuth state TTL) and hold no
+  credential bytes until `finalizeConnect()` populates `instanceKey`.
 - Schema migrations that rename columns or change FQNs would invalidate AAD. The
   `columnFqn` field hard-codes `"connection.credentials_encrypted"`; a future
   schema change to that name must coordinate with an AAD re-encrypt step.
@@ -159,9 +143,10 @@ Re-open this decision if any of the following land:
 
 ## References
 
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/registry/EncryptionContext.java`
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/registry/CredentialBundleConverter.java`
-- `server/src/main/resources/db/changelog/1779700900000_credentials_format_version.xml`
+- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContext.java`
+- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/CredentialBundleConverter.java`
+- `server/src/main/resources/db/changelog/1779790459343_changelog.xml`
+  (changesets 8–9: backfill + legacy column drop)
 - AWS Database Encryption SDK — Concepts (record identity): https://docs.aws.amazon.com/database-encryption-sdk/latest/devguide/concepts.html
 - AWS KMS — Encryption Context: https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html
 - NIST SP 800-38D — GCM/GMAC: https://csrc.nist.gov/pubs/sp/800/38/d/final

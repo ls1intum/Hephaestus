@@ -19,9 +19,7 @@ public final class ArchitectureTestConstants {
         // Prevent instantiation
     }
 
-    // ========================================================================
     // PACKAGE PATTERNS
-    // ========================================================================
 
     /** Base package for all application code. */
     public static final String BASE_PACKAGE = "de.tum.cit.aet.hephaestus";
@@ -29,9 +27,7 @@ public final class ArchitectureTestConstants {
     /** Generated code packages to exclude from most checks. */
     public static final String GENERATED_GRAPHQL_PACKAGE = "..graphql..model..";
 
-    // ========================================================================
     // COMPLEXITY THRESHOLDS (Single Responsibility Principle)
-    // ========================================================================
 
     /**
      * Maximum business methods per service class.
@@ -57,9 +53,7 @@ public final class ArchitectureTestConstants {
      */
     public static final int MAX_CONTROLLER_DEPENDENCIES = 5;
 
-    // ========================================================================
     // INTERFACE THRESHOLDS (Interface Segregation Principle)
-    // ========================================================================
 
     /**
      * Maximum methods per interface.
@@ -77,9 +71,7 @@ public final class ArchitectureTestConstants {
      */
     public static final int MAX_SPI_METHODS = 8;
 
-    // ========================================================================
     // SPRING ANNOTATIONS
-    // ========================================================================
 
     /** Spring @Service annotation fully qualified name. */
     public static final String SPRING_SERVICE = "org.springframework.stereotype.Service";
@@ -99,16 +91,12 @@ public final class ArchitectureTestConstants {
     /** Spring @Repository annotation fully qualified name. */
     public static final String SPRING_REPOSITORY = "org.springframework.stereotype.Repository";
 
-    // ========================================================================
     // SECURITY ANNOTATIONS
-    // ========================================================================
 
     /** Spring Security @PreAuthorize fully qualified name. */
     public static final String SPRING_PRE_AUTHORIZE = "org.springframework.security.access.prepost.PreAuthorize";
 
-    // ========================================================================
     // TEST NAMING PATTERNS
-    // ========================================================================
 
     /** Pattern for unit test class names. */
     public static final String UNIT_TEST_SUFFIX = "Test";

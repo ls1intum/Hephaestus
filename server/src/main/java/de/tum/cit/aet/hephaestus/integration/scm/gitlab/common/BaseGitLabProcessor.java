@@ -87,9 +87,7 @@ public abstract class BaseGitLabProcessor {
         this.gitLabProperties = gitLabProperties;
     }
 
-    // ========================================================================
     // User Resolution
-    // ========================================================================
 
     /**
      * Finds or creates a user from webhook data.
@@ -114,9 +112,7 @@ public abstract class BaseGitLabProcessor {
         return gitLabUserService.findOrCreateUser(lookup, providerId);
     }
 
-    // ========================================================================
     // Label Resolution
-    // ========================================================================
 
     /**
      * Finds or creates a label from webhook data.
@@ -179,9 +175,7 @@ public abstract class BaseGitLabProcessor {
         return LabelIdUtils.generateDeterministicId(repositoryId, labelName);
     }
 
-    // ========================================================================
     // Relationship Updates
-    // ========================================================================
 
     /**
      * Updates assignees collection from webhook user list.
@@ -239,9 +233,7 @@ public abstract class BaseGitLabProcessor {
         return false;
     }
 
-    // ========================================================================
     // Timestamp Parsing
-    // ========================================================================
 
     /**
      * Parses a GitLab timestamp string to an Instant.
@@ -268,9 +260,7 @@ public abstract class BaseGitLabProcessor {
         }
     }
 
-    // ========================================================================
     // Context Resolution
-    // ========================================================================
 
     /**
      * Resolves a ProcessingContext from a project's pathWithNamespace for webhook events.
@@ -309,9 +299,7 @@ public abstract class BaseGitLabProcessor {
         return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
     }
 
-    // ========================================================================
     // Sanitization
-    // ========================================================================
 
     /** Strips null bytes and other characters that are invalid in PostgreSQL text columns. */
     @Nullable

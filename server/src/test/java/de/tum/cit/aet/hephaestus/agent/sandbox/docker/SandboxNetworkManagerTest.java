@@ -31,7 +31,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -87,7 +86,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldFallBackToHostname() {
             SandboxProperties propsNoId = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,
@@ -114,7 +112,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldReturnNullWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,
@@ -138,7 +135,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldReturnNullWhenHostnameBlank() {
             SandboxProperties propsNoId = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,
@@ -163,7 +159,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         void shouldCacheContainerId() {
             var callCount = new java.util.concurrent.atomic.AtomicInteger(0);
             SandboxProperties propsNoId = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,
@@ -205,7 +200,6 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         @Test
         void shouldNoOpWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,

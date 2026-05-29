@@ -7,7 +7,8 @@
 ## Context
 
 Hephaestus opens outbound OAuth Authorization Code flows from per-workspace admin pages
-("Connect GitHub", "Connect GitLab", "Connect Slack", "Connect Outline"). The framework
+("Connect GitHub", "Connect GitLab", "Connect Slack"; Outline integration was
+removed from this epic — see ADR 0015). The framework
 must:
 
 - Survive multi-step flows that may take **minutes** and span **tab close / reopen** (GitHub
@@ -23,9 +24,8 @@ must:
 - Support **per-instance** ClientRegistration shapes (each Slack workspace has its own
   signing secret; each GitLab self-hosted instance has its own `client_id`).
 
-Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
-`spring-boot-starter-oauth2-client` could replace the hand-rolled `HmacOAuthStateService`
-+ `OAuthStateNonceStore` + PKCE plumbing. Both arrived independently at the same answer.
+We examined whether `spring-boot-starter-oauth2-client` could replace the hand-rolled
+`HmacOAuthStateService` + `OAuthStateNonceStore` + PKCE plumbing.
 
 ## Decision drivers
 
@@ -39,7 +39,7 @@ Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
   re-implementing `OAuthStateNonceStore` behind Spring's interface — same code, less power
   (no per-row TTL queries, no workspace cross-referencing).
 - **Dynamic per-tenant ClientRegistration is not first-class.**
-  [spring-security#15860](https://github.com/spring-projects/spring-security/issues/15860)
+  [spring-security#12862](https://github.com/spring-projects/spring-security/issues/12862)
   is an open enhancement request. Workarounds require a custom `ClientRegistrationRepository`
   with careful concurrent-modification handling. Same effort as hand-rolled; less control.
 - **GitHub App ≠ standard OAuth Authorization Code.** GitHub App install callbacks deliver
@@ -58,9 +58,7 @@ Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
    The session-binding, principal-keyed persistence, and single-vendor-flow assumptions
    are baked too deep. Net code reduction is negative once the per-tenant
    `ClientRegistrationRepository` + JDBC `AuthorizationRequestRepository` + custom
-   `OAuth2AuthorizedClientService` are written. We'd ship the same bugs Linear / Sentry /
-   Vercel learned to avoid when their multi-tenant integration platforms reached this
-   scale.
+   `OAuth2AuthorizedClientService` are written.
 
 2. **Hybrid** — keep the hand-rolled state HMAC + nonce, but adopt:
    - `org.springframework.security.oauth2.core.endpoint.PkceParameterNames` constants
@@ -70,7 +68,7 @@ Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
      primitive we deliberately match.
 
 3. **Hand-roll** the entire flow, document our cryptographic choices in line with RFC 7636
-   + RFC 9700, ArchUnit-pin the state token shape. The audits' verdict.
+   + RFC 9700, ArchUnit-pin the state token shape. Adopted.
 
 ## Decision
 
@@ -80,11 +78,11 @@ nothing and reduce future drift:
 - Keep `HmacOAuthStateService`, `OAuthStateNonceStore`, the `state` payload shape
   `(workspaceId|kind|issuedAt|nonce|actorRef|codeVerifier?)`, and the single-use
   `consumed_at` conditional UPDATE.
-- Keep the PKCE primitive we landed in Wave 4 (`issueWithPkce` → `IssuedState`).
+- Keep the PKCE primitive (`issueWithPkce` → `IssuedState`).
 - Reference Spring's PKCE primitive in Javadoc so future readers know we matched it
   deliberately rather than reinvented it.
-- ArchUnit pins remain: the OAuth state SPI lives under `integration/oauth/state/`
-  (Wave 1 packaging move from `manifest/` to `oauth/state/`).
+- ArchUnit pins remain: the OAuth state SPI lives under
+  `integration/core/oauth/state/`.
 
 ## Consequences
 
@@ -114,7 +112,7 @@ nothing and reduce future drift:
 Any of:
 - Spring Security ships first-class multi-tenant `ClientRegistrationRepository` + a
   per-tenant `OAuth2AuthorizedClientService` schema that keys on something other than
-  `principal_name` (track [issue #15860](https://github.com/spring-projects/spring-security/issues/15860)).
+  `principal_name` (track [issue #12862](https://github.com/spring-projects/spring-security/issues/12862)).
 - GitHub App flow lands a standard `code` exchange at install time (currently `installation_id`
   is the callback param, not `code`).
 - We reach 10+ integration kinds — at that point the per-kind `ConnectionStrategy`
@@ -123,11 +121,6 @@ Any of:
 
 ## References
 
-- [RFC 9700 — Best Current Practice for OAuth 2.0 Security (Jan 2025)](https://www.rfc-editor.org/rfc/rfc9700.html)
 - [RFC 7636 — PKCE](https://www.rfc-editor.org/info/rfc7636)
-- [Spring Security OAuth2 Client docs](https://docs.spring.io/spring-security/reference/servlet/oauth2/client/index.html)
-- [`JdbcOAuth2AuthorizedClientService` schema](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/JdbcOAuth2AuthorizedClientService.html)
-- [`AuthorizationRequestRepository` default — HttpSession-backed](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/web/AuthorizationRequestRepository.html)
-- [spring-security/#15860 — Multi-tenant ClientRegistration enhancement request](https://github.com/spring-projects/spring-security/issues/15860)
-- [ch4mpy/spring-addons discussion #230 — multitenant dynamic ClientRegistrationRepository workaround](https://github.com/ch4mpy/spring-addons/discussions/230)
-- [GitHub Community #42351 — GitHub App approval flow loses state](https://github.com/orgs/community/discussions/42351)
+- [RFC 9700 — Best Current Practice for OAuth 2.0 Security (Jan 2025)](https://www.rfc-editor.org/rfc/rfc9700.html)
+- [spring-security/#12862 — Multi-tenant ClientRegistration enhancement request](https://github.com/spring-projects/spring-security/issues/12862)

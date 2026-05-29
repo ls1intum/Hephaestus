@@ -1,27 +1,23 @@
 import { CodeReviewIcon } from "@primer/octicons-react";
-import type {
-	ProfileActivityStats,
-	ProfileReviewActivity,
-	PullRequestBaseInfo,
-	PullRequestInfo,
-} from "@/api/types.gen";
+import { ArrowRightIcon } from "lucide-react";
+import type { ProfileActivityMonitor, PullRequestBaseInfo } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
+import { Button } from "@/components/ui/button";
+import { type ActivityMonitorFilters, MAX_ACTIVITY_MONITOR_LIMIT } from "@/lib/activity-monitor";
 import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
 import { EmptyState } from "../shared/EmptyState";
 import { IssueCard } from "../shared/IssueCard";
+import { ActivityMonitorConfiguration } from "./ActivityMonitorConfiguration";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 export interface ProfileContentProps {
 	providerType?: ProviderType;
-	reviewActivity?: ProfileReviewActivity[];
-	openPullRequests?: PullRequestInfo[];
-	/** Server-computed activity stats */
-	activityStats?: ProfileActivityStats;
-	/** Server-provided list of reviewed pull requests */
-	reviewedPullRequests?: PullRequestInfo[];
+	activityMonitorData?: ProfileActivityMonitor;
+	activityMonitorFilters: ActivityMonitorFilters;
+	onActivityMonitorFiltersChange: (filters: ActivityMonitorFilters) => void;
 	isLoading: boolean;
 	username: string;
 	displayName?: string;
@@ -30,16 +26,14 @@ export interface ProfileContentProps {
 	afterDate?: string;
 	beforeDate?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
 }
 
 export function ProfileContent({
 	providerType = "GITHUB",
-	reviewActivity = [],
-	openPullRequests = [],
-	activityStats,
-	reviewedPullRequests,
+	activityMonitorData,
+	activityMonitorFilters,
+	onActivityMonitorFiltersChange,
 	isLoading,
 	username,
 	displayName,
@@ -49,69 +43,87 @@ export function ProfileContent({
 	onTimeframeChange,
 	schedule,
 }: ProfileContentProps) {
-	// Generate skeleton arrays for loading state
-	const skeletonReviews = isLoading ? Array.from({ length: 3 }, (_, i) => ({ id: i })) : [];
+	const stats = activityMonitorData?.activityStats;
+	const repositories = activityMonitorData?.repositories ?? [];
 
-	const skeletonPullRequests = isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : [];
-
-	const filteredReviewActivity = isLoading
-		? skeletonReviews
-		: (reviewActivity ?? []).filter((activity) => (activity.score ?? 0) > 0);
-
-	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
+	const reviewActivity = (activityMonitorData?.reviewActivity ?? []).filter(
+		(activity) => (activity.score ?? 0) > 0,
+	);
+	const pullRequests = activityMonitorData?.authoredPullRequests ?? [];
+	const totalReviewActivityCount = activityMonitorData?.totalReviewActivityCount ?? 0;
+	const totalAuthoredPullRequestCount = activityMonitorData?.totalAuthoredPullRequestCount ?? 0;
 
 	const terms = getProviderTerms(providerType);
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
-	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
-		reviewedPullRequests && reviewedPullRequests.length > 0
-			? reviewedPullRequests
-			: (reviewActivity ?? [])
-					.filter((activity) => (activity.score ?? 0) > 0)
-					.map((activity) => activity.pullRequest)
-					.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
+	const canViewAllReviewActivity = !isLoading && totalReviewActivityCount > reviewActivity.length;
+	const canViewAllPullRequests = !isLoading && totalAuthoredPullRequestCount > pullRequests.length;
+
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] = reviewActivity
+		.map((activity) => activity.pullRequest)
+		.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
+
+	const expandMonitor = () => {
+		onActivityMonitorFiltersChange({
+			...activityMonitorFilters,
+			limit: MAX_ACTIVITY_MONITOR_LIMIT,
+		});
+	};
 
 	return (
 		<div className="flex flex-col gap-4">
-			<ProfileTimeframePicker
-				afterDate={afterDate}
-				beforeDate={beforeDate}
-				onTimeframeChange={onTimeframeChange}
-				schedule={schedule}
-				enableAllActivity
-			/>
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-				{/* Latest Pull Request Activity */}
-				<div className="flex flex-col gap-4">
-					<div className="flex flex-col gap-1">
-						<div className="flex flex-wrap items-center gap-3">
-							<h3 className="text-lg font-semibold">Review activity</h3>
-							<ActivityBadges
-								reviewedPullRequests={reviewedPullRequestsForPopover}
-								approvals={activityStats?.numberOfApprovals ?? 0}
-								changeRequests={activityStats?.numberOfChangeRequests ?? 0}
-								comments={activityStats?.numberOfComments ?? 0}
-								codeComments={activityStats?.numberOfCodeComments ?? 0}
-								ownReplies={activityStats?.numberOfOwnReplies ?? 0}
-								openPullRequests={activityStats?.numberOfOpenPullRequests ?? 0}
-								mergedPullRequests={activityStats?.numberOfMergedPullRequests ?? 0}
-								closedPullRequests={activityStats?.numberOfClosedPullRequests ?? 0}
-								openedIssues={activityStats?.numberOfOpenedIssues ?? 0}
-								closedIssues={activityStats?.numberOfClosedIssues ?? 0}
-								isLoading={isLoading}
-								providerType={providerType}
-							/>
-						</div>
-						<p className="text-sm text-provider-muted-foreground">
-							This list shows review work that affects score. The badges also show other activity.
-						</p>
+			<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+				<div className="flex flex-col gap-1">
+					<div className="flex flex-wrap items-center gap-3">
+						<h2 className="text-xl font-semibold">Activity Monitor</h2>
+						<ActivityBadges
+							reviewedPullRequests={reviewedPullRequestsForPopover}
+							approvals={stats?.numberOfApprovals ?? 0}
+							changeRequests={stats?.numberOfChangeRequests ?? 0}
+							comments={stats?.numberOfComments ?? 0}
+							codeComments={stats?.numberOfCodeComments ?? 0}
+							ownReplies={stats?.numberOfOwnReplies ?? 0}
+							openPullRequests={stats?.numberOfOpenPullRequests ?? 0}
+							mergedPullRequests={stats?.numberOfMergedPullRequests ?? 0}
+							closedPullRequests={stats?.numberOfClosedPullRequests ?? 0}
+							openedIssues={stats?.numberOfOpenedIssues ?? 0}
+							closedIssues={stats?.numberOfClosedIssues ?? 0}
+							isLoading={isLoading}
+							providerType={providerType}
+						/>
 					</div>
-					<div className="flex flex-col gap-2 m-1">
-						{filteredReviewActivity.length > 0 ? (
-							(filteredReviewActivity as ProfileReviewActivity[]).map((activity) => (
+					<p className="text-sm text-provider-muted-foreground">
+						Activity across projects in this workspace.
+					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-2 md:justify-end">
+					<ProfileTimeframePicker
+						afterDate={afterDate}
+						beforeDate={beforeDate}
+						onTimeframeChange={onTimeframeChange}
+						schedule={schedule}
+						enableAllActivity
+					/>
+					<ActivityMonitorConfiguration
+						repositories={repositories}
+						filters={activityMonitorFilters}
+						onFiltersChange={onActivityMonitorFiltersChange}
+					/>
+				</div>
+			</div>
+			<div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+				<div className="flex flex-col gap-4">
+					<h3 className="text-lg font-semibold">Review activity</h3>
+					<div className="flex flex-col gap-2">
+						{isLoading ? (
+							Array.from({ length: 3 }, (_, i) => (
+								<ReviewActivityCard key={i} isLoading providerType={providerType} />
+							))
+						) : reviewActivity.length > 0 ? (
+							reviewActivity.map((activity) => (
 								<ReviewActivityCard
 									key={activity.id}
-									isLoading={isLoading}
+									isLoading={false}
 									state={activity.state}
 									submittedAt={activity.submittedAt}
 									htmlUrl={activity.htmlUrl}
@@ -133,17 +145,30 @@ export function ProfileContent({
 							/>
 						)}
 					</div>
+					{canViewAllReviewActivity && (
+						<Button
+							type="button"
+							variant="link"
+							className="w-fit px-0 text-primary"
+							onClick={expandMonitor}
+						>
+							View all review activity
+							<ArrowRightIcon data-icon="inline-end" />
+						</Button>
+					)}
 				</div>
-
-				{/* Open Pull Requests / Merge Requests */}
-				<div className="flex flex-col gap-2">
+				<div className="flex flex-col gap-4">
 					<h3 className="text-lg font-semibold">Open {terms.pullRequests.toLowerCase()}</h3>
-					<div className="flex flex-col gap-2 m-1">
-						{displayPullRequests.length > 0 ? (
-							(displayPullRequests as PullRequestInfo[]).map((pullRequest) => (
+					<div className="flex flex-col gap-2">
+						{isLoading ? (
+							Array.from({ length: 2 }, (_, i) => (
+								<IssueCard key={i} isLoading providerType={providerType} />
+							))
+						) : pullRequests.length > 0 ? (
+							pullRequests.map((pullRequest) => (
 								<IssueCard
 									key={pullRequest.id}
-									isLoading={isLoading}
+									isLoading={false}
 									additions={pullRequest.additions}
 									deletions={pullRequest.deletions}
 									number={pullRequest.number}
@@ -170,6 +195,17 @@ export function ProfileContent({
 							/>
 						)}
 					</div>
+					{canViewAllPullRequests && (
+						<Button
+							type="button"
+							variant="link"
+							className="w-fit px-0 text-primary"
+							onClick={expandMonitor}
+						>
+							View all {terms.pullRequests.toLowerCase()}
+							<ArrowRightIcon data-icon="inline-end" />
+						</Button>
+					)}
 				</div>
 			</div>
 		</div>

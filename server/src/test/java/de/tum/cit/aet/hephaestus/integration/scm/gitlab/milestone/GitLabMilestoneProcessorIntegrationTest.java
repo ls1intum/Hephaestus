@@ -49,12 +49,12 @@ import org.springframework.test.context.TestPropertySource;
 @DisplayName("GitLab Milestone Processor")
 @TestPropertySource(
     properties = {
-        "hephaestus.gitlab.enabled=true",
-        "hephaestus.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.gitlab.connect-timeout=30s",
-        "hephaestus.gitlab.read-timeout=60s",
-        "hephaestus.gitlab.rate-limit-delay=200ms",
-        "hephaestus.gitlab.sync-page-delay=5m",
+        "hephaestus.integration.gitlab.enabled=true",
+        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
+        "hephaestus.integration.gitlab.connect-timeout=30s",
+        "hephaestus.integration.gitlab.read-timeout=60s",
+        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
+        "hephaestus.integration.gitlab.sync-page-delay=5m",
     }
 )
 class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
@@ -617,7 +617,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabMilestoneDTO createDto(int iid, String state) {
         return new GitLabMilestoneDTO(
@@ -637,7 +637,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Test Data Setup ====================
+    // Test Data Setup
 
     private void setupTestData() {
         gitlabProvider = gitProviderRepository
@@ -682,7 +682,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace = workspaceRepository.save(testWorkspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestMilestoneEventListener {

@@ -20,7 +20,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // ── Evidence builders ──
+    // Evidence builders
 
     private JsonNode buildEvidence(List<LocationSpec> locations, List<String> snippets) {
         ObjectNode evidence = objectMapper.createObjectNode();
@@ -51,7 +51,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         }
     }
 
-    // ── Finding builders ──
+    // Finding builders
 
     private ValidatedFinding positiveFinding(String slug) {
         return new ValidatedFinding(
@@ -93,7 +93,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return slug.replace('-', ' ').substring(0, 1).toUpperCase() + slug.replace('-', ' ').substring(1);
     }
 
-    // ── Realistic findings used across tests ──
+    // Realistic findings used across tests
 
     private List<ValidatedFinding> mixedFindings() {
         List<ValidatedFinding> findings = new ArrayList<>();
@@ -158,9 +158,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return findings;
     }
 
-    // =========================================================================
     // Test 1: Mixed findings
-    // =========================================================================
 
     @Test
     void compose_withMixedFindings_producesExpectedMrNote() {
@@ -218,9 +216,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(secretsNote.body()).contains("ProcessInfo.processInfo.environment");
     }
 
-    // =========================================================================
     // Test 2: All positive findings produce an approval comment
-    // =========================================================================
 
     @Test
     void compose_withAllPositive_producesApprovalNote() {
@@ -239,9 +235,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes()).isEmpty();
     }
 
-    // =========================================================================
     // Test 3: Overflow with >5 negatives
-    // =========================================================================
 
     @Test
     void compose_withManyNegatives_allInCompactList() {
@@ -347,9 +341,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes()).hasSize(7);
     }
 
-    // =========================================================================
     // Test 4: All negatives get inline diff notes
-    // =========================================================================
 
     @Test
     void compose_diffNotes_allNegativesGetInlineComments() {
@@ -400,9 +392,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         }
     }
 
-    // =========================================================================
     // Edge cases
-    // =========================================================================
 
     @Test
     void compose_withNull_returnsNull() {

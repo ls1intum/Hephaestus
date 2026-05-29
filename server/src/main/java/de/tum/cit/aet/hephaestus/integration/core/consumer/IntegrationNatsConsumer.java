@@ -133,9 +133,7 @@ public class IntegrationNatsConsumer {
         this.stats = stats;
     }
 
-    // -------------------------------------------------------------------------
     // Lifecycle
-    // -------------------------------------------------------------------------
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
@@ -236,9 +234,7 @@ public class IntegrationNatsConsumer {
         log.info("Integration NATS consumer fleet shut down");
     }
 
-    // -------------------------------------------------------------------------
     // Public surface (called by workspace lifecycle services)
-    // -------------------------------------------------------------------------
 
     /**
      * Start (or no-op if already running) a JetStream consumer for the given scope.
@@ -325,9 +321,7 @@ public class IntegrationNatsConsumer {
         });
     }
 
-    // -------------------------------------------------------------------------
     // JetStream setup
-    // -------------------------------------------------------------------------
 
     private void setupScopeConsumer(Long scopeId) throws IOException {
         Optional<NatsSubscriptionInfo> infoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
@@ -485,9 +479,7 @@ public class IntegrationNatsConsumer {
         return s == null || s.isBlank();
     }
 
-    // -------------------------------------------------------------------------
     // Message dispatch
-    // -------------------------------------------------------------------------
 
     /**
      * Single entry point for every queued message across every scope. The dispatcher is
@@ -522,9 +514,7 @@ public class IntegrationNatsConsumer {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Connection management
-    // -------------------------------------------------------------------------
 
     private void validateConfiguration() {
         if (isBlank(connectionProperties.server())) {
@@ -649,9 +639,7 @@ public class IntegrationNatsConsumer {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Test seams (package-private — used by unit tests in the same package).
-    // -------------------------------------------------------------------------
 
     boolean isShuttingDown() {
         return shuttingDown.get();

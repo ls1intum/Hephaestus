@@ -1,5 +1,5 @@
 {
-  "_comment": "v2: same shape as v1 plus future vendor-added fields. Tolerant-reader must IGNORE the unknown top-level + nested keys, not throw.",
+  "_comment": "SYNTHETIC forward-compatibility fixture (NOT a real GitHub schema). It is the v1 payload with fabricated unknown keys injected at the top level and at every nesting level (prefixed _ or suffixed _v2). The tolerant reader must IGNORE these unknown keys and still extract the known fields.",
   "action": "opened",
   "number": 42,
   "_future_top_level": "vendor adds an opaque tracing context — must be ignored",

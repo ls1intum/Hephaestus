@@ -80,7 +80,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -209,7 +208,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         @Test
         void shouldUseActiveServerPortWhenProxyPortUnset() {
             SandboxProperties properties = new SandboxProperties(
-                true,
                 "unix:///var/run/docker.sock",
                 false,
                 null,

@@ -68,7 +68,7 @@ public class GitHubIssueCommentMessageHandler extends AbstractIntegrationMessage
             return;
         }
 
-        log.info(
+        log.debug(
             "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}, isPullRequest={}",
             event.action(),
             issueDto.number(),

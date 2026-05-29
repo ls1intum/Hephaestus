@@ -11,6 +11,5 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 public enum SubjectClass {
     PULL_REQUEST,
     ISSUE,
-    OUTLINE_DOCUMENT,
     SLACK_MESSAGE_THREAD,
 }

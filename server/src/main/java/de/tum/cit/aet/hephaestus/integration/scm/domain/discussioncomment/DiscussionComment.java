@@ -82,7 +82,7 @@ public class DiscussionComment extends BaseGitServiceEntity {
      */
     private Instant lastSyncAt;
 
-    // ========== Relationships ==========
+    // Relationships
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "discussion_id")

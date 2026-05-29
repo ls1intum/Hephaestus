@@ -79,13 +79,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         // Unified integration framework
         "Connection", // has direct Workspace field
         "ConnectionAudit", // through Connection.workspace
-        "FeedbackPost", // through Connection.workspace
-        // Slack + Outline persistence (#1204/#1205 runtime tables)
-        // Workspace-scoped via Connection.workspace; deletion rules + ToS contract in entity Javadoc.
-        "SlackChannel",
-        "SlackMessage",
-        "OutlineDocument",
-        "OutlineCollection"
+        "FeedbackPost" // through Connection.workspace
     );
 
     /**
@@ -110,12 +104,11 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "AuthEvent", // Append-only auth audit; references workspace optionally, not scoped by it
         "IssuedJwt", // JWT revocation list; account-scoped
         "JwtSigningKey", // System-wide signing keys
-        "AccountExport" // GDPR Art. 20 self-service export; account-scoped, spans workspaces
+        "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
+        "WorkerRegistry" // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
     );
 
-    // ========================================================================
     // ENTITY WORKSPACE RELATIONSHIPS
-    // ========================================================================
 
     @Nested
     class EntityWorkspaceRelationshipTests {
@@ -218,9 +211,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DTO WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
     class DtoWorkspaceContextTests {
@@ -299,9 +290,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // REPOSITORY RETURN TYPE SAFETY
-    // ========================================================================
 
     @Nested
     class RepositoryReturnTypeSafetyTests {
@@ -433,9 +422,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CASCADE DELETE WORKSPACE SAFETY
-    // ========================================================================
 
     @Nested
     class CascadeDeleteSafetyTests {

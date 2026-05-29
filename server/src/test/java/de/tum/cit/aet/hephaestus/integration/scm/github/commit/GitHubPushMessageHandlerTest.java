@@ -6,12 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryMan
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
@@ -97,7 +98,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         handleEvent.invoke(handler, event);
     }
 
-    // ========== Test Data Builders ==========
+    // Test Data Builders
 
     private static GitHubRepositoryRefDTO createRepoRef(Long id, String fullName) {
         return new GitHubRepositoryRefDTO(
@@ -156,17 +157,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     }
 
     private Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
-        Repository repo = mock(Repository.class, org.mockito.Mockito.withSettings().lenient());
-        when(repo.getId()).thenReturn(id);
-        when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
-        when(repo.getDefaultBranch()).thenReturn(defaultBranch);
-        when(repo.getOrganization()).thenReturn(null);
-        var provider = mock(
-            de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider.class,
-            org.mockito.Mockito.withSettings().lenient()
-        );
-        when(provider.getId()).thenReturn(1L);
-        when(repo.getProvider()).thenReturn(provider);
+        Repository repo = TestEntities.repository(id, nameWithOwner, defaultBranch);
+        repo.setOrganization(null);
+        repo.setProvider(TestEntities.gitProvider(1L, GitProviderType.GITHUB));
         return repo;
     }
 
@@ -692,15 +685,10 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             // After upsertCommit, findByShaAndRepositoryId must return a Commit entity for file changes
             // and for publishCommitCreated (which calls CommitData.from(commit))
-            var persistedCommit = mock(
-                de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit.class,
-                org.mockito.Mockito.withSettings().lenient()
-            );
-            when(persistedCommit.getId()).thenReturn(1L);
-            when(persistedCommit.getSha()).thenReturn("sha1aabbccdd112233445566778899aabbccddeeff");
-            when(persistedCommit.getMessage()).thenReturn("msg");
-            when(persistedCommit.getAuthoredAt()).thenReturn(Instant.parse("2024-01-15T10:30:00Z"));
-            when(persistedCommit.getRepository()).thenReturn(repo);
+            var persistedCommit = TestEntities.commit(1L, "sha1aabbccdd112233445566778899aabbccddeeff");
+            persistedCommit.setMessage("msg");
+            persistedCommit.setAuthoredAt(Instant.parse("2024-01-15T10:30:00Z"));
+            persistedCommit.setRepository(repo);
             when(
                 commitRepository.findByShaAndRepositoryId("sha1aabbccdd112233445566778899aabbccddeeff", 100L)
             ).thenReturn(Optional.of(persistedCommit));
@@ -952,15 +940,10 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             // Mock the persisted commit lookup for publishCommitCreated
-            var persistedCommit = mock(
-                de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit.class,
-                org.mockito.Mockito.withSettings().lenient()
-            );
-            when(persistedCommit.getId()).thenReturn(1L);
-            when(persistedCommit.getSha()).thenReturn("abc123def456789012345678901234567890abcd");
-            when(persistedCommit.getMessage()).thenReturn("feat: publish test");
-            when(persistedCommit.getAuthoredAt()).thenReturn(Instant.parse("2024-01-15T10:30:00Z"));
-            when(persistedCommit.getRepository()).thenReturn(repo);
+            var persistedCommit = TestEntities.commit(1L, "abc123def456789012345678901234567890abcd");
+            persistedCommit.setMessage("feat: publish test");
+            persistedCommit.setAuthoredAt(Instant.parse("2024-01-15T10:30:00Z"));
+            persistedCommit.setRepository(repo);
             when(
                 commitRepository.findByShaAndRepositoryId("abc123def456789012345678901234567890abcd", 100L)
             ).thenReturn(Optional.of(persistedCommit));

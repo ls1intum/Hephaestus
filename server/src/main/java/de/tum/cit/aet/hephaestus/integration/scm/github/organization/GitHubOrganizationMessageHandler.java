@@ -70,7 +70,7 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
             return;
         }
 
-        log.info(
+        log.debug(
             "Received organization event: action={}, orgId={}, orgLogin={}",
             event.action(),
             orgDto.id(),

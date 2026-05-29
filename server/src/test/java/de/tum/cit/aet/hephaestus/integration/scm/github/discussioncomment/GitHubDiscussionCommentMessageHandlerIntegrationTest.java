@@ -235,7 +235,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         return objectMapper.readValue(json, GitHubDiscussionCommentEventDTO.class);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestEventListener {

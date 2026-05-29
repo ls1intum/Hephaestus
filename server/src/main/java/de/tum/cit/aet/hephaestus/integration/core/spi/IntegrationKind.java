@@ -18,8 +18,6 @@ public enum IntegrationKind {
     GITLAB(IntegrationFamily.SCM),
     /** Slack workspace. */
     SLACK(IntegrationFamily.MESSAGING),
-    /** Outline (getoutline.com) knowledge base. */
-    OUTLINE(IntegrationFamily.KNOWLEDGE),
     /**
      * Workspace-scoped GitHub OAuth login app — surfaces a "Sign in with this workspace's
      * GitHub" provider in addition to the env-default {@code github} registration. Distinct

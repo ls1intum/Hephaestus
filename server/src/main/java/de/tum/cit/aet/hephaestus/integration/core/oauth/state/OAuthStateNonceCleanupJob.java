@@ -8,7 +8,6 @@ import java.time.Instant;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,9 +37,20 @@ public class OAuthStateNonceCleanupJob {
     private final Duration retention;
     private final Counter prunedCounter;
 
+    /** Spring-wired constructor; retention binds via {@link OAuthStateProperties}. */
+    @org.springframework.beans.factory.annotation.Autowired
     public OAuthStateNonceCleanupJob(
         OAuthStateNonceRepository repository,
-        @Value("${hephaestus.integration.oauth-state.nonce-retention:P7D}") Duration retention,
+        OAuthStateProperties properties,
+        MeterRegistry meterRegistry
+    ) {
+        this(repository, properties.nonceRetention(), meterRegistry);
+    }
+
+    /** Canonical constructor (also the unit-test seam): retention passed directly. */
+    public OAuthStateNonceCleanupJob(
+        OAuthStateNonceRepository repository,
+        Duration retention,
         MeterRegistry meterRegistry
     ) {
         this.repository = repository;

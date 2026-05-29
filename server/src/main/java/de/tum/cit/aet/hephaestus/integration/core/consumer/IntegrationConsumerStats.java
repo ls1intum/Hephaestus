@@ -22,9 +22,7 @@ public class IntegrationConsumerStats {
     private final AtomicReference<Instant> lastDispatchAt = new AtomicReference<>();
     private final AtomicReference<Instant> lastNakAt = new AtomicReference<>();
 
-    // -------------------------------------------------------------------------
     // Readers (called from the health probe; never blocking)
-    // -------------------------------------------------------------------------
 
     /**
      * @return the underlying NATS connection status as a coarse-grained label
@@ -67,9 +65,7 @@ public class IntegrationConsumerStats {
         return Optional.ofNullable(lastNakAt.get());
     }
 
-    // -------------------------------------------------------------------------
     // Writers (called by the consumer fleet's lifecycle + message loop)
-    // -------------------------------------------------------------------------
 
     /** Update the cached connection-status label. Null tolerated (treated as uninitialised). */
     public void setNatsConnectionStatus(@Nullable String status) {

@@ -11,6 +11,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -277,6 +278,10 @@ public class GitHubIssueSyncService {
         }
 
         int totalIssuesSynced = 0;
+        // Raw nodes received across all pages — the apples-to-apples count for issues.totalCount.
+        // (totalIssuesSynced is post-filter: it omits skipped/unparseable nodes, so it would
+        // report a phantom gap even on a fully-paginated sync.)
+        int issuesReceived = 0;
         int totalCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
         int reportedTotalCount = -1;
@@ -415,6 +420,8 @@ public class GitHubIssueSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+
+                issuesReceived += connection.getNodes().size();
 
                 // Process the page within its own transaction to keep transactions short
                 final Long repoId = repositoryId;
@@ -567,11 +574,18 @@ public class GitHubIssueSyncService {
             }
         }
 
-        // Check for overflow: did we fetch fewer items than GitHub reported?
-        // Only meaningful during full sync — during incremental sync we intentionally fetch
-        // only recently-updated items, so fetchedCount < totalCount is expected by design.
+        // Full-sync only; compare raw issue nodes received (not the post-filter count) vs totalCount.
+        // hasMore stays true on every early break (error/rate-limit, page cap, empty/null page) and is
+        // false only after clean exhaustion — so it is the complete early-stop signal.
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            GraphQlConnectionOverflowDetector.check("issues", totalIssuesSynced, reportedTotalCount, safeNameWithOwner);
+            boolean stoppedEarly = abortReason != null || hasMore;
+            GraphQlConnectionOverflowDetector.checkPaginated(
+                "issues",
+                issuesReceived,
+                reportedTotalCount,
+                stoppedEarly,
+                safeNameWithOwner
+            );
         }
 
         // Fetch remaining comments for issues with >10 comments (using cursor for efficient continuation)
@@ -720,7 +734,7 @@ public class GitHubIssueSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updateIssueSyncCursor(syncTargetId, cursor);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, cursor);
             log.debug("Persisted issue sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }
@@ -736,7 +750,7 @@ public class GitHubIssueSyncService {
         TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
-            backfillStateProvider.updateIssueSyncCursor(syncTargetId, null);
+            backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.ISSUE, null);
             log.debug("Cleared issue sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
     }

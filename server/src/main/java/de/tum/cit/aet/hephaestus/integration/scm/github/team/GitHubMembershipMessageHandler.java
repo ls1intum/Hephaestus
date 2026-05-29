@@ -69,7 +69,7 @@ public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHa
             return;
         }
 
-        log.info(
+        log.debug(
             "Received membership event: action={}, userLogin={}, teamName={}, orgLogin={}",
             event.action(),
             sanitizeForLog(memberDto.login()),

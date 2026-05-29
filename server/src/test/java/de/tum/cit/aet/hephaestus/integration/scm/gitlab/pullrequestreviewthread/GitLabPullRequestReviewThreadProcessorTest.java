@@ -56,9 +56,7 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         pr.setProvider(provider);
     }
 
-    // ========================================================================
     // deterministicNativeId
-    // ========================================================================
 
     @Nested
     class DeterministicNativeId {
@@ -86,9 +84,7 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // findOrCreateThread — creation populates position metadata
-    // ========================================================================
 
     @Nested
     class CreateThread {
@@ -238,9 +234,7 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // findOrCreateThread — update backfill
-    // ========================================================================
 
     @Nested
     class UpdateThreadBackfill {
@@ -451,9 +445,7 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // ThreadData backward-compat 6-arg constructor
-    // ========================================================================
 
     @Nested
     class ThreadDataBackwardCompat {

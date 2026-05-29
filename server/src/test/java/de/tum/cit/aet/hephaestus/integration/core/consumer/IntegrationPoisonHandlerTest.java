@@ -164,9 +164,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Build a mocked NATS message with deliveredCount + subject pre-wired. We use

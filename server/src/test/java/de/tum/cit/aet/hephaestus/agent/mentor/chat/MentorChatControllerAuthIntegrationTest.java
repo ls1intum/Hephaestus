@@ -20,7 +20,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -30,12 +29,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * membership pre-check and the {@code @PreAuthorize("@workspaceSecure.isMember()")} expression
  * — survive future regressions.
  */
-@TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
 class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
+    // The mentor beans now wire unconditionally; InteractiveSandboxService is part of the
+    // worker capability (absent in the test profile, where the worker role is off), so mock it.
     @MockitoBean
     private InteractiveSandboxService interactiveSandboxService;
 

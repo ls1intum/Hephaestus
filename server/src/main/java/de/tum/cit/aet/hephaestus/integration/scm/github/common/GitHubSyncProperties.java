@@ -21,12 +21,14 @@ import org.springframework.validation.annotation.Validated;
  * <h2>Configuration Example</h2>
  * <pre>{@code
  * hephaestus:
- *   sync:
- *     graphql-timeout: 30s
- *     extended-graphql-timeout: 60s
- *     pagination-throttle: 200ms
- *     incremental-sync-enabled: true
- *     incremental-sync-buffer: 5m
+ *   integration:
+ *     github:
+ *       sync:
+ *         graphql-timeout: 30s
+ *         extended-graphql-timeout: 60s
+ *         pagination-throttle: 200ms
+ *         incremental-sync-enabled: true
+ *         incremental-sync-buffer: 5m
  * }</pre>
  *
  * <h2>Duration Format</h2>
@@ -63,7 +65,7 @@ import org.springframework.validation.annotation.Validated;
  *      GitHub GraphQL Rate Limits</a>
  */
 @Validated
-@ConfigurationProperties(prefix = "hephaestus.sync")
+@ConfigurationProperties(prefix = "hephaestus.integration.github.sync")
 public record GitHubSyncProperties(
     @NotNull @DurationUnit(SECONDS) @DefaultValue("30s") Duration graphqlTimeout,
     @NotNull @DurationUnit(SECONDS) @DefaultValue("60s") Duration extendedGraphqlTimeout,

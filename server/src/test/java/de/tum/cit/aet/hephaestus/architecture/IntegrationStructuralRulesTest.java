@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/** Structural fitness functions added in the Phase 4 integration restructure. */
+/** Structural fitness functions pinning the integration package layout and vendor-neutral core. */
 class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
 
     private static final Set<String> VENDOR_LITERALS = Set.of("Github", "Gitlab", "Slack", "Outline");
@@ -80,9 +80,15 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
         Path integrationDir = locateIntegrationRoot();
         try (Stream<Path> children = Files.list(integrationDir)) {
             Set<String> actual = children.map(p -> p.getFileName().toString()).collect(Collectors.toSet());
-            Set<String> expected = Set.of("core", "scm", "slack", "outline", "package-info.java");
+            // {core, scm, slack} are the original Phase-4 trait roots. {identity} is the
+            // OIDC-login vendor-adapter root (ADR 0017): it owns the per-workspace OIDC login
+            // ConnectionStrategy impls + the composite ClientRegistrationRepository, mirroring
+            // integration.slack.connect. It lives here (not in core.auth) so that core.auth never
+            // imports integration.* — that import would invert the bounded-context direction and
+            // re-introduce the core ↔ scm-data-platform cycle.
+            Set<String> expected = Set.of("core", "scm", "slack", "identity", "package-info.java");
             assertThat(actual)
-                .as("Phase 4 settled on {core, scm, slack, outline} as the only top-level integration sub-roots.")
+                .as("Integration top-level sub-roots: {core, scm, slack, identity} (ADR 0017 OIDC login).")
                 .isEqualTo(expected);
         }
     }

@@ -51,7 +51,7 @@ public record CreateWorkspaceRequestDTO(
 
     @NotNull(message = "Integration kind is required")
     @Schema(
-        description = "Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE flow through OAuth, not this endpoint.",
+        description = "Integration kind to provision. Must be GITHUB or GITLAB; SLACK flows through OAuth, not this endpoint.",
         example = "GITLAB"
     )
     IntegrationKind kind,
@@ -75,7 +75,7 @@ public record CreateWorkspaceRequestDTO(
         return personalAccessToken != null && !personalAccessToken.isBlank();
     }
 
-    @AssertTrue(message = "kind must be GITHUB or GITLAB; SLACK/OUTLINE flow through OAuth")
+    @AssertTrue(message = "kind must be GITHUB or GITLAB; SLACK flows through OAuth")
     @Schema(hidden = true)
     private boolean isKindSupported() {
         return kind == IntegrationKind.GITHUB || kind == IntegrationKind.GITLAB;

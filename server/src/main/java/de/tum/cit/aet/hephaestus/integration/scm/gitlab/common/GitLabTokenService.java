@@ -33,7 +33,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  */
 @Service
 @Slf4j
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabTokenService {
 
     private static final String USER_ENDPOINT = "/api/v4/user";

@@ -166,7 +166,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         setupTestData();
     }
 
-    // ==================== Event Key Tests ====================
+    // Event Key Tests
 
     @Nested
     class EventType {
@@ -177,7 +177,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Basic Lifecycle Events ====================
+    // Basic Lifecycle Events
 
     @Nested
     class BasicLifecycleEvents {
@@ -293,7 +293,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Draft State Events ====================
+    // Draft State Events
 
     @Nested
     class DraftStateEvents {
@@ -335,7 +335,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Synchronize Event ====================
+    // Synchronize Event
 
     @Nested
     class SynchronizeEvent {
@@ -360,7 +360,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Label Events ====================
+    // Label Events
 
     @Nested
     class LabelEvents {
@@ -407,7 +407,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Assignment Events ====================
+    // Assignment Events
 
     @Nested
     class AssignmentEvents {
@@ -447,7 +447,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Milestone Events ====================
+    // Milestone Events
 
     @Nested
     class MilestoneEvents {
@@ -497,7 +497,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Review Request Events ====================
+    // Review Request Events
 
     @Nested
     class ReviewRequestEvents {
@@ -532,7 +532,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Lock Events ====================
+    // Lock Events
 
     @Nested
     class LockEvents {
@@ -570,7 +570,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -668,7 +668,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Full Workflow Tests ====================
+    // Full Workflow Tests
 
     @Nested
     class FullWorkflow {
@@ -729,7 +729,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== DTO Parsing Tests ====================
+    // DTO Parsing Tests
 
     @Nested
     class DTOParsing {
@@ -807,7 +807,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         }
     }
 
-    // ==================== Helper Methods ====================
+    // Helper Methods
 
     private GitHubPullRequestEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
@@ -873,7 +873,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         return users.stream().map(User::getLogin).collect(Collectors.toSet());
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestPullRequestEventListener {

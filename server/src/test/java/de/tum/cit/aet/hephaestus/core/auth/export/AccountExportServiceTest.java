@@ -19,8 +19,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery.WorkspaceMembershipView;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
@@ -55,6 +54,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         AuthEventRepository authEventRepo = mock(AuthEventRepository.class);
         AccountWorkspaceMembershipQuery membershipQuery = mock(AccountWorkspaceMembershipQuery.class);
         AccountPreferencesQuery preferencesQuery = mock(AccountPreferencesQuery.class);
+        GitProviderRegistry gitProviderRegistry = mock(GitProviderRegistry.class);
 
         Account account = new Account("Ada Lovelace");
         setId(account, ACCOUNT_ID);
@@ -63,8 +63,8 @@ class AccountExportServiceTest extends BaseUnitTest {
         account.setStatus(Account.Status.ACTIVE);
 
         IdentityLink link = new IdentityLink();
-        GitProvider provider = new GitProvider(GitProviderType.GITLAB, "https://gitlab.example.com");
-        link.setGitProvider(provider);
+        link.setGitProviderId(55L);
+        when(gitProviderRegistry.providerTypeName(55L)).thenReturn("GITLAB");
         link.setSubject("123");
         link.setUsernameAtSignup("ada");
         link.setEmailAtSignup("ada@signup.example.com");
@@ -87,6 +87,7 @@ class AccountExportServiceTest extends BaseUnitTest {
             authEventRepo,
             membershipQuery,
             preferencesQuery,
+            gitProviderRegistry,
             clock
         );
 

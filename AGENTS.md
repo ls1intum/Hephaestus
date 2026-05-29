@@ -81,6 +81,8 @@ Regeneration is destructive; stash local edits before running these commands. Ch
   2. Snapshot the schema, run Liquibase diff, and create a timestamped changelog file.
   3. Tear down the temporary container.
 - Trim the generated changelog to only the real schema deltas (e.g., new columns). Never commit the raw diff wholesale—prune back to the minimal change set before renaming it into `db/changelog/`.
+- **Filename convention (required):** the committed file MUST be `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`, i.e. what the draft tool emits), strictly greater than the latest existing changelog so `master.xml` stays monotonic. Do NOT invent a round number and do NOT use a descriptive suffix; keep the `_changelog.xml` name. `changeSet` ids follow `<timestamp>-1`, `<timestamp>-2`, …
+- **One consolidated changelog per branch/PR (required):** add every schema change for a branch as additional `<changeSet>` entries inside that single file. Never open a PR with more than one new changelog file — consolidate. Each `changeSet` should be preconditioned (`onFail="MARK_RAN"`) with a `<rollback>`, matching the existing files.
 - After drafting a changelog, run `pnpm run db:generate-erd-docs` to keep ERD docs in sync.
 - Never manually edit generated Liquibase diff sections unless you fully understand the implications. Prefer creating a follow-up changelog to fix mistakes.
 

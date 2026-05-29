@@ -52,7 +52,7 @@ public record GitHubDiscussionCommentDTO(
         return databaseId != null ? databaseId : id;
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubDiscussionCommentDTO from a GraphQL DiscussionComment model.
@@ -145,7 +145,7 @@ public record GitHubDiscussionCommentDTO(
         }
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static String convertAuthorAssociation(@Nullable GHCommentAuthorAssociation association) {

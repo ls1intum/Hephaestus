@@ -60,14 +60,24 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
-    github:
-        app:
-            # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
-            id: ${GH_APP_ID:0}
-            privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
-            privateKey: ${GH_APP_PRIVATE_KEY:}
-        meta:
-            auth-token: ${GH_AUTH_TOKEN:}
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SCM + SLACK INTEGRATION (Production)
+    #
+    # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
+    # `connection` table — there is no global bot token. The signing secret is still
+    # required for inbound webhook signature verification.
+    # ═══════════════════════════════════════════════════════════════════════════
+    integration:
+        github:
+            app:
+                # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+                id: ${GH_APP_ID:0}
+                privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+                privateKey: ${GH_APP_PRIVATE_KEY:}
+            meta:
+                auth-token: ${GH_AUTH_TOKEN:}
+        slack:
+            signing-secret: ${SLACK_SIGNING_SECRET}
 
     sync:
         run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}
@@ -109,16 +119,6 @@ hephaestus:
     agent:
         image:
             require-digest: true
-
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SLACK INTEGRATION (Production)
-    #
-    # Per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no longer a global bot token. The signing
-    # secret below is still required for inbound webhook signature verification.
-    # ═══════════════════════════════════════════════════════════════════════════
-    slack:
-        signing-secret: ${SLACK_SIGNING_SECRET}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # SENTRY ERROR TRACKING (Production)

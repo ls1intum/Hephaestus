@@ -32,6 +32,12 @@ import org.springframework.lang.Nullable;
  */
 public final class ScmEventPayload {
 
+    /**
+     * Diagnostic only — fires from the {@link ReviewData#from} / {@link ReviewThreadData#from}
+     * factories when an entity references a null {@code PullRequest} (the FK is nullable
+     * on the join column). Callers use {@code Optional.empty()} as the contract; this log
+     * exists so operators can investigate which DB rows triggered the empty path.
+     */
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ScmEventPayload.class);
 
     private ScmEventPayload() {}

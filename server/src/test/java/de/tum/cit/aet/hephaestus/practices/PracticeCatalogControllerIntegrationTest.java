@@ -70,9 +70,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         );
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // LIST
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class ListPractices {
@@ -229,9 +227,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET SINGLE
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class GetPractice {
@@ -317,9 +313,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // CREATE
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("POST /practices")
@@ -777,9 +771,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // UPDATE
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("PATCH /practices/{practiceSlug}")
@@ -1019,9 +1011,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // SET ACTIVE
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("PATCH /practices/{practiceSlug}/active")
@@ -1172,9 +1162,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // DELETE PRACTICE
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class DeletePractice {
@@ -1242,9 +1230,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // WORKSPACE ISOLATION
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     class WorkspaceIsolation {

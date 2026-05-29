@@ -2,7 +2,13 @@ package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.core.SimpleLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,21 +40,52 @@ public class LeaderboardTaskScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
 
+    // Cron fires on every server replica; ShedLock ensures only one replica runs each task per
+    // tick (lockAtLeastFor covers clock skew so a fast task can't release before peers fire).
+    private static final Duration LOCK_AT_MOST_FOR = Duration.ofHours(1);
+    private static final Duration LOCK_AT_LEAST_FOR = Duration.ofMinutes(1);
+
     private final LeaderboardProperties leaderboardProperties;
     private final TaskScheduler taskScheduler;
     private final List<LeaderboardNotificationTask> notificationTasks;
     private final LeaguePointsUpdateTask leaguePointsUpdateTask;
+    private final LockProvider lockProvider;
 
     public LeaderboardTaskScheduler(
         LeaderboardProperties leaderboardProperties,
         TaskScheduler taskScheduler,
         List<LeaderboardNotificationTask> notificationTasks,
-        LeaguePointsUpdateTask leaguePointsUpdateTask
+        LeaguePointsUpdateTask leaguePointsUpdateTask,
+        LockProvider lockProvider
     ) {
         this.leaderboardProperties = leaderboardProperties;
         this.taskScheduler = taskScheduler;
         this.notificationTasks = notificationTasks;
         this.leaguePointsUpdateTask = leaguePointsUpdateTask;
+        this.lockProvider = lockProvider;
+    }
+
+    /**
+     * Wraps a task so that, across multiple server replicas, only the replica that acquires the
+     * named ShedLock executes it on a given tick. Mirrors the {@code @SchedulerLock} guard the
+     * SCM sync schedulers use — but applied programmatically because the leaderboard cron is built
+     * dynamically from {@link LeaderboardProperties} rather than a static {@code @Scheduled} cron.
+     */
+    private Runnable locked(Runnable task, String lockName) {
+        return () -> {
+            Optional<SimpleLock> lock = lockProvider.lock(
+                new LockConfiguration(Instant.now(), lockName, LOCK_AT_MOST_FOR, LOCK_AT_LEAST_FOR)
+            );
+            if (lock.isEmpty()) {
+                log.info("Skipped leaderboard task: reason=lockHeldByAnotherReplica, lock={}", lockName);
+                return;
+            }
+            try {
+                task.run();
+            } finally {
+                lock.get().unlock();
+            }
+        };
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -84,13 +121,17 @@ public class LeaderboardTaskScheduler {
         for (LeaderboardNotificationTask task : notificationTasks) {
             String description = task.getClass().getSimpleName();
             log.info("Scheduled notification task: task={}, cronExpression={}", description, cron);
-            scheduleSafely(task, new CronTrigger(cron), description);
+            scheduleSafely(locked(task, "leaderboard-notify-" + description), new CronTrigger(cron), description);
         }
     }
 
     private void scheduleLeaguePointsUpdate(String cron) {
         log.info("Scheduled league points update: cronExpression={}", cron);
-        scheduleSafely(leaguePointsUpdateTask, new CronTrigger(cron), "league points update");
+        scheduleSafely(
+            locked(leaguePointsUpdateTask, "leaderboard-league-points-update"),
+            new CronTrigger(cron),
+            "league points update"
+        );
     }
 
     private void scheduleSafely(Runnable task, CronTrigger trigger, String description) {

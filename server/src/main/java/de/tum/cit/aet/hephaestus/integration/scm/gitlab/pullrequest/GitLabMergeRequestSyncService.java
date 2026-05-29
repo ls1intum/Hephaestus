@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
  * overflow detection via {@code count} fields and follow-up pagination.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMergeRequestSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestSyncService.class);
@@ -247,9 +247,7 @@ public class GitLabMergeRequestSyncService {
         return result;
     }
 
-    // ========================================================================
     // Intermediate extraction records
-    // ========================================================================
 
     private record ScalarFields(
         String globalId,
@@ -291,9 +289,7 @@ public class GitLabMergeRequestSyncService {
         static final UserFields EMPTY = new UserFields(null, null, null, null, null, null);
     }
 
-    // ========================================================================
     // Historical backfill
-    // ========================================================================
 
     /**
      * Backfills historical merge requests using {@code CREATED_DESC} ordering.
@@ -437,9 +433,7 @@ public class GitLabMergeRequestSyncService {
         }
     }
 
-    // ========================================================================
     // processMrNode — delegates to focused extraction helpers
-    // ========================================================================
 
     @Nullable
     private PullRequest processMrNode(Map<String, Object> node, Repository repository, Long scopeId) {
@@ -547,9 +541,7 @@ public class GitLabMergeRequestSyncService {
         return pr;
     }
 
-    // ========================================================================
     // Scalar field extraction
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     private static ScalarFields extractScalarFields(Map<String, Object> node) {
@@ -608,9 +600,7 @@ public class GitLabMergeRequestSyncService {
         );
     }
 
-    // ========================================================================
     // Diff stats extraction
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     private static DiffStats extractDiffStats(Map<String, Object> node) {
@@ -624,9 +614,7 @@ public class GitLabMergeRequestSyncService {
         return new DiffStats(additions, deletions, fileCount);
     }
 
-    // ========================================================================
     // Milestone extraction
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -646,9 +634,7 @@ public class GitLabMergeRequestSyncService {
         }
     }
 
-    // ========================================================================
     // User field extraction (reusable for author, mergeUser)
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     private static UserFields extractUserFields(Map<String, Object> node, String fieldName) {
@@ -678,9 +664,7 @@ public class GitLabMergeRequestSyncService {
         );
     }
 
-    // ========================================================================
     // Labels extraction with overflow detection
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -727,9 +711,7 @@ public class GitLabMergeRequestSyncService {
         return syncLabels;
     }
 
-    // ========================================================================
     // Assignees extraction with overflow detection
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -770,9 +752,7 @@ public class GitLabMergeRequestSyncService {
         return syncAssignees;
     }
 
-    // ========================================================================
     // Reviewers extraction with overflow detection
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -812,9 +792,7 @@ public class GitLabMergeRequestSyncService {
         return syncReviewers;
     }
 
-    // ========================================================================
     // Approvers extraction with overflow detection
-    // ========================================================================
 
     @SuppressWarnings("unchecked")
     @Nullable
@@ -854,9 +832,7 @@ public class GitLabMergeRequestSyncService {
         return syncApprovers;
     }
 
-    // ========================================================================
     // Participants extraction (identity-harvest only, best-effort)
-    // ========================================================================
 
     /**
      * Extracts the participants connection as a list of {@link GitLabMergeRequestProcessor.SyncUserData}.
@@ -892,9 +868,7 @@ public class GitLabMergeRequestSyncService {
         return syncParticipants;
     }
 
-    // ========================================================================
     // Nested overflow detection and follow-up pagination
-    // ========================================================================
 
     private record NestedOverflow(boolean hasOverflow, @Nullable String endCursor, int count) {}
 

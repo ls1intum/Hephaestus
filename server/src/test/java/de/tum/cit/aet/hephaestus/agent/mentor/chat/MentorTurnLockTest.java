@@ -139,7 +139,7 @@ class MentorTurnLockTest extends BaseUnitTest {
         assertThat(lock.activeKeys()).isZero();
     }
 
-    // ─── Sandbox-level FIFO lock (multi-session) ─────────────────────────────────────────
+    // Sandbox-level FIFO lock (multi-session)
 
     @Test
     void sandboxLock_sameKeySerialises_differentKeysParallel() throws Exception {

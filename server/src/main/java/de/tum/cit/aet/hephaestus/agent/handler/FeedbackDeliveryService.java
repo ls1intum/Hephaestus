@@ -63,7 +63,7 @@ class FeedbackDeliveryService {
             return;
         }
 
-        // ── Suppression guards ──────────────────────────────────────────────
+        // Suppression guards
 
         var metadata = job.getMetadata();
         Long pullRequestId = (metadata != null && metadata.has("pull_request_id"))
@@ -100,7 +100,7 @@ class FeedbackDeliveryService {
             }
         }
 
-        // ── Always post new ─────────────────────────────────────────────────
+        // Always post new
 
         postSummaryNote(job, delivery);
         postDiffNotes(job, delivery);
@@ -137,7 +137,7 @@ class FeedbackDeliveryService {
         );
     }
 
-    // ── Formatting ──────────────────────────────────────────────────────────
+    // Formatting
 
     static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);

@@ -317,9 +317,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         verify(projectProcessor, never()).processPushEvent(any(), any());
     }
 
-    // ========================================================================
     // Organization Linking Tests
-    // ========================================================================
 
     @Nested
     class OrganizationLinking {
@@ -421,9 +419,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // extractGroupPath Tests
-    // ========================================================================
 
     @Nested
     class ExtractGroupPath {
@@ -465,9 +461,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private GitLabPushEventDTO.ProjectInfo createProjectInfo(Long id, String pathWithNamespace) {
         return new GitLabPushEventDTO.ProjectInfo(

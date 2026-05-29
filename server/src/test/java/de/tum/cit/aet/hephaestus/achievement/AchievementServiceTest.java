@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.springframework.cache.CacheManager;
 import tools.jackson.databind.ObjectMapper;
@@ -109,6 +110,34 @@ class AchievementServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("acquires the per-user advisory lock before reading progress")
+        void acquiresUserLockBeforeReads() {
+            // Lock must precede any read so it can't be reordered after a flush-triggering query.
+            AchievementDefinition def = new AchievementDefinition(
+                "pr.merged.common.1",
+                AchievementCategory.PULL_REQUESTS,
+                AchievementRarity.COMMON,
+                new LinearAchievementProgress(0, 1),
+                null,
+                false,
+                Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+                "StandardCountEvaluator"
+            );
+            when(achievementRegistry.getByTriggerEvent(ActivityEventType.PULL_REQUEST_MERGED)).thenReturn(List.of(def));
+            when(userAchievementRepository.findByUserIdAndAchievementIdIn(eq(1L), any())).thenReturn(List.of());
+            when(
+                userAchievementRepository.insertIfAbsent(any(UUID.class), eq(1L), anyString(), anyString(), any())
+            ).thenReturn(1);
+
+            service.checkAndUnlock(createEvent(ActivityEventType.PULL_REQUEST_MERGED));
+
+            InOrder inOrder = inOrder(userAchievementRepository);
+            inOrder.verify(userAchievementRepository).acquireUserLock(1L);
+            inOrder.verify(userAchievementRepository).findByUserIdAndAchievementIdIn(eq(1L), any());
+        }
+
+        @Test
+        @DisplayName("creates new UserAchievement and increments progress")
         void createsNewProgressRecord() {
             AchievementDefinition def = new AchievementDefinition(
                 "commit.common.1",

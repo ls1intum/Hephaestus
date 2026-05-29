@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * treated every failure as an opaque error.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGraphQlResponseHandler {
 
     private static final long MAX_RATE_LIMIT_WAIT_MS = 120_000;

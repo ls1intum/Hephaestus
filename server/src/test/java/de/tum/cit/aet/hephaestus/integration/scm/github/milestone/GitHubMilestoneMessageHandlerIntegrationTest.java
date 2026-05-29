@@ -268,7 +268,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Edge Case Tests ====================
+    // Edge Case Tests
 
     @Nested
     class EdgeCases {
@@ -480,7 +480,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Repository Association Tests ====================
+    // Repository Association Tests
 
     @Nested
     class RepositoryAssociation {
@@ -521,7 +521,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Milestone-Issue Relationship Tests ====================
+    // Milestone-Issue Relationship Tests
 
     @Nested
     class MilestoneIssueRelationship {

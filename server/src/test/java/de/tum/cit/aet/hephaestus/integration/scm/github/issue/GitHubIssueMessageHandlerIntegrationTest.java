@@ -150,7 +150,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         setupTestData();
     }
 
-    // ==================== Event Key Tests ====================
+    // Event Key Tests
 
     @Nested
     class EventType {
@@ -161,7 +161,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Basic Lifecycle Events ====================
+    // Basic Lifecycle Events
 
     @Nested
     class BasicLifecycleEvents {
@@ -303,7 +303,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Label Events ====================
+    // Label Events
 
     @Nested
     class LabelEvents {
@@ -348,7 +348,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Assignment Events ====================
+    // Assignment Events
 
     @Nested
     class AssignmentEvents {
@@ -389,7 +389,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Milestone Events ====================
+    // Milestone Events
 
     @Nested
     class MilestoneEvents {
@@ -431,7 +431,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Issue Type Events ====================
+    // Issue Type Events
 
     @Nested
     class IssueTypeEvents {
@@ -477,7 +477,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Lock Events ====================
+    // Lock Events
 
     @Nested
     class LockEvents {
@@ -511,7 +511,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Pin Events ====================
+    // Pin Events
 
     @Nested
     class PinEvents {
@@ -543,7 +543,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Transfer Event ====================
+    // Transfer Event
 
     @Nested
     class TransferEvent {
@@ -563,7 +563,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -650,7 +650,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helper Methods ====================
+    // Helper Methods
 
     private GitHubIssueEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
@@ -714,7 +714,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .collect(Collectors.toSet());
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestEventListener {

@@ -64,7 +64,7 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
     @Test
     void nullRetentionFallsBackToDefault() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, null, registry);
+        OAuthStateNonceCleanupJob job = new OAuthStateNonceCleanupJob(repository, (Duration) null, registry);
         when(repository.deleteByIssuedAtBefore(any(Instant.class))).thenReturn(0);
 
         // Should not throw — null is normalised.

@@ -52,14 +52,14 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGraphQlClientProvider {
 
     /**
      * WebClient request attribute key for passing scopeId through to exchange filters.
      * This attribute is internal to the HTTP client pipeline — never sent on the wire.
      */
-    public static final String SCOPE_ID_ATTRIBUTE = "hephaestus.gitlab.scopeId";
+    public static final String SCOPE_ID_ATTRIBUTE = "hephaestus.integration.gitlab.scopeId";
 
     private final HttpGraphQlClient baseClient;
     private final GitLabTokenService tokenService;
@@ -158,9 +158,7 @@ public class GitLabGraphQlClientProvider {
             .build();
     }
 
-    // ========================================================================
     // Rate Limit Tracking (Per-Scope)
-    // ========================================================================
 
     /**
      * Updates the rate limit tracker from HTTP response headers.

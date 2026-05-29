@@ -50,6 +50,8 @@ tags:
   name: connection-controller
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Team management within workspace
+  name: Teams
 - description: |-
     Unified webhook ingest controller.
 
@@ -59,12 +61,10 @@ tags:
      verification, subject derivation and JetStream publication through the per-kind
      {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
      {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
-     GitHub, GitLab, Slack and Outline all share this endpoint.
+     GitHub, GitLab and Slack all share this endpoint.
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Team management within workspace
-  name: Teams
 - description: Super-admin account management
   name: Admin
 - description: Contributor feedback on AI-generated practice findings
@@ -2125,8 +2125,7 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: the user's GitHub login
-        in: path
+      - in: path
         name: login
         required: true
         schema:
@@ -2149,10 +2148,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Profile"
-          description: "user profile with open PRs, review activity, league points,\
-            \ etc."
+          description: OK
       security: []
       summary: Get user profile
+      tags:
+      - Profile
+  /workspaces/{workspaceSlug}/profile/{login}/activity-monitor:
+    get:
+      description: Returns workspace-scoped activity monitor data for a contributor
+        with optional repository and limit filters
+      operationId: getActivityMonitor
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: after
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: before
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: repositoryIds
+        required: false
+        schema:
+          type: array
+          items:
+            type: integer
+            format: int64
+          maxItems: 100
+          minItems: 0
+          uniqueItems: true
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileActivityMonitor"
+          description: OK
+      security: []
+      summary: Get contributor activity monitor
       tags:
       - Profile
   /workspaces/{workspaceSlug}/public-visibility:
@@ -3407,7 +3465,6 @@ components:
           enum:
           - SCM
           - MESSAGING
-          - KNOWLEDGE
           - IDENTITY
         id:
           type: integer
@@ -3420,7 +3477,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-          - OUTLINE
           - OIDC_LOGIN_GITHUB
           - OIDC_LOGIN_GITLAB
         lastActivityAt:
@@ -3470,7 +3526,6 @@ components:
           enum:
           - SCM
           - MESSAGING
-          - KNOWLEDGE
           - IDENTITY
         id:
           type: integer
@@ -3483,7 +3538,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-          - OUTLINE
           - OIDC_LOGIN_GITHUB
           - OIDC_LOGIN_GITLAB
         lastActivityAt:
@@ -3725,13 +3779,12 @@ components:
           minLength: 0
         kind:
           type: string
-          description: "Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE\
-            \ flow through OAuth, not this endpoint."
+          description: "Integration kind to provision. Must be GITHUB or GITLAB; SLACK\
+            \ flows through OAuth, not this endpoint."
           enum:
           - GITHUB
           - GITLAB
           - SLACK
-          - OUTLINE
           - OIDC_LOGIN_GITHUB
           - OIDC_LOGIN_GITLAB
           example: GITLAB
@@ -4049,7 +4102,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-          - OUTLINE
           - OIDC_LOGIN_GITHUB
           - OIDC_LOGIN_GITLAB
         redirectAfter:
@@ -4498,11 +4550,9 @@ components:
       - verdict
     Profile:
       type: object
-      description: Complete user profile including contribution history and activity
+      description: "User profile header: identity, league standing, contribution surface,\
+        \ XP"
       properties:
-        activityStats:
-          $ref: "#/components/schemas/ProfileActivityStats"
-          description: Aggregated activity stats consistent with leaderboard calculations
         contributedRepositories:
           type: array
           description: Repositories the user has contributed to
@@ -4512,21 +4562,6 @@ components:
           type: string
           format: date-time
           description: Timestamp of the user's first contribution
-        openPullRequests:
-          type: array
-          description: Currently open pull requests authored by the user
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        reviewActivity:
-          type: array
-          description: Recent scored review activity with XP scores
-          items:
-            $ref: "#/components/schemas/ProfileReviewActivity"
-        reviewedPullRequests:
-          type: array
-          description: Distinct pull requests reviewed by this user
-          items:
-            $ref: "#/components/schemas/PullRequestInfo"
         userInfo:
           $ref: "#/components/schemas/UserInfo"
           description: Basic information about the user
@@ -4534,13 +4569,49 @@ components:
           $ref: "#/components/schemas/ProfileXpRecord"
           description: XP progress information for the users' profile
       required:
-      - activityStats
       - contributedRepositories
-      - openPullRequests
-      - reviewActivity
-      - reviewedPullRequests
       - userInfo
       - xpRecord
+    ProfileActivityMonitor:
+      type: object
+      description: Configurable activity monitor data for a contributor profile
+      properties:
+        activityStats:
+          $ref: "#/components/schemas/ProfileActivityStats"
+          description: Aggregated activity stats after applying monitor filters
+        authoredPullRequests:
+          type: array
+          description: "Open pull requests authored in the selected timeframe, after\
+            \ repository filters and limit"
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        repositories:
+          type: array
+          description: Repositories with monitor-relevant activity in the selected
+            timeframe
+          items:
+            $ref: "#/components/schemas/RepositoryInfo"
+        reviewActivity:
+          type: array
+          description: Review activity entries after applying monitor filters and
+            limit
+          items:
+            $ref: "#/components/schemas/ProfileReviewActivity"
+        totalAuthoredPullRequestCount:
+          type: integer
+          format: int32
+          description: "Total open authored pull requests after filters, before limit"
+        totalReviewActivityCount:
+          type: integer
+          format: int32
+          description: "Total review activity entries after filters, before limit"
+      required:
+      - activityStats
+      - authoredPullRequests
+      - repositories
+      - reviewActivity
+      - totalAuthoredPullRequestCount
+      - totalReviewActivityCount
     ProfileActivityStats:
       type: object
       description: Aggregated activity statistics with XP scores for a user profile

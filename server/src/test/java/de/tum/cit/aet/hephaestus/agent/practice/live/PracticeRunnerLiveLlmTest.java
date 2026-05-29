@@ -258,9 +258,7 @@ class PracticeRunnerLiveLlmTest {
         System.out.printf("[practice-live] %d finding(s); negative=%s%n", findings.size(), foundNegative);
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // Workspace staging
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private void stageWorkspace(LiveLlmCredentials creds) throws IOException {
         // ESM resolution walks node_modules upward from the importing file. Production binds the
@@ -398,9 +396,7 @@ class PracticeRunnerLiveLlmTest {
         Files.copy(FIXTURE_DIR.resolve(relativePath), dest, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // Process plumbing
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private static Process spawnRunner(LiveLlmCredentials creds) throws IOException {
         ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.mjs");

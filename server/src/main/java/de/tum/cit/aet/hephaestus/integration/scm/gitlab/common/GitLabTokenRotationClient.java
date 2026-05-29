@@ -26,7 +26,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * @see <a href="https://docs.gitlab.com/ee/api/personal_access_tokens.html#rotate-a-personal-access-token">GitLab PAT Rotation</a>
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabTokenRotationClient {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabTokenRotationClient.class);

@@ -15,7 +15,6 @@ import org.springframework.lang.Nullable;
  *   <li>GitHub: {@code instanceKey} = installation id as string (or {@code "pat"} for PAT_ORG)
  *   <li>GitLab: {@code instanceKey} = {@code "<host>:<group_id>"}
  *   <li>Slack: {@code instanceKey} = team id
- *   <li>Outline: {@code instanceKey} = workspace id (their workspace)
  * </ul>
  */
 public record IntegrationRef(@NonNull IntegrationKind kind, long workspaceId, @Nullable String instanceKey) {

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * verification, subject derivation and JetStream publication through the per-kind
  * {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
  * {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
- * GitHub, GitLab, Slack and Outline all share this endpoint.
+ * GitHub, GitLab and Slack all share this endpoint.
  *
  * <p>Active only on the webhook runtime role.
  */

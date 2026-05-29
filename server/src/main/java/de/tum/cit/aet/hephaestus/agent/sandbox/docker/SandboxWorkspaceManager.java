@@ -307,9 +307,7 @@ public class SandboxWorkspaceManager {
         return result;
     }
 
-    // -------------------------------------------------------------------------
     // Internal helpers
-    // -------------------------------------------------------------------------
 
     private byte[] createTarArchive(Map<String, byte[]> files) {
         try (

@@ -104,9 +104,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         verify(findingsCache).evict(eq("7:9"));
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // Event builders
-    // ════════════════════════════════════════════════════════════════════════
 
     private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
         ScmEventPayload.PullRequestData pr = new ScmEventPayload.PullRequestData(

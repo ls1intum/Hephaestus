@@ -74,7 +74,7 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
         Long repositoryId = repositoryRef.id();
         GitHubEventAction.Repository action = event.actionType();
 
-        log.info(
+        log.debug(
             "Received repository event: action={}, repoName={}, repoId={}",
             event.action(),
             safeFullName,

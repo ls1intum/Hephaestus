@@ -13,10 +13,11 @@ import org.springframework.stereotype.Component;
  * GitLab integration manifest. {@code GitlabWebhookSignatureVerifier} runs dual-mode
  * (legacy plaintext {@code X-Gitlab-Token} + GitLab 19.0+ HMAC {@code whsec_*}).
  *
- * <p>Feedback-delivery / inline-finding / approval capabilities are gated on the legacy
- * {@code hephaestus.gitlab.enabled} flag — the underlying GraphQL provider and the
+ * <p>Feedback-delivery / inline-finding / approval capabilities are gated on the
+ * {@code hephaestus.integration.gitlab.enabled} flag — the underlying GraphQL provider and the
  * channel beans share that flag, and the bootstrap demands matching SPI beans for any
- * declared capability.
+ * declared capability. GitLab is opt-in (default off): the manifest is only present when the
+ * flag is explicitly {@code true}, matching the gated beans.
  *
  * <p>No {@code RATE_LIMITED}: GitLab has no per-kind {@code RateLimitTracker} impl.
  * No {@code SCOPE_CHANGES}: GitLab has no install/uninstall/scope webhooks, so
@@ -24,12 +25,12 @@ import org.springframework.stereotype.Component;
  * capability would lie to the UI's practice-gating check.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabManifest implements IntegrationManifest {
 
     private final boolean gitlabStackEnabled;
 
-    public GitLabManifest(@Value("${hephaestus.gitlab.enabled:false}") boolean gitlabStackEnabled) {
+    public GitLabManifest(@Value("${hephaestus.integration.gitlab.enabled:false}") boolean gitlabStackEnabled) {
         this.gitlabStackEnabled = gitlabStackEnabled;
     }
 
@@ -47,7 +48,7 @@ public class GitLabManifest implements IntegrationManifest {
     public Set<Capability> declaredCapabilities() {
         EnumSet<Capability> capabilities = EnumSet.of(Capability.WEBHOOK_INGEST);
         if (gitlabStackEnabled) {
-            // GraphQL provider + channel beans only load when hephaestus.gitlab.enabled=true.
+            // GraphQL provider + channel beans only load when hephaestus.integration.gitlab.enabled=true.
             capabilities.add(Capability.FEEDBACK_DELIVERY);
             capabilities.add(Capability.INLINE_FINDINGS);
             capabilities.add(Capability.APPROVAL_WORKFLOW);

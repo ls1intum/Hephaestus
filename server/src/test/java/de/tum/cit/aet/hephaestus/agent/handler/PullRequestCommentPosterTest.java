@@ -47,7 +47,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         poster = new PullRequestCommentPoster(List.of(githubChannel, gitlabChannel));
     }
 
-    // ── Sanitization Tests ──
+    // Sanitization Tests
 
     @Nested
     class Sanitize {
@@ -294,7 +294,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
     }
 
-    // ── Formatting Tests ──
+    // Formatting Tests
 
     @Nested
     class FormatComment {
@@ -359,7 +359,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
     }
 
-    // ── Posting Tests ──
+    // Posting Tests
 
     @Nested
     class PostComment {
@@ -471,7 +471,7 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         }
     }
 
-    // ── Helpers ──
+    // Helpers
 
     private AgentJob createTestJob(IntegrationKind kind) {
         AgentJob job = new AgentJob();
@@ -489,8 +489,8 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
 
         job.setConfigSnapshot(objectMapper.createObjectNode());
 
-        Workspace workspaceProxy = mock(Workspace.class);
-        lenient().when(workspaceProxy.getId()).thenReturn(1L);
+        Workspace workspaceProxy = new Workspace();
+        workspaceProxy.setId(1L);
         job.setWorkspace(workspaceProxy);
 
         return job;

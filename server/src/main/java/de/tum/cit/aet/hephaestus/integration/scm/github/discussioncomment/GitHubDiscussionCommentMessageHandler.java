@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
@@ -35,11 +36,13 @@ public class GitHubDiscussionCommentMessageHandler
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
     private final GitHubDiscussionCommentProcessor commentProcessor;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GitHubDiscussionCommentMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubDiscussionProcessor discussionProcessor,
         GitHubDiscussionCommentProcessor commentProcessor,
+        SyncSchedulerProperties syncSchedulerProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -53,6 +56,15 @@ public class GitHubDiscussionCommentMessageHandler
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
         this.commentProcessor = commentProcessor;
+        this.syncSchedulerProperties = syncSchedulerProperties;
+    }
+
+    /**
+     * Discussion-comment webhook events are skipped when {@code hephaestus.sync.discussions.enabled=false}.
+     */
+    @Override
+    public boolean isEnabled() {
+        return syncSchedulerProperties.discussions().enabled();
     }
 
     @Override
@@ -65,7 +77,7 @@ public class GitHubDiscussionCommentMessageHandler
             return;
         }
 
-        log.info(
+        log.debug(
             "Received discussion_comment event: action={}, discussionNumber={}, commentId={}, repoName={}",
             event.action(),
             discussionDto.number(),

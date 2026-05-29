@@ -91,13 +91,37 @@ public record WebhookProperties(
     }
 
     public record Stream(
-        @DefaultValue("2m") Duration duplicateWindow,
+        // Replay-defense invariant: the JetStream dedup window MUST be >= the largest per-vendor
+        // timestamp replay tolerance, otherwise a captured-but-still-timestamp-valid request can be
+        // replayed once its dedup entry has expired (the 2-5 min band). The widest vendor tolerance
+        // is 5m (GitLab whsec TIMESTAMP_TOLERANCE, Slack v0 MAX_DRIFT_SECONDS); we set 10m to also
+        // cover GitHub — which has NO timestamp, so the dedup window keyed on X-GitHub-Delivery is
+        // its ONLY replay defense — plus provider redelivery horizons. See REPLAY_TOLERANCE_FLOOR.
+        @DefaultValue("10m") Duration duplicateWindow,
         @DefaultValue("180d") Duration maxAge,
         @DefaultValue("2000000") long maxMessages
     ) {
+        /**
+         * Lower bound for {@link #duplicateWindow}: the maximum per-vendor timestamp replay
+         * tolerance across all webhook verifiers (GitLab whsec + Slack v0 both use 5 minutes).
+         * The dedup window must be at least this large so a request can never outlive its dedup
+         * entry while still being timestamp-valid. GitHub deliveries carry no timestamp at all,
+         * so for them the dedup window is the sole replay defense and a larger value is safer.
+         */
+        public static final Duration REPLAY_TOLERANCE_FLOOR = Duration.ofMinutes(5);
+
         public Stream {
             if (duplicateWindow.isZero() || duplicateWindow.isNegative()) {
                 throw new IllegalArgumentException("stream.duplicateWindow must be positive, got: " + duplicateWindow);
+            }
+            if (duplicateWindow.compareTo(REPLAY_TOLERANCE_FLOOR) < 0) {
+                throw new IllegalArgumentException(
+                    "stream.duplicateWindow (" +
+                        duplicateWindow +
+                        ") must be >= the max vendor replay tolerance (" +
+                        REPLAY_TOLERANCE_FLOOR +
+                        ") so a timestamp-valid request cannot outlive its dedup entry"
+                );
             }
             if (maxAge.isZero() || maxAge.isNegative()) {
                 throw new IllegalArgumentException("stream.maxAge must be positive, got: " + maxAge);

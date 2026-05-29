@@ -87,9 +87,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     )
     int backfillCommitActors(@Param("repositoryId") Long repositoryId, @Param("xpPerCommit") double xpPerCommit);
 
-    // ========================================================================
     // Leaderboard Aggregation Queries
-    // ========================================================================
 
     /**
      * Workspace-level XP aggregation. Does NOT apply per-team hidden-repo settings; use
@@ -630,9 +628,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         Long getCount();
     }
 
-    // ========================================================================
     // Profile XP Lookups
-    // ========================================================================
 
     /** Total lifetime XP for an actor in a workspace. Returns 0 if no events exist. */
     @Query(
@@ -685,9 +681,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     @Query(value = "DELETE FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    // ========================================================================
     // Profile Activity Queries (ActivityEvent as source of truth)
-    // ========================================================================
 
     /**
      * Profile activity history (review + comment events, PR events excluded).
@@ -723,9 +717,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("until") Instant until
     );
 
-    // ========================================================================
     // Achievement Progress Queries
-    // ========================================================================
 
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
     @Query(

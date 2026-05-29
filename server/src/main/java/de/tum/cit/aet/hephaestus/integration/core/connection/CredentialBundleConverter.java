@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
+import de.tum.cit.aet.hephaestus.core.security.SecurityProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
@@ -61,11 +62,24 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
         log.debug("Instantiated CredentialBundleConverter: enabled=false, reason=no_spring_context");
     }
 
+    /**
+     * Spring-wired constructor. The key is bound via {@link SecurityProperties}; the active
+     * profile string still comes through {@code @Value} so the prod fail-fast check is identical.
+     */
     @Autowired
     public CredentialBundleConverter(
-        @Value("${hephaestus.security.encryption-key:}") String encryptionKey,
+        SecurityProperties securityProperties,
         @Value("${spring.profiles.active:}") String activeProfiles
     ) {
+        this(securityProperties.encryptionKey(), activeProfiles);
+    }
+
+    /**
+     * Canonical constructor (also the unit-test seam): builds the cipher key directly from the
+     * raw inputs. Same semantics as before — missing key fails fast in prod, warns elsewhere; a
+     * non-32-char key is rejected.
+     */
+    public CredentialBundleConverter(@Nullable String encryptionKey, @Nullable String activeProfiles) {
         if (encryptionKey == null || encryptionKey.isBlank()) {
             if (activeProfiles != null && activeProfiles.contains("prod")) {
                 throw new IllegalStateException(

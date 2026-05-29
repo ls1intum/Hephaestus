@@ -65,9 +65,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         thread.setProvider(provider);
     }
 
-    // ========================================================================
     // resolvePath (static helper)
-    // ========================================================================
 
     @Nested
     class ResolvePath {
@@ -97,9 +95,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // deriveSide (static helper)
-    // ========================================================================
 
     @Nested
     class DeriveSide {
@@ -126,9 +122,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // buildDiffHunkStub (static helper)
-    // ========================================================================
 
     @Nested
     class BuildDiffHunkStub {
@@ -156,9 +150,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // findOrCreateComment — new comment creation
-    // ========================================================================
 
     @Nested
     class CreateComment {
@@ -352,9 +344,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // DiffNoteData backward-compat constructor
-    // ========================================================================
 
     @Nested
     class DiffNoteDataBackwardCompat {
@@ -380,9 +370,7 @@ class GitLabPullRequestReviewCommentProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private static GitLabPullRequestReviewCommentProcessor.DiffNoteData buildDiffNoteData(
         String newPath,

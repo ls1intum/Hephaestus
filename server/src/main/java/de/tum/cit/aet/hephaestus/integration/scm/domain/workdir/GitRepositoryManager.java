@@ -31,6 +31,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.lang.Nullable;
@@ -168,6 +169,15 @@ public class GitRepositoryManager {
     private void cloneRepository(Path repoPath, String cloneUrl, @Nullable String token)
         throws GitAPIException, IOException {
         log.info("Cloning repository: url={}, path={}", sanitizeUrl(cloneUrl), repoPath);
+
+        // We only reach here when isRepositoryCloned() is false, so any directory already at
+        // repoPath is not a usable clone (a partial/aborted clone, or a stale checkout left by a
+        // reused repository id). JGit refuses to clone into a non-empty directory, so remove it
+        // first for a clean checkout instead of failing the whole commit backfill.
+        if (Files.exists(repoPath)) {
+            log.warn("Removing stale/partial checkout before clone: path={}", repoPath);
+            FileUtils.delete(repoPath.toFile(), FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
+        }
 
         Files.createDirectories(repoPath.getParent());
 

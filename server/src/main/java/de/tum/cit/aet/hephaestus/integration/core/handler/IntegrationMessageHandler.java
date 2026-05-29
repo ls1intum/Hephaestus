@@ -43,4 +43,17 @@ public interface IntegrationMessageHandler {
      * @param msg the NATS message; never null.
      */
     void onMessage(Message msg);
+
+    /**
+     * Whether this handler is currently active. A handler may declare itself disabled —
+     * e.g. when its feature flag is off — in which case the dispatcher treats it as if no
+     * handler were registered for the key (ACK and skip the message). Defaults to
+     * {@code true}; override to consult a runtime toggle.
+     *
+     * @return {@code true} if the handler should process messages; {@code false} to be
+     *     treated as no handler.
+     */
+    default boolean isEnabled() {
+        return true;
+    }
 }

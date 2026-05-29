@@ -183,8 +183,10 @@ public class ActivityEventService implements ActivityRecorder {
             new ActivitySavedEvent(Optional.ofNullable(actor), eventType, occurredAt, workspaceId, targetType, targetId)
         );
 
-        // Structured logging with trace context
-        log.info(
+        // One line per recorded event — DEBUG by default (per-event bookkeeping; the
+        // eventsRecordedCounter / xpDistribution metrics already track volume). Per-repo
+        // sync rollups carry the INFO-level summary.
+        log.debug(
             "Recorded activity event: eventType={}, targetId={}, xp={}, scopeId={}, actorId={}",
             eventType,
             targetId,

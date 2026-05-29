@@ -57,7 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * @see GitLabCommitSyncService
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabCommitBackfillService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitBackfillService.class);

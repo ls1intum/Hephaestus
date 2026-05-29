@@ -6,12 +6,12 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -78,7 +79,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         );
     }
 
-    // ========== Helpers ==========
+    // Helpers
 
     private static SyncTarget createSyncTarget(AuthMode authMode) {
         return new SyncTarget(
@@ -107,13 +108,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     private static Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
-        Repository repo = mock(Repository.class);
-        lenient().when(repo.getId()).thenReturn(id);
-        lenient().when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
-        lenient().when(repo.getDefaultBranch()).thenReturn(defaultBranch);
-        var provider = mock(de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider.class);
-        lenient().when(provider.getId()).thenReturn(1L);
-        lenient().when(repo.getProvider()).thenReturn(provider);
+        Repository repo = TestEntities.repository(id, nameWithOwner, defaultBranch);
+        repo.setProvider(TestEntities.gitProvider(1L, GitProviderType.GITHUB));
         return repo;
     }
 
@@ -146,23 +142,17 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     }
 
     private static Commit createMockCommit(String sha, Long repoId) {
-        Commit commit = mock(Commit.class);
-        lenient().when(commit.getSha()).thenReturn(sha);
-        lenient().when(commit.getId()).thenReturn(1L);
-        lenient().when(commit.getMessage()).thenReturn("test");
-        lenient().when(commit.getAuthoredAt()).thenReturn(Instant.parse("2024-01-15T10:00:00Z"));
-        lenient().when(commit.getAdditions()).thenReturn(0);
-        lenient().when(commit.getDeletions()).thenReturn(0);
-        lenient().when(commit.getChangedFiles()).thenReturn(0);
-
-        Repository mockRepo = mock(Repository.class);
-        lenient().when(mockRepo.getId()).thenReturn(repoId);
-        lenient().when(commit.getRepository()).thenReturn(mockRepo);
-
+        Commit commit = TestEntities.commit(1L, sha);
+        commit.setMessage("test");
+        commit.setAuthoredAt(Instant.parse("2024-01-15T10:00:00Z"));
+        commit.setAdditions(0);
+        commit.setDeletions(0);
+        commit.setChangedFiles(0);
+        commit.setRepository(TestEntities.repository(repoId, null));
         return commit;
     }
 
-    // ========== Tests ==========
+    // Tests
 
     @Nested
     class SkipConditions {
@@ -606,18 +596,17 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
 
-            Commit mockCommit = mock(Commit.class);
-            lenient().when(mockCommit.getSha()).thenReturn("commit1");
-            lenient().when(mockCommit.getRepository()).thenReturn(repo);
+            Commit persistedCommit = TestEntities.commit(1L, "commit1");
+            persistedCommit.setRepository(repo);
             // findByShaAndRepositoryId called twice: once for file changes, once for event
-            when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
+            when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(persistedCommit));
             SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             service.backfillCommits(target, repo, 100L);
 
-            // Verify file change was attached
-            verify(mockCommit).addFileChange(any());
-            verify(commitRepository).save(mockCommit);
+            // Verify file change was attached via the real bidirectional wiring
+            assertThat(persistedCommit.getFileChanges()).isNotEmpty();
+            verify(commitRepository).save(persistedCommit);
         }
     }
 }

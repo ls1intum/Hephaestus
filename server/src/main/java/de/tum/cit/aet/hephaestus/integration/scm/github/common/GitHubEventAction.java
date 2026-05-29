@@ -8,7 +8,7 @@ public sealed interface GitHubEventAction {
     /** The raw action string from the webhook payload. */
     String value();
 
-    // ========== Repository Events ==========
+    // Repository Events
 
     enum Repository implements GitHubEventAction {
         CREATED,
@@ -44,7 +44,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Issue Events ==========
+    // Issue Events
 
     enum Issue implements GitHubEventAction {
         OPENED,
@@ -98,7 +98,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Pull Request Events ==========
+    // Pull Request Events
 
     enum PullRequest implements GitHubEventAction {
         OPENED,
@@ -154,7 +154,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Pull Request Review Events ==========
+    // Pull Request Review Events
 
     enum PullRequestReview implements GitHubEventAction {
         SUBMITTED,
@@ -178,7 +178,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Pull Request Review Comment Events ==========
+    // Pull Request Review Comment Events
 
     enum PullRequestReviewComment implements GitHubEventAction {
         CREATED,
@@ -202,7 +202,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Pull Request Review Thread Events ==========
+    // Pull Request Review Thread Events
 
     enum PullRequestReviewThread implements GitHubEventAction {
         RESOLVED,
@@ -224,7 +224,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Issue Comment Events ==========
+    // Issue Comment Events
 
     enum IssueComment implements GitHubEventAction {
         CREATED,
@@ -248,7 +248,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Label Events ==========
+    // Label Events
 
     enum Label implements GitHubEventAction {
         CREATED,
@@ -272,7 +272,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Milestone Events ==========
+    // Milestone Events
 
     enum Milestone implements GitHubEventAction {
         CREATED,
@@ -300,7 +300,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Installation Events ==========
+    // Installation Events
 
     enum Installation implements GitHubEventAction {
         CREATED,
@@ -328,7 +328,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Installation Repositories Events ==========
+    // Installation Repositories Events
 
     enum InstallationRepositories implements GitHubEventAction {
         ADDED,
@@ -350,7 +350,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Installation Target Events ==========
+    // Installation Target Events
 
     enum InstallationTarget implements GitHubEventAction {
         RENAMED,
@@ -370,7 +370,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Organization Events ==========
+    // Organization Events
 
     enum Organization implements GitHubEventAction {
         MEMBER_ADDED,
@@ -396,7 +396,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Team Events ==========
+    // Team Events
 
     enum Team implements GitHubEventAction {
         CREATED,
@@ -424,7 +424,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Membership Events (team member changes) ==========
+    // Membership Events (team member changes)
 
     enum Membership implements GitHubEventAction {
         ADDED,
@@ -446,7 +446,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Member Events (repository collaborator changes) ==========
+    // Member Events (repository collaborator changes)
 
     enum Member implements GitHubEventAction {
         ADDED,
@@ -470,7 +470,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Sub-Issue Events ==========
+    // Sub-Issue Events
 
     enum SubIssue implements GitHubEventAction {
         SUB_ISSUE_ADDED,
@@ -504,7 +504,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Issue Dependency Events ==========
+    // Issue Dependency Events
 
     /**
      * Actions for the issue_dependencies webhook event.
@@ -535,7 +535,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== GitHub Projects V2 Events ==========
+    // GitHub Projects V2 Events
 
     /**
      * Actions for the projects_v2 webhook event.
@@ -568,7 +568,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== GitHub Projects V2 Item Events ==========
+    // GitHub Projects V2 Item Events
 
     /**
      * Actions for the projects_v2_item webhook event.
@@ -605,7 +605,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== GitHub Projects V2 Status Update Events ==========
+    // GitHub Projects V2 Status Update Events
 
     /**
      * Actions for the projects_v2_status_update webhook event.
@@ -634,7 +634,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Discussion Events ==========
+    // Discussion Events
 
     enum Discussion implements GitHubEventAction {
         CREATED,
@@ -682,7 +682,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Discussion Comment Events ==========
+    // Discussion Comment Events
 
     enum DiscussionComment implements GitHubEventAction {
         CREATED,
@@ -706,7 +706,7 @@ public sealed interface GitHubEventAction {
         }
     }
 
-    // ========== Push Events ==========
+    // Push Events
 
     /**
      * Push events don't have a traditional "action" field. The event itself is the action.

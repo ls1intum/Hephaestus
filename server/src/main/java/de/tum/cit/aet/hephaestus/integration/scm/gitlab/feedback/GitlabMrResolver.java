@@ -16,12 +16,12 @@ import org.springframework.stereotype.Component;
  * {@link GitlabApprovalChannel}) so per-channel mutations don't re-roundtrip the same
  * lookup.
  *
- * <p>Gated on {@code hephaestus.gitlab.enabled=true} to track
+ * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider} — the channel beans only load when the GitLab
  * GraphQL provider does.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 class GitlabMrResolver {
 
     static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(15);

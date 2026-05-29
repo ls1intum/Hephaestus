@@ -4,7 +4,6 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHDraftIssue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV2Item;
@@ -146,7 +145,7 @@ public record GitHubProjectItemDTO(
         };
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubProjectItemDTO from a GraphQL GHProjectV2Item model.
@@ -196,13 +195,8 @@ public record GitHubProjectItemDTO(
                 fieldValuesTruncated = Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 fieldValuesEndCursor = pageInfo.getEndCursor();
             }
-
-            GraphQlConnectionOverflowDetector.check(
-                "fieldValues",
-                fieldValues.size(),
-                fieldValuesTotalCount,
-                "project item " + (item.getId() != null ? item.getId() : "unknown")
-            );
+            // No overflow warning here: truncation is expected and handled — the cursor above drives
+            // follow-up pagination in GitHubProjectItemFieldValueSyncService.
         }
 
         // Extract creator info
@@ -252,7 +246,7 @@ public record GitHubProjectItemDTO(
         return result;
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static Long toLong(@Nullable BigInteger value) {

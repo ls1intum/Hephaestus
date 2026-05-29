@@ -82,7 +82,7 @@ public class CommitFileChange {
     @Column(length = 1024)
     private String previousFilename;
 
-    // ========== Relationships ==========
+    // Relationships
 
     /**
      * The commit this file change belongs to.
@@ -92,7 +92,7 @@ public class CommitFileChange {
     @ToString.Exclude
     private Commit commit;
 
-    // ========== Enums ==========
+    // Enums
 
     /**
      * The type of change made to a file.

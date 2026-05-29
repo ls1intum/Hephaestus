@@ -989,13 +989,39 @@ export type ProfileActivityStats = {
 };
 
 /**
- * Complete user profile including contribution history and activity
+ * Configurable activity monitor data for a contributor profile
  */
-export type Profile = {
+export type ProfileActivityMonitor = {
     /**
-     * Aggregated activity stats consistent with leaderboard calculations
+     * Aggregated activity stats after applying monitor filters
      */
     activityStats: ProfileActivityStats;
+    /**
+     * Open pull requests authored in the selected timeframe, after repository filters and limit
+     */
+    authoredPullRequests: Array<PullRequestInfo>;
+    /**
+     * Repositories with monitor-relevant activity in the selected timeframe
+     */
+    repositories: Array<RepositoryInfo>;
+    /**
+     * Review activity entries after applying monitor filters and limit
+     */
+    reviewActivity: Array<ProfileReviewActivity>;
+    /**
+     * Total open authored pull requests after filters, before limit
+     */
+    totalAuthoredPullRequestCount: number;
+    /**
+     * Total review activity entries after filters, before limit
+     */
+    totalReviewActivityCount: number;
+};
+
+/**
+ * User profile header: identity, league standing, contribution surface, XP
+ */
+export type Profile = {
     /**
      * Repositories the user has contributed to
      */
@@ -1004,18 +1030,6 @@ export type Profile = {
      * Timestamp of the user's first contribution
      */
     firstContribution?: Date;
-    /**
-     * Currently open pull requests authored by the user
-     */
-    openPullRequests: Array<PullRequestInfo>;
-    /**
-     * Recent scored review activity with XP scores
-     */
-    reviewActivity: Array<ProfileReviewActivity>;
-    /**
-     * Distinct pull requests reviewed by this user
-     */
-    reviewedPullRequests: Array<PullRequestInfo>;
     /**
      * Basic information about the user
      */
@@ -1435,7 +1449,7 @@ export type LeaderboardEntry = {
  * <code>IllegalArgumentException</code>.
  */
 export type InitiateConnectionRequest = {
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
     redirectAfter?: string;
     userInput?: {
         [key: string]: string;
@@ -1666,9 +1680,9 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
-     * Integration kind to provision. Must be GITHUB or GITLAB; SLACK/OUTLINE flow through OAuth, not this endpoint.
+     * Integration kind to provision. Must be GITHUB or GITLAB; SLACK flows through OAuth, not this endpoint.
      */
-    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
     /**
      * Deprecated: ignored by the server. The authenticated user always becomes the owner.
      *
@@ -1853,10 +1867,10 @@ export type ConnectionSummary = {
     capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     createdAt?: Date;
     displayName?: string;
-    family?: 'SCM' | 'MESSAGING' | 'KNOWLEDGE' | 'IDENTITY';
+    family?: 'SCM' | 'MESSAGING' | 'IDENTITY';
     id?: number;
     instanceKey?: string;
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
     lastActivityAt?: Date;
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
@@ -1880,10 +1894,10 @@ export type ConnectionDetail = {
     config?: string;
     createdAt?: Date;
     displayName?: string;
-    family?: 'SCM' | 'MESSAGING' | 'KNOWLEDGE' | 'IDENTITY';
+    family?: 'SCM' | 'MESSAGING' | 'IDENTITY';
     id?: number;
     instanceKey?: string;
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
     lastActivityAt?: Date;
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
@@ -3843,9 +3857,6 @@ export type GetUserProfileData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
         login: string;
     };
     query?: {
@@ -3857,12 +3868,39 @@ export type GetUserProfileData = {
 
 export type GetUserProfileResponses = {
     /**
-     * user profile with open PRs, review activity, league points, etc.
+     * OK
      */
     200: Profile;
 };
 
 export type GetUserProfileResponse = GetUserProfileResponses[keyof GetUserProfileResponses];
+
+export type GetActivityMonitorData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: {
+        after?: Date;
+        before?: Date;
+        repositoryIds?: Array<number>;
+        limit?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/profile/{login}/activity-monitor';
+};
+
+export type GetActivityMonitorResponses = {
+    /**
+     * OK
+     */
+    200: ProfileActivityMonitor;
+};
+
+export type GetActivityMonitorResponse = GetActivityMonitorResponses[keyof GetActivityMonitorResponses];
 
 export type UpdatePublicVisibilityData = {
     body: UpdateWorkspacePublicVisibilityRequest;

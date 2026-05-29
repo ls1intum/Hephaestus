@@ -311,9 +311,7 @@ class LeaderboardXpQueryServiceTest {
         }
     }
 
-    // ========================================================================
     // Helper Methods
-    // ========================================================================
 
     private User createUser(Long id, String login) {
         User user = new User();

@@ -954,9 +954,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private Commit createCommit(Long id) {
         Commit commit = new Commit();

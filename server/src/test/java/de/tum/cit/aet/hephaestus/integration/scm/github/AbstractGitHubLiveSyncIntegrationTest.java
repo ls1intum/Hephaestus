@@ -361,7 +361,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         fixtureService.removeCollaborator(fullName, username);
     }
 
-    // ========== RECORD TYPES ==========
+    // RECORD TYPES
 
     protected record CreatedIssue(
         long issueId,

@@ -10,9 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -26,6 +25,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
@@ -112,23 +112,34 @@ public class SecurityConfig {
     }
 
     /**
-     * Fallback chain when Spring's OAuth2 resource-server autoconfig produces no
-     * {@code JwtDecoder} (worker-only pod, smoke tests, fresh dev box). Mutually exclusive with
-     * {@link #resourceServerSecurityFilterChain(HttpSecurity, Converter)} via the same gate so
-     * only one "any request" chain ever loads at runtime.
+     * Application security chain (fallback after {@link #workerHubSecurityFilterChain}).
      *
-     * <p>Honors {@code hephaestus.dev.trigger-enabled=true} the same way the resource-server
-     * chain does — without this, a fresh dev box has no way to fire the trigger after enabling
-     * the flag, because the lockdown chain owns the {@code anyRequest()} slot.
+     * <p>The {@link JwtDecoder} is resolved via {@link ObjectProvider} when this bean is built, so
+     * it sees the decoder even when it comes from Spring Boot's OAuth2 autoconfig (registered after
+     * user config). {@code @ConditionalOnBean(JwtDecoder)} can't be used here: it evaluates before
+     * the autoconfig decoder is registered and would drop the server role into deny-all.
+     *
+     * <p>Decoder present (the native-auth {@link de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder},
+     * ADR 0017) → wire the OAuth2 resource server with the full native-auth rules (security headers,
+     * auth rate limiting, the public auth-discovery permit list). Absent (worker-only pod that excludes
+     * the OAuth2 autoconfig, or the {@code specs} profile that boots without a decoder) → deny everything.
+     * The {@code hephaestus.dev.trigger-enabled} carve-out applies in both modes.
      */
     @Bean
-    @ConditionalOnMissingBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
-    SecurityFilterChain lockdownSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain appSecurityFilterChain(
+        HttpSecurity http,
+        ObjectProvider<JwtDecoder> jwtDecoderProvider,
+        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
+        AuthRateLimitFilter authRateLimitFilter
+    ) throws Exception {
         http
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(requests -> {
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+
+        JwtDecoder jwtDecoder = jwtDecoderProvider.getIfAvailable();
+        if (jwtDecoder == null) {
+            http.authorizeHttpRequests(requests -> {
                 requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
                 // OpenAPI / Swagger endpoints are public on the resource-server chain; they must
                 // also be public on the lockdown chain so spec generation works on no-JWT-decoder boots
@@ -142,29 +153,17 @@ public class SecurityConfig {
                 }
                 requests.anyRequest().denyAll();
             });
-        return http.build();
-    }
+            return http.build();
+        }
 
-    @Bean
-    @ConditionalOnBean(org.springframework.security.oauth2.jwt.JwtDecoder.class)
-    SecurityFilterChain resourceServerSecurityFilterChain(
-        HttpSecurity http,
-        Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
-        AuthRateLimitFilter authRateLimitFilter
-    ) throws Exception {
         http.oauth2ResourceServer(resourceServer -> {
             resourceServer.jwt(jwtConfigurer -> {
-                jwtConfigurer.jwtAuthenticationConverter(authenticationConverter);
+                jwtConfigurer.decoder(jwtDecoder).jwtAuthenticationConverter(authenticationConverter);
             });
         });
 
-        http
-            .sessionManagement(sessions -> {
-                sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-            })
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
-
+        // Security headers (HSTS, CSP-report-only, COOP, COEP, Referrer-Policy,
+        // X-Content-Type-Options) for the user-facing resource-server chain.
         SecurityHeaders.apply(http);
 
         // Token-bucket rate limiting on the hot auth endpoints (/auth/refresh, /auth/impersonate,
@@ -180,7 +179,7 @@ public class SecurityConfig {
             // Webhook endpoints — authenticated by HMAC (GitHub) or shared-token (GitLab) at the
             // pipeline layer. Spring Security must not block these or external providers can
             // never reach the receiver. See integration.webhook.* and ADR 0008. The unified
-            // {@code /webhooks/{kind}} entry point serves GitHub, GitLab, Slack and Outline.
+            // {@code /webhooks/{kind}} entry point serves GitHub, GitLab and Slack.
             requests.requestMatchers(HttpMethod.POST, "/webhooks/**").permitAll();
             // OAuth vendor callbacks — authenticated by HMAC-signed state parameter at the
             // controller layer (see OAuthCallbackController). The vendor redirect arrives

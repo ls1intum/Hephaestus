@@ -74,7 +74,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
 - Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
 
-## Webhook receiver (`server/.../integration/webhook/`)
+## Webhook receiver (`server/.../integration/core/webhook/`)
 
 - Pure verifier/builder classes (`HmacVerifier`, `GitLabTokenVerifier`, `GitLabSubjectBuilder`,
   `GitHubSubjectBuilder`, `DedupIdResolver`) — Spring-free; exercised by JUnit unit tests plus

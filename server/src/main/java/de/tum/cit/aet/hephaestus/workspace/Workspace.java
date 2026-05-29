@@ -92,10 +92,8 @@ public class Workspace {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ========================================================================
     // Sync Timestamps - Track last successful sync for each data domain
     // Used by sync services to determine incremental fetch windows
-    // ========================================================================
 
     /** Last sync time for organization users (collaborators with repo access) */
     private Instant usersSyncedAt;
@@ -115,9 +113,7 @@ public class Workspace {
     /** Last sync time for issue dependencies (blocked_by/blocking) via GraphQL */
     private Instant issueDependenciesSyncedAt;
 
-    // ========================================================================
     // Identity & Display
-    // ========================================================================
 
     /**
      * URL-safe unique identifier for the workspace.
@@ -155,9 +151,7 @@ public class Workspace {
     @NotNull(message = "Status is required")
     private WorkspaceStatus status = WorkspaceStatus.ACTIVE;
 
-    // ========================================================================
     // Repository Monitoring
-    // ========================================================================
 
     /**
      * Repositories this workspace monitors for webhook events.
@@ -174,9 +168,7 @@ public class Workspace {
     @ToString.Exclude
     private Set<RepositoryToMonitor> repositoriesToMonitor = new HashSet<>();
 
-    // ========================================================================
     // Git Provider Account
-    // ========================================================================
 
     /** Git provider account login (GitHub org login or GitLab group path, e.g., "ls1intum" or "org/team") */
     @Column(name = "account_login", nullable = false, length = 120)
@@ -204,9 +196,7 @@ public class Workspace {
     @ToString.Exclude
     private Organization organization;
 
-    // ========================================================================
     // Audit Timestamps
-    // ========================================================================
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -214,9 +204,7 @@ public class Workspace {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
-    // ========================================================================
     // Leaderboard Schedule
-    // ========================================================================
 
     /** Day of week for scheduled leaderboard generation (1=Monday, 7=Sunday) */
     @Column(name = "leaderboard_schedule_day")
@@ -239,9 +227,7 @@ public class Workspace {
     @Column(name = "leaderboard_notification_enabled")
     private Boolean leaderboardNotificationEnabled;
 
-    // ========================================================================
     // Feature Flags
-    // ========================================================================
 
     /**
      * Workspace-scoped feature flags controlling which features are enabled.
@@ -264,9 +250,7 @@ public class Workspace {
         this.updatedAt = Instant.now();
     }
 
-    // ========================================================================
     // Nested Enums
-    // ========================================================================
 
     /**
      * Workspace lifecycle states with defined transition rules.

@@ -91,9 +91,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     )
     void deleteAllByPracticeWorkspaceId(@Param("workspaceId") Long workspaceId);
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Read queries for the contributor dashboard (Issue #896)
-    // ══════════════════════════════════════════════════════════════════════════
 
     /**
      * Paginated findings for a contributor within a workspace, with optional filters.
@@ -193,9 +191,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("workspaceId") Long workspaceId
     );
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Aggregation for agent context (Issue #895)
-    // ══════════════════════════════════════════════════════════════════════════
 
     /**
      * Returns aggregated verdict counts per practice for a contributor within a workspace.

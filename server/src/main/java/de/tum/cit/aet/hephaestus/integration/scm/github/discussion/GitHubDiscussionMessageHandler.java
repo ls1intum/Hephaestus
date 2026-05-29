@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.discussion;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
@@ -28,10 +29,12 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     public GitHubDiscussionMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubDiscussionProcessor discussionProcessor,
+        SyncSchedulerProperties syncSchedulerProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -44,6 +47,15 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
         );
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
+        this.syncSchedulerProperties = syncSchedulerProperties;
+    }
+
+    /**
+     * Discussion webhook events are skipped when {@code hephaestus.sync.discussions.enabled=false}.
+     */
+    @Override
+    public boolean isEnabled() {
+        return syncSchedulerProperties.discussions().enabled();
     }
 
     @Override
@@ -55,7 +67,7 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
             return;
         }
 
-        log.info(
+        log.debug(
             "Received discussion event: action={}, discussionNumber={}, repoName={}",
             event.action(),
             discussionDto.number(),

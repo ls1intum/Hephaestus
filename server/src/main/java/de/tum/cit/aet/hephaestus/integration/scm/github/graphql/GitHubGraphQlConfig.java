@@ -4,7 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
-import de.tum.cit.aet.hephaestus.config.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHActor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssue;
@@ -128,11 +128,19 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
             .build();
 
+        // The buffer limit must be set on the CUSTOM decoder, not only via
+        // defaultCodecs().maxInMemorySize(): the latter governs the default codecs, but our
+        // custom JacksonJsonDecoder (registered for GitHub's 64-bit databaseId handling) keeps
+        // its own 256 KB default. Without this, large PR pages with embedded reviews/threads
+        // fail with "DataBufferLimitException: Exceeded limit on max bytes to buffer : 262144".
+        JacksonJsonDecoder graphQlJsonDecoder = new JacksonJsonDecoder(graphQlObjectMapper);
+        graphQlJsonDecoder.setMaxInMemorySize(MAX_BUFFER_SIZE);
+
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
                 config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
                 config.customCodecs().register(new JacksonJsonEncoder(graphQlObjectMapper));
-                config.customCodecs().register(new JacksonJsonDecoder(graphQlObjectMapper));
+                config.customCodecs().register(graphQlJsonDecoder);
             })
             .build();
 

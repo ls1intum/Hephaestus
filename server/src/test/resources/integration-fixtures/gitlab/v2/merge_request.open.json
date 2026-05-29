@@ -1,5 +1,5 @@
 {
-  "_comment": "v2: shape from a hypothetical GitLab future release with new vendor fields. Tolerant reader must IGNORE unknown keys, not throw.",
+  "_comment": "SYNTHETIC forward-compatibility fixture (NOT a real GitLab schema). It is the v1 payload with fabricated unknown keys injected at the top level and at every nesting level (suffixed _v2). The tolerant reader must IGNORE these unknown keys and still extract the known fields.",
   "object_kind": "merge_request",
   "event_type": "merge_request",
   "_event_uuid_v2": "00000000-0000-0000-0000-000000000001",

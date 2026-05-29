@@ -248,7 +248,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @TempDir
         Path tempDir;
 
-        // ---- Size limit tests (from this PR) ----
+        // Size limit tests (from this PR)
 
         @Test
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
@@ -344,7 +344,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             assertThat(SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES).isEqualTo(500_000);
         }
 
-        // ---- Validation tests (from main) ----
+        // Validation tests (from main)
 
         @Test
         void shouldSkipWhenDirectoryMountsNull() {

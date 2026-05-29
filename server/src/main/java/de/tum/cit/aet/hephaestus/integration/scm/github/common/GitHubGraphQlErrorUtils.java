@@ -171,9 +171,7 @@ public final class GitHubGraphQlErrorUtils {
         return null;
     }
 
-    // ========================================================================
     // Transient Error Detection for Retry Logic
-    // ========================================================================
 
     /**
      * Checks if the GraphQL response contains a transient error that should be retried.

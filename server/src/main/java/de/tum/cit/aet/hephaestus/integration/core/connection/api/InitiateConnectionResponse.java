@@ -10,7 +10,7 @@ import java.net.URI;
  *
  * <p>Two variants discriminated by the {@code type} property:
  * <ul>
- *   <li>{@link RedirectDTO} — for OAuth / App-install flows (GitHub, Slack, Outline).
+ *   <li>{@link RedirectDTO} — for OAuth / App-install flows (GitHub, Slack).
  *       Carries the vendor URL to bounce the browser to plus the signed OAuth state.</li>
  *   <li>{@link LinkedDTO} — for inline-credential flows (GitLab PAT paste). Carries the
  *       newly-created {@code Connection} id; no further round-trip is needed.</li>

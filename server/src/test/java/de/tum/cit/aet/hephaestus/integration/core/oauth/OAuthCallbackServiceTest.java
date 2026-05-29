@@ -28,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 class OAuthCallbackServiceTest extends BaseUnitTest {
@@ -110,7 +109,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 any()
             )
         ).thenReturn(Optional.empty());
-        Workspace workspace = Mockito.mock(Workspace.class);
+        Workspace workspace = new Workspace();
         when(workspaceRepository.findById(42L)).thenReturn(Optional.of(workspace));
         when(connectionRepository.save(any(Connection.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -243,7 +242,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         verify(connectionService).transition(eq(pending), any(TransitionRequest.class));
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────
+    // helpers
 
     private static Connection newConnection(
         long id,
@@ -252,8 +251,8 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         String instanceKey,
         IntegrationState state
     ) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
@@ -264,7 +263,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 java.util.Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, java.util.Set.of());
             case OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> new ConnectionConfig.OidcLoginConfig(
                 "https://gitlab.example.com",
                 java.util.Set.of("openid", "profile", "email"),

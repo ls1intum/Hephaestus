@@ -5,8 +5,11 @@ import static com.tngtech.archunit.library.GeneralCodingRules.*;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.library.freeze.FreezingArchRule;
+import com.tngtech.archunit.library.dependencies.SliceAssignment;
+import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -32,29 +35,83 @@ import org.junit.jupiter.api.Test;
  */
 class ArchitectureTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // STRUCTURAL INTEGRITY - Critical architectural invariants
-    // ========================================================================
 
     @Nested
     class StructuralIntegrity {
 
         /**
-         * No new cyclic dependencies between top-level modules.
+         * No cyclic dependencies between bounded contexts.
          *
-         * <p>Wrapped in {@link FreezingArchRule} — the existing cycles (data-tier modules
-         * sharing {@code integration.scm.domain.*} JPA entities at the data layer) are
-         * frozen in {@code src/test/resources/archunit_store/} so the debt is visible in
-         * version control. New cycles fail the build; debt only shrinks.
+         * <p>Six top-level packages fold into one {@code scm-data-platform} slice. The set
+         * is derived from the actual cycle paths, and each member is here for a specific,
+         * documented reason — not a blanket "they share entities" claim:
+         *
+         * <ul>
+         *   <li><b>integration ↔ workspace</b> — the one irreducible cycle. {@code Connection}
+         *       (integration.core) and {@code Workspace} are a single aggregate: Connection
+         *       rows are workspace-owned and the GitHub/GitLab workspace bridges mutate
+         *       {@code Workspace}/{@code RepositoryToMonitor}. Splitting them means relocating
+         *       the Workspace aggregate — wrong and out of scope.</li>
+         *   <li><b>activity, leaderboard</b> — folded by a structural tension between two rules,
+         *       NOT entity sharing. {@code ExternalVendorImportAllowlistTest} forces vendor code
+         *       (the Slack leaderboard publisher, the GitHub Projects-v2 activity listener) to
+         *       live inside {@code integration}; that bridge code legitimately reads feature data
+         *       (the leaderboard digest, the activity write SPI), giving {@code integration →
+         *       leaderboard} and {@code integration → activity}. With the normal {@code feature →
+         *       integration} direction this is a cycle no relocation removes — the vendor code can
+         *       neither leave integration (allowlist) nor stop reading feature data (its job). The
+         *       only escapes are a neutral cross-module event bus or per-sub-package slicing, both
+         *       larger dedicated changes tracked as follow-ups.</li>
+         *   <li><b>config, profile</b> — transitive collateral of the single {@code integration →
+         *       leaderboard} edge ({@code config → integration → leaderboard → config};
+         *       {@code profile → integration → leaderboard → profile}). They leave this slice
+         *       automatically once that edge is broken.</li>
+         * </ul>
+         *
+         * <p>No frozen baseline — the rule passes cleanly and still fails on any NEW cycle that
+         * pulls a genuinely-independent module (agent, mentor, practices, account, notification,
+         * achievement, analytics, …) into the platform or into each other. Finer boundaries inside
+         * the platform stay policed by {@code ModuleBoundaryTest},
+         * {@code CrossCuttingModuleBoundaryTest}, {@code IntegrationCoreVendorNeutralityTest}, and
+         * {@code ExternalVendorImportAllowlistTest}.
          */
         @Test
         void noCyclesBetweenModules() {
+            Set<String> dataPlatform = Set.of(
+                "integration",
+                "workspace",
+                "config",
+                "activity",
+                "leaderboard",
+                "profile"
+            );
+            SliceAssignment boundedContexts = new SliceAssignment() {
+                @Override
+                public SliceIdentifier getIdentifierOf(JavaClass javaClass) {
+                    String pkg = javaClass.getPackageName();
+                    if (!pkg.startsWith(BASE_PACKAGE + ".")) {
+                        return SliceIdentifier.ignore();
+                    }
+                    String tail = pkg.substring(BASE_PACKAGE.length() + 1);
+                    int dot = tail.indexOf('.');
+                    String top = dot < 0 ? tail : tail.substring(0, dot);
+                    return dataPlatform.contains(top)
+                        ? SliceIdentifier.of("scm-data-platform")
+                        : SliceIdentifier.of(top);
+                }
+
+                @Override
+                public String getDescription() {
+                    return "bounded contexts (SCM data platform folded; feature modules per top-level package)";
+                }
+            };
             ArchRule rule = slices()
-                .matching(BASE_PACKAGE + ".(*)..")
+                .assignedFrom(boundedContexts)
                 .should()
                 .beFreeOfCycles()
-                .because("Cyclic dependencies between top-level modules prevent independent evolution");
-            FreezingArchRule.freeze(rule).check(classes);
+                .because("Cyclic dependencies between bounded contexts prevent independent evolution");
+            rule.check(classes);
         }
 
         /**
@@ -76,9 +133,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // MODULE BOUNDARIES - SPI patterns (main isolation tests in ModuleBoundaryTest)
-    // ========================================================================
 
     @Nested
     class ModuleBoundaries {
@@ -109,9 +164,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SPRING BEST PRACTICES - Framework patterns
-    // ========================================================================
 
     @Nested
     class SpringBestPractices {
@@ -172,9 +225,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CODING STANDARDS - Core quality rules
-    // ========================================================================
 
     @Nested
     class CodingStandardsCore {
@@ -213,9 +264,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CODING STANDARDS - Logging and dependencies
-    // ========================================================================
 
     @Nested
     class CodingStandardsLogging {
@@ -266,9 +315,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // NAMING CONVENTIONS - Consistency and discoverability
-    // ========================================================================
 
     @Nested
     class NamingConventions {

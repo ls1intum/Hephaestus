@@ -112,9 +112,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Helper methods
-    // ═══════════════════════════════════════════════════════════════
 
     private GitHubProjectItemDTO createDraftIssueDTO() {
         return new GitHubProjectItemDTO(
@@ -205,9 +203,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         when(projectItemRepository.findByProjectIdAndNodeId(PROJECT_ID, NODE_ID)).thenReturn(Optional.of(entity));
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // process() tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class Process {
@@ -775,9 +771,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // removeStaleDraftIssues tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class RemoveStaleDraftIssues {
@@ -875,9 +869,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // removeStaleIssuePrItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class RemoveStaleIssuePrItems {
@@ -1001,9 +993,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // processArchived() tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class ProcessArchived {
@@ -1084,9 +1074,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // processRestored() tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class ProcessRestored {

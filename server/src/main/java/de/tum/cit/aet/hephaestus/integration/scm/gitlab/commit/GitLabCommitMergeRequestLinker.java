@@ -51,7 +51,7 @@ import org.springframework.stereotype.Service;
  * workspace bootstrap).
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabCommitMergeRequestLinker {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitMergeRequestLinker.class);
@@ -327,9 +327,7 @@ public class GitLabCommitMergeRequestLinker {
         return result;
     }
 
-    // ========================================================================
     // Node extraction helpers
-    // ========================================================================
 
     @Nullable
     private static Integer extractIid(Map<String, Object> mrNode) {
@@ -488,9 +486,7 @@ public class GitLabCommitMergeRequestLinker {
         return collected;
     }
 
-    // ========================================================================
     // Follow-up pagination for MRs with >100 commits
-    // ========================================================================
 
     /**
      * Fetches commit SHAs beyond the first nested page (100 commits) for a single MR.
@@ -589,9 +585,7 @@ public class GitLabCommitMergeRequestLinker {
         return remaining;
     }
 
-    // ========================================================================
     // Author attribution harvest + backfill
-    // ========================================================================
 
     /**
      * Adds harvested (login → email) pairs from a single MR's commit list into

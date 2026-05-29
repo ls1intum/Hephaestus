@@ -18,7 +18,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // ── parseDiffStatPaths ──────────────────────────────────────────────────
+    // parseDiffStatPaths
 
     @Nested
     class ParseDiffStatPaths {
@@ -89,7 +89,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
     }
 
-    // ── filterByDiffScope ───────────────────────────────────────────────────
+    // filterByDiffScope
 
     @Nested
     class FilterByDiffScope {

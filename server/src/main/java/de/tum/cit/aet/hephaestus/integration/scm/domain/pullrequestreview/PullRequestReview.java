@@ -71,7 +71,7 @@ public class PullRequestReview extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 
-    // ==================== Bidirectional Relationship Helpers ====================
+    // Bidirectional Relationship Helpers
 
     /**
      * Adds a comment to this review and maintains bidirectional consistency.

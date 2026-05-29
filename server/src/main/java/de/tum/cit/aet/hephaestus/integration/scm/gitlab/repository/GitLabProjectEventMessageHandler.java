@@ -31,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * These events are only available on group-level webhooks.
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessageHandler<GitLabProjectEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabProjectEventMessageHandler.class);
@@ -65,7 +65,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
     @Override
     protected void handleEvent(GitLabProjectEventDTO event) {
         String safePath = sanitizeForLog(event.pathWithNamespace());
-        log.info(
+        log.debug(
             "Received project event: eventName={}, path={}, projectId={}",
             event.eventName(),
             safePath,

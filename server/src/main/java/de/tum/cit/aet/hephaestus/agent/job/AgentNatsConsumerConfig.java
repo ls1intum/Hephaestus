@@ -22,10 +22,9 @@ import org.springframework.core.annotation.Order;
 /**
  * Agent NATS stream + durable pull consumer setup. Worker-only.
  *
- * <p>Stream bootstrap is idempotent ({@code updateStream} → {@code addStream} fallback);
- * config-mismatch races are logged at ERROR. Multi-replica workers should gate stream
- * creation via {@code hephaestus.agent.nats.bootstrap-stream=false} on replicas N+1 (not
- * needed today — worker is single-replica).
+ * <p>Stream bootstrap is idempotent ({@code updateStream} → {@code addStream} fallback), so
+ * multiple worker replicas racing to create the stream converge safely; the loser logs the
+ * benign create race at ERROR. The durable pull consumer is shared across replicas.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnExpression("${hephaestus.agent.nats.enabled:false} and ${" + RuntimeRole.WORKER_PROPERTY + ":true}")

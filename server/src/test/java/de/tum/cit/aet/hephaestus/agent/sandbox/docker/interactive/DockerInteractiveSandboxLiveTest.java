@@ -85,7 +85,6 @@ class DockerInteractiveSandboxLiveTest {
     @BeforeEach
     void setUp() throws Exception {
         SandboxProperties sandboxProperties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -409,7 +408,7 @@ class DockerInteractiveSandboxLiveTest {
         @DisplayName("interactive containers carry KIND=interactive + SESSION_ID")
         void labelsPresent() {
             AttachedSandbox sb = adapter.attach(buildSpec("u6", "w6"));
-            String sessionId = sb.sessionId().toString();
+            String sessionId = sb.identity().sessionId().toString();
             var match = containerManager
                 .listManagedContainers()
                 .stream()

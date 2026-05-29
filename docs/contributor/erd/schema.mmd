@@ -77,6 +77,7 @@ erDiagram
         VARCHAR(32) cancellation_reason
         VARCHAR(48) integration_kind
         VARCHAR(48) subject_class
+        VARCHAR(255) worker_id
     }
 
     ChatMessage {
@@ -434,30 +435,6 @@ erDiagram
         VARCHAR(32) role "NOT NULL"
     }
 
-    OutlineCollection {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(64) collection_id UK "NOT NULL"
-        VARCHAR(256) name
-        TEXT description
-        VARCHAR(1024) url
-        TIMESTAMPTZ ingested_at "NOT NULL"
-        TIMESTAMPTZ deleted_at
-    }
-
-    OutlineDocument {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(64) document_id UK "NOT NULL"
-        VARCHAR(64) collection_id
-        VARCHAR(512) title
-        VARCHAR(1024) url
-        VARCHAR(64) last_revision_id
-        TIMESTAMPTZ last_modified_at
-        TIMESTAMPTZ ingested_at "NOT NULL"
-        TIMESTAMPTZ deleted_at
-    }
-
     Practice {
         BIGINT id PK
         BIGINT workspace_id FK,UK "NOT NULL"
@@ -470,9 +447,6 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
-        JSONB required_capabilities "NOT NULL"
-        JSONB required_aspects "NOT NULL"
-        VARCHAR(32) required_family
     }
 
     PracticeFinding {
@@ -702,33 +676,6 @@ erDiagram
         VARCHAR(255) locked_by "NOT NULL"
     }
 
-    SlackChannel {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(64) channel_id UK "NOT NULL"
-        VARCHAR(256) name
-        TEXT topic
-        TEXT purpose
-        BOOLEAN is_archived "NOT NULL"
-        TIMESTAMPTZ archived_at
-        INTEGER member_count
-        TIMESTAMPTZ ingested_at "NOT NULL"
-    }
-
-    SlackMessage {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(64) team_id UK "NOT NULL"
-        VARCHAR(64) channel_id UK "NOT NULL"
-        VARCHAR(64) ts UK "NOT NULL"
-        VARCHAR(64) thread_ts
-        VARCHAR(64) user_id
-        TEXT text
-        JSONB blocks
-        TIMESTAMPTZ ingested_at "NOT NULL"
-        TIMESTAMPTZ deleted_at
-    }
-
     Team {
         BIGINT id PK
         VARCHAR(255) name
@@ -785,6 +732,12 @@ erDiagram
         BIGINT user_id FK,UK "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
         BOOLEAN ai_review_enabled "NOT NULL"
+    }
+
+    WorkerRegistry {
+        VARCHAR(255) worker_id PK
+        TIMESTAMPTZ last_heartbeat "NOT NULL"
+        TIMESTAMPTZ registered_at "NOT NULL"
     }
 
     WorkerTokenDenylist {
@@ -883,8 +836,6 @@ erDiagram
     GitProvider ||--|| Milestone : references
     Repository ||--|| Milestone : has
     GitProvider ||--|| Organization : references
-    Connection ||--|| OutlineCollection : has
-    Connection ||--|| OutlineDocument : has
     Workspace ||--|| Practice : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
@@ -898,8 +849,6 @@ erDiagram
     GitProvider ||--|| PullRequestReviewThread : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     GitProvider ||--|| Repository : references
-    Connection ||--|| SlackChannel : has
-    Connection ||--|| SlackMessage : has
     GitProvider ||--|| Team : references
     GitProvider ||--|| User : references
     User ||--|| UserAchievement : has

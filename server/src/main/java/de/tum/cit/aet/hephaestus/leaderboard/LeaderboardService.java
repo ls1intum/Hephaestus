@@ -137,16 +137,12 @@ public class LeaderboardService {
             )
             .orElse(Collections.emptySet());
 
-        // ========================================================================
         // XP and breakdown from activity events (source of truth)
-        // ========================================================================
         Map<Long, LeaderboardUserXp> activityData = new HashMap<>(
             leaderboardXpQueryService.getLeaderboardData(workspaceId, after, before, teamIds)
         );
 
-        // ========================================================================
         // Include ALL team members, even those with zero activity
-        // ========================================================================
         List<User> allTeamMembers;
         if (team.isPresent() && !teamIds.isEmpty()) {
             allTeamMembers = userRepository.findAllByTeamIds(teamIds);
@@ -175,9 +171,7 @@ public class LeaderboardService {
             return Collections.emptyList();
         }
 
-        // ========================================================================
         // Fetch PR data for display (not for scoring)
-        // ========================================================================
         Set<Long> actorIds = activityData.keySet();
 
         List<PullRequestReview> reviews;
@@ -200,9 +194,7 @@ public class LeaderboardService {
             .filter(r -> r.getAuthor() != null && r.getAuthor().getId() != null)
             .collect(Collectors.groupingBy(r -> r.getAuthor().getId()));
 
-        // ========================================================================
         // Get league points for ranking
-        // ========================================================================
         Collection<User> users = activityData.values().stream().map(LeaderboardUserXp::user).toList();
 
         Map<Long, Integer> leaguePointsByUserId = workspaceMembershipService.getLeaguePointsSnapshot(
@@ -210,9 +202,7 @@ public class LeaderboardService {
             workspaceId
         );
 
-        // ========================================================================
         // Sort by specified criteria
-        // ========================================================================
         Comparator<Map.Entry<Long, LeaderboardUserXp>> comparator = comparatorForActivityData(
             sort,
             leaguePointsByUserId
@@ -220,9 +210,7 @@ public class LeaderboardService {
 
         List<Long> ranking = activityData.entrySet().stream().sorted(comparator).map(Map.Entry::getKey).toList();
 
-        // ========================================================================
         // Build DTOs
-        // ========================================================================
         List<LeaderboardEntryDTO> result = new ArrayList<>();
         for (int index = 0; index < ranking.size(); index++) {
             Long userId = ranking.get(index);

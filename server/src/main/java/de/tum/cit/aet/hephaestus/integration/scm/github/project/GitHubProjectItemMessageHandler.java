@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -45,6 +46,7 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
     private final ProjectItemRepository projectItemRepository;
     private final ScopeIdResolver scopeIdResolver;
     private final GitProviderRepository gitProviderRepository;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     GitHubProjectItemMessageHandler(
         GitHubProjectItemProcessor itemProcessor,
@@ -52,6 +54,7 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
         ProjectItemRepository projectItemRepository,
         ScopeIdResolver scopeIdResolver,
         GitProviderRepository gitProviderRepository,
+        SyncSchedulerProperties syncSchedulerProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -67,6 +70,15 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
         this.projectItemRepository = projectItemRepository;
         this.scopeIdResolver = scopeIdResolver;
         this.gitProviderRepository = gitProviderRepository;
+        this.syncSchedulerProperties = syncSchedulerProperties;
+    }
+
+    /**
+     * Projects V2 item webhook events are skipped when {@code hephaestus.sync.projects.enabled=false}.
+     */
+    @Override
+    public boolean isEnabled() {
+        return syncSchedulerProperties.projects().enabled();
     }
 
     @Override
@@ -82,7 +94,7 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
         Project.OwnerType ownerType = event.detectOwnerType();
         String ownerIdentifier = event.getOwnerIdentifier();
 
-        log.info(
+        log.debug(
             "Received projects_v2_item event: action={}, itemNodeId={}, ownerType={}, owner={}",
             event.action(),
             itemDto.nodeId() != null ? sanitizeForLog(itemDto.nodeId()) : "unknown",

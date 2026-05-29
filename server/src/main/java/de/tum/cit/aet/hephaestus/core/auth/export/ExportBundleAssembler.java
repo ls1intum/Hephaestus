@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -51,6 +52,7 @@ public class ExportBundleAssembler {
     private final AuthEventRepository authEventRepository;
     private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
     private final AccountPreferencesQuery preferencesQuery;
+    private final GitProviderRegistry gitProviderRegistry;
     private final Clock clock;
 
     public ExportBundleAssembler(
@@ -59,6 +61,7 @@ public class ExportBundleAssembler {
         AuthEventRepository authEventRepository,
         AccountWorkspaceMembershipQuery workspaceMembershipQuery,
         AccountPreferencesQuery preferencesQuery,
+        GitProviderRegistry gitProviderRegistry,
         Clock clock
     ) {
         this.accountService = accountService;
@@ -66,6 +69,7 @@ public class ExportBundleAssembler {
         this.authEventRepository = authEventRepository;
         this.workspaceMembershipQuery = workspaceMembershipQuery;
         this.preferencesQuery = preferencesQuery;
+        this.gitProviderRegistry = gitProviderRegistry;
         this.clock = clock;
     }
 
@@ -90,10 +94,7 @@ public class ExportBundleAssembler {
             account.getCreatedAt()
         );
 
-        List<ExportBundle.Identity> identityViews = identities
-            .stream()
-            .map(ExportBundleAssembler::toIdentity)
-            .toList();
+        List<ExportBundle.Identity> identityViews = identities.stream().map(this::toIdentity).toList();
 
         List<ExportBundle.WorkspaceMembership> memberships = workspaceMembershipQuery
             .membershipsForLogins(logins)
@@ -131,8 +132,8 @@ public class ExportBundleAssembler {
         );
     }
 
-    private static ExportBundle.Identity toIdentity(IdentityLink il) {
-        String provider = il.getGitProvider() != null ? il.getGitProvider().getType().name() : "OIDC";
+    private ExportBundle.Identity toIdentity(IdentityLink il) {
+        String provider = gitProviderRegistry.providerTypeName(il.getGitProviderId());
         return new ExportBundle.Identity(
             provider,
             il.getSubject(),

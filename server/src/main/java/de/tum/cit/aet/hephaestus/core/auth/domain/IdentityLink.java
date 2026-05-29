@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.core.auth.domain;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -53,9 +52,17 @@ public class IdentityLink {
     @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "git_provider_id", nullable = false)
-    private GitProvider gitProvider;
+    /**
+     * FK (by id) to the {@code git_provider} row owned by the {@code integration} module.
+     * Stored as a plain scalar rather than a JPA {@code @ManyToOne GitProvider} association so
+     * that {@code core.auth} does not import the integration entity — that import would invert
+     * the bounded-context dependency direction ({@code integration → core}). Resolution of a
+     * {@code registrationId} to this id happens through the
+     * {@code de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry} SPI, implemented in
+     * {@code integration}. The DB column and FK constraint are unchanged.
+     */
+    @Column(name = "git_provider_id", nullable = false)
+    private Long gitProviderId;
 
     /** IdP-stable user id (GitHub numeric id, GitLab numeric id, Slack {@code U...}). */
     @Column(name = "subject", nullable = false, length = 255)

@@ -105,18 +105,22 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
         Optional<byte[]> secret = secretSource.getSecret(new SecretLookup(headers));
         if (secret.isEmpty()) {
             log.warn(
-                "Slack signing secret unconfigured — set hephaestus.slack.signing-secret or hephaestus.webhook.secret"
+                "Slack signing secret unconfigured — set hephaestus.integration.slack.signing-secret or hephaestus.webhook.secret"
             );
             return new VerificationResult.Invalid("signing secret unconfigured");
         }
 
-        // 5. Compute + compare constant-time.
-        String basestring = "v0:" + timestamp + ":" + new String(body, StandardCharsets.UTF_8);
+        // 5. Compute + compare constant-time. Slack signs over the RAW request body bytes, so we
+        // feed the "v0:<ts>:" prefix and the body straight into the Mac. Round-tripping the body
+        // through `new String(body, UTF_8)` would map any non-UTF-8 byte to U+FFFD and re-encode
+        // to different bytes, producing a wrong MAC and rejecting an otherwise-valid request.
         byte[] computedMac;
         try {
             Mac mac = Mac.getInstance(HMAC_SHA256);
             mac.init(new SecretKeySpec(secret.get(), HMAC_SHA256));
-            computedMac = mac.doFinal(basestring.getBytes(StandardCharsets.UTF_8));
+            mac.update(("v0:" + timestamp + ":").getBytes(StandardCharsets.UTF_8));
+            mac.update(body);
+            computedMac = mac.doFinal();
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             log.error("HmacSHA256 unavailable", e);
             return new VerificationResult.Invalid("hmac unavailable");

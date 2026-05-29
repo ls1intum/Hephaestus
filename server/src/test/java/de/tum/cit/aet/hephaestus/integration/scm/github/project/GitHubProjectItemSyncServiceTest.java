@@ -100,14 +100,24 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             fieldValueSyncService,
             graphQlClientProvider,
             syncProperties,
+            new de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties(
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                null,
+                null,
+                null,
+                new de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties.ProjectsProperties(
+                    true
+                )
+            ),
             exceptionClassifier,
             transactionTemplate
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Helper methods
-    // ═══════════════════════════════════════════════════════════════
 
     private Project createProject() {
         Project project = new Project();
@@ -177,9 +187,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         return ghProject;
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // processEmbeddedItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class ProcessEmbeddedItems {
@@ -524,9 +532,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncRemainingProjectItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncRemainingProjectItems {
@@ -543,7 +549,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 null,
                 false,
-                mock(Repository.class),
+                new Repository(),
                 "cursor",
                 PARENT_ISSUE_ID
             );
@@ -558,7 +564,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
                 SCOPE_ID,
                 "  ",
                 false,
-                mock(Repository.class),
+                new Repository(),
                 "cursor",
                 PARENT_ISSUE_ID
             );
@@ -569,7 +575,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldPaginateThroughRemainingItemsForIssue() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName("GetIssueProjectItems")).thenReturn(requestSpec);
@@ -629,7 +635,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldUsePrSpecificQueryForPullRequests() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName("GetPullRequestProjectItems")).thenReturn(requestSpec);
@@ -663,7 +669,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldStopOnRateLimitCritical() throws InterruptedException {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -692,7 +698,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldHandleEmptyResponseWhenAllItemsInEmbeddedList() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -721,7 +727,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldHandleInvalidGraphQlResponseAndBreak() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -745,7 +751,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldHandleExceptionDuringPaginationAndBreak() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);
@@ -771,7 +777,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         void shouldPaginateThroughMultiplePages() {
-            Repository repository = mock(Repository.class);
+            Repository repository = new Repository();
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(10));
             when(graphQlClient.documentName(anyString())).thenReturn(requestSpec);

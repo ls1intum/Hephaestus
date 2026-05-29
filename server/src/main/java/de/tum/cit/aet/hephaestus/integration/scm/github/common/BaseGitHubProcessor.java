@@ -240,9 +240,7 @@ public abstract class BaseGitHubProcessor {
         return PostgresStringUtils.sanitize(input);
     }
 
-    // ========================================================================
     // Shared relationship update helpers (used by Issue and PR processors)
-    // ========================================================================
 
     /**
      * Updates assignees collection from DTO list.

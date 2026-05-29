@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import java.time.Clock;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -32,18 +32,18 @@ public class AccountProvisioningService {
 
     private final AccountRepository accountRepository;
     private final IdentityLinkRepository identityLinkRepository;
-    private final RegistrationToGitProviderResolver providerResolver;
+    private final GitProviderRegistry gitProviderRegistry;
     private final Clock clock;
 
     public AccountProvisioningService(
         AccountRepository accountRepository,
         IdentityLinkRepository identityLinkRepository,
-        RegistrationToGitProviderResolver providerResolver,
+        GitProviderRegistry gitProviderRegistry,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
-        this.providerResolver = providerResolver;
+        this.gitProviderRegistry = gitProviderRegistry;
         this.clock = clock;
     }
 
@@ -58,11 +58,11 @@ public class AccountProvisioningService {
         OAuth2User principal,
         AuthIntentCookie.Intent intent
     ) {
-        GitProvider provider = providerResolver.resolve(registrationId);
+        long providerId = gitProviderRegistry.resolveProviderId(registrationId);
         AuthIntentCookie.Intent.Mode mode = (intent != null) ? intent.mode() : AuthIntentCookie.Intent.Mode.LOGIN;
 
         IdentityLink link = identityLinkRepository
-            .findActiveByProviderSubject(provider.getId(), subject, /* teamId */ null)
+            .findActiveByProviderSubject(providerId, subject, /* teamId */ null)
             .orElse(null);
 
         if (link != null) {
@@ -77,7 +77,7 @@ public class AccountProvisioningService {
                 .orElseThrow(() ->
                     new IllegalStateException("auth.link: linkingAccountId=" + intent.linkingAccountId() + " not found")
                 );
-            IdentityLink linked = newIdentityLink(account, provider, subject, principal);
+            IdentityLink linked = newIdentityLink(account, providerId, subject, principal);
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
             log.info("auth.success: linked provider={} to existing accountId={}", registrationId, account.getId());
@@ -87,15 +87,15 @@ public class AccountProvisioningService {
         Account account = new Account(displayName(principal, subject));
         account.setPrimaryEmail(email(principal));
         account = accountRepository.save(account);
-        identityLinkRepository.save(newIdentityLink(account, provider, subject, principal));
+        identityLinkRepository.save(newIdentityLink(account, providerId, subject, principal));
         log.info("auth.success: JIT created accountId={} via provider={}", account.getId(), registrationId);
         return account;
     }
 
-    private IdentityLink newIdentityLink(Account account, GitProvider provider, String subject, OAuth2User principal) {
+    private IdentityLink newIdentityLink(Account account, long providerId, String subject, OAuth2User principal) {
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
-        link.setGitProvider(provider);
+        link.setGitProviderId(providerId);
         link.setSubject(subject);
         link.setUsernameAtSignup(stringAttr(principal, "login", "preferred_username", "username"));
         link.setEmailAtSignup(email(principal));

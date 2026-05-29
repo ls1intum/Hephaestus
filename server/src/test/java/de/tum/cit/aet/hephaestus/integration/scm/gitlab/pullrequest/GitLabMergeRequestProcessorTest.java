@@ -179,9 +179,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         // upsertUser is void - no stubbing needed
     }
 
-    // ========================================================================
     // State Mapping
-    // ========================================================================
 
     @Nested
     class StateMapping {
@@ -469,9 +467,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Webhook Event Processing
-    // ========================================================================
 
     @Nested
     class WebhookProcessing {
@@ -1215,9 +1211,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // GraphQL Sync Processing
-    // ========================================================================
 
     @Nested
     class SyncProcessing {
@@ -1750,9 +1744,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Confidential Filtering
-    // ========================================================================
 
     @Nested
     class ConfidentialFiltering {
@@ -1803,9 +1795,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Detailed Merge Status Mapping
-    // ========================================================================
 
     @Nested
     class DetailedMergeStatusMapping {
@@ -1944,9 +1934,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Approval Review ID Generation
-    // ========================================================================
 
     @Nested
     class ApprovalReviewIdGeneration {
@@ -1988,9 +1976,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private ProcessingContext createContext() {
         return ProcessingContext.forWebhook(1L, testRepo, "open");

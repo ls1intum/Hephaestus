@@ -418,7 +418,7 @@ public class ActivityEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
-        log.info(
+        log.debug(
             "Received ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
             reviewData.id(),
             reviewData.state(),
@@ -785,9 +785,7 @@ public class ActivityEventListener {
         );
     }
 
-    // ========================================================================
     // Review Thread Events (Code Review Effectiveness)
-    // ========================================================================
 
     /**
      * Handle review thread resolved events.
@@ -1184,9 +1182,7 @@ public class ActivityEventListener {
         return ActivityEventType.REVIEW_COMMENTED;
     }
 
-    // ========================================================================
     // Commit Events
-    // ========================================================================
 
     /**
      * Handle commit created events.
@@ -1262,9 +1258,7 @@ public class ActivityEventListener {
         }
     }
 
-    // ========================================================================
     // Discussion Events (Community Engagement Tracking)
-    // ========================================================================
 
     /**
      * Handle discussion created events.
@@ -1434,9 +1428,7 @@ public class ActivityEventListener {
         );
     }
 
-    // ========================================================================
     // Discussion Comment Events
-    // ========================================================================
 
     /**
      * Handle discussion comment created events.

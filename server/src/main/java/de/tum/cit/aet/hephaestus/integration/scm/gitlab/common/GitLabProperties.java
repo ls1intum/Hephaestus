@@ -19,13 +19,14 @@ import org.springframework.validation.annotation.Validated;
  * <h2>Configuration Example</h2>
  * <pre>{@code
  * hephaestus:
- *   gitlab:
- *     enabled: true
- *     default-server-url: https://gitlab.com
- *     graphql-timeout: 30s
- *     extended-graphql-timeout: 60s
- *     pagination-throttle: 200ms
- *     token-validation-cache-duration: 5m
+ *   integration:
+ *     gitlab:
+ *       enabled: true
+ *       default-server-url: https://gitlab.com
+ *       graphql-timeout: 30s
+ *       extended-graphql-timeout: 60s
+ *       pagination-throttle: 200ms
+ *       token-validation-cache-duration: 5m
  * }</pre>
  *
  * @param defaultServerUrl              default GitLab server URL; used when workspace does not
@@ -38,7 +39,7 @@ import org.springframework.validation.annotation.Validated;
  *                                      re-validating against {@code /api/v4/user} (default: 5 minutes)
  */
 @Validated
-@ConfigurationProperties(prefix = "hephaestus.gitlab")
+@ConfigurationProperties(prefix = "hephaestus.integration.gitlab")
 public record GitLabProperties(
     @NotNull @DefaultValue("https://gitlab.com") String defaultServerUrl,
     @NotNull @DurationUnit(SECONDS) @DefaultValue("30s") Duration graphqlTimeout,

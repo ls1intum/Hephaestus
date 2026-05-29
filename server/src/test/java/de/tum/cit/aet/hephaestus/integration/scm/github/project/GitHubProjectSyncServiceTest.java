@@ -139,7 +139,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             "0 0 3 * * *", // cron
             15, // cooldownMinutes
             new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()) // empty = all allowed
+            new FilterProperties(Set.of(), Set.of(), Set.of()), // empty = all allowed
+            null,
+            new SyncSchedulerProperties.ProjectsProperties(true) // projects enabled for these tests
         );
 
         // TransactionTemplate mocking: execute callbacks immediately
@@ -181,9 +183,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // Helper methods
-    // ═══════════════════════════════════════════════════════════════
 
     private Organization createOrganization() {
         GitProvider provider = new GitProvider();
@@ -273,9 +273,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         return connection;
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncProjectsForOrganization tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncProjectsForOrganization {
@@ -517,7 +515,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 "0 0 3 * * *",
                 15,
                 new BackfillProperties(false, 50, 100, 60),
-                new FilterProperties(Set.of(), Set.of(), Set.of("test-org/1")) // Only project #1
+                new FilterProperties(Set.of(), Set.of(), Set.of("test-org/1")), // Only project #1
+                null,
+                new SyncSchedulerProperties.ProjectsProperties(true)
             );
             service = new GitHubProjectSyncService(
                 projectRepository,
@@ -616,9 +616,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // syncProjectItems tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class SyncProjectItems {
@@ -702,9 +700,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.itemsSynced()).isTrue();
         }
 
-        // ═══════════════════════════════════════════════════
         // Issue/PR field value backfill tests
-        // ═══════════════════════════════════════════════════
 
         /**
          * Creates a GHProjectV2Item of ISSUE type with optional field values.
@@ -1114,9 +1110,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
     // getProjectsNeedingItemSync tests
-    // ═══════════════════════════════════════════════════════════════
 
     @Nested
     class GetProjectsNeedingItemSync {

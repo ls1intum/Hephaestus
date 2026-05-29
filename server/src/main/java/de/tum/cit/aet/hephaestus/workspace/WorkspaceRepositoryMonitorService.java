@@ -125,9 +125,7 @@ public class WorkspaceRepositoryMonitorService {
         this.dataSyncTriggers = triggerMap;
     }
 
-    // ========================================================================
     // Public API: Get Monitored Repositories
-    // ========================================================================
 
     @Transactional(readOnly = true)
     public List<String> getMonitoredRepositories(String slug) {
@@ -144,9 +142,7 @@ public class WorkspaceRepositoryMonitorService {
         return getMonitoredRepositories(requireSlug(workspaceContext));
     }
 
-    // ========================================================================
     // Public API: Add Repository to Monitor
-    // ========================================================================
 
     public void addRepositoryToMonitor(String slug, String nameWithOwner)
         throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
@@ -219,9 +215,7 @@ public class WorkspaceRepositoryMonitorService {
         addRepositoriesToMonitor(requireSlug(workspaceContext), namesWithOwners);
     }
 
-    // ========================================================================
     // Public API: Remove Repository from Monitor
-    // ========================================================================
 
     public void removeRepositoryFromMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
         Workspace workspace = requireWorkspace(slug);
@@ -264,9 +258,7 @@ public class WorkspaceRepositoryMonitorService {
         removeRepositoryFromMonitor(requireSlug(workspaceContext), nameWithOwner);
     }
 
-    // ========================================================================
     // Public API: Installation-based Repository Monitor Management
-    // ========================================================================
 
     /**
      * Idempotently ensure a repository monitor exists for a given installation id
@@ -424,9 +416,7 @@ public class WorkspaceRepositoryMonitorService {
         ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), true);
     }
 
-    // ========================================================================
     // Public API: Ensure All Installation Repositories Covered
-    // ========================================================================
 
     /**
      * Enumerate all repositories available to the installation when repository
@@ -538,9 +528,7 @@ public class WorkspaceRepositoryMonitorService {
             .forEach(monitor -> removeRepositoryMonitorForInstallation(installationId, monitor.getNameWithOwner()));
     }
 
-    // ========================================================================
     // Internal Helper Methods
-    // ========================================================================
 
     /**
      * Finds a repository by its full name if it exists in the database.

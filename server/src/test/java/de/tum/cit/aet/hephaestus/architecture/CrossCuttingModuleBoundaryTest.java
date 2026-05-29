@@ -24,9 +24,7 @@ import org.junit.jupiter.api.Test;
  */
 class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // CONTRIBUTORS MODULE ISOLATION
-    // ========================================================================
 
     @Nested
     class ContributorsModuleTests {
@@ -81,9 +79,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // ACCOUNT MODULE ISOLATION
-    // ========================================================================
 
     @Nested
     class AccountModuleTests {
@@ -131,9 +127,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CORE & SHARED PACKAGE PROTECTION
-    // ========================================================================
 
     @Nested
     class CoreSharedPackageTests {
@@ -211,9 +205,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // ANALYTICS MODULE ISOLATION
-    // ========================================================================
 
     @Nested
     class AnalyticsModuleTests {
@@ -242,9 +234,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CONFIG MODULE ISOLATION
-    // ========================================================================
 
     @Nested
     class ConfigModuleTests {
@@ -273,9 +263,7 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
     // which means they pass even when there's nothing to check.
     // The top-level cycle test in ArchitectureTest.noCyclesBetweenModules() is sufficient.
 
-    // ========================================================================
     // WORKSPACE ADAPTER PATTERN VERIFICATION
-    // ========================================================================
 
     @Nested
     class WorkspaceCrossCuttingTests {

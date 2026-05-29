@@ -53,7 +53,7 @@ public record GitHubPullRequestReviewEventDTO(
         @Nullable Instant updatedAt,
         @Nullable Boolean authorCanPushToRepository
     ) {
-        // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+        // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
         /**
          * Creates a GitHubReviewDTO from a GraphQL GHPullRequestReview model.

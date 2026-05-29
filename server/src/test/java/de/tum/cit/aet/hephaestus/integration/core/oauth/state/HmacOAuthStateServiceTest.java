@@ -106,7 +106,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         // subjects (rare but valid in some IDP configs) don't break the framing.
         HmacOAuthStateService svc = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
         String actor = "user|with|pipes";
-        String state = svc.issue(42L, IntegrationKind.OUTLINE, actor);
+        String state = svc.issue(42L, IntegrationKind.SLACK, actor);
         assertThat(svc.consume(state).actorRef()).isEqualTo(actor);
     }
 

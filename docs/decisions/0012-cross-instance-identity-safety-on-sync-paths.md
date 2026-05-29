@@ -2,14 +2,12 @@
 
 **Status:** Accepted
 **Date:** 2026-05-25
-**Authors:** Live-run audit (#1198 pass 14)
 
 ## Context
 
-Pass 13 closed a write-side cross-instance identity CVE (provider_id stamping —
-ADR was implicit in the commit, see `2ee311408`). Pass 14 live-ran the GitHub
-flow against `staging.hephaestus.aet.cit.tum.de` NATS while the GitLab flow was
-also active. Two further structural defects surfaced in the same defect family.
+A prior fix closed a write-side cross-instance identity defect (provider_id
+stamping). A live run of the GitHub flow against staging NATS, with the GitLab
+flow also active, surfaced two further structural defects in the same family.
 
 ### Defect 1 — Cross-provider login collision on read paths
 
@@ -30,23 +28,9 @@ Failed to sync teams: scopeId=2, orgLogin=HephaestusTest,
   error=NonUniqueResultException - Query did not return a unique result: 2 results
 ```
 
-13 call sites used the unscoped method:
-
-| File | Line | Kind |
-|---|---|---|
-| `GitHubProjectSyncService` | 197 | GitHub |
-| `GitHubTeamSyncService` | 137 | GitHub |
-| `GithubDataSyncService` | 860 | GitHub |
-| `GitHubIssueProcessor` | 490 | GitHub |
-| `GithubDataSyncScheduler` | 456 | GitHub |
-| `GitLabIssueTypeSyncService` | 73 | GitLab |
-| `GitlabDataSyncScheduler` | 292, 633 | GitLab |
-| `GitLabHistoricalBackfillService` | 256 | GitLab |
-| `GitLabWorkspaceInitializationService` | 315, 420 | GitLab |
-| `GitLabMilestoneProcessorIntegrationTest` | 591 | GitLab (test) |
-
-Every one of these is in a context where the kind is statically known (it's
-inside `integration/github/` or `integration/gitlab/`). The unscoped method
+Every call site of the unscoped method is in a context where the kind is
+statically known (inside `integration/github/` or `integration/gitlab/`); the
+boundary is pinned by `IntegrationSubjectBoundariesTest`. The unscoped method
 itself was the footgun: it cannot enforce the invariant the call site needs.
 
 ### Defect 2 — Transient auth failures silently deleted user-configured RTMs
@@ -60,7 +44,7 @@ for **multiple** failure modes:
 4. Rate limit exhausted with no retry budget
 5. Generic exception classification miss
 
-The caller in `GithubDataSyncService:226` collapsed all of these into "repo
+The caller in `GithubDataSyncService` collapsed all of these into "repo
 not on GitHub" and called `syncTargetProvider.removeSyncTarget(syncTarget.id())`
 — **permanently deleting the user-configured `repository_to_monitor` row**.
 
@@ -88,20 +72,20 @@ Replaced with two provider-scoped variants:
   these call sites, and the implementation is a Spring Data derived-query, no
   custom JPQL needed.
 
-Every one of the 13 call sites was migrated to the kind-scoped variant. The
-unscoped method declaration is gone — the compiler now enforces the invariant.
+Every call site was migrated to the kind-scoped variant. The unscoped method
+declaration is gone — the compiler now enforces the invariant.
 
 The `findByLoginIgnoreCaseAndProvider_Type` variant is sufficient as long as no
 two different instances of the same provider type host a colliding login. In a
 multi-tenant SaaS deployment where the same group/org name can exist on
 `gitlab.com` and `gitlab.lrz.de`, switch the call site to the providerId
-variant (the providerId comes from `workspace.serverUrl` via the resolver added
-in pass 13).
+variant (the providerId comes from `workspace.serverUrl` via the server-URL
+resolver).
 
 ### For defect 2 — distinguish definitive 404 from transient inability to ask
 
 Added `RepositoryNotFoundOnGitProviderException` to
-`gitprovider/common/exception/`. `GitHubRepositorySyncService` now throws this
+`integration/scm/domain/common/exception/`. `GitHubRepositorySyncService` now throws this
 exception in the **one** code path where GitHub definitively responded
 "repository does not exist" (GraphQL response valid, `repository` field null).
 Every other failure mode still returns `Optional.empty()` — the **transient**
@@ -125,11 +109,10 @@ if (syncedRepository.isEmpty()) {
 }
 ```
 
-The existing classification-based `removeSyncTarget` at
-`GithubDataSyncService:444` (inside `case NOT_FOUND` of the exception
-classifier) is already correct — it only fires on genuine 404 errors from the
-GraphQL response. The fix at line 226 brings the earlier code path up to the
-same safety bar.
+The existing classification-based `removeSyncTarget` in `GithubDataSyncService`
+(inside `case NOT_FOUND` of the exception classifier) is already correct — it
+only fires on genuine 404 errors from the GraphQL response. The fix brings the
+earlier code path up to the same safety bar.
 
 The exception name uses "GitProvider" not "GitHub" so the same pattern can be
 adopted by GitLab when an equivalent path is added there (today GitLab does
@@ -145,30 +128,17 @@ exception is reusable).
    we shipped; the DB constraint is a follow-up once the backfill window is
    coordinated with operations.
 
-2. **Keep `findByLoginIgnoreCase(String)` and require all callers to switch to a
-   wrapper that asserts the provider context at runtime.** Rejected because the
-   compile-time fix is exhaustive without operator discipline; a runtime assertion
-   wrapper depends on every caller routing through it.
-
-3. **Cache the provider on a ThreadLocal at the webhook/sync entry point + read it
+2. **Cache the provider on a ThreadLocal at the webhook/sync entry point + read it
    in the repository.** Rejected: ThreadLocal-coupling for tenancy is precisely the
    pattern the existing `WorkspaceStatementInspector` warns against (ADR-0004). The
    provider must be an explicit parameter.
 
-4. **`removeSyncTarget` always on `Optional.empty()`, with retry on a higher layer.**
+3. **`removeSyncTarget` always on `Optional.empty()`, with retry on a higher layer.**
    Rejected: silently deleting an RTM during a transient GitHub 5xx is the original
-   CVE; no amount of retry-at-higher-layer fixes the silent-delete window between
-   the empty branch and the operator noticing the missing repo.
-
-5. **`removeSyncTarget` only when the explicit `RepositoryNotFoundOnGitProviderException`
-   is thrown.** Adopted — this is the shipping design. The exception is thrown at
-   exactly one site (`GitHubRepositorySyncService.syncRepository` after a 404
-   classification by `GitHubExceptionClassifier`) and propagates up through the
-   catch site at `GithubDataSyncService:444`.
-
-6. **Stop calling `removeSyncTarget` at all from sync paths; require an explicit
-   admin action to remove RTMs.** Rejected: admin-removed-from-org repos legitimately
-   need automatic RTM cleanup or the sync queue accumulates dead targets.
+   defect; no amount of retry-at-higher-layer fixes the silent-delete window between
+   the empty branch and the operator noticing the missing repo. (The shipped design
+   instead removes only on the explicit `RepositoryNotFoundOnGitProviderException`,
+   thrown at exactly one site after a 404 classification.)
 
 ## Consequences
 
@@ -216,5 +186,5 @@ exception is reusable).
 - `OrganizationRepository.findByLoginIgnoreCaseAndProvider_Type` — the new
   Spring Data derived-query method
 - `RepositoryNotFoundOnGitProviderException` — the new definitive-404 signal
-- ADR-0011 (pass 13) — predecessor in the same defect family
+- ADR-0011 — predecessor in the same defect family
   (`integration_identity` not wired from sync)

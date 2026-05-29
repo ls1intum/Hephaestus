@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.live;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,8 +47,7 @@ final class StdioAttachedSandbox implements AttachedSandbox {
     private static final int MAX_LINE_BYTES = 8 * 1024 * 1024;
 
     private final UUID sessionId;
-    private final String userId;
-    private final String workspaceId;
+    private final SandboxIdentity identity;
     private final Process process;
     private final OutputStream stdin;
     private final CopyOnWriteArrayList<Consumer<JsonNode>> listeners = new CopyOnWriteArrayList<>();
@@ -56,8 +56,7 @@ final class StdioAttachedSandbox implements AttachedSandbox {
 
     StdioAttachedSandbox(UUID sessionId, String userId, String workspaceId, Process process) {
         this.sessionId = sessionId;
-        this.userId = userId;
-        this.workspaceId = workspaceId;
+        this.identity = new SandboxIdentity(sessionId, userId, workspaceId);
         this.process = process;
         this.stdin = process.getOutputStream();
         startStdoutPump(process.getInputStream());
@@ -70,18 +69,8 @@ final class StdioAttachedSandbox implements AttachedSandbox {
     }
 
     @Override
-    public UUID sessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public String userId() {
-        return userId;
-    }
-
-    @Override
-    public String workspaceId() {
-        return workspaceId;
+    public SandboxIdentity identity() {
+        return identity;
     }
 
     @Override

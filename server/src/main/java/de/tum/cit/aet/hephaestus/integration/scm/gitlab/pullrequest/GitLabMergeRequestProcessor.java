@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Deterministic review IDs prevent collisions with GitHub review IDs.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestProcessor.class);
@@ -90,9 +90,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         this.eventPublisher = eventPublisher;
     }
 
-    // ========================================================================
     // Sync Data Records
-    // ========================================================================
 
     public record SyncLabelData(String globalId, String title, @Nullable String color) {}
 
@@ -152,9 +150,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable Integer milestoneIid
     ) {}
 
-    // ========================================================================
     // Webhook Processing
-    // ========================================================================
 
     /**
      * Process a GitLab merge request webhook event (open/update).
@@ -493,9 +489,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         );
     }
 
-    // ========================================================================
     // Sync Processing
-    // ========================================================================
 
     /**
      * Looks up the current state of an existing PR before processing a webhook event.
@@ -687,9 +681,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         return pr;
     }
 
-    // ========================================================================
     // Private Helpers
-    // ========================================================================
 
     @Nullable
     private User resolveWebhookAuthor(GitLabMergeRequestEventDTO event, Long providerId) {

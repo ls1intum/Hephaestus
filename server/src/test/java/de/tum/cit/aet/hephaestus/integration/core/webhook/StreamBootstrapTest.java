@@ -32,7 +32,7 @@ class StreamBootstrapTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-        new WebhookProperties.Stream(Duration.ofMinutes(2), Duration.ofDays(180), 2_000_000L),
+        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), 2_000_000L),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(26_214_400L)
     );
@@ -45,12 +45,12 @@ class StreamBootstrapTest extends BaseUnitTest {
 
         new StreamBootstrap(jsm, properties).bootstrap();
 
-        // One stream per registered integration kind (gitlab/github/slack/outline).
+        // One stream per registered integration kind (gitlab/github/slack).
         ArgumentCaptor<StreamConfiguration> captor = ArgumentCaptor.forClass(StreamConfiguration.class);
-        verify(jsm, times(4)).addStream(captor.capture());
+        verify(jsm, times(3)).addStream(captor.capture());
         assertThat(captor.getAllValues())
             .extracting(StreamConfiguration::getName)
-            .containsExactlyInAnyOrder("gitlab", "github", "slack", "outline");
+            .containsExactlyInAnyOrder("gitlab", "github", "slack");
     }
 
     @Test
@@ -92,7 +92,7 @@ class StreamBootstrapTest extends BaseUnitTest {
     @Test
     void warnsWhenLiveMaxMessagesIsUnlimited(CapturedOutput output) throws Exception {
         StreamConfiguration config = mock(StreamConfiguration.class);
-        when(config.getDuplicateWindow()).thenReturn(Duration.ofMinutes(2));
+        when(config.getDuplicateWindow()).thenReturn(Duration.ofMinutes(10));
         when(config.getMaxAge()).thenReturn(Duration.ofDays(180));
         when(config.getMaxMsgs()).thenReturn(-1L); // unlimited; expected = 2_000_000
         when(config.getStorageType()).thenReturn(io.nats.client.api.StorageType.File);

@@ -259,7 +259,7 @@ class WebhookIngestPipelineTest extends BaseUnitTest {
             .hasMessageContaining("Duplicate SubjectKeyDeriver");
     }
 
-    // ── Stubs ───────────────────────────────────────────────────────────────
+    // Stubs
 
     private static WebhookSignatureVerifier stubVerifier(IntegrationKind kind, VerificationResult result) {
         return new WebhookSignatureVerifier() {

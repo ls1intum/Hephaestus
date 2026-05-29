@@ -43,7 +43,7 @@ import org.springframework.stereotype.Service;
  * After a complete sync, stale milestones (present in DB but not on GitLab) are removed.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMilestoneSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMilestoneSyncService.class);

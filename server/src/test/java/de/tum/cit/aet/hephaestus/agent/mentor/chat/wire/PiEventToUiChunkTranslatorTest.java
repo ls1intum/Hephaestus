@@ -48,7 +48,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         }
     }
 
-    // ─── message_start ───────────────────────────────────────────────────────────────────
+    // message_start
 
     @Test
     void messageStart_assistant_emitsStartAndCapturesModel() throws Exception {
@@ -104,7 +104,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
             .containsExactly("StartStep");
     }
 
-    // ─── message_update (Pi's authoritative shape) ───────────────────────────────────────
+    // message_update (Pi's authoritative shape)
 
     @Test
     void delta_type_translatesTo_textDelta_chunk() throws Exception {
@@ -156,7 +156,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(((UIMessageChunk.ReasoningDelta) out.get(1)).delta()).isEqualTo("Let me think");
     }
 
-    // ─── message_end (captures final usage but emits no UI chunks) ───────────────────────
+    // message_end (captures final usage but emits no UI chunks)
 
     @Test
     void messageEnd_capturesUsage_emitsNothing() throws Exception {
@@ -172,7 +172,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(state.observedModel()).isEqualTo("claude-3-5-haiku-20241022");
     }
 
-    // ─── tool_execution_start / end with real camelCase shapes ───────────────────────────
+    // tool_execution_start / end with real camelCase shapes
 
     @Test
     void tool_call_start_emits_inputAvailable() throws Exception {
@@ -232,7 +232,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(out.get(0)).isInstanceOf(UIMessageChunk.ToolOutputAvailable.class);
     }
 
-    // ─── agent_end (no usage on event itself — harvest from messages[]) ──────────────────
+    // agent_end (no usage on event itself — harvest from messages[])
 
     @Test
     void agentEnd_noEventUsage_harvestsFromMessages() throws Exception {
@@ -315,7 +315,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(finish.finishReason()).isSameAs(UIMessageChunk.FinishReason.STOP);
     }
 
-    // ─── turn_end + open block closure ───────────────────────────────────────────────────
+    // turn_end + open block closure
 
     @Test
     void turnEnd_closesAllOpenBlocks() throws Exception {
@@ -338,7 +338,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
             .containsExactly("TextEnd", "ToolInputStart", "ToolInputAvailable");
     }
 
-    // ─── link_finding (runner-emitted, camelCase canonical) ──────────────────────────────
+    // link_finding (runner-emitted, camelCase canonical)
 
     @Test
     void linkFinding_camelCase_emitsDataFinding() throws Exception {
@@ -359,7 +359,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         ).isEmpty();
     }
 
-    // ─── synthetic runner events (snake-case, runner-owned) ──────────────────────────────
+    // synthetic runner events (snake-case, runner-owned)
 
     @Test
     void piError_emitsError() throws Exception {
@@ -512,7 +512,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(translator.translate(mapper.createObjectNode().put("noType", true), state)).isEmpty();
     }
 
-    // ─── parts accumulation ──────────────────────────────────────────────────────────────
+    // parts accumulation
 
     @Test
     void stateAccumulatesPartsAcrossDeltas() throws Exception {
@@ -534,7 +534,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(snapshot.get(1).get("text").asText()).isEqualTo("hello");
     }
 
-    // ─── tool-call part mutation (single part per toolCallId across states) ──────────────
+    // tool-call part mutation (single part per toolCallId across states)
 
     @Test
     @DisplayName("Tool execution start+end produces ONE persisted part that mutates state in place")

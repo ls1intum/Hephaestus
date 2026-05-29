@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
-import de.tum.cit.aet.hephaestus.core.auth.oauth.LoginClientRegistrationRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
@@ -27,10 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Auth discovery", description = "Identity provider discovery (public)")
 public class IdentityProviderDiscoveryController {
 
-    private final LoginClientRegistrationRepository registrationRepository;
+    private final IdentityProviderCatalog identityProviderCatalog;
 
-    public IdentityProviderDiscoveryController(LoginClientRegistrationRepository registrationRepository) {
-        this.registrationRepository = registrationRepository;
+    public IdentityProviderDiscoveryController(IdentityProviderCatalog identityProviderCatalog) {
+        this.identityProviderCatalog = identityProviderCatalog;
     }
 
     /** One row per sign-in option. {@code providerType} drives the SPA's icon choice. */
@@ -41,7 +41,7 @@ public class IdentityProviderDiscoveryController {
     @Operation(summary = "List available identity providers", operationId = "listIdentityProviders")
     public ResponseEntity<List<IdentityProviderViewDTO>> list() {
         List<IdentityProviderViewDTO> views = new ArrayList<>();
-        for (ClientRegistration reg : registrationRepository) {
+        for (ClientRegistration reg : identityProviderCatalog.listRegistrations()) {
             views.add(
                 new IdentityProviderViewDTO(
                     reg.getRegistrationId(),

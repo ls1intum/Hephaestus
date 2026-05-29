@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -29,9 +30,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class AccountWebController {
 
     private final AccountService accountService;
+    private final GitProviderRegistry gitProviderRegistry;
 
-    public AccountWebController(AccountService accountService) {
+    public AccountWebController(AccountService accountService, GitProviderRegistry gitProviderRegistry) {
         this.accountService = accountService;
+        this.gitProviderRegistry = gitProviderRegistry;
     }
 
     public record CurrentUserViewDTO(
@@ -72,7 +75,7 @@ public class AccountWebController {
         IdentityLink primary = identities.stream().findFirst().orElse(null);
         boolean hasGitLab = identities
             .stream()
-            .anyMatch(il -> il.getGitProvider() != null && "GITLAB".equals(il.getGitProvider().getType().name()));
+            .anyMatch(il -> "GITLAB".equals(gitProviderRegistry.providerTypeName(il.getGitProviderId())));
         return ResponseEntity.ok(
             new CurrentUserViewDTO(
                 account.getId(),
@@ -85,9 +88,7 @@ public class AccountWebController {
                 primary != null ? primary.getUsernameAtSignup() : account.getDisplayName(),
                 primary != null ? primary.getAvatarUrl() : null,
                 primary != null ? primary.getProfileUrl() : null,
-                primary != null && primary.getGitProvider() != null
-                    ? primary.getGitProvider().getType().name()
-                    : null,
+                primary != null ? gitProviderRegistry.providerTypeName(primary.getGitProviderId()) : null,
                 primary != null ? primary.getSubject() : null,
                 hasGitLab,
                 CurrentAccount.roles()
@@ -101,7 +102,7 @@ public class AccountWebController {
         List<IdentityViewDTO> views = accountService
             .activeIdentities(CurrentAccount.requireId())
             .stream()
-            .map(AccountWebController::toView)
+            .map(this::toView)
             .toList();
         return ResponseEntity.ok(views);
     }
@@ -122,8 +123,8 @@ public class AccountWebController {
         return ResponseEntity.noContent().build();
     }
 
-    private static IdentityViewDTO toView(IdentityLink il) {
-        String providerType = il.getGitProvider() != null ? il.getGitProvider().getType().name() : "OIDC";
+    private IdentityViewDTO toView(IdentityLink il) {
+        String providerType = gitProviderRegistry.providerTypeName(il.getGitProviderId());
         return new IdentityViewDTO(
             il.getId(),
             providerType,

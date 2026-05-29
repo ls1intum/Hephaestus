@@ -70,7 +70,7 @@ public class PiEventToUiChunkTranslator {
         };
     }
 
-    // ─── session_persisted → capture verbatim Pi session JSONL into state ─────────────────
+    // session_persisted → capture verbatim Pi session JSONL into state
 
     private List<UIMessageChunk> handleSessionPersisted(JsonNode event, TranslatorState state) {
         String jsonl = optionalString(event, "jsonl");
@@ -84,7 +84,7 @@ public class PiEventToUiChunkTranslator {
         return List.of();
     }
 
-    // ─── turn_watchdog_fired → Error with user-friendly text ──────────────────────────────
+    // turn_watchdog_fired → Error with user-friendly text
 
     private List<UIMessageChunk> handleWatchdogFired(TranslatorState state) {
         // Runner emits this when the per-turn budget is exceeded; the bare type string
@@ -97,7 +97,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── message_end → no chunks, but captures the authoritative usage snapshot ───────────
+    // message_end → no chunks, but captures the authoritative usage snapshot
 
     private List<UIMessageChunk> handleMessageEnd(JsonNode event, TranslatorState state) {
         // Per pi-coding-agent dist/core/extensions/types.d.ts MessageEndEvent.message: AgentMessage.
@@ -114,7 +114,7 @@ public class PiEventToUiChunkTranslator {
         return List.of();
     }
 
-    // ─── message_start / Start + StartStep ────────────────────────────────────────────────
+    // message_start / Start + StartStep
 
     private List<UIMessageChunk> handleMessageStart(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts MessageStartEvent:
@@ -148,7 +148,7 @@ public class PiEventToUiChunkTranslator {
         return List.of(new UIMessageChunk.StartStep());
     }
 
-    // ─── message_update: text_delta + thinking_delta ──────────────────────────────────────
+    // message_update: text_delta + thinking_delta
 
     private List<UIMessageChunk> handleMessageUpdate(JsonNode event, TranslatorState state) {
         // Pi shape: {type:"message_update", message: AgentMessage, assistantMessageEvent: {...}}
@@ -278,7 +278,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── tool_execution_start / end ───────────────────────────────────────────────────────
+    // tool_execution_start / end
 
     private List<UIMessageChunk> handleToolStart(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent extensions/types.ts ToolExecutionStartEvent:
@@ -347,7 +347,7 @@ public class PiEventToUiChunkTranslator {
         return null;
     }
 
-    // ─── turn_end ─────────────────────────────────────────────────────────────────────────
+    // turn_end
 
     private List<UIMessageChunk> handleTurnEnd(TranslatorState state) {
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
@@ -371,7 +371,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── agent_end → Finish ──────────────────────────────────────────────────────────────
+    // agent_end → Finish
 
     private List<UIMessageChunk> handleAgentEnd(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts AgentEndEvent:
@@ -432,7 +432,7 @@ public class PiEventToUiChunkTranslator {
         };
     }
 
-    // ─── link_finding → DataFinding ──────────────────────────────────────────────────────
+    // link_finding → DataFinding
 
     private List<UIMessageChunk> handleLinkFinding(JsonNode event, TranslatorState state) {
         // Runner emits camelCase `findingId` (pi-mentor-runner.mjs defineLinkFindingTool).
@@ -451,7 +451,7 @@ public class PiEventToUiChunkTranslator {
         }
     }
 
-    // ─── pi_error / turn_watchdog_fired → Error ───────────────────────────────────────────
+    // pi_error / turn_watchdog_fired → Error
 
     private List<UIMessageChunk> handleError(JsonNode event, TranslatorState state) {
         String errorText = optionalString(event, "message");
@@ -468,7 +468,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── helpers ──────────────────────────────────────────────────────────────────────────
+    // helpers
 
     /**
      * Return the {@code field}'s text value, or {@code null} if absent, JSON-null, or a non-text

@@ -62,7 +62,7 @@ public record GitHubProjectStatusUpdateDTO(
         };
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubProjectStatusUpdateDTO from a GraphQL GHProjectV2StatusUpdate model.
@@ -91,7 +91,7 @@ public record GitHubProjectStatusUpdateDTO(
         );
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static Long toLong(@Nullable BigInteger value) {

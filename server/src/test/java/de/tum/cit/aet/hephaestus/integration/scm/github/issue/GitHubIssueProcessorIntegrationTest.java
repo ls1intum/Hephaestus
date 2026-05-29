@@ -195,7 +195,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         );
     }
 
-    // ==================== Critical: getDatabaseId() Fallback Tests ====================
+    // Critical: getDatabaseId() Fallback Tests
 
     @Nested
     class GetDatabaseIdFallback {
@@ -312,7 +312,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process (Create/Update) Tests ====================
+    // Process (Create/Update) Tests
 
     @Nested
     class ProcessMethodCreate {
@@ -582,7 +582,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Process (Update) Tests ====================
+    // Process (Update) Tests
 
     @Nested
     class ProcessMethodUpdate {
@@ -843,7 +843,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== State Transition Tests ====================
+    // State Transition Tests
 
     @Nested
     class StateTransitions {
@@ -973,7 +973,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Label Event Tests ====================
+    // Label Event Tests
 
     @Nested
     class LabelEvents {
@@ -1052,7 +1052,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Issue Type Tests ====================
+    // Issue Type Tests
 
     @Nested
     class IssueTypeEvents {
@@ -1129,7 +1129,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Delete Tests ====================
+    // Delete Tests
 
     @Nested
     class DeleteMethod {
@@ -1237,7 +1237,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -1435,7 +1435,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class TestIssueEventListener {

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
@@ -22,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
@@ -29,6 +31,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -70,6 +73,13 @@ public class WorkerControlClient {
     private volatile Thread outboundThread;
     private volatile Thread inboundThread;
     private volatile Thread connectionThread;
+
+    /**
+     * Handler for hub-originated {@link CancelJob} frames: {@code (jobId, reason)}. Wired by
+     * {@code WorkerConfiguration} to the job executor's local-cancel path. Kept as a callback so the
+     * transport layer stays decoupled from job execution.
+     */
+    private volatile BiConsumer<UUID, String> cancelHandler;
 
     public WorkerControlClient(
         WorkerProperties properties,
@@ -137,6 +147,14 @@ public class WorkerControlClient {
         return connected.get();
     }
 
+    /**
+     * Register the handler invoked when the hub sends a {@link CancelJob}. Idempotent; the last
+     * registration wins. {@code null} disables handling (frames are logged and dropped).
+     */
+    public void setCancelHandler(BiConsumer<UUID, String> handler) {
+        this.cancelHandler = handler;
+    }
+
     /** Sentinel {@link Instant#EPOCH} when no frame has been received yet. */
     public Instant lastInboundAt() {
         return lastInboundAt.get();
@@ -201,6 +219,7 @@ public class WorkerControlClient {
                     log.info("Hub requested reconnect: {}", r.reason());
                     forceReconnect("server-requested:" + r.reason());
                 }
+                case CancelJob c -> handleCancelJob(c);
                 // Hub never originates these — log once and ignore (protocol violation by the hub).
                 case Heartbeat h -> warnSourceMismatch(h);
                 case WorkerHello h -> warnSourceMismatch(h);
@@ -209,6 +228,22 @@ public class WorkerControlClient {
         } catch (RuntimeException e) {
             log.error("Inbound dispatch threw for {}", frame.getClass().getSimpleName(), e);
         }
+    }
+
+    private void handleCancelJob(CancelJob frame) {
+        BiConsumer<UUID, String> handler = cancelHandler;
+        if (handler == null) {
+            log.debug("CancelJob received for {} but no cancel handler is wired; ignoring", frame.jobId());
+            return;
+        }
+        UUID jobId;
+        try {
+            jobId = UUID.fromString(frame.jobId());
+        } catch (IllegalArgumentException e) {
+            log.warn("CancelJob with malformed jobId '{}'; ignoring", frame.jobId());
+            return;
+        }
+        handler.accept(jobId, frame.reason());
     }
 
     private void warnSourceMismatch(WorkerControlFrame frame) {

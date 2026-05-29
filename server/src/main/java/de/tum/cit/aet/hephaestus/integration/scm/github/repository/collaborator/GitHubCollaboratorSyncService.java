@@ -110,6 +110,7 @@ public class GitHubCollaboratorSyncService {
         try {
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
             int totalSynced = 0;
+            int collaboratorsReceived = 0;
             int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;
@@ -219,6 +220,7 @@ public class GitHubCollaboratorSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = response.getTotalCount();
                 }
+                collaboratorsReceived += response.getEdges().size();
 
                 for (GHRepositoryCollaboratorEdge edge : response.getEdges()) {
                     var graphQlUser = edge.getNode();
@@ -251,12 +253,13 @@ public class GitHubCollaboratorSyncService {
             // Mark sync as completed normally if we exhausted all pages
             syncCompletedNormally = !hasNextPage;
 
-            // Check for overflow: did we fetch fewer items than GitHub reported?
+            // Raw edges received vs collaborators.totalCount (totalSynced is post-filter).
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
+                GraphQlConnectionOverflowDetector.checkPaginated(
                     "collaborators",
-                    totalSynced,
+                    collaboratorsReceived,
                     reportedTotalCount,
+                    !syncCompletedNormally,
                     safeNameWithOwner
                 );
             }

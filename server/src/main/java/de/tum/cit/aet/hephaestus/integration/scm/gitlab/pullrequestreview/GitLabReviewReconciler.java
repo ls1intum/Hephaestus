@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * row and updates {@code submittedAt} if an earlier note is discovered.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabReviewReconciler {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabReviewReconciler.class);

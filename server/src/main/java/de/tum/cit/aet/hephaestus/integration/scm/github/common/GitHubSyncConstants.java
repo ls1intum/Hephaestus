@@ -14,18 +14,14 @@ public final class GitHubSyncConstants {
         // Utility class - prevent instantiation
     }
 
-    // ========================================================================
     // API Configuration
-    // ========================================================================
 
     /**
      * GitHub REST API base URL.
      */
     public static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
-    // ========================================================================
     // Pagination
-    // ========================================================================
 
     /**
      * Default page size for GraphQL queries (100 items per page).
@@ -76,9 +72,7 @@ public final class GitHubSyncConstants {
      */
     public static final int LARGE_PAGE_SIZE = 100;
 
-    // ========================================================================
     // Project Sync Page Sizes (Cost-Optimized)
-    // ========================================================================
     //
     // GitHub GraphQL API cost formula: cost = ceil(total_nodes_requested / 100)
     // Nested collections MULTIPLY: items(50) * fieldValues(20) = 1,000 nodes = 10 cost points
@@ -199,9 +193,7 @@ public final class GitHubSyncConstants {
     public static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
     public static final double JITTER_FACTOR = 0.5;
 
-    // ========================================================================
     // Adaptive Page Sizing
-    // ========================================================================
 
     /**
      * Remaining-points threshold below which page sizes are halved.

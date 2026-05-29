@@ -338,7 +338,7 @@ public class WorkspaceProvisioningService {
      * global default exposed via {@link WorkspaceProviderAvailability}.
      *
      * <p>The availability port exposes the same URL the wizard would show — that URL is the
-     * one configured under {@code hephaestus.gitlab.default-server-url} (the historical
+     * one configured under {@code hephaestus.integration.gitlab.default-server-url} (the historical
      * single source of truth). When availability is unset (feature flag off), throws —
      * bootstrap of a GitLab workspace cannot proceed without one.
      */
@@ -614,7 +614,7 @@ public class WorkspaceProvisioningService {
         @JsonProperty("html_url") String htmlUrl
     ) {}
 
-    // ============ DTOs for GitLab REST API ============
+    // DTOs for GitLab REST API
 
     private record GitLabTokenUserResponse(
         Long id,

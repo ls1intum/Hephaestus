@@ -110,6 +110,7 @@ public class GitHubMilestoneSyncService {
             ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             Set<Integer> syncedNumbers = new HashSet<>();
             int totalSynced = 0;
+            int milestonesReceived = 0;
             int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;
@@ -217,6 +218,7 @@ public class GitHubMilestoneSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = response.getTotalCount();
                 }
+                milestonesReceived += response.getNodes().size();
 
                 for (var graphQlMilestone : response.getNodes()) {
                     GitHubMilestoneDTO dto = convertToDTO(graphQlMilestone);
@@ -237,12 +239,13 @@ public class GitHubMilestoneSyncService {
             // Mark sync as completed normally if we exhausted all pages
             syncCompletedNormally = !hasNextPage;
 
-            // Check for overflow: did we fetch fewer items than GitHub reported?
+            // Raw nodes received vs milestones.totalCount (totalSynced is post-filter).
             if (reportedTotalCount >= 0) {
-                GraphQlConnectionOverflowDetector.check(
+                GraphQlConnectionOverflowDetector.checkPaginated(
                     "milestones",
-                    totalSynced,
+                    milestonesReceived,
                     reportedTotalCount,
+                    !syncCompletedNormally,
                     safeNameWithOwner
                 );
             }

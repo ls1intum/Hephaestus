@@ -20,7 +20,6 @@ import org.springframework.lang.Nullable;
  *   <li>Slack OAuth callback → {@link #onInstanceInstalled} (initialResources empty)
  *   <li>Slack {@code member_joined_channel} → {@link #onScopeChanged}
  *   <li>Slack {@code app_uninstalled} or {@code tokens_revoked} → {@link #onInstanceUninstalled}
- *   <li>Outline {@code collections.create} → {@link #onScopeChanged}
  * </ul>
  */
 public interface IntegrationLifecycleListener {

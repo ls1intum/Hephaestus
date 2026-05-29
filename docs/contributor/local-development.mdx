@@ -14,7 +14,7 @@ Install and configure the following tools before you attempt a local build:
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker Desktop** – Used for PostgreSQL and NATS containers.
 3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
-4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
+4. **NATS CLI (optional)** – Helpful when inspecting the agent job stream (NATS is disabled by default locally).
 
 ## Recommended IDE setup
 
@@ -32,7 +32,7 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 ### Maven profiles and local configuration
 
-We ship three Maven profiles: `local` (default), `prod`, and `spec`. For development stick to the `local` profile.
+We ship three Maven profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
 
 Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
@@ -40,16 +40,27 @@ Create `server/src/main/resources/application-local.yml` to override defaults. T
 Never commit `application-local.yml`. It may contain secrets and machine-specific configuration.
 :::
 
-### Running the server
+### Running the stack
 
 1. Start Docker Desktop.
-2. From `server`, run:
+2. From the repo root, start everything with one command:
 
    ```bash
-   ./mvnw spring-boot:run
+   pnpm dev
    ```
 
-3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
+   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL and Keycloak containers are brought up automatically.
+
+   Prefer plain terminals? Run the two sides yourself:
+
+   ```bash
+   pnpm dev:server   # terminal 1 — brings up Postgres/Keycloak, then Spring Boot
+   pnpm dev:webapp   # terminal 2 — Vite dev server
+   ```
+
+3. Access the API at `http://localhost:8080` (Swagger UI at `http://localhost:8080/swagger-ui/index.html`) and the webapp at `http://localhost:4200`.
+
+To wipe the local database (e.g. after a bad migration or sync), run `pnpm dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
 
 ### Port overrides
 
@@ -189,15 +200,16 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
 When using GitHub App mode, your app might have access to hundreds of repositories. Use filters to focus on specific orgs/repos during development:
 
 ```yaml
-monitoring:
-  filters:
-    allowed-organizations:
-      - ls1intum
-      - HephaestusTest
-    allowed-repositories:
-      - ls1intum/Hephaestus
-      - ls1intum/Artemis
-      - HephaestusTest/demo-repository
+hephaestus:
+  sync:
+    filters:
+      allowed-organizations:
+        - ls1intum
+        - HephaestusTest
+      allowed-repositories:
+        - ls1intum/Hephaestus
+        - ls1intum/Artemis
+        - HephaestusTest/demo-repository
 ```
 
 Empty lists = no filtering (production behavior). Non-empty = only sync matching items.
@@ -243,7 +255,7 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `admin
 The webhook receiver lives in the Java server (`integration.core.webhook` package). In local
 development the monolith default boots all three runtime roles (`server`, `worker`, `webhook`),
 so `pnpm run dev:server` exposes the unified `/webhooks/{kind}` endpoint (kinds: `github`,
-`gitlab`, `slack`, `outline`) alongside the rest of the API.
+`gitlab`, `slack`) alongside the rest of the API.
 
 In production the receiver is deployed as a separate `webhook-server` container from the same
 image, activated with `SPRING_PROFILES_ACTIVE=prod,webhook`. The app-server's deploy cycle does

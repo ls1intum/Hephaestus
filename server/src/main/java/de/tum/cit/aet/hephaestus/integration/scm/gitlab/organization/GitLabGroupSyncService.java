@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  * pages and adjusting page size when the budget is low.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabGroupSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabGroupSyncService.class);
@@ -80,7 +80,7 @@ public class GitLabGroupSyncService {
 
     /**
      * Resolves the GitLab provider entity from the database for {@code serverUrl}.
-     * Falls back to the configured default ({@code hephaestus.gitlab.default-server-url})
+     * Falls back to the configured default ({@code hephaestus.integration.gitlab.default-server-url})
      * only when the caller has no per-workspace URL to pass — that fallback path stamps
      * gitlab.com on rows that may actually live elsewhere (silent cross-instance data
      * corruption observed live on 2026-05-25 against gitlab.lrz.de), so always prefer

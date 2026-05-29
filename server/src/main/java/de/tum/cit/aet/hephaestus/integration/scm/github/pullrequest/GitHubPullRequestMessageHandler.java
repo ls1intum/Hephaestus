@@ -53,7 +53,7 @@ public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageH
             return;
         }
 
-        log.info(
+        log.debug(
             "Received pull_request event: action={}, prNumber={}, repoName={}",
             event.action(),
             prDto.number(),

@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
@@ -49,12 +50,14 @@ public class GitHubProjectStatusUpdateMessageHandler
     private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
     private final ScopeIdResolver scopeIdResolver;
     private final GitProviderRepository gitProviderRepository;
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     GitHubProjectStatusUpdateMessageHandler(
         ProjectRepository projectRepository,
         GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
         ScopeIdResolver scopeIdResolver,
         GitProviderRepository gitProviderRepository,
+        SyncSchedulerProperties syncSchedulerProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -69,6 +72,15 @@ public class GitHubProjectStatusUpdateMessageHandler
         this.statusUpdateProcessor = statusUpdateProcessor;
         this.scopeIdResolver = scopeIdResolver;
         this.gitProviderRepository = gitProviderRepository;
+        this.syncSchedulerProperties = syncSchedulerProperties;
+    }
+
+    /**
+     * Projects V2 status-update webhook events are skipped when {@code hephaestus.sync.projects.enabled=false}.
+     */
+    @Override
+    public boolean isEnabled() {
+        return syncSchedulerProperties.projects().enabled();
     }
 
     @Override
@@ -93,7 +105,7 @@ public class GitHubProjectStatusUpdateMessageHandler
         Project.OwnerType ownerType = event.detectOwnerType();
         String ownerIdentifier = event.getOwnerIdentifier();
 
-        log.info(
+        log.debug(
             "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}, owner={}",
             event.action(),
             payload.nodeId() != null ? sanitizeForLog(payload.nodeId()) : "unknown",

@@ -166,7 +166,7 @@ public class PullRequest extends Issue {
         return true;
     }
 
-    // ==================== Bidirectional Relationship Helpers ====================
+    // Bidirectional Relationship Helpers
 
     /**
      * Adds a review to this pull request and maintains bidirectional consistency.

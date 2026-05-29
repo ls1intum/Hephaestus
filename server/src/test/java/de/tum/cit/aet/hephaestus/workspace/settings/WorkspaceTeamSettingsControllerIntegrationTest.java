@@ -95,9 +95,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         label = createLabel("feature", "0366d6", repository);
     }
 
-    // ========================================================================
     // Team Visibility Settings Tests
-    // ========================================================================
 
     @Nested
     class TeamVisibilitySettingsTests {
@@ -207,9 +205,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    // ========================================================================
     // Repository Visibility Settings Tests
-    // ========================================================================
 
     @Nested
     class RepositoryVisibilitySettingsTests {
@@ -349,9 +345,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    // ========================================================================
     // Label Filter Settings Tests
-    // ========================================================================
 
     @Nested
     class LabelFilterSettingsTests {
@@ -585,9 +579,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    // ========================================================================
     // XP Filtering Integration Tests
-    // ========================================================================
 
     @Nested
     class XpFilteringIntegrationTests {
@@ -701,9 +693,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    // ========================================================================
     // Test Helper Methods
-    // ========================================================================
 
     /**
      * Creates and persists a team entity for testing.

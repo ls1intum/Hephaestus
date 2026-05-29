@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHand
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
-import de.tum.cit.aet.hephaestus.integration.outline.webhook.OutlineSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.webhook.GithubSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackSubjectParser;
@@ -26,8 +25,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     private static final List<SubjectParser> ALL_PARSERS = List.of(
         new GithubSubjectParser(),
         new GitlabSubjectParser(),
-        new SlackSubjectParser(),
-        new OutlineSubjectParser()
+        new SlackSubjectParser()
     );
 
     @Test
@@ -58,16 +56,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
         );
 
         assertThat(dispatcher.dispatch("gitlab.acme~group.project.push")).isEmpty();
-    }
-
-    @Test
-    void outlineSubjectWithoutHandlerReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
-
-        assertThat(dispatcher.dispatch("outline.workspace.collection.document.publish")).isEmpty();
     }
 
     @Test
@@ -113,6 +101,23 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     }
 
     @Test
+    void dispatchSkipsHandlerThatDeclaresItselfDisabled() {
+        // A handler whose feature flag is off reports isEnabled()=false; the dispatcher must
+        // treat it as no handler so the consumer ACKs and skips (e.g. project/discussion sync
+        // disabled). Mirrors the pre-#1198 GitHubMessageHandlerRegistry getHandler->null gate.
+        RecordingHandler disabled = new RecordingHandler(
+            new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"),
+            false
+        );
+        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
+            new IntegrationMessageHandlerRegistry(List.of(disabled)),
+            ALL_PARSERS
+        );
+
+        assertThat(dispatcher.dispatch("github.acme.foo.issues")).isEmpty();
+    }
+
+    @Test
     void duplicateSubjectParserForSameKindFailsAtConstruction() {
         SubjectParser first = new GithubSubjectParser();
         SubjectParser second = new GithubSubjectParser();
@@ -142,10 +147,15 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     private static class RecordingHandler implements IntegrationMessageHandler {
 
         private final EventTypeKey key;
-        private final java.util.List<Message> received = new java.util.ArrayList<>();
+        private final boolean enabled;
 
         RecordingHandler(EventTypeKey key) {
+            this(key, true);
+        }
+
+        RecordingHandler(EventTypeKey key, boolean enabled) {
             this.key = key;
+            this.enabled = enabled;
         }
 
         @Override
@@ -154,8 +164,13 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
         }
 
         @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        @Override
         public void onMessage(Message msg) {
-            received.add(msg);
+            // No-op: these tests assert on dispatch resolution, not message handling.
         }
     }
 }

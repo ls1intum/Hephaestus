@@ -26,7 +26,7 @@ public class GitHubProjectBackfillStateProvider {
         this.projectRepository = projectRepository;
     }
 
-    // ── Item sync ──
+    // Item sync
 
     @Transactional
     public void updateProjectItemSyncCursor(Long projectId, String cursor) {
@@ -59,7 +59,7 @@ public class GitHubProjectBackfillStateProvider {
         return projectRepository.findById(projectId).map(Project::getItemsSyncedAt);
     }
 
-    // ── Field sync ──
+    // Field sync
 
     @Transactional
     public void updateProjectFieldSyncCursor(Long projectId, String cursor) {
@@ -92,7 +92,7 @@ public class GitHubProjectBackfillStateProvider {
         return projectRepository.findById(projectId).map(Project::getFieldsSyncedAt);
     }
 
-    // ── Status update sync ──
+    // Status update sync
 
     @Transactional
     public void updateProjectStatusUpdateSyncCursor(Long projectId, String cursor) {

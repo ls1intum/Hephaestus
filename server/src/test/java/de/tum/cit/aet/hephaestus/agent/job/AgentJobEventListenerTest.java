@@ -4,7 +4,6 @@ import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.T
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,7 +69,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // Helpers
 
     private ScmEventPayload.PullRequestData createPrData(Issue.State state, boolean isDraft, boolean isMerged) {
         return new ScmEventPayload.PullRequestData(
@@ -113,17 +112,17 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     /**
-     * Creates a mock PullRequest with lenient stubs — not all fields are accessed
-     * depending on the code path (e.g., closed PR skips branch info checks).
+     * Creates a real PullRequest with the fields the listener reads set — not all fields
+     * are accessed depending on the code path (e.g., closed PR skips branch info checks).
      */
     private PullRequest mockPullRequest(String headRefOid, String headRefName, String baseRefName) {
-        PullRequest pr = mock(PullRequest.class);
-        lenient().when(pr.getId()).thenReturn(PR_ID);
-        lenient().when(pr.getHeadRefOid()).thenReturn(headRefOid);
-        lenient().when(pr.getHeadRefName()).thenReturn(headRefName);
-        lenient().when(pr.getBaseRefName()).thenReturn(baseRefName);
-        lenient().when(pr.getState()).thenReturn(Issue.State.OPEN);
-        lenient().when(pr.isMerged()).thenReturn(false);
+        PullRequest pr = new PullRequest();
+        pr.setId(PR_ID);
+        pr.setHeadRefOid(headRefOid);
+        pr.setHeadRefName(headRefName);
+        pr.setBaseRefName(baseRefName);
+        pr.setState(Issue.State.OPEN);
+        pr.setMerged(false);
         return pr;
     }
 
@@ -155,7 +154,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         return pr;
     }
 
-    // ── Test Groups ─────────────────────────────────────────────────────────
+    // Test Groups
 
     @Nested
     class FilteringTests {
@@ -476,10 +475,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             repo.setId(100L);
             repo.setNameWithOwner("owner/repo");
             repo.setDefaultBranch("main");
-            when(pr.getRepository()).thenReturn(repo);
-            when(pr.getNumber()).thenReturn(PR_NUMBER);
-            when(pr.getTitle()).thenReturn("Test PR");
-            when(pr.getHtmlUrl()).thenReturn("https://github.com/owner/repo/pull/42");
+            pr.setRepository(repo);
+            pr.setNumber(PR_NUMBER);
+            pr.setTitle("Test PR");
+            pr.setHtmlUrl("https://github.com/owner/repo/pull/42");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             Workspace workspace = new Workspace();
@@ -526,8 +525,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var reviewData = createReviewData();
             var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
-            PullRequest pr = mock(PullRequest.class);
-            when(pr.getState()).thenReturn(Issue.State.CLOSED);
+            PullRequest pr = new PullRequest();
+            pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             listener.onReviewSubmitted(event);
@@ -541,10 +540,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var reviewData = createReviewData();
             var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
-            PullRequest pr = mock(PullRequest.class);
-            when(pr.getState()).thenReturn(Issue.State.MERGED);
-            // Lenient: isMerged() may not be reached when getState() == MERGED short-circuits the || chain
-            lenient().when(pr.isMerged()).thenReturn(true);
+            PullRequest pr = new PullRequest();
+            pr.setState(Issue.State.MERGED);
+            pr.setMerged(true);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             listener.onReviewSubmitted(event);
@@ -558,9 +556,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             var reviewData = createReviewData();
             var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
-            PullRequest pr = mock(PullRequest.class);
-            when(pr.getState()).thenReturn(Issue.State.OPEN);
-            when(pr.isMerged()).thenReturn(true);
+            PullRequest pr = new PullRequest();
+            pr.setState(Issue.State.OPEN);
+            pr.setMerged(true);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             listener.onReviewSubmitted(event);
@@ -609,10 +607,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             repo.setId(100L);
             repo.setNameWithOwner("owner/repo");
             repo.setDefaultBranch("main");
-            when(pr.getRepository()).thenReturn(repo);
-            when(pr.getNumber()).thenReturn(PR_NUMBER);
-            when(pr.getTitle()).thenReturn("Test PR");
-            when(pr.getHtmlUrl()).thenReturn("https://github.com/owner/repo/pull/42");
+            pr.setRepository(repo);
+            pr.setNumber(PR_NUMBER);
+            pr.setTitle("Test PR");
+            pr.setHtmlUrl("https://github.com/owner/repo/pull/42");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             Workspace workspace = new Workspace();
@@ -686,21 +684,20 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         /**
-         * Creates a mock PR for collaboration tests. Uses lenient stubs because the real gate
-         * accesses different fields depending on which gate step short-circuits.
+         * Creates a real PR for collaboration tests with the fields the gate reads set.
          */
         private PullRequest setupCollaborationPR() {
-            PullRequest pr = mock(PullRequest.class);
-            lenient().when(pr.getId()).thenReturn(PR_ID);
-            lenient().when(pr.getHeadRefOid()).thenReturn("abc123");
-            lenient().when(pr.getHeadRefName()).thenReturn("feature/test");
-            lenient().when(pr.getBaseRefName()).thenReturn("main");
-            lenient().when(pr.getState()).thenReturn(Issue.State.OPEN);
-            lenient().when(pr.isDraft()).thenReturn(false);
+            PullRequest pr = new PullRequest();
+            pr.setId(PR_ID);
+            pr.setHeadRefOid("abc123");
+            pr.setHeadRefName("feature/test");
+            pr.setBaseRefName("main");
+            pr.setState(Issue.State.OPEN);
+            pr.setDraft(false);
 
             Repository repo = new Repository();
             repo.setNameWithOwner("owner/repo");
-            lenient().when(pr.getRepository()).thenReturn(repo);
+            pr.setRepository(repo);
 
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
             return pr;

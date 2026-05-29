@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -55,6 +56,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
@@ -135,7 +137,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
-            interactiveSandboxService,
+            sandboxServiceProvider(interactiveSandboxService),
             translator,
             turnLock,
             persistence,
@@ -195,9 +197,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         sandbox.close(Duration.ZERO);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // 1. Happy path: chunks in order + assistant persisted via finalise
-    // ════════════════════════════════════════════════════════════════════════
 
     @Test
     void runTurn_happyPath_emitsStartThenChunksThenFinish() throws Exception {
@@ -234,9 +234,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // 2. Client disconnect: runner draining, abort sent, finalise still runs
-    // ════════════════════════════════════════════════════════════════════════
 
     @Test
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
@@ -288,9 +286,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.CLIENT_DISCONNECT);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // 3. Runner poisoned (-32002): sandbox evicted, lock released, row interrupted
-    // ════════════════════════════════════════════════════════════════════════
 
     @Test
     void runTurn_runnerPoisoned_evictsSandbox() throws Exception {
@@ -308,9 +304,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.POISONED);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // 4. In-flight conflict from persistence → 409 chunk; no runner activity
-    // ════════════════════════════════════════════════════════════════════════
 
     @Test
     @DisplayName("in-flight conflict: persistence throws; conflict chunk sent; sandbox never attached")
@@ -358,9 +352,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(otherOutcomes).as("no other outcome counter bumped").isZero();
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // 5. JVM-lock conflict (LOCAL backstop) — distinct outcome from DB conflict
-    // ════════════════════════════════════════════════════════════════════════
 
     @Test
     @DisplayName("in-flight conflict (LOCAL): JVM lock already held; persistence never invoked")
@@ -398,9 +390,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertOutcomeRecorded(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // Helpers
-    // ════════════════════════════════════════════════════════════════════════
 
     /** Run a turn on the same thread as the test (deterministic) and block until the emitter completes. */
     private void runTurnSync() {
@@ -408,6 +398,31 @@ class MentorChatServiceTest extends BaseUnitTest {
     }
 
     /** Direct (synchronous) ExecutorService — the test thread runs every task before returning. */
+    /** Minimal {@link ObjectProvider} that always yields the supplied sandbox-service mock. */
+    private static ObjectProvider<InteractiveSandboxService> sandboxServiceProvider(InteractiveSandboxService svc) {
+        return new ObjectProvider<>() {
+            @Override
+            public InteractiveSandboxService getObject() {
+                return svc;
+            }
+
+            @Override
+            public InteractiveSandboxService getObject(Object... args) {
+                return svc;
+            }
+
+            @Override
+            public InteractiveSandboxService getIfAvailable() {
+                return svc;
+            }
+
+            @Override
+            public InteractiveSandboxService getIfUnique() {
+                return svc;
+            }
+        };
+    }
+
     private static ExecutorService directExecutor() {
         return new java.util.concurrent.AbstractExecutorService() {
             @Override
@@ -567,9 +582,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         throw new NoSuchFieldException(name + " on " + target.getClass());
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // Recording SseEmitter — captures every chunk for assertion
-    // ════════════════════════════════════════════════════════════════════════
 
     static final class RecordingEmitter extends SseEmitter {
 
@@ -624,9 +637,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // Fake AttachedSandbox — buffers sent frames, dispatches pushed frames to all listeners
-    // ════════════════════════════════════════════════════════════════════════
 
     static final class FakeSandbox implements AttachedSandbox {
 
@@ -639,18 +650,8 @@ class MentorChatServiceTest extends BaseUnitTest {
         volatile Consumer<JsonNode> onSend = f -> {};
 
         @Override
-        public UUID sessionId() {
-            return sessionId;
-        }
-
-        @Override
-        public String userId() {
-            return Long.toString(USER_ID);
-        }
-
-        @Override
-        public String workspaceId() {
-            return Long.toString(WORKSPACE_ID);
+        public SandboxIdentity identity() {
+            return new SandboxIdentity(sessionId, Long.toString(USER_ID), Long.toString(WORKSPACE_ID));
         }
 
         @Override

@@ -159,9 +159,7 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         org.springframework.data.domain.Pageable pageable
     );
 
-    // ════════════════════════════════════════════════════════════════════════
     // Findings aspect — reviews received in window
-    // ════════════════════════════════════════════════════════════════════════
 
     /**
      * Earliest USER-role message per thread for a batch of thread ids. One round trip instead of

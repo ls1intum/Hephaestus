@@ -194,9 +194,7 @@ public final class ScopeConsumer {
         return currentSubjects.clone();
     }
 
-    // -------------------------------------------------------------------------
     // Internals
-    // -------------------------------------------------------------------------
 
     private void enqueueMessage(Message msg) {
         if (!running.get()) {

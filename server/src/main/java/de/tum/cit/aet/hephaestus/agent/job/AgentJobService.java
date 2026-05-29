@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -52,6 +53,7 @@ public class AgentJobService {
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
     private final @Nullable SandboxManager sandboxManager;
+    private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
 
     public AgentJobService(
         AgentJobRepository agentJobRepository,
@@ -63,7 +65,8 @@ public class AgentJobService {
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
-        @Nullable SandboxManager sandboxManager
+        @Nullable SandboxManager sandboxManager,
+        Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher
     ) {
         this.agentJobRepository = agentJobRepository;
         this.agentConfigRepository = agentConfigRepository;
@@ -75,9 +78,10 @@ public class AgentJobService {
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
         this.sandboxManager = sandboxManager;
+        this.workerJobCancelDispatcher = workerJobCancelDispatcher;
     }
 
-    // ── Read operations ──
+    // Read operations
 
     @Transactional(readOnly = true)
     public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Long configId, Pageable pageable) {
@@ -100,7 +104,7 @@ public class AgentJobService {
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
-    // ── Submit ──
+    // Submit
 
     /**
      * Lookup a PR by ID, build a review submission request, and submit a job.
@@ -273,7 +277,7 @@ public class AgentJobService {
         });
     }
 
-    // ── Retry delivery ──
+    // Retry delivery
 
     /**
      * Retry delivery for a completed agent job whose delivery failed or was never attempted.
@@ -339,7 +343,7 @@ public class AgentJobService {
         );
     }
 
-    // ── Cancel ──
+    // Cancel
 
     /**
      * Cancel an agent job.
@@ -408,8 +412,16 @@ public class AgentJobService {
             }
         }
 
-        // Best-effort inline sandbox cancel when worker is co-located. When worker runs in a
-        // separate JVM, SandboxManager is null and reconciler/zombie-sweeper backstops apply.
+        // Reload to read worker_id (set at claim) for cancel routing.
+        AgentJob fresh = agentJobRepository
+            .findByIdAndWorkspaceId(jobId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+
+        // Split deployment: ask the owning worker to stop its container over the WSS channel (#1138).
+        // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
+        workerJobCancelDispatcher.ifPresent(d -> d.dispatch(fresh.getWorkerId(), jobId, "user-cancel"));
+
+        // Monolith / co-located worker: stop the container in-process.
         if (sandboxManager != null) {
             try {
                 sandboxManager.cancel(jobId);
@@ -418,13 +430,10 @@ public class AgentJobService {
             }
         }
 
-        // Reload to return fresh state
-        return agentJobRepository
-            .findByIdAndWorkspaceId(jobId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+        return fresh;
     }
 
-    // ── Cooldown helpers ──
+    // Cooldown helpers
 
     /**
      * Extract the PR-scoped prefix from an idempotency key by stripping the commit-SHA segment.

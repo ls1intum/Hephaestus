@@ -5,12 +5,10 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
-import de.tum.cit.aet.hephaestus.core.auth.oauth.LoginClientRegistrationRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
+import de.tum.cit.aet.hephaestus.core.auth.spi.OAuthLoginDefaultsProvider;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import java.time.Clock;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -64,10 +62,12 @@ public class AuthSecurityConfig {
     private static final String REDIRECT_URI_TEMPLATE = "{baseUrl}/login/oauth2/code/{registrationId}";
 
     /**
-     * Composite registration repository: env-configured defaults (github, gitlab-lrz)
-     * overlaid with workspace-scoped OIDC login Connections (family IDENTITY). Replaces
-     * Spring Boot's auto-configured InMemoryClientRegistrationRepository (which backs off
-     * once this bean is present).
+     * Env-configured default OAuth login providers (github, gitlab-lrz), exposed as the
+     * {@link OAuthLoginDefaultsProvider} port. The {@code integration} module's composite
+     * {@code ClientRegistrationRepository} consumes this and overlays the workspace-scoped
+     * OIDC-login Connections (family IDENTITY) — keeping the secret-bearing Connection access
+     * out of {@code core.auth} and the bounded-context dependency direction correct
+     * ({@code integration → core}, never the reverse).
      *
      * <p>Default providers are built from {@link AuthProperties} rather than
      * {@code spring.security.oauth2.client.*} so that a provider with no configured client id
@@ -75,11 +75,7 @@ public class AuthSecurityConfig {
      * reject the empty client id and abort the context (breaking CI, specs and worker pods).
      */
     @Bean
-    public LoginClientRegistrationRepository clientRegistrationRepository(
-        AuthProperties authProperties,
-        ConnectionRepository connectionRepository,
-        CredentialBundleConverter credentialConverter
-    ) {
+    public OAuthLoginDefaultsProvider oauthLoginDefaultsProvider(AuthProperties authProperties) {
         List<ClientRegistration> registrations = new ArrayList<>();
         if (authProperties.github().configured()) {
             registrations.add(buildGithubRegistration(authProperties.github()));
@@ -93,7 +89,7 @@ public class AuthSecurityConfig {
                 "and/or hephaestus.auth.gitlab-lrz.client-id. Workspace-scoped OIDC Connections may still apply."
             );
         }
-        return new LoginClientRegistrationRepository(registrations, connectionRepository, credentialConverter);
+        return () -> List.copyOf(registrations);
     }
 
     private static ClientRegistration buildGithubRegistration(AuthProperties.GithubLogin github) {

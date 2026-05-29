@@ -22,7 +22,6 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 /**
@@ -53,7 +52,8 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     @Test
     void patConnection_decryptsToken() {
         long workspaceId = 17L;
-        Workspace ws = Mockito.mock(Workspace.class);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         Connection connection = new Connection(
             ws,
             IntegrationKind.GITHUB,
@@ -74,7 +74,7 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     @Test
     void appConnection_surfacesInstallationCredentialBundle() {
         long workspaceId = 17L;
-        Workspace ws = Mockito.mock(Workspace.class);
+        Workspace ws = new Workspace();
         Connection connection = new Connection(
             ws,
             IntegrationKind.GITHUB,
@@ -98,7 +98,7 @@ class GithubCredentialProviderTest extends BaseUnitTest {
     @Test
     void patConnection_noBlob_returnsEmpty() {
         long workspaceId = 17L;
-        Workspace ws = Mockito.mock(Workspace.class);
+        Workspace ws = new Workspace();
         Connection connection = new Connection(
             ws,
             IntegrationKind.GITHUB,

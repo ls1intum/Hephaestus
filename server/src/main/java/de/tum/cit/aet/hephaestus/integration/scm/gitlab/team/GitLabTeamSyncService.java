@@ -70,7 +70,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * </ol>
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabTeamSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabTeamSyncService.class);
@@ -279,9 +279,7 @@ public class GitLabTeamSyncService {
         return totalSynced;
     }
 
-    // ========================================================================
     // Phase A.0: Fetch Root Group
-    // ========================================================================
 
     /**
      * Fetches the root group metadata and upserts it as a Team so subgroups have
@@ -343,9 +341,7 @@ public class GitLabTeamSyncService {
         return rootTeam;
     }
 
-    // ========================================================================
     // Phase A: Fetch Descendant Groups
-    // ========================================================================
 
     private boolean fetchAndProcessDescendantGroups(
         HttpGraphQlClient client,
@@ -461,9 +457,7 @@ public class GitLabTeamSyncService {
         return true;
     }
 
-    // ========================================================================
     // Phase B: Resolve Parent References
-    // ========================================================================
 
     void resolveParentReferences(
         Map<Long, Team> syncedTeamsByNativeId,
@@ -509,9 +503,7 @@ public class GitLabTeamSyncService {
         });
     }
 
-    // ========================================================================
     // Phase C: Sync Members
-    // ========================================================================
 
     int syncTeamMembers(HttpGraphQlClient client, Long scopeId, Long teamId, String groupFullPath, Long providerId) {
         // Phase C.1: Fetch all members via GraphQL OUTSIDE a transaction
@@ -720,9 +712,7 @@ public class GitLabTeamSyncService {
         }
     }
 
-    // ========================================================================
     // Phase D: Sync Team-Repo Permissions
-    // ========================================================================
 
     int syncTeamRepoPermissions(Long teamId, String groupFullPath, Long providerId) {
         Integer result = transactionTemplate.execute(status -> {
@@ -772,9 +762,7 @@ public class GitLabTeamSyncService {
         return result != null ? result : 0;
     }
 
-    // ========================================================================
     // Phase F: Add project collaborators as team members
-    // ========================================================================
 
     /**
      * Adds project-level collaborators (WRITE/TRIAGE) as members of their parent subgroup team.
@@ -834,9 +822,7 @@ public class GitLabTeamSyncService {
         return result != null ? result : 0;
     }
 
-    // ========================================================================
     // Phase E: Cleanup
-    // ========================================================================
 
     private void removeDeletedTeams(String groupFullPath, Set<Long> syncedNativeIds, Long providerId) {
         transactionTemplate.executeWithoutResult(status -> {
@@ -861,9 +847,7 @@ public class GitLabTeamSyncService {
         });
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private GitProvider resolveProvider() {
         return gitProviderRepository

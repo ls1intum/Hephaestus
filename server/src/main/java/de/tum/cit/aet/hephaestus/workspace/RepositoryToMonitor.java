@@ -44,9 +44,7 @@ public class RepositoryToMonitor {
     // The time up to which discussions have been synced in the recent sync
     private Instant discussionsSyncedAt;
 
-    // ========================================================================
     // Issue Backfill Tracking
-    // ========================================================================
 
     /**
      * The highest issue number discovered in the repository for backfill tracking.
@@ -61,9 +59,7 @@ public class RepositoryToMonitor {
      */
     private Integer issueBackfillCheckpoint;
 
-    // ========================================================================
     // Pull Request Backfill Tracking
-    // ========================================================================
 
     /**
      * The highest pull request number discovered in the repository for backfill tracking.
@@ -106,9 +102,7 @@ public class RepositoryToMonitor {
     @ToString.Exclude
     private Workspace workspace;
 
-    // ========================================================================
     // Backfill Status Helper Methods
-    // ========================================================================
 
     /**
      * Checks if issue backfill has been initialized (high water mark set).

@@ -105,7 +105,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        log.info(
+        log.debug(
             "Received push event: branch={}, commitCount={}, forced={}, repoName={}",
             getBranchName(event.ref()),
             event.commits().size(),
@@ -361,7 +361,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         return true;
     }
 
-    // ========== Domain Event Publishing ==========
+    // Domain Event Publishing
 
     /**
      * Publishes a {@link ScmDomainEvent.CommitCreated} event for a newly persisted commit.
@@ -423,7 +423,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
     }
 
-    // ========== Utility Methods ==========
+    // Utility Methods
 
     private String getBranchName(String ref) {
         if (ref == null) return "unknown";

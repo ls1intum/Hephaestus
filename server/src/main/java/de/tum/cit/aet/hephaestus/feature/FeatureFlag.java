@@ -28,7 +28,7 @@ public enum FeatureFlag {
     RUN_PRACTICE_REVIEW(Kind.ROLE, "run_practice_review"),
     ADMIN(Kind.ROLE, "admin"),
 
-    // ── Operational/development flags (Spring Boot config) ──────────────
+    // Operational/development flags (Spring Boot config)
     PRACTICE_REVIEW_FOR_ALL(Kind.CONFIG, "practice-review-for-all"),
     GITLAB_WORKSPACE_CREATION(Kind.CONFIG, "gitlab-workspace-creation");
 

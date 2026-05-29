@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  * All services are conditionally available (null when not configured).
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabSyncServiceHolder {
 
     private final GitLabGroupSyncService groupSyncService;

@@ -107,7 +107,7 @@ public record GitHubPullRequestDTO(
         return databaseId != null ? databaseId : id;
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubPullRequestDTO from a GraphQL GHPullRequest model.
@@ -222,7 +222,7 @@ public record GitHubPullRequestDTO(
         );
     }
 
-    // ========== CONVERSION HELPERS ==========
+    // CONVERSION HELPERS
 
     @Nullable
     private static ReviewDecision convertReviewDecision(@Nullable GHPullRequestReviewDecision decision) {

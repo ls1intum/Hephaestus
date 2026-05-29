@@ -22,7 +22,7 @@ import org.hibernate.annotations.CreationTimestamp;
  * <p>Powers edit-in-place: when re-running practice review against the same subject,
  * the agent layer looks up existing posts via {@link FeedbackPostService} and edits
  * them rather than posting duplicates. Works uniformly across GitHub PR comments,
- * GitLab MR notes, Slack {@code chat.update}, and Outline {@code comments.update}.
+ * GitLab MR notes, and Slack {@code chat.update}.
  */
 @Entity
 @Table(

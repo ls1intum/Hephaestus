@@ -5,9 +5,6 @@ spring:
             lifecycle-management: none
             skip:
                 in-tests: true
-    mail:
-        host: localhost
-        port: 25
     liquibase:
         enabled: false
     datasource:
@@ -21,16 +18,6 @@ spring:
         properties:
             hibernate:
                 dialect: org.hibernate.dialect.H2Dialect
-
-monitoring:
-    run-on-startup: false
-
-github:
-    app:
-        id: 0
-        privateKey: ""
-        privateKeyLocation: ""
-    auth-token: ""
 
 hephaestus:
     # OpenAPI generation boots the full Spring context; HmacOAuthStateService fails fast
@@ -57,5 +44,3 @@ hephaestus:
         nats:
             enabled: false
             server: "nats://localhost:4222"
-    mentor:
-        enabled: false

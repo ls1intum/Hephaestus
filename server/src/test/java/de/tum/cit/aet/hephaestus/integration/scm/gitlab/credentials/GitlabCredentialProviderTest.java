@@ -25,7 +25,7 @@ import org.mockito.MockitoAnnotations;
 /**
  * Decryption smoke test for the GitLab provider — proves the converter wiring works
  * end-to-end. Connection lookup branches (missing / non-ACTIVE / missing blob → empty)
- * are covered transitively by the parallel Slack/Outline/GitHub tests + the converter's
+ * are covered transitively by the parallel Slack/GitHub tests + the converter's
  * own contract tests; we only re-verify the happy-path decode here to keep the suite
  * compact.
  */
@@ -76,8 +76,8 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
     }
 
     private static Connection newGitlabConnection(long workspaceId) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         return new Connection(
             ws,
             IntegrationKind.GITLAB,

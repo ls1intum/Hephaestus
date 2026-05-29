@@ -2,17 +2,16 @@
 
 **Status:** Accepted
 **Date:** 2026-05-27
-**Authors:** Principal-engineer cleanup pass on #1198 (PE-DB + PE-IDM)
 **Supersedes:** [ADR 0011](0011-integration-identity-not-wired-from-sync.md)
 
 ## Context
 
 ADR 0011 introduced a "three-layer identity model" — `integration.registry.Connection` (Layer 1), `integration.identity.HephaestusUser` (Layer 2), `integration.identity.IntegrationIdentity` (Layer 3) — and immediately admitted that the Layer 2 / Layer 3 wiring never landed: neither sync path nor any OAuth callback populated `integration_identity`, both tables stayed at row-count zero in every environment, and the only consumer of the table (the pre-workspace install-bind surface) was itself deleted when AC#6 was dropped from #1198 on 2026-05-26.
 
-A combined principal-engineer audit (PE-DB + PE-IDM) on 2026-05-27 confirmed the consequences:
+A review of the shipped state confirmed the consequences:
 
 - `HephaestusUser`, `IntegrationIdentity`, `IntegrationIdentityRepository`, `HephaestusUserRepository`, `UserDirectory`, and `JpaUserDirectory` have **zero callers** across `server/src`. The Javadoc on `HephaestusUser` references a phantom `IdentityLinkingService` that does not exist.
-- The actual authorization join key is `preferred_username → User.login` (`WorkspaceContextFilter:157`, `SecurityUtils.getCurrentUserLogin`). Keycloak `sub` — the stable IdP-side identifier — is never persisted server-side. A user rename in Keycloak silently breaks authorization.
+- The actual authorization join key is `preferred_username → User.login` (`WorkspaceContextFilter`, `SecurityUtils.getCurrentUserLogin`). Keycloak `sub` — the stable IdP-side identifier — is never persisted server-side. A user rename in Keycloak silently breaks authorization.
 - The Liquibase changeset for `hephaestus_user` + `integration_identity` is in an unmerged branch (#1198), so endorsed Liquibase guidance is to remove the create steps rather than ship "create then drop" history.
 
 Shipping infrastructure that does not run is a tax on every future reader. The audit recommended deletion plus a corrective seed for the model we actually need.
@@ -34,9 +33,9 @@ Shipping infrastructure that does not run is a tax on every future reader. The a
 
 **Option 1**, executed in two stages:
 
-- **Stage A (this PR — `principal-engineer-production-challenge` head):**
+- **Stage A (this PR):**
   - Delete `HephaestusUser`, `HephaestusUserRepository`, `IntegrationIdentity`, `IntegrationIdentityRepository`, `UserDirectory`, `JpaUserDirectory` and the now-empty `integration.identity` package.
-  - Remove the `hephaestus_user` + `integration_identity` table creates from the unmerged `1779790459343_unified_integration_framework.xml` changelog (endorsed Liquibase practice for changes that have not yet shipped to any environment).
+  - Remove the `hephaestus_user` + `integration_identity` table creates from the unmerged `1779790459343_changelog.xml` changelog (endorsed Liquibase practice for changes that have not yet shipped to any environment).
   - Delete the dead webapp helper `getGitProviderId()` from `keycloak.ts` + `AuthContext.tsx`.
   - Add `User.keycloakSubject` (column + partial unique index `uq_user_keycloak_subject WHERE keycloak_subject IS NOT NULL`).
   - Wire `AuthenticatedGitProviderUserService.upsertUser` to seed `keycloak_subject` from the JWT `sub` claim on every authenticated upsert. Sync paths (`GitLabIssueProcessor.findOrCreateUser` etc.) explicitly do NOT populate this column — they upsert vendor users we have never authenticated.
@@ -74,6 +73,6 @@ The partial unique index is the correct uniqueness contract for the seeded colum
 - ADR 0011 — `integration_identity is OAuth-fed, not sync-fed (today)` — historical predecessor.
 - ADR 0015 — `unified integration framework` — the Layer 1 (`Connection`) half of the original three-layer model, which IS load-bearing and stays.
 - Liquibase docs on editing unmerged changesets vs. shipping forward-only — endorsed practice for branch-local cleanup.
-- `WorkspaceContextFilter.java:157`, `SecurityUtils.java:22-31` — current `preferred_username → User.login` lookup that Stage B will flip.
+- `WorkspaceContextFilter`, `SecurityUtils` — current `preferred_username → User.login` lookup that Stage B will flip.
 - `AuthenticatedGitProviderUserService.upsertUser` — the seed point for `keycloak_subject` populated in this PR.
-- `1779862439263_user_keycloak_subject.xml` — the new column + partial unique index.
+- `1779790459343_changelog.xml` — the new `keycloak_subject` column + partial unique index.

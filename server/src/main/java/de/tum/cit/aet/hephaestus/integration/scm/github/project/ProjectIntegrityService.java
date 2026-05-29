@@ -66,7 +66,7 @@ public class ProjectIntegrityService {
     private final RepositoryRepository repositoryRepository;
     private final UserRepository userRepository;
 
-    // ==================== Cascade Delete Operations ====================
+    // Cascade Delete Operations
 
     /**
      * Deletes all projects owned by the specified organization.
@@ -137,7 +137,7 @@ public class ProjectIntegrityService {
         return deleted;
     }
 
-    // ==================== Validation Operations ====================
+    // Validation Operations
 
     /**
      * Validates that the owner entity exists for a project.
@@ -227,7 +227,7 @@ public class ProjectIntegrityService {
         return userRepository.findById(project.getOwnerId());
     }
 
-    // ==================== Orphan Detection ====================
+    // Orphan Detection
 
     /**
      * Counts projects that have missing owners (orphaned projects).

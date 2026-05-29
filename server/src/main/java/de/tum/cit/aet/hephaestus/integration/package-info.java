@@ -1,14 +1,14 @@
 /**
  * Unified integration framework.
  *
- * <p>Houses all vendor adapters (GitHub, GitLab, Slack, Outline, …) end-to-end plus the
+ * <p>Houses all vendor adapters (GitHub, GitLab, Slack, …) end-to-end plus the
  * cross-cutting trait modules (webhook ingest, realtime ingest, NATS consumer, identity,
  * feedback-post tracking, connection aggregate, framework bootstrap) and the family
- * libraries (scm-lib, messaging-lib, knowledge-lib, project-tracker-lib).
+ * libraries (scm-lib, messaging-lib, project-tracker-lib).
  *
  * <p>Three coexisting structural axes:
  * <ul>
- *   <li><b>Vendor coherence</b> — {@code integration/scm/{github,gitlab}/...}, {@code integration/{slack,outline}/...}
+ *   <li><b>Vendor coherence</b> — {@code integration/scm/{github,gitlab}/...}, {@code integration/slack/...}
  *   <li><b>Family-shared abstractions</b> — {@code integration/{scm,messaging,knowledge,project-tracker}-lib/...}
  *   <li><b>Cross-cutting traits</b> — {@code integration/core/{webhook,consumer,events,spi,handler,connection,oauth,feedback,framework}/...}
  * </ul>

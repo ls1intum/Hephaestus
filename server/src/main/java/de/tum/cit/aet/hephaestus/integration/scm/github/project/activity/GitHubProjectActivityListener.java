@@ -54,9 +54,7 @@ public class GitHubProjectActivityListener {
     private final ProjectRepository projectRepository;
     private final IssueRepository issueRepository;
 
-    // ========================================================================
     // Project Lifecycle Events
-    // ========================================================================
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -183,9 +181,7 @@ public class GitHubProjectActivityListener {
         );
     }
 
-    // ========================================================================
     // Project Item Events
-    // ========================================================================
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -354,9 +350,7 @@ public class GitHubProjectActivityListener {
         );
     }
 
-    // ========================================================================
     // Project Status Update Events
-    // ========================================================================
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -427,9 +421,7 @@ public class GitHubProjectActivityListener {
         );
     }
 
-    // ========================================================================
     // Helpers (mirrored from ActivityEventListener — see class javadoc)
-    // ========================================================================
 
     private void safeRecord(String eventName, Long entityId, Runnable recordAction) {
         try {

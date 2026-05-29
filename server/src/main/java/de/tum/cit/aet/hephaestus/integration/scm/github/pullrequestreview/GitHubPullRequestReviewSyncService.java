@@ -191,6 +191,7 @@ public class GitHubPullRequestReviewSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
+        int reviewsReceived = 0;
         int reportedTotalCount = -1;
         String cursor = startCursor;
         boolean hasMore = true;
@@ -323,6 +324,7 @@ public class GitHubPullRequestReviewSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+                reviewsReceived += connection.getNodes().size();
 
                 // Fetch any remaining nested review comments before persistence
                 for (var graphQlReview : connection.getNodes()) {
@@ -391,13 +393,14 @@ public class GitHubPullRequestReviewSyncService {
             }
         }
 
-        // Check for overflow: did we fetch fewer items than GitHub reported?
-        // Include inline count to avoid false positives (inline reviews were already synced)
+        // Raw nodes received + inline reviews from the embedded first page (both counted by
+        // reviews.totalCount), vs totalCount. totalSynced is post-filter, so it can't be the comparand.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "reviews",
-                totalSynced + inlineCount,
+                reviewsReceived + inlineCount,
                 reportedTotalCount,
+                hasMore,
                 safeNameWithOwner + " PR #" + pullRequest.getNumber()
             );
         }
@@ -694,12 +697,12 @@ public class GitHubPullRequestReviewSyncService {
             }
         }
 
-        // Check for overflow: did we fetch fewer comments than GitHub reported?
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "reviewComments",
                 allComments.size(),
                 reportedTotalCount,
+                hasMore,
                 "reviewId=" + reviewId
             );
         }

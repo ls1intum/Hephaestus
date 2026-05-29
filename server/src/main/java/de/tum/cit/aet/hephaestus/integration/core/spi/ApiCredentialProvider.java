@@ -45,7 +45,7 @@ public interface ApiCredentialProvider {
         permits BearerToken, InstallationCredential, OAuthSession, OAuthClientSecret {}
 
     /**
-     * Long-lived or short-lived bearer (PAT, Slack xoxb, Outline OAuth access token).
+     * Long-lived or short-lived bearer (PAT, Slack xoxb, OAuth access token).
      * {@link #toString()} redacts {@code token} so accidental log calls do not leak it;
      * the same applies to the other two variants below.
      */

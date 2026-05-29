@@ -7,9 +7,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins Slice H — the integration module must use the Spring-Boot-4-wired
- * Jackson 3 {@code ObjectMapper} ({@code tools.jackson.databind.ObjectMapper}),
- * never Jackson 2's {@code com.fasterxml.jackson.databind.ObjectMapper}.
+ * The integration module must use the Spring-Boot-4-wired Jackson 3
+ * {@code ObjectMapper} ({@code tools.jackson.databind.ObjectMapper}), never
+ * Jackson 2's {@code com.fasterxml.jackson.databind.ObjectMapper}.
  * Jackson 2 jars remain on the classpath (transitive deps), so without this
  * rule it is easy to re-introduce the legacy type by import autocompletion.
  *
@@ -45,7 +45,7 @@ class IntegrationJacksonNamespaceTest extends HephaestusArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAPackage("com.fasterxml.jackson.core..")
-            .because("Jackson 2 core types replaced by tools.jackson.core.* in Slice H.");
+            .because("Jackson 2 core types are replaced by tools.jackson.core.* under Jackson 3.");
         rule.check(classes);
     }
 }

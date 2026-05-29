@@ -132,7 +132,7 @@ public class ProjectItem extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<ProjectFieldValue> fieldValues = new HashSet<>();
 
-    // ==================== Bidirectional Relationship Helpers ====================
+    // Bidirectional Relationship Helpers
 
     /**
      * Adds a field value to this item and maintains bidirectional consistency.

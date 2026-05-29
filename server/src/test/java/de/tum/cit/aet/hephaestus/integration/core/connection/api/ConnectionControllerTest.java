@@ -40,7 +40,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -194,15 +194,13 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("initiate with no registered strategy returns 400")
-    void initiate_unknownKind_throws400() {
+    @DisplayName("initiate with no registered strategy throws IllegalArgumentException (→ 400 via advice)")
+    void initiate_unknownKind_throwsBadRequest() {
         ConnectionController bare = new ConnectionController(admin, connectionService, objectMapper, List.of());
         InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.SLACK, Map.of(), null);
-        assertThatThrownBy(() -> bare.initiate(1L, req, null)).satisfies(e ->
-            assertThat(((org.springframework.web.server.ResponseStatusException) e).getStatusCode().value()).isEqualTo(
-                400
-            )
-        );
+        assertThatThrownBy(() -> bare.initiate(1L, req, null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("No ConnectionStrategy registered");
     }
 
     @Test
@@ -348,48 +346,14 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void exceptionHandler_illegalState_to409() {
-        ResponseEntity<Map<String, String>> response = controller.handleIllegalTransition(
-            new IllegalStateException("Illegal transition for connection 7: UNINSTALLED → ACTIVE")
-        );
-
-        assertThat(response.getStatusCode().value()).isEqualTo(409);
-        assertThat(response.getBody()).containsKey("error");
-        assertThat(response.getBody().get("error")).contains("Illegal transition");
+    void exceptionHandler_notFound_to404ProblemDetail() {
+        ProblemDetail problem = controller.handleNotFound(new NoSuchElementException("Connection not found: id=999"));
+        assertThat(problem.getStatus()).isEqualTo(404);
+        assertThat(problem.getDetail()).contains("999");
+        assertThat(problem.getTitle()).isEqualTo("Resource not found");
     }
 
-    @Test
-    void exceptionHandler_notFound_to404() {
-        ResponseEntity<Map<String, String>> response = controller.handleNotFound(
-            new NoSuchElementException("Connection not found: id=999")
-        );
-        assertThat(response.getStatusCode().value()).isEqualTo(404);
-        assertThat(response.getBody().get("error")).contains("999");
-    }
-
-    @Test
-    void exceptionHandler_dataIntegrity_to409() {
-        org.springframework.dao.DataIntegrityViolationException e =
-            new org.springframework.dao.DataIntegrityViolationException(
-                "duplicate key",
-                new RuntimeException("uq_connection violation")
-            );
-        ResponseEntity<Map<String, String>> response = controller.handleDbConflict(e);
-        assertThat(response.getStatusCode().value()).isEqualTo(409);
-        assertThat(response.getBody().get("error")).contains("Conflict");
-    }
-
-    @Test
-    void exceptionHandler_statusCodesAlign() {
-        assertThat(controller.handleNotFound(new NoSuchElementException("x")).getStatusCode()).isEqualTo(
-            HttpStatus.NOT_FOUND
-        );
-        assertThat(controller.handleIllegalTransition(new IllegalStateException("x")).getStatusCode()).isEqualTo(
-            HttpStatus.CONFLICT
-        );
-    }
-
-    // ── helpers ──────────────────────────────────────────────────────────
+    // helpers
 
     private Connection newConnection(
         long id,
@@ -398,10 +362,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         String instanceKey,
         IntegrationState state
     ) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        // lenient: a few tests don't traverse the workspace-id check path — keeping the stub
-        // centralised in the helper is worth more than micromanaging per-test.
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
@@ -412,7 +374,6 @@ class ConnectionControllerTest extends BaseUnitTest {
                 Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, Set.of());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, Set.of());
             case OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> new ConnectionConfig.OidcLoginConfig(
                 "https://gitlab.example.com",
                 Set.of("openid", "profile", "email"),

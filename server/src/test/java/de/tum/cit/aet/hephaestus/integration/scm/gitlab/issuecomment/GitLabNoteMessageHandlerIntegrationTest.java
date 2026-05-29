@@ -48,12 +48,12 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("GitLab Note Message Handler")
 @TestPropertySource(
     properties = {
-        "hephaestus.gitlab.enabled=true",
-        "hephaestus.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.gitlab.connect-timeout=30s",
-        "hephaestus.gitlab.read-timeout=60s",
-        "hephaestus.gitlab.rate-limit-delay=200ms",
-        "hephaestus.gitlab.sync-page-delay=5m",
+        "hephaestus.integration.gitlab.enabled=true",
+        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
+        "hephaestus.integration.gitlab.connect-timeout=30s",
+        "hephaestus.integration.gitlab.read-timeout=60s",
+        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
+        "hephaestus.integration.gitlab.sync-page-delay=5m",
     }
 )
 @Import(GitLabNoteMessageHandlerIntegrationTest.GitLabNoteTestEventListener.class)
@@ -132,14 +132,14 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         setupTestData();
     }
 
-    // ==================== Event Type ====================
+    // Event Type
 
     @Test
     void returnsCorrectEventType() {
         assertThat(handler.key().eventType()).isEqualTo("note");
     }
 
-    // ==================== Issue Notes ====================
+    // Issue Notes
 
     @Nested
     class IssueNotes {
@@ -185,7 +185,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== MR Notes ====================
+    // MR Notes
 
     @Nested
     class MergeRequestNotes {
@@ -227,7 +227,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== System Notes ====================
+    // System Notes
 
     @Nested
     class SystemNotes {
@@ -241,7 +241,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Confidential Notes ====================
+    // Confidential Notes
 
     @Nested
     class ConfidentialNotes {
@@ -255,7 +255,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Edge Cases ====================
+    // Edge Cases
 
     @Nested
     class EdgeCases {
@@ -310,7 +310,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // ==================== Helpers ====================
+    // Helpers
 
     private GitLabNoteEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
@@ -396,7 +396,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.save(workspace);
     }
 
-    // ==================== Test Event Listener ====================
+    // Test Event Listener
 
     @Component
     static class GitLabNoteTestEventListener {

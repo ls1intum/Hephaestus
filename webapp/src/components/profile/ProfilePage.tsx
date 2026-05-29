@@ -1,6 +1,7 @@
 import { XCircleIcon } from "lucide-react";
-import type { Profile } from "@/api/types.gen";
+import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
@@ -9,6 +10,9 @@ import { ProfileHeader } from "./ProfileHeader";
 interface ProfileProps {
 	providerType?: ProviderType;
 	profileData?: Profile;
+	activityMonitorData?: ProfileActivityMonitor;
+	activityMonitorFilters: ActivityMonitorFilters;
+	onActivityMonitorFiltersChange: (filters: ActivityMonitorFilters) => void;
 	isLoading: boolean;
 	error: boolean;
 	username: string;
@@ -27,6 +31,9 @@ interface ProfileProps {
 export function ProfilePage({
 	providerType = "GITHUB",
 	profileData,
+	activityMonitorData,
+	activityMonitorFilters,
+	onActivityMonitorFiltersChange,
 	isLoading,
 	error,
 	username,
@@ -68,10 +75,9 @@ export function ProfilePage({
 			/>
 			<ProfileContent
 				providerType={providerType}
-				reviewActivity={profileData?.reviewActivity}
-				openPullRequests={profileData?.openPullRequests}
-				activityStats={profileData?.activityStats}
-				reviewedPullRequests={profileData?.reviewedPullRequests}
+				activityMonitorData={activityMonitorData}
+				activityMonitorFilters={activityMonitorFilters}
+				onActivityMonitorFiltersChange={onActivityMonitorFiltersChange}
 				isLoading={isLoading}
 				username={username}
 				displayName={profileData?.userInfo?.name}

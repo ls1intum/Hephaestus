@@ -4,7 +4,6 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 public enum IntegrationFamily {
     SCM,
     MESSAGING,
-    KNOWLEDGE,
     /**
      * Identity provider — workspace-scoped OIDC login providers (self-hosted GitLab, GHE).
      * Members of this family DO NOT participate in sync; they back the

@@ -30,7 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * </ul>
  */
 @Component
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessageHandler<GitLabMergeRequestEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestMessageHandler.class);

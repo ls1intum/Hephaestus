@@ -27,7 +27,7 @@ public record GitHubLabelDTO(
     @Nullable Instant createdAt,
     @Nullable Instant updatedAt
 ) {
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubLabelDTO from a GraphQL GHLabel model.

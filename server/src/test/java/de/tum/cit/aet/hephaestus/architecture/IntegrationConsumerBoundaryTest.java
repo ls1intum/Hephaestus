@@ -9,13 +9,13 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Locks the post-Slice-D consumer surface in place.
+ * Locks the consumer surface in place.
  *
  * <ol>
- *   <li>{@code integration/scm/sync/} is emptied of all non-{@code backfill} production code.
+ *   <li>{@code integration/scm/sync/} holds no non-{@code backfill} production code.
  *       The unified consumer fleet lives under {@code integration/consumer/}; per-kind
  *       sync drivers live under {@code integration/<kind>/sync/}. New code in the legacy
- *       package would re-grow the boulder this slice spent dissolving.</li>
+ *       package would re-grow the coupling this boundary exists to prevent.</li>
  *   <li>The {@code agent/} runtime role never imports {@code integration.consumer..}.
  *       Consumer beans are server-role-only ({@link de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole#SERVER_PROPERTY});
  *       letting the agent role link against them would re-introduce the bean-cluster
@@ -51,7 +51,7 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
 
         assertThat(violations)
             .as(
-                "integration/scm/sync/ must be empty of production code after Slice D — the unified " +
+                "integration/scm/sync/ must be empty of production code — the unified " +
                     "consumer lives under integration/consumer/ and the per-kind sync drivers live " +
                     "under integration/<kind>/sync/. Sub-packages allowed: %s",
                 ALLOWED_SYNC_SUBPACKAGES

@@ -49,10 +49,14 @@ public final class GraphQlConnectionOverflowDetector {
     }
 
     /**
-     * Checks whether a GraphQL connection returned fewer nodes than {@code totalCount} indicates.
-     * <p>
-     * Logs a warning when overflow is detected (i.e., {@code totalCount > fetchedCount}).
-     * This is the primary detection method when the GraphQL query includes {@code totalCount}.
+     * Checks a <b>single-page</b> connection that has no follow-up pagination (e.g. an embedded
+     * {@code assignees}/{@code labels} connection on a DTO). Here {@code totalCount > fetchedCount}
+     * genuinely means the extra items will never be fetched, so it is logged at WARN.
+     *
+     * <p><b>Do not</b> use this overload from inside a pagination loop: a count gap that remains
+     * after the loop exhausted every page is a benign unit/over-report discrepancy, not data loss.
+     * Use {@link #checkPaginated} there and pass whether the loop stopped early — it demotes the
+     * benign case to DEBUG and only WARNs on real truncation.
      *
      * @param connectionName  human-readable name of the connection (e.g. "assignees", "reviews")
      * @param fetchedCount    number of nodes actually fetched ({@code nodes.size()})
@@ -63,8 +67,8 @@ public final class GraphQlConnectionOverflowDetector {
     public static boolean check(String connectionName, int fetchedCount, int totalCount, String context) {
         if (totalCount > fetchedCount) {
             log.warn(
-                "GraphQL connection overflow: connection={}, fetchedCount={}, totalCount={}, context={}. " +
-                    "Data may be incomplete — consider adding follow-up pagination.",
+                "GraphQL embedded connection truncated: connection={}, fetchedCount={}, totalCount={}, context={}. " +
+                    "No follow-up pagination — remaining items were not fetched.",
                 connectionName,
                 fetchedCount,
                 totalCount,
@@ -72,6 +76,55 @@ public final class GraphQlConnectionOverflowDetector {
             );
             return true;
         }
+        return false;
+    }
+
+    /**
+     * Checks completeness of a <b>paginated</b> connection, gating severity on <em>why the loop
+     * ended</em> rather than the count comparison alone.
+     *
+     * <p>If the loop ran to completion ({@code stoppedEarly == false}), any residual
+     * {@code totalCount > fetchedCount} gap is benign — a unit/over-report discrepancy, not loss —
+     * and is logged at DEBUG. Only an early stop (error, rate-limit, or page cap leaving pages
+     * unfetched) is real incompleteness and logged at WARN.
+     *
+     * @param connectionName human-readable connection name (e.g. "reviewThreads", "issues")
+     * @param fetchedCount   nodes received across all pages — must be apples-to-apples with
+     *                       {@code totalCount} (count what the connection counts, not post-filter results)
+     * @param totalCount     total reported by the connection
+     * @param stoppedEarly   {@code true} if the loop broke before exhausting all pages
+     * @param context        contextual description for the log message
+     * @return {@code true} if data is incomplete (gap present and the loop stopped early)
+     */
+    public static boolean checkPaginated(
+        String connectionName,
+        int fetchedCount,
+        int totalCount,
+        boolean stoppedEarly,
+        String context
+    ) {
+        if (totalCount <= fetchedCount) {
+            return false;
+        }
+        if (stoppedEarly) {
+            log.warn(
+                "GraphQL connection truncated by early stop: connection={}, fetchedCount={}, totalCount={}, " +
+                    "context={}. Pagination stopped before all pages were retrieved; data is incomplete.",
+                connectionName,
+                fetchedCount,
+                totalCount,
+                context
+            );
+            return true;
+        }
+        log.debug(
+            "GraphQL connection count gap after full pagination (benign): connection={}, fetchedCount={}, " +
+                "totalCount={}, context={}.",
+            connectionName,
+            fetchedCount,
+            totalCount,
+            context
+        );
         return false;
     }
 
@@ -91,8 +144,8 @@ public final class GraphQlConnectionOverflowDetector {
     public static boolean check(String connectionName, int fetchedCount, boolean hasNextPage, String context) {
         if (hasNextPage) {
             log.warn(
-                "GraphQL connection overflow: connection={}, fetchedCount={}, hasNextPage=true, context={}. " +
-                    "Data may be incomplete — consider adding follow-up pagination.",
+                "GraphQL embedded connection truncated: connection={}, fetchedCount={}, hasNextPage=true, " +
+                    "context={}. No follow-up pagination — remaining items were not fetched.",
                 connectionName,
                 fetchedCount,
                 context

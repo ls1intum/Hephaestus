@@ -165,7 +165,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query("UPDATE Project p SET p.itemSyncCursor = NULL WHERE p.id = :projectId")
     void clearItemSyncCursor(@Param("projectId") Long projectId);
 
-    // ==================== Field Sync Cursor Management ====================
+    // Field Sync Cursor Management
 
     /**
      * Updates the field sync cursor for a project.
@@ -206,7 +206,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query("UPDATE Project p SET p.fieldSyncCursor = NULL WHERE p.id = :projectId")
     void clearFieldSyncCursor(@Param("projectId") Long projectId);
 
-    // ==================== Status Update Sync Cursor Management ====================
+    // Status Update Sync Cursor Management
 
     /**
      * Updates the status update sync cursor for a project.
@@ -279,7 +279,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         @Param("cooldownThreshold") Instant cooldownThreshold
     );
 
-    // ==================== Cascade Delete Operations ====================
+    // Cascade Delete Operations
     // These methods support application-level referential integrity for the
     // polymorphic owner relationship (ownerType + ownerId).
     //

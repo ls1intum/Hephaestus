@@ -120,7 +120,7 @@ public record GitHubUserDTO(
         return databaseId != null ? databaseId : id;
     }
 
-    // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
+    // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
      * Creates a GitHubUserDTO from a GraphQL GHActor interface.

@@ -49,7 +49,7 @@ public class GitHubTestFixtureService {
             .build();
     }
 
-    // ========== REPOSITORY OPERATIONS ==========
+    // REPOSITORY OPERATIONS
 
     /**
      * Creates an ephemeral private repository in the given organization.
@@ -166,7 +166,7 @@ public class GitHubTestFixtureService {
         }
     }
 
-    // ========== LABEL OPERATIONS ==========
+    // LABEL OPERATIONS
 
     /**
      * Creates a label in a repository via GraphQL mutation.
@@ -254,7 +254,7 @@ public class GitHubTestFixtureService {
             .block(Duration.ofSeconds(30));
     }
 
-    // ========== MILESTONE OPERATIONS (REST API - no GraphQL mutation) ==========
+    // MILESTONE OPERATIONS (REST API - no GraphQL mutation)
 
     /**
      * Creates a milestone via REST API (no GraphQL mutation exists).
@@ -330,7 +330,7 @@ public class GitHubTestFixtureService {
             .block(Duration.ofSeconds(30));
     }
 
-    // ========== ISSUE OPERATIONS ==========
+    // ISSUE OPERATIONS
 
     /**
      * Creates an issue via GraphQL mutation.
@@ -416,7 +416,7 @@ public class GitHubTestFixtureService {
         );
     }
 
-    // ========== PULL REQUEST OPERATIONS ==========
+    // PULL REQUEST OPERATIONS
 
     /**
      * Creates a pull request via GraphQL mutation.
@@ -538,7 +538,7 @@ public class GitHubTestFixtureService {
         );
     }
 
-    // ========== BRANCH OPERATIONS ==========
+    // BRANCH OPERATIONS
 
     /**
      * Creates a branch (ref) via GraphQL mutation.
@@ -663,7 +663,7 @@ public class GitHubTestFixtureService {
         return response.field("createCommitOnBranch.commit.oid").toEntity(String.class);
     }
 
-    // ========== TEAM OPERATIONS (REST API) ==========
+    // TEAM OPERATIONS (REST API)
 
     /**
      * Creates a team via REST API.
@@ -763,7 +763,7 @@ public class GitHubTestFixtureService {
             .block(Duration.ofSeconds(30));
     }
 
-    // ========== COLLABORATOR OPERATIONS (REST API) ==========
+    // COLLABORATOR OPERATIONS (REST API)
 
     /**
      * Adds a collaborator to a repository.
@@ -793,7 +793,7 @@ public class GitHubTestFixtureService {
             .block(Duration.ofSeconds(30));
     }
 
-    // ========== ORGANIZATION QUERIES ==========
+    // ORGANIZATION QUERIES
 
     /**
      * Gets the node ID of an organization.
@@ -857,7 +857,7 @@ public class GitHubTestFixtureService {
             .toList();
     }
 
-    // ========== REPOSITORY QUERIES ==========
+    // REPOSITORY QUERIES
 
     /**
      * Gets repository info including node ID and default branch.
@@ -947,7 +947,7 @@ public class GitHubTestFixtureService {
             .toList();
     }
 
-    // ========== HELPER METHODS ==========
+    // HELPER METHODS
 
     private void createInitialCommit(String fullName) {
         String[] parts = fullName.split("/");
@@ -1000,7 +1000,7 @@ public class GitHubTestFixtureService {
         throw new RuntimeException("Timed out waiting for default branch on " + fullName);
     }
 
-    // ========== RECORD TYPES ==========
+    // RECORD TYPES
 
     public record CreatedRepository(String nodeId, Long databaseId, String name, String fullName, String url) {}
 

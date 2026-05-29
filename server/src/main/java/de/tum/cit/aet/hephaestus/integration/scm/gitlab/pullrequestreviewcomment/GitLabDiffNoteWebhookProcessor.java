@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
  * the same discussion_id, enabling correct thread grouping without waiting for GraphQL sync.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabDiffNoteWebhookProcessor.class);

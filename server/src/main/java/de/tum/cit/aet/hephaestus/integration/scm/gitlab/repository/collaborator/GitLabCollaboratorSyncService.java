@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link RepositoryCollaborator} entities.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabCollaboratorSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabCollaboratorSyncService.class);

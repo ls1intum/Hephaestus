@@ -63,7 +63,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
     private IntegrationKindRouting routing;
     private FakeStrategy slackStrategy;
-    private FakeStrategy outlineStrategy;
     private OAuthCallbackController controller;
 
     @BeforeEach
@@ -73,17 +72,16 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         // here gives the test exact parity with production path resolution.
         routing = new IntegrationKindRouting();
         slackStrategy = new FakeStrategy(IntegrationKind.SLACK);
-        outlineStrategy = new FakeStrategy(IntegrationKind.OUTLINE);
         controller = new OAuthCallbackController(
             routing,
             oauthStateService,
             callbackService,
-            List.of(slackStrategy, outlineStrategy),
+            List.of(slackStrategy),
             PROPS
         );
     }
 
-    // ── Happy path ──────────────────────────────────────────────────────────
+    // Happy path
 
     @Test
     void happyPath_slackCompleted_transitionsAndRedirects() {
@@ -147,7 +145,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(actor.getValue()).isNull();
     }
 
-    // ── Vendor-side error ───────────────────────────────────────────────────
+    // Vendor-side error
 
     @Test
     void vendorError_jsonRequest_returns400WithStructuredJson() {
@@ -194,7 +192,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(slackStrategy.finalizeCalls).isEqualTo(0);
     }
 
-    // ── State validation ────────────────────────────────────────────────────
+    // State validation
 
     @Test
     void missingState_jsonRequest_returns400() {
@@ -253,12 +251,12 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
 
     @Test
     void stateKindMismatch_jsonRequest_returns400() {
-        // State issued for SLACK; replayed against /oauth/callback/outline.
+        // State issued for SLACK; replayed against /oauth/callback/github.
         StateBinding binding = new StateBinding(42L, IntegrationKind.SLACK, Instant.now(), "alice");
         when(oauthStateService.consume("slack-state")).thenReturn(binding);
 
         ResponseEntity<?> response = controller.callbackGet(
-            "outline",
+            "github",
             "slack-state",
             null,
             null,
@@ -270,13 +268,12 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         @SuppressWarnings("unchecked")
         Map<String, String> body = (Map<String, String>) response.getBody();
         assertThat(body).containsEntry("error", "kind_mismatch");
-        assertThat(body.get("errorDescription")).contains("SLACK").contains("outline");
-        assertThat(outlineStrategy.finalizeCalls).isEqualTo(0);
+        assertThat(body.get("errorDescription")).contains("SLACK").contains("github");
         assertThat(slackStrategy.finalizeCalls).isEqualTo(0);
         verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
     }
 
-    // ── Strategy failure ────────────────────────────────────────────────────
+    // Strategy failure
 
     @Test
     void finalizeFailed_jsonRequest_returns400() {
@@ -352,7 +349,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(body).containsEntry("error", "strategy_error");
     }
 
-    // ── Transition guard rejection ──────────────────────────────────────────
+    // Transition guard rejection
 
     @Test
     void completeConnection_transitionGuardRejects_jsonRequest_returns409() {
@@ -404,7 +401,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(response.getHeaders().getLocation().toString()).contains("reason=transition_conflict");
     }
 
-    // ── Unknown kind ────────────────────────────────────────────────────────
+    // Unknown kind
 
     @Test
     void unknownKind_jsonRequest_returns404() {
@@ -437,7 +434,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(response.getHeaders().getLocation().toString()).contains("reason=unknown_kind");
     }
 
-    // ── No strategy registered ──────────────────────────────────────────────
+    // No strategy registered
 
     @Test
     void noStrategy_returns500() {
@@ -467,7 +464,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         assertThat(body).containsEntry("error", "no_strategy");
     }
 
-    // ── POST callback ───────────────────────────────────────────────────────
+    // POST callback
 
     @Test
     void postCallback_sharesGetHandler() {
@@ -492,7 +489,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         verify(callbackService).completeConnection(any(), any(), any());
     }
 
-    // ── Duplicate strategy guard ────────────────────────────────────────────
+    // Duplicate strategy guard
 
     @Test
     void duplicateStrategy_throwsAtWiringTime() {
@@ -505,7 +502,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             .hasMessageContaining("Duplicate ConnectionStrategy");
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────
+    // helpers
 
     /** Browser request: {@code Accept: text/html,...} (typical browser default). */
     private static HttpServletRequest htmlRequest() {
@@ -530,8 +527,8 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         String instanceKey,
         IntegrationState state
     ) {
-        Workspace ws = Mockito.mock(Workspace.class);
-        Mockito.lenient().when(ws.getId()).thenReturn(workspaceId);
+        Workspace ws = new Workspace();
+        ws.setId(workspaceId);
         ConnectionConfig cfg = switch (kind) {
             case GITHUB -> new ConnectionConfig.GitHubAppConfig(null, null, null, java.util.Set.of());
             case GITLAB -> new ConnectionConfig.GitLabConfig(
@@ -542,7 +539,6 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
                 java.util.Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
-            case OUTLINE -> new ConnectionConfig.OutlineConfig("https://app.getoutline.com", null, java.util.Set.of());
             case OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> new ConnectionConfig.OidcLoginConfig(
                 "https://gitlab.example.com",
                 java.util.Set.of("openid", "profile", "email"),
