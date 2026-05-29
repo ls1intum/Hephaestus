@@ -39,7 +39,7 @@ We examined whether `spring-boot-starter-oauth2-client` could replace the hand-r
   re-implementing `OAuthStateNonceStore` behind Spring's interface — same code, less power
   (no per-row TTL queries, no workspace cross-referencing).
 - **Dynamic per-tenant ClientRegistration is not first-class.**
-  [spring-security#15860](https://github.com/spring-projects/spring-security/issues/15860)
+  [spring-security#12862](https://github.com/spring-projects/spring-security/issues/12862)
   is an open enhancement request. Workarounds require a custom `ClientRegistrationRepository`
   with careful concurrent-modification handling. Same effort as hand-rolled; less control.
 - **GitHub App ≠ standard OAuth Authorization Code.** GitHub App install callbacks deliver
@@ -112,7 +112,7 @@ nothing and reduce future drift:
 Any of:
 - Spring Security ships first-class multi-tenant `ClientRegistrationRepository` + a
   per-tenant `OAuth2AuthorizedClientService` schema that keys on something other than
-  `principal_name` (track [issue #15860](https://github.com/spring-projects/spring-security/issues/15860)).
+  `principal_name` (track [issue #12862](https://github.com/spring-projects/spring-security/issues/12862)).
 - GitHub App flow lands a standard `code` exchange at install time (currently `installation_id`
   is the callback param, not `code`).
 - We reach 10+ integration kinds — at that point the per-kind `ConnectionStrategy`
@@ -123,4 +123,4 @@ Any of:
 
 - [RFC 7636 — PKCE](https://www.rfc-editor.org/info/rfc7636)
 - [RFC 9700 — Best Current Practice for OAuth 2.0 Security (Jan 2025)](https://www.rfc-editor.org/rfc/rfc9700.html)
-- [spring-security/#15860 — Multi-tenant ClientRegistration enhancement request](https://github.com/spring-projects/spring-security/issues/15860)
+- [spring-security/#12862 — Multi-tenant ClientRegistration enhancement request](https://github.com/spring-projects/spring-security/issues/12862)
