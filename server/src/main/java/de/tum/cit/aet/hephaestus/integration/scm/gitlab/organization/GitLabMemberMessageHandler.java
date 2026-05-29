@@ -87,7 +87,7 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
         String safeGroupPath = sanitizeForLog(event.groupPath());
         String safeUsername = sanitizeForLog(event.userUsername());
 
-        log.info(
+        log.debug(
             "Received member event: eventName={}, groupPath={}, user={}, access={}",
             event.eventName(),
             safeGroupPath,

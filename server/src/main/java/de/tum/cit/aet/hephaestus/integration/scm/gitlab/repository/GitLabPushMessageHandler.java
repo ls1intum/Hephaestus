@@ -136,7 +136,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         String safeRef = sanitizeForLog(event.ref());
-        log.info(
+        log.debug(
             "Received push event: projectPath={}, ref={}, commits={}",
             safeProjectPath,
             safeRef,

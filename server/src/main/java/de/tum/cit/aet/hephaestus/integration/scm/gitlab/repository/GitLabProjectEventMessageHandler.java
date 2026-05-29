@@ -65,7 +65,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
     @Override
     protected void handleEvent(GitLabProjectEventDTO event) {
         String safePath = sanitizeForLog(event.pathWithNamespace());
-        log.info(
+        log.debug(
             "Received project event: eventName={}, path={}, projectId={}",
             event.eventName(),
             safePath,

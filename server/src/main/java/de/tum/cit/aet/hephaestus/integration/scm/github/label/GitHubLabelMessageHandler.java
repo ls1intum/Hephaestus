@@ -53,7 +53,7 @@ public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler
             return;
         }
 
-        log.info(
+        log.debug(
             "Received label event: action={}, labelName={}, repoName={}",
             event.action(),
             sanitizeForLog(labelDto.name()),

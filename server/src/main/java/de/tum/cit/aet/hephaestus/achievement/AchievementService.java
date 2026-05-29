@@ -59,9 +59,11 @@ import tools.jackson.databind.ObjectMapper;
  * </pre>
  *
  * <h3>Thread Safety</h3>
- * <p>Achievement progress updates are idempotent in structure due to the unique
- * constraint on (user_id, achievement_id). Concurrent increment attempts are
- * serialized by the {@code @Transactional} boundary.
+ * <p>{@link #checkAndUnlock} runs on the {@code @Async} achievement executor, so a sync burst can
+ * deliver many same-user events concurrently. Evaluation is serialized per user via a
+ * transaction-scoped advisory lock (see {@link UserAchievementRepository#acquireUserLock}); different
+ * users stay parallel. The {@code INSERT ... ON CONFLICT} upsert and {@code @Retryable} remain as
+ * secondary guards.
  *
  * @see AchievementEventListener
  * @see AchievementDefinition
@@ -158,13 +160,9 @@ public class AchievementService {
      * @param event the activity saved event containing user, type, and timestamp
      * @return list of newly unlocked achievement types (empty if none)
      */
-    @Retryable(
-        includes = { ObjectOptimisticLockingFailureException.class },
-        maxRetries = 4,
-        delay = 100,
-        multiplier = 2.0,
-        maxDelay = 2000
-    )
+    // Thin tripwire only: the per-user advisory lock should make optimistic-lock failures
+    // impossible, so a few retries are a safety net, not the latency sink the pre-lock code needed.
+    @Retryable(includes = { ObjectOptimisticLockingFailureException.class }, maxRetries = 2, delay = 100)
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
         if (event.user().isEmpty()) {
@@ -175,6 +173,9 @@ public class AchievementService {
         User user = event.user().get();
         ActivityEventType eventType = event.eventType();
         Instant occurredAt = event.occurredAt();
+
+        // Serialize same-user evaluation before any read (see UserAchievementRepository#acquireUserLock).
+        userAchievementRepository.acquireUserLock(user.getId());
 
         // Find achievements triggered by this event type
         List<AchievementDefinition> candidates = achievementRegistry.getByTriggerEvent(eventType);
@@ -220,7 +221,7 @@ public class AchievementService {
             if (wasUnlocked) {
                 uaProgress.setUnlockedAt(occurredAt);
                 newlyUnlocked.add(achievementDefinition);
-                log.info(
+                log.debug(
                     "Achievement unlocked: userId={}, achievement={}, progress={}, occurredAt={}",
                     user.getId(),
                     achievementDefinition.id(),

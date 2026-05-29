@@ -136,7 +136,7 @@ public class GitHubSubIssueSyncService {
         boolean isLink,
         @Nullable SubIssuesSummaryDTO parentSummary
     ) {
-        log.info(
+        log.debug(
             "Received sub-issue event: subIssueId={}, parentIssueId={}, isLink={}",
             subIssueId,
             parentIssueId,
@@ -343,6 +343,9 @@ public class GitHubSubIssueSyncService {
         String cursor = null;
         boolean hasNextPage = true;
         int linkedCount = 0;
+        // Raw issue nodes received across all pages — apples-to-apples with issues.totalCount.
+        // (linkedCount counts sub-issue links found, which most issues don't have.)
+        int issuesReceived = 0;
         int reportedTotalCount = -1;
 
         int pageCount = 0;
@@ -467,6 +470,8 @@ public class GitHubSubIssueSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
 
+                issuesReceived += issueConnection.getNodes() != null ? issueConnection.getNodes().size() : 0;
+
                 // Process each page in its own transaction (call through proxy for @Transactional)
                 linkedCount += self.processIssueNodesInTransaction(issueConnection, repository, scopeId);
             } catch (InstallationNotFoundException e) {
@@ -493,12 +498,13 @@ public class GitHubSubIssueSyncService {
             }
         }
 
-        // Check for overflow
+        // Raw issue nodes received (not sub-issue links found) vs issues.totalCount.
         if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "issues",
-                linkedCount,
+                issuesReceived,
                 reportedTotalCount,
+                hasNextPage,
                 "repoName=" + sanitizeForLog(repository.getNameWithOwner())
             );
         }

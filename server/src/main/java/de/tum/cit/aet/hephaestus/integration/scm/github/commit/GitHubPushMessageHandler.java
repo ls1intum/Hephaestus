@@ -105,7 +105,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        log.info(
+        log.debug(
             "Received push event: branch={}, commitCount={}, forced={}, repoName={}",
             getBranchName(event.ref()),
             event.commits().size(),

@@ -650,6 +650,22 @@ resilience4j:
             gitlabGraphQl:
                 baseConfig: default
 
+# Shared logging defaults (apply to every profile, incl. prod which sets no overrides).
+# WARN is reserved for genuinely actionable situations; per-event/per-changeset chatter is
+# silenced here (3rd-party loggers) or downgraded to DEBUG at the source (our own packages).
+logging:
+    level:
+        # Liquibase logs every changeset at INFO on each boot (the bulk of startup noise).
+        # WARN keeps real migration problems (validation/checksum/lock-wait).
+        liquibase: WARN
+        # Hibernate HHH100503 (batch-on-release) was a symptom of the achievement lock
+        # contention fixed separately; WARN keeps genuine batch problems visible.
+        org.hibernate.orm.jdbc.batch: WARN
+        # Webhook receipts and per-event bookkeeping are logged at DEBUG at the source, so
+        # per-repo sync rollups stay the only INFO. Flip the package to DEBUG to restore the
+        # full per-event firehose for diagnosis (no redeploy needed):
+        #   logging.level.de.tum.cit.aet.hephaestus.integration.scm: DEBUG
+
 # Local profile (tracked defaults; per-developer secrets stay in gitignored application-local.yml).
 ---
 spring:

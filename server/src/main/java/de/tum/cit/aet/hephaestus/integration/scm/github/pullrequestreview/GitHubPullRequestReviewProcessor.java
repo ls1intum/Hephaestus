@@ -268,7 +268,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         var reviewDataOpt = ScmEventPayload.ReviewData.from(saved);
         if (reviewDataOpt.isPresent()) {
             var reviewData = reviewDataOpt.get();
-            log.info(
+            log.debug(
                 "Publishing ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
                 reviewData.id(),
                 reviewData.state(),

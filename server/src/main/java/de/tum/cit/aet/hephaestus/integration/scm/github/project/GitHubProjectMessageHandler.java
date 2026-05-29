@@ -91,7 +91,7 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
         String ownerIdentifier = event.getOwnerIdentifier();
         Long ownerId = event.getOwnerId();
 
-        log.info(
+        log.debug(
             "Received projects_v2 event: action={}, projectNumber={}, ownerType={}, owner={}",
             event.action(),
             projectDto.number(),

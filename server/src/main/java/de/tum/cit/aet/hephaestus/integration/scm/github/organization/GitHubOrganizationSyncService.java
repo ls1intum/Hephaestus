@@ -269,6 +269,9 @@ public class GitHubOrganizationSyncService {
 
         // Collect all members with pagination, using a Set to track seen user IDs for deduplication
         List<GHOrganizationMemberEdge> allMembers = new ArrayList<>(membersConnection.getEdges());
+        // Raw edges received across all pages; allMembers is post-dedup, so it would under-count and
+        // could mask a real truncation — the completeness check must compare the raw count.
+        int membersReceived = membersConnection.getEdges().size();
         Set<Long> seenUserDatabaseIds = new HashSet<>();
         for (GHOrganizationMemberEdge edge : membersConnection.getEdges()) {
             if (edge != null && edge.getNode() != null && edge.getNode().getDatabaseId() != null) {
@@ -392,6 +395,8 @@ public class GitHubOrganizationSyncService {
                 break;
             }
 
+            membersReceived += nextPage.getEdges().size();
+
             // Add only members we haven't seen yet (deduplication safety)
             for (GHOrganizationMemberEdge edge : nextPage.getEdges()) {
                 if (edge != null && edge.getNode() != null && edge.getNode().getDatabaseId() != null) {
@@ -413,12 +418,13 @@ public class GitHubOrganizationSyncService {
         // Mark sync as completed normally if we exhausted all pages (pageInfo.hasNextPage is false)
         syncCompletedNormally = pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage());
 
-        // Check for overflow
+        // Raw edges received vs members.totalCount (allMembers is post-dedup).
         if (latestTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "members",
-                allMembers.size(),
+                membersReceived,
                 latestTotalCount,
+                !syncCompletedNormally,
                 "orgLogin=" + sanitizeForLog(organization.getLogin())
             );
         }

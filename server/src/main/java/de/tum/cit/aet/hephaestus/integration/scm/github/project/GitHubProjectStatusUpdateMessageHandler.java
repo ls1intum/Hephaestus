@@ -105,7 +105,7 @@ public class GitHubProjectStatusUpdateMessageHandler
         Project.OwnerType ownerType = event.detectOwnerType();
         String ownerIdentifier = event.getOwnerIdentifier();
 
-        log.info(
+        log.debug(
             "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}, owner={}",
             event.action(),
             payload.nodeId() != null ? sanitizeForLog(payload.nodeId()) : "unknown",

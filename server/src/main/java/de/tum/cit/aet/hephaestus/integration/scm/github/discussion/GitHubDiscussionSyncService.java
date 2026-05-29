@@ -239,6 +239,7 @@ public class GitHubDiscussionSyncService {
         final boolean incrementalSync = isIncrementalSync;
 
         int totalDiscussionsSynced = 0;
+        int discussionsReceived = 0; // raw nodes received, for the apples-to-apples completeness check
         int totalCommentsSynced = 0;
         List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination = new ArrayList<>();
         List<CommentWithReplyCursor> commentsNeedingReplyPagination = new ArrayList<>();
@@ -357,6 +358,7 @@ public class GitHubDiscussionSyncService {
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
+                discussionsReceived += connection.getNodes().size();
 
                 // Process page within transaction
                 final Long repoId = repositoryId;
@@ -534,14 +536,13 @@ public class GitHubDiscussionSyncService {
             }
         }
 
-        // Detect if pagination was incomplete (reported total vs actually synced)
-        // Only meaningful during full sync — during incremental sync we intentionally fetch
-        // only recently-updated items, so fetchedCount < totalCount is expected by design.
+        // Full-sync only; compare raw nodes received (not the post-process count) against totalCount.
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            GraphQlConnectionOverflowDetector.check(
+            GraphQlConnectionOverflowDetector.checkPaginated(
                 "discussions",
-                totalDiscussionsSynced,
+                discussionsReceived,
                 reportedTotalCount,
+                abortReason != null || hasMore,
                 safeNameWithOwner
             );
         }
@@ -699,13 +700,7 @@ public class GitHubDiscussionSyncService {
                     if (node != null && node.getReplies() != null) {
                         var repliesPageInfo = node.getReplies().getPageInfo();
                         if (repliesPageInfo != null && Boolean.TRUE.equals(repliesPageInfo.getHasNextPage())) {
-                            GraphQlConnectionOverflowDetector.check(
-                                "discussionComment.replies",
-                                node.getReplies().getNodes() != null ? node.getReplies().getNodes().size() : 0,
-                                true,
-                                "discussionNumber=" + graphQlDiscussion.getNumber() + ", commentId=" + node.getId()
-                            );
-                            // Track for follow-up reply pagination
+                            // No overflow warning: truncated replies are enqueued for follow-up pagination below.
                             if (node.getId() != null && repliesPageInfo.getEndCursor() != null) {
                                 commentsNeedingReplyPagination.add(
                                     new CommentWithReplyCursor(
@@ -909,13 +904,7 @@ public class GitHubDiscussionSyncService {
                         if (node != null && node.getReplies() != null) {
                             var repliesPageInfo = node.getReplies().getPageInfo();
                             if (repliesPageInfo != null && Boolean.TRUE.equals(repliesPageInfo.getHasNextPage())) {
-                                GraphQlConnectionOverflowDetector.check(
-                                    "discussionComment.replies",
-                                    node.getReplies().getNodes() != null ? node.getReplies().getNodes().size() : 0,
-                                    true,
-                                    "discussionNumber=" + discussionNumber + ", commentId=" + node.getId()
-                                );
-                                // Track for follow-up reply pagination
+                                // No overflow warning: truncated replies are enqueued for follow-up pagination below.
                                 if (node.getId() != null && repliesPageInfo.getEndCursor() != null) {
                                     commentsNeedingReplyPagination.add(
                                         new CommentWithReplyCursor(

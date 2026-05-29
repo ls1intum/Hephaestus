@@ -26,7 +26,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlErro
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryNameParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnectionOverflowDetector;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequestConnection;
@@ -769,12 +768,9 @@ public class GitHubHistoricalBackfillService {
             }
         }
 
-        GraphQlConnectionOverflowDetector.check(
-            "issues",
-            totalIssuesSynced,
-            reportedTotalCount,
-            "repo=" + repoNameForLog
-        );
+        // No completeness check: backfill paginates one bounded batch per cycle and resumes from a
+        // saved cursor across cycles, so this batch's count vs the whole-connection totalCount is
+        // meaningless. Real truncation surfaces via the force-pagination/completion logs.
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processIssuesPage when !hasMore)
@@ -977,12 +973,8 @@ public class GitHubHistoricalBackfillService {
             }
         }
 
-        GraphQlConnectionOverflowDetector.check(
-            "pullRequests",
-            totalPRsSynced,
-            reportedTotalCount,
-            "repo=" + repoNameForLog
-        );
+        // No completeness check: see the issues batch above — per-batch count vs whole-connection
+        // totalCount is meaningless for a resumable bounded backfill.
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processPullRequestsPage when !hasMore)

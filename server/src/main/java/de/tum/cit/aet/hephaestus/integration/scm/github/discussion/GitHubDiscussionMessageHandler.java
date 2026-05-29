@@ -67,7 +67,7 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
             return;
         }
 
-        log.info(
+        log.debug(
             "Received discussion event: action={}, discussionNumber={}, repoName={}",
             event.action(),
             discussionDto.number(),

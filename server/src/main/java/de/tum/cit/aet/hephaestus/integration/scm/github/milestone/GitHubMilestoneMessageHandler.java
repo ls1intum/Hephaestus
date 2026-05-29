@@ -53,7 +53,7 @@ public class GitHubMilestoneMessageHandler extends AbstractIntegrationMessageHan
             return;
         }
 
-        log.info(
+        log.debug(
             "Received milestone event: action={}, milestoneTitle={}, repoName={}",
             event.action(),
             sanitizeForLog(milestoneDto.title()),
