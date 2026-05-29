@@ -23,88 +23,52 @@ import java.util.Optional;
  * @see BackfillStateProvider for backfill tracking operations
  */
 public interface SyncTimestampProvider {
-    // SCOPE SYNC TIMESTAMPS
-
     /**
      * Gets the sync metadata for a scope (issue types, dependencies, sub-issues).
-     * <p>
-     * <b>Important:</b> The default implementation returns empty. Implementations
-     * MUST override this method to provide actual sync metadata.
      *
      * @param scopeId the scope ID
      * @return the sync metadata, or empty if scope not found
      */
-    default Optional<SyncMetadata> getSyncMetadata(Long scopeId) {
-        return Optional.empty();
-    }
+    Optional<SyncMetadata> getSyncMetadata(Long scopeId);
 
     /**
      * Updates the sync timestamp for scope-level sync operations.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to persist sync timestamps.
      *
      * @param scopeId  the scope ID
      * @param syncType the type of sync (ISSUE_TYPES, ISSUE_DEPENDENCIES, SUB_ISSUES)
      * @param syncedAt the timestamp of the sync
      */
-    default void updateScopeSyncTimestamp(Long scopeId, SyncType syncType, Instant syncedAt) {
-        // Default no-op - implementations MUST override to persist timestamps
-    }
-
-    // USER SYNC TIMESTAMPS
+    void updateScopeSyncTimestamp(Long scopeId, SyncType syncType, Instant syncedAt);
 
     /**
      * Gets the user sync state for a scope.
-     * <p>
-     * <b>Important:</b> The default implementation returns empty. Implementations
-     * MUST override this method to provide actual user sync state.
      *
      * @param scopeId the scope ID
      * @return the user sync state, or empty if scope not found
      */
-    default Optional<UserSyncState> getUserSyncState(Long scopeId) {
-        return Optional.empty();
-    }
+    Optional<UserSyncState> getUserSyncState(Long scopeId);
 
     /**
      * Updates the users sync timestamp for a scope.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to persist sync timestamps.
      *
      * @param scopeId  the scope ID
      * @param syncedAt the timestamp of the sync
      */
-    default void updateUsersSyncTimestamp(Long scopeId, Instant syncedAt) {
-        // Default no-op - implementations MUST override to persist timestamps
-    }
-
-    // TEAM SYNC TIMESTAMPS
+    void updateUsersSyncTimestamp(Long scopeId, Instant syncedAt);
 
     /**
      * Gets the team sync state for a scope.
-     * <p>
-     * <b>Important:</b> The default implementation returns empty. Implementations
-     * MUST override this method to provide actual team sync state.
      *
      * @param scopeId the scope ID
      * @return the team sync state, or empty if scope not found
      */
-    default Optional<TeamSyncState> getTeamSyncState(Long scopeId) {
-        return Optional.empty();
-    }
+    Optional<TeamSyncState> getTeamSyncState(Long scopeId);
 
     /**
      * Updates the teams sync timestamp for a scope.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to persist sync timestamps.
      *
      * @param scopeId  the scope ID
      * @param syncedAt the timestamp of the sync
      */
-    default void updateTeamsSyncTimestamp(Long scopeId, Instant syncedAt) {
-        // Default no-op - implementations MUST override to persist timestamps
-    }
+    void updateTeamsSyncTimestamp(Long scopeId, Instant syncedAt);
 }

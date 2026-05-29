@@ -23,70 +23,43 @@ import java.util.Optional;
 public interface BackfillStateProvider {
     /**
      * Finds a sync target by its ID.
-     * <p>
-     * <b>Important:</b> The default implementation returns empty. Implementations
-     * MUST override this method to provide actual sync target lookup.
      *
      * @param syncTargetId the sync target ID
      * @return the sync target, or empty if not found
      */
-    default Optional<SyncTarget> findSyncTargetById(Long syncTargetId) {
-        return Optional.empty();
-    }
+    Optional<SyncTarget> findSyncTargetById(Long syncTargetId);
 
     /**
      * Updates the issue backfill state for a sync target.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to persist backfill state, otherwise sync progress
-     * will be lost between restarts.
      *
      * @param syncTargetId   the sync target ID
      * @param highWaterMark  the high water mark (highest issue number at backfill start), or null to keep current
      * @param checkpoint     the current checkpoint (lowest issue number synced), or null to keep current
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
-    default void updateIssueBackfillState(
-        Long syncTargetId,
-        Integer highWaterMark,
-        Integer checkpoint,
-        Instant lastRunAt
-    ) {
-        // Default no-op - implementations MUST override to persist state
-    }
+    void updateIssueBackfillState(Long syncTargetId, Integer highWaterMark, Integer checkpoint, Instant lastRunAt);
 
     /**
      * Updates the pull request backfill state for a sync target.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to persist backfill state, otherwise sync progress
-     * will be lost between restarts.
      *
      * @param syncTargetId   the sync target ID
      * @param highWaterMark  the high water mark (highest pull request number at backfill start), or null to keep current
      * @param checkpoint     the current checkpoint (lowest pull request number synced), or null to keep current
      * @param lastRunAt      when the backfill was last run, or null to keep current
      */
-    default void updatePullRequestBackfillState(
+    void updatePullRequestBackfillState(
         Long syncTargetId,
         Integer highWaterMark,
         Integer checkpoint,
         Instant lastRunAt
-    ) {
-        // Default no-op - implementations MUST override to persist state
-    }
+    );
 
     /**
      * Removes a sync target from the system.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to actually remove sync targets.
      *
      * @param syncTargetId the sync target ID to remove
      */
-    default void removeSyncTarget(Long syncTargetId) {
-        // Default no-op - implementations MUST override to remove targets
-    }
+    void removeSyncTarget(Long syncTargetId);
 
     /**
      * Updates the pagination cursor for the given {@link SyncCursorKind}, keyed by
@@ -95,15 +68,10 @@ public interface BackfillStateProvider {
      * <p>
      * Lets sync resume mid-pagination after interruption; persist within the same
      * transaction as the synced data for consistency.
-     * <p>
-     * <b>Important:</b> The default implementation is a no-op. Implementations
-     * MUST override this method to persist cursor state for reliable resumption.
      *
      * @param scopeId the {@code syncTargetId} (repository) the cursor belongs to
      * @param kind    the entity kind whose cursor is being persisted
      * @param cursor  the GraphQL pagination cursor, or null to clear (sync complete)
      */
-    default void updateSyncCursor(Long scopeId, SyncCursorKind kind, String cursor) {
-        // Default no-op - implementations MUST override to persist cursor
-    }
+    void updateSyncCursor(Long scopeId, SyncCursorKind kind, String cursor);
 }
