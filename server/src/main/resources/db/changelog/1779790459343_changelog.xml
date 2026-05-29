@@ -371,6 +371,15 @@
                 <sqlCheck expectedResult="t">SELECT EXISTS (SELECT 1 FROM connection)</sqlCheck>
                 <!-- Safe state #3: legacy columns already gone (re-run on cutover DB). -->
                 <not><columnExists tableName="workspace" columnName="installation_id"/></not>
+                <!-- Safe state #4: no workspace carries a backfillable git_provider_mode, so the
+                     empty connection table is correct (nothing to migrate), not a backfill failure.
+                     The customChange skips NULL-mode rows, which would otherwise trip this guard.
+                     columnExists is ordered first so the <and> short-circuits on the cutover re-run
+                     where git_provider_mode is already dropped (covered by safe state #3). -->
+                <and>
+                    <columnExists tableName="workspace" columnName="git_provider_mode"/>
+                    <sqlCheck expectedResult="f">SELECT EXISTS (SELECT 1 FROM workspace WHERE git_provider_mode IS NOT NULL)</sqlCheck>
+                </and>
             </or>
         </preConditions>
         <comment>

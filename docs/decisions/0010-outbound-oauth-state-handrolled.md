@@ -58,9 +58,7 @@ We examined whether `spring-boot-starter-oauth2-client` could replace the hand-r
    The session-binding, principal-keyed persistence, and single-vendor-flow assumptions
    are baked too deep. Net code reduction is negative once the per-tenant
    `ClientRegistrationRepository` + JDBC `AuthorizationRequestRepository` + custom
-   `OAuth2AuthorizedClientService` are written. We'd ship the same bugs Linear / Sentry /
-   Vercel learned to avoid when their multi-tenant integration platforms reached this
-   scale.
+   `OAuth2AuthorizedClientService` are written.
 
 2. **Hybrid** — keep the hand-rolled state HMAC + nonce, but adopt:
    - `org.springframework.security.oauth2.core.endpoint.PkceParameterNames` constants
@@ -123,11 +121,6 @@ Any of:
 
 ## References
 
-- [RFC 9700 — Best Current Practice for OAuth 2.0 Security (Jan 2025)](https://www.rfc-editor.org/rfc/rfc9700.html)
 - [RFC 7636 — PKCE](https://www.rfc-editor.org/info/rfc7636)
-- [Spring Security OAuth2 Client docs](https://docs.spring.io/spring-security/reference/servlet/oauth2/client/index.html)
-- [`JdbcOAuth2AuthorizedClientService` schema](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/JdbcOAuth2AuthorizedClientService.html)
-- [`AuthorizationRequestRepository` default — HttpSession-backed](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/oauth2/client/web/AuthorizationRequestRepository.html)
+- [RFC 9700 — Best Current Practice for OAuth 2.0 Security (Jan 2025)](https://www.rfc-editor.org/rfc/rfc9700.html)
 - [spring-security/#15860 — Multi-tenant ClientRegistration enhancement request](https://github.com/spring-projects/spring-security/issues/15860)
-- [ch4mpy/spring-addons discussion #230 — multitenant dynamic ClientRegistrationRepository workaround](https://github.com/ch4mpy/spring-addons/discussions/230)
-- [GitHub Community #42351 — GitHub App approval flow loses state](https://github.com/orgs/community/discussions/42351)

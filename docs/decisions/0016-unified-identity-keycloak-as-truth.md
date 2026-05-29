@@ -75,4 +75,4 @@ The partial unique index is the correct uniqueness contract for the seeded colum
 - Liquibase docs on editing unmerged changesets vs. shipping forward-only — endorsed practice for branch-local cleanup.
 - `WorkspaceContextFilter`, `SecurityUtils` — current `preferred_username → User.login` lookup that Stage B will flip.
 - `AuthenticatedGitProviderUserService.upsertUser` — the seed point for `keycloak_subject` populated in this PR.
-- `1779862439263_user_keycloak_subject.xml` — the new column + partial unique index.
+- `1779790459343_changelog.xml` — the new `keycloak_subject` column + partial unique index.

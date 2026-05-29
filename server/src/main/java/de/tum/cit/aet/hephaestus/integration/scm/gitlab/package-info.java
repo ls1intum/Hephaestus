@@ -26,8 +26,7 @@
         "core::webhook",
         "core::security",
         "workspace",
-        // Workspace flows that lived in workspace/ pre-#1198 now live here — they still
-        // depend on the workspace named sub-surfaces.
+        // GitLab workspace flows depend on the workspace named sub-surfaces.
         "workspace::context",
         "workspace::spi",
         "workspace::events",

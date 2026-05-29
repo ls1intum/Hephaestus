@@ -85,7 +85,7 @@ resolver).
 ### For defect 2 — distinguish definitive 404 from transient inability to ask
 
 Added `RepositoryNotFoundOnGitProviderException` to
-`gitprovider/common/exception/`. `GitHubRepositorySyncService` now throws this
+`integration/scm/domain/common/exception/`. `GitHubRepositorySyncService` now throws this
 exception in the **one** code path where GitHub definitively responded
 "repository does not exist" (GraphQL response valid, `repository` field null).
 Every other failure mode still returns `Optional.empty()` — the **transient**

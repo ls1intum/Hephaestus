@@ -15,8 +15,8 @@ linearity. This ADR records the unified surface the codebase now ships against
 so the next vendor doesn't have to re-litigate it.
 
 Outline integration was an out-of-scope non-goal for this epic and does not exist
-in the shipped tree (deferred to #1203). The `Connection` table still carries the
-`OUTLINE` kind value for forward compatibility.
+in the shipped tree (deferred to #1203). No `OUTLINE` value ships in
+`IntegrationKind` today — the enum is `GITHUB`, `GITLAB`, `SLACK`.
 
 ## Decision drivers
 
@@ -75,10 +75,10 @@ Detail of the substrate packages:
 - `integration/core/spi/` — sole cross-module API surface (`@NamedInterface`).
 - `integration/core/events/` — in-process `ScmDomainEvent` sealed family via
   Spring `ApplicationEventPublisher`. Wire-level publication is raw bytes plus
-  vendor headers, in `integration/core/webhook/`. **Scope note:** the event
-  substrate is currently SCM-scoped (`ScmDomainEvent` + 2-value
-  `GitProviderType`). A cross-vendor `IntegrationEvent` envelope is deferred
-  to the Slack/Outline integration epics (#1203/#1204/#1205).
+  vendor headers, in `integration/core/webhook/`. The event substrate is
+  currently SCM-scoped (`ScmDomainEvent` + 2-value `GitProviderType`); a
+  cross-vendor `IntegrationEvent` envelope is deferred to the later
+  Slack/Outline integration work.
 - `integration/core/connection/` — `Connection` aggregate root, audit log,
   sealed `ConnectionConfig`, AES-256-GCM `CredentialBundleConverter`,
   `EncryptionContext` AAD. Also hosts the platform-level
@@ -117,34 +117,15 @@ Detail of the substrate packages:
 product analytics, not a vendor integration. Naming the package after the
 capability avoids the `integration/` vs `integrations/` foot-gun.
 
-The SPI surface is 30 interfaces in `integration/core/spi/` across three axes
-(42 files total in the package; non-interface types are enums, records, and
-exception classes):
-
-- **Lifecycle** (6): `ProvisioningListener`, `IntegrationLifecycleListener`,
-  `OrganizationMembershipListener`, `TeamMembershipListener`,
-  `ConnectionStrategy`, `WorkspaceProvisioningHook`.
-- **Wire** (10): `WebhookSignatureVerifier`, `WebhookSecretSource`,
-  `SubjectKeyDeriver`, `SubjectParser`, `ApiCredentialProvider`,
-  `TokenRefresher`, `InstallationTokenProvider`, `ScopeIdResolver`,
-  `ScmTokenSource`, `ScmCommentReactionSink`.
-- **Capability** (14): `FeedbackChannel`, `InlineFindingChannel`,
-  `ApprovalChannel`, `BackfillStateProvider`, `SyncContextProvider`,
-  `SyncTargetProvider`, `SyncTimestampProvider`, `NatsSubscriptionProvider`,
-  `RepositoryScopeFilter`, `IntegrationManifest`, `InstallationRepositoryEnumerator`,
-  `InstallationSuspensionTracker`, `WorkspaceDataSyncTrigger`,
-  `WorkspaceProviderAvailability`.
-
-The 30:2 surface (30 interfaces, currently only GitHub and GitLab implement
-most) looks heavy. Each interface is single-purpose and capability-gated: a
-vendor implements only what its `IntegrationManifest` declares, so the next
-vendor pays only for the capabilities it declares. Honest caveat: several of
-these interfaces (e.g. `ScmTokenSource`, `ScmCommentReactionSink`,
-`WorkspaceDataSyncTrigger`) are single-implementer dependency-inversion seams
-against `workspace/`, not multi-vendor SPIs in the extensibility sense. The
-count therefore overstates vendor-facing surface area; the interfaces that
-matter for adding a third SCM vendor are roughly the Wire and sync Capability
-axes.
+The SPI in `integration/core/spi/` is organised on three axes — **lifecycle**
+(provisioning + membership listeners, `ConnectionStrategy`), **wire** (signature
+verification, subject parsing, token/credential sources), and **capability**
+(feedback/finding/approval channels, sync context + timestamp providers,
+manifest). Each interface is single-purpose and capability-gated: a vendor
+implements only what its `IntegrationManifest` declares. Many are single-
+implementer dependency-inversion seams against `workspace/` rather than
+multi-vendor extension points, so the interfaces that matter for adding a third
+SCM vendor are essentially the wire and sync-capability axes.
 
 Credentials at rest use AES-256-GCM with AAD bound to
 `(workspaceId, kind, instanceKey, columnFqn)`. The ciphertext envelope is
@@ -181,10 +162,9 @@ Neutral:
   guidance prefers one file per logical change. Defensible here because
   the file IS the unit of release for this epic — splitting it would
   spread one decision across 12 files for no operational benefit.
-- The 30-interface SPI surface is broader than a pure multi-vendor extensibility
-  count implies (see Decision above — several seams are single-implementer
-  DI boundaries against `workspace/`, not vendor extension points). Each
-  interface is small; the cost is conceptual surface area, not LOC.
+- The SPI surface is broad, but several interfaces are single-implementer DI
+  seams against `workspace/` rather than vendor extension points (see Decision).
+  Each interface is small; the cost is conceptual surface area, not LOC.
 
 Negative:
 

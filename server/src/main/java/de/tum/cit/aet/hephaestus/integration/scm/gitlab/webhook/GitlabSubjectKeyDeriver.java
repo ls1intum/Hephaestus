@@ -123,7 +123,10 @@ public class GitlabSubjectKeyDeriver implements SubjectKeyDeriver {
         List<String> out = new ArrayList<>();
         for (String segment : path.split("/", -1)) {
             if (!segment.isEmpty()) {
-                out.add(segment.toLowerCase(Locale.ROOT).replace('.', '~'));
+                // Case-preserving: the consumer-side filter (ConsumerSubjectMath#buildSubjectPrefix)
+                // is fed the stored, case-preserved RepositoryToMonitor#nameWithOwner, so the producer
+                // MUST preserve case too — lowercasing here drops events for mixed-case GitLab paths.
+                out.add(segment.replace('.', '~'));
             }
         }
         return out;

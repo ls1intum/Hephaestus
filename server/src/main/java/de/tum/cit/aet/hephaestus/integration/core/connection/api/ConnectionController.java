@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +16,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
@@ -29,7 +28,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -115,27 +113,20 @@ public class ConnectionController {
         @Nullable Authentication authentication
     ) {
         if (body == null || body.kind() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "kind is required");
+            throw new IllegalArgumentException("kind is required");
         }
 
         ConnectionStrategy strategy = strategies.get(body.kind());
         if (strategy == null) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "No ConnectionStrategy registered for kind=" + body.kind()
-            );
+            throw new IllegalArgumentException("No ConnectionStrategy registered for kind=" + body.kind());
         }
 
+        // Strategy-level validation failures (e.g. missing 'pat' for GitLab) surface as
+        // IllegalArgumentException → 400 ProblemDetail via GlobalControllerAdvice.
         Map<String, String> userInput = body.userInput() == null ? Map.of() : body.userInput();
-        ConnectInitiation initiation;
-        try {
-            initiation = strategy.initiate(
-                new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, body.redirectAfter())
-            );
-        } catch (IllegalArgumentException e) {
-            // Strategy-level validation failure (e.g. missing 'pat' for GitLab) → 400.
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
-        }
+        ConnectInitiation initiation = strategy.initiate(
+            new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, body.redirectAfter())
+        );
 
         return switch (initiation) {
             case ConnectInitiation.RedirectToVendor r -> ResponseEntity.ok(
@@ -268,29 +259,19 @@ public class ConnectionController {
     @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequest")
     public record ReasonRequest(@Nullable String reason) {}
 
+    /**
+     * Not-found is signalled as {@link NoSuchElementException} by {@code ConnectionAdminService}
+     * (deliberately undistinguished from cross-workspace reads to avoid leaking workspace
+     * boundaries). It is mapped locally — rather than globally — so a stray {@code Optional.get()}
+     * elsewhere in the app still surfaces as a 500, not a misleading 404.
+     * {@code EntityNotFoundException}, {@code IllegalStateException}, {@code IllegalArgumentException}
+     * and {@code DataIntegrityViolationException} are all handled by {@code GlobalControllerAdvice}.
+     */
     @ExceptionHandler(NoSuchElementException.class)
-    ResponseEntity<Map<String, String>> handleNotFound(NoSuchElementException e) {
+    ProblemDetail handleNotFound(NoSuchElementException e) {
         log.info("Connection lookup 404: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
-    }
-
-    @ExceptionHandler(EntityNotFoundException.class)
-    ResponseEntity<Map<String, String>> handleEntityMissing(EntityNotFoundException e) {
-        log.info("Entity lookup 404: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
-    }
-
-    @ExceptionHandler(IllegalStateException.class)
-    ResponseEntity<Map<String, String>> handleIllegalTransition(IllegalStateException e) {
-        log.warn("Connection lifecycle conflict (409): {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    ResponseEntity<Map<String, String>> handleDbConflict(DataIntegrityViolationException e) {
-        log.warn("Connection DB conflict (409): {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(
-            Map.of("error", "Conflict: " + e.getMostSpecificCause().getMessage())
-        );
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        problem.setTitle("Resource not found");
+        return problem;
     }
 }

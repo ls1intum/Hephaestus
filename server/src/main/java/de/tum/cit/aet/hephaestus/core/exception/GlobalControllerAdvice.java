@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -70,6 +71,13 @@ public class GlobalControllerAdvice {
     ProblemDetail handleIllegalState(IllegalStateException exception) {
         log.warn("Handled illegal state exception: message={}", exception.getMessage());
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        // Unique/FK constraint races (e.g. concurrent connection installs) → 409, not a 500.
+        log.warn("Handled data integrity violation: message={}", exception.getMostSpecificCause().getMessage());
+        return problem(HttpStatus.CONFLICT, "Conflict", "The request conflicts with the current resource state.");
     }
 
     // VALIDATION EXCEPTIONS

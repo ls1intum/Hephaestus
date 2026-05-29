@@ -492,10 +492,10 @@ hephaestus:
             # client-id/client-secret below drive the per-workspace install flow (Slack does
             # NOT support refresh-token rotation for legacy bot tokens, so no refresher ships).
             signing-secret: ${SLACK_SIGNING_SECRET:}
-            client-id: ${HEPHAESTUS_SLACK_CLIENT_ID:}
-            client-secret: ${HEPHAESTUS_SLACK_CLIENT_SECRET:}
-            redirect-uri: ${HEPHAESTUS_SLACK_REDIRECT_URI:}
-            api-base: ${HEPHAESTUS_SLACK_API_BASE:https://slack.com}
+            client-id: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}
+            client-secret: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}
+            redirect-uri: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:}
+            api-base: ${HEPHAESTUS_INTEGRATION_SLACK_API_BASE:https://slack.com}
     #     outline:
     #         enabled: false
 

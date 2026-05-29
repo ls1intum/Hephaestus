@@ -21,8 +21,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Slack OAuth v2 connection strategy. Token-rotation apps are rejected at finalize
- * (refresh path lands later in #1198).
+ * Slack OAuth v2 connection strategy. Token-rotation apps are rejected at finalize because
+ * token refresh is not yet implemented.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)

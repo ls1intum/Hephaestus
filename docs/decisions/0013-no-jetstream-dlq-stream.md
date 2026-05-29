@@ -19,32 +19,21 @@ The original argument for a DLQ stream:
   long-running agent jobs whose container died mid-execution).
 
 What the revert noticed:
-- **Dedup window already covers vendor-retry storms.** GitHub redelivers up to 8 times
-  over a few hours with the same `X-GitHub-Delivery` UUID; GitLab redelivers up to 5
-  times with `X-Gitlab-Webhook-UUID`; Slack redelivers 3 times. The JetStream stream
-  `duplicate-window: 2m` (default) catches the same delivery-id arriving on the same
-  subject — vendor retries are not the source of DLQ entries.
-- **`IntegrationPoisonHandler` is the right shape for the actual failure modes.** It
-  NAKs with exponential backoff up to `maxRedeliver` (default 10), then ACKs + bumps
-  `integration.consumer.poison`. The failures it sees are (a) DB constraint races on
-  upsert (resolved on retry), (b) sync-target removed mid-flight (legitimate skip),
-  (c) malformed payload from vendor schema drift (alerts surface via the counter +
-  WARN log + sanitized subject).
-- **A DLQ stream would flap on (a) and (b)** — both are recoverable on retry. The
-  ACK-after-N policy is the *correct* outcome for both. A DLQ stream that fills with
-  transient-race entries is operationally worse than no DLQ stream.
+- **The failure modes don't want a DLQ.** `IntegrationPoisonHandler` NAKs with
+  exponential backoff up to `maxRedeliver` (default 10), then ACKs + bumps
+  `integration.consumer.poison`. The failures it sees are DB constraint races on
+  upsert (resolved on retry), sync-target removed mid-flight (legitimate skip), and
+  malformed payloads from vendor schema drift. The first two are recoverable on
+  retry, so a DLQ would just flap on them — operationally worse than no DLQ.
 - **Replay-after-fix is not a current workflow.** No oncall procedure documents
-  "drain DLQ and re-inject"; vendors retry on their own schedule when their delivery
-  fails to ACK; if Hephaestus is the broken party the fix is a code change + the next
-  vendor poll cycle redelivers (GitHub) or a manual `gh api` replay (operator).
-- **The Micrometer `integration.consumer.poison` counter + WARN log is operator-
-  actionable** — a non-zero rate triggers Grafana alert and the log shows
-  `sanitizeForLog(subject)` so operators can reason about scope without payload bytes.
-- **Capacity.** A DLQ stream at staging traffic (~50 deliveries/day × 4 providers ×
-  365 days = ~73k/year) accumulates persistent bytes for an event no one will replay.
-- **Operator audit trail.** The `integration_consumer_dlq` Liquibase table that pass-9
-  introduced (correlation_id, subject, deliveredCount, bytes) wasn't queried by any
-  shipped Grafana dashboard, nor by any operator runbook.
+  "drain DLQ and re-inject"; vendors retry on their own schedule, and if Hephaestus
+  is the broken party the fix is a code change followed by the next vendor poll
+  cycle (GitHub) or a manual operator replay.
+- **The counter + WARN log is the operator signal.** A non-zero
+  `integration.consumer.poison` rate triggers a Grafana alert; the log carries
+  `sanitizeForLog(subject)` so operators reason about scope without payload bytes.
+  The `integration_consumer_dlq` table pass-9 added was never queried by any
+  dashboard or runbook.
 
 ## Decision
 
@@ -62,7 +51,7 @@ What the revert noticed:
 No `dlq` stream is provisioned in `StreamBootstrap`. No `IntegrationDlqConsumer` bean
 exists. No `integration_consumer_dlq` table exists in Liquibase.
 
-## Rejected alternatives
+## Considered options
 
 1. **Dedicated DLQ JetStream stream with retention=-1.** Rejected for the reasons in
    Context: flap on transient races, no replay workflow, no dashboards consuming the
@@ -71,12 +60,10 @@ exists. No `integration_consumer_dlq` table exists in Liquibase.
    messages to `dlq.<kind>.<subject>`). Rejected: still flap-prone, still no replay
    workflow, AND mixes "real traffic" + "operator audit trail" on one stream's storage
    budget.
-3. **External DLQ store (S3, etc.).** Rejected: out of scope for #1198, more
-   infrastructure to operate, doesn't solve the underlying "no one is going to replay
-   this" problem.
-4. **In-process bounded-buffer DLQ (last N poison messages in memory).** Rejected:
-   loses on pod restart, doesn't scale across replicas, debug-only utility that's
-   already covered by the structured log line.
+3. **External store (S3) or an in-process bounded buffer.** Rejected: more
+   infrastructure (or lost on pod restart), and neither solves the underlying
+   "no one is going to replay this" problem — both are already covered by the
+   structured log line.
 
 ## Consequences
 

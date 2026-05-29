@@ -776,13 +776,23 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- Webhook receiver pure-class layer (subject grammar, dedup ID,
-                                     HMAC, hex): ≥95% branch coverage so refactors fail loudly. -->
+                                <!-- Webhook pure-class layer (ingest pipeline + per-vendor subject
+                                     grammar, dedup ID, HMAC signature verification): ≥95% branch
+                                     coverage so a refactor that drops a case fails loudly. The
+                                     Spring-wired *WebhookSecretSource adapters are excluded — they
+                                     are credential lookups exercised by integration tests, not pure
+                                     classes. Each listed package is gated independently. -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
                                         <include>de.tum.cit.aet.hephaestus.integration.core.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.scm.github.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.slack.webhook</include>
                                     </includes>
+                                    <excludes>
+                                        <exclude>*WebhookSecretSource</exclude>
+                                    </excludes>
                                     <limits>
                                         <limit>
                                             <counter>BRANCH</counter>
