@@ -24,9 +24,8 @@ must:
 - Support **per-instance** ClientRegistration shapes (each Slack workspace has its own
   signing secret; each GitLab self-hosted instance has its own `client_id`).
 
-Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
-`spring-boot-starter-oauth2-client` could replace the hand-rolled `HmacOAuthStateService`
-+ `OAuthStateNonceStore` + PKCE plumbing. Both arrived independently at the same answer.
+We examined whether `spring-boot-starter-oauth2-client` could replace the hand-rolled
+`HmacOAuthStateService` + `OAuthStateNonceStore` + PKCE plumbing.
 
 ## Decision drivers
 
@@ -71,7 +70,7 @@ Two parallel principal-engineer audits (Wave 8 + Wave 10) examined whether
      primitive we deliberately match.
 
 3. **Hand-roll** the entire flow, document our cryptographic choices in line with RFC 7636
-   + RFC 9700, ArchUnit-pin the state token shape. The audits' verdict.
+   + RFC 9700, ArchUnit-pin the state token shape. Adopted.
 
 ## Decision
 
@@ -81,13 +80,11 @@ nothing and reduce future drift:
 - Keep `HmacOAuthStateService`, `OAuthStateNonceStore`, the `state` payload shape
   `(workspaceId|kind|issuedAt|nonce|actorRef|codeVerifier?)`, and the single-use
   `consumed_at` conditional UPDATE.
-- Keep the PKCE primitive we landed in Wave 4 (`issueWithPkce` → `IssuedState`).
+- Keep the PKCE primitive (`issueWithPkce` → `IssuedState`).
 - Reference Spring's PKCE primitive in Javadoc so future readers know we matched it
   deliberately rather than reinvented it.
 - ArchUnit pins remain: the OAuth state SPI lives under
-  `integration/core/oauth/state/` (Wave 1 packaging move from `manifest/` to
-  `oauth/state/`; Phase 1 restructure move from `integration/oauth/state/` to
-  `integration/core/oauth/state/`).
+  `integration/core/oauth/state/`.
 
 ## Consequences
 

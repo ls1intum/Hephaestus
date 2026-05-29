@@ -2,25 +2,24 @@
 
 **Status:** Accepted
 **Date:** 2026-05-25
-**Authors:** Integration framework polish (#1198), Wave 9 CVE fix
 
 ## Context
 
-Pass 1 (commit `e1af1fdaf`) introduced AES-GCM credential encryption with a *static
-context string* as AAD:
+The first AES-GCM credential-encryption implementation (commit `e1af1fdaf`) used a
+*static context string* as AAD:
 
 ```
 CONTEXT_AAD = "hephaestus-credential-bundle-v1"
 ```
 
-A pass-3 audit caught that this AAD is **shared across every row in the database**.
-An attacker with DB write access to the `connection` table (compromised replication
-slot, leaked Postgres super-user, etc.) can copy ciphertext from workspace A's
-`credentials_encrypted` column into workspace B's row, and the converter decrypts it
-cleanly — the GitHub installation token / OAuth session silently moves tenants.
+That AAD is **shared across every row in the database**. An attacker with DB write
+access to the `connection` table (compromised replication slot, leaked Postgres
+super-user, etc.) can copy ciphertext from workspace A's `credentials_encrypted`
+column into workspace B's row, and the converter decrypts it cleanly — the GitHub
+installation token / OAuth session silently moves tenants.
 
-Pass 9 (`420dee0d5`) closed the gap by binding AAD per row. This ADR records what
-shipped, what was rejected, and the operational implications.
+The fix (commit `420dee0d5`) closed the gap by binding AAD per row. This ADR records
+what shipped, what was rejected, and the operational implications.
 
 The threat model: an attacker who can write to the database but does NOT have the
 application's encryption key. AES-GCM's authentication tag prevents direct ciphertext

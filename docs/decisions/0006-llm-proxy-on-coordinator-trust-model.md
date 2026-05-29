@@ -22,9 +22,8 @@ out. The question is which JVM hosts the proxy when the worker is split out:
 - **Worker-hosted (worker JVM)** — workers proxy locally; LLM credentials live on
   the worker.
 
-An earlier principal-engineer recommendation said "move to worker" — that
-recommendation was wrong for the BYO model and we'd have shipped a credential
-isolation breach.
+An earlier recommendation said "move to worker" — that recommendation was wrong
+for the BYO model and we'd have shipped a credential isolation breach.
 
 ## Decision drivers
 

@@ -10,29 +10,18 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Locks the post-Slice-F state where every production message handler routes through the
- * unified {@code IntegrationMessageHandlerRegistry}.
- *
- * <p>The slice that introduced {@link AbstractIntegrationMessageHandler} and migrated all
- * 24 GitHub + 8 GitLab handlers onto it deleted both legacy registries
- * ({@code GitHubMessageHandlerRegistry}, {@code GitLabMessageHandlerRegistry}) and their
- * abstract bases ({@code GitHubMessageHandler<T>}, {@code GitLabMessageHandler<T>}). The
- * rules below enforce that the migration cannot regress:
+ * Invariant: every production message handler routes through the unified
+ * {@code IntegrationMessageHandlerRegistry}, never a per-kind registry.
  *
  * <ol>
- *   <li>No production class may name the deleted registries — accidentally re-introducing
- *       a parallel resolution path is the single failure mode this slice spent solving.</li>
- *   <li>Every {@code *MessageHandler} class under {@code integration/<kind>/} must extend
- *       {@link AbstractIntegrationMessageHandler} OR implement
- *       {@link IntegrationMessageHandler} directly — there is no other valid handler
- *       shape now that the legacy bases are gone.</li>
- *   <li>The unified registry must be populated; an empty registry would silently route
- *       100% of traffic to ACK-as-no-op. We assert via a minimum count.</li>
+ *   <li>No production class may name the deleted legacy registries — re-introducing one
+ *       splits the routing surface into a parallel resolution path.</li>
+ *   <li>Every concrete {@code *MessageHandler} under {@code integration/<kind>/} must extend
+ *       {@link AbstractIntegrationMessageHandler} or implement {@link IntegrationMessageHandler}
+ *       directly; anything else cannot be picked up by the unified registry.</li>
+ *   <li>The registry must be non-empty per kind — an empty registry silently routes 100% of
+ *       traffic to ACK-as-no-op.</li>
  * </ol>
- *
- * <p>The minimum count (30) is a floor, not a target — it leaves slack for handlers to be
- * added or removed within the same family without churning this test, while still failing
- * loudly if the migration is reverted to the legacy bases (zero unified handlers).
  */
 class IntegrationMessageHandlerArchTest extends HephaestusArchitectureTest {
 

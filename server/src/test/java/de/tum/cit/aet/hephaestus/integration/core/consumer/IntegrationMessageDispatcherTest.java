@@ -148,7 +148,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
         private final EventTypeKey key;
         private final boolean enabled;
-        private final java.util.List<Message> received = new java.util.ArrayList<>();
 
         RecordingHandler(EventTypeKey key) {
             this(key, true);
@@ -171,7 +170,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
         @Override
         public void onMessage(Message msg) {
-            received.add(msg);
+            // No-op: these tests assert on dispatch resolution, not message handling.
         }
     }
 }

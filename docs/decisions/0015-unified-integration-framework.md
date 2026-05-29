@@ -1,47 +1,8 @@
 # ADR 0015: Unified integration framework — package layout and SPI surface
 
-**Status:** Accepted (amended 2026-05-27 for Phase 1-4 restructure)
+**Status:** Accepted
 **Date:** 2026-05-26
 **Authors:** Felix T.J. Dietrich
-
-## 2026-05-27 Update — Phase 1-4 Restructure
-
-The original Decision shipped vendor adapters and cross-cutting substrate as
-siblings under `integration/`. A four-phase restructure (commits `121b32472`,
-`8066bdba1`, `461c914cd`, `6d8a2d564`) re-shaped the tree:
-
-```
-integration/
-├── core/        cross-cutting substrate (Phase 1: spi, events, framework,
-│                connection, consumer, handler, oauth, webhook, feedback;
-│                Phase 4: connection/identity for multi-vendor JWT→User)
-├── scm/         SCM family root (Phase 2/3)
-│   ├── domain/  shared kernel — 18 leaf packages (Phase 3)
-│   ├── github/  vendor adapter (Phase 2: moved from integration/github/)
-│   ├── gitlab/  vendor adapter (Phase 2)
-│   └── sync/    family-shared orchestrator
-└── slack/       Modulith OPEN (empirically required: the leaderboard fan-out
-                 crosses module boundaries at runtime; CLOSED deferred — see
-                 `slack/package-info.java`) — single vendor, opt-in
-                 (matchIfMissing=false)
-```
-
-> **2026-05-29 Scope note:** `integration/outline/` was removed entirely in this
-> epic as an out-of-scope non-goal (#1198). The live top-level set is
-> `{core, scm, slack}`. Outline integration is deferred to a future epic
-> (#1203). References to Outline in the original Decision text below have been
-> corrected accordingly.
-
-Key non-layout changes from Phase 4:
-- SPI vendor-name purge: `GithubAppCredential` → `InstallationCredential`,
-  `AuthMode.GITHUB_APP` → `INSTALLATION_APP`.
-- Modulith `allowedDependencies` declared explicitly on every vendor leaf.
-- `IntegrationStructuralRulesTest` pins post-restructure invariants in ArchUnit.
-- Identity persistence: see [ADR 0016](0016-unified-identity-keycloak-as-truth.md)
-  for the Keycloak-subject migration (Stage A) that runs alongside this layout.
-
-The original Decision text below is preserved as the canonical SPI surface;
-the Phase 1-4 deltas are renames and module re-rooting, not contract changes.
 
 ## Context
 
@@ -49,14 +10,13 @@ Before #1198, each vendor (GitHub, GitLab, Slack-as-notification) had its own
 hand-rolled adapter, its own webhook route, its own message-handler registry,
 and its own credential storage path on the `Workspace` row. Three external
 modules (`workspace/`, `contributors/`, `gitprovider/common/github/app/`)
-imported vendor classes directly. Adding Slack and Outline would have compounded
-the linearity.
+imported vendor classes directly. Adding more vendors would have compounded that
+linearity. This ADR records the unified surface the codebase now ships against
+so the next vendor doesn't have to re-litigate it.
 
-The cleanup landed in two phases: the iteration (passes 1–15) shaped the
-contract surface; pass 16 cut over the runtime, consolidated the schema,
-renamed the domain, and removed every backwards-compat shim. This ADR records
-the surface the codebase now ships against so the next vendor doesn't have to
-re-litigate it.
+Outline integration was an out-of-scope non-goal for this epic and does not exist
+in the shipped tree (deferred to #1203). The `Connection` table still carries the
+`OUTLINE` kind value for forward compatibility.
 
 ## Decision drivers
 
@@ -75,22 +35,42 @@ re-litigate it.
 1. **Status quo** — extend `gitprovider/` for each new family. Rejected:
    the package name says "git" and every consumer learns to mentally translate.
 2. **Per-family roots** (`scm/`, `messaging/`, `knowledge/` as siblings,
-   vendor under family). PE-B Alternative B. Rejected mid-epic: ~600 file
-   moves, ~3000 import rewrites, and the cross-cutting `platform/` pile
-   reintroduces what we were trying to eliminate.
+   vendor under family). Rejected: ~600 file moves, ~3000 import rewrites, and
+   the cross-cutting `platform/` pile reintroduces what we were trying to
+   eliminate.
 3. **Pipeline-first** — collapse `webhook/`, `oauth/`, `consumer/`, `handler/`
-   into one `ingest/`. PE-B Alternative A. Rejected: webhook (HMAC, raw
-   body) and oauth (signed state, browser redirect) have different security
-   models; grouping them obscures more than it reveals.
-4. **Surgical fix on the current layout** — PE-B Alternative C, adopted.
-   The current layout was 90% right; rename `registry/` → `connection/`,
-   `manifest/` → `framework/`, move `GitProvider*` out of `scm/common/`,
-   collapse the `sync/` orphan, fix one Javadoc lie. ~50 file moves.
+   into one `ingest/`. Rejected: webhook (HMAC, raw body) and oauth (signed
+   state, browser redirect) have different security models; grouping them
+   obscures more than it reveals.
+4. **Cross-cutting substrate under `core/`, SCM family under `scm/`** — adopted.
+   `core/` holds the vendor-neutral pipeline; `scm/` is the SCM family root with
+   the shared domain kernel plus per-vendor adapters; single-vendor families
+   (Slack) sit at the top level. This keeps the pipeline's security boundaries
+   (webhook vs oauth) distinct while letting a new SCM vendor add one package.
 
 ## Decision
 
-The integration domain lives under `integration/` with the following structure
-(all paths are under `integration/core/` after the Phase 1-4 restructure):
+The integration domain lives under `integration/` with the following top-level
+shape:
+
+```
+integration/
+├── core/   vendor-neutral substrate: spi, events, framework, connection,
+│           consumer, handler, oauth, webhook, feedback
+├── scm/    SCM family root: domain (shared kernel, 18 leaf packages),
+│           github/, gitlab/ (vendor adapters), sync/ (family orchestrator)
+└── slack/  single-vendor messaging adapter, Modulith OPEN, opt-in
+            (matchIfMissing=false)
+```
+
+SPI vendor-name neutrality is enforced in naming (`InstallationCredential` not
+`GithubAppCredential`, `AuthMode.INSTALLATION_APP` not `GITHUB_APP`), with
+Modulith `allowedDependencies` declared explicitly on every vendor leaf and
+`IntegrationStructuralRulesTest` pinning the invariants in ArchUnit. Identity
+persistence is covered separately by
+[ADR 0016](0016-unified-identity-keycloak-as-truth.md).
+
+Detail of the substrate packages:
 
 - `integration/core/spi/` — sole cross-module API surface (`@NamedInterface`).
 - `integration/core/events/` — in-process `ScmDomainEvent` sealed family via
@@ -132,13 +112,10 @@ The integration domain lives under `integration/` with the following structure
   layer was removed in this epic (see Consequences). Declared
   `Type.OPEN` by empirical necessity — the leaderboard fan-out crosses module
   boundaries; full CLOSED is deferred. Opt-in (matchIfMissing=false).
-- **Outline** was removed from this epic as an out-of-scope non-goal. It does
-  not exist in the shipped tree. Deferred to #1203.
 
 `analytics/` is a sibling of `integration/`, not under it. PostHog is
 product analytics, not a vendor integration. Naming the package after the
-capability avoids the `integration/` vs `integrations/` foot-gun the
-iteration accumulated.
+capability avoids the `integration/` vs `integrations/` foot-gun.
 
 The SPI surface is 30 interfaces in `integration/core/spi/` across three axes
 (42 files total in the package; non-interface types are enums, records, and
@@ -212,8 +189,8 @@ Neutral:
 Negative:
 
 - The API contract break (`gitProviderMode` → `kind`) requires regenerating
-  every client. Webapp regenerated in pass 16; future external API consumers
-  must port at adoption time.
+  every client. The webapp client was regenerated in this epic; future external
+  API consumers must port at adoption time.
 - The backfill (`WorkspaceConnectionBackfillChange`) requires the encryption
   key at migration time. If the key is absent the changeset fails loudly
   (not silently) before any legacy columns are dropped. Operators must ensure
@@ -224,10 +201,6 @@ Negative:
   persistence layer (`SlackMessage`/`SlackChannel` entities + repos +
   deletion handler) was removed in this epic; `SlackLifecycleListener` is a
   no-op stub. The Connection table accepts SLACK rows.
-- Outline was removed from this epic as an out-of-scope non-goal (#1198
-  non-goal). The `integration/outline/` package does not exist in the shipped
-  tree; the Connection table still carries the OUTLINE kind value for forward
-  compatibility. Outline integration is deferred to #1203.
 
 ## Revisit trigger
 

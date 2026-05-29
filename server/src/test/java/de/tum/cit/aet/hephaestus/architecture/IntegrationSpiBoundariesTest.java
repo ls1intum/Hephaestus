@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaFieldAccess;
 import com.tngtech.archunit.core.domain.JavaModifier;
@@ -29,12 +30,10 @@ import org.junit.jupiter.api.Test;
  *   <li>{@link #agentDoesNotReadProviderEnumConstants} — agent/** must dispatch via the SPI
  *       registry (a {@code Map<IntegrationKind, …Channel>} keyed by {@code channel.kind()}),
  *       never by naming a concrete enum constant ({@code IntegrationKind.GITHUB} /
- *       {@code GITLAB} / {@code SLACK}). This is Issue #1198 AC#8: the delivery classes
+ *       {@code GITLAB} / {@code SLACK}), and must never reach for the legacy
+ *       {@code GitProviderType} enum at all. This is Issue #1198 AC#8: the delivery classes
  *       {@code DiffNotePoster}, {@code PullRequestCommentPoster}, {@code FeedbackDeliveryService}
  *       must not branch on the provider enum.
- *   <li>{@link #agentDoesNotDependOnGitProviderType} — forward guard: agent/** must never
- *       reach for the legacy {@code GitProviderType} enum (absorbed from the former
- *       {@code AgentDoesNotBranchOnGitProviderTypeTest}).
  * </ul>
  */
 class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
@@ -112,37 +111,25 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
         ArchRule rule = classes()
             .that()
             .resideInAPackage("..agent..")
-            .should(notReadEnumConstantsOf(INTEGRATION_KIND_FQN))
+            // Bites for both enums: no constant reads of IntegrationKind, and no dependency at all
+            // on the legacy GitProviderType (whose only legitimate agent-side use would itself be a
+            // branch-on-provider). Reading a GitProviderType constant is caught by the same
+            // constant-read condition; depending on the type in any other way is caught explicitly.
+            .should(
+                notReadEnumConstantsOf(INTEGRATION_KIND_FQN)
+                    .and(notReadEnumConstantsOf(GIT_PROVIDER_TYPE_FQN))
+                    .and(notDependOnClass(GIT_PROVIDER_TYPE_FQN))
+            )
             // Strict: if no agent/** classes are loaded the rule must fail rather than pass
             // vacuously — the population is the whole agent module and is never legitimately empty.
             .allowEmptyShould(false)
             .because(
                 "Issue #1198 AC#8: agent/** dispatches on the provider via the SPI registry " +
                     "(Map<IntegrationKind, …Channel> keyed by channel.kind()). Reading a concrete " +
-                    "IntegrationKind constant (GITHUB/GITLAB/SLACK) is the branch-on-provider smell — " +
-                    "push the behaviour into the per-kind SPI adapter instead."
+                    "IntegrationKind constant (GITHUB/GITLAB/SLACK) — or touching the legacy " +
+                    "GitProviderType enum at all — is the branch-on-provider smell; push the " +
+                    "behaviour into the per-kind SPI adapter instead."
             );
-        rule.check(classes);
-    }
-
-    /**
-     * Forward guard absorbed from the former {@code AgentDoesNotBranchOnGitProviderTypeTest}.
-     *
-     * <p>{@code GitProviderType} is the legacy SCM-only enum. Agent/** references it zero times
-     * today, so this rule's population is legitimately empty — it exists to catch a future
-     * regression, not a present one. Hence {@code allowEmptyShould(true)}: an empty match is the
-     * <em>passing</em> state here, unlike the AC#8 rule above.
-     */
-    @Test
-    void agentDoesNotDependOnGitProviderType() {
-        ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage("..agent..")
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName(GIT_PROVIDER_TYPE_FQN)
-            .allowEmptyShould(true) // forward guard: agent/** legitimately references GitProviderType zero times today
-            .because("agent/** dispatches by IntegrationKind via the SPI registry, never the legacy GitProviderType");
         rule.check(classes);
     }
 
@@ -179,6 +166,35 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                                     target.getOwner().getSimpleName(),
                                     target.getName(),
                                     access.getSourceCodeLocation()
+                                )
+                            )
+                        );
+                    }
+                }
+            }
+        };
+    }
+
+    /**
+     * Fails a class that has any direct dependency on the named class — extends/implements, field,
+     * parameter, return type, local variable, annotation, or call target. Used to forbid the legacy
+     * {@code GitProviderType} from agent/** entirely, not just its constant reads.
+     */
+    private static ArchCondition<JavaClass> notDependOnClass(String fqn) {
+        return new ArchCondition<>("not depend on " + fqn) {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
+                    if (dependency.getTargetClass().getFullName().equals(fqn)) {
+                        events.add(
+                            SimpleConditionEvent.violated(
+                                javaClass,
+                                String.format(
+                                    "%s depends on %s at %s — agent/** must dispatch by IntegrationKind " +
+                                        "via the SPI registry, never the legacy GitProviderType",
+                                    javaClass.getSimpleName(),
+                                    fqn,
+                                    dependency.getSourceCodeLocation()
                                 )
                             )
                         );

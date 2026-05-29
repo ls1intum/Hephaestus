@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -21,42 +20,20 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Pins the tolerant-reader contract for the SCM webhook DTOs against two fixtures per vendor,
- * exercised through the REAL production deserialization path and the REAL production mapper.
+ * Pins the tolerant-reader contract for the SCM webhook DTOs through the REAL production path:
+ * {@link NatsMessageDeserializer} over the Spring-Boot-autoconfigured Jackson&nbsp;3
+ * {@code tools.jackson.databind.ObjectMapper}.
  *
- * <p>Production deserializes every NATS webhook payload via {@link NatsMessageDeserializer}, which
- * delegates to the Spring-Boot-autoconfigured Jackson&nbsp;3 {@code tools.jackson.databind.ObjectMapper}
- * bean. This test boots only {@link JacksonAutoConfiguration} (no DB, web, or Docker), so the
- * injected {@link ObjectMapper} is the exact bean production uses — built from the {@code spring.jackson.*}
- * stanza in {@code application.yml} ({@code fail-on-unknown-properties: false},
- * {@code fail-on-null-for-primitives: false}, {@code default-property-inclusion: non_null},
- * UTC time zone, ISO date-times). The test then drives {@link NatsMessageDeserializer} over that
- * bean, exactly as the live message handlers do.
+ * <p>Booting the real auto-config (rather than hand-building a mapper) is the point: unknown-field
+ * tolerance is mapper <em>configuration</em> ({@code spring.jackson.fail-on-unknown-properties:
+ * false}), not an annotation effect, so only the autoconfigured bean tests what production actually
+ * does. A hand-rolled mapper would re-encode the config under test and drift silently.
  *
- * <p>Why a context test rather than a hand-built {@code JsonMapper}: the tolerant-reader behaviour
- * here is mapper-configuration, not annotation, behaviour. A hand-rolled builder would re-encode the
- * config the test claims to verify — drifting silently if {@code application.yml} changes, and (as
- * the earlier Jackson&nbsp;2 version did) testing an engine production does not run. Booting the real
- * auto-config makes the assertions track production faithfully.
- *
- * <p>The earlier version of this test built a hand-rolled Jackson&nbsp;<b>2</b>
- * ({@code com.fasterxml.jackson.databind}) mapper and leaned on {@code @JsonIgnoreProperties} for
- * unknown-field tolerance. That was theatre: production runs a different engine (Jackson&nbsp;3),
- * where unknown-field tolerance is the engine default rather than an annotation effect, so the green
- * told us nothing about whether production tolerates the payload.
- *
- * <p>v1 fixtures are minimal "as-shipped today" examples. v2 fixtures are SYNTHETIC
- * forward-compatibility fixtures: the v1 payload with fabricated unknown keys injected at the top
- * level and at every nesting level, simulating a vendor adding fields the DTO does not declare.
- *
- * <p>The behaviour under test, on the real engine, is the tolerant-reader property in two halves:
- * (1) the reader must deserialize the unknown-field payload WITHOUT throwing — the real regression
- * guard against a future flip of {@code fail-on-unknown-properties} to {@code true}; and (2) it must
- * still map the right JSON path to the right DTO field, including deep paths
- * ({@code pull_request.base.ref}) and a typed coercion ({@code created_at} -> {@code Instant}), so a
- * mis-wired {@code @JsonProperty} is caught. The v2 tests additionally assert the fixture genuinely
- * carries injected unknown keys, so the tolerance assertion cannot quietly become vacuous if someone
- * strips the synthetic fields.
+ * <p>v1 fixtures are minimal "as-shipped" examples; v2 fixtures inject synthetic unknown keys at the
+ * top level and every nesting level. Each v2 test asserts (a) the fixture really carries unknown keys
+ * (so the tolerance check can't go vacuous), (b) deserialization does not throw (the regression guard
+ * against a future flip to {@code fail-on-unknown-properties: true}), and (c) known fields — including
+ * deep paths and a typed {@code Instant} coercion — still map correctly.
  */
 @Tag("unit")
 @SpringBootTest(classes = JacksonAutoConfiguration.class)
@@ -137,21 +114,6 @@ class MultiVersionFixtureTest {
 
         // (2) Correctness.
         assertKnownGitlabFields(dto);
-    }
-
-    /** Tolerance is the contract under test — assert it never throws for either v2 fixture. */
-    @Test
-    void v2Fixtures_neverThrowThroughTheRealDeserializer() {
-        assertThatCode(() ->
-            deserialize("/integration-fixtures/github/v2/pull_request.opened.json", GitHubPullRequestEventDTO.class)
-        )
-            .as("real Jackson-3 production mapper tolerates unknown GitHub fields")
-            .doesNotThrowAnyException();
-        assertThatCode(() ->
-            deserialize("/integration-fixtures/gitlab/v2/merge_request.open.json", GitLabMergeRequestEventDTO.class)
-        )
-            .as("real Jackson-3 production mapper tolerates unknown GitLab fields")
-            .doesNotThrowAnyException();
     }
 
     /**

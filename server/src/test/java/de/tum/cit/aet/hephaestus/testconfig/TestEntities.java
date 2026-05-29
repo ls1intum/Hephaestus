@@ -10,21 +10,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 
 /**
- * Object-mother for the owned JPA {@code @Entity} POJOs used across unit tests.
- *
- * <p><b>Why this exists.</b> These entities all carry {@code @NoArgsConstructor + @Setter}
- * (Lombok), so the real object is cheaper and strictly more faithful than a Mockito mock.
- * Mocking an owned entity and stubbing its getters is tautological —
- * {@code when(ws.getId()).thenReturn(1L)} followed by an assertion on {@code 1L} tests the
- * stub, not the system under test, and couples the test to getter names instead of real
- * entity wiring (relationships, equals/hashCode). Constructing the real object exercises the
- * same field plumbing the production code relies on.
+ * Object-mother for the owned JPA {@code @Entity} POJOs used across unit tests. Constructing the
+ * real object (these all carry Lombok {@code @NoArgsConstructor + @Setter}) is cheaper and more
+ * faithful than mocking it; see {@code NoMockingOwnedEntitiesTest} for the full rationale and the
+ * guard that enforces it.
  *
  * <p>Each factory sets only the minimal identifying fields. Tests that need more should set
  * additional fields on the returned instance directly — the entity is fully mutable.
- *
- * <p><b>Guarded by</b> {@code NoMockingOwnedEntitiesTest}: re-introducing
- * {@code mock(<Entity>.class)} for any of these owned entities fails the architecture suite.
  */
 public final class TestEntities {
 

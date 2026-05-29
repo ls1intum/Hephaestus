@@ -20,36 +20,15 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Authenticity guard: validates that the <strong>production</strong> schema — built from the
- * 600+ Liquibase changesets in {@code db/master.xml} — is consistent with the JPA {@code @Entity}
- * mappings, exactly as a production boot would (which runs {@code ddl-auto: validate} over a
- * Liquibase-built schema).
+ * Authenticity guard for production-boot drift: builds the schema from the real Liquibase
+ * migration set ({@code db/master.xml}) and runs Hibernate {@code ddl-auto: validate} over it,
+ * exactly as a production boot does.
  *
- * <p><b>Why this test exists.</b> Every other integration test extends
- * {@link de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest}, which builds the schema with
- * Hibernate {@code ddl-auto: create} and disables Liquibase (see {@code application-test.yml}).
- * That means the real migration set is NEVER exercised in CI: a divergent migration (wrong column
- * type, missing constraint, entity/schema drift) sails through CI and only blows up at production
- * boot. This test closes that gap by reproducing the production boot contract in CI.
- *
- * <p><b>Why a dedicated, fresh container.</b> The shared singleton
- * {@link de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer#getInstance()} already holds
- * a Hibernate {@code create}-built schema; running Liquibase on top of it would conflict
- * (objects already exist). We therefore start an isolated, non-reused
- * {@code new PostgreSQLContainer<>("postgres:16")} so Liquibase builds the schema from a truly
- * empty database, and Hibernate then {@code validate}s the entities against it.
- *
- * <p><b>What asserts.</b> A successful context start IS the headline assertion — if any changeset
- * fails to apply, or Hibernate {@code validate} finds a missing/type-mismatched column, the context
- * never starts and the test fails. We add explicit, concrete assertions on top: the
- * {@code DATABASECHANGELOG} ledger holds the full migration set, and a couple of representative
- * production columns ({@code workspace.account_login}, {@code connection.credentials_encrypted})
- * are present in the Liquibase-built schema.
- *
- * <p>This test does NOT extend {@code BaseIntegrationTest} on purpose: it must own its datasource,
- * Liquibase, and ddl-auto wiring rather than inherit the {@code create}/Liquibase-disabled defaults.
- * It is {@link DirtiesContext}d after the class so its distinct context + DB never leak into the
- * shared-container suite.
+ * <p>This closes a real gap: every other integration test extends {@code BaseIntegrationTest},
+ * which builds the schema with Hibernate {@code ddl-auto: create} and disables Liquibase, so the
+ * migrations are NEVER exercised in CI — a divergent migration (wrong column type, missing
+ * constraint, entity/schema drift) only blows up at production boot. A clean context start here IS
+ * the headline assertion; the explicit assertions below add concrete checks on top.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
