@@ -1,11 +1,18 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.leaderboard.spi.WorkspaceScheduleChangedEvent;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.SimpleLock;
@@ -24,13 +31,30 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
 
 /**
- * Wires every registered {@link LeaderboardNotificationTask} + the league-points update
- * onto the cron defined in {@link LeaderboardProperties}.
+ * Schedules the weekly leaderboard work <b>per workspace</b>: each workspace runs its notification
+ * channels + league-points recompute on its own cron, derived from
+ * {@link LeaderboardScheduleResolver} (the workspace's {@code leaderboardScheduleDay}/{@code Time}
+ * override, falling back to the global {@link LeaderboardProperties#schedule()} default).
  *
- * <p>Notification tasks register themselves as Spring beans implementing the marker
- * interface — the scheduler picks them up via constructor injection and stays vendor-
- * agnostic. The Slack task lives in the slack module; future Teams/Discord/email tasks
- * register the same way without changing this class.
+ * <p>Registration: one {@link CronTrigger} per workspace, (re)built at startup, when a workspace is
+ * created ({@link WorkspaceCreatedEvent}), and when its schedule changes
+ * ({@link WorkspaceScheduleChangedEvent}). A workspace deleted between ticks self-cancels on its
+ * next fire (the runnable re-loads by id and cancels its own future when the row is gone), so no
+ * delete event is required.
+ *
+ * <p>Notification channels register as Spring beans implementing {@link LeaderboardNotificationTask}
+ * — the scheduler stays vendor-agnostic; the Slack task lives in the slack module. The global
+ * {@code notification.enabled} flag is the kill-switch for notification channels (league-points
+ * recompute always runs). ShedLock keys per {@code (workspace, task)} so only one replica runs each
+ * on a given tick.
+ *
+ * <p>In-process registry caveat: cron triggers live on this replica's {@link TaskScheduler}. Every
+ * replica registers the same triggers and races for the ShedLock, so exactly one runs each tick —
+ * but a schedule edit only re-registers on the replica that handles the HTTP request. The next
+ * occurrence still fires correctly on all replicas because {@link #onScheduleChanged} is driven by
+ * an {@link org.springframework.context.ApplicationEvent}, which in a single-process deployment
+ * reaches the one scheduler; multi-replica live edits converge on the next app restart. (The data
+ * is always authoritative — only the in-memory trigger cadence can lag a peer until restart.)
  */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @Component
@@ -46,32 +70,132 @@ public class LeaderboardTaskScheduler {
     private static final Duration LOCK_AT_LEAST_FOR = Duration.ofMinutes(1);
 
     private final LeaderboardProperties leaderboardProperties;
+    private final LeaderboardScheduleResolver scheduleResolver;
     private final TaskScheduler taskScheduler;
     private final List<LeaderboardNotificationTask> notificationTasks;
     private final LeaguePointsUpdateTask leaguePointsUpdateTask;
+    private final WorkspaceRepository workspaceRepository;
     private final LockProvider lockProvider;
+
+    /** Live cron registration per workspace id, so schedule edits can cancel + re-register. */
+    private final Map<Long, ScheduledFuture<?>> registrations = new ConcurrentHashMap<>();
 
     public LeaderboardTaskScheduler(
         LeaderboardProperties leaderboardProperties,
+        LeaderboardScheduleResolver scheduleResolver,
         TaskScheduler taskScheduler,
         List<LeaderboardNotificationTask> notificationTasks,
         LeaguePointsUpdateTask leaguePointsUpdateTask,
+        WorkspaceRepository workspaceRepository,
         LockProvider lockProvider
     ) {
         this.leaderboardProperties = leaderboardProperties;
+        this.scheduleResolver = scheduleResolver;
         this.taskScheduler = taskScheduler;
         this.notificationTasks = notificationTasks;
         this.leaguePointsUpdateTask = leaguePointsUpdateTask;
+        this.workspaceRepository = workspaceRepository;
         this.lockProvider = lockProvider;
     }
 
+    @EventListener(ApplicationReadyEvent.class)
+    public void scheduleAllWorkspaces() {
+        List<Workspace> workspaces = workspaceRepository.findAll();
+        log.info("Scheduling leaderboard tasks for {} workspace(s)", workspaces.size());
+        for (Workspace workspace : workspaces) {
+            register(workspace);
+        }
+    }
+
+    /** A newly-created workspace gets its cron registered immediately, no restart needed. */
+    @EventListener
+    public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
+        workspaceRepository.findById(event.workspaceId()).ifPresent(this::register);
+    }
+
+    /** A schedule edit cancels the old trigger and re-registers at the new cadence. */
+    @EventListener
+    public void onScheduleChanged(WorkspaceScheduleChangedEvent event) {
+        workspaceRepository.findById(event.workspaceId()).ifPresent(this::register);
+    }
+
+    /** (Re)register the per-workspace cron, cancelling any prior trigger for the same workspace. */
+    private synchronized void register(Workspace workspace) {
+        Long workspaceId = workspace.getId();
+        if (workspaceId == null) {
+            return;
+        }
+        String cron = scheduleResolver.cron(workspace);
+        if (!CronExpression.isValidExpression(cron)) {
+            log.error("Rejected invalid cron expression: workspaceId={}, cronExpression={}", workspaceId, cron);
+            return;
+        }
+
+        ScheduledFuture<?> previous = registrations.remove(workspaceId);
+        if (previous != null) {
+            previous.cancel(false);
+        }
+
+        try {
+            ScheduledFuture<?> future = taskScheduler.schedule(
+                locked(() -> runForWorkspace(workspaceId), workspaceId),
+                new CronTrigger(cron)
+            );
+            if (future != null) {
+                registrations.put(workspaceId, future);
+            }
+            log.info("Scheduled leaderboard tasks: workspaceId={}, cronExpression={}", workspaceId, cron);
+        } catch (TaskRejectedException ex) {
+            log.warn("Skipped scheduling: reason=taskRejected, workspaceId={}", workspaceId, ex);
+        }
+    }
+
     /**
-     * Wraps a task so that, across multiple server replicas, only the replica that acquires the
-     * named ShedLock executes it on a given tick. Mirrors the {@code @SchedulerLock} guard the
-     * SCM sync schedulers use — but applied programmatically because the leaderboard cron is built
-     * dynamically from {@link LeaderboardProperties} rather than a static {@code @Scheduled} cron.
+     * Run all leaderboard work for one workspace on its tick. Re-loads the workspace by id so a row
+     * deleted since registration self-cancels (and notification-enabled / schedule reflect the
+     * latest persisted state). Leagues always run; notification channels run only when the global
+     * notification kill-switch is on.
      */
-    private Runnable locked(Runnable task, String lockName) {
+    private void runForWorkspace(long workspaceId) {
+        Optional<Workspace> current = workspaceRepository.findById(workspaceId);
+        if (current.isEmpty()) {
+            log.info("Cancelled leaderboard schedule: reason=workspaceDeleted, workspaceId={}", workspaceId);
+            ScheduledFuture<?> future = registrations.remove(workspaceId);
+            if (future != null) {
+                future.cancel(false);
+            }
+            return;
+        }
+        Workspace workspace = current.get();
+
+        if (leaderboardProperties.notification().enabled()) {
+            for (LeaderboardNotificationTask task : notificationTasks) {
+                try {
+                    task.runForWorkspace(workspace);
+                } catch (RuntimeException e) {
+                    log.warn(
+                        "Leaderboard notification task failed: task={}, workspaceId={}, error={}",
+                        task.getClass().getSimpleName(),
+                        workspaceId,
+                        e.getMessage()
+                    );
+                }
+            }
+        }
+
+        try {
+            leaguePointsUpdateTask.runForWorkspace(workspace);
+        } catch (RuntimeException e) {
+            log.error("League points update failed: workspaceId={}", workspaceId, e);
+        }
+    }
+
+    /**
+     * Wraps the per-workspace run so that, across replicas, only the replica that acquires the
+     * workspace's ShedLock executes it on a given tick.
+     */
+    private Runnable locked(Runnable task, long workspaceId) {
+        String lockName = "leaderboard-workspace-" + workspaceId;
         return () -> {
             Optional<SimpleLock> lock = lockProvider.lock(
                 new LockConfiguration(Instant.now(), lockName, LOCK_AT_MOST_FOR, LOCK_AT_LEAST_FOR)
@@ -86,59 +210,5 @@ public class LeaderboardTaskScheduler {
                 lock.get().unlock();
             }
         };
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void activateTaskScheduler() {
-        var timeParts = leaderboardProperties.schedule().time().split(":");
-
-        String cron = String.format(
-            "0 %s %s ? * %s",
-            timeParts.length > 1 ? timeParts[1] : 0,
-            timeParts[0],
-            leaderboardProperties.schedule().day()
-        );
-
-        if (!CronExpression.isValidExpression(cron)) {
-            log.error("Rejected invalid cron expression: cronExpression={}", cron);
-            return;
-        }
-
-        scheduleNotificationTasks(cron);
-        scheduleLeaguePointsUpdate(cron);
-    }
-
-    private void scheduleNotificationTasks(String cron) {
-        if (!leaderboardProperties.notification().enabled()) {
-            log.info("Skipped notification task scheduling: reason=notificationsDisabled");
-            return;
-        }
-        if (notificationTasks.isEmpty()) {
-            log.warn("Skipped notification task scheduling: reason=noTasksRegistered");
-            return;
-        }
-
-        for (LeaderboardNotificationTask task : notificationTasks) {
-            String description = task.getClass().getSimpleName();
-            log.info("Scheduled notification task: task={}, cronExpression={}", description, cron);
-            scheduleSafely(locked(task, "leaderboard-notify-" + description), new CronTrigger(cron), description);
-        }
-    }
-
-    private void scheduleLeaguePointsUpdate(String cron) {
-        log.info("Scheduled league points update: cronExpression={}", cron);
-        scheduleSafely(
-            locked(leaguePointsUpdateTask, "leaderboard-league-points-update"),
-            new CronTrigger(cron),
-            "league points update"
-        );
-    }
-
-    private void scheduleSafely(Runnable task, CronTrigger trigger, String description) {
-        try {
-            taskScheduler.schedule(task, trigger);
-        } catch (TaskRejectedException ex) {
-            log.warn("Skipped scheduling: reason=taskRejected, task={}", description, ex);
-        }
     }
 }

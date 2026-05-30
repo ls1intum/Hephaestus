@@ -28,13 +28,16 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	// Slack notification card props (only rendered when leaderboard is enabled)
+	// Slack notification card props (rendered for any workspace with a slug — the weekly
+	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
 	workspaceId?: number;
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
 	slackChannelId?: string;
 	slackTeamLabel?: string;
 	slackNotificationsEnabled: boolean;
+	slackScheduleDay?: number;
+	slackScheduleTime?: string;
 	onSlackSaved: () => void;
 }
 
@@ -59,6 +62,8 @@ export function AdminSettingsPage({
 	slackChannelId,
 	slackTeamLabel,
 	slackNotificationsEnabled,
+	slackScheduleDay,
+	slackScheduleTime,
 	onSlackSaved,
 }: AdminSettingsPageProps) {
 	return (
@@ -88,13 +93,15 @@ export function AdminSettingsPage({
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
 				)}
 
-				{features.leaderboardEnabled && workspaceId != null && workspaceSlug != null && (
+				{workspaceId != null && workspaceSlug != null && (
 					<AdminSlackNotificationSettings
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
 						channelId={slackChannelId}
 						teamLabel={slackTeamLabel}
 						enabled={slackNotificationsEnabled}
+						scheduleDay={slackScheduleDay}
+						scheduleTime={slackScheduleTime}
 						onSaved={onSlackSaved}
 					/>
 				)}

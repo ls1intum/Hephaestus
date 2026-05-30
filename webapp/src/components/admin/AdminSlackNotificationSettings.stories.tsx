@@ -10,6 +10,8 @@ const meta = {
 		workspaceSlug: "demo-workspace",
 		hasSlackConnection: false,
 		enabled: false,
+		scheduleDay: 1,
+		scheduleTime: "09:00",
 		onSaved: fn(),
 	},
 } satisfies Meta<typeof AdminSlackNotificationSettings>;

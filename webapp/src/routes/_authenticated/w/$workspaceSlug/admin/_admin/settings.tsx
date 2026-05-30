@@ -193,6 +193,8 @@ function AdminSettings() {
 			slackChannelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
 			slackTeamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
 			slackNotificationsEnabled={workspaceData?.leaderboardNotificationEnabled ?? false}
+			slackScheduleDay={workspaceData?.leaderboardScheduleDay ?? undefined}
+			slackScheduleTime={workspaceData?.leaderboardScheduleTime ?? undefined}
 			onSlackSaved={() =>
 				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
 			}

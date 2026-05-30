@@ -5,76 +5,51 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.leaderboard.*;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.transaction.Transactional;
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+/**
+ * Recomputes league points for a single workspace from its just-closed leaderboard cycle.
+ *
+ * <p>Per-workspace: the {@code LeaderboardTaskScheduler} invokes {@link #runForWorkspace(Workspace)}
+ * on each workspace's own cron tick, so the cycle window is resolved from that workspace's schedule
+ * (via {@link LeaderboardScheduleResolver}), not a single global cron.
+ */
 @Component
-public class LeaguePointsUpdateTask implements Runnable {
+public class LeaguePointsUpdateTask {
 
     private static final Logger log = LoggerFactory.getLogger(LeaguePointsUpdateTask.class);
 
-    private final LeaderboardProperties leaderboardProperties;
     private final UserRepository userRepository;
     private final LeaderboardService leaderboardService;
     private final LeaguePointsService leaguePointsService;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final WorkspaceRepository workspaceRepository;
+    private final LeaderboardScheduleResolver scheduleResolver;
 
     public LeaguePointsUpdateTask(
-        LeaderboardProperties leaderboardProperties,
         UserRepository userRepository,
         LeaderboardService leaderboardService,
         LeaguePointsService leaguePointsService,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceRepository workspaceRepository
+        LeaderboardScheduleResolver scheduleResolver
     ) {
-        this.leaderboardProperties = leaderboardProperties;
         this.userRepository = userRepository;
         this.leaderboardService = leaderboardService;
         this.leaguePointsService = leaguePointsService;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.workspaceRepository = workspaceRepository;
-    }
-
-    @Override
-    @Transactional
-    public void run() {
-        List<Workspace> workspaces = workspaceRepository.findAll();
-
-        if (workspaces.isEmpty()) {
-            log.debug("Skipped league points update: reason=noWorkspacesConfigured");
-            return;
-        }
-
-        log.info("Started scheduled league points update: workspaceCount={}", workspaces.size());
-
-        for (Workspace workspace : workspaces) {
-            try {
-                updateLeaguePointsForWorkspace(workspace);
-            } catch (Exception e) {
-                log.error("Failed to update league points: workspaceId={}", workspace.getId(), e);
-            }
-        }
-
-        log.info("Completed scheduled league points update: workspaceCount={}", workspaces.size());
+        this.scheduleResolver = scheduleResolver;
     }
 
     /**
-     * Updates league points for all members of a specific workspace based on the latest leaderboard.
-     *
-     * @param workspaceId the workspace ID for which to update league points
+     * Update league points for every member of {@code workspace}, scored against the workspace's
+     * just-closed leaderboard cycle.
      */
-    private void updateLeaguePointsForWorkspace(Workspace workspace) {
+    @Transactional
+    public void runForWorkspace(Workspace workspace) {
         if (workspace == null || workspace.getId() == null) {
             log.warn("Skipped league points update: reason=missingWorkspaceId");
             return;
@@ -108,25 +83,15 @@ public class LeaguePointsUpdateTask implements Runnable {
     }
 
     /**
-     * Retrieves the latest leaderboard based on the scheduled time of the environment.
-     *
-     * @return List of {@code LeaderboardEntryDTO} representing the latest leaderboard
+     * The workspace's just-closed leaderboard cycle, using its own schedule (or the global default
+     * when unset) to bound the window.
      */
     private List<LeaderboardEntryDTO> getLatestLeaderboard(Workspace workspace) {
-        String[] timeParts = leaderboardProperties.schedule().time().split(":");
-        ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
-        ZonedDateTime zonedBefore = zonedNow
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(leaderboardProperties.schedule().day())))
-            .withHour(Integer.parseInt(timeParts[0]))
-            .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
-            .withSecond(0)
-            .withNano(0);
-        Instant before = zonedBefore.toInstant();
-        Instant after = zonedBefore.minusWeeks(1).toInstant();
+        LeaderboardScheduleResolver.CycleWindow window = scheduleResolver.previousCycleWindow(workspace);
         return leaderboardService.createLeaderboard(
             workspace,
-            after,
-            before,
+            window.after(),
+            window.before(),
             "all",
             LeaderboardSortType.SCORE,
             LeaderboardMode.INDIVIDUAL

@@ -1,24 +1,17 @@
 package de.tum.cit.aet.hephaestus.leaderboard.tasks;
 
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardMode;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardNotificationTask;
-import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardProperties;
+import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardScheduleResolver;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardService;
 import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardSortType;
 import de.tum.cit.aet.hephaestus.leaderboard.spi.LeaderboardDigestReadyEvent;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.time.DayOfWeek;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -28,25 +21,20 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 /**
- * Weekly Slack digest fan-out — leaderboard-side half.
+ * Weekly Slack digest — leaderboard-side half, per workspace.
  *
- * <p>Owns the schedule + data assembly: enumerates active Slack connections, computes the
- * weekly window, fetches the top-3 leaderboard entries per workspace, and publishes a
- * vendor-neutral {@link LeaderboardDigestReadyEvent} per qualifying workspace-channel
- * target. The actual Slack publish lives in {@code integration/slack/leaderboard/} so
- * this module no longer imports any Slack types.
+ * <p>The {@code LeaderboardTaskScheduler} invokes {@link #runForWorkspace(Workspace)} on the
+ * workspace's own scheduled cron tick. This task owns data assembly: resolve the workspace's ACTIVE
+ * Slack connection config, compute its weekly window (via {@link LeaderboardScheduleResolver}),
+ * fetch its top-3 leaderboard entries, and publish a vendor-neutral
+ * {@link LeaderboardDigestReadyEvent}. The actual Slack publish lives in
+ * {@code integration/slack/leaderboard/}, so this leaderboard-module class imports no Slack types.
  *
- * <p>Fan-out is per-target: one workspace → one channel → one event. Skip preconditions
- * (notifications-off, no channel configured, empty leaderboard) remain on the leaderboard
- * side — if the assembled payload would be empty, no event is emitted (preserves the
- * "reason=noQualifiedReviewers" / "reason=disabled" / "reason=noChannelConfigured" early
- * returns of the original code path).
+ * <p>Skip preconditions stay here (notifications-off, no active Slack connection, no channel
+ * configured, empty leaderboard) — when the assembled payload would be empty no event is emitted.
  *
- * <p>NOTE: This task remains a {@link LeaderboardNotificationTask} so the existing cron
- * wiring in {@code LeaderboardTaskScheduler} picks it up unchanged. The class is still
- * gated on {@code hephaestus.integration.slack.enabled} because publishing leaderboard
- * digest events that no subscriber listens to would be wasted work. When the gate is off
- * the cron still fires but the task short-circuits before assembling a payload.
+ * <p>Gated on {@code hephaestus.integration.slack.enabled}: when off, the bean is absent and the
+ * scheduler simply has no Slack notification task to run.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -54,125 +42,81 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
 
     private static final Logger log = LoggerFactory.getLogger(SlackWeeklyLeaderboardTask.class);
 
-    private final LeaderboardProperties leaderboardProperties;
     private final ApplicationProperties applicationProperties;
     private final LeaderboardService leaderboardService;
-    private final ConnectionRepository connectionRepository;
+    private final ConnectionService connectionService;
+    private final LeaderboardScheduleResolver scheduleResolver;
     private final ApplicationEventPublisher eventPublisher;
 
     public SlackWeeklyLeaderboardTask(
-        LeaderboardProperties leaderboardProperties,
         ApplicationProperties applicationProperties,
         LeaderboardService leaderboardService,
-        ConnectionRepository connectionRepository,
+        ConnectionService connectionService,
+        LeaderboardScheduleResolver scheduleResolver,
         ApplicationEventPublisher eventPublisher
     ) {
-        this.leaderboardProperties = leaderboardProperties;
         this.applicationProperties = applicationProperties;
         this.leaderboardService = leaderboardService;
-        this.connectionRepository = connectionRepository;
+        this.connectionService = connectionService;
+        this.scheduleResolver = scheduleResolver;
         this.eventPublisher = eventPublisher;
     }
 
     @Override
-    public void run() {
-        List<Connection> connections = connectionRepository.findByKindAndStateWithWorkspace(
-            IntegrationKind.SLACK,
-            IntegrationState.ACTIVE
-        );
-        if (connections.isEmpty()) {
-            log.info("Skipped Slack notification: reason=noActiveSlackConnections");
+    public void runForWorkspace(Workspace workspace) {
+        if (workspace == null || workspace.getId() == null) {
             return;
         }
+        long workspaceId = workspace.getId();
 
-        long currentDate = Instant.now().getEpochSecond();
-        String[] timeParts = leaderboardProperties.schedule().time().split(":");
-        ZonedDateTime zonedNow = ZonedDateTime.now(ZoneId.systemDefault());
-        ZonedDateTime zonedBefore = zonedNow
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(leaderboardProperties.schedule().day())))
-            .withHour(Integer.parseInt(timeParts[0]))
-            .withMinute(timeParts.length > 1 ? Integer.parseInt(timeParts[1]) : 0)
-            .withSecond(0)
-            .withNano(0);
-        Instant before = zonedBefore.toInstant();
-        Instant after = zonedBefore.minusWeeks(1).toInstant();
-        String baseUrl = normalizeBaseUrl(applicationProperties.hostUrl());
-
-        for (Connection connection : connections) {
-            // Skip-then-iterate; one workspace's failure must NOT block the next.
-            try {
-                publishForConnection(connection, currentDate, after, before, baseUrl);
-            } catch (RuntimeException e) {
-                log.warn(
-                    "Slack notification fan-out failed for workspace={}: {}",
-                    connection.getWorkspace() == null ? null : connection.getWorkspace().getId(),
-                    e.getMessage()
-                );
-            }
-        }
-    }
-
-    private void publishForConnection(
-        Connection connection,
-        long currentDate,
-        Instant after,
-        Instant before,
-        String baseUrl
-    ) {
-        Workspace workspace = connection.getWorkspace();
-        if (workspace == null) {
-            log.warn("Slack Connection {} has no workspace — skipping", connection.getId());
-            return;
-        }
         if (!Boolean.TRUE.equals(workspace.getLeaderboardNotificationEnabled())) {
-            log.debug("Skipped Slack notification: reason=disabled, workspaceId={}", workspace.getId());
-            return;
-        }
-        // Cast is safe: the repo query filters by IntegrationKind.SLACK, so the config
-        // variant is always SlackConfig. (Cross-variant returns are guarded by
-        // ConnectionService.updateConfig.)
-        ConnectionConfig.SlackConfig slackConfig = (ConnectionConfig.SlackConfig) connection.getConfig();
-        String channelId = slackConfig.notificationChannelId();
-        if (channelId == null || channelId.isBlank()) {
-            log.info("Skipped Slack notification: reason=noChannelConfigured, workspaceId={}", workspace.getId());
+            log.debug("Skipped Slack notification: reason=disabled, workspaceId={}", workspaceId);
             return;
         }
 
-        Optional<String> team = Optional.ofNullable(slackConfig.teamLabel()).filter(t -> !t.isBlank());
-        List<LeaderboardEntryDTO> topEntries = fetchTopEntries(workspace, after, before, team);
+        Optional<ConnectionConfig.SlackConfig> slackConfig = connectionService.findSlackNotificationConfig(workspaceId);
+        if (slackConfig.isEmpty()) {
+            log.info("Skipped Slack notification: reason=noActiveSlackConnection, workspaceId={}", workspaceId);
+            return;
+        }
+        String channelId = slackConfig.get().notificationChannelId();
+        if (channelId == null || channelId.isBlank()) {
+            log.info("Skipped Slack notification: reason=noChannelConfigured, workspaceId={}", workspaceId);
+            return;
+        }
+
+        Optional<String> team = Optional.ofNullable(slackConfig.get().teamLabel()).filter(t -> !t.isBlank());
+        LeaderboardScheduleResolver.CycleWindow window = scheduleResolver.previousCycleWindow(workspace);
+        List<LeaderboardEntryDTO> topEntries = fetchTopEntries(workspace, window, team);
         if (topEntries.isEmpty()) {
-            log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
+            log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspaceId);
             return;
         }
 
         eventPublisher.publishEvent(
             new LeaderboardDigestReadyEvent(
-                workspace.getId(),
+                workspaceId,
                 workspace.getWorkspaceSlug(),
                 channelId,
                 team.orElse(null),
-                currentDate,
-                after,
-                before,
+                Instant.now().getEpochSecond(),
+                window.after(),
+                window.before(),
                 topEntries,
-                baseUrl
+                normalizeBaseUrl(applicationProperties.hostUrl())
             )
         );
     }
 
     private List<LeaderboardEntryDTO> fetchTopEntries(
         Workspace workspace,
-        Instant after,
-        Instant before,
+        LeaderboardScheduleResolver.CycleWindow window,
         Optional<String> team
     ) {
-        if (workspace == null || workspace.getId() == null) {
-            return List.of();
-        }
         var leaderboard = leaderboardService.createLeaderboard(
             workspace,
-            after,
-            before,
+            window.after(),
+            window.before(),
             team.orElse("all"),
             LeaderboardSortType.SCORE,
             LeaderboardMode.INDIVIDUAL
