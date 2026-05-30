@@ -31,19 +31,6 @@ public interface OAuthStateNonceRepository extends JpaRepository<OAuthStateNonce
     @Query("UPDATE OAuthStateNonce n SET n.consumedAt = :now " + "WHERE n.nonce = :nonce AND n.consumedAt IS NULL")
     int markConsumed(@Param("nonce") String nonce, @Param("now") Instant now);
 
-    /**
-     * Reads the persisted PKCE code_verifier. Used by {@link OAuthStateNonceStore} inside
-     * the same transaction as {@link #markConsumed}, so the verifier shares the
-     * single-use property of the nonce — a replay attacker who steals the {@code state}
-     * cannot also steal the verifier (the row is already consumed by the legitimate
-     * callback).
-     *
-     * @return verifier string, or {@code null} for legacy / non-PKCE flows
-     */
-    @Query("SELECT n.codeVerifier FROM OAuthStateNonce n WHERE n.nonce = :nonce")
-    @org.jspecify.annotations.Nullable
-    String findCodeVerifier(@Param("nonce") String nonce);
-
     /** Cleanup helper — drops rows older than the cutoff. */
     @Modifying
     @Query("DELETE FROM OAuthStateNonce n WHERE n.issuedAt < :cutoff")

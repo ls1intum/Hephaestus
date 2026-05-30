@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.slack.credentials.SlackCredentialProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -25,32 +24,6 @@ class SlackMessageServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new SlackMessageService(credentialProvider);
-    }
-
-    @Test
-    void initTest_returnsFalseWhenNoToken() {
-        when(credentialProvider.resolve(any(IntegrationRef.class))).thenReturn(Optional.empty());
-
-        boolean result = service.initTest(7L);
-
-        assertThat(result).isFalse();
-    }
-
-    @Test
-    void initTest_returnsFalseWhenWrongBundleVariant() {
-        when(credentialProvider.resolve(any(IntegrationRef.class))).thenReturn(
-            Optional.of(
-                (CredentialBundle) new de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.OAuthSession(
-                    "a",
-                    "b",
-                    null
-                )
-            )
-        );
-
-        boolean result = service.initTest(7L);
-
-        assertThat(result).isFalse();
     }
 
     @Test

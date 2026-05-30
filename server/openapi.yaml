@@ -867,31 +867,14 @@ paths:
           description: OK
       tags:
       - Connections
-  /workspaces/{workspaceSlug}/connections/{id}/disconnect:
-    post:
-      operationId: disconnect
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-      tags:
-      - Connections
-  /workspaces/{workspaceSlug}/connections/{id}/reactivate:
-    post:
-      operationId: reactivate
+  /workspaces/{workspaceSlug}/connections/{id}/status:
+    patch:
+      description: |-
+        Resource-oriented lifecycle transition: <code>ACTIVE</code> (reactivate), <code>SUSPENDED</code>
+         (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
+         <code>PENDING</code> is internal to the OAuth handshake and rejected as a bad request; illegal
+         transitions surface as 400 via the state machine.
+      operationId: updateStatus_1
       parameters:
       - description: Workspace slug
         in: path
@@ -910,7 +893,8 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReasonRequest"
+              $ref: "#/components/schemas/UpdateConnectionStatusRequest"
+        required: true
       responses:
         "200":
           content:
@@ -918,37 +902,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConnectionSummary"
           description: OK
-      tags:
-      - Connections
-  /workspaces/{workspaceSlug}/connections/{id}/suspend:
-    post:
-      operationId: suspend
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReasonRequest"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConnectionSummary"
-          description: OK
+      summary: |-
+        Resource-oriented lifecycle transition: <code>ACTIVE</code> (reactivate), <code>SUSPENDED</code>
+         (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
       tags:
       - Connections
   /workspaces/{workspaceSlug}/features:
@@ -4622,13 +4578,6 @@ components:
       - number
       - state
       - title
-    ReasonRequest:
-      type: object
-      description: "Lifecycle-action body — reason is optional, applied to both suspend\
-        \ and reactivate."
-      properties:
-        reason:
-          type: string
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -4854,6 +4803,24 @@ components:
           example: 600
           maximum: 3600
           minimum: 30
+    UpdateConnectionStatusRequest:
+      type: object
+      description: Request to update a connection's lifecycle status
+      properties:
+        reason:
+          type: string
+          description: Optional human-readable reason recorded on the audit trail
+        state:
+          type: string
+          description: "Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED,\
+            \ UNINSTALLED."
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+      required:
+      - state
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state

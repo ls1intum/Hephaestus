@@ -14,7 +14,7 @@
           3.  agent_job.{integration_kind, subject_class} + composite index.
           4.  (removed: slack_channel + slack_message — write-dead persistence layer deleted).
           5.  shedlock.
-          7.  oauth_state_nonce (incl. PKCE code_verifier from the start).
+          7.  oauth_state_nonce (single-use OAuth state replay guard).
           8.  WorkspaceConnectionBackfillChange (Java customChange) — idempotent
               backfill of legacy Workspace columns into connection rows.
           8b. HALT guard — prevents section-9 drops on a populated workspace
@@ -313,10 +313,7 @@
         </preConditions>
         <comment>
             Single-use nonce store for OAuth state — closes the within-TTL replay window
-            left open by HMAC-only state. PKCE verifier (RFC 7636 §4.1, 43–128 chars,
-            opt-in per strategy) is persisted on the same row so the redirect carries
-            only the SHA-256 challenge while the verifier survives the token-exchange
-            POST round-trip.
+            left open by HMAC-only state.
         </comment>
         <createTable tableName="oauth_state_nonce">
             <column name="nonce" type="varchar(32)">
@@ -332,7 +329,6 @@
                 <constraints nullable="false"/>
             </column>
             <column name="consumed_at" type="timestamp with time zone"/>
-            <column name="code_verifier" type="VARCHAR(128)"/>
         </createTable>
         <createIndex tableName="oauth_state_nonce" indexName="ix_oauth_state_nonce_issued_at">
             <column name="issued_at"/>

@@ -33,25 +33,12 @@ public class OAuthStateNonceStore {
         this.repository = repository;
     }
 
-    /** Issue without PKCE — kept for legacy/non-OAuth flows (App install, PAT). */
-    @Transactional
-    public void issue(String nonce, long workspaceId, IntegrationKind kind, Instant issuedAt) {
-        issue(nonce, workspaceId, kind, issuedAt, null);
-    }
-
     /**
-     * Record a freshly minted nonce, optionally with a PKCE {@code code_verifier}.
-     * Persists immediately so a subsequent consume sees the row even if the issuing
-     * transaction is separate.
+     * Record a freshly minted nonce. Persists immediately so a subsequent consume sees
+     * the row even if the issuing transaction is separate.
      */
     @Transactional
-    public void issue(
-        String nonce,
-        long workspaceId,
-        IntegrationKind kind,
-        Instant issuedAt,
-        @org.jspecify.annotations.Nullable String codeVerifier
-    ) {
+    public void issue(String nonce, long workspaceId, IntegrationKind kind, Instant issuedAt) {
         if (nonce == null || nonce.isEmpty()) {
             throw new IllegalArgumentException("nonce must be non-empty");
         }
@@ -64,7 +51,7 @@ public class OAuthStateNonceStore {
             );
             return;
         }
-        repository.save(new OAuthStateNonce(nonce, workspaceId, kind.name(), issuedAt, codeVerifier));
+        repository.save(new OAuthStateNonce(nonce, workspaceId, kind.name(), issuedAt));
     }
 
     /**
@@ -84,46 +71,5 @@ public class OAuthStateNonceStore {
         }
         int updated = repository.markConsumed(nonce, Instant.now());
         return updated == 1;
-    }
-
-    /**
-     * Consume the nonce AND read its PKCE verifier in one transaction. The verifier
-     * lookup happens immediately before the conditional UPDATE so a replay attacker
-     * who races the legitimate callback never observes one without the other.
-     *
-     * <p>The wrapper record distinguishes "consume failed" (row absent / already
-     * consumed) from "consume succeeded but no verifier was persisted" (legacy /
-     * non-PKCE flow). Returning a bare {@code Optional<String>} would conflate those
-     * two cases and force callers to bolt on a second probe.
-     *
-     * @return {@link ConsumeResult} with {@code consumed=true} exactly once per nonce;
-     *         {@code verifier} present iff a PKCE verifier was persisted at issue time.
-     */
-    @Transactional
-    public ConsumeResult tryConsumeWithVerifier(String nonce) {
-        if (nonce == null || nonce.isEmpty()) {
-            return ConsumeResult.notConsumed();
-        }
-        String verifier = repository.findCodeVerifier(nonce);
-        int updated = repository.markConsumed(nonce, Instant.now());
-        if (updated != 1) {
-            return ConsumeResult.notConsumed();
-        }
-        return ConsumeResult.consumed(verifier);
-    }
-
-    /**
-     * Outcome of {@link #tryConsumeWithVerifier}. {@code consumed} is the single-use
-     * winner-loser bit; {@code verifier} carries the PKCE code_verifier when one was
-     * persisted at issue time.
-     */
-    public record ConsumeResult(boolean consumed, java.util.Optional<String> verifier) {
-        public static ConsumeResult notConsumed() {
-            return new ConsumeResult(false, java.util.Optional.empty());
-        }
-
-        public static ConsumeResult consumed(@org.jspecify.annotations.Nullable String verifier) {
-            return new ConsumeResult(true, java.util.Optional.ofNullable(verifier));
-        }
     }
 }

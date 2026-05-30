@@ -211,7 +211,7 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void suspend_active_transitionsAndPersistsReason() {
+    void updateStatus_toSuspended_transitionsAndPersistsReason() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
@@ -223,10 +223,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<ConnectionSummaryDTO> response = controller.suspend(
+        ResponseEntity<ConnectionSummaryDTO> response = controller.updateStatus(
             ctx(workspaceId),
             7L,
-            new ConnectionController.ReasonRequestDTO("scheduled maintenance"),
+            new UpdateConnectionStatusRequestDTO(IntegrationState.SUSPENDED, "scheduled maintenance"),
             null
         );
 
@@ -243,7 +243,7 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void reactivate_suspended_transitions() {
+    void updateStatus_toActive_transitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.SUSPENDED);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
@@ -254,7 +254,12 @@ class ConnectionControllerTest extends BaseUnitTest {
         });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<ConnectionSummaryDTO> response = controller.reactivate(ctx(workspaceId), 7L, null, null);
+        ResponseEntity<ConnectionSummaryDTO> response = controller.updateStatus(
+            ctx(workspaceId),
+            7L,
+            new UpdateConnectionStatusRequestDTO(IntegrationState.ACTIVE, null),
+            null
+        );
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.ACTIVE);
@@ -266,7 +271,7 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void disconnect_callsRevokeAndTransitions() {
+    void updateStatus_toUninstalled_revokesAndTransitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
@@ -275,10 +280,17 @@ class ConnectionControllerTest extends BaseUnitTest {
             conn.setState(IntegrationState.UNINSTALLED);
             return conn;
         });
+        when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<Void> response = controller.disconnect(ctx(workspaceId), 7L, null);
+        ResponseEntity<ConnectionSummaryDTO> response = controller.updateStatus(
+            ctx(workspaceId),
+            7L,
+            new UpdateConnectionStatusRequestDTO(IntegrationState.UNINSTALLED, null),
+            null
+        );
 
-        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody().state()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
@@ -288,19 +300,47 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    void disconnect_revokeThrows_stillTransitions() {
+    void updateStatus_uninstalledRevokeThrows_stillTransitions() {
         long workspaceId = 42L;
         Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
         when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
         githubStrategy.revokeThrows = true;
-        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv ->
-            inv.getArgument(0)
+        when(connectionService.transition(any(Connection.class), any(TransitionRequest.class))).thenAnswer(inv -> {
+            Connection conn = inv.getArgument(0);
+            conn.setState(IntegrationState.UNINSTALLED);
+            return conn;
+        });
+        when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
+
+        ResponseEntity<ConnectionSummaryDTO> response = controller.updateStatus(
+            ctx(workspaceId),
+            7L,
+            new UpdateConnectionStatusRequestDTO(IntegrationState.UNINSTALLED, null),
+            null
         );
 
-        ResponseEntity<Void> response = controller.disconnect(ctx(workspaceId), 7L, null);
-
-        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
         verify(connectionService, times(1)).transition(any(Connection.class), any(TransitionRequest.class));
+    }
+
+    @Test
+    void updateStatus_pendingTarget_throwsBadRequest() {
+        long workspaceId = 42L;
+        Connection c = newConnection(7L, workspaceId, IntegrationKind.GITHUB, "100", IntegrationState.ACTIVE);
+        when(admin.findInWorkspaceOrThrow(workspaceId, 7L)).thenReturn(c);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+            controller.updateStatus(
+                ctx(workspaceId),
+                7L,
+                new UpdateConnectionStatusRequestDTO(IntegrationState.PENDING, null),
+                null
+            )
+        ).isInstanceOf(IllegalArgumentException.class);
+        verify(connectionService, org.mockito.Mockito.never()).transition(
+            any(Connection.class),
+            any(TransitionRequest.class)
+        );
     }
 
     @Test

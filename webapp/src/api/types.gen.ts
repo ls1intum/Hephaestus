@@ -549,6 +549,20 @@ export type UpdatePracticeActiveRequest = {
 };
 
 /**
+ * Request to update a connection's lifecycle status
+ */
+export type UpdateConnectionStatusRequest = {
+    /**
+     * Optional human-readable reason recorded on the audit trail
+     */
+    reason?: string;
+    /**
+     * Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED, UNINSTALLED.
+     */
+    state: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+};
+
+/**
  * Request to update an existing agent configuration (all fields optional — null fields are not changed)
  */
 export type UpdateAgentConfigRequest = {
@@ -727,13 +741,6 @@ export type RenameWorkspaceSlugRequest = {
      * New URL-friendly identifier for the workspace
      */
     newSlug: string;
-};
-
-/**
- * Lifecycle-action body — reason is optional, applied to both suspend and reactivate.
- */
-export type ReasonRequest = {
-    reason?: string;
 };
 
 /**
@@ -2791,8 +2798,8 @@ export type AuditResponses = {
 
 export type AuditResponse = AuditResponses[keyof AuditResponses];
 
-export type DisconnectData = {
-    body?: never;
+export type UpdateStatus1Data = {
+    body: UpdateConnectionStatusRequest;
     path: {
         /**
          * Workspace slug
@@ -2801,59 +2808,17 @@ export type DisconnectData = {
         id: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/{id}/disconnect';
+    url: '/workspaces/{workspaceSlug}/connections/{id}/status';
 };
 
-export type DisconnectResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
-export type ReactivateData = {
-    body?: ReasonRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        id: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/{id}/reactivate';
-};
-
-export type ReactivateResponses = {
+export type UpdateStatus1Responses = {
     /**
      * OK
      */
     200: ConnectionSummary;
 };
 
-export type ReactivateResponse = ReactivateResponses[keyof ReactivateResponses];
-
-export type SuspendData = {
-    body?: ReasonRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        id: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/connections/{id}/suspend';
-};
-
-export type SuspendResponses = {
-    /**
-     * OK
-     */
-    200: ConnectionSummary;
-};
-
-export type SuspendResponse = SuspendResponses[keyof SuspendResponses];
+export type UpdateStatus1Response = UpdateStatus1Responses[keyof UpdateStatus1Responses];
 
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;

@@ -1,8 +1,17 @@
 # ADR 0010: Hand-roll OAuth state for outbound per-workspace integrations
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-05-30 — PKCE primitive removed)
 **Date:** 2026-05-25
 **Authors:** Integration framework polish (#1198)
+
+> **Amendment (2026-05-30):** The PKCE primitive (`issueWithPkce` → `IssuedState`, the
+> `code_verifier` nonce column, and the verifier-carrying consume path) was removed. It was
+> never wired into any strategy — both providers (GitHub App, Slack OAuth v2) are
+> **confidential clients** authenticating with a `client_secret`, for which PKCE is
+> recommended-but-not-required (RFC 9700) and provided no active protection while unwired.
+> The signed state payload is now `(workspaceId|kind|issuedAt|nonce|actorRef)`; CSRF/replay
+> defense (HMAC + TTL + single-use nonce) is unchanged. A future public-client provider that
+> needs PKCE can reintroduce the primitive against this same `OAuthStateService` seam.
 
 ## Context
 

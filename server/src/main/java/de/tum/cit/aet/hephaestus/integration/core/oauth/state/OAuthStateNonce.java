@@ -54,33 +54,13 @@ public class OAuthStateNonce {
     @Nullable
     private Instant consumedAt;
 
-    /**
-     * RFC 7636 PKCE code_verifier — 43-128 unreserved chars. Null for legacy / non-OAuth
-     * flows (App install, PAT paste). Read during the same transaction that flips
-     * {@code consumed_at} so single-use applies to the verifier too.
-     */
-    @Column(name = "code_verifier", length = 128)
-    @Nullable
-    private String codeVerifier;
-
     protected OAuthStateNonce() {}
 
     public OAuthStateNonce(String nonce, long workspaceId, String kind, Instant issuedAt) {
-        this(nonce, workspaceId, kind, issuedAt, null);
-    }
-
-    public OAuthStateNonce(
-        String nonce,
-        long workspaceId,
-        String kind,
-        Instant issuedAt,
-        @Nullable String codeVerifier
-    ) {
         this.nonce = nonce;
         this.workspaceId = workspaceId;
         this.kind = kind;
         this.issuedAt = issuedAt;
-        this.codeVerifier = codeVerifier;
     }
 
     public String getNonce() {
@@ -102,10 +82,5 @@ public class OAuthStateNonce {
     @Nullable
     public Instant getConsumedAt() {
         return consumedAt;
-    }
-
-    @Nullable
-    public String getCodeVerifier() {
-        return codeVerifier;
     }
 }

@@ -183,121 +183,14 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
         assertThat(store.consumedCount()).isEqualTo(0);
     }
 
-    @Test
-    @org.junit.jupiter.api.DisplayName("issueWithPkce: code_challenge = BASE64URL(SHA256(verifier)) per RFC 7636 §4.2")
-    void pkce_challengeMatchesSpec() throws Exception {
-        InMemoryNonceStore store = new InMemoryNonceStore();
-        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
-
-        de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.IssuedState issued = svc.issueWithPkce(
-            42L,
-            IntegrationKind.GITHUB,
-            "alice@example.com"
-        );
-
-        assertThat(issued.codeChallengeMethod()).isEqualTo("S256");
-        assertThat(issued.codeChallenge()).hasSize(43); // SHA-256 → 32 bytes → base64url-no-pad
-        // The verifier survives in the store; the consume path will hand it back via StateBinding.
-        String verifier = store.lastVerifier();
-        assertThat(verifier).hasSizeBetween(43, 128); // RFC 7636 §4.1 ABNF range
-        assertThat(verifier).matches("[A-Za-z0-9\\-_.~]+"); // unreserved
-        // Verify the challenge derivation against the actual verifier the service stored.
-        java.security.MessageDigest sha = java.security.MessageDigest.getInstance("SHA-256");
-        byte[] digest = sha.digest(verifier.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-        String expected = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
-        assertThat(issued.codeChallenge()).isEqualTo(expected);
-    }
-
-    @Test
-    @org.junit.jupiter.api.DisplayName("issueWithPkce: consume returns the verifier in StateBinding")
-    void pkce_consumeReturnsVerifier() {
-        InMemoryNonceStore store = new InMemoryNonceStore();
-        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
-
-        var issued = svc.issueWithPkce(42L, IntegrationKind.GITHUB, null);
-
-        StateBinding binding = svc.consume(issued.state());
-        assertThat(binding.codeVerifier())
-            .as("StateBinding.codeVerifier must surface to the strategy for the token-exchange POST")
-            .isNotNull()
-            .matches("[A-Za-z0-9\\-_.~]+");
-    }
-
-    @Test
-    @org.junit.jupiter.api.DisplayName("non-PKCE issue: consume returns null codeVerifier")
-    void nonPkce_consumeReturnsNullVerifier() {
-        InMemoryNonceStore store = new InMemoryNonceStore();
-        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
-        String state = svc.issue(42L, IntegrationKind.GITHUB);
-
-        StateBinding binding = svc.consume(state);
-        assertThat(binding.codeVerifier()).isNull();
-    }
-
-    @Test
-    @org.junit.jupiter.api.DisplayName(
-        "PKCE: second consume of the same state is rejected (verifier shares single-use)"
-    )
-    void pkce_replayRejected() {
-        InMemoryNonceStore store = new InMemoryNonceStore();
-        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
-        var issued = svc.issueWithPkce(42L, IntegrationKind.GITHUB, null);
-
-        svc.consume(issued.state());
-
-        assertThatThrownBy(() -> svc.consume(issued.state()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("already consumed");
-    }
-
-    @Test
-    @org.junit.jupiter.api.DisplayName("PKCE: each issue produces a fresh verifier (no reuse across flows)")
-    void pkce_verifierIsFreshPerIssue() {
-        InMemoryNonceStore store = new InMemoryNonceStore();
-        HmacOAuthStateService svc = HmacOAuthStateService.withNonceStore(SECRET, Duration.ofMinutes(10), store);
-
-        var first = svc.issueWithPkce(1L, IntegrationKind.GITHUB, null);
-        var second = svc.issueWithPkce(1L, IntegrationKind.GITHUB, null);
-
-        assertThat(first.codeChallenge()).isNotEqualTo(second.codeChallenge());
-    }
-
-    @Test
-    @org.junit.jupiter.api.DisplayName(
-        "OAuthStateService.issueWithPkce default impl refuses — strategies cannot silently fall through"
-    )
-    void spi_default_refusesPkce() {
-        // A bare impl that only overrides consume() must NOT accidentally honour PKCE
-        // requests with a no-op — that would let an OAuth flow skip PKCE silently.
-        de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService bare =
-            new de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService() {
-                @Override
-                public String issue(long w, IntegrationKind k) {
-                    return "x";
-                }
-
-                @Override
-                public StateBinding consume(String s) {
-                    throw new IllegalArgumentException();
-                }
-            };
-        assertThatThrownBy(() -> bare.issueWithPkce(1L, IntegrationKind.GITHUB, null)).isInstanceOf(
-            UnsupportedOperationException.class
-        );
-    }
-
     /**
      * Minimal in-memory store used only by these tests. Mirrors the production
-     * "atomic conditional UPDATE" semantics: first {@link #tryConsumeWithVerifier}
-     * for a known nonce returns consumed=true once; every subsequent call returns
-     * consumed=false. PKCE verifiers are stored alongside the nonce.
+     * "atomic conditional UPDATE" semantics: the first {@link #tryConsume} for a known
+     * nonce returns true once; every subsequent call returns false.
      */
     private static final class InMemoryNonceStore extends OAuthStateNonceStore {
 
-        private record Row(boolean consumed, @org.jspecify.annotations.Nullable String verifier) {}
-
-        private final java.util.Map<String, Row> rows = new java.util.concurrent.ConcurrentHashMap<>();
-        private volatile String lastVerifier;
+        private final java.util.Map<String, Boolean> consumed = new java.util.concurrent.ConcurrentHashMap<>();
 
         InMemoryNonceStore() {
             super(null);
@@ -305,48 +198,24 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
 
         @Override
         public void issue(String nonce, long workspaceId, IntegrationKind kind, java.time.Instant issuedAt) {
-            issue(nonce, workspaceId, kind, issuedAt, null);
-        }
-
-        @Override
-        public void issue(
-            String nonce,
-            long workspaceId,
-            IntegrationKind kind,
-            java.time.Instant issuedAt,
-            @org.jspecify.annotations.Nullable String codeVerifier
-        ) {
-            rows.putIfAbsent(nonce, new Row(false, codeVerifier));
-            if (codeVerifier != null) this.lastVerifier = codeVerifier;
+            consumed.putIfAbsent(nonce, false);
         }
 
         @Override
         public boolean tryConsume(String nonce) {
-            Row row = rows.get(nonce);
-            if (row == null || row.consumed()) return false;
-            return rows.replace(nonce, row, new Row(true, row.verifier()));
-        }
-
-        @Override
-        public ConsumeResult tryConsumeWithVerifier(String nonce) {
-            Row row = rows.get(nonce);
-            if (row == null || row.consumed()) return ConsumeResult.notConsumed();
-            boolean swapped = rows.replace(nonce, row, new Row(true, row.verifier()));
-            return swapped ? ConsumeResult.consumed(row.verifier()) : ConsumeResult.notConsumed();
+            Boolean prior = consumed.get(nonce);
+            if (prior == null || prior) return false;
+            return consumed.replace(nonce, false, true);
         }
 
         int size() {
-            return rows.size();
+            return consumed.size();
         }
 
         int consumedCount() {
             int n = 0;
-            for (Row r : rows.values()) if (r.consumed()) n++;
+            for (Boolean c : consumed.values()) if (c) n++;
             return n;
-        }
-
-        String lastVerifier() {
-            return lastVerifier;
         }
     }
 }
