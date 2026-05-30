@@ -32,7 +32,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Entity
 @Table(
@@ -58,7 +58,7 @@ public class Issue extends BaseGitServiceEntity {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    private Issue.State state;
+    private State state;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 32)

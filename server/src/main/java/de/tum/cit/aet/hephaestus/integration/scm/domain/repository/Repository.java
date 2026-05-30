@@ -27,7 +27,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Represents a Git repository from a provider (e.g., GitHub).
@@ -96,7 +96,7 @@ public class Repository extends BaseGitServiceEntity {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    private Repository.Visibility visibility;
+    private Visibility visibility;
 
     @NonNull
     private String defaultBranch;

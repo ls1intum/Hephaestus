@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.team;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team.Privacy;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A lightweight DTO for team data that only contains basic information.

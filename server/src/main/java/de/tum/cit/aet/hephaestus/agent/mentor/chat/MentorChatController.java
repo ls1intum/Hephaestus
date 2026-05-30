@@ -121,7 +121,7 @@ public class MentorChatController {
     }
 
     private static String textOrNull(JsonNode node, String field) {
-        return node.has(field) && node.get(field).isTextual() ? node.get(field).asText() : null;
+        return node.has(field) && node.get(field).isString() ? node.get(field).asString() : null;
     }
 
     /** Emit one error chunk + the AI-SDK [DONE] sentinel; complete the emitter. */

@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.util.Set;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Sealed per-kind Connection configuration. Persisted as JSONB via Hibernate 7's

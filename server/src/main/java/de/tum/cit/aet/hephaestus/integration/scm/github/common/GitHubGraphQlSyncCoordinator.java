@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.Category;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Map;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Inputs for {@link PiRuntimeFactory#build(PiPlanSpec)}. Validation lives in the compact

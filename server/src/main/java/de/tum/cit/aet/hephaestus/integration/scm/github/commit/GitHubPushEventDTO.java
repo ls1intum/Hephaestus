@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEven
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub push webhook event payloads.

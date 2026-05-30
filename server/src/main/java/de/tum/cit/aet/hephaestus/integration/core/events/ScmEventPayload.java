@@ -16,8 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
 import java.util.Optional;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable event payload DTOs for SCM domain events. These records are safe for
@@ -47,7 +47,7 @@ public final class ScmEventPayload {
         int number,
         @NonNull String title,
         @Nullable String body,
-        @NonNull Issue.State state,
+        Issue.@NonNull State state,
         @Nullable String stateReason,
         @NonNull String htmlUrl,
         boolean isPullRequest,
@@ -81,7 +81,7 @@ public final class ScmEventPayload {
         int number,
         @NonNull String title,
         @Nullable String body,
-        @NonNull PullRequest.State state,
+        PullRequest.@NonNull State state,
         boolean isDraft,
         boolean isMerged,
         int additions,
@@ -136,7 +136,7 @@ public final class ScmEventPayload {
         int number,
         @NonNull String title,
         @Nullable String description,
-        @NonNull Milestone.State state
+        Milestone.@NonNull State state
     ) {
         public static MilestoneData from(Milestone milestone) {
             return new MilestoneData(
@@ -182,7 +182,7 @@ public final class ScmEventPayload {
     public record ReviewData(
         @NonNull Long id,
         @Nullable String body,
-        @NonNull PullRequestReview.State state,
+        PullRequestReview.@NonNull State state,
         boolean isDismissed,
         @NonNull String htmlUrl,
         @Nullable Long authorId,
@@ -244,7 +244,7 @@ public final class ScmEventPayload {
 
     public record ReviewThreadData(
         @NonNull Long id,
-        @NonNull PullRequestReviewThread.State state,
+        PullRequestReviewThread.@NonNull State state,
         @Nullable String path,
         @Nullable Integer line,
         @NonNull Long pullRequestId
@@ -320,7 +320,7 @@ public final class ScmEventPayload {
         int number,
         @NonNull String title,
         @Nullable String body,
-        @NonNull Discussion.State state,
+        Discussion.@NonNull State state,
         @Nullable String stateReason,
         boolean isLocked,
         int commentsCount,

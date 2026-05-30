@@ -26,8 +26,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents a Git provider user (GitHub user, bot, or organization).
@@ -80,7 +80,7 @@ public class User extends BaseGitServiceEntity {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    private User.Type type;
+    private Type type;
 
     @OneToMany(mappedBy = "user")
     @ToString.Exclude

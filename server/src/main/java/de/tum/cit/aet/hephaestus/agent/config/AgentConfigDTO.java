@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Agent configuration for a workspace (API key redacted)")
 public record AgentConfigDTO(

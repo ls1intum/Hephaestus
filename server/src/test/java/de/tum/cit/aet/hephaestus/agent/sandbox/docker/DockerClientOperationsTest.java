@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -279,7 +281,7 @@ class DockerClientOperationsTest extends BaseUnitTest {
         void shouldMapContainerFields() {
             ListContainersCmd cmd = mock(ListContainersCmd.class);
             when(dockerClient.listContainersCmd()).thenReturn(cmd);
-            when(cmd.withLabelFilter(any(Map.class))).thenReturn(cmd);
+            when(cmd.withLabelFilter(anyMap())).thenReturn(cmd);
             when(cmd.withShowAll(true)).thenReturn(cmd);
 
             Container container = mock(Container.class);
@@ -303,7 +305,7 @@ class DockerClientOperationsTest extends BaseUnitTest {
         void shouldHandleNullFields() {
             ListContainersCmd cmd = mock(ListContainersCmd.class);
             when(dockerClient.listContainersCmd()).thenReturn(cmd);
-            when(cmd.withLabelFilter(any(Map.class))).thenReturn(cmd);
+            when(cmd.withLabelFilter(anyMap())).thenReturn(cmd);
             when(cmd.withShowAll(true)).thenReturn(cmd);
 
             Container container = mock(Container.class);
@@ -399,8 +401,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(cmd.withHostConfig(any())).thenReturn(cmd);
             when(cmd.withNetworkMode(anyString())).thenReturn(cmd);
             when(cmd.withLabels(any())).thenReturn(cmd);
-            when(cmd.withCmd(any(List.class))).thenReturn(cmd);
-            when(cmd.withEnv(any(List.class))).thenReturn(cmd);
+            when(cmd.withCmd(anyList())).thenReturn(cmd);
+            when(cmd.withEnv(anyList())).thenReturn(cmd);
             when(cmd.withHostName("agent")).thenReturn(cmd);
             when(cmd.withUser("1000:1000")).thenReturn(cmd);
             when(cmd.exec()).thenReturn(response);
@@ -482,8 +484,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             ops.createContainer(spec);
 
             // cmd, env, hostname, user should NOT be called
-            verify(cmd, never()).withCmd(any(List.class));
-            verify(cmd, never()).withEnv(any(List.class));
+            verify(cmd, never()).withCmd(anyList());
+            verify(cmd, never()).withEnv(anyList());
             verify(cmd, never()).withHostName(anyString());
             verify(cmd, never()).withUser(anyString());
         }

@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItem;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdate;
 import java.time.Instant;
 import java.time.LocalDate;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Async-safe payload DTOs mirroring the GitHub Projects V2 GraphQL surface
@@ -33,7 +33,7 @@ public final class GitHubProjectEventPayload {
         boolean closed,
         boolean isPublic,
         @NonNull String url,
-        @NonNull Project.OwnerType ownerType,
+        Project.@NonNull OwnerType ownerType,
         @NonNull Long ownerId,
         @Nullable Long creatorId,
         @Nullable Long actorId,
@@ -87,7 +87,7 @@ public final class GitHubProjectEventPayload {
         @NonNull Long id,
         @NonNull String nodeId,
         @NonNull Long projectId,
-        @NonNull ProjectItem.ContentType contentType,
+        ProjectItem.@NonNull ContentType contentType,
         @Nullable Long issueId,
         boolean archived,
         @Nullable Long actorId,
@@ -134,7 +134,7 @@ public final class GitHubProjectEventPayload {
         @Nullable String body,
         @Nullable LocalDate startDate,
         @Nullable LocalDate targetDate,
-        @Nullable ProjectStatusUpdate.Status status,
+        ProjectStatusUpdate.@Nullable Status status,
         @Nullable Long creatorId,
         @Nullable Instant createdAt,
         @Nullable Instant updatedAt

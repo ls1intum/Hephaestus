@@ -344,10 +344,10 @@ public class WorkerControlClient {
         }
         tools.jackson.databind.JsonNode json = objectMapper.readTree(response.body());
         tools.jackson.databind.JsonNode token = json.get("token");
-        if (token == null || token.isNull() || !token.isTextual() || token.asText().isEmpty()) {
+        if (token == null || token.isNull() || !token.isString() || token.asString().isEmpty()) {
             throw new IOException("token exchange response missing token");
         }
-        return token.asText();
+        return token.asString();
     }
 
     private void openWebSocket(String jwt) throws InterruptedException, IOException {

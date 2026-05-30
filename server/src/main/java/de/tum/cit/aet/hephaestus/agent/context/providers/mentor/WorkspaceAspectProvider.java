@@ -176,8 +176,8 @@ public class WorkspaceAspectProvider implements ContentProvider {
         Iterator<JsonNode> it = parts.values().iterator();
         while (it.hasNext()) {
             JsonNode part = it.next();
-            if (part.has("type") && "text".equals(part.get("type").asText()) && part.has("text")) {
-                return part.get("text").asText();
+            if (part.has("type") && "text".equals(part.get("type").asString()) && part.has("text")) {
+                return part.get("text").asString();
             }
         }
         return null;

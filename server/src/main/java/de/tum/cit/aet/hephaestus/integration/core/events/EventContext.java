@@ -6,10 +6,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.LazyInitializationException;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
 
 /**
  * Immutable context for domain events - safe for async handling.

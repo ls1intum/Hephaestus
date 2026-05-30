@@ -195,7 +195,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
-            assertThat(job.getMetadata().get("commit_sha").asText()).isEqualTo("abc123");
+            assertThat(job.getMetadata().get("commit_sha").asString()).isEqualTo("abc123");
 
             // Verify persisted in DB
             AgentJob fromDb = agentJobRepository.findById(job.getId()).orElseThrow();

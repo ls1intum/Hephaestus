@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhook
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitLab issue webhook events.

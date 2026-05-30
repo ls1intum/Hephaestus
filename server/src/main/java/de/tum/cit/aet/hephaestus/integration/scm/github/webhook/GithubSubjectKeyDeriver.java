@@ -49,10 +49,10 @@ public class GithubSubjectKeyDeriver implements SubjectKeyDeriver {
             JsonNode organization = payload.path("organization");
             if (!repository.isMissingNode() && !repository.isNull()) {
                 JsonNode owner = repository.path("owner");
-                org = sanitize(orPlaceholder(owner.path("login").asText("")));
-                repo = sanitize(orPlaceholder(repository.path("name").asText("")));
+                org = sanitize(orPlaceholder(owner.path("login").asString("")));
+                repo = sanitize(orPlaceholder(repository.path("name").asString("")));
             } else if (!organization.isMissingNode() && !organization.isNull()) {
-                org = sanitize(orPlaceholder(organization.path("login").asText("")));
+                org = sanitize(orPlaceholder(organization.path("login").asString("")));
             }
         }
         return SUBJECT_PREFIX + org + "." + repo + "." + eventSegment;

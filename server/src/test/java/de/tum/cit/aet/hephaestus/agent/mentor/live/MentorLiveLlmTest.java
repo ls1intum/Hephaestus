@@ -167,7 +167,7 @@ class MentorLiveLlmTest {
             chunks.addAll(translator.translate(event, state));
             // Pi's terminal event for a turn is `agent_end`; the translator turns it into a
             // Finish chunk. We signal completion off that, not by polling.
-            if ("agent_end".equals(event.path("type").asText())) {
+            if ("agent_end".equals(event.path("type").asString())) {
                 translationDone.complete(null);
             }
         });
@@ -231,13 +231,13 @@ class MentorLiveLlmTest {
         // UIMessage carries the concatenated text exactly.
         JsonNode textPart = null;
         for (JsonNode p : partsSnapshot) {
-            if ("text".equals(p.path("type").asText())) {
+            if ("text".equals(p.path("type").asString())) {
                 textPart = p;
                 break;
             }
         }
         if (textPart != null) {
-            assertThat(textPart.path("text").asText()).isEqualTo(concatenated);
+            assertThat(textPart.path("text").asString()).isEqualTo(concatenated);
         }
     }
 
@@ -385,7 +385,7 @@ class MentorLiveLlmTest {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
-            if ("agent_end".equals(event.path("type").asText())) {
+            if ("agent_end".equals(event.path("type").asString())) {
                 done.complete(null);
             }
         });
@@ -469,8 +469,8 @@ class MentorLiveLlmTest {
         sandbox.subscribe(frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
-            if ("session_persisted".equals(event.path("type").asText())) {
-                String jsonl = event.path("jsonl").asText("");
+            if ("session_persisted".equals(event.path("type").asString())) {
+                String jsonl = event.path("jsonl").asString("");
                 if (!jsonl.isEmpty()) captured.set(jsonl.getBytes(StandardCharsets.UTF_8));
             }
         });
@@ -530,7 +530,7 @@ class MentorLiveLlmTest {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
-            if ("agent_end".equals(event.path("type").asText())) {
+            if ("agent_end".equals(event.path("type").asString())) {
                 done.complete(null);
             }
         });
@@ -704,8 +704,8 @@ class MentorLiveLlmTest {
     }
 
     private static boolean isThreadEvent(JsonNode frame, UUID threadId) {
-        if (!"event".equals(frame.path("method").asText())) return false;
-        String observedThreadId = frame.path("params").path("threadId").asText();
+        if (!"event".equals(frame.path("method").asString())) return false;
+        String observedThreadId = frame.path("params").path("threadId").asString();
         // runner_ready notification has no threadId — we filter it out here intentionally.
         return threadId.toString().equals(observedThreadId);
     }
@@ -730,8 +730,8 @@ class MentorLiveLlmTest {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
                 } else if (
-                    "event".equals(frame.path("method").asText()) &&
-                    "runner_ready".equals(frame.path("params").path("event").path("type").asText())
+                    "event".equals(frame.path("method").asString()) &&
+                    "runner_ready".equals(frame.path("params").path("event").path("type").asString())
                 ) {
                     readyNotifications.add(frame);
                 }
@@ -756,7 +756,7 @@ class MentorLiveLlmTest {
             ObjectNode params = MAPPER.createObjectNode();
             params.put("threadId", threadId.toString());
             JsonNode response = call("open_thread", params, Duration.ofSeconds(30));
-            assertThat(response.path("result").path("threadId").asText())
+            assertThat(response.path("result").path("threadId").asString())
                 .as("open_thread acks with threadId")
                 .isEqualTo(threadId.toString());
         }

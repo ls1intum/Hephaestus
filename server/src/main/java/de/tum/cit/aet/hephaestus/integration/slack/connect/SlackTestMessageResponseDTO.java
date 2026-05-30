@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** Result of the Slack test-message probe; carries the Slack error code on failure. */
 public record SlackTestMessageResponseDTO(boolean ok, @Nullable String channelId, @Nullable String slackError) {}

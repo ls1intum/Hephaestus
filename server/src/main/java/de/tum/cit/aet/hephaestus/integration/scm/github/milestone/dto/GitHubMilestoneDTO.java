@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMilestone;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMilestoneState;
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub milestones.

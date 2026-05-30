@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared utilities for extracting typed values from GitLab GraphQL/webhook

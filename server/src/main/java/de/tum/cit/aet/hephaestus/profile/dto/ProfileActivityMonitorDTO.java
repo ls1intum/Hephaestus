@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestI
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Configurable activity monitor data for a contributor profile")
 public record ProfileActivityMonitorDTO(

@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHLabelCon
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub labels.

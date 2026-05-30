@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.analytics.posthog;
 
 import org.hibernate.validator.constraints.URL;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**

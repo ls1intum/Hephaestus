@@ -23,8 +23,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -365,8 +365,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     /**
      * Convert state reason string to Discussion.StateReason enum.
      */
-    @Nullable
-    private Discussion.StateReason convertStateReason(@Nullable String stateReason) {
+    private Discussion.@Nullable StateReason convertStateReason(@Nullable String stateReason) {
         if (stateReason == null) {
             return null;
         }
@@ -382,8 +381,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     /**
      * Convert lock reason string to Discussion.LockReason enum.
      */
-    @Nullable
-    private Discussion.LockReason convertLockReason(@Nullable String lockReason) {
+    private Discussion.@Nullable LockReason convertLockReason(@Nullable String lockReason) {
         if (lockReason == null) {
             return null;
         }

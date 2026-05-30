@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.profile.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.profile.XpSystem;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Profile-specific DTO representing the user's XP progress and level.

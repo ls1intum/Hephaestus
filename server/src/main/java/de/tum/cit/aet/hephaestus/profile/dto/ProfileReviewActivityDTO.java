@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /** Review activity with XP score sourced from the activity_event ledger (CQRS read model). */
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -14,9 +14,8 @@ import org.springframework.lang.NonNull;
 public record ProfileReviewActivityDTO(
     @NonNull @Schema(description = "Unique identifier of the review") Long id,
     @NonNull @Schema(description = "Whether the review was dismissed") Boolean isDismissed,
-    @NonNull
     @Schema(description = "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)")
-    PullRequestReview.State state,
+    PullRequestReview.@NonNull State state,
     @NonNull @Schema(description = "Number of inline code comments in the review", example = "3") Integer codeComments,
     @Schema(description = "Author of the review") UserInfoDTO author,
     @Schema(description = "Pull request that was reviewed") PullRequestBaseInfoDTO pullRequest,

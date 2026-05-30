@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.events;
 
 import java.util.Set;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Sealed SCM domain events published in-process after vendor processors commit.
@@ -106,7 +106,7 @@ public final class ScmDomainEvent {
 
     public record IssueUntyped(
         ScmEventPayload.IssueData issue,
-        @Nullable ScmEventPayload.IssueTypeData previousType,
+        ScmEventPayload.@Nullable IssueTypeData previousType,
         EventContext context
     ) implements IssueEvent {}
 
@@ -319,8 +319,7 @@ public final class ScmDomainEvent {
     }
 
     public sealed interface CommitEvent extends Event, ContextualEvent permits CommitCreated, CommitAuthorsReconciled {
-        @Nullable
-        ScmEventPayload.CommitData commit();
+        ScmEventPayload.@Nullable CommitData commit();
     }
 
     public record CommitCreated(ScmEventPayload.CommitData commit, EventContext context) implements CommitEvent {}

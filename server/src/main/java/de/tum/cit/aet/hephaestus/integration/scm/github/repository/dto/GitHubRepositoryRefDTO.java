@@ -5,7 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUt
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRepository;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Lightweight DTO for repository references in webhook payloads and GraphQL responses.

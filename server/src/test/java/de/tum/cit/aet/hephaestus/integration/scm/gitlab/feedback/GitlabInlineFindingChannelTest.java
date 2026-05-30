@@ -97,7 +97,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         when(createResponse.field("createDiffNote.errors")).thenReturn(errorsField);
         when(errorsField.getValue()).thenReturn(List.of());
 
-        when(spec.execute()).thenReturn(Mono.just(dedupResponse), Mono.just(createResponse));
+        when(spec.execute()).thenReturn(Mono.just(dedupResponse)).thenReturn(Mono.just(createResponse));
 
         InlineResult result = channel.postInlineFindings(
             gitlabTarget(),

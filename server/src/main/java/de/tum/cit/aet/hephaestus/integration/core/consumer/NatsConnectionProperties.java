@@ -4,10 +4,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 // idleHeartbeat / heartbeatRestartThreshold / heartbeatLogInterval / installationStaleAfter

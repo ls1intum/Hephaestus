@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.databind.JsonNode;
@@ -86,7 +86,7 @@ public class PracticeDetectionResultParser {
         if (rawOutputNode == null || rawOutputNode.isNull() || rawOutputNode.isMissingNode()) {
             return ParseResult.empty("missing rawOutput field in job output");
         }
-        String rawOutputText = rawOutputNode.asText();
+        String rawOutputText = rawOutputNode.asString();
         if (rawOutputText.isBlank()) {
             return ParseResult.empty("rawOutput is blank");
         }
@@ -167,13 +167,13 @@ public class PracticeDetectionResultParser {
         if (
             filePathNode == null ||
             filePathNode.isNull() ||
-            !filePathNode.isTextual() ||
-            filePathNode.asText().isBlank()
+            !filePathNode.isString() ||
+            filePathNode.asString().isBlank()
         ) {
             log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing filePath", findingIndex, noteIndex);
             return null;
         }
-        String filePath = filePathNode.asText();
+        String filePath = filePathNode.asString();
 
         // Reject internal workspace paths — agent sometimes hallucinates context/target/ or .analysis/ paths
         if (
@@ -226,11 +226,11 @@ public class PracticeDetectionResultParser {
 
         // Required: body
         JsonNode bodyNode = entry.get("body");
-        if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
+        if (bodyNode == null || bodyNode.isNull() || !bodyNode.isString() || bodyNode.asString().isBlank()) {
             log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing body", findingIndex, noteIndex);
             return null;
         }
-        String body = bodyNode.asText();
+        String body = bodyNode.asString();
         if (body.length() > MAX_DIFF_NOTE_BODY_LENGTH) {
             log.debug(
                 "Truncating suggestedDiffNote body from {} to {} chars at finding {}, index {}",
@@ -331,30 +331,30 @@ public class PracticeDetectionResultParser {
 
     private static String textField(JsonNode entry, String field) {
         JsonNode node = entry.get(field);
-        if (node == null || node.isNull() || !node.isTextual()) {
+        if (node == null || node.isNull() || !node.isString()) {
             throw new EntryValidationException("missing or non-text field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     private static String optionalTextField(JsonNode entry, String field) {
         JsonNode node = entry.get(field);
-        if (node == null || node.isNull() || !node.isTextual()) {
+        if (node == null || node.isNull() || !node.isString()) {
             return null;
         }
-        String text = node.asText();
+        String text = node.asString();
         return text.isBlank() ? null : text;
     }
 
     private static <E extends Enum<E>> E parseEnum(JsonNode entry, String field, Class<E> enumType) {
         JsonNode node = entry.get(field);
-        if (node == null || node.isNull() || !node.isTextual()) {
+        if (node == null || node.isNull() || !node.isString()) {
             throw new EntryValidationException("missing or non-text field: " + field);
         }
         try {
-            return Enum.valueOf(enumType, node.asText().toUpperCase(Locale.ROOT));
+            return Enum.valueOf(enumType, node.asString().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new EntryValidationException("invalid " + field + " value: '" + node.asText() + "'");
+            throw new EntryValidationException("invalid " + field + " value: '" + node.asString() + "'");
         }
     }
 

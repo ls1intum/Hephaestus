@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.security;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**

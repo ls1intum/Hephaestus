@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /** Parsed result of an agent execution. Shared across Pi-based agent variants. */
 public record AgentResult(boolean success, Map<String, Object> output, @Nullable LlmUsage usage) {

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents the result of a synchronization operation with phase tracking.

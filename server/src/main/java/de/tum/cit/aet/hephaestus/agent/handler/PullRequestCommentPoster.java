@@ -17,9 +17,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -392,7 +392,7 @@ class PullRequestCommentPoster {
 
         JsonNode configSnapshot = job.getConfigSnapshot();
         if (configSnapshot != null && configSnapshot.has("model_name")) {
-            String modelName = configSnapshot.get("model_name").asText();
+            String modelName = configSnapshot.get("model_name").asString();
             if (!modelName.isBlank()) {
                 sb.append(" &middot; ").append(escapeHtml(modelName));
             }
@@ -432,7 +432,7 @@ class PullRequestCommentPoster {
         if (node == null || node.isNull()) {
             throw new JobDeliveryException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     @Nullable
@@ -444,7 +444,7 @@ class PullRequestCommentPoster {
         if (node == null || node.isNull()) {
             return null;
         }
-        return node.asText();
+        return node.asString();
     }
 
     static int requireMetadataInt(@Nullable JsonNode metadata, String field) {

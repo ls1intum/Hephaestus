@@ -183,9 +183,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             JsonNode metadata = submission.metadata();
 
             assertThat(metadata.get("repository_id").asLong()).isEqualTo(123L);
-            assertThat(metadata.get("repository_full_name").asText()).isEqualTo("owner/repo");
+            assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
-            assertThat(metadata.get("commit_sha").asText()).isEqualTo("abc123def456");
+            assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123def456");
             assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123def456");
         }
 
@@ -237,10 +237,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(envelope.get("schemaVersion").asInt()).isEqualTo(1);
             assertThat(envelope.get("workspaceId").asLong()).isEqualTo(WORKSPACE_ID);
             JsonNode task = envelope.get("task");
-            assertThat(task.get("kind").asText()).isEqualTo("practice_review");
+            assertThat(task.get("kind").asString()).isEqualTo("practice_review");
             assertThat(task.get("pullRequestNumber").asInt()).isEqualTo(42);
-            assertThat(task.get("repositoryFullName").asText()).isEqualTo("owner/repo");
-            assertThat(task.get("prompt").asText()).contains("Review merge request #42");
+            assertThat(task.get("repositoryFullName").asString()).isEqualTo("owner/repo");
+            assertThat(task.get("prompt").asString()).contains("Review merge request #42");
         }
 
         @Test

@@ -248,7 +248,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         ClientResponseField field = mock(ClientResponseField.class);
         lenient().when(response.isValid()).thenReturn(true);
         lenient().when(response.field(fieldPath)).thenReturn(field);
-        lenient().when(field.toEntity(any(Class.class))).thenReturn(entity);
+        lenient().when(field.toEntity(org.mockito.ArgumentMatchers.<Class<Object>>any())).thenReturn(entity);
         // Mock the parent "node" field for deleted-project detection checks
         if (fieldPath.startsWith("node.")) {
             ClientResponseField nodeField = mock(ClientResponseField.class);

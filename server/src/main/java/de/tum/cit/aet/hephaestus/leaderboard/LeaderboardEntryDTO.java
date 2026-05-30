@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /** Ranked leaderboard entry. Exactly one of {@code user} / {@code team} is populated depending on leaderboard mode. */
 @JsonInclude(JsonInclude.Include.NON_NULL)

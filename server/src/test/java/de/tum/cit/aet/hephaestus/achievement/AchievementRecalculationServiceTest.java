@@ -82,8 +82,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
 
             // TransactionTemplate.executeWithoutResult -> just run the consumer
             doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                var consumer = invocation.getArgument(0, java.util.function.Consumer.class);
+                java.util.function.Consumer<Object> consumer = invocation.getArgument(0);
                 consumer.accept(null);
                 return null;
             })
@@ -115,8 +114,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
         @Test
         void handlesEmptyHistory() {
             doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                var consumer = invocation.getArgument(0, java.util.function.Consumer.class);
+                java.util.function.Consumer<Object> consumer = invocation.getArgument(0);
                 consumer.accept(null);
                 return null;
             })

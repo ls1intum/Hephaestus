@@ -540,7 +540,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (pathNode == null || pathNode.isNull() || pathNode.isMissingNode()) {
                     continue;
                 }
-                String path = pathNode.asText();
+                String path = pathNode.asString();
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
@@ -566,10 +566,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asText().isBlank()) {
+        if (node == null || node.isNull() || node.asString().isBlank()) {
             throw new JobPreparationException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     private static int requireInt(JsonNode metadata, String field) {

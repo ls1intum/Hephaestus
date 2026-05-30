@@ -75,7 +75,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/findings_history.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("user").get("login").asText()).isEqualTo("octo");
+        assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(0L);
         // All verdicts present even when count is 0 — keeps the wire shape stable.
         for (Verdict v : Verdict.values()) {

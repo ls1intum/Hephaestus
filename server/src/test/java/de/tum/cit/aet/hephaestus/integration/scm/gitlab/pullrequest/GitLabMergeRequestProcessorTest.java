@@ -1841,8 +1841,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         private void assertMergeStatusMapping(
-            @org.springframework.lang.Nullable String detailedStatus,
-            @org.springframework.lang.Nullable String expectedMapping
+            @org.jspecify.annotations.Nullable String detailedStatus,
+            @org.jspecify.annotations.Nullable String expectedMapping
         ) {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))

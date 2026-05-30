@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Build the shell {@code export ... && } prefix that prepares LLM credentials inside the Pi

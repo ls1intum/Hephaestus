@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Response POJO for GitLab descendant group GraphQL queries.

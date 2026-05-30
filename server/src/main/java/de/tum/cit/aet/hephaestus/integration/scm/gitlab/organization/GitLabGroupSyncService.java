@@ -90,7 +90,7 @@ public class GitLabGroupSyncService {
      *                   or {@code null} to fall back to the global default
      * @throws IllegalStateException if no GitLab provider row exists for the URL
      */
-    private GitProvider resolveProvider(@org.springframework.lang.Nullable String serverUrl) {
+    private GitProvider resolveProvider(@org.jspecify.annotations.Nullable String serverUrl) {
         String effective = (serverUrl == null || serverUrl.isBlank()) ? gitLabProperties.defaultServerUrl() : serverUrl;
         return gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITLAB, effective)
@@ -113,7 +113,7 @@ public class GitLabGroupSyncService {
     public Optional<Organization> syncGroup(
         Long scopeId,
         String groupFullPath,
-        @org.springframework.lang.Nullable String serverUrl
+        @org.jspecify.annotations.Nullable String serverUrl
     ) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
@@ -197,7 +197,7 @@ public class GitLabGroupSyncService {
     public GitLabSyncResult syncGroupProjects(
         Long scopeId,
         String groupFullPath,
-        @org.springframework.lang.Nullable String serverUrl
+        @org.jspecify.annotations.Nullable String serverUrl
     ) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group projects sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);

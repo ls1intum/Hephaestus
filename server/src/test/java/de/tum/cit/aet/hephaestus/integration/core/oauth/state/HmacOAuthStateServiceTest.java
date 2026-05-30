@@ -294,7 +294,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
      */
     private static final class InMemoryNonceStore extends OAuthStateNonceStore {
 
-        private record Row(boolean consumed, @org.springframework.lang.Nullable String verifier) {}
+        private record Row(boolean consumed, @org.jspecify.annotations.Nullable String verifier) {}
 
         private final java.util.Map<String, Row> rows = new java.util.concurrent.ConcurrentHashMap<>();
         private volatile String lastVerifier;
@@ -314,7 +314,7 @@ class HmacOAuthStateServiceTest extends BaseUnitTest {
             long workspaceId,
             IntegrationKind kind,
             java.time.Instant issuedAt,
-            @org.springframework.lang.Nullable String codeVerifier
+            @org.jspecify.annotations.Nullable String codeVerifier
         ) {
             rows.putIfAbsent(nonce, new Row(false, codeVerifier));
             if (codeVerifier != null) this.lastVerifier = codeVerifier;

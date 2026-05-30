@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.events;
 
 import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import java.util.Set;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Sealed events for GitHub Projects V2 — project, item, and status-update
@@ -16,8 +16,7 @@ public final class GitHubProjectEvent {
     public sealed interface ProjectEvent
         permits ProjectCreated, ProjectUpdated, ProjectClosed, ProjectReopened, ProjectDeleted
     {
-        @Nullable
-        GitHubProjectEventPayload.ProjectData project();
+        GitHubProjectEventPayload.@Nullable ProjectData project();
 
         EventContext context();
     }
@@ -61,8 +60,7 @@ public final class GitHubProjectEvent {
             ProjectItemConverted,
             ProjectItemReordered
     {
-        @Nullable
-        GitHubProjectEventPayload.ProjectItemData item();
+        GitHubProjectEventPayload.@Nullable ProjectItemData item();
 
         Long projectId();
 
@@ -116,8 +114,7 @@ public final class GitHubProjectEvent {
     public sealed interface ProjectStatusUpdateEvent
         permits ProjectStatusUpdateCreated, ProjectStatusUpdateUpdated, ProjectStatusUpdateDeleted
     {
-        @Nullable
-        GitHubProjectEventPayload.ProjectStatusUpdateData statusUpdate();
+        GitHubProjectEventPayload.@Nullable ProjectStatusUpdateData statusUpdate();
 
         Long projectId();
 

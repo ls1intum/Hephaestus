@@ -143,7 +143,7 @@ public class PullRequest extends Issue { ... }
 ### DTOs and Mappers
 
 - Use Java records for DTOs
-- Annotate required fields with `@NonNull` (from `org.springframework.lang`)
+- Annotate required fields with `@NonNull` (from `org.jspecify.annotations`)
 - Keep mapping logic in dedicated `*Mapper` classes or static factory methods
 
 ```java

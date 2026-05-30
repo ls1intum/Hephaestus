@@ -17,11 +17,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -293,8 +293,7 @@ public class GitLabPullRequestReviewCommentProcessor {
      *   <li>{@code RIGHT} as a safe default when neither line is provided (matches GitHub mapper fallback)</li>
      * </ul>
      */
-    @Nullable
-    static PullRequestReviewComment.Side deriveSide(@Nullable Integer newLine, @Nullable Integer oldLine) {
+    static PullRequestReviewComment.@Nullable Side deriveSide(@Nullable Integer newLine, @Nullable Integer oldLine) {
         if (newLine != null) {
             return PullRequestReviewComment.Side.RIGHT;
         }

@@ -125,9 +125,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void mapsProvider(LlmProvider provider, String expected) throws Exception {
             byte[] json = factory.buildPiSettingsJson(provider, "some-model");
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
-            assertThat(root.path("defaultProvider").asText()).isEqualTo(expected);
-            assertThat(root.path("defaultModel").asText()).isEqualTo("some-model");
-            assertThat(root.path("transport").asText()).isEqualTo("sse");
+            assertThat(root.path("defaultProvider").asString()).isEqualTo(expected);
+            assertThat(root.path("defaultModel").asString()).isEqualTo("some-model");
+            assertThat(root.path("transport").asString()).isEqualTo("sse");
         }
 
         @Test
@@ -281,8 +281,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asText()).isEqualTo("gpt-x");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("hephaestus");
+            assertThat(settings.path("defaultModel").asString()).isEqualTo("gpt-x");
         }
 
         @Test
@@ -309,8 +309,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             // defaultProvider=hephaestus pins the provider explicitly, so Pi does not parse the
             // slash in defaultModel as a provider/model reference; the full id is what the
             // runner-script's registerProvider() call matches AND what the gateway expects on the wire.
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asText()).isEqualTo("openai/gpt-oss-120b");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("hephaestus");
+            assertThat(settings.path("defaultModel").asString()).isEqualTo("openai/gpt-oss-120b");
         }
 
         @Test
@@ -334,7 +334,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("openai");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("openai");
         }
 
         @Test
@@ -359,7 +359,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("azure-openai-responses");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("azure-openai-responses");
         }
     }
 

@@ -142,10 +142,10 @@ public class SlackWebhookSignatureVerifier implements WebhookSignatureVerifier {
             JsonNode root = objectMapper.readTree(body);
             if (root == null || !root.isObject()) return Optional.empty();
             JsonNode typeNode = root.get("type");
-            if (typeNode == null || !"url_verification".equals(typeNode.asText())) return Optional.empty();
+            if (typeNode == null || !"url_verification".equals(typeNode.asString())) return Optional.empty();
             JsonNode challengeNode = root.get("challenge");
-            if (challengeNode == null || !challengeNode.isTextual()) return Optional.empty();
-            return Optional.of(challengeNode.asText());
+            if (challengeNode == null || !challengeNode.isString()) return Optional.empty();
+            return Optional.of(challengeNode.asString());
         } catch (Exception e) {
             // Non-JSON bodies are normal for event-callback envelopes only when challenge
             // isn't present; falling through to the signature path is correct.

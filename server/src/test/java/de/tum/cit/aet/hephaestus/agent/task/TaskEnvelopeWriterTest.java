@@ -36,12 +36,12 @@ class TaskEnvelopeWriterTest extends BaseUnitTest {
         JsonNode root = reader.readTree(writer.write(sampleEnvelope()));
 
         assertThat(root.get("schemaVersion").asInt()).isEqualTo(1);
-        assertThat(root.get("jobId").asText()).isEqualTo("00000000-0000-0000-0000-00000000abcd");
+        assertThat(root.get("jobId").asString()).isEqualTo("00000000-0000-0000-0000-00000000abcd");
         assertThat(root.get("workspaceId").asLong()).isEqualTo(99L);
-        assertThat(root.get("task").get("kind").asText()).isEqualTo("practice_review");
-        assertThat(root.get("task").get("prompt").asText()).isEqualTo("Review this PR");
+        assertThat(root.get("task").get("kind").asString()).isEqualTo("practice_review");
+        assertThat(root.get("task").get("prompt").asString()).isEqualTo("Review this PR");
         assertThat(root.get("task").get("pullRequestNumber").asInt()).isEqualTo(42);
-        assertThat(root.get("task").get("repositoryFullName").asText()).isEqualTo("owner/repo");
+        assertThat(root.get("task").get("repositoryFullName").asString()).isEqualTo("owner/repo");
     }
 
     @Test

@@ -41,7 +41,7 @@ public interface OAuthStateNonceRepository extends JpaRepository<OAuthStateNonce
      * @return verifier string, or {@code null} for legacy / non-PKCE flows
      */
     @Query("SELECT n.codeVerifier FROM OAuthStateNonce n WHERE n.nonce = :nonce")
-    @org.springframework.lang.Nullable
+    @org.jspecify.annotations.Nullable
     String findCodeVerifier(@Param("nonce") String nonce);
 
     /** Cleanup helper — drops rows older than the cutoff. */

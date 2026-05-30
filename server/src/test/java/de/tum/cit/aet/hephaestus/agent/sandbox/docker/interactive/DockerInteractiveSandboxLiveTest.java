@@ -227,7 +227,7 @@ class DockerInteractiveSandboxLiveTest {
             await()
                 .atMost(Duration.ofSeconds(15))
                 .untilAsserted(() ->
-                    assertThat(frames.stream().anyMatch(n -> "pong".equals(n.path("type").asText()))).isTrue()
+                    assertThat(frames.stream().anyMatch(n -> "pong".equals(n.path("type").asString()))).isTrue()
                 );
             sb.close(Duration.ofSeconds(2));
         }
@@ -254,11 +254,11 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode echoBack = frames
                         .stream()
-                        .filter(n -> "echo_back".equals(n.path("type").asText()))
+                        .filter(n -> "echo_back".equals(n.path("type").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(echoBack).isNotNull();
-                    assertThat(echoBack.path("payload").asText()).isEqualTo(payload);
+                    assertThat(echoBack.path("payload").asString()).isEqualTo(payload);
                 });
             // 3-byte UTF-8 sequences; catches encoding regressions.
             assertThat(LINE_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
@@ -296,7 +296,7 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         snapshot
                             .stream()
-                            .filter(n -> "tick".equals(n.path("type").asText()))
+                            .filter(n -> "tick".equals(n.path("type").asString()))
                             .count()
                     ).isEqualTo(ringCapacity)
                 );
@@ -305,7 +305,7 @@ class DockerInteractiveSandboxLiveTest {
             assertThat(
                 snapshot
                     .stream()
-                    .filter(n -> "tick".equals(n.path("type").asText()))
+                    .filter(n -> "tick".equals(n.path("type").asString()))
                     .map(n -> n.path("n").asInt())
             )
                 .as("subscriber must observe ticks (%d..%d)", oldestRetainedN, newestN)
@@ -594,7 +594,9 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         frames
                             .stream()
-                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                            .anyMatch(f ->
+                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
+                            )
                     ).isTrue()
                 );
             sb.close(Duration.ofSeconds(2));
@@ -615,7 +617,9 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         frames
                             .stream()
-                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                            .anyMatch(f ->
+                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
+                            )
                     ).isTrue()
                 );
 
@@ -633,7 +637,7 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode resp = frames
                         .stream()
-                        .filter(f -> helloId.equals(f.path("id").asText()))
+                        .filter(f -> helloId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(resp).as("hello response").isNotNull();
@@ -655,7 +659,9 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         frames
                             .stream()
-                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                            .anyMatch(f ->
+                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
+                            )
                     ).isTrue()
                 );
 
@@ -671,7 +677,7 @@ class DockerInteractiveSandboxLiveTest {
             await()
                 .atMost(RPC_TIMEOUT)
                 .untilAsserted(() ->
-                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asText()))).isTrue()
+                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asString()))).isTrue()
                 );
 
             // open_thread
@@ -689,11 +695,11 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode openResp = frames
                         .stream()
-                        .filter(f -> openId.equals(f.path("id").asText()))
+                        .filter(f -> openId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(openResp).as("open_thread response").isNotNull();
-                    assertThat(openResp.path("result").path("threadId").asText()).isEqualTo(threadId);
+                    assertThat(openResp.path("result").path("threadId").asString()).isEqualTo(threadId);
                 });
 
             // prompt (stub emits: agent_start → message_update/text_delta → agent_end)
@@ -710,7 +716,7 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode promptResp = frames
                         .stream()
-                        .filter(f -> promptId.equals(f.path("id").asText()))
+                        .filter(f -> promptId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(promptResp).as("prompt response").isNotNull();
@@ -725,18 +731,18 @@ class DockerInteractiveSandboxLiveTest {
                         .stream()
                         .filter(
                             f ->
-                                "event".equals(f.path("method").asText()) &&
-                                threadId.equals(f.path("params").path("threadId").asText())
+                                "event".equals(f.path("method").asString()) &&
+                                threadId.equals(f.path("params").path("threadId").asString())
                         )
                         .map(f -> f.path("params").path("event"))
                         .collect(Collectors.toList());
-                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asText())))
+                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asString())))
                         .as("agent_start")
                         .isTrue();
-                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asText())))
+                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asString())))
                         .as("message_update / text_delta")
                         .isTrue();
-                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asText())))
+                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asString())))
                         .as("agent_end")
                         .isTrue();
                 });

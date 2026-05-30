@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
 import java.time.Duration;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
 
 /**
  * SPI for tracking GitHub API rate limits per scope/installation.

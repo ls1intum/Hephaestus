@@ -23,7 +23,7 @@ public final class TriggerEventsConverter {
         }
         List<String> result = new ArrayList<>(triggerEvents.size());
         for (JsonNode node : triggerEvents) {
-            result.add(node.asText());
+            result.add(node.asString());
         }
         return List.copyOf(result);
     }

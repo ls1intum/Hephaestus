@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
 
 /**
  * Utility class for analyzing GitHub GraphQL API errors.

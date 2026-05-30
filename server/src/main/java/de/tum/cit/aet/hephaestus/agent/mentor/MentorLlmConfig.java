@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor;
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec.

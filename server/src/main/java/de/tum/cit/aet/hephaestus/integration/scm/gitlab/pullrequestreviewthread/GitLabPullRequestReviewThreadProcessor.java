@@ -12,11 +12,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +65,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         @Nullable String filePath,
         @Nullable Integer newLine,
         @Nullable Integer oldLine,
-        @Nullable PullRequestReviewComment.Side side,
+        PullRequestReviewComment.@Nullable Side side,
         @Nullable String commitSha,
         @Nullable String originalCommitSha,
         @Nullable Boolean outdated,
@@ -79,7 +79,7 @@ public class GitLabPullRequestReviewThreadProcessor {
             @Nullable String filePath,
             @Nullable Integer newLine,
             @Nullable Integer oldLine,
-            @Nullable PullRequestReviewComment.Side side,
+            PullRequestReviewComment.@Nullable Side side,
             @Nullable String commitSha,
             @Nullable String originalCommitSha,
             @Nullable Instant createdAt

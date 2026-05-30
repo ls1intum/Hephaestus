@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHMannequi
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHOrganization;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * DTO for GitHub user references.

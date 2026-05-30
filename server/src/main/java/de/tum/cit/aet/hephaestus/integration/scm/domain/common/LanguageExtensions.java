@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.common;
 
 import java.util.Map;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared mapping from file extensions to programming language names.

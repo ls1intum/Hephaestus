@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.commit.util;
 
 import lombok.experimental.UtilityClass;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared helper methods used across commit-related services.

@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -52,8 +52,7 @@ public record GitHubProjectFieldDTO(
      * Get the data type as an enum.
      * Handles both custom field types and built-in system field types.
      */
-    @Nullable
-    public ProjectField.DataType getDataTypeEnum() {
+    public ProjectField.@Nullable DataType getDataTypeEnum() {
         if (dataType == null) {
             return null;
         }

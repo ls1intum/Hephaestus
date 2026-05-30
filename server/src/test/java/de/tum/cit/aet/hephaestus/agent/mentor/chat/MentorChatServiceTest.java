@@ -478,7 +478,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     private Runnable scheduleHappyPathResponses(FakeSandbox sb) {
         return () ->
             sb.onSend = frame -> {
-                String method = frame.path("method").asText("");
+                String method = frame.path("method").asString("");
                 long id = frame.path("id").asLong(0);
                 switch (method) {
                     case "hello" -> sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
@@ -518,7 +518,7 @@ class MentorChatServiceTest extends BaseUnitTest {
     private Runnable scheduleRunnerPoisoned(FakeSandbox sb) {
         return () ->
             sb.onSend = frame -> {
-                String method = frame.path("method").asText("");
+                String method = frame.path("method").asString("");
                 long id = frame.path("id").asLong(0);
                 switch (method) {
                     case "hello" -> sb.push(jsonRpcResult(id, mapper.createObjectNode().put("protocolVersion", 1)));
@@ -628,7 +628,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             for (String raw : rawData) {
                 try {
                     JsonNode n = m.readTree(raw);
-                    if (n.has("type")) types.add(n.get("type").asText());
+                    if (n.has("type")) types.add(n.get("type").asString());
                 } catch (Exception ignored) {
                     // Not a JSON SSE frame (e.g. a heartbeat comment) — skip.
                 }
@@ -693,7 +693,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         List<String> methodsSent() {
             List<String> out = new ArrayList<>();
             for (JsonNode frame : sent) {
-                if (frame.has("method")) out.add(frame.get("method").asText());
+                if (frame.has("method")) out.add(frame.get("method").asString());
             }
             return out;
         }

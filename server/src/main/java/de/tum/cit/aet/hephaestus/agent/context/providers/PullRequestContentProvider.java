@@ -19,9 +19,9 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -169,7 +169,7 @@ public class PullRequestContentProvider implements ContentProvider {
                 JsonNode metadata = job.getMetadata();
                 String repoFullName =
                     metadata != null && metadata.has("repository_full_name")
-                        ? metadata.get("repository_full_name").asText()
+                        ? metadata.get("repository_full_name").asString()
                         : null;
                 if (serverUrl != null && token != null && repoFullName != null) {
                     String cloneUrl = serverUrl + "/" + repoFullName + ".git";
@@ -293,14 +293,14 @@ public class PullRequestContentProvider implements ContentProvider {
     }
 
     private void addCommitLog(ObjectNode metadata, JsonNode jobMetadata) {
-        String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asText() : null;
-        String targetBranch = jobMetadata.has("target_branch") ? jobMetadata.get("target_branch").asText() : null;
+        String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asString() : null;
+        String targetBranch = jobMetadata.has("target_branch") ? jobMetadata.get("target_branch").asString() : null;
         long repositoryId = requireLong(jobMetadata, "repository_id");
 
         if (sourceBranch == null || targetBranch == null) return;
 
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-        String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asText() : null;
+        String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asString() : null;
 
         String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
         String logOutput = range != null ? gitDiffOperations.shortLog(repoPath, range[0], range[1]) : null;
@@ -366,7 +366,7 @@ public class PullRequestContentProvider implements ContentProvider {
     // Diff
 
     private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata, AgentJob job) {
-        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asText() : null;
+        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
         if (headSha == null || headSha.isBlank()) {
@@ -527,10 +527,10 @@ public class PullRequestContentProvider implements ContentProvider {
 
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asText().isBlank()) {
+        if (node == null || node.isNull() || node.asString().isBlank()) {
             throw new JobPreparationException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     private static int requireInt(JsonNode metadata, String field) {

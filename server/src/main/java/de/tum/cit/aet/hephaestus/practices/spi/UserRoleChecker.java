@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Service Provider Interface for checking user roles.

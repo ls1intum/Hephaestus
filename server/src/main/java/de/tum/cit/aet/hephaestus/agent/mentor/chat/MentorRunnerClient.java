@@ -15,9 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import reactor.core.Disposable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -186,7 +186,7 @@ public final class MentorRunnerClient implements AutoCloseable {
             return;
         }
         if (frame.has("method")) {
-            String method = frame.get("method").asText();
+            String method = frame.get("method").asString();
             if ("event".equals(method)) {
                 handleEvent(frame);
             } else if ("fetch_context".equals(method)) {
@@ -213,7 +213,7 @@ public final class MentorRunnerClient implements AutoCloseable {
         if (frame.has("error") && !frame.get("error").isNull()) {
             JsonNode error = frame.get("error");
             int code = error.has("code") ? error.get("code").asInt() : -32000;
-            String message = error.has("message") ? error.get("message").asText() : "runner error";
+            String message = error.has("message") ? error.get("message").asString() : "runner error";
             call.future.completeExceptionally(new MentorRunnerException(code, message, error));
         } else {
             JsonNode result = frame.has("result") ? frame.get("result") : objectMapper.nullNode();
@@ -234,7 +234,7 @@ public final class MentorRunnerClient implements AutoCloseable {
         // Notification-type frames (`runner_ready`) ship with `threadId: null` and pass
         // through here for ALL clients; the translator drops them by event-type.
         if (params.has("threadId") && !params.get("threadId").isNull()) {
-            String frameThreadId = params.get("threadId").asText();
+            String frameThreadId = params.get("threadId").asString();
             if (!boundThreadId.toString().equals(frameThreadId)) {
                 return;
             }
@@ -257,8 +257,8 @@ public final class MentorRunnerClient implements AutoCloseable {
             sendCallbackError(idNode, -32600, "missing params");
             return;
         }
-        String threadIdStr = params.has("threadId") ? params.get("threadId").asText() : null;
-        String path = params.has("path") ? params.get("path").asText() : null;
+        String threadIdStr = params.has("threadId") ? params.get("threadId").asString() : null;
+        String path = params.has("path") ? params.get("path").asString() : null;
         if (threadIdStr == null || path == null) {
             sendCallbackError(idNode, -32600, "missing threadId or path");
             return;

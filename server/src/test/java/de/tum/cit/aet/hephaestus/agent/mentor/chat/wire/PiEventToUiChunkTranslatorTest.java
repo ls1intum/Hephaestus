@@ -187,7 +187,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(startChunk.toolCallId()).isEqualTo("call-real-1");
         assertThat(startChunk.toolName()).isEqualTo("fetch_context");
         UIMessageChunk.ToolInputAvailable avail = (UIMessageChunk.ToolInputAvailable) out.get(1);
-        assertThat(avail.input().get("path").asText()).isEqualTo("workspace.json");
+        assertThat(avail.input().get("path").asString()).isEqualTo("workspace.json");
     }
 
     @Test
@@ -199,7 +199,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         assertThat(out).hasSize(1);
         UIMessageChunk.ToolOutputAvailable avail = (UIMessageChunk.ToolOutputAvailable) out.get(0);
-        assertThat(avail.output().path("content").get(0).get("text").asText()).isEqualTo("{\"workspace\":{}}");
+        assertThat(avail.output().path("content").get(0).get("text").asString()).isEqualTo("{\"workspace\":{}}");
     }
 
     @Test
@@ -529,9 +529,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         JsonNode snapshot = state.partsSnapshot();
         assertThat(snapshot.isArray()).isTrue();
         assertThat(snapshot).hasSize(2);
-        assertThat(snapshot.get(0).get("type").asText()).isEqualTo("step-start");
-        assertThat(snapshot.get(1).get("type").asText()).isEqualTo("text");
-        assertThat(snapshot.get(1).get("text").asText()).isEqualTo("hello");
+        assertThat(snapshot.get(0).get("type").asString()).isEqualTo("step-start");
+        assertThat(snapshot.get(1).get("type").asString()).isEqualTo("text");
+        assertThat(snapshot.get(1).get("text").asString()).isEqualTo("hello");
     }
 
     // tool-call part mutation (single part per toolCallId across states)
@@ -562,9 +562,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         // toolCallId hit and would surface the input-available state forever).
         assertThat(snapshot).hasSize(1);
         JsonNode part = snapshot.get(0);
-        assertThat(part.get("type").asText()).isEqualTo("tool-fetch_context");
-        assertThat(part.get("toolCallId").asText()).isEqualTo("tc-1");
-        assertThat(part.get("state").asText()).isEqualTo("output-available");
+        assertThat(part.get("type").asString()).isEqualTo("tool-fetch_context");
+        assertThat(part.get("toolCallId").asString()).isEqualTo("tc-1");
+        assertThat(part.get("state").asString()).isEqualTo("output-available");
         assertThat(part.has("input")).isTrue();
         assertThat(part.has("output")).isTrue();
     }
@@ -595,8 +595,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         JsonNode snapshot = state.partsSnapshot();
         assertThat(snapshot).hasSize(1);
         JsonNode part = snapshot.get(0);
-        assertThat(part.get("state").asText()).isEqualTo("output-error");
+        assertThat(part.get("state").asString()).isEqualTo("output-error");
         assertThat(part.has("output")).isFalse();
-        assertThat(part.get("errorText").asText()).isEqualTo("fetch_context timed out");
+        assertThat(part.get("errorText").asString()).isEqualTo("fetch_context timed out");
     }
 }

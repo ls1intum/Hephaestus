@@ -89,6 +89,15 @@
         <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
     <dependencies>
+        <!-- JSpecify nullness annotations (@NonNull/@Nullable). The forward-looking standard
+             adopted by Spring Framework 7 / Boot 4, replacing the deprecated
+             org.springframework.lang.* annotations. Version managed by the Spring Boot BOM.
+             A custom ModelConverter (JSpecifyRequiredModelConverter) teaches SpringDoc to read
+             these for OpenAPI `required`, since swagger-core only recognises the Spring ones. -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>

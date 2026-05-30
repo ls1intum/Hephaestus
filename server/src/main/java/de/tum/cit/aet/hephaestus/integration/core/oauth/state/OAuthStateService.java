@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Signed, single-use OAuth state-parameter helper.
