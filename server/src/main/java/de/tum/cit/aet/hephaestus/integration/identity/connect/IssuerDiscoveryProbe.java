@@ -183,8 +183,12 @@ public class IssuerDiscoveryProbe {
             socket.startHandshake();
 
             String request =
-                "GET " + path + " HTTP/1.1\r\n" +
-                "Host: " + host + "\r\n" +
+                "GET " +
+                path +
+                " HTTP/1.1\r\n" +
+                "Host: " +
+                host +
+                "\r\n" +
                 "Accept: application/json\r\n" +
                 "User-Agent: Hephaestus-IssuerDiscoveryProbe\r\n" +
                 "Connection: close\r\n\r\n";
@@ -296,10 +300,10 @@ public class IssuerDiscoveryProbe {
 
     private static String requireText(JsonNode doc, String field) {
         JsonNode node = doc.get(field);
-        if (node == null || !node.isTextual() || node.asText().isBlank()) {
+        if (node == null || !node.isString() || node.asString().isBlank()) {
             throw new IssuerValidationException("OIDC discovery document is missing '" + field + "'");
         }
-        return node.asText();
+        return node.asString();
     }
 
     private static String stripTrailingSlash(String path) {

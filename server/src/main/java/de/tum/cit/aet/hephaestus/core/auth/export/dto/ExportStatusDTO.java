@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.export.dto;
 
 import java.time.Instant;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Status view for {@code GET /user/exports/{id}}. {@code status} ∈

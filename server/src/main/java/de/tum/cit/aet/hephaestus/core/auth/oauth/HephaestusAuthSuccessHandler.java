@@ -85,7 +85,11 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         // JwtPrincipalFactory enforce the same invariant as defense-in-depth, but this is where the
         // login decision is made, so it must be rejected here too. No cookie is set on this path.
         if (account.getStatus() != Account.Status.ACTIVE) {
-            log.warn("auth.success: rejecting login for non-ACTIVE accountId={} status={}", account.getId(), account.getStatus());
+            log.warn(
+                "auth.success: rejecting login for non-ACTIVE accountId={} status={}",
+                account.getId(),
+                account.getStatus()
+            );
             getRedirectStrategy().sendRedirect(request, response, "/auth/error?code=account_inactive");
             return;
         }

@@ -89,9 +89,7 @@ class AccountHardDeleteSweeperTest extends BaseIntegrationTest {
         // deleted_at = now - (cooldown + 1h) → strictly older than the cutoff → must be swept.
         markDeleting(id, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
 
-        assertThat(childRowCounts(id))
-            .as("precondition: all four child tables seeded")
-            .containsExactly(1, 1, 1, 1);
+        assertThat(childRowCounts(id)).as("precondition: all four child tables seeded").containsExactly(1, 1, 1, 1);
 
         // Act
         int purged = sweeper.sweepNow();

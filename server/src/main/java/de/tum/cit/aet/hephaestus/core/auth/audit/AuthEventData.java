@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Immutable carrier of an {@link AuthEvent}'s business fields — the parameter object that

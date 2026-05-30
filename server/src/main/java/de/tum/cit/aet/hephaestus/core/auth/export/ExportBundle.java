@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The structured GDPR Art. 20 export document. Serialized to JSON as the {@link AccountExport}

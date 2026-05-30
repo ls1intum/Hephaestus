@@ -99,6 +99,6 @@ class ImpersonationServiceTest extends BaseUnitTest {
 
         // Must be parseable JSON and round-trip the exact reason (control chars preserved).
         JsonNode parsed = objectMapper.readTree(details);
-        assertThat(parsed.get("reason").asText()).isEqualTo(nastyReason);
+        assertThat(parsed.get("reason").asString()).isEqualTo(nastyReason);
     }
 }

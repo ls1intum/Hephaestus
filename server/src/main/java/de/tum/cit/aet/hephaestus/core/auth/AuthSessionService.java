@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

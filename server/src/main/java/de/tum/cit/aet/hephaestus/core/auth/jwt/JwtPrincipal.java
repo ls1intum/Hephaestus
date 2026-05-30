@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
 import java.util.Set;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The data {@link HephaestusJwtIssuer} bakes into a Hephaestus access token. Built by

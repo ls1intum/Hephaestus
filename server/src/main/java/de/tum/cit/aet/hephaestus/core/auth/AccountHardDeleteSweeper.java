@@ -98,7 +98,10 @@ public class AccountHardDeleteSweeper {
         // Children carry ON DELETE CASCADE on account_id, but we keep the account tombstone, so the
         // cascade is not triggered — delete the personal/auth child rows explicitly. account_feature
         // also has enabled_by_account_id (ON DELETE SET NULL), cleared here for the deleted actor.
-        jdbcTemplate.update("UPDATE account_feature SET enabled_by_account_id = NULL WHERE enabled_by_account_id = ?", accountId);
+        jdbcTemplate.update(
+            "UPDATE account_feature SET enabled_by_account_id = NULL WHERE enabled_by_account_id = ?",
+            accountId
+        );
         jdbcTemplate.update("DELETE FROM account_feature WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM identity_link WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM issued_jwt WHERE account_id = ?", accountId);

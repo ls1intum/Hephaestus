@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.notification;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRoleQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**

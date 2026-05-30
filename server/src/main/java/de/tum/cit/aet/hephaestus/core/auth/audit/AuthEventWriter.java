@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
