@@ -336,7 +336,7 @@ public class ConnectionService {
         return connectionRepository.save(connection);
     }
 
-    /** Parameter object for {@link #transition} — collapses 7 params to one record. */
+    /** Parameter object for {@link #transition} — collapses 6 params to one record. */
     public record TransitionRequest(
         IntegrationState next,
         String eventType,

@@ -53,7 +53,11 @@ function IntegrationsCallback() {
 		<div className="mx-auto max-w-md py-12">
 			<Card>
 				<CardContent className="flex flex-col items-center gap-4 py-8">
-					<Icon className={ok ? "size-12 text-green-600" : "size-12 text-destructive"} />
+					<Icon
+						className={
+							ok ? "size-12 text-green-600 dark:text-green-400" : "size-12 text-destructive"
+						}
+					/>
 					<div className="text-center">
 						<h1 className="text-xl font-semibold">
 							{ok ? "Integration connected" : "Connection failed"}

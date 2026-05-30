@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
-import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;

@@ -48,3 +48,33 @@ export const ConnectedDisabled: Story = {
 		enabled: false,
 	},
 };
+
+/** Non-default day — pins that the day Select renders the label ("Thursday"), not the raw value. */
+export const NonDefaultDay: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelId: "C0974LJBPBK",
+		enabled: true,
+		scheduleDay: 4,
+		scheduleTime: "14:30",
+	},
+};
+
+/** Invalid channel id — the field shows aria-invalid + the format error, and Save is disabled. */
+export const InvalidChannel: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelId: "not-a-channel",
+		enabled: true,
+	},
+};
+
+/** Invalid time — the time field surfaces its HH:mm error and Save is disabled. */
+export const InvalidTime: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelId: "C0974LJBPBK",
+		enabled: true,
+		scheduleTime: "9am",
+	},
+};

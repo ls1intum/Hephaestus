@@ -205,7 +205,7 @@ export function AdminSlackNotificationSettings({
 						) : (
 							<>
 								<div className="flex items-center gap-2 text-sm">
-									<CheckIcon className="size-4 text-green-600" />
+									<CheckIcon className="size-4 text-green-600 dark:text-green-400" />
 									<span>Slack workspace connected</span>
 								</div>
 
@@ -221,6 +221,7 @@ export function AdminSlackNotificationSettings({
 									<Switch
 										id="slack-enabled"
 										checked={enabledInput}
+										disabled={save.isPending}
 										onCheckedChange={(value) => {
 											setEnabledInput(value);
 											setDirty(true);
@@ -234,6 +235,7 @@ export function AdminSlackNotificationSettings({
 										<Select
 											items={DAYS}
 											value={dayInput}
+											disabled={save.isPending}
 											onValueChange={(value) => {
 												if (value) {
 													setDayInput(value);
@@ -259,27 +261,31 @@ export function AdminSlackNotificationSettings({
 											id="slack-time"
 											type="time"
 											value={timeInput}
+											disabled={save.isPending}
 											onChange={(e) => {
 												setTimeInput(e.target.value);
 												setDirty(true);
 											}}
 											aria-invalid={timeInvalid}
+											aria-describedby={timeInvalid ? "slack-time-error" : "slack-time-description"}
 										/>
+										<p id="slack-time-description" className="text-xs text-muted-foreground">
+											When the weekly cycle ends and the digest posts (workspace timezone).
+										</p>
 										{timeInvalid && (
-											<p className="text-xs text-destructive">Time must be in HH:mm format.</p>
+											<p id="slack-time-error" className="text-xs text-destructive">
+												Time must be in HH:mm format.
+											</p>
 										)}
 									</div>
 								</div>
-								<p className="text-xs text-muted-foreground">
-									When the weekly leaderboard cycle ends and the digest is posted (workspace
-									timezone).
-								</p>
 
 								<div className="space-y-2">
 									<Label htmlFor="slack-channel">Channel ID</Label>
 									<Input
 										id="slack-channel"
 										value={channelInput}
+										disabled={save.isPending}
 										onChange={(e) => {
 											setChannelInput(e.target.value.trim());
 											setDirty(true);
@@ -287,14 +293,17 @@ export function AdminSlackNotificationSettings({
 										placeholder="C0974LJBPBK"
 										autoComplete="off"
 										aria-invalid={channelInvalid}
+										aria-describedby={
+											channelInvalid ? "slack-channel-error" : "slack-channel-description"
+										}
 									/>
-									<p className="text-xs text-muted-foreground">
+									<p id="slack-channel-description" className="text-xs text-muted-foreground">
 										Right-click the channel in Slack → <em>View channel details</em> → copy the ID
 										at the bottom. The bot must already be a member (or the channel must be public —
 										the bot installed with <code>chat:write.public</code>).
 									</p>
 									{channelInvalid && (
-										<p className="text-xs text-destructive">
+										<p id="slack-channel-error" className="text-xs text-destructive">
 											Channel IDs start with C / G / D followed by 8+ alphanumerics.
 										</p>
 									)}
@@ -305,14 +314,16 @@ export function AdminSlackNotificationSettings({
 									<Input
 										id="slack-team"
 										value={teamInput}
+										disabled={save.isPending}
 										onChange={(e) => {
 											setTeamInput(e.target.value);
 											setDirty(true);
 										}}
 										placeholder="e.g. engineering"
 										autoComplete="off"
+										aria-describedby="slack-team-description"
 									/>
-									<p className="text-xs text-muted-foreground">
+									<p id="slack-team-description" className="text-xs text-muted-foreground">
 										Restrict the leaderboard to a single team. Leave blank to include every
 										contributor in the workspace.
 									</p>

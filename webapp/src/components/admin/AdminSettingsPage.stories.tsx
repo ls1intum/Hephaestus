@@ -75,3 +75,14 @@ export const PracticeReviewWithSubToggles: Story = {
 		},
 	},
 };
+
+/** Slack connected + configured — pins that the Slack digest card renders within the page. */
+export const SlackConfigured: Story = {
+	args: {
+		hasSlackConnection: true,
+		slackChannelId: "C0974LJBPBK",
+		slackNotificationsEnabled: true,
+		slackScheduleDay: 3,
+		slackScheduleTime: "09:00",
+	},
+};
