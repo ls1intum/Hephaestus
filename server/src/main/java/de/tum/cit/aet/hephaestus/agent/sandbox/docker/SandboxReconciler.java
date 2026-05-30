@@ -176,7 +176,7 @@ public class SandboxReconciler {
         MDC.put(MDC_RECONCILER_TYPE, "periodic");
         try {
             reconciliationDuration.record(() -> {
-                log.debug("Sandbox reconciler: periodic sweep");
+                log.trace("Sandbox reconciler: periodic sweep");
 
                 Set<UUID> activeJobIds;
                 try {

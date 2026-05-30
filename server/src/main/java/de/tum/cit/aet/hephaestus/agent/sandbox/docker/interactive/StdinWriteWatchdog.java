@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Shared timestamp inspector that enforces {@code hephaestus.mentor.stdin-write-timeout-ms}
- * across active sessions. {@link InteractiveSandboxRegistry#tickWatchdog} drives it on a
- * {@code @Scheduled} cadence; each tick is O(N) timestamp reads with no blocking.
+ * across active sessions. {@link #tick()} runs on a {@code @Scheduled} cadence; each tick is
+ * O(N) timestamp reads with no blocking.
  */
 public final class StdinWriteWatchdog {
 
