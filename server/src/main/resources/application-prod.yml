@@ -14,6 +14,14 @@ spring:
     liquibase:
         contexts: prod
 
+    # Belt-and-suspenders: the spring-boot-docker-compose jar ships in the image (it powers the
+    # local profile), and Boot's default is enabled=true. Prod brings infra up via docker/compose.*
+    # on the host, never from inside the app container, so explicitly disable Boot's auto-start
+    # instead of relying on "no compose.yaml happens to be in the workdir".
+    docker:
+        compose:
+            enabled: false
+
     security:
         oauth2:
             resourceserver:
