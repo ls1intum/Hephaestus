@@ -20,9 +20,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.function.Function;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,25 +34,23 @@ import org.springframework.stereotype.Component;
  *
  * <p>Subscribes to {@link LeaderboardDigestReadyEvent} (one event per workspace-channel
  * target, emitted by {@code SlackWeeklyLeaderboardTask}) and performs the vendor-specific
- * work the leaderboard module is no longer allowed to touch: resolving Slack users via
- * fuzzy name/email matching, building the {@code chat.postMessage} block kit payload,
- * and sending. The leaderboard task owns schedule + data assembly; this class owns
- * publish.
+ * work the leaderboard module is no longer allowed to touch: resolving Slack users for an
+ * {@code @}-mention, building the {@code chat.postMessage} block kit payload, and sending.
+ * The leaderboard task owns schedule + data assembly; this class owns publish.
+ *
+ * <p><b>User resolution is exact-match only</b> — a top reviewer is {@code @}-mentioned only
+ * when their leaderboard handle or email matches a Slack member's handle or email
+ * case-insensitively. There is deliberately <b>no</b> fuzzy / edit-distance matching: a
+ * near-miss must never {@code @}-mention an unrelated person in a public channel. A reviewer
+ * with no Slack account is rendered as a <b>plain name</b> (not dropped), so the digest always
+ * lists the real top&nbsp;3.
  *
  * <p>{@link EventListener} (not {@code TransactionalEventListener}) is correct here:
  * the publisher is a cron task with no surrounding transaction the publish needs to
- * coordinate with, and any subscriber that needed AFTER_COMMIT ordering would also
- * need a transaction on the publish side — there isn't one.
+ * coordinate with.
  *
- * <p>Failure modes preserved from the original task:
- * <ul>
- *   <li>{@link SlackSendException} on send → log + swallow, so one workspace's Slack outage
- *       does not abort the (synchronous) listener for the others. Each workspace is published
- *       under its own event.
- *   <li>No matching Slack users for top entries → log + skip publish (same outcome as the
- *       original "reason=noQualifiedReviewers" branch, but moved to the vendor side
- *       because user-resolution requires the Slack SDK).
- * </ul>
+ * <p>{@link SlackSendException} on send → log + swallow, so one workspace's Slack outage
+ * does not abort the (synchronous) listener; each workspace is published under its own event.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -70,22 +68,25 @@ public class SlackLeaderboardDigestPublisher {
     @EventListener
     public void onDigestReady(LeaderboardDigestReadyEvent event) {
         List<User> allSlackUsers = slackMessageService.listMembers(event.workspaceId());
-        List<User> topReviewers = event
+
+        // Render every top entry: an exact-matched reviewer becomes a real <@id> mention, an
+        // unmatched one becomes a plain name — never dropped, never fuzzy-mentioned.
+        List<String> rankedMentions = event
             .topEntries()
             .stream()
-            .map(mapToSlackUser(allSlackUsers))
-            .filter(user -> user != null)
+            .map(entry -> mentionFor(entry, allSlackUsers))
+            .filter(s -> s != null && !s.isBlank())
             .toList();
-        if (topReviewers.isEmpty()) {
+        if (rankedMentions.isEmpty()) {
             log.info(
-                "Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}, channelId={}",
+                "Skipped Slack notification: reason=noReviewersToRender, workspaceId={}, channelId={}",
                 event.workspaceId(),
                 event.channelId()
             );
             return;
         }
 
-        List<LayoutBlock> blocks = buildBlocks(event, topReviewers);
+        List<LayoutBlock> blocks = buildBlocks(event, rankedMentions);
         try {
             slackMessageService.sendForWorkspace(event.workspaceId(), event.channelId(), blocks, FALLBACK_TEXT);
         } catch (SlackSendException e) {
@@ -98,64 +99,44 @@ public class SlackLeaderboardDigestPublisher {
         }
     }
 
-    private Function<LeaderboardEntryDTO, User> mapToSlackUser(List<User> allSlackUsers) {
-        return entry -> {
-            UserInfoDTO leaderboardUser = entry.user();
-            if (leaderboardUser == null) {
-                return null;
-            }
-
-            var exactUser = allSlackUsers
-                .stream()
-                .filter(
-                    user ->
-                        user.getName().equalsIgnoreCase(leaderboardUser.name()) ||
-                        (user.getProfile() != null &&
-                            user.getProfile().getEmail() != null &&
-                            user.getProfile().getEmail().equalsIgnoreCase(leaderboardUser.email()))
-                )
-                .findFirst();
-            if (exactUser.isPresent()) {
-                return exactUser.get();
-            }
-
-            // Fall back to nearest-name match, but only within a small edit budget so a
-            // contributor with no Slack counterpart is dropped (filtered out upstream) rather
-            // than @-mentioning an unrelated person in the public digest.
-            return nearestNameMatch(leaderboardUser.name(), allSlackUsers);
-        };
-    }
-
     /**
-     * Nearest Slack user by Levenshtein distance on real-name (falling back to handle), accepted
-     * only if the edit distance is within a budget proportional to the target length (≤30%, min 1,
-     * capped at 4). Returns {@code null} when the target is blank or no candidate is close enough —
-     * a deliberately conservative match to avoid mentioning the wrong person. Null/blank candidate
-     * names are skipped so a deactivated/bot account never trips the matcher.
+     * Slack mention for a leaderboard entry: {@code <@id>} when the entry exactly matches a Slack
+     * member by handle or email (case-insensitive), otherwise the reviewer's plain display name.
+     * Returns {@code null} only for a team-aggregate row (no individual user).
      */
-    static User nearestNameMatch(String targetName, List<User> candidates) {
-        if (targetName == null || targetName.isBlank()) {
+    static String mentionFor(LeaderboardEntryDTO entry, List<User> allSlackUsers) {
+        UserInfoDTO reviewer = entry.user();
+        if (reviewer == null) {
             return null;
         }
-        LevenshteinDistance distance = LevenshteinDistance.getDefaultInstance();
-        User best = null;
-        int bestDistance = Integer.MAX_VALUE;
-        for (User candidate : candidates) {
-            String candidateName = candidate.getRealName() != null ? candidate.getRealName() : candidate.getName();
-            if (candidateName == null || candidateName.isBlank()) {
-                continue;
-            }
-            int d = distance.apply(targetName, candidateName);
-            if (d < bestDistance) {
-                bestDistance = d;
-                best = candidate;
-            }
-        }
-        int maxAllowed = Math.min(4, Math.max(1, (targetName.length() * 3) / 10));
-        return bestDistance <= maxAllowed ? best : null;
+        return exactMatch(reviewer, allSlackUsers)
+            .map(user -> "<@" + user.getId() + ">")
+            .orElseGet(() -> plainName(reviewer));
     }
 
-    private List<LayoutBlock> buildBlocks(LeaderboardDigestReadyEvent event, List<User> topReviewers) {
+    /** Deterministic, case-insensitive match on Slack handle or profile email. No fuzzy fallback. */
+    private static java.util.Optional<User> exactMatch(UserInfoDTO reviewer, List<User> allSlackUsers) {
+        return allSlackUsers
+            .stream()
+            .filter(
+                user ->
+                    (reviewer.name() != null && reviewer.name().equalsIgnoreCase(user.getName())) ||
+                    (reviewer.email() != null &&
+                        user.getProfile() != null &&
+                        reviewer.email().equalsIgnoreCase(user.getProfile().getEmail()))
+            )
+            .findFirst();
+    }
+
+    /** Best human-readable name for an unmatched reviewer: display name, else login. */
+    private static String plainName(UserInfoDTO reviewer) {
+        if (reviewer.name() != null && !reviewer.name().isBlank()) {
+            return reviewer.name();
+        }
+        return reviewer.login();
+    }
+
+    private List<LayoutBlock> buildBlocks(LeaderboardDigestReadyEvent event, List<String> rankedMentions) {
         final String baseUrl = event.baseUrl();
         final String workspaceBase = baseUrl + "/w/" + event.workspaceSlug();
         String teamFilter = event.teamLabel() == null ? "all" : event.teamLabel();
@@ -193,10 +174,9 @@ public class SlackLeaderboardDigestPublisher {
             section(section ->
                 section.text(
                     markdownText(
-                        IntStream.range(0, topReviewers.size())
-                            .mapToObj(i -> ((i + 1) + ". <@" + topReviewers.get(i).getId() + ">"))
-                            .reduce((a, b) -> a + "\n" + b)
-                            .orElse("")
+                        IntStream.range(0, rankedMentions.size())
+                            .mapToObj(i -> ((i + 1) + ". " + rankedMentions.get(i)))
+                            .collect(Collectors.joining("\n"))
                     )
                 )
             ),
