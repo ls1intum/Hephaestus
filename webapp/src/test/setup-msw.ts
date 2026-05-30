@@ -6,7 +6,15 @@
 // `server.use(...)` override in one test never leaks into the next.
 
 import { afterAll, afterEach, beforeAll } from "vitest";
+import { client } from "@/api/client.gen";
 import { server } from "@/mocks/server";
+
+// The generated hey-api client resolves request paths against `baseUrl` (it does
+// `new URL(path, baseUrl)`); with no baseUrl a relative path like `/user` throws
+// "Failed to parse URL". In the app `client.setConfig` runs in `main.tsx`, which the
+// test bundle never imports — so configure an absolute base here. The MSW handlers use
+// `*/path` wildcards, so this host is matched regardless of its exact value.
+client.setConfig({ baseUrl: "http://localhost:8080" });
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => server.resetHandlers());
