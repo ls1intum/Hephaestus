@@ -6,13 +6,13 @@ import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Audit-log entry returned by {@code GET /api/v1/workspaces/{workspaceId}/connections/{id}/audit}.
+ * Audit-log entry returned by {@code GET /workspaces/{workspaceSlug}/connections/{id}/audit}.
  *
  * <p>Lean projection of {@link ConnectionAudit} — the entity carries a back-reference
  * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
  * want to serialize on every response.
  */
-public record ConnectionAuditEntry(
+public record ConnectionAuditEntryDTO(
     String eventType,
     @Nullable IntegrationState fromState,
     @Nullable IntegrationState toState,
@@ -21,8 +21,8 @@ public record ConnectionAuditEntry(
     @Nullable String correlationId,
     Instant occurredAt
 ) {
-    public static ConnectionAuditEntry from(ConnectionAudit audit) {
-        return new ConnectionAuditEntry(
+    public static ConnectionAuditEntryDTO from(ConnectionAudit audit) {
+        return new ConnectionAuditEntryDTO(
             audit.getEventType(),
             audit.getFromState(),
             audit.getToState(),

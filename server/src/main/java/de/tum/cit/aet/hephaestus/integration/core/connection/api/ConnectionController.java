@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +29,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -41,14 +42,14 @@ import tools.jackson.databind.ObjectMapper;
  * only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
  * translation.
  *
- * <p>The {@code workspaceId} path variable + class-level
- * {@link RequireAtLeastWorkspaceAdmin} satisfy the
- * {@code MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext} rule — the
- * annotation simple name contains {@code Workspace}, which the rule recognises as a
- * workspace-context guard.
+ * <p>{@link WorkspaceScopedController} prefixes every route with
+ * {@code /workspaces/{workspaceSlug}} (the repo-wide convention) so the
+ * {@code WorkspaceContextFilter} resolves the tenant + the caller's roles before
+ * {@link RequireAtLeastWorkspaceAdmin} runs. The resolved {@link WorkspaceContext} supplies
+ * the numeric workspace id to the service layer.
  */
-@RestController
-@RequestMapping("/api/v1/workspaces/{workspaceId}/connections")
+@WorkspaceScopedController
+@RequestMapping("/connections")
 @RequireAtLeastWorkspaceAdmin
 public class ConnectionController {
 
@@ -91,27 +92,28 @@ public class ConnectionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ConnectionSummary>> list(@PathVariable Long workspaceId) {
-        List<ConnectionSummary> summaries = admin
-            .listForWorkspace(workspaceId)
+    public ResponseEntity<List<ConnectionSummaryDTO>> list(WorkspaceContext workspace) {
+        List<ConnectionSummaryDTO> summaries = admin
+            .listForWorkspace(workspace.id())
             .stream()
-            .map(c -> ConnectionSummary.from(c, admin.manifests()))
+            .map(c -> ConnectionSummaryDTO.from(c, admin.manifests()))
             .toList();
         return ResponseEntity.ok(summaries);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ConnectionDetail> read(@PathVariable Long workspaceId, @PathVariable Long id) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
-        return ResponseEntity.ok(ConnectionDetail.from(connection, admin.manifests(), objectMapper));
+    public ResponseEntity<ConnectionDetailDTO> read(WorkspaceContext workspace, @PathVariable Long id) {
+        Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
+        return ResponseEntity.ok(ConnectionDetailDTO.from(connection, admin.manifests(), objectMapper));
     }
 
     @PostMapping
-    public ResponseEntity<InitiateConnectionResponse> initiate(
-        @PathVariable Long workspaceId,
-        @RequestBody @NotNull InitiateConnectionRequest body,
+    public ResponseEntity<InitiateConnectionResponseDTO> initiate(
+        WorkspaceContext workspace,
+        @RequestBody @NotNull InitiateConnectionRequestDTO body,
         @Nullable Authentication authentication
     ) {
+        Long workspaceId = workspace.id();
         if (body == null || body.kind() == null) {
             throw new IllegalArgumentException("kind is required");
         }
@@ -130,7 +132,7 @@ public class ConnectionController {
 
         return switch (initiation) {
             case ConnectInitiation.RedirectToVendor r -> ResponseEntity.ok(
-                new InitiateConnectionResponse.Redirect(r.vendorUrl(), r.oauthState())
+                InitiateConnectionResponseDTO.redirect(r.vendorUrl(), r.oauthState())
             );
             case ConnectInitiation.AcceptInline inline -> {
                 Connection connection = admin.createInlineConnection(
@@ -141,19 +143,19 @@ public class ConnectionController {
                     userInput,
                     actorRef(authentication)
                 );
-                yield ResponseEntity.ok(new InitiateConnectionResponse.Linked(connection.getId()));
+                yield ResponseEntity.ok(InitiateConnectionResponseDTO.linked(connection.getId()));
             }
         };
     }
 
     @PostMapping("/{id}/suspend")
-    public ResponseEntity<ConnectionSummary> suspend(
-        @PathVariable Long workspaceId,
+    public ResponseEntity<ConnectionSummaryDTO> suspend(
+        WorkspaceContext workspace,
         @PathVariable Long id,
-        @RequestBody(required = false) @Nullable ReasonRequest body,
+        @RequestBody(required = false) @Nullable ReasonRequestDTO body,
         @Nullable Authentication authentication
     ) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
+        Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
         String reason = body == null ? null : body.reason();
         connection = connectionService.transition(
             connection,
@@ -166,17 +168,17 @@ public class ConnectionController {
                 reason
             )
         );
-        return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
+        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
     }
 
     @PostMapping("/{id}/reactivate")
-    public ResponseEntity<ConnectionSummary> reactivate(
-        @PathVariable Long workspaceId,
+    public ResponseEntity<ConnectionSummaryDTO> reactivate(
+        WorkspaceContext workspace,
         @PathVariable Long id,
-        @RequestBody(required = false) @Nullable ReasonRequest body,
+        @RequestBody(required = false) @Nullable ReasonRequestDTO body,
         @Nullable Authentication authentication
     ) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
+        Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
         String reason = body == null ? null : body.reason();
         connection = connectionService.transition(
             connection,
@@ -189,16 +191,16 @@ public class ConnectionController {
                 reason
             )
         );
-        return ResponseEntity.ok(ConnectionSummary.from(connection, admin.manifests()));
+        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
     }
 
     @PostMapping("/{id}/disconnect")
     public ResponseEntity<Void> disconnect(
-        @PathVariable Long workspaceId,
+        WorkspaceContext workspace,
         @PathVariable Long id,
         @Nullable Authentication authentication
     ) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
+        Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
 
         // Best-effort vendor-side revoke. Strategy may be missing if the kind was
         // de-registered after the connection row was written; we still want the local
@@ -238,14 +240,14 @@ public class ConnectionController {
     }
 
     @GetMapping("/{id}/audit")
-    public ResponseEntity<List<ConnectionAuditEntry>> audit(@PathVariable Long workspaceId, @PathVariable Long id) {
+    public ResponseEntity<List<ConnectionAuditEntryDTO>> audit(WorkspaceContext workspace, @PathVariable Long id) {
         // findInWorkspaceOrThrow enforces the workspace scope before we expose audit history,
         // so cross-workspace audit reads return 404 rather than leaking a partial trail.
-        admin.findInWorkspaceOrThrow(workspaceId, id);
-        List<ConnectionAuditEntry> entries = admin
+        admin.findInWorkspaceOrThrow(workspace.id(), id);
+        List<ConnectionAuditEntryDTO> entries = admin
             .auditForConnection(id, AUDIT_PAGE_CAP)
             .stream()
-            .map(ConnectionAuditEntry::from)
+            .map(ConnectionAuditEntryDTO::from)
             .toList();
         return ResponseEntity.ok(entries);
     }
@@ -256,8 +258,7 @@ public class ConnectionController {
     }
 
     /** Lifecycle-action body — reason is optional, applied to both suspend and reactivate. */
-    @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequest")
-    public record ReasonRequest(@Nullable String reason) {}
+    public record ReasonRequestDTO(@Nullable String reason) {}
 
     /**
      * Not-found is signalled as {@link NoSuchElementException} by {@code ConnectionAdminService}

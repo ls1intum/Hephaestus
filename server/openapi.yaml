@@ -20,6 +20,23 @@ tags:
 - description: Global contributor information
   name: Contributors
 - description: |-
+    Administrative REST surface for managing per-workspace
+     {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
+     initiate, suspend, reactivate, disconnect, audit.
+
+     <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
+     the state machine + audit invariants live in {@link ConnectionService ConnectionService}; per-kind
+     vendor flows live in {@link ConnectionStrategy ConnectionStrategy} implementations. The controller's
+     only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
+     translation.
+
+     <p>{@link WorkspaceScopedController WorkspaceScopedController} prefixes every route with
+     <code>/workspaces/{workspaceSlug</code>} (the repo-wide convention) so the
+     <code>WorkspaceContextFilter</code> resolves the tenant + the caller's roles before
+     {@link RequireAtLeastWorkspaceAdmin RequireAtLeastWorkspaceAdmin} runs. The resolved {@link WorkspaceContext WorkspaceContext} supplies
+     the numeric workspace id to the service layer.
+  name: connection-controller
+- description: |-
     Workspace registry endpoints that operate outside of a specific workspace slug.
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
@@ -38,23 +55,6 @@ tags:
   name: workspace-membership-controller
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
-- description: |-
-    Administrative REST surface for managing per-workspace
-     {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
-     initiate, suspend, reactivate, disconnect, audit.
-
-     <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
-     the state machine + audit invariants live in {@link ConnectionService ConnectionService}; per-kind
-     vendor flows live in {@link ConnectionStrategy ConnectionStrategy} implementations. The controller's
-     only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
-     translation.
-
-     <p>The <code>workspaceId</code> path variable + class-level
-     {@link RequireAtLeastWorkspaceAdmin RequireAtLeastWorkspaceAdmin} satisfy the
-     <code>MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext</code> rule — the
-     annotation simple name contains <code>Workspace</code>, which the rule recognises as a
-     workspace-context guard.
-  name: connection-controller
 - description: "User account management (settings, deletion)"
   name: Account
 - description: Slack admin connectivity probe — test-message dispatch.
@@ -103,205 +103,6 @@ tags:
 - description: Contributor rankings and league statistics
   name: Leaderboard
 paths:
-  /api/v1/workspaces/{workspaceId}/connections:
-    get:
-      operationId: list
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ConnectionSummary"
-          description: OK
-      tags:
-      - connection
-    post:
-      operationId: initiate
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/InitiateConnectionRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                oneOf:
-                - $ref: "#/components/schemas/Linked"
-                - $ref: "#/components/schemas/Redirect"
-          description: OK
-      tags:
-      - connection
-  /api/v1/workspaces/{workspaceId}/connections/slack/test-message:
-    post:
-      operationId: sendTestMessage
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SlackTestMessageResponse"
-          description: OK
-      tags:
-      - slack-connection-admin
-  /api/v1/workspaces/{workspaceId}/connections/{id}:
-    get:
-      operationId: read
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConnectionDetail"
-          description: OK
-      tags:
-      - connection
-  /api/v1/workspaces/{workspaceId}/connections/{id}/audit:
-    get:
-      operationId: audit
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ConnectionAuditEntry"
-          description: OK
-      tags:
-      - connection
-  /api/v1/workspaces/{workspaceId}/connections/{id}/disconnect:
-    post:
-      operationId: disconnect
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-      tags:
-      - connection
-  /api/v1/workspaces/{workspaceId}/connections/{id}/reactivate:
-    post:
-      operationId: reactivate
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReasonRequest"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConnectionSummary"
-          description: OK
-      tags:
-      - connection
-  /api/v1/workspaces/{workspaceId}/connections/{id}/suspend:
-    post:
-      operationId: suspend
-      parameters:
-      - in: path
-        name: workspaceId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReasonRequest"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConnectionSummary"
-          description: OK
-      tags:
-      - connection
   /auth/identity-providers:
     get:
       description: Returns all enabled identity providers that can be used for login.
@@ -962,6 +763,211 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/connections:
+    get:
+      operationId: list
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - connection
+    post:
+      operationId: initiate
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiateConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitiateConnectionResponse"
+          description: OK
+      tags:
+      - connection
+  /workspaces/{workspaceSlug}/connections/slack/test-message:
+    post:
+      operationId: sendTestMessage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackTestMessageResponse"
+          description: OK
+      tags:
+      - slack-connection-admin
+  /workspaces/{workspaceSlug}/connections/{id}:
+    get:
+      operationId: read
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionDetail"
+          description: OK
+      tags:
+      - connection
+  /workspaces/{workspaceSlug}/connections/{id}/audit:
+    get:
+      operationId: audit
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionAuditEntry"
+          description: OK
+      tags:
+      - connection
+  /workspaces/{workspaceSlug}/connections/{id}/disconnect:
+    post:
+      operationId: disconnect
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      tags:
+      - connection
+  /workspaces/{workspaceSlug}/connections/{id}/reactivate:
+    post:
+      operationId: reactivate
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - connection
+  /workspaces/{workspaceSlug}/connections/{id}/suspend:
+    post:
+      operationId: suspend
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - connection
   /workspaces/{workspaceSlug}/features:
     patch:
       operationId: updateFeatures
@@ -3176,6 +3182,164 @@ components:
           format: uuid
         title:
           type: string
+    ConnectionAuditEntry:
+      type: object
+      description: |-
+        Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
+
+         <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
+         to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+         want to serialize on every response.
+      properties:
+        actorKind:
+          type: string
+        actorRef:
+          type: string
+        correlationId:
+          type: string
+        eventType:
+          type: string
+        fromState:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        occurredAt:
+          type: string
+          format: date-time
+        toState:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+    ConnectionDetail:
+      type: object
+      description: |-
+        Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
+         sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
+         <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
+         client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
+         and is not exposed by this DTO.
+
+         <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+         the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
+         object.
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+            - WEBHOOK_INGEST
+            - URL_VERIFICATION_HANDSHAKE
+            - REPLAY_PROTECTION
+            - TOKEN_REFRESH
+            - FEEDBACK_DELIVERY
+            - INLINE_FINDINGS
+            - APPROVAL_WORKFLOW
+            - SCOPE_CHANGES
+          uniqueItems: true
+        config:
+          type: object
+          additionalProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        family:
+          type: string
+          enum:
+          - SCM
+          - MESSAGING
+        id:
+          type: integer
+          format: int64
+        instanceKey:
+          type: string
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+        lastActivityAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        stateReason:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    ConnectionSummary:
+      type: object
+      description: |-
+        Wire shape returned by the <code>GET /workspaces/{workspaceSlug</code>/connections}
+         list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+         credentials, no audit. Capabilities are looked up from the per-kind manifest at
+         response build time so adding/removing a capability needs no DB migration.
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+            - WEBHOOK_INGEST
+            - URL_VERIFICATION_HANDSHAKE
+            - REPLAY_PROTECTION
+            - TOKEN_REFRESH
+            - FEEDBACK_DELIVERY
+            - INLINE_FINDINGS
+            - APPROVAL_WORKFLOW
+            - SCOPE_CHANGES
+          uniqueItems: true
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        family:
+          type: string
+          enum:
+          - SCM
+          - MESSAGING
+        id:
+          type: integer
+          format: int64
+        instanceKey:
+          type: string
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+        lastActivityAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        stateReason:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -3612,6 +3776,62 @@ components:
       - alias
       - displayName
       - type
+    InitiateConnectionRequest:
+      type: object
+      description: |-
+        Inbound payload for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+
+         <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
+         implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
+         <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
+         Validation is the strategy's responsibility — invalid input surfaces as a 400 via
+         <code>IllegalArgumentException</code>.
+      properties:
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+        redirectAfter:
+          type: string
+          format: uri
+        userInput:
+          type: object
+          additionalProperties:
+            type: string
+    InitiateConnectionResponse:
+      type: object
+      description: |-
+        Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+
+         <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+         <ul>
+           <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+               URL to bounce the browser to; {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#state #state} is the signed OAuth state.</li>
+           <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+               newly-created Connection; no further round-trip is needed.</li>
+         </ul>
+
+         <p>Deliberately a flat record (nullable per-variant fields) rather than a sealed
+         <code>oneOf</code> hierarchy: a discriminated union serialises to OpenAPI <code>oneOf +
+         discriminator</code>, which the webapp's hey-api react-query transformer mishandles. A flat shape
+         round-trips cleanly through code generation, so the webapp consumes the generated client
+         instead of a hand-rolled fetch wrapper.
+      properties:
+        connectionId:
+          type: integer
+          format: int64
+        state:
+          type: string
+        type:
+          type: string
+          enum:
+          - REDIRECT
+          - LINKED
+        vendorUrl:
+          type: string
+          format: uri
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -4419,6 +4639,13 @@ components:
       - number
       - state
       - title
+    ReasonRequest:
+      type: object
+      description: "Lifecycle-action body — reason is optional, applied to both suspend\
+        \ and reactivate."
+      properties:
+        reason:
+          type: string
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -4466,6 +4693,17 @@ components:
       - id
       - name
       - nameWithOwner
+    SlackTestMessageResponse:
+      type: object
+      description: Result of the Slack test-message probe; carries the Slack error
+        code on failure.
+      properties:
+        channelId:
+          type: string
+        ok:
+          type: boolean
+        slackError:
+          type: string
     SortObject:
       type: object
       properties:

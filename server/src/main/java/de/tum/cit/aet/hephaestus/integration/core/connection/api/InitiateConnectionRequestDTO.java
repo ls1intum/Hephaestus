@@ -6,7 +6,7 @@ import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Inbound payload for {@code POST /api/v1/workspaces/{workspaceId}/connections}.
+ * Inbound payload for {@code POST /workspaces/{workspaceSlug}/connections}.
  *
  * <p>{@code userInput} is intentionally a free-form map so per-kind ConnectionStrategy
  * implementations can dictate their own field schema (e.g. GitLab needs {@code pat} +
@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
  * {@code IllegalArgumentException}.
  */
-public record InitiateConnectionRequest(
+public record InitiateConnectionRequestDTO(
     IntegrationKind kind,
     Map<String, String> userInput,
     @Nullable URI redirectAfter

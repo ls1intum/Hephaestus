@@ -711,6 +711,15 @@ export type SortObject = {
 };
 
 /**
+ * Result of the Slack test-message probe; carries the Slack error code on failure.
+ */
+export type SlackTestMessageResponse = {
+    channelId?: string;
+    ok?: boolean;
+    slackError?: string;
+};
+
+/**
  * Request to rename a workspace's URL slug
  */
 export type RenameWorkspaceSlugRequest = {
@@ -718,6 +727,13 @@ export type RenameWorkspaceSlugRequest = {
      * New URL-friendly identifier for the workspace
      */
     newSlug: string;
+};
+
+/**
+ * Lifecycle-action body — reason is optional, applied to both suspend and reactivate.
+ */
+export type ReasonRequest = {
+    reason?: string;
 };
 
 /**
@@ -1427,6 +1443,47 @@ export type LeaderboardEntry = {
 };
 
 /**
+ * Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+ *
+ * <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+ * <ul>
+ * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+ * URL to bounce the browser to; {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#state #state} is the signed OAuth state.</li>
+ * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+ * newly-created Connection; no further round-trip is needed.</li>
+ * </ul>
+ *
+ * <p>Deliberately a flat record (nullable per-variant fields) rather than a sealed
+ * <code>oneOf</code> hierarchy: a discriminated union serialises to OpenAPI <code>oneOf +
+ * discriminator</code>, which the webapp's hey-api react-query transformer mishandles. A flat shape
+ * round-trips cleanly through code generation, so the webapp consumes the generated client
+ * instead of a hand-rolled fetch wrapper.
+ */
+export type InitiateConnectionResponse = {
+    connectionId?: number;
+    state?: string;
+    type?: 'REDIRECT' | 'LINKED';
+    vendorUrl?: string;
+};
+
+/**
+ * Inbound payload for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+ *
+ * <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
+ * implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
+ * <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
+ * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
+ * <code>IllegalArgumentException</code>.
+ */
+export type InitiateConnectionRequest = {
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    redirectAfter?: string;
+    userInput?: {
+        [key: string]: string;
+    };
+};
+
+/**
  * An enabled identity provider available for login
  */
 export type IdentityProvider = {
@@ -1780,6 +1837,71 @@ export type Contributor = {
      * Display name of the contributor
      */
     name: string;
+};
+
+/**
+ * Wire shape returned by the <code>GET /workspaces/{workspaceSlug</code>/connections}
+ * list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+ * credentials, no audit. Capabilities are looked up from the per-kind manifest at
+ * response build time so adding/removing a capability needs no DB migration.
+ */
+export type ConnectionSummary = {
+    capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    createdAt?: Date;
+    displayName?: string;
+    family?: 'SCM' | 'MESSAGING';
+    id?: number;
+    instanceKey?: string;
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    lastActivityAt?: Date;
+    state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    stateReason?: string;
+    updatedAt?: Date;
+};
+
+/**
+ * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
+ * sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
+ * <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
+ * client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
+ * and is not exposed by this DTO.
+ *
+ * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+ * the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
+ * object.
+ */
+export type ConnectionDetail = {
+    capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    config?: {
+        [key: string]: unknown;
+    };
+    createdAt?: Date;
+    displayName?: string;
+    family?: 'SCM' | 'MESSAGING';
+    id?: number;
+    instanceKey?: string;
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    lastActivityAt?: Date;
+    state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    stateReason?: string;
+    updatedAt?: Date;
+};
+
+/**
+ * Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
+ *
+ * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
+ * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+ * want to serialize on every response.
+ */
+export type ConnectionAuditEntry = {
+    actorKind?: string;
+    actorRef?: string;
+    correlationId?: string;
+    eventType?: string;
+    fromState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    occurredAt?: Date;
+    toState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
 };
 
 /**
@@ -2561,6 +2683,177 @@ export type RetryDeliveryResponses = {
 };
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+
+export type ListData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections';
+};
+
+export type ListResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionSummary>;
+};
+
+export type ListResponse = ListResponses[keyof ListResponses];
+
+export type InitiateData = {
+    body: InitiateConnectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections';
+};
+
+export type InitiateResponses = {
+    /**
+     * OK
+     */
+    200: InitiateConnectionResponse;
+};
+
+export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
+
+export type SendTestMessageData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/slack/test-message';
+};
+
+export type SendTestMessageResponses = {
+    /**
+     * OK
+     */
+    200: SlackTestMessageResponse;
+};
+
+export type SendTestMessageResponse = SendTestMessageResponses[keyof SendTestMessageResponses];
+
+export type ReadData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}';
+};
+
+export type ReadResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionDetail;
+};
+
+export type ReadResponse = ReadResponses[keyof ReadResponses];
+
+export type AuditData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}/audit';
+};
+
+export type AuditResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionAuditEntry>;
+};
+
+export type AuditResponse = AuditResponses[keyof AuditResponses];
+
+export type DisconnectData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}/disconnect';
+};
+
+export type DisconnectResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ReactivateData = {
+    body?: ReasonRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}/reactivate';
+};
+
+export type ReactivateResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionSummary;
+};
+
+export type ReactivateResponse = ReactivateResponses[keyof ReactivateResponses];
+
+export type SuspendData = {
+    body?: ReasonRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}/suspend';
+};
+
+export type SuspendResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionSummary;
+};
+
+export type SuspendResponse = SuspendResponses[keyof SuspendResponses];
 
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;

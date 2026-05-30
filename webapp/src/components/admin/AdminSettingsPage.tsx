@@ -90,7 +90,6 @@ export function AdminSettingsPage({
 
 				{features.leaderboardEnabled && workspaceId != null && workspaceSlug != null && (
 					<AdminSlackNotificationSettings
-						workspaceId={workspaceId}
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
 						channelId={slackChannelId}

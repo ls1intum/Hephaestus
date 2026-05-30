@@ -26,7 +26,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.time.Instant;
@@ -105,10 +108,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
         when(manifests.capabilitiesFor(IntegrationKind.GITLAB)).thenReturn(Set.of(Capability.WEBHOOK_INGEST));
 
-        ResponseEntity<List<ConnectionSummary>> response = controller.list(workspaceId);
+        ResponseEntity<List<ConnectionSummaryDTO>> response = controller.list(ctx(workspaceId));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        List<ConnectionSummary> body = response.getBody();
+        List<ConnectionSummaryDTO> body = response.getBody();
         assertThat(body).hasSize(2);
         assertThat(body.get(0).id()).isEqualTo(11L);
         assertThat(body.get(0).kind()).isEqualTo(IntegrationKind.GITHUB);
@@ -125,7 +128,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         when(admin.findInWorkspaceOrThrow(1L, 999L)).thenThrow(
             new NoSuchElementException("Connection not found: id=999")
         );
-        assertThatThrownBy(() -> controller.read(1L, 999L)).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> controller.read(ctx(1L), 999L)).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
@@ -134,7 +137,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         when(admin.findInWorkspaceOrThrow(999L, 7L)).thenThrow(
             new NoSuchElementException("Connection not found in workspace 999: id=7")
         );
-        assertThatThrownBy(() -> controller.read(999L, 7L))
+        assertThatThrownBy(() -> controller.read(ctx(999L), 7L))
             .isInstanceOf(NoSuchElementException.class)
             .hasMessageContaining("workspace 999");
     }
@@ -144,14 +147,15 @@ class ConnectionControllerTest extends BaseUnitTest {
         URI vendor = URI.create("https://github.com/apps/x/installations/new?state=abc");
         githubStrategy.nextInitiation = new ConnectInitiation.RedirectToVendor(vendor, "abc");
 
-        InitiateConnectionRequest req = new InitiateConnectionRequest(IntegrationKind.GITHUB, Map.of(), null);
-        ResponseEntity<InitiateConnectionResponse> response = controller.initiate(7L, req, null);
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.GITHUB, Map.of(), null);
+        ResponseEntity<InitiateConnectionResponseDTO> response = controller.initiate(ctx(7L), req, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody()).isInstanceOf(InitiateConnectionResponse.Redirect.class);
-        InitiateConnectionResponse.Redirect redirect = (InitiateConnectionResponse.Redirect) response.getBody();
+        InitiateConnectionResponseDTO redirect = response.getBody();
+        assertThat(redirect.type()).isEqualTo(InitiateConnectionResponseDTO.Type.REDIRECT);
         assertThat(redirect.vendorUrl()).isEqualTo(vendor);
         assertThat(redirect.state()).isEqualTo("abc");
+        assertThat(redirect.connectionId()).isNull();
         verify(admin, never()).createInlineConnection(anyLong(), any(), any(), any(), any(), any());
     }
 
@@ -172,17 +176,19 @@ class ConnectionControllerTest extends BaseUnitTest {
             )
         ).thenReturn(saved);
 
-        InitiateConnectionRequest req = new InitiateConnectionRequest(
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(
             IntegrationKind.GITLAB,
             Map.of("pat", "glpat-fake", "group_id", "200", "server_url", "https://gitlab.com"),
             null
         );
         Authentication auth = new UsernamePasswordAuthenticationToken("alice@example.com", "");
-        ResponseEntity<InitiateConnectionResponse> response = controller.initiate(workspaceId, req, auth);
+        ResponseEntity<InitiateConnectionResponseDTO> response = controller.initiate(ctx(workspaceId), req, auth);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
-        InitiateConnectionResponse.Linked linked = (InitiateConnectionResponse.Linked) response.getBody();
+        InitiateConnectionResponseDTO linked = response.getBody();
+        assertThat(linked.type()).isEqualTo(InitiateConnectionResponseDTO.Type.LINKED);
         assertThat(linked.connectionId()).isEqualTo(99L);
+        assertThat(linked.vendorUrl()).isNull();
 
         verify(admin).createInlineConnection(
             eq(workspaceId),
@@ -198,8 +204,8 @@ class ConnectionControllerTest extends BaseUnitTest {
     @DisplayName("initiate with no registered strategy throws IllegalArgumentException (→ 400 via advice)")
     void initiate_unknownKind_throwsBadRequest() {
         ConnectionController bare = new ConnectionController(admin, connectionService, objectMapper, List.of());
-        InitiateConnectionRequest req = new InitiateConnectionRequest(IntegrationKind.SLACK, Map.of(), null);
-        assertThatThrownBy(() -> bare.initiate(1L, req, null))
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.SLACK, Map.of(), null);
+        assertThatThrownBy(() -> bare.initiate(ctx(1L), req, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("No ConnectionStrategy registered");
     }
@@ -217,10 +223,10 @@ class ConnectionControllerTest extends BaseUnitTest {
         });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<ConnectionSummary> response = controller.suspend(
-            workspaceId,
+        ResponseEntity<ConnectionSummaryDTO> response = controller.suspend(
+            ctx(workspaceId),
             7L,
-            new ConnectionController.ReasonRequest("scheduled maintenance"),
+            new ConnectionController.ReasonRequestDTO("scheduled maintenance"),
             null
         );
 
@@ -248,7 +254,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         });
         when(manifests.capabilitiesFor(IntegrationKind.GITHUB)).thenReturn(Set.of());
 
-        ResponseEntity<ConnectionSummary> response = controller.reactivate(workspaceId, 7L, null, null);
+        ResponseEntity<ConnectionSummaryDTO> response = controller.reactivate(ctx(workspaceId), 7L, null, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody().state()).isEqualTo(IntegrationState.ACTIVE);
@@ -270,7 +276,7 @@ class ConnectionControllerTest extends BaseUnitTest {
             return conn;
         });
 
-        ResponseEntity<Void> response = controller.disconnect(workspaceId, 7L, null);
+        ResponseEntity<Void> response = controller.disconnect(ctx(workspaceId), 7L, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(204);
         assertThat(githubStrategy.revokeCalls).isEqualTo(1);
@@ -291,7 +297,7 @@ class ConnectionControllerTest extends BaseUnitTest {
             inv.getArgument(0)
         );
 
-        ResponseEntity<Void> response = controller.disconnect(workspaceId, 7L, null);
+        ResponseEntity<Void> response = controller.disconnect(ctx(workspaceId), 7L, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(204);
         verify(connectionService, times(1)).transition(any(Connection.class), any(TransitionRequest.class));
@@ -325,7 +331,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         );
         when(admin.auditForConnection(eq(7L), anyInt())).thenReturn(List.of(a2, a1));
 
-        ResponseEntity<List<ConnectionAuditEntry>> response = controller.audit(workspaceId, 7L);
+        ResponseEntity<List<ConnectionAuditEntryDTO>> response = controller.audit(ctx(workspaceId), 7L);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).hasSize(2);
@@ -342,7 +348,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         when(admin.findInWorkspaceOrThrow(999L, 7L)).thenThrow(
             new NoSuchElementException("Connection not found in workspace 999: id=7")
         );
-        assertThatThrownBy(() -> controller.audit(999L, 7L)).isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> controller.audit(ctx(999L), 7L)).isInstanceOf(NoSuchElementException.class);
         verify(admin, never()).auditForConnection(anyLong(), anyInt());
     }
 
@@ -355,6 +361,24 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     // helpers
+
+    /**
+     * Minimal admin {@link WorkspaceContext} for the given workspace id. The controller only reads
+     * {@code id()}; the filter + {@code @RequireAtLeastWorkspaceAdmin} guard (covered by integration
+     * tests) supply the real context at runtime.
+     */
+    private static WorkspaceContext ctx(long workspaceId) {
+        return new WorkspaceContext(
+            workspaceId,
+            "ws-" + workspaceId,
+            "Workspace " + workspaceId,
+            AccountType.ORG,
+            null,
+            false,
+            false,
+            Set.of(WorkspaceRole.ADMIN)
+        );
+    }
 
     private Connection newConnection(
         long id,

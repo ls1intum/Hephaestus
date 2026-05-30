@@ -7,7 +7,6 @@ const meta = {
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
-		workspaceId: 1,
 		workspaceSlug: "demo-workspace",
 		hasSlackConnection: false,
 		enabled: false,

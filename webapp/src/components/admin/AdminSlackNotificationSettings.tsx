@@ -2,16 +2,18 @@ import { useMutation } from "@tanstack/react-query";
 import { CheckIcon, ExternalLinkIcon, LoaderIcon, SendIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { updateNotificationsMutation } from "@/api/@tanstack/react-query.gen";
+import {
+	initiateMutation,
+	sendTestMessageMutation,
+	updateNotificationsMutation,
+} from "@/api/@tanstack/react-query.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { initiateSlackConnection, sendSlackTestMessage } from "@/lib/slackConnectionApi";
 
 export interface AdminSlackNotificationSettingsProps {
-	workspaceId: number;
 	workspaceSlug: string;
 	hasSlackConnection: boolean;
 	channelId?: string;
@@ -23,7 +25,6 @@ export interface AdminSlackNotificationSettingsProps {
 const SLACK_CHANNEL_ID = /^[CGD][A-Z0-9]{8,}$/;
 
 export function AdminSlackNotificationSettings({
-	workspaceId,
 	workspaceSlug,
 	hasSlackConnection,
 	channelId,
@@ -73,7 +74,7 @@ export function AdminSlackNotificationSettings({
 	});
 
 	const test = useMutation({
-		mutationFn: () => sendSlackTestMessage(workspaceId),
+		...sendTestMessageMutation(),
 		onSuccess: (data) => {
 			if (data.ok) {
 				toast.success("Test message posted to Slack");
@@ -87,17 +88,13 @@ export function AdminSlackNotificationSettings({
 	});
 
 	const connect = useMutation({
-		mutationFn: () => {
-			// Persist the originating slug so the OAuth landing route can route back.
-			window.sessionStorage.setItem("slack-connect-return-slug", workspaceSlug);
-			return initiateSlackConnection(workspaceId);
-		},
+		...initiateMutation(),
 		onSuccess: (initiation) => {
-			if (initiation.type === "redirect") {
+			if (initiation.type === "REDIRECT" && initiation.vendorUrl) {
 				window.location.assign(initiation.vendorUrl);
 				return; // page is unloading
 			}
-			// type === "linked" — no OAuth needed (e.g. PAT flow). Slack never reaches here today.
+			// type === "LINKED" — no OAuth needed (e.g. PAT flow). Slack never reaches here today.
 			toast.success("Slack workspace already linked");
 			onSaved();
 		},
@@ -119,7 +116,14 @@ export function AdminSlackNotificationSettings({
 
 						{!hasSlackConnection ? (
 							<Button
-								onClick={() => connect.mutate()}
+								onClick={() => {
+									// Persist the originating slug so the OAuth landing route can route back.
+									window.sessionStorage.setItem("slack-connect-return-slug", workspaceSlug);
+									connect.mutate({
+										path: { workspaceSlug },
+										body: { kind: "SLACK", userInput: {} },
+									});
+								}}
 								disabled={connect.isPending}
 								className="w-full"
 							>
@@ -222,7 +226,7 @@ export function AdminSlackNotificationSettings({
 									</Button>
 									<Button
 										variant="outline"
-										onClick={() => test.mutate()}
+										onClick={() => test.mutate({ path: { workspaceSlug } })}
 										disabled={test.isPending || channelInput.length === 0}
 									>
 										<SendIcon className="mr-2 size-3.5" />
