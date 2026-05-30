@@ -20,29 +20,14 @@ tags:
 - description: Global contributor information
   name: Contributors
 - description: |-
-    Administrative REST surface for managing per-workspace
-     {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
-     initiate, suspend, reactivate, disconnect, audit.
-
-     <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService ConnectionAdminService};
-     the state machine + audit invariants live in {@link ConnectionService ConnectionService}; per-kind
-     vendor flows live in {@link ConnectionStrategy ConnectionStrategy} implementations. The controller's
-     only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
-     translation.
-
-     <p>{@link WorkspaceScopedController WorkspaceScopedController} prefixes every route with
-     <code>/workspaces/{workspaceSlug</code>} (the repo-wide convention) so the
-     <code>WorkspaceContextFilter</code> resolves the tenant + the caller's roles before
-     {@link RequireAtLeastWorkspaceAdmin RequireAtLeastWorkspaceAdmin} runs. The resolved {@link WorkspaceContext WorkspaceContext} supplies
-     the numeric workspace id to the service layer.
-  name: connection-controller
-- description: |-
     Workspace registry endpoints that operate outside of a specific workspace slug.
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
 - description: Read-only access to practice evaluation findings
   name: Practice Findings
+- description: Workspace integration connection management
+  name: Connections
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -57,8 +42,6 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
-- description: Slack admin connectivity probe — test-message dispatch.
-  name: slack-connection-admin-controller
 - description: |-
     Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
      identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
@@ -784,7 +767,7 @@ paths:
                   $ref: "#/components/schemas/ConnectionSummary"
           description: OK
       tags:
-      - connection
+      - Connections
     post:
       operationId: initiate
       parameters:
@@ -809,7 +792,7 @@ paths:
                 $ref: "#/components/schemas/InitiateConnectionResponse"
           description: OK
       tags:
-      - connection
+      - Connections
   /workspaces/{workspaceSlug}/connections/slack/test-message:
     post:
       operationId: sendTestMessage
@@ -829,7 +812,7 @@ paths:
                 $ref: "#/components/schemas/SlackTestMessageResponse"
           description: OK
       tags:
-      - slack-connection-admin
+      - Connections
   /workspaces/{workspaceSlug}/connections/{id}:
     get:
       operationId: read
@@ -855,7 +838,7 @@ paths:
                 $ref: "#/components/schemas/ConnectionDetail"
           description: OK
       tags:
-      - connection
+      - Connections
   /workspaces/{workspaceSlug}/connections/{id}/audit:
     get:
       operationId: audit
@@ -883,7 +866,7 @@ paths:
                   $ref: "#/components/schemas/ConnectionAuditEntry"
           description: OK
       tags:
-      - connection
+      - Connections
   /workspaces/{workspaceSlug}/connections/{id}/disconnect:
     post:
       operationId: disconnect
@@ -905,7 +888,7 @@ paths:
         "200":
           description: OK
       tags:
-      - connection
+      - Connections
   /workspaces/{workspaceSlug}/connections/{id}/reactivate:
     post:
       operationId: reactivate
@@ -936,7 +919,7 @@ paths:
                 $ref: "#/components/schemas/ConnectionSummary"
           description: OK
       tags:
-      - connection
+      - Connections
   /workspaces/{workspaceSlug}/connections/{id}/suspend:
     post:
       operationId: suspend
@@ -967,7 +950,7 @@ paths:
                 $ref: "#/components/schemas/ConnectionSummary"
           description: OK
       tags:
-      - connection
+      - Connections
   /workspaces/{workspaceSlug}/features:
     patch:
       operationId: updateFeatures

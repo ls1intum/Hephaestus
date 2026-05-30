@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,7 @@ import tools.jackson.databind.ObjectMapper;
 @WorkspaceScopedController
 @RequestMapping("/connections")
 @RequireAtLeastWorkspaceAdmin
+@Tag(name = "Connections", description = "Workspace integration connection management")
 public class ConnectionController {
 
     private static final Logger log = LoggerFactory.getLogger(ConnectionController.class);

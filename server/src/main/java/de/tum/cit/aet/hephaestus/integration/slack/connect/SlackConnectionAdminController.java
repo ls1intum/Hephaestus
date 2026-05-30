@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/connections/slack")
 @RequireAtLeastWorkspaceAdmin
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
+@Tag(name = "Connections", description = "Workspace integration connection management")
 public class SlackConnectionAdminController {
 
     private static final Logger log = LoggerFactory.getLogger(SlackConnectionAdminController.class);
