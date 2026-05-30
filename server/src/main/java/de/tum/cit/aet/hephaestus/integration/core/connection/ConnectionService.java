@@ -3,10 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
@@ -48,36 +46,6 @@ public class ConnectionService {
             kind,
             IntegrationState.ACTIVE
         );
-    }
-
-    @Transactional(readOnly = true)
-    public Connection requireActive(long workspaceId, IntegrationKind kind) {
-        return findActive(workspaceId, kind).orElseThrow(() ->
-            new NoSuchElementException("No ACTIVE Connection for workspace=" + workspaceId + " kind=" + kind)
-        );
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<Connection> findByRef(IntegrationRef ref) {
-        if (ref.instanceKey() == null) return Optional.empty();
-        return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
-            ref.workspaceId(),
-            ref.kind(),
-            ref.instanceKey()
-        );
-    }
-
-    /**
-     * Workspace id for a GitHub App installation id. Empty when no GitHub Connection
-     * carries this installation id; callers MUST NOT auto-create on empty.
-     */
-    @Transactional(readOnly = true)
-    public Optional<Long> findWorkspaceIdByGitHubInstallationId(long installationId) {
-        return connectionRepository
-            .findByKindAndInstanceKey(IntegrationKind.GITHUB, Long.toString(installationId))
-            .stream()
-            .findFirst()
-            .map(c -> c.getWorkspace().getId());
     }
 
     /**

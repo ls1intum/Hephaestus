@@ -36,7 +36,7 @@ public record EncryptionContext(
     @Nullable String instanceKey,
     String columnFqn
 ) {
-    /** AAD schema version. Bump when fields change shape; tolerant decrypt switches on this byte. */
+    /** AAD schema version. Only V2 is supported; decrypt rejects any other version byte. */
     public static final byte SCHEMA_VERSION_V2 = 0x02;
 
     private static final byte[] DOMAIN_SEPARATOR = "hephaestus-credential-bundle".getBytes(StandardCharsets.UTF_8);

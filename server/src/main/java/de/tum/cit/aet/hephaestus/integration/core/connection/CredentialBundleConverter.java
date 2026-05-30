@@ -138,10 +138,10 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     /**
-     * Context-less {@link AttributeConverter} read path. Always rejects v2 blobs so the
-     * tolerant fallback is forced through the explicit {@link #decrypt(byte[],
-     * EncryptionContext)} entrypoint. Returns {@code null} for {@code null} input so JPA
-     * mapping of a NULL column stays sane.
+     * Context-less {@link AttributeConverter} read path. Always rejects v2 blobs, forcing every
+     * read through the explicit {@link #decrypt(byte[], EncryptionContext)} entrypoint that
+     * supplies the per-row AAD. Returns {@code null} for {@code null} input so JPA mapping of a
+     * NULL column stays sane.
      */
     @Override
     @Nullable

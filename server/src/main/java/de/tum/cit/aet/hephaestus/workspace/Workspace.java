@@ -227,6 +227,15 @@ public class Workspace {
     @Column(name = "leaderboard_notification_enabled")
     private Boolean leaderboardNotificationEnabled;
 
+    /**
+     * End instant ({@code before} bound) of the most recent leaderboard cycle whose league points
+     * have already been applied. The league-points update accumulates ({@code newPoints = current +
+     * delta}), so it guards on this marker to stay idempotent: a re-run for an already-processed
+     * cycle (lock expiry, manual replay, at-least-once delivery) no-ops instead of double-awarding.
+     */
+    @Column(name = "leaderboard_league_cycle_at")
+    private Instant leaderboardLeagueCycleAt;
+
     // Feature Flags
 
     /**

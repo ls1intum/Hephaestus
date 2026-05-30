@@ -16,10 +16,9 @@ import org.junit.jupiter.api.Test;
  */
 class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
 
-    private static User slackUser(String id, String realName, String handle, String email) {
+    private static User slackUser(String id, String handle, String email) {
         User u = new User();
         u.setId(id);
-        u.setRealName(realName);
         u.setName(handle);
         User.Profile profile = new User.Profile();
         profile.setEmail(email);
@@ -42,8 +41,8 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
 
     @Test
     void mentionsByExactHandle() {
-        User alice = slackUser("U1", "Alice Smith", "Alice Smith", "alice@x.io");
-        User bob = slackUser("U2", "Bob Jones", "bjones", "bob@x.io");
+        User alice = slackUser("U1", "Alice Smith", "alice@x.io");
+        User bob = slackUser("U2", "bjones", "bob@x.io");
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "none@x.io"), List.of(alice, bob))
         ).isEqualTo("<@U1>");
@@ -51,7 +50,7 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
 
     @Test
     void mentionsByExactEmailWhenHandleDiffers() {
-        User alice = slackUser("U1", "Alice S", "asmith", "alice@x.io");
+        User alice = slackUser("U1", "asmith", "alice@x.io");
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "ALICE@x.io"), List.of(alice))
         ).isEqualTo("<@U1>");
@@ -59,7 +58,7 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
 
     @Test
     void rendersPlainNameWhenNoSlackMatch() {
-        User bob = slackUser("U2", "Bob Jones", "bjones", "bob@x.io");
+        User bob = slackUser("U2", "bjones", "bob@x.io");
         // No handle/email match — plain display name, never a fuzzy @-mention of Bob.
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Zachariah Wong", "zw@x.io"), List.of(bob))
@@ -68,7 +67,7 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
 
     @Test
     void doesNotMentionNearMiss() {
-        User alice = slackUser("U1", "Alice Smith", "asmith", "alice@x.io");
+        User alice = slackUser("U1", "asmith", "alice@x.io");
         // "Alice Smyth" is one edit away but is NOT an exact match → plain name, not <@U1>.
         assertThat(
             SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smyth", "smyth@x.io"), List.of(alice))

@@ -34,6 +34,7 @@ export interface AdminSlackNotificationSettingsProps {
 	onSaved: () => void;
 }
 
+// Client-side format hints only — the server re-validates both on save.
 const SLACK_CHANNEL_ID = /^[CGD][A-Z0-9]{8,}$/;
 const TIME_24H = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DEFAULT_DAY = 1;
@@ -47,7 +48,7 @@ const DAYS = [
 	{ value: "5", label: "Friday" },
 	{ value: "6", label: "Saturday" },
 	{ value: "7", label: "Sunday" },
-] as const;
+];
 
 export function AdminSlackNotificationSettings({
 	workspaceSlug,
@@ -124,7 +125,9 @@ export function AdminSlackNotificationSettings({
 			onSaved();
 		},
 		onError: (e) => {
-			toast.error("Failed to save Slack notification settings", { description: String(e) });
+			toast.error("Failed to save Slack notification settings", {
+				description: e instanceof Error ? e.message : undefined,
+			});
 		},
 	});
 
@@ -138,7 +141,9 @@ export function AdminSlackNotificationSettings({
 			}
 		},
 		onError: (e) => {
-			toast.error("Test message failed", { description: String(e) });
+			toast.error("Test message failed", {
+				description: e instanceof Error ? e.message : undefined,
+			});
 		},
 	});
 
@@ -154,7 +159,9 @@ export function AdminSlackNotificationSettings({
 			onSaved();
 		},
 		onError: (e) => {
-			toast.error("Could not start Slack OAuth", { description: String(e) });
+			toast.error("Could not start Slack OAuth", {
+				description: e instanceof Error ? e.message : undefined,
+			});
 		},
 	});
 
@@ -225,11 +232,13 @@ export function AdminSlackNotificationSettings({
 									<div className="space-y-2">
 										<Label htmlFor="slack-day">Day</Label>
 										<Select
+											items={DAYS}
 											value={dayInput}
 											onValueChange={(value) => {
-												if (!value) return;
-												setDayInput(value);
-												setDirty(true);
+												if (value) {
+													setDayInput(value);
+													setDirty(true);
+												}
 											}}
 										>
 											<SelectTrigger id="slack-day">

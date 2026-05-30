@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import net.javacrumbs.shedlock.core.LockConfiguration;
@@ -29,6 +30,8 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Schedules the weekly leaderboard work <b>per workspace</b>: each workspace runs its notification
@@ -66,6 +69,12 @@ public class LeaderboardTaskScheduler {
 
     // Cron fires on every server replica; ShedLock ensures only one replica runs each task per
     // tick (lockAtLeastFor covers clock skew so a fast task can't release before peers fire).
+    //
+    // lockAtMostFor is a safety ceiling, not an expected runtime: the weekly work is O(members)
+    // and completes in seconds-to-minutes even for large workspaces, so 1h is comfortably above
+    // p99. It bounds how long a crashed replica's lock survives before another may retry — and
+    // because the league-points update is idempotent per cycle (it records the processed cycle
+    // and no-ops a repeat), a retry after lock expiry cannot double-award.
     private static final Duration LOCK_AT_MOST_FOR = Duration.ofHours(1);
     private static final Duration LOCK_AT_LEAST_FOR = Duration.ofMinutes(1);
 
@@ -113,8 +122,12 @@ public class LeaderboardTaskScheduler {
         workspaceRepository.findById(event.workspaceId()).ifPresent(this::register);
     }
 
-    /** A schedule edit cancels the old trigger and re-registers at the new cadence. */
-    @EventListener
+    /**
+     * A schedule edit cancels the old trigger and re-registers at the new cadence. Bound to the
+     * commit of the editing transaction so the in-memory cron only changes once the new schedule is
+     * durable (a rolled-back edit leaves the existing trigger untouched).
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onScheduleChanged(WorkspaceScheduleChangedEvent event) {
         workspaceRepository.findById(event.workspaceId()).ifPresent(this::register);
     }
@@ -131,15 +144,15 @@ public class LeaderboardTaskScheduler {
             return;
         }
 
-        ScheduledFuture<?> previous = registrations.remove(workspaceId);
-        if (previous != null) {
-            previous.cancel(false);
-        }
+        cancelRegistration(workspaceId);
 
         try {
+            // Fire in the server's timezone — the same zone LeaderboardScheduleResolver uses for
+            // its window math, so cron fire-time and cycle boundary always agree. (All workspaces
+            // share the server zone; there is no per-workspace timezone today.)
             ScheduledFuture<?> future = taskScheduler.schedule(
                 locked(() -> runForWorkspace(workspaceId), workspaceId),
-                new CronTrigger(cron)
+                new CronTrigger(cron, TimeZone.getDefault())
             );
             if (future != null) {
                 registrations.put(workspaceId, future);
@@ -147,6 +160,17 @@ public class LeaderboardTaskScheduler {
             log.info("Scheduled leaderboard tasks: workspaceId={}, cronExpression={}", workspaceId, cron);
         } catch (TaskRejectedException ex) {
             log.warn("Skipped scheduling: reason=taskRejected, workspaceId={}", workspaceId, ex);
+        }
+    }
+
+    /**
+     * Cancel and forget a workspace's trigger. Shares {@code register()}'s monitor so a self-cancel
+     * (workspace deleted, fired from a scheduler thread) can't race a concurrent re-registration.
+     */
+    private synchronized void cancelRegistration(long workspaceId) {
+        ScheduledFuture<?> previous = registrations.remove(workspaceId);
+        if (previous != null) {
+            previous.cancel(false);
         }
     }
 
@@ -160,10 +184,7 @@ public class LeaderboardTaskScheduler {
         Optional<Workspace> current = workspaceRepository.findById(workspaceId);
         if (current.isEmpty()) {
             log.info("Cancelled leaderboard schedule: reason=workspaceDeleted, workspaceId={}", workspaceId);
-            ScheduledFuture<?> future = registrations.remove(workspaceId);
-            if (future != null) {
-                future.cancel(false);
-            }
+            cancelRegistration(workspaceId);
             return;
         }
         Workspace workspace = current.get();

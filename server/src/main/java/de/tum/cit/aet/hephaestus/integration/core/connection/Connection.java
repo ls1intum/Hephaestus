@@ -264,7 +264,8 @@ public class Connection {
         if (credentialsEncrypted == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(converter.decrypt(credentialsEncrypted, encryptionContext()));
+        // decrypt(...) returns a non-null bundle or throws on tamper/version/context mismatch.
+        return Optional.of(converter.decrypt(credentialsEncrypted, encryptionContext()));
     }
 
     private EncryptionContext encryptionContext() {

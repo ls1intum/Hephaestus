@@ -187,7 +187,6 @@ function AdminSettings() {
 			}}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
-			workspaceId={workspaceData?.id}
 			workspaceSlug={workspaceSlug ?? undefined}
 			hasSlackConnection={workspaceData?.hasSlackToken ?? false}
 			slackChannelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}

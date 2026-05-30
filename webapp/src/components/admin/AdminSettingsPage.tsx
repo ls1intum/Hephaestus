@@ -7,7 +7,6 @@ import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
-// Use the RepositoryItem type from the AdminRepositoriesSettings component
 type RepositoryItem = {
 	nameWithOwner: string;
 };
@@ -30,7 +29,6 @@ export interface AdminSettingsPageProps {
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 	// Slack notification card props (rendered for any workspace with a slug — the weekly
 	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
-	workspaceId?: number;
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
 	slackChannelId?: string;
@@ -56,7 +54,6 @@ export function AdminSettingsPage({
 	features,
 	isSavingFeatures,
 	onToggleFeature,
-	workspaceId,
 	workspaceSlug,
 	hasSlackConnection,
 	slackChannelId,
@@ -93,7 +90,7 @@ export function AdminSettingsPage({
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
 				)}
 
-				{workspaceId != null && workspaceSlug != null && (
+				{workspaceSlug != null && (
 					<AdminSlackNotificationSettings
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}

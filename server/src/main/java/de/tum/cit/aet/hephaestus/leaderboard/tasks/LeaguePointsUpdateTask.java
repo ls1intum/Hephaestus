@@ -5,7 +5,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.leaderboard.*;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.transaction.Transactional;
+import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -29,24 +31,32 @@ public class LeaguePointsUpdateTask {
     private final LeaguePointsService leaguePointsService;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final LeaderboardScheduleResolver scheduleResolver;
+    private final WorkspaceRepository workspaceRepository;
 
     public LeaguePointsUpdateTask(
         UserRepository userRepository,
         LeaderboardService leaderboardService,
         LeaguePointsService leaguePointsService,
         WorkspaceMembershipService workspaceMembershipService,
-        LeaderboardScheduleResolver scheduleResolver
+        LeaderboardScheduleResolver scheduleResolver,
+        WorkspaceRepository workspaceRepository
     ) {
         this.userRepository = userRepository;
         this.leaderboardService = leaderboardService;
         this.leaguePointsService = leaguePointsService;
         this.workspaceMembershipService = workspaceMembershipService;
         this.scheduleResolver = scheduleResolver;
+        this.workspaceRepository = workspaceRepository;
     }
 
     /**
      * Update league points for every member of {@code workspace}, scored against the workspace's
      * just-closed leaderboard cycle.
+     *
+     * <p>Idempotent per cycle: the scheduler passes a detached entity, so we re-load the managed row
+     * inside this transaction, then skip if this cycle's points were already applied (its end instant
+     * recorded in {@code leaderboardLeagueCycleAt}). Because scoring accumulates, this guard is what
+     * keeps a lock-expiry retry or manual replay from double-awarding.
      */
     @Transactional
     public void runForWorkspace(Workspace workspace) {
@@ -54,12 +64,34 @@ public class LeaguePointsUpdateTask {
             log.warn("Skipped league points update: reason=missingWorkspaceId");
             return;
         }
-
         Long workspaceId = workspace.getId();
-        log.debug("Started league points update: workspaceId={}", workspaceId);
+        Workspace managed = workspaceRepository.findById(workspaceId).orElse(null);
+        if (managed == null) {
+            return;
+        }
 
-        List<LeaderboardEntryDTO> leaderboard = getLatestLeaderboard(workspace);
+        LeaderboardScheduleResolver.CycleWindow window = scheduleResolver.previousCycleWindow(managed);
+        Instant lastCycle = managed.getLeaderboardLeagueCycleAt();
+        if (lastCycle != null && !window.before().isAfter(lastCycle)) {
+            log.debug(
+                "Skipped league points update: reason=cycleAlreadyApplied, workspaceId={}, cycleEnd={}",
+                workspaceId,
+                window.before()
+            );
+            return;
+        }
+
+        log.debug("Started league points update: workspaceId={}", workspaceId);
+        List<LeaderboardEntryDTO> leaderboard = leaderboardService.createLeaderboard(
+            managed,
+            window.after(),
+            window.before(),
+            "all",
+            LeaderboardSortType.SCORE,
+            LeaderboardMode.INDIVIDUAL
+        );
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
+        managed.setLeaderboardLeagueCycleAt(window.before());
 
         log.debug("Updated league points: workspaceId={}, userCount={}", workspaceId, leaderboard.size());
     }
@@ -80,21 +112,5 @@ public class LeaguePointsUpdateTask {
             int newPoints = leaguePointsService.calculateNewPoints(user, currentPoints, entry);
             workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);
         };
-    }
-
-    /**
-     * The workspace's just-closed leaderboard cycle, using its own schedule (or the global default
-     * when unset) to bound the window.
-     */
-    private List<LeaderboardEntryDTO> getLatestLeaderboard(Workspace workspace) {
-        LeaderboardScheduleResolver.CycleWindow window = scheduleResolver.previousCycleWindow(workspace);
-        return leaderboardService.createLeaderboard(
-            workspace,
-            window.after(),
-            window.before(),
-            "all",
-            LeaderboardSortType.SCORE,
-            LeaderboardMode.INDIVIDUAL
-        );
     }
 }
