@@ -164,14 +164,6 @@ public class InteractiveSandboxRegistry {
         }
     }
 
-    @Scheduled(fixedDelay = 1, timeUnit = TimeUnit.SECONDS)
-    public void tickWatchdog() {
-        if (shuttingDown) {
-            return;
-        }
-        watchdog.tick();
-    }
-
     /** After a restart the in-memory registry is gone; any {@code KIND=interactive} container is orphan. */
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
