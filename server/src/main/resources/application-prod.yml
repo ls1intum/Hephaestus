@@ -74,8 +74,8 @@ hephaestus:
     # SCM + SLACK INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no global bot token. The signing secret is still
-    # required for inbound webhook signature verification.
+    # `connection` table — there is no global bot token. Slack is outbound-only (leaderboard
+    # digest + test message); no inbound webhook secret is required.
     # ═══════════════════════════════════════════════════════════════════════════
     integration:
         github:
@@ -86,8 +86,6 @@ hephaestus:
                 privateKey: ${GH_APP_PRIVATE_KEY:}
             meta:
                 auth-token: ${GH_AUTH_TOKEN:}
-        slack:
-            signing-secret: ${SLACK_SIGNING_SECRET}
 
     sync:
         run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}

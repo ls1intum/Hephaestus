@@ -488,10 +488,9 @@ hephaestus:
             token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
         slack:
             enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
-            # App-global signing secret — verifies inbound webhook signatures. The OAuth
-            # client-id/client-secret below drive the per-workspace install flow (Slack does
-            # NOT support refresh-token rotation for legacy bot tokens, so no refresher ships).
-            signing-secret: ${SLACK_SIGNING_SECRET:}
+            # OAuth client-id/client-secret drive the per-workspace install flow (Slack does NOT
+            # support refresh-token rotation for legacy bot tokens, so no refresher ships). Slack
+            # is outbound-only today; there is no inbound webhook signing secret.
             client-id: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}
             client-secret: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}
             redirect-uri: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:}

@@ -27,7 +27,7 @@ credentials and the app fails fast in `prod` if they are missing:
 |---|---|---|
 | `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | AES-256-GCM key for credentials at rest | **Exactly 32 chars.** Required in `prod` (fail-fast). Keep it stable — rotating it requires re-encrypting all `connection` rows. |
 | `WEBHOOK_SECRET` | Inbound webhook HMAC/token verification | Already required pre-#1198. Also backs OAuth-state HMAC unless `HEPHAESTUS_INTEGRATION_OAUTH_STATE_SECRET` is set. In non-`prod` an ephemeral secret is auto-generated (a WARN is logged) so local dev boots without it. |
-| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID` / `_CLIENT_SECRET` / `_REDIRECT_URI` | Slack per-workspace OAuth install | **Renamed** from `HEPHAESTUS_SLACK_*` in this PR. `SLACK_SIGNING_SECRET` is unchanged. Only needed if Slack is enabled. |
+| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID` / `_CLIENT_SECRET` / `_REDIRECT_URI` | Slack per-workspace OAuth install | **Renamed** from `HEPHAESTUS_SLACK_*` in this PR. Only needed if Slack is enabled. Slack is outbound-only (digest + test message), so no `SLACK_SIGNING_SECRET` is required. |
 
 GitHub App (`GH_APP_ID`, `GH_APP_PRIVATE_KEY`) and GitLab (`hephaestus.integration.gitlab.*`)
 env keys are unchanged in shape.
