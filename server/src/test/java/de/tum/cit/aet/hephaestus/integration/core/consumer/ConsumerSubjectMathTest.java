@@ -73,7 +73,8 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
                 IntegrationKind.GITHUB
             );
             assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z")).contains(IntegrationKind.GITLAB);
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.m")).contains(IntegrationKind.SLACK);
+            // Slack is messaging-only — not in the NATS subject allow-list, so it never resolves.
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.m")).isEmpty();
         }
 
         @Test

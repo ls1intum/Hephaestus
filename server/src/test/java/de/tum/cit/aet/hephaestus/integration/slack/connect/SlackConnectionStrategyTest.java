@@ -64,10 +64,7 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
                 true,
                 null,
                 "xoxe-abc",
-                "U1",
-                "A1",
                 new OAuthV2Access.Team("T1", "Acme"),
-                "chat:write",
                 /* expiresIn */ 43200,
                 /* refreshToken */ "xoxe-refresh"
             )
@@ -82,7 +79,7 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     @Test
     void finalize_missingTeam_returnsFailed() {
         when(oauthClient.exchangeCode(eq("c"), any())).thenReturn(
-            new OAuthV2Access(true, null, "xoxb", "U1", "A1", null, "chat:write", null, null)
+            new OAuthV2Access(true, null, "xoxb", null, null, null)
         );
 
         ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of("code", "c"));
@@ -94,17 +91,7 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
     @Test
     void finalize_happyPath_returnsCompletedWithTeamConfigAndBearerToken() {
         when(oauthClient.exchangeCode(eq("c"), eq("https://app.test/oauth/callback/slack"))).thenReturn(
-            new OAuthV2Access(
-                true,
-                null,
-                "xoxb-abc",
-                "U1",
-                "A1",
-                new OAuthV2Access.Team("T9", "Hephaestus Test"),
-                "chat:write,team:read",
-                null,
-                null
-            )
+            new OAuthV2Access(true, null, "xoxb-abc", new OAuthV2Access.Team("T9", "Hephaestus Test"), null, null)
         );
 
         ConnectFinalization r = strategy.finalizeConnect(ref(), Map.of("code", "c"));

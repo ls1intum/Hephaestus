@@ -33,7 +33,6 @@ public record ConnectionDetailDTO(
     @Nullable String stateReason,
     Instant createdAt,
     Instant updatedAt,
-    @Nullable Instant lastActivityAt,
     Set<Capability> capabilities,
     @Nullable Map<String, Object> config
 ) {
@@ -50,7 +49,6 @@ public record ConnectionDetailDTO(
             c.getStateReason(),
             c.getCreatedAt(),
             c.getUpdatedAt(),
-            c.getLastActivityAt(),
             manifests.capabilitiesFor(c.getKind()),
             configMap
         );

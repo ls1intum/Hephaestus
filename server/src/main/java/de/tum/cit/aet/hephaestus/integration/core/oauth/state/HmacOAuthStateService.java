@@ -21,7 +21,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Default {@link OAuthStateService} impl: HMAC-SHA256 over
- * {@code workspaceId | kind | issuedAt | nonce}, base64url-encoded.
+ * {@code workspaceId | kind | issuedAt | nonce | actorSegment} (five pipe-delimited
+ * fields; {@code actorSegment} is the base64url-encoded actorRef, empty when null),
+ * base64url-encoded. The emitted token appends the signature as a sixth segment, so
+ * {@link #consume} splits on exactly six parts.
  *
  * <p>Verifies the MAC + freshness; rejects expired tokens (10-minute TTL by default).
  * The nonce makes every issued state unique, so even simultaneous concurrent OAuth

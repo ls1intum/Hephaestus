@@ -1853,14 +1853,13 @@ export type Contributor = {
  * response build time so adding/removing a capability needs no DB migration.
  */
 export type ConnectionSummary = {
-    capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     createdAt?: Date;
     displayName?: string;
     family?: 'SCM' | 'MESSAGING';
     id?: number;
     instanceKey?: string;
     kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
-    lastActivityAt?: Date;
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
     updatedAt?: Date;
@@ -1878,7 +1877,7 @@ export type ConnectionSummary = {
  * object.
  */
 export type ConnectionDetail = {
-    capabilities?: Array<'WEBHOOK_INGEST' | 'URL_VERIFICATION_HANDSHAKE' | 'REPLAY_PROTECTION' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     config?: {
         [key: string]: unknown;
     };
@@ -1888,7 +1887,6 @@ export type ConnectionDetail = {
     id?: number;
     instanceKey?: string;
     kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
-    lastActivityAt?: Date;
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
     updatedAt?: Date;

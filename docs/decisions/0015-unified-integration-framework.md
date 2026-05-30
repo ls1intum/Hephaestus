@@ -93,7 +93,7 @@ Detail of the substrate packages:
 - `integration/core/handler/` — `IntegrationMessageHandler` SPI + `EventTypeKey`
   registry.
 - `integration/core/oauth/` — outbound OAuth callback + signed-state nonce store
-  (RFC 7636 PKCE-S256 + RFC 9700 single-use state).
+  (RFC 9700 single-use signed state (HMAC + TTL + nonce)).
 - `integration/core/feedback/` — `FeedbackPost` table for edit-in-place feedback
   identity across vendors.
 - `integration/scm/` — the platform-agnostic SCM domain (formerly
@@ -133,7 +133,7 @@ Credentials at rest use AES-256-GCM with AAD bound to
 substitution attacks fail because the AAD doesn't match.
 
 The Liquibase migration is one file, `1779790459343_changelog.xml`,
-32 changesets. Changeset 8 runs an idempotent `WorkspaceConnectionBackfillChange`
+25 changesets. Changeset 8 runs an idempotent `WorkspaceConnectionBackfillChange`
 Java customChange that re-wraps legacy `Workspace` credentials into `connection`
 rows with AES-GCM v2 blobs. Changeset 9 drops the legacy `Workspace` columns
 only after verifying that the backfill succeeded. The changelog header documents
@@ -158,7 +158,7 @@ Positive:
 
 Neutral:
 
-- One-file changelog with 32 changesets is non-idiomatic; Liquibase
+- One-file changelog with 25 changesets is non-idiomatic; Liquibase
   guidance prefers one file per logical change. Defensible here because
   the file IS the unit of release for this epic — splitting it would
   spread one decision across 12 files for no operational benefit.

@@ -32,8 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Implements the full sync provider interface hierarchy:
  * <ul>
- *   <li>{@link SyncTargetProvider} - Core sync target operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTimestampProvider SyncTimestampProvider} - Sync timestamp operations</li>
+ *   <li>{@link SyncTargetProvider} - Core sync target + scope-level timestamp operations</li>
  *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
  * </ul>
  */

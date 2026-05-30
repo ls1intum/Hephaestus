@@ -101,9 +101,6 @@ const connectionSummarySchemaResponseTransformer = (data: any) => {
     if (data.createdAt) {
         data.createdAt = new Date(data.createdAt);
     }
-    if (data.lastActivityAt) {
-        data.lastActivityAt = new Date(data.lastActivityAt);
-    }
     if (data.updatedAt) {
         data.updatedAt = new Date(data.updatedAt);
     }
@@ -118,9 +115,6 @@ export const listResponseTransformer = async (data: any): Promise<ListResponse> 
 const connectionDetailSchemaResponseTransformer = (data: any) => {
     if (data.createdAt) {
         data.createdAt = new Date(data.createdAt);
-    }
-    if (data.lastActivityAt) {
-        data.lastActivityAt = new Date(data.lastActivityAt);
     }
     if (data.updatedAt) {
         data.updatedAt = new Date(data.updatedAt);

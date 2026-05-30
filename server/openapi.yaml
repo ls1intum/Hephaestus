@@ -3174,8 +3174,6 @@ components:
             type: string
             enum:
             - WEBHOOK_INGEST
-            - URL_VERIFICATION_HANDSHAKE
-            - REPLAY_PROTECTION
             - TOKEN_REFRESH
             - FEEDBACK_DELIVERY
             - INLINE_FINDINGS
@@ -3206,9 +3204,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-        lastActivityAt:
-          type: string
-          format: date-time
         state:
           type: string
           enum:
@@ -3235,8 +3230,6 @@ components:
             type: string
             enum:
             - WEBHOOK_INGEST
-            - URL_VERIFICATION_HANDSHAKE
-            - REPLAY_PROTECTION
             - TOKEN_REFRESH
             - FEEDBACK_DELIVERY
             - INLINE_FINDINGS
@@ -3264,9 +3257,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-        lastActivityAt:
-          type: string
-          format: date-time
         state:
           type: string
           enum:

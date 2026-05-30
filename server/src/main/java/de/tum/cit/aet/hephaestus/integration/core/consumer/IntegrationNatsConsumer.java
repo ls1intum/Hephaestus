@@ -424,8 +424,13 @@ public class IntegrationNatsConsumer {
                 return streamContext.createOrUpdateConsumer(
                     ConsumerConfiguration.builder(config).filterSubjects(subjects).build()
                 );
-            } catch (JetStreamApiException notFound) {
-                // Falls through to create-new path.
+            } catch (JetStreamApiException e) {
+                // 10014 = consumer not found: expected on first start / after cleanup, fall through
+                // to the create-new path. Any other API error (auth, server fault) is a real failure
+                // and must not be silently reinterpreted as "create a fresh consumer".
+                if (e.getApiErrorCode() != 10014) {
+                    throw e;
+                }
                 log.debug("Durable consumer not found, creating fresh: consumerName={}", consumerName);
             }
         }

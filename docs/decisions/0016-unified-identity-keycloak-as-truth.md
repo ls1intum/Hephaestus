@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR 0011 introduced a "three-layer identity model" — `integration.registry.Connection` (Layer 1), `integration.identity.HephaestusUser` (Layer 2), `integration.identity.IntegrationIdentity` (Layer 3) — and immediately admitted that the Layer 2 / Layer 3 wiring never landed: neither sync path nor any OAuth callback populated `integration_identity`, both tables stayed at row-count zero in every environment, and the only consumer of the table (the pre-workspace install-bind surface) was itself deleted when AC#6 was dropped from #1198 on 2026-05-26.
+ADR 0011 introduced a "three-layer identity model" — `integration.core.connection.Connection` (Layer 1), `integration.identity.HephaestusUser` (Layer 2), `integration.identity.IntegrationIdentity` (Layer 3) — and immediately admitted that the Layer 2 / Layer 3 wiring never landed: neither sync path nor any OAuth callback populated `integration_identity`, both tables stayed at row-count zero in every environment, and the only consumer of the table (the pre-workspace install-bind surface) was itself deleted when AC#6 was dropped from #1198 on 2026-05-26.
 
 A review of the shipped state confirmed the consequences:
 

@@ -148,7 +148,7 @@ public class SlackLeaderboardDigestPublisher {
                         markdownText(
                             "<!date^" +
                                 event.currentDateEpochSeconds() +
-                                "^{date} at {time}| Today at 9:00AM CEST> | " +
+                                "^{date} at {time}|Weekly digest> | " +
                                 workspaceBase
                         )
                     )

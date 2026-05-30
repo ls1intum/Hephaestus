@@ -161,7 +161,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
         assertThat(result.getInstanceKey()).isEqualTo("T123");
         assertThat(result.getDisplayName()).isEqualTo("Acme");
         assertThat(result.getState()).isEqualTo(IntegrationState.ACTIVE);
-        assertThat(result.getCredentialsAlg()).isEqualTo("aesgcm-v1");
+        assertThat(result.getCredentialsAlg()).isEqualTo("aesgcm-v2");
 
         ArgumentCaptor<TransitionRequest> req = ArgumentCaptor.forClass(TransitionRequest.class);
         verify(connectionService).transition(any(Connection.class), req.capture());

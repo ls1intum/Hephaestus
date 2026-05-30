@@ -67,7 +67,6 @@
             <column name="updated_at" type="timestamp with time zone" defaultValueComputed="NOW()">
                 <constraints nullable="false"/>
             </column>
-            <column name="last_activity_at" type="timestamp with time zone"/>
             <column name="version" type="bigint" defaultValueNumeric="0">
                 <constraints nullable="false"/>
             </column>
@@ -77,7 +76,7 @@
                              constraintName="uq_connection"/>
         <sql>
             ALTER TABLE connection ADD CONSTRAINT ck_connection_kind
-                CHECK (kind IN ('GITHUB','GITLAB','SLACK','OUTLINE'));
+                CHECK (kind IN ('GITHUB','GITLAB','SLACK'));
             ALTER TABLE connection ADD CONSTRAINT ck_connection_state
                 CHECK (state IN ('PENDING','ACTIVE','SUSPENDED','UNINSTALLED'));
         </sql>
@@ -236,7 +235,7 @@
         <preConditions onFail="MARK_RAN" onFailMessage="agent_job.integration_kind already present">
             <not><columnExists tableName="agent_job" columnName="integration_kind"/></not>
         </preConditions>
-        <comment>Add integration_kind: enables per-kind dispatch (GITHUB/GITLAB/SLACK/OUTLINE).</comment>
+        <comment>Add integration_kind: enables per-kind dispatch (GITHUB/GITLAB/SLACK).</comment>
         <addColumn tableName="agent_job">
             <column name="integration_kind" type="varchar(48)"/>
         </addColumn>

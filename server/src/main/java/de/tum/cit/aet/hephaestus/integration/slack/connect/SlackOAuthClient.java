@@ -125,10 +125,7 @@ public class SlackOAuthClient {
         @JsonProperty("ok") boolean ok,
         @JsonProperty("error") @Nullable String error,
         @JsonProperty("access_token") @Nullable String accessToken,
-        @JsonProperty("bot_user_id") @Nullable String botUserId,
-        @JsonProperty("app_id") @Nullable String appId,
         @JsonProperty("team") @Nullable Team team,
-        @JsonProperty("scope") @Nullable String scope,
         @JsonProperty("expires_in") @Nullable Integer expiresIn,
         @JsonProperty("refresh_token") @Nullable String refreshToken
     ) {

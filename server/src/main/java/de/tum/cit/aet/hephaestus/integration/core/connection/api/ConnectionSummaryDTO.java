@@ -26,7 +26,6 @@ public record ConnectionSummaryDTO(
     @Nullable String stateReason,
     Instant createdAt,
     Instant updatedAt,
-    @Nullable Instant lastActivityAt,
     Set<Capability> capabilities
 ) {
     public static ConnectionSummaryDTO from(Connection c, IntegrationManifestRegistry manifests) {
@@ -40,7 +39,6 @@ public record ConnectionSummaryDTO(
             c.getStateReason(),
             c.getCreatedAt(),
             c.getUpdatedAt(),
-            c.getLastActivityAt(),
             manifests.capabilitiesFor(c.getKind())
         );
     }

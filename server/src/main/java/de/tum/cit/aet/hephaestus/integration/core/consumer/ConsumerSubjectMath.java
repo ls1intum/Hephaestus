@@ -34,32 +34,29 @@ import org.jspecify.annotations.Nullable;
  * wildcards collapses this to O(n) repos.
  *
  * <h2>Subject-prefix → kind</h2>
- * {@link #kindFromSubjectPrefix(String)} duplicates the allow-list used by the public
- * router ({@code IntegrationKindRouting} for HTTP paths) and the message dispatcher
- * ({@code IntegrationMessageDispatcher#kindFromSubjectPrefix}). The duplication is
- * deliberate: this class is pure (no Spring), can be called from anywhere on the hot
- * path, and we never want to call {@link IntegrationKind#valueOf(String)} on
- * subject-derived input (reflection-on-user-input is the bug class we are precluding).
- * Adding a new kind requires touching all three allow-lists — failure to do so causes
- * silent NAKs at the consumer rather than misrouting, which is the cheaper failure mode.
+ * {@link #kindFromSubjectPrefix(String)} is the single source of truth for NATS-subject
+ * routing; {@link IntegrationMessageDispatcher} delegates to it rather than keeping its
+ * own copy. The map is pure (no Spring), can be called from anywhere on the hot path, and
+ * never calls {@link IntegrationKind#valueOf(String)} on subject-derived input
+ * (reflection-on-user-input is the bug class we are precluding). It lists only the kinds
+ * that publish to JetStream (GitHub, GitLab); Slack is messaging-only and has no NATS
+ * stream. The HTTP-path router {@code IntegrationKindRouting} is intentionally separate —
+ * it additionally routes {@code slack} for the OAuth-callback endpoint, a membership the
+ * NATS map must not share.
  *
- * @see IntegrationMessageDispatcher#kindFromSubjectPrefix(String) the dispatcher's copy
- * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP router's copy
+ * @see de.tum.cit.aet.hephaestus.integration.core.webhook.IntegrationKindRouting the HTTP-path router
  */
 public final class ConsumerSubjectMath {
 
     /**
-     * Mirror of the allow-list in {@link IntegrationMessageDispatcher} and
-     * {@code IntegrationKindRouting}. Kept here to avoid a cyclic dependency between
-     * the consumer's pure-utility surface and the (non-pure) dispatcher bean.
+     * NATS subject-prefix allow-list — the kinds that publish to JetStream. Slack is
+     * messaging-only (no stream) and is deliberately absent.
      */
     private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
         "github",
         IntegrationKind.GITHUB,
         "gitlab",
-        IntegrationKind.GITLAB,
-        "slack",
-        IntegrationKind.SLACK
+        IntegrationKind.GITLAB
     );
 
     private ConsumerSubjectMath() {
@@ -194,9 +191,6 @@ public final class ConsumerSubjectMath {
      * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns
      * {@link Optional#empty()} for null, blank, dot-less, or unknown prefixes. Never
      * reflects on input.
-     *
-     * <p>Mirrors {@link IntegrationMessageDispatcher#kindFromSubjectPrefix(String)} so this
-     * class can be used on hot paths without pulling the dispatcher bean in.
      */
     public static Optional<IntegrationKind> kindFromSubjectPrefix(@Nullable String fullSubject) {
         if (fullSubject == null || fullSubject.isBlank()) {

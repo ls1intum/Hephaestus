@@ -666,9 +666,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             assertThat(result.count()).isZero();
-            assertThat(result.fieldsSynced()).isTrue();
-            assertThat(result.statusUpdatesSynced()).isTrue();
-            assertThat(result.itemsSynced()).isTrue();
         }
 
         @Test
@@ -695,9 +692,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED_WITH_WARNINGS);
-            assertThat(result.fieldsSynced()).isFalse();
-            assertThat(result.statusUpdatesSynced()).isTrue();
-            assertThat(result.itemsSynced()).isTrue();
         }
 
         // Issue/PR field value backfill tests

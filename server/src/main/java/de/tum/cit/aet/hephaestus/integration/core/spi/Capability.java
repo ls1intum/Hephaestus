@@ -12,10 +12,6 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 public enum Capability {
     /** Receives HTTP webhook events. */
     WEBHOOK_INGEST,
-    /** Vendor sends a verification handshake the pipeline answers in-band (Slack). */
-    URL_VERIFICATION_HANDSHAKE,
-    /** Verifier rejects requests with stale timestamps (Slack 5-minute window). */
-    REPLAY_PROTECTION,
     /** OAuth refresh tokens are minted via {@code TokenRefresher}. */
     TOKEN_REFRESH,
 

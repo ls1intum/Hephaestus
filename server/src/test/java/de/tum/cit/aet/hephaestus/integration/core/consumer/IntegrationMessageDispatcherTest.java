@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.github.webhook.GithubSubjectParser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabSubjectParser;
-import de.tum.cit.aet.hephaestus.integration.slack.webhook.SlackSubjectParser;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.util.List;
@@ -24,8 +23,7 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
     private static final List<SubjectParser> ALL_PARSERS = List.of(
         new GithubSubjectParser(),
-        new GitlabSubjectParser(),
-        new SlackSubjectParser()
+        new GitlabSubjectParser()
     );
 
     @Test
@@ -39,12 +37,14 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     }
 
     @Test
-    void slackSubjectWithoutHandlerReturnsEmpty() {
+    void nonNatsKindSubjectReturnsEmpty() {
         IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
             new IntegrationMessageHandlerRegistry(List.of()),
             ALL_PARSERS
         );
 
+        // Slack is messaging-only and not in the NATS subject allow-list, so its subject
+        // never resolves to a kind — the dispatcher short-circuits to empty.
         assertThat(dispatcher.dispatch("slack.T0123.C456.message")).isEmpty();
     }
 
@@ -128,20 +128,6 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
             .hasMessageContaining("Duplicate SubjectParser")
             .hasMessageContaining("GITHUB")
             .hasMessageContaining(GithubSubjectParser.class.getName());
-    }
-
-    @Test
-    void prefixLookupIsCaseInsensitiveAndAllowListed() {
-        // Static helper exposed package-private so we can pin its allow-list semantics
-        // without spinning up the full dispatcher.
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("GITHUB.acme.foo.issues")).contains(
-            IntegrationKind.GITHUB
-        );
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("Gitlab.x.y.z")).contains(IntegrationKind.GITLAB);
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("bitbucket.x.y.z")).isEmpty();
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix(null)).isEmpty();
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("")).isEmpty();
-        assertThat(IntegrationMessageDispatcher.kindFromSubjectPrefix("github")).isEmpty();
     }
 
     private static class RecordingHandler implements IntegrationMessageHandler {

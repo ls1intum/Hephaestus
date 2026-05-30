@@ -88,18 +88,15 @@ src/main/java/de/tum/cit/aet/hephaestus/
 ├── config/                       # @Configuration beans
 ├── workspace/                    # Multi-tenant workspace management
 ├── integration/                  # Unified integration framework
-│   ├── scm/                      # Provider-agnostic git domain (PR, issue, review, …)
+│   ├── core/                     # Vendor-agnostic substrate (webhook, consumer, oauth, …)
+│   │   └── webhook/              # Shared inbound webhook substrate (all kinds)
+│   ├── scm/                      # Provider-agnostic git domain + SCM vendor adapters
 │   │   ├── common/               # Base entities, converters
-│   │   ├── pullrequest/          # PR entity, sync service
-│   │   ├── issue/                # Issue entity (PR inherits from Issue)
-│   │   ├── user/                 # Git user sync
-│   │   ├── team/                 # Team management
-│   │   └── sync/                 # Data synchronization orchestration
-│   ├── github/                   # GitHub vendor adapter (REST + GraphQL + webhook ingest)
-│   ├── gitlab/                   # GitLab vendor adapter (REST + GraphQL + webhook ingest)
-│   ├── slack/                    # Slack adapter
-│   ├── outline/                  # Outline adapter
-│   └── webhook/                  # Shared inbound webhook substrate (all kinds)
+│   │   ├── domain/               # PR, issue, review, team, user, … entities
+│   │   ├── sync/                 # Data synchronization orchestration
+│   │   ├── github/               # GitHub vendor adapter (REST + GraphQL + webhook ingest)
+│   │   └── gitlab/               # GitLab vendor adapter (REST + GraphQL + webhook ingest)
+│   └── slack/                    # Slack adapter
 ├── leaderboard/                  # Scoring, rankings, league points
 ├── activity/                     # Activity tracking (XP, leaderboard gamification)
 ├── mentor/                       # AI mentor (in-process Pi agent)

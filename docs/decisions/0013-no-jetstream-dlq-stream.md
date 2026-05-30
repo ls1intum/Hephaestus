@@ -92,7 +92,7 @@ Re-open this decision if any of the following land:
 
 ## References
 
-- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/consumer/IntegrationPoisonHandler.java`
+- `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/consumer/IntegrationPoisonHandler.java`
 - Revert: commit `b6970db0b`
 - Original pass-9 add: commit `976b4dbf9`
 - Counter dashboard: Grafana panel `integration.consumer.poison{kind}` (per-vendor rate)
