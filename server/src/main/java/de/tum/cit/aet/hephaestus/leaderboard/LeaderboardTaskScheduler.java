@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.leaderboard.spi.WorkspaceScheduleChangedEvent;
 import de.tum.cit.aet.hephaestus.leaderboard.tasks.LeaguePointsUpdateTask;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceScheduleChangedEvent;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
