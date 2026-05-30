@@ -20,8 +20,10 @@
         "integration.core::oauth",
         "integration.core::consumer",
         "integration.core::webhook",
-        // SlackConnectionAdminController uses RequireAtLeastWorkspaceAdmin.
+        // SlackConnectionAdminController uses RequireAtLeastWorkspaceAdmin (authorization) and
+        // resolves the workspace via @WorkspaceScopedController / WorkspaceContext (context).
         "workspace::authorization",
+        "workspace::context",
         // SlackLeaderboardDigestPublisher subscribes to LeaderboardDigestReadyEvent.
         // The leaderboard task owns schedule + data assembly; this adapter owns the
         // Slack publish (block-kit build + chat.postMessage). The event payload carries

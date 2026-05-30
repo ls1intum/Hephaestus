@@ -2,15 +2,17 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Provides sync targets (repositories) for the integration.scm ETL engine.
  * <p>
  * This is the main SPI (Service Provider Interface) for the sync engine to discover
- * and manage synchronization targets. It covers sync-target discovery plus scope-level
- * timestamp operations, and extends {@link BackfillStateProvider} for incremental-sync
- * tracking.
+ * and manage synchronization targets. It extends focused sub-interfaces to comply
+ * with the Interface Segregation Principle (ISP):
+ * <ul>
+ *   <li>{@link SyncTimestampProvider} – Sync timestamp operations</li>
+ *   <li>{@link BackfillStateProvider} – Backfill tracking for incremental sync</li>
+ * </ul>
  * <p>
  * <b>Design Principles:</b>
  * <ul>
@@ -23,9 +25,10 @@ import java.util.Optional;
  * <b>Thread Safety:</b> Implementations must be thread-safe. The sync engine may call
  * methods concurrently from multiple sync threads.
  *
+ * @see SyncTimestampProvider
  * @see BackfillStateProvider
  */
-public interface SyncTargetProvider extends BackfillStateProvider {
+public interface SyncTargetProvider extends SyncTimestampProvider, BackfillStateProvider {
     // CORE SYNC TARGET OPERATIONS
 
     /**
@@ -92,57 +95,6 @@ public interface SyncTargetProvider extends BackfillStateProvider {
      * @param syncTargetId the sync target ID to remove (must not be null)
      */
     void removeSyncTarget(Long syncTargetId);
-
-    // SCOPE-LEVEL TIMESTAMP OPERATIONS
-
-    /**
-     * Gets the sync metadata for a scope (issue types, dependencies, sub-issues).
-     *
-     * @param scopeId the scope ID
-     * @return the sync metadata, or empty if scope not found
-     */
-    Optional<SyncMetadata> getSyncMetadata(Long scopeId);
-
-    /**
-     * Updates the sync timestamp for scope-level sync operations.
-     *
-     * @param scopeId  the scope ID
-     * @param syncType the type of sync (ISSUE_TYPES, ISSUE_DEPENDENCIES, SUB_ISSUES)
-     * @param syncedAt the timestamp of the sync
-     */
-    void updateScopeSyncTimestamp(Long scopeId, SyncType syncType, Instant syncedAt);
-
-    /**
-     * Gets the user sync state for a scope.
-     *
-     * @param scopeId the scope ID
-     * @return the user sync state, or empty if scope not found
-     */
-    Optional<UserSyncState> getUserSyncState(Long scopeId);
-
-    /**
-     * Updates the users sync timestamp for a scope.
-     *
-     * @param scopeId  the scope ID
-     * @param syncedAt the timestamp of the sync
-     */
-    void updateUsersSyncTimestamp(Long scopeId, Instant syncedAt);
-
-    /**
-     * Gets the team sync state for a scope.
-     *
-     * @param scopeId the scope ID
-     * @return the team sync state, or empty if scope not found
-     */
-    Optional<TeamSyncState> getTeamSyncState(Long scopeId);
-
-    /**
-     * Updates the teams sync timestamp for a scope.
-     *
-     * @param scopeId  the scope ID
-     * @param syncedAt the timestamp of the sync
-     */
-    void updateTeamsSyncTimestamp(Long scopeId, Instant syncedAt);
 
     // SYNC SESSIONS
 

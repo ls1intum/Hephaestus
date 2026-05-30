@@ -25,6 +25,8 @@
         "profile",
         "workspace",
         "workspace::context",
+        // LeaderboardTaskScheduler reschedules on WorkspaceCreatedEvent / WorkspaceScheduleChangedEvent.
+        "workspace::events",
         "workspace::settings",
     }
 )

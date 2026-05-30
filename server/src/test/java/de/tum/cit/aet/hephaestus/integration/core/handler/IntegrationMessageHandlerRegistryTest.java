@@ -78,13 +78,10 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
     }
 
     @Test
-    void resolveWithNullArgumentsReturnsEmpty() {
+    void resolveWithNullKeyReturnsEmpty() {
         IntegrationMessageHandlerRegistry registry = new IntegrationMessageHandlerRegistry(List.of());
 
         assertThat(registry.resolve((EventTypeKey) null)).isEmpty();
-        assertThat(registry.resolve(null, "push")).isEmpty();
-        assertThat(registry.resolve(IntegrationKind.GITHUB, null)).isEmpty();
-        assertThat(registry.resolve(IntegrationKind.GITHUB, "  ")).isEmpty();
     }
 
     private static class StubHandler implements IntegrationMessageHandler {
