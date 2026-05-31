@@ -9,6 +9,8 @@ export type { UserProfile } from "./authClient";
 export interface AuthContextType {
 	isAuthenticated: boolean;
 	isLoading: boolean;
+	/** True when the `/user` probe settled in an error state (e.g. 401/403) rather than returning a user. */
+	isError: boolean;
 	username: string | undefined;
 	userRoles: string[];
 	/** True when the current account is an application super-admin (APP_ADMIN or `admin` role). */
@@ -68,6 +70,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	// `isPending` is true only while the very first fetch is in flight (no cached data yet),
 	// matching the previous mount-time loading window.
 	const isLoading = userQuery.isPending;
+	// Distinguish "probe failed" (401/403/network) from "probe settled with no user". Callers that
+	// must not optimistically route into a protected area on a failed probe (e.g. /auth/callback)
+	// branch on this instead of relying on a downstream guard to bounce them back.
+	const isError = userQuery.isError;
 
 	// No manual memoization: the project runs React Compiler, which memoizes these derived
 	// values and stable callbacks automatically (see webapp/AGENTS.md).
@@ -118,6 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	const value: AuthContextType = {
 		isAuthenticated: user !== null,
 		isLoading,
+		isError,
 		username: user?.username ?? undefined,
 		userRoles: user?.roles ?? [],
 		isAppAdmin,

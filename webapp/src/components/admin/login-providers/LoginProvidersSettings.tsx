@@ -57,6 +57,10 @@ export function LoginProvidersSettings({ workspaceSlug, apiOrigin }: LoginProvid
 	const invalidateList = () =>
 		queryClient.invalidateQueries({ queryKey: listQueryKey({ path: { workspaceSlug } }) });
 
+	// Track which kind the in-flight initiate is for, so we can label the callback URL.
+	// Declared before `initiate` because its `onSuccess` closes over this state.
+	const [pendingKind, setPendingKind] = useState<LoginProviderKind | null>(null);
+
 	const initiate = useMutation({
 		...initiateMutation(),
 		onSuccess: (response) => {
@@ -77,9 +81,6 @@ export function LoginProvidersSettings({ workspaceSlug, apiOrigin }: LoginProvid
 			toast.error("Could not add login provider", { description: problemDetailOf(err) });
 		},
 	});
-
-	// Track which kind the in-flight initiate is for, so we can label the callback URL.
-	const [pendingKind, setPendingKind] = useState<LoginProviderKind | null>(null);
 
 	// All three lifecycle transitions funnel through the single status endpoint
 	// (PATCH .../connections/{id}/status). We distinguish the action by the target

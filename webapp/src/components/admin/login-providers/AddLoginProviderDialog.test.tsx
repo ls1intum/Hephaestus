@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Dialog } from "@/components/ui/dialog";
 import { AddLoginProviderDialog } from "./AddLoginProviderDialog";
@@ -15,54 +15,44 @@ function renderDialog(onSubmit = vi.fn()) {
 	return { ...result, onSubmit };
 }
 
-function inputBySuffix(root: ParentNode, suffix: string): HTMLInputElement {
-	const input = Array.from(root.querySelectorAll<HTMLInputElement>("input")).find((el) =>
-		el.id.endsWith(suffix),
-	);
-	if (!input) throw new Error(`No input ending in ${suffix}`);
-	return input;
+function setField(label: string, value: string) {
+	fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
-function setField(root: ParentNode, suffix: string, value: string) {
-	fireEvent.change(inputBySuffix(root, suffix), { target: { value } });
-}
-
-function submit(root: ParentNode) {
-	const form = root.querySelector("form");
-	if (!form) throw new Error("No form");
-	fireEvent.submit(form);
+function submit() {
+	fireEvent.click(screen.getByRole("button", { name: /Validate.*add/ }));
 }
 
 describe("AddLoginProviderDialog", () => {
 	it("blocks submission and shows field errors when required fields are empty", () => {
 		const { baseElement, onSubmit } = renderDialog();
 
-		submit(baseElement);
+		submit();
 
 		expect(onSubmit).not.toHaveBeenCalled();
 		expect(baseElement.querySelector('[aria-invalid="true"]')).not.toBeNull();
 	});
 
 	it("rejects a non-HTTPS issuer URL", () => {
-		const { baseElement, onSubmit } = renderDialog();
+		const { onSubmit } = renderDialog();
 
-		setField(baseElement, "display-name", "Acme");
-		setField(baseElement, "issuer-url", "http://git.example.com");
-		setField(baseElement, "client-id", "cid");
-		setField(baseElement, "client-secret", "secret");
-		submit(baseElement);
+		setField("Display name", "Acme");
+		setField("Issuer / base URL", "http://git.example.com");
+		setField("Client ID", "cid");
+		setField("Client secret", "secret");
+		submit();
 
 		expect(onSubmit).not.toHaveBeenCalled();
 	});
 
 	it("submits a normalized payload when all fields are valid", () => {
-		const { baseElement, onSubmit } = renderDialog();
+		const { onSubmit } = renderDialog();
 
-		setField(baseElement, "display-name", "  Acme GHE  ");
-		setField(baseElement, "issuer-url", " https://git.example.com ");
-		setField(baseElement, "client-id", " cid ");
-		setField(baseElement, "client-secret", "shh");
-		submit(baseElement);
+		setField("Display name", "  Acme GHE  ");
+		setField("Issuer / base URL", " https://git.example.com ");
+		setField("Client ID", " cid ");
+		setField("Client secret", "shh");
+		submit();
 
 		expect(onSubmit).toHaveBeenCalledTimes(1);
 		expect(onSubmit).toHaveBeenCalledWith({

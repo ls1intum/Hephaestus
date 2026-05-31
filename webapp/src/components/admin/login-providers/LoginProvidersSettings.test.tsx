@@ -1,8 +1,7 @@
-// Behavioral tests for the workspace login-providers admin surface (ADR 0017). HTTP is
-// intercepted at the MSW boundary (src/mocks/handlers.ts); we assert on observable DOM and that
-// an RFC-9457 problem+json error from the issuer-discovery probe surfaces its `detail` via
-// problemDetailOf. Closes part of the F7 gating gap. The dialog's pure client-side validation is
-// covered separately in AddLoginProviderDialog.test.tsx; here we drive the mutation flows.
+// Behavioral tests for the workspace login-providers admin surface (ADR 0017): drives the mutation
+// flows and asserts an RFC-9457 problem+json error from the issuer-discovery probe surfaces its
+// `detail` via problemDetailOf. The dialog's client-side validation is covered separately in
+// AddLoginProviderDialog.test.tsx.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -21,17 +20,13 @@ function renderWithClient(node: ReactNode) {
 }
 
 function fillDialog(dialog: HTMLElement) {
-	const input = (suffix: string) => {
-		const el = Array.from(dialog.querySelectorAll<HTMLInputElement>("input")).find((i) =>
-			i.id.endsWith(suffix),
-		);
-		if (!el) throw new Error(`No input ${suffix}`);
-		return el;
-	};
-	fireEvent.change(input("display-name"), { target: { value: "Acme GHE" } });
-	fireEvent.change(input("issuer-url"), { target: { value: "https://git.example.com" } });
-	fireEvent.change(input("client-id"), { target: { value: "cid" } });
-	fireEvent.change(input("client-secret"), { target: { value: "shh" } });
+	const ui = within(dialog);
+	fireEvent.change(ui.getByLabelText("Display name"), { target: { value: "Acme GHE" } });
+	fireEvent.change(ui.getByLabelText("Issuer / base URL"), {
+		target: { value: "https://git.example.com" },
+	});
+	fireEvent.change(ui.getByLabelText("Client ID"), { target: { value: "cid" } });
+	fireEvent.change(ui.getByLabelText("Client secret"), { target: { value: "shh" } });
 }
 
 describe("LoginProvidersSettings", () => {

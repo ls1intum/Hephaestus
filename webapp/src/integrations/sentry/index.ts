@@ -19,10 +19,10 @@ export function initSentry() {
 	Sentry.init({
 		dsn: environment.sentry.dsn,
 		environment: environment.sentry.environment,
-		// Sentry v10 made this gate IP-address inference too. We keep PII on to
-		// retain v9 behavior and so error reports include the authenticated
-		// account; data subjects are TUM students covered by the project DPA.
-		sendDefaultPii: true,
+		// Don't let Sentry infer IP/PII by default — data minimisation. We already
+		// attach the context an error report needs explicitly, so the safer default
+		// avoids shipping inferred IP addresses for TUM-student data subjects.
+		sendDefaultPii: false,
 	});
 	initialized = true;
 }

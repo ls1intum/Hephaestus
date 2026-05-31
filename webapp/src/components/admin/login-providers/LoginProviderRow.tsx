@@ -202,7 +202,7 @@ export function LoginProviderRow({
 							aria-label="Copy callback URL"
 						>
 							{copied ? (
-								<CheckIcon className="mr-1.5 size-3.5 text-green-600" />
+								<CheckIcon className="mr-1.5 size-3.5 text-provider-success-foreground" />
 							) : (
 								<CopyIcon className="mr-1.5 size-3.5" />
 							)}

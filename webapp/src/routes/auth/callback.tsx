@@ -22,17 +22,24 @@ export const Route = createFileRoute("/auth/callback")({
 
 function AuthCallbackPage() {
 	const { returnTo } = Route.useSearch();
-	const { isLoading } = useAuth();
+	const { isLoading, isError } = useAuth();
 	const navigate = useNavigate();
 
 	useEffect(() => {
 		// Wait for the cookie-session probe (GET /user) to settle so the target route
 		// paints with the correct auth state.
 		if (isLoading) return;
+		// If the probe errored (401/403/network) the session cookie wasn't accepted — route
+		// straight to /login rather than optimistically navigating into a protected target and
+		// relying on the `_authenticated` guard to bounce us back.
+		if (isError) {
+			navigate({ to: "/login", replace: true });
+			return;
+		}
 		// `href` (not `to`) carries the runtime-validated internal path while keeping the typed
 		// navigate API: safeReturnTo only returns relative paths, so this stays an SPA navigation.
 		navigate({ href: safeReturnTo(returnTo), replace: true });
-	}, [isLoading, returnTo, navigate]);
+	}, [isLoading, isError, returnTo, navigate]);
 
 	return (
 		<div className="flex min-h-[100dvh] items-center justify-center">

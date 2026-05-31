@@ -91,10 +91,8 @@ describe("toUserProfile", () => {
 	});
 });
 
-// HTTP is intercepted at the MSW boundary (src/mocks/handlers.ts), not by stubbing fetch or
-// internal modules, so these exercise the real fetch + boundary-narrowing path. Closes part of
-// the F7 gating gap: the auth state machine had no behavioral coverage. `environment.serverUrl`
-// defaults to http://localhost:8080; the MSW `*/user` wildcard matches regardless of host.
+// Exercises the real fetch + boundary-narrowing path (MSW intercepts `*/user`, matching regardless
+// of host) rather than stubbing fetch or internal modules.
 describe("authClient.fetchCurrentUser", () => {
 	it("returns the narrowed user on a 200", async () => {
 		const user = await authClient.fetchCurrentUser();

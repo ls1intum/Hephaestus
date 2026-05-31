@@ -1,6 +1,5 @@
-// Behavioral tests for the active-sessions settings surface (ADR 0017 native auth). HTTP is
-// intercepted at the MSW boundary (src/mocks/handlers.ts); we assert on observable DOM (roles,
-// names, button state) rather than mock internals. Closes part of the F7 gating gap.
+// Behavioral tests for the active-sessions settings surface; asserts on observable DOM (roles,
+// names, button state) rather than mock internals.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -19,12 +18,9 @@ function renderWithClient(node: ReactNode) {
 	return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
 }
 
-/** A session row, located by the device label it renders. */
+/** A session row, located by its accessible name (the device's user-agent label). */
 function rowByDevice(label: string): HTMLElement {
-	const labelEl = screen.getByText(label);
-	const row = labelEl.closest("div.rounded-lg");
-	if (!row) throw new Error(`No session row for ${label}`);
-	return row as HTMLElement;
+	return screen.getByRole("listitem", { name: label });
 }
 
 describe("SessionsSection", () => {

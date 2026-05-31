@@ -133,9 +133,10 @@ export function SessionsSection() {
 			) : sessions.length === 0 ? (
 				<p className="text-sm text-muted-foreground">No active sessions found.</p>
 			) : (
-				<div className="space-y-3">
+				<div className="space-y-3" role="list">
 					{sessions.map((session) => {
 						const lastSeen = formatTimestamp(session.issuedAt);
+						const deviceLabel = session.userAgent || "Unknown device";
 						// Scope the pending state to the row actually being revoked so a single revoke
 						// doesn't disable/spin every other session's button (mirrors LoginProvidersSettings).
 						const isRevokingThis =
@@ -143,15 +144,15 @@ export function SessionsSection() {
 						return (
 							<div
 								key={session.jti ?? `${session.userAgent}:${session.ip}`}
+								role="listitem"
+								aria-label={deviceLabel}
 								className="flex items-center justify-between gap-4 rounded-lg border p-4"
 							>
 								<div className="flex items-center gap-3 min-w-0">
 									<MonitorIcon className="size-5 shrink-0" aria-hidden="true" />
 									<div className="min-w-0">
 										<div className="flex items-center gap-2">
-											<span className="text-sm font-medium truncate">
-												{session.userAgent || "Unknown device"}
-											</span>
+											<span className="text-sm font-medium truncate">{deviceLabel}</span>
 											{session.current && (
 												<Badge variant="secondary" className="text-xs">
 													This device

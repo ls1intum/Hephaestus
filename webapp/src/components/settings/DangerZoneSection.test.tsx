@@ -1,12 +1,12 @@
 // Behavioral tests for the GDPR danger-zone settings (ADR 0017). HTTP is intercepted at the MSW
 // boundary; we assert on observable DOM and that the destructive delete is gated behind the typed
-// confirmation phrase. Closes part of the F7 gating gap.
+// confirmation phrase.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { server } from "@/mocks/server";
 import { DangerZoneSection } from "./DangerZoneSection";
 
@@ -18,19 +18,25 @@ function renderWithClient(node: ReactNode) {
 }
 
 describe("DangerZoneSection — data export", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	it("requests an export, polls PENDING -> READY, then surfaces a Download affordance", async () => {
+		// `shouldAdvanceTime` lets MSW's promise-based responses keep resolving while we still
+		// control the 2s `refetchInterval` poll deterministically (no real wall-clock wait).
+		vi.useFakeTimers({ shouldAdvanceTime: true });
 		renderWithClient(<DangerZoneSection onAccountDeleted={vi.fn()} />);
 
 		fireEvent.click(screen.getByRole("button", { name: /Request export/ }));
 
-		// The default handlers return PENDING on the first status poll then READY afterwards; the
-		// component polls every 2s while PENDING, so the Download button appears once READY lands.
-		const downloadButton = await screen.findByRole(
-			"button",
-			{ name: /Download/ },
-			{ timeout: 5000 },
-		);
-		expect(downloadButton).toBeTruthy();
+		// First status poll returns PENDING; the in-progress copy proves we're polling.
+		await waitFor(() => expect(screen.getByText(/Preparing your export/i)).toBeTruthy());
+
+		// Drive the 2s poll interval forward; the next poll lands READY.
+		await act(() => vi.advanceTimersByTimeAsync(2000));
+
+		await waitFor(() => expect(screen.getByRole("button", { name: /Download/ })).toBeTruthy());
 		expect(screen.getByText(/ready to download/i)).toBeTruthy();
 	});
 });
