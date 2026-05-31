@@ -53,7 +53,7 @@ public class AuthEvent {
     @Nullable
     private Long accountId;
 
-    /** Impersonator, if the event was performed under a {@code SwitchUserFilter}-bound session. */
+    /** Impersonator account id (the {@code act} claim), if the event was performed under impersonation. */
     @Column(name = "acting_account_id")
     @Nullable
     private Long actingAccountId;

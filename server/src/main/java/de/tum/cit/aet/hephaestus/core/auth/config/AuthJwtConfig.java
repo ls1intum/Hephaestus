@@ -77,5 +77,8 @@ public class AuthJwtConfig {
         } catch (RuntimeException e) {
             log.warn("auth.jwt: deferred signing-key bootstrap (will seed on first issuance): {}", e.toString());
         }
+        // SECURITY: the bootstrap above is best-effort, but an unsealed signing key in prod is a
+        // forge-any-token risk — that condition must NOT be swallowed. Fail the boot loudly.
+        keyService.assertProdKeysSealed();
     }
 }

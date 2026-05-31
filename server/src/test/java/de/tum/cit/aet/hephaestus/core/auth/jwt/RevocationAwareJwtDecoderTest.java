@@ -153,9 +153,12 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
             .thenReturn(Optional.of(new IssuedJwt(jti, 42L, NOW.plus(Duration.ofMinutes(15)))));
 
         String token = validToken(jti);
-        // Flip the last character of the signature segment.
-        char last = token.charAt(token.length() - 1);
-        String tampered = token.substring(0, token.length() - 1) + (last == 'A' ? 'B' : 'A');
+        // Flip the FIRST character of the signature segment. (Flipping the LAST char is flaky: the
+        // final base64url char only carries the signature's trailing bits, which can decode to the
+        // same bytes; the first char always contributes a full, significant byte.)
+        int sigStart = token.lastIndexOf('.') + 1;
+        char first = token.charAt(sigStart);
+        String tampered = token.substring(0, sigStart) + (first == 'A' ? 'B' : 'A') + token.substring(sigStart + 1);
 
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(tampered)).isInstanceOf(JwtException.class);
     }

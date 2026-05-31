@@ -40,11 +40,12 @@ import org.springframework.transaction.annotation.Transactional;
  * sealer is disabled (a local dev/CI/test boot with no key) the private bytes are stored as
  * raw PKCS#8 DER tagged {@code "v0-unsealed"}.
  *
- * <p>An <em>unsealed</em> private key in the DB is a forge-any-token risk, so
- * {@link #ensureActiveKey()} <strong>fails closed in the {@code prod} profile</strong> for
- * legacy/misconfigured rows: it refuses to boot if any active key is still {@code v0-unsealed}.
- * Prod auto-generation produces a <em>sealed</em> key (the sealer is enabled there), so a fresh
- * prod boots cleanly; only a pre-existing unsealed row trips the guard.
+ * <p>An <em>unsealed</em> private key in the DB is a forge-any-token risk, so the service
+ * <strong>fails closed in the {@code prod} profile</strong> on a legacy/misconfigured
+ * {@code v0-unsealed} row at two points: {@link #assertProdKeysSealed()} (run from a NON-swallowed
+ * startup hook, so the boot aborts) and {@link #toJwk} (so even a deferred first-issuance can never
+ * sign with an unsealed key). Prod auto-generation produces a <em>sealed</em> key (the sealer is
+ * enabled there), so a fresh prod boots cleanly; only a pre-existing unsealed row trips the guard.
  *
  * <h2>Rotation</h2>
  * Two active keys at any time. {@link #rotate()} generates a new key, marks the oldest
@@ -90,28 +91,12 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
      */
     @Transactional
     public synchronized void ensureActiveKey() {
-        boolean prod = environment.acceptsProfiles(Profiles.of("prod"));
         if (repository.countByActiveTrue() > 0) {
-            if (
-                prod &&
-                repository
-                    .findActive()
-                    .stream()
-                    .anyMatch(k -> UNSEALED_KEY_ID.equals(k.getEncryptionKeyId()))
-            ) {
-                throw new IllegalStateException(
-                    "Active JWT signing key is stored unsealed (encryption_key_id=" +
-                        UNSEALED_KEY_ID +
-                        "). Refusing to boot in prod — a DB read would let an attacker forge any token. " +
-                        "This is a legacy/misconfigured row; rotate it out (a new key seals at rest under " +
-                        "the system encryption key) before deploying (ADR 0017 / auth-cutover runbook)."
-                );
-            }
             return;
         }
-        if (prod && !sealer.isEnabled()) {
-            // Should be unreachable: in prod the sealer fails fast in its own constructor when the
-            // key is missing. Belt-and-suspenders so we never bootstrap an unsealed key in prod.
+        if (isProd() && !sealer.isEnabled()) {
+            // Unreachable in practice (the sealer constructor fails fast in prod when the key is
+            // missing); belt-and-suspenders so we never bootstrap an unsealed key in prod.
             throw new IllegalStateException(
                 "No JWT signing key present and sealing is disabled. Refusing to bootstrap an unsealed " +
                     "signing key in prod; set hephaestus.security.encryption-key (ADR 0017)."
@@ -121,6 +106,37 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
         repository.save(row);
         cache.set(null);
         log.info("auth.jwt: bootstrapped initial signing key kid={} sealed={}", row.getKid(), sealer.isEnabled());
+    }
+
+    /**
+     * Fail closed in the {@code prod} profile if any active signing key is stored unsealed
+     * ({@code encryption_key_id="v0-unsealed"}) — a DB read of such a row lets an attacker forge any
+     * token. Invoked from a NON-swallowed startup hook (so the boot actually aborts, unlike the
+     * best-effort {@link #ensureActiveKey()} bootstrap) and re-enforced at key materialization
+     * ({@link #toJwk}) so a deferred first-issuance can never sign with an unsealed key either.
+     * A freshly generated key in prod is always sealed, so this only trips on a legacy/misconfigured
+     * row, which must be rotated out before deploying (ADR 0017 / auth-cutover runbook).
+     */
+    public void assertProdKeysSealed() {
+        if (isProd() && hasUnsealedActiveKey()) {
+            throw new IllegalStateException(
+                "Active JWT signing key is stored unsealed (encryption_key_id=" +
+                    UNSEALED_KEY_ID +
+                    "). Refusing to operate in prod — a DB read would let an attacker forge any token. " +
+                    "Rotate the legacy row out before deploying (ADR 0017 / auth-cutover runbook)."
+            );
+        }
+    }
+
+    private boolean hasUnsealedActiveKey() {
+        return repository
+            .findActive()
+            .stream()
+            .anyMatch(k -> UNSEALED_KEY_ID.equals(k.getEncryptionKeyId()));
+    }
+
+    private boolean isProd() {
+        return environment.acceptsProfiles(Profiles.of("prod"));
     }
 
     /**
@@ -211,6 +227,14 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     }
 
     private JWK toJwk(JwtSigningKey row) {
+        boolean unsealed = UNSEALED_KEY_ID.equals(row.getEncryptionKeyId());
+        // Fail closed BEFORE the materialization try/catch so the reason is not masked: never use an
+        // unsealed (forgeable) signing key in prod, even on the deferred first-issuance path.
+        if (unsealed && isProd()) {
+            throw new IllegalStateException(
+                "Refusing to use an unsealed JWT signing key (kid=" + row.getKid() + ") in prod."
+            );
+        }
         try {
             byte[] publicDer = stripPem(row.getPublicKeyPem());
             ECPublicKey publicKey = (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(
@@ -218,9 +242,7 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
             );
             // Unseal the private bytes if this row was sealed at rest; legacy "v0-unsealed"
             // rows carry raw PKCS#8 DER and parse directly.
-            byte[] privateDer = UNSEALED_KEY_ID.equals(row.getEncryptionKeyId())
-                ? row.getPrivateKeyPem()
-                : sealer.unseal(row.getPrivateKeyPem());
+            byte[] privateDer = unsealed ? row.getPrivateKeyPem() : sealer.unseal(row.getPrivateKeyPem());
             ECPrivateKey privateKey = (ECPrivateKey) KeyFactory.getInstance("EC").generatePrivate(
                 new PKCS8EncodedKeySpec(privateDer)
             );

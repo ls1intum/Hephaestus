@@ -92,18 +92,28 @@ class JwtSigningKeyServiceSealingTest extends BaseUnitTest {
     }
 
     @Test
-    void prod_existingUnsealedRow_refusesToBoot() {
+    void prod_existingUnsealedRow_failsClosed() {
+        // A legacy v0-unsealed row must fail closed in prod at BOTH enforcement points: the
+        // non-swallowed startup assertion (so boot aborts) and key materialization / signing
+        // (so a deferred first-issuance can't sign with the forgeable key either). ensureActiveKey()
+        // itself is best-effort and intentionally does NOT throw here — the swallowing @PostConstruct
+        // would hide it, which is exactly the inert-guard bug this guards against.
         JwtSigningKeySealer sealer = new JwtSigningKeySealer(KEY, "prod");
         JwtSigningKeyRepository repo = mock(JwtSigningKeyRepository.class);
-        when(repo.countByActiveTrue()).thenReturn(1L);
 
         JwtSigningKey legacy = new JwtSigningKey();
+        legacy.setKid("legacy-kid");
         legacy.setEncryptionKeyId("v0-unsealed");
         when(repo.findActive()).thenReturn(List.of(legacy));
 
         JwtSigningKeyService service = new JwtSigningKeyService(repo, env("prod"), sealer);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(service::ensureActiveKey)
+        // Startup assertion (called from AuthJwtConfig OUTSIDE the swallow) aborts boot.
+        org.assertj.core.api.Assertions.assertThatThrownBy(service::assertProdKeysSealed)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("unsealed");
+        // Signing path also refuses to materialize the unsealed key.
+        org.assertj.core.api.Assertions.assertThatThrownBy(service::currentSigningKey)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("unsealed");
     }
