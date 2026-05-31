@@ -8,7 +8,6 @@ import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 import { LoginProvidersSettings } from "./login-providers/LoginProvidersSettings";
 
-// Use the RepositoryItem type from the AdminRepositoriesSettings component
 type RepositoryItem = {
 	nameWithOwner: string;
 };
@@ -29,13 +28,15 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
-	// Slack notification card props (only rendered when leaderboard is enabled)
-	workspaceId?: number;
+	// Slack notification card props (rendered for any workspace with a slug — the weekly
+	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
 	slackChannelId?: string;
 	slackTeamLabel?: string;
 	slackNotificationsEnabled: boolean;
+	slackScheduleDay?: number;
+	slackScheduleTime?: string;
 	onSlackSaved: () => void;
 	/** API origin used to build OAuth callback URLs for self-hosted login providers. */
 	apiOrigin: string;
@@ -56,12 +57,13 @@ export function AdminSettingsPage({
 	features,
 	isSavingFeatures,
 	onToggleFeature,
-	workspaceId,
 	workspaceSlug,
 	hasSlackConnection,
 	slackChannelId,
 	slackTeamLabel,
 	slackNotificationsEnabled,
+	slackScheduleDay,
+	slackScheduleTime,
 	onSlackSaved,
 	apiOrigin,
 }: AdminSettingsPageProps) {
@@ -88,22 +90,23 @@ export function AdminSettingsPage({
 					onRemoveRepository={onRemoveRepository}
 				/>
 
-				{workspaceId != null && (
-					<LoginProvidersSettings workspaceId={workspaceId} apiOrigin={apiOrigin} />
+				{workspaceSlug != null && (
+					<LoginProvidersSettings workspaceSlug={workspaceSlug} apiOrigin={apiOrigin} />
 				)}
 
 				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
 				)}
 
-				{features.leaderboardEnabled && workspaceId != null && workspaceSlug != null && (
+				{workspaceSlug != null && (
 					<AdminSlackNotificationSettings
-						workspaceId={workspaceId}
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
 						channelId={slackChannelId}
 						teamLabel={slackTeamLabel}
 						enabled={slackNotificationsEnabled}
+						scheduleDay={slackScheduleDay}
+						scheduleTime={slackScheduleTime}
 						onSaved={onSlackSaved}
 					/>
 				)}

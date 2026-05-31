@@ -1139,16 +1139,14 @@ public class GitHubProjectSyncService {
             itemsSynced
         );
 
-        // Return phase-aware SyncResult
-        if (finalStatus == SyncResult.Status.ABORTED_RATE_LIMIT) {
-            return SyncResult.abortedRateLimitWithPhases(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
-        } else if (finalStatus == SyncResult.Status.ABORTED_ERROR) {
-            return SyncResult.abortedErrorWithPhases(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
-        } else if (finalStatus == SyncResult.Status.COMPLETED_WITH_WARNINGS) {
-            return SyncResult.completedWithWarnings(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
-        } else {
-            return SyncResult.completedWithPhases(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
-        }
+        // The per-phase booleans drive finalStatus (and the log line above); the SyncResult itself
+        // only carries the resolved status + count.
+        return switch (finalStatus) {
+            case ABORTED_RATE_LIMIT -> SyncResult.abortedRateLimit(totalSynced);
+            case ABORTED_ERROR -> SyncResult.abortedError(totalSynced);
+            case COMPLETED_WITH_WARNINGS -> SyncResult.completedWithWarnings(totalSynced);
+            case COMPLETED -> SyncResult.completed(totalSynced);
+        };
     }
 
     /**

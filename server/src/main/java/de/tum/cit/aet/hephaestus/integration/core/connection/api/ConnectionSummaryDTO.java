@@ -11,7 +11,7 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Wire shape returned by the {@code GET /api/v1/workspaces/{workspaceId}/connections}
+ * Wire shape returned by the {@code GET /workspaces/{workspaceSlug}/connections}
  * list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
  * credentials, no audit. Capabilities are looked up from the per-kind manifest at
  * response build time so adding/removing a capability needs no DB migration.
@@ -26,7 +26,6 @@ public record ConnectionSummaryDTO(
     @Nullable String stateReason,
     Instant createdAt,
     Instant updatedAt,
-    @Nullable Instant lastActivityAt,
     Set<Capability> capabilities
 ) {
     public static ConnectionSummaryDTO from(Connection c, IntegrationManifestRegistry manifests) {
@@ -40,7 +39,6 @@ public record ConnectionSummaryDTO(
             c.getStateReason(),
             c.getCreatedAt(),
             c.getUpdatedAt(),
-            c.getLastActivityAt(),
             manifests.capabilitiesFor(c.getKind())
         );
     }

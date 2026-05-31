@@ -7,10 +7,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,9 +18,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Splits the routing problem into three independent steps:
  * <ol>
- *   <li>Map subject prefix → {@link IntegrationKind} via a hard-coded allow-list. This
- *       is the only point that touches the prefix string; we deliberately do NOT call
- *       {@link IntegrationKind#valueOf(String)} on subject input.</li>
+ *   <li>Map subject prefix → {@link IntegrationKind} via {@link
+ *       ConsumerSubjectMath#kindFromSubjectPrefix(String)} (the single NATS-routing
+ *       allow-list; never calls {@link IntegrationKind#valueOf(String)} on subject
+ *       input).</li>
  *   <li>Hand the full subject to that kind's registered {@link SubjectParser} to obtain
  *       an {@link EventTypeKey}.</li>
  *   <li>Look the key up in the {@link IntegrationMessageHandlerRegistry}.</li>
@@ -41,20 +40,6 @@ import org.springframework.stereotype.Component;
 public class IntegrationMessageDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(IntegrationMessageDispatcher.class);
-
-    /**
-     * Hard-coded subject-prefix allow-list. Never derived from user input. New kinds must
-     * be added here AND in {@link IntegrationKind} at the same time — failure to do so
-     * causes silent NACKs at the dispatcher rather than misrouting.
-     */
-    private static final Map<String, IntegrationKind> PREFIX_TO_KIND = Map.of(
-        "github",
-        IntegrationKind.GITHUB,
-        "gitlab",
-        IntegrationKind.GITLAB,
-        "slack",
-        IntegrationKind.SLACK
-    );
 
     private final IntegrationMessageHandlerRegistry registry;
     private final Map<IntegrationKind, SubjectParser> parsersByKind;
@@ -94,7 +79,7 @@ public class IntegrationMessageDispatcher {
      * chain (prefix → kind → key → handler) is missing.
      */
     public Optional<IntegrationMessageHandler> dispatch(String fullSubject) {
-        Optional<IntegrationKind> kind = kindFromSubjectPrefix(fullSubject);
+        Optional<IntegrationKind> kind = ConsumerSubjectMath.kindFromSubjectPrefix(fullSubject);
         if (kind.isEmpty()) {
             return Optional.empty();
         }
@@ -121,22 +106,5 @@ public class IntegrationMessageDispatcher {
     /** Number of {@link SubjectParser} bindings — one per registered kind. */
     public int parserCount() {
         return parsersByKind.size();
-    }
-
-    /**
-     * Explicit allow-list mapping of subject prefix → {@link IntegrationKind}. Returns
-     * empty for null, blank, dot-less, or unknown prefixes. Never reflects on the
-     * input.
-     */
-    static Optional<IntegrationKind> kindFromSubjectPrefix(@Nullable String fullSubject) {
-        if (fullSubject == null || fullSubject.isBlank()) {
-            return Optional.empty();
-        }
-        int firstDot = fullSubject.indexOf('.');
-        if (firstDot <= 0) {
-            return Optional.empty();
-        }
-        String prefix = fullSubject.substring(0, firstDot).toLowerCase(Locale.ROOT);
-        return Optional.ofNullable(PREFIX_TO_KIND.get(prefix));
     }
 }

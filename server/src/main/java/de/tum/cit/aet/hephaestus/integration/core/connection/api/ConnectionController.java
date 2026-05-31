@@ -8,8 +8,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -23,17 +28,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Administrative REST surface for managing per-workspace
  * {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection} rows — list, read,
- * initiate, suspend, reactivate, disconnect, audit.
+ * initiate, status transitions (suspend / reactivate / disconnect via {@code PATCH /status}), audit.
  *
  * <p>Thin HTTP adapter: all repository access lives in {@link ConnectionAdminService};
  * the state machine + audit invariants live in {@link ConnectionService}; per-kind
@@ -41,15 +46,16 @@ import tools.jackson.databind.ObjectMapper;
  * only jobs are HTTP wire mapping (DTO ↔ entity), strategy resolution, and exception
  * translation.
  *
- * <p>The {@code workspaceId} path variable + class-level
- * {@link RequireAtLeastWorkspaceAdmin} satisfy the
- * {@code MultiTenancyArchitectureTest.dataEndpointsReceiveWorkspaceContext} rule — the
- * annotation simple name contains {@code Workspace}, which the rule recognises as a
- * workspace-context guard.
+ * <p>{@link WorkspaceScopedController} prefixes every route with
+ * {@code /workspaces/{workspaceSlug}} (the repo-wide convention) so the
+ * {@code WorkspaceContextFilter} resolves the tenant + the caller's roles before
+ * {@link RequireAtLeastWorkspaceAdmin} runs. The resolved {@link WorkspaceContext} supplies
+ * the numeric workspace id to the service layer.
  */
-@RestController
-@RequestMapping("/api/v1/workspaces/{workspaceId}/connections")
+@WorkspaceScopedController
+@RequestMapping("/connections")
 @RequireAtLeastWorkspaceAdmin
+@Tag(name = "Connections", description = "Workspace integration connection management")
 public class ConnectionController {
 
     private static final Logger log = LoggerFactory.getLogger(ConnectionController.class);
@@ -91,9 +97,9 @@ public class ConnectionController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ConnectionSummaryDTO>> list(@PathVariable Long workspaceId) {
+    public ResponseEntity<List<ConnectionSummaryDTO>> list(WorkspaceContext workspace) {
         List<ConnectionSummaryDTO> summaries = admin
-            .listForWorkspace(workspaceId)
+            .listForWorkspace(workspace.id())
             .stream()
             .map(c -> ConnectionSummaryDTO.from(c, admin.manifests()))
             .toList();
@@ -101,17 +107,18 @@ public class ConnectionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ConnectionDetailDTO> read(@PathVariable Long workspaceId, @PathVariable Long id) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
+    public ResponseEntity<ConnectionDetailDTO> read(WorkspaceContext workspace, @PathVariable Long id) {
+        Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
         return ResponseEntity.ok(ConnectionDetailDTO.from(connection, admin.manifests(), objectMapper));
     }
 
     @PostMapping
-    public ResponseEntity<InitiateConnectionResponse> initiate(
-        @PathVariable Long workspaceId,
+    public ResponseEntity<InitiateConnectionResponseDTO> initiate(
+        WorkspaceContext workspace,
         @RequestBody @NotNull InitiateConnectionRequestDTO body,
         @Nullable Authentication authentication
     ) {
+        Long workspaceId = workspace.id();
         if (body == null || body.kind() == null) {
             throw new IllegalArgumentException("kind is required");
         }
@@ -130,7 +137,7 @@ public class ConnectionController {
 
         return switch (initiation) {
             case ConnectInitiation.RedirectToVendor r -> ResponseEntity.ok(
-                new InitiateConnectionResponse.RedirectDTO(r.vendorUrl(), r.oauthState())
+                InitiateConnectionResponseDTO.redirect(r.vendorUrl(), r.oauthState())
             );
             case ConnectInitiation.AcceptInline inline -> {
                 Connection connection = admin.createInlineConnection(
@@ -141,107 +148,78 @@ public class ConnectionController {
                     userInput,
                     actorRef(authentication)
                 );
-                yield ResponseEntity.ok(new InitiateConnectionResponse.LinkedDTO(connection.getId()));
+                yield ResponseEntity.ok(InitiateConnectionResponseDTO.linked(connection.getId()));
             }
         };
     }
 
-    @PostMapping("/{id}/suspend")
-    public ResponseEntity<ConnectionSummaryDTO> suspend(
-        @PathVariable Long workspaceId,
+    /**
+     * Resource-oriented lifecycle transition: {@code ACTIVE} (reactivate), {@code SUSPENDED}
+     * (suspend), or {@code UNINSTALLED} (disconnect — also best-effort revokes the vendor token).
+     * {@code PENDING} is internal to the OAuth handshake and rejected as a bad request; illegal
+     * transitions surface as 400 via the state machine.
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ConnectionSummaryDTO> updateStatus(
+        WorkspaceContext workspace,
         @PathVariable Long id,
-        @RequestBody(required = false) @Nullable ReasonRequestDTO body,
+        @RequestBody @Valid @NotNull UpdateConnectionStatusRequestDTO body,
         @Nullable Authentication authentication
     ) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
-        String reason = body == null ? null : body.reason();
+        Connection connection = admin.findInWorkspaceOrThrow(workspace.id(), id);
+        IntegrationState target = body.state();
+        String eventType = switch (target) {
+            case ACTIVE -> "REACTIVATE";
+            case SUSPENDED -> "SUSPEND";
+            case UNINSTALLED -> "DISCONNECT";
+            case PENDING -> throw new IllegalArgumentException("PENDING is not an admin-settable connection state");
+        };
+
+        // Entering the terminal state additionally revokes the vendor-side grant.
+        if (target == IntegrationState.UNINSTALLED) {
+            revokeBestEffort(connection);
+        }
+
+        String correlationId = eventType.toLowerCase(Locale.ROOT) + "-" + connection.getId() + "-" + UUID.randomUUID();
         connection = connectionService.transition(
             connection,
-            new TransitionRequest(
-                IntegrationState.SUSPENDED,
-                "SUSPEND",
-                "ADMIN",
-                actorRef(authentication),
-                "suspend-" + connection.getId() + "-" + UUID.randomUUID(),
-                reason
-            )
+            new TransitionRequest(target, eventType, "ADMIN", actorRef(authentication), correlationId, body.reason())
         );
         return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
     }
 
-    @PostMapping("/{id}/reactivate")
-    public ResponseEntity<ConnectionSummaryDTO> reactivate(
-        @PathVariable Long workspaceId,
-        @PathVariable Long id,
-        @RequestBody(required = false) @Nullable ReasonRequestDTO body,
-        @Nullable Authentication authentication
-    ) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
-        String reason = body == null ? null : body.reason();
-        connection = connectionService.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "REACTIVATE",
-                "ADMIN",
-                actorRef(authentication),
-                "reactivate-" + connection.getId() + "-" + UUID.randomUUID(),
-                reason
-            )
-        );
-        return ResponseEntity.ok(ConnectionSummaryDTO.from(connection, admin.manifests()));
-    }
-
-    @PostMapping("/{id}/disconnect")
-    public ResponseEntity<Void> disconnect(
-        @PathVariable Long workspaceId,
-        @PathVariable Long id,
-        @Nullable Authentication authentication
-    ) {
-        Connection connection = admin.findInWorkspaceOrThrow(workspaceId, id);
-
-        // Best-effort vendor-side revoke. Strategy may be missing if the kind was
-        // de-registered after the connection row was written; we still want the local
-        // state transition to succeed so the admin can clear stale rows.
+    /**
+     * Best-effort vendor-side revoke before the UNINSTALLED transition. The strategy may be
+     * missing if the kind was de-registered after the row was written, and the vendor call may
+     * fail — in both cases we log and proceed so the admin can still clear the stale row locally.
+     */
+    private void revokeBestEffort(Connection connection) {
         ConnectionStrategy strategy = strategies.get(connection.getKind());
-        if (strategy != null) {
-            try {
-                strategy.revoke(connection.toRef());
-            } catch (RuntimeException e) {
-                log.warn(
-                    "Vendor-side revoke failed for connection={} kind={}: {} — proceeding with local UNINSTALLED transition",
-                    connection.getId(),
-                    connection.getKind(),
-                    e.toString()
-                );
-            }
-        } else {
+        if (strategy == null) {
             log.warn(
                 "No ConnectionStrategy registered for kind={} on disconnect of connection={} — local transition only",
                 connection.getKind(),
                 connection.getId()
             );
+            return;
         }
-
-        connectionService.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.UNINSTALLED,
-                "DISCONNECT",
-                "ADMIN",
-                actorRef(authentication),
-                "disconnect-" + connection.getId() + "-" + UUID.randomUUID(),
-                null
-            )
-        );
-        return ResponseEntity.noContent().build();
+        try {
+            strategy.revoke(connection.toRef());
+        } catch (RuntimeException e) {
+            log.warn(
+                "Vendor-side revoke failed for connection={} kind={}: {} — proceeding with local UNINSTALLED transition",
+                connection.getId(),
+                connection.getKind(),
+                e.toString()
+            );
+        }
     }
 
     @GetMapping("/{id}/audit")
-    public ResponseEntity<List<ConnectionAuditEntryDTO>> audit(@PathVariable Long workspaceId, @PathVariable Long id) {
+    public ResponseEntity<List<ConnectionAuditEntryDTO>> audit(WorkspaceContext workspace, @PathVariable Long id) {
         // findInWorkspaceOrThrow enforces the workspace scope before we expose audit history,
         // so cross-workspace audit reads return 404 rather than leaking a partial trail.
-        admin.findInWorkspaceOrThrow(workspaceId, id);
+        admin.findInWorkspaceOrThrow(workspace.id(), id);
         List<ConnectionAuditEntryDTO> entries = admin
             .auditForConnection(id, AUDIT_PAGE_CAP)
             .stream()
@@ -254,10 +232,6 @@ public class ConnectionController {
         if (authentication == null || authentication.getName() == null) return "anonymous";
         return authentication.getName();
     }
-
-    /** Lifecycle-action body — reason is optional, applied to both suspend and reactivate. */
-    @io.swagger.v3.oas.annotations.media.Schema(name = "ReasonRequestDTO")
-    public record ReasonRequestDTO(@Nullable String reason) {}
 
     /**
      * Not-found is signalled as {@link NoSuchElementException} by {@code ConnectionAdminService}

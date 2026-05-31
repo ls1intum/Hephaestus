@@ -33,8 +33,13 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
 
     private static final Logger log = LoggerFactory.getLogger(CredentialBundleConverter.class);
 
-    /** Tag persisted on {@code connection.credentials_alg} for any blob written by this converter. */
-    public static final String ALGORITHM_TAG = "aesgcm-v1";
+    /**
+     * Tag persisted on {@code connection.credentials_alg} for any blob written by this converter.
+     * Observational only — decryption routes off the in-blob {@link #FORMAT_VERSION_V2} version
+     * byte, never this column — so it must match the actual on-disk format (v2) to avoid misleading
+     * an operator or any future column-based routing.
+     */
+    public static final String ALGORITHM_TAG = "aesgcm-v2";
 
     /** First byte of every v2-format ciphertext (per-row AAD). */
     public static final byte FORMAT_VERSION_V2 = 0x02;
@@ -138,10 +143,10 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     }
 
     /**
-     * Context-less {@link AttributeConverter} read path. Always rejects v2 blobs so the
-     * tolerant fallback is forced through the explicit {@link #decrypt(byte[],
-     * EncryptionContext)} entrypoint. Returns {@code null} for {@code null} input so JPA
-     * mapping of a NULL column stays sane.
+     * Context-less {@link AttributeConverter} read path. Always rejects v2 blobs, forcing every
+     * read through the explicit {@link #decrypt(byte[], EncryptionContext)} entrypoint that
+     * supplies the per-row AAD. Returns {@code null} for {@code null} input so JPA mapping of a
+     * NULL column stays sane.
      */
     @Override
     @Nullable

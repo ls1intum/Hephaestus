@@ -3,12 +3,10 @@ import { KeyRoundIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-	disconnectMutation,
 	initiateMutation,
 	listOptions,
 	listQueryKey,
-	reactivateMutation,
-	suspendMutation,
+	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { ConnectionSummary } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
@@ -25,8 +23,8 @@ import {
 } from "./loginProviders";
 
 export interface LoginProvidersSettingsProps {
-	/** Numeric workspace id — the connections API is keyed by id, not slug. */
-	workspaceId: number;
+	/** Workspace slug — the connections API is keyed by slug. */
+	workspaceSlug: string;
 	/** API origin (e.g. environment.serverUrl) used to build the OAuth callback URL. */
 	apiOrigin: string;
 }
@@ -39,7 +37,7 @@ export interface LoginProvidersSettingsProps {
  * client-side to the IDENTITY family (kinds `OIDC_LOGIN_GITHUB` / `OIDC_LOGIN_GITLAB`)
  * so the Slack/SCM connections that share the endpoint don't leak onto this screen.
  */
-export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvidersSettingsProps) {
+export function LoginProvidersSettings({ workspaceSlug, apiOrigin }: LoginProvidersSettingsProps) {
 	const queryClient = useQueryClient();
 	const [dialogOpen, setDialogOpen] = useState(false);
 	// Connection id we just created — its callback URL is surfaced prominently so the admin
@@ -48,7 +46,7 @@ export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvider
 		null,
 	);
 
-	const queryOptions = listOptions({ path: { workspaceId } });
+	const queryOptions = listOptions({ path: { workspaceSlug } });
 	const { data, isLoading, error } = useQuery(queryOptions);
 
 	const providers = (data ?? []).filter(
@@ -57,21 +55,18 @@ export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvider
 	);
 
 	const invalidateList = () =>
-		queryClient.invalidateQueries({ queryKey: listQueryKey({ path: { workspaceId } }) });
+		queryClient.invalidateQueries({ queryKey: listQueryKey({ path: { workspaceSlug } }) });
 
 	const initiate = useMutation({
 		...initiateMutation(),
 		onSuccess: (response) => {
-			// OIDC login is always an inline-credential ("linked") flow — the synchronous
-			// issuer-discovery probe ran server-side and a Connection row now exists.
-			const connectionId =
-				response && typeof response === "object" && "connectionId" in response
-					? (response.connectionId as number | undefined)
-					: undefined;
+			// OIDC login is always an inline-credential ("LINKED") flow — the synchronous
+			// issuer-discovery probe ran server-side and a Connection row now exists, so the
+			// flat response carries `connectionId` rather than a `vendorUrl` redirect.
 			invalidateList();
 			setDialogOpen(false);
-			if (connectionId != null && pendingKind != null) {
-				setJustCreated({ id: connectionId, kind: pendingKind });
+			if (response.type === "LINKED" && response.connectionId != null && pendingKind != null) {
+				setJustCreated({ id: response.connectionId, kind: pendingKind });
 			}
 			toast.success("Login provider added");
 		},
@@ -86,33 +81,30 @@ export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvider
 	// Track which kind the in-flight initiate is for, so we can label the callback URL.
 	const [pendingKind, setPendingKind] = useState<LoginProviderKind | null>(null);
 
-	const lifecycleMutationOptions = {
-		onSuccess: () => {
+	// All three lifecycle transitions funnel through the single status endpoint
+	// (PATCH .../connections/{id}/status). We distinguish the action by the target
+	// `state` in the in-flight variables so per-row pending state stays accurate.
+	const updateStatus = useMutation({
+		...updateStatus1Mutation(),
+		onSuccess: (_data, variables) => {
 			invalidateList();
+			if (variables.body?.state === "UNINSTALLED") {
+				toast.success("Login provider disconnected");
+			}
 		},
-	} as const;
+		onError: (err, variables) => {
+			const message =
+				variables.body?.state === "SUSPENDED"
+					? "Could not suspend provider"
+					: variables.body?.state === "UNINSTALLED"
+						? "Could not disconnect provider"
+						: "Could not reactivate provider";
+			toast.error(message, { description: problemDetailOf(err) });
+		},
+	});
 
-	const suspend = useMutation({
-		...suspendMutation(),
-		...lifecycleMutationOptions,
-		onError: (err) =>
-			toast.error("Could not suspend provider", { description: problemDetailOf(err) }),
-	});
-	const reactivate = useMutation({
-		...reactivateMutation(),
-		...lifecycleMutationOptions,
-		onError: (err) =>
-			toast.error("Could not reactivate provider", { description: problemDetailOf(err) }),
-	});
-	const disconnect = useMutation({
-		...disconnectMutation(),
-		onSuccess: () => {
-			invalidateList();
-			toast.success("Login provider disconnected");
-		},
-		onError: (err) =>
-			toast.error("Could not disconnect provider", { description: problemDetailOf(err) }),
-	});
+	const pendingState = updateStatus.isPending ? updateStatus.variables?.body?.state : undefined;
+	const pendingId = updateStatus.isPending ? updateStatus.variables?.path.id : undefined;
 
 	return (
 		<div className="space-y-6">
@@ -149,7 +141,7 @@ export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvider
 								setPendingKind(payload.kind);
 								initiate.reset();
 								initiate.mutate({
-									path: { workspaceId },
+									path: { workspaceSlug },
 									body: { kind: payload.kind, userInput: payload.userInput },
 								});
 							}}
@@ -195,7 +187,7 @@ export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvider
 							providers.map((provider) => (
 								<LoginProviderRow
 									key={provider.id}
-									workspaceId={workspaceId}
+									workspaceSlug={workspaceSlug}
 									provider={provider}
 									callbackUrl={
 										provider.id != null
@@ -203,24 +195,29 @@ export function LoginProvidersSettings({ workspaceId, apiOrigin }: LoginProvider
 											: undefined
 									}
 									highlightCallback={justCreated?.id === provider.id}
-									isSuspending={suspend.isPending && suspend.variables?.path.id === provider.id}
-									isReactivating={
-										reactivate.isPending && reactivate.variables?.path.id === provider.id
-									}
-									isDisconnecting={
-										disconnect.isPending && disconnect.variables?.path.id === provider.id
-									}
+									isSuspending={pendingId === provider.id && pendingState === "SUSPENDED"}
+									isReactivating={pendingId === provider.id && pendingState === "ACTIVE"}
+									isDisconnecting={pendingId === provider.id && pendingState === "UNINSTALLED"}
 									onSuspend={(reason) =>
 										provider.id != null &&
-										suspend.mutate({ path: { workspaceId, id: provider.id }, body: { reason } })
+										updateStatus.mutate({
+											path: { workspaceSlug, id: provider.id },
+											body: { state: "SUSPENDED", reason },
+										})
 									}
 									onReactivate={() =>
 										provider.id != null &&
-										reactivate.mutate({ path: { workspaceId, id: provider.id }, body: {} })
+										updateStatus.mutate({
+											path: { workspaceSlug, id: provider.id },
+											body: { state: "ACTIVE" },
+										})
 									}
 									onDisconnect={() =>
 										provider.id != null &&
-										disconnect.mutate({ path: { workspaceId, id: provider.id } })
+										updateStatus.mutate({
+											path: { workspaceSlug, id: provider.id },
+											body: { state: "UNINSTALLED" },
+										})
 									}
 								/>
 							))}

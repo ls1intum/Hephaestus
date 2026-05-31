@@ -19,6 +19,14 @@ spring:
     # HEPHAESTUS_AUTH_STATE_COOKIE_KEY, GITHUB_OAUTH_CLIENT_ID/SECRET,
     # GITLAB_LRZ_OAUTH_CLIENT_ID/SECRET. See ADR 0017 + docs/runbooks/auth-cutover.md.
 
+    # Belt-and-suspenders: the spring-boot-docker-compose jar ships in the image (it powers the
+    # local profile), and Boot's default is enabled=true. Prod brings infra up via docker/compose.*
+    # on the host, never from inside the app container, so explicitly disable Boot's auto-start
+    # instead of relying on "no compose.yaml happens to be in the workdir".
+    docker:
+        compose:
+            enabled: false
+
 server:
     forward-headers-strategy: native
     tomcat:
@@ -64,8 +72,8 @@ hephaestus:
     # SCM + SLACK INTEGRATION (Production)
     #
     # Slack: per-workspace bot tokens are issued via OAuth and encrypted at rest in the
-    # `connection` table — there is no global bot token. The signing secret is still
-    # required for inbound webhook signature verification.
+    # `connection` table — there is no global bot token. Slack is outbound-only (leaderboard
+    # digest + test message); no inbound webhook secret is required.
     # ═══════════════════════════════════════════════════════════════════════════
     integration:
         github:
@@ -76,8 +84,6 @@ hephaestus:
                 privateKey: ${GH_APP_PRIVATE_KEY:}
             meta:
                 auth-token: ${GH_AUTH_TOKEN:}
-        slack:
-            signing-secret: ${SLACK_SIGNING_SECRET}
 
     sync:
         run-on-startup: ${MONITORING_RUN_ON_STARTUP:true}

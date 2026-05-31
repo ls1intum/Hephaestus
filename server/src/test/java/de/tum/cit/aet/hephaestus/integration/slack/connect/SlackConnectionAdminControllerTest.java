@@ -14,6 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -46,7 +49,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
 
     @Test
     void sendTestMessage_happyPath_returns200() {
-        ResponseEntity<SlackTestMessageResponseDTO> response = controller.sendTestMessage(1L);
+        ResponseEntity<SlackTestMessageResponseDTO> response = controller.sendTestMessage(ctx(1L));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -59,7 +62,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
     void sendTestMessage_noActiveConnection_returns404() {
         when(connectionService.findSlackNotificationConfig(eq(2L))).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> controller.sendTestMessage(2L))
+        assertThatThrownBy(() -> controller.sendTestMessage(ctx(2L)))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("404")
             .hasMessageContaining("No ACTIVE Slack Connection");
@@ -71,7 +74,7 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
             Optional.of(new ConnectionConfig.SlackConfig("T1", "Acme", null, "core-team", Set.of()))
         );
 
-        assertThatThrownBy(() -> controller.sendTestMessage(3L))
+        assertThatThrownBy(() -> controller.sendTestMessage(ctx(3L)))
             .isInstanceOf(ResponseStatusException.class)
             .hasMessageContaining("404")
             .hasMessageContaining("channel not configured");
@@ -99,12 +102,25 @@ class SlackConnectionAdminControllerTest extends BaseUnitTest {
             .when(slackMessageService)
             .sendForWorkspace(anyLong(), anyString(), any(), anyString());
 
-        ResponseEntity<SlackTestMessageResponseDTO> response = controller.sendTestMessage(1L);
+        ResponseEntity<SlackTestMessageResponseDTO> response = controller.sendTestMessage(ctx(1L));
 
         assertThat(response.getStatusCode().value()).isEqualTo(expectedStatus);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().ok()).isFalse();
         assertThat(response.getBody().channelId()).isEqualTo("C123456789");
         assertThat(response.getBody().slackError()).isEqualTo(slackError);
+    }
+
+    private static WorkspaceContext ctx(long workspaceId) {
+        return new WorkspaceContext(
+            workspaceId,
+            "ws-" + workspaceId,
+            "Workspace " + workspaceId,
+            AccountType.ORG,
+            null,
+            false,
+            false,
+            Set.of(WorkspaceRole.ADMIN)
+        );
     }
 }

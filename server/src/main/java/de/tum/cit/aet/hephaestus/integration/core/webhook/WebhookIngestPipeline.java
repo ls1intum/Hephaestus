@@ -224,9 +224,4 @@ public class WebhookIngestPipeline {
         }
         return Collections.unmodifiableMap(headers);
     }
-
-    @Nullable
-    public WebhookSignatureVerifier verifierFor(IntegrationKind kind) {
-        return verifiersByKind.get(kind);
-    }
 }

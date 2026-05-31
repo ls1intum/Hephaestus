@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleCon
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,10 +15,9 @@ import org.springframework.stereotype.Component;
 /**
  * {@link ApiCredentialProvider} for Slack.
  *
- * <p>Looks up the active Connection (no Connection / non-ACTIVE state / missing blob
- * → empty) and decrypts the {@code xoxb-…} bot token via {@link CredentialBundleConverter},
- * returning a {@link BearerToken} bundle. Callers MUST already treat empty as
- * "no auth available".
+ * <p>Looks up the active Connection (no ACTIVE Connection / missing blob → empty) and
+ * decrypts the {@code xoxb-…} bot token via {@link CredentialBundleConverter}, returning a
+ * {@link BearerToken} bundle. Callers MUST already treat empty as "no auth available".
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
@@ -48,9 +46,6 @@ public class SlackCredentialProvider implements ApiCredentialProvider {
             return Optional.empty();
         }
         Connection conn = connection.get();
-        if (conn.getState() != IntegrationState.ACTIVE) {
-            return Optional.empty();
-        }
         if (conn.getCredentialsEncrypted() == null) {
             log.warn("Slack Connection {} has no credentials blob — cannot resolve bot token", conn.getId());
             return Optional.empty();

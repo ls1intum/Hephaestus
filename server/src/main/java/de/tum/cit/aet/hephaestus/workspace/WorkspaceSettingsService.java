@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceScheduleChangedEvent;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -14,6 +15,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,7 @@ public class WorkspaceSettingsService {
 
     private final WorkspaceRepository workspaceRepository;
     private final ConnectionService connectionService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Update the leaderboard schedule for a workspace.
@@ -64,8 +67,11 @@ public class WorkspaceSettingsService {
             workspace.setLeaderboardScheduleTime(time);
         }
 
+        Workspace saved = workspaceRepository.save(workspace);
         log.info("Updated workspace schedule: workspaceId={}, day={}, time={}", workspaceId, day, time);
-        return workspaceRepository.save(workspace);
+        // Re-register the per-workspace leaderboard cron at the new cadence without a restart.
+        eventPublisher.publishEvent(new WorkspaceScheduleChangedEvent(workspaceId));
+        return saved;
     }
 
     /**

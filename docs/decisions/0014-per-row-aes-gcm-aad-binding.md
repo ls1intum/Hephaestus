@@ -5,7 +5,7 @@
 
 ## Context
 
-The first AES-GCM credential-encryption implementation (commit `e1af1fdaf`) used a
+The first AES-GCM credential-encryption implementation (commit `8c86831de`) used a
 *static context string* as AAD:
 
 ```

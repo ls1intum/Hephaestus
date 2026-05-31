@@ -1,8 +1,17 @@
 # ADR 0010: Hand-roll OAuth state for outbound per-workspace integrations
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-05-30 — PKCE primitive removed)
 **Date:** 2026-05-25
 **Authors:** Integration framework polish (#1198)
+
+> **Amendment (2026-05-30):** The PKCE primitive (`issueWithPkce` → `IssuedState`, the
+> `code_verifier` nonce column, and the verifier-carrying consume path) was removed. It was
+> never wired into any strategy — both providers (GitHub App, Slack OAuth v2) are
+> **confidential clients** authenticating with a `client_secret`, for which PKCE is
+> recommended-but-not-required (RFC 9700) and provided no active protection while unwired.
+> The signed state payload is now `(workspaceId|kind|issuedAt|nonce|actorRef)`; CSRF/replay
+> defense (HMAC + TTL + single-use nonce) is unchanged. A future public-client provider that
+> needs PKCE can reintroduce the primitive against this same `OAuthStateService` seam.
 
 ## Context
 
@@ -25,7 +34,7 @@ must:
   signing secret; each GitLab self-hosted instance has its own `client_id`).
 
 We examined whether `spring-boot-starter-oauth2-client` could replace the hand-rolled
-`HmacOAuthStateService` + `OAuthStateNonceStore` + PKCE plumbing.
+`HmacOAuthStateService` + `OAuthStateNonceStore` plumbing.
 
 ## Decision drivers
 
@@ -47,10 +56,12 @@ We examined whether `spring-boot-starter-oauth2-client` could replace the hand-r
   installation token is minted server-side via JWT-signed-with-private-key. Spring's
   `OAuth2LoginAuthenticationFilter` at `/login/oauth2/code/{registrationId}` is the wrong
   endpoint shape entirely.
-- **Spring's PKCE primitives are validated; we match them.** Our 32-byte SecureRandom →
-  43-char base64url-no-pad verifier matches
-  [`OAuth2AuthorizationRequestCustomizers.withPkce()`](https://github.com/spring-projects/spring-security/blob/main/oauth2/oauth2-client/src/main/java/org/springframework/security/oauth2/client/web/DefaultOAuth2AuthorizationRequestResolver.java)
-  byte-for-byte. The cryptographic choice is the same.
+- **Both providers are confidential clients.** GitHub App and Slack OAuth v2 both
+  authenticate the token exchange with a `client_secret`, so PKCE is recommended-but-not-
+  required (RFC 9700 § 2.1.1) rather than load-bearing. We do not implement PKCE; CSRF/replay
+  defense rests entirely on the signed-state HMAC + TTL + single-use nonce. A future
+  public-client provider that genuinely needs PKCE can layer it onto this same
+  `OAuthStateService` seam.
 
 ## Considered options
 
@@ -60,15 +71,13 @@ We examined whether `spring-boot-starter-oauth2-client` could replace the hand-r
    `ClientRegistrationRepository` + JDBC `AuthorizationRequestRepository` + custom
    `OAuth2AuthorizedClientService` are written.
 
-2. **Hybrid** — keep the hand-rolled state HMAC + nonce, but adopt:
-   - `org.springframework.security.oauth2.core.endpoint.PkceParameterNames` constants
-     instead of hardcoded `"code_verifier"` / `"code_challenge"` / `"code_challenge_method"`
-     literals (typo prevention on token-exchange POSTs).
-   - Reference Spring's `DefaultOAuth2AuthorizationRequestResolver` in Javadoc as the
-     primitive we deliberately match.
+2. **Hybrid** — keep the hand-rolled state HMAC + nonce, but adopt Spring's vocabulary
+   where it overlaps:
+   - Reuse Spring naming for the binding fields (`StateBinding`) so a future migration
+     (if the OSS landscape closes the multi-tenant gap) is a refactor, not a rewrite.
 
-3. **Hand-roll** the entire flow, document our cryptographic choices in line with RFC 7636
-   + RFC 9700, ArchUnit-pin the state token shape. Adopted.
+3. **Hand-roll** the entire flow, document our cryptographic choices in line with RFC 9700,
+   ArchUnit-pin the state token shape. Adopted.
 
 ## Decision
 
@@ -76,11 +85,10 @@ We examined whether `spring-boot-starter-oauth2-client` could replace the hand-r
 nothing and reduce future drift:
 
 - Keep `HmacOAuthStateService`, `OAuthStateNonceStore`, the `state` payload shape
-  `(workspaceId|kind|issuedAt|nonce|actorRef|codeVerifier?)`, and the single-use
+  `(workspaceId|kind|issuedAt|nonce|actorRef)`, and the single-use
   `consumed_at` conditional UPDATE.
-- Keep the PKCE primitive (`issueWithPkce` → `IssuedState`).
-- Reference Spring's PKCE primitive in Javadoc so future readers know we matched it
-  deliberately rather than reinvented it.
+- No PKCE: both providers are confidential clients, so the signed-state HMAC + TTL +
+  single-use nonce carry the CSRF/replay defense on their own.
 - ArchUnit pins remain: the OAuth state SPI lives under
   `integration/core/oauth/state/`.
 
@@ -96,10 +104,9 @@ nothing and reduce future drift:
   bean per tenant.
 
 **Neutral:**
-- Vocabulary aligned with Spring Security where it overlaps: `IssuedState`,
-  `StateBinding`, `code_verifier` / `code_challenge` follow Spring naming so future
-  migration (if the OSS landscape closes the multi-tenant gap) is a refactor, not a
-  rewrite.
+- Vocabulary aligned with Spring Security where it overlaps: `StateBinding` follows
+  Spring naming so future migration (if the OSS landscape closes the multi-tenant gap)
+  is a refactor, not a rewrite.
 
 **Negative:**
 - Maintain ~600 LOC of OAuth state plumbing that Spring would have provided for the

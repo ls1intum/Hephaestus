@@ -18,7 +18,6 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
 
         assertThat(registry.handlerCount()).isZero();
         assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITHUB, "repository.push"))).isEmpty();
-        assertThat(registry.resolve(IntegrationKind.GITHUB, "repository.push")).isEmpty();
     }
 
     @Test
@@ -28,7 +27,6 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
 
         assertThat(registry.handlerCount()).isEqualTo(1);
         assertThat(registry.resolve(githubPush.key())).contains(githubPush);
-        assertThat(registry.resolve(IntegrationKind.GITHUB, "repository.push")).contains(githubPush);
     }
 
     @Test
@@ -42,9 +40,9 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
         assertThat(registry.handlerCount()).isEqualTo(2);
         assertThat(registry.resolve(githubPush.key())).contains(githubPush);
         assertThat(registry.resolve(gitlabMr.key())).contains(gitlabMr);
-        // Cross-resolve never confuses kinds:
-        assertThat(registry.resolve(IntegrationKind.GITHUB, "merge_request")).isEmpty();
-        assertThat(registry.resolve(IntegrationKind.GITLAB, "repository.push")).isEmpty();
+        // Mismatched (kind, eventType) keys never confuse the lookup:
+        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITHUB, "merge_request"))).isEmpty();
+        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITLAB, "repository.push"))).isEmpty();
     }
 
     @Test
@@ -80,13 +78,10 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
     }
 
     @Test
-    void resolveWithNullArgumentsReturnsEmpty() {
+    void resolveWithNullKeyReturnsEmpty() {
         IntegrationMessageHandlerRegistry registry = new IntegrationMessageHandlerRegistry(List.of());
 
         assertThat(registry.resolve((EventTypeKey) null)).isEmpty();
-        assertThat(registry.resolve(null, "push")).isEmpty();
-        assertThat(registry.resolve(IntegrationKind.GITHUB, null)).isEmpty();
-        assertThat(registry.resolve(IntegrationKind.GITHUB, "  ")).isEmpty();
     }
 
     private static class StubHandler implements IntegrationMessageHandler {

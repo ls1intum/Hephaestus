@@ -29,7 +29,7 @@ Failed to sync teams: scopeId=2, orgLogin=HephaestusTest,
 ```
 
 Every call site of the unscoped method is in a context where the kind is
-statically known (inside `integration/github/` or `integration/gitlab/`); the
+statically known (inside `integration/scm/github/` or `integration/scm/gitlab/`); the
 boundary is pinned by `IntegrationSubjectBoundariesTest`. The unscoped method
 itself was the footgun: it cannot enforce the invariant the call site needs.
 
@@ -67,8 +67,8 @@ Replaced with two provider-scoped variants:
   in hand for other reasons; the only authoritative form for multi-instance
   GitLab in a multi-tenant SaaS deployment).
 - `findByLoginIgnoreCaseAndProvider_Type(String login, GitProviderType type)`
-  — for kind-scoped code paths (anything under `integration/github/` or
-  `integration/gitlab/`). This is the workhorse: kind is known statically at
+  — for kind-scoped code paths (anything under `integration/scm/github/` or
+  `integration/scm/gitlab/`). This is the workhorse: kind is known statically at
   these call sites, and the implementation is a Spring Data derived-query, no
   custom JPQL needed.
 

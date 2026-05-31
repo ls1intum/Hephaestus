@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminListUsersData, AdminListUsersResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DisconnectData, DisconnectResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetFindingData, GetFindingErrors, GetFindingResponses, GetFindingsForPullRequestData, GetFindingsForPullRequestResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestFeedbackData, GetLatestFeedbackErrors, GetLatestFeedbackResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetOpenidConfigurationData, GetOpenidConfigurationResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListData, ListFindingsData, ListFindingsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReactivateData, ReactivateResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitFeedbackData, SubmitFeedbackErrors, SubmitFeedbackResponses, SuspendData, SuspendResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminListUsersData, AdminListUsersResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetFindingData, GetFindingErrors, GetFindingResponses, GetFindingsForPullRequestData, GetFindingsForPullRequestResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestFeedbackData, GetLatestFeedbackErrors, GetLatestFeedbackResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetOpenidConfigurationData, GetOpenidConfigurationResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListData, ListFindingsData, ListFindingsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitFeedbackData, SubmitFeedbackErrors, SubmitFeedbackResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -51,60 +51,6 @@ export const adminListUsers = <ThrowOnError extends boolean = false>(options?: O
 export const adminUpdateUser = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateUserData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateUserResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/admin/users/{id}',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const list = <ThrowOnError extends boolean = false>(options: Options<ListData, ThrowOnError>) => (options.client ?? client).get<ListResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections',
-    ...options
-});
-
-export const initiate = <ThrowOnError extends boolean = false>(options: Options<InitiateData, ThrowOnError>) => (options.client ?? client).post<InitiateResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const read = <ThrowOnError extends boolean = false>(options: Options<ReadData, ThrowOnError>) => (options.client ?? client).get<ReadResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections/{id}',
-    ...options
-});
-
-export const audit = <ThrowOnError extends boolean = false>(options: Options<AuditData, ThrowOnError>) => (options.client ?? client).get<AuditResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/audit',
-    ...options
-});
-
-export const disconnect = <ThrowOnError extends boolean = false>(options: Options<DisconnectData, ThrowOnError>) => (options.client ?? client).post<DisconnectResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/disconnect',
-    ...options
-});
-
-export const reactivate = <ThrowOnError extends boolean = false>(options: Options<ReactivateData, ThrowOnError>) => (options.client ?? client).post<ReactivateResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/reactivate',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-export const suspend = <ThrowOnError extends boolean = false>(options: Options<SuspendData, ThrowOnError>) => (options.client ?? client).post<SuspendResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/api/v1/workspaces/{workspaceId}/connections/{id}/suspend',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -458,6 +404,59 @@ export const retryDelivery = <ThrowOnError extends boolean = false>(options: Opt
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry',
     ...options
+});
+
+export const list = <ThrowOnError extends boolean = false>(options: Options<ListData, ThrowOnError>) => (options.client ?? client).get<ListResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections',
+    ...options
+});
+
+export const initiate = <ThrowOnError extends boolean = false>(options: Options<InitiateData, ThrowOnError>) => (options.client ?? client).post<InitiateResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const sendTestMessage = <ThrowOnError extends boolean = false>(options: Options<SendTestMessageData, ThrowOnError>) => (options.client ?? client).post<SendTestMessageResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/slack/test-message',
+    ...options
+});
+
+export const read = <ThrowOnError extends boolean = false>(options: Options<ReadData, ThrowOnError>) => (options.client ?? client).get<ReadResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/{id}',
+    ...options
+});
+
+export const audit = <ThrowOnError extends boolean = false>(options: Options<AuditData, ThrowOnError>) => (options.client ?? client).get<AuditResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/{id}/audit',
+    ...options
+});
+
+/**
+ * Resource-oriented lifecycle transition: <code>ACTIVE</code> (reactivate), <code>SUSPENDED</code>
+ * (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
+ *
+ * Resource-oriented lifecycle transition: <code>ACTIVE</code> (reactivate), <code>SUSPENDED</code>
+ * (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
+ * <code>PENDING</code> is internal to the OAuth handshake and rejected as a bad request; illegal
+ * transitions surface as 400 via the state machine.
+ */
+export const updateStatus1 = <ThrowOnError extends boolean = false>(options: Options<UpdateStatus1Data, ThrowOnError>) => (options.client ?? client).patch<UpdateStatus1Responses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/connections/{id}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

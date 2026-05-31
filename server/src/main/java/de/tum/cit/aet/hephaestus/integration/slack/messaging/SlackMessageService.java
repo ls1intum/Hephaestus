@@ -4,7 +4,6 @@ import com.slack.api.Slack;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
-import com.slack.api.methods.response.auth.AuthTestResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.users.UsersListResponse;
 import com.slack.api.model.User;
@@ -40,25 +39,6 @@ public class SlackMessageService {
     public SlackMessageService(SlackCredentialProvider credentialProvider) {
         this.slack = Slack.getInstance();
         this.credentialProvider = credentialProvider;
-    }
-
-    public boolean initTest(long workspaceId) {
-        Optional<String> token = resolveToken(workspaceId);
-        if (token.isEmpty()) {
-            log.debug("Slack init test skipped: no token for workspaceId={}", workspaceId);
-            return false;
-        }
-        try {
-            AuthTestResponse response = slack.methods(token.get()).authTest(r -> r);
-            if (response.isOk()) {
-                return true;
-            }
-            log.warn("Slack auth.test failed: workspaceId={}, error={}", workspaceId, response.getError());
-            return false;
-        } catch (SlackApiException | IOException e) {
-            log.warn("Slack auth.test transport failure: workspaceId={}, error={}", workspaceId, e.getMessage());
-            return false;
-        }
     }
 
     public void sendForWorkspace(long workspaceId, String channelId, List<LayoutBlock> blocks, String fallback) {

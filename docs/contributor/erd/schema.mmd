@@ -147,7 +147,6 @@ erDiagram
         VARCHAR(64) credentials_alg
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
-        TIMESTAMPTZ last_activity_at
         BIGINT version "NOT NULL"
     }
 
@@ -413,7 +412,6 @@ erDiagram
         VARCHAR(48) kind "NOT NULL"
         TIMESTAMPTZ issued_at "NOT NULL"
         TIMESTAMPTZ consumed_at
-        VARCHAR(128) code_verifier
     }
 
     Organization {
@@ -775,6 +773,7 @@ erDiagram
         BOOLEAN practice_review_auto_trigger_enabled "NOT NULL"
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
+        TIMESTAMPTZ leaderboard_league_cycle_at
     }
 
     WorkspaceMembership {

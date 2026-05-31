@@ -125,7 +125,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
         for (int i = 0; i < 2; i++) {
             MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-            req.addHeader("X-Forwarded-For", "203.0.113.7");
+            req.setRemoteAddr("203.0.113.7");
             MockHttpServletResponse res = new MockHttpServletResponse();
             FilterChain chain = mock(FilterChain.class);
             f.doFilter(req, res, chain);
@@ -135,7 +135,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
         // third request from the same IP is rejected
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        req.addHeader("X-Forwarded-For", "203.0.113.7");
+        req.setRemoteAddr("203.0.113.7");
         MockHttpServletResponse res = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
         f.doFilter(req, res, chain);
@@ -155,13 +155,13 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         AuthRateLimitFilter f = filter(p);
 
         MockHttpServletRequest a = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        a.addHeader("X-Forwarded-For", "198.51.100.1");
+        a.setRemoteAddr("198.51.100.1");
         MockHttpServletResponse ra = new MockHttpServletResponse();
         FilterChain ca = mock(FilterChain.class);
         f.doFilter(a, ra, ca);
 
         MockHttpServletRequest b = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        b.addHeader("X-Forwarded-For", "198.51.100.2");
+        b.setRemoteAddr("198.51.100.2");
         MockHttpServletResponse rb = new MockHttpServletResponse();
         FilterChain cb = mock(FilterChain.class);
         f.doFilter(b, rb, cb);
@@ -259,9 +259,10 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void singleTrustedProxyTakesRightmostXffHopAsClient() throws Exception {
-        // One Coolify hop: the proxy appends the real client IP, so XFF has exactly one entry which
-        // IS the client. getRemoteAddr() is the proxy and must be ignored.
+    void xffHeaderIsIgnoredClientIpComesFromRemoteAddr() throws Exception {
+        // The filter never parses X-Forwarded-For itself. Under forward-headers-strategy=native,
+        // Tomcat's RemoteIpValve validates the proxy chain upstream and rewrites getRemoteAddr() to
+        // the real client, so a raw XFF header must NOT influence the bucket key here.
         AuthRateLimitFilter f = filter(props());
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
@@ -269,14 +270,14 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         req.setRemoteAddr("10.0.0.1");
         f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.7");
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
     }
 
     @Test
-    void spoofedLeftmostXffEntriesAreIgnoredWithSingleTrustedProxy() throws Exception {
-        // Attacker prepends bogus hops to forge a fresh bucket: "evil1, evil2, <real-client>".
-        // With one trusted proxy the only trustworthy entry is the rightmost one (the address our
-        // proxy appended). The leftmost spoofed values MUST NOT key the bucket.
+    void spoofedXffEntriesCannotForgeABucketKey() throws Exception {
+        // Attacker prepends bogus hops trying to forge a fresh bucket: "evil1, evil2, <fake>".
+        // Because the key derives from the unforgeable getRemoteAddr() (set by the trusted valve),
+        // none of the attacker-supplied XFF values can key the bucket.
         AuthRateLimitFilter f = filter(props());
 
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
@@ -284,13 +285,13 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         req.setRemoteAddr("10.0.0.1");
         f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
 
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.50");
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
     }
 
     @Test
     void spoofedXffCannotMintUnlimitedBucketsAcrossRequests() throws Exception {
-        // capacity 1: an attacker rotating the leftmost spoofed value must still collapse into the
-        // SAME bucket (the rightmost trusted hop) and get 429 on the second attempt.
+        // capacity 1: an attacker rotating the XFF value across requests must still collapse into the
+        // SAME bucket (keyed by the unforgeable remote address) and get 429 on the second attempt.
         AuthRateLimitFilter f = filter(props(new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1))));
 
         MockHttpServletRequest first = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
@@ -302,7 +303,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         verify(firstChain, times(1)).doFilter(first, firstRes);
 
         MockHttpServletRequest second = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        second.addHeader("X-Forwarded-For", "9.9.9.2, 203.0.113.50"); // rotated spoof, same real client
+        second.addHeader("X-Forwarded-For", "9.9.9.2, 203.0.113.50"); // rotated spoof, same socket peer
         second.setRemoteAddr("10.0.0.1");
         MockHttpServletResponse secondRes = new MockHttpServletResponse();
         FilterChain secondChain = mock(FilterChain.class);
@@ -310,7 +311,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
         verify(secondChain, never()).doFilter(second, secondRes);
         assertThat(secondRes.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.50");
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
     }
 
     @Test

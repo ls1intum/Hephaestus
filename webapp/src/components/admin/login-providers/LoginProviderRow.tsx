@@ -33,7 +33,7 @@ import {
 } from "./loginProviders";
 
 export interface LoginProviderRowProps {
-	workspaceId: number;
+	workspaceSlug: string;
 	provider: ConnectionSummary & { kind: LoginProviderKind };
 	/** Pre-built OAuth callback URL the admin must register in their IdP app. */
 	callbackUrl?: string;
@@ -48,7 +48,7 @@ export interface LoginProviderRowProps {
 }
 
 export function LoginProviderRow({
-	workspaceId,
+	workspaceSlug,
 	provider,
 	callbackUrl,
 	highlightCallback = false,
@@ -99,7 +99,7 @@ export function LoginProviderRow({
 								</Button>
 							}
 						/>
-						<AuditSheet workspaceId={workspaceId} connectionId={provider.id} />
+						<AuditSheet workspaceSlug={workspaceSlug} connectionId={provider.id} />
 					</Sheet>
 
 					{provider.state === "ACTIVE" && (
@@ -218,9 +218,15 @@ export function LoginProviderRow({
 	);
 }
 
-function AuditSheet({ workspaceId, connectionId }: { workspaceId: number; connectionId?: number }) {
+function AuditSheet({
+	workspaceSlug,
+	connectionId,
+}: {
+	workspaceSlug: string;
+	connectionId?: number;
+}) {
 	const { data, isLoading, error } = useQuery({
-		...auditOptions({ path: { workspaceId, id: connectionId ?? 0 } }),
+		...auditOptions({ path: { workspaceSlug, id: connectionId ?? 0 } }),
 		enabled: connectionId != null,
 	});
 

@@ -7,10 +7,11 @@ const meta = {
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
-		workspaceId: 1,
 		workspaceSlug: "demo-workspace",
 		hasSlackConnection: false,
 		enabled: false,
+		scheduleDay: 1,
+		scheduleTime: "09:00",
 		onSaved: fn(),
 	},
 } satisfies Meta<typeof AdminSlackNotificationSettings>;
@@ -45,5 +46,35 @@ export const ConnectedDisabled: Story = {
 		channelId: "C0974LJBPBK",
 		teamLabel: "engineering",
 		enabled: false,
+	},
+};
+
+/** Non-default day — pins that the day Select renders the label ("Thursday"), not the raw value. */
+export const NonDefaultDay: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelId: "C0974LJBPBK",
+		enabled: true,
+		scheduleDay: 4,
+		scheduleTime: "14:30",
+	},
+};
+
+/** Invalid channel id — the field shows aria-invalid + the format error, and Save is disabled. */
+export const InvalidChannel: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelId: "not-a-channel",
+		enabled: true,
+	},
+};
+
+/** Invalid time — the time field surfaces its HH:mm error and Save is disabled. */
+export const InvalidTime: Story = {
+	args: {
+		hasSlackConnection: true,
+		channelId: "C0974LJBPBK",
+		enabled: true,
+		scheduleTime: "9am",
 	},
 };

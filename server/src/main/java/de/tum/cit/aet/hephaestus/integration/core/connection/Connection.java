@@ -95,10 +95,6 @@ public class Connection {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "last_activity_at")
-    @Nullable
-    private Instant lastActivityAt;
-
     @Version
     @Column(nullable = false)
     @ColumnDefault("0")
@@ -197,11 +193,6 @@ public class Connection {
         return updatedAt;
     }
 
-    @Nullable
-    public Instant getLastActivityAt() {
-        return lastActivityAt;
-    }
-
     public Long getVersion() {
         return version;
     }
@@ -228,10 +219,6 @@ public class Connection {
 
     public void setCredentialsAlg(@Nullable String credentialsAlg) {
         this.credentialsAlg = credentialsAlg;
-    }
-
-    public void setLastActivityAt(@Nullable Instant lastActivityAt) {
-        this.lastActivityAt = lastActivityAt;
     }
 
     /**
@@ -264,7 +251,8 @@ public class Connection {
         if (credentialsEncrypted == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(converter.decrypt(credentialsEncrypted, encryptionContext()));
+        // decrypt(...) returns a non-null bundle or throws on tamper/version/context mismatch.
+        return Optional.of(converter.decrypt(credentialsEncrypted, encryptionContext()));
     }
 
     private EncryptionContext encryptionContext() {

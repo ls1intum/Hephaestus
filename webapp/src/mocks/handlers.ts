@@ -73,24 +73,19 @@ export const handlers = [
 	http.post("*/auth/impersonate\\:exit", () => new HttpResponse(null, { status: 204 })),
 
 	// --- workspace connection registry (IDENTITY login providers) -----------
-	http.get("*/api/v1/workspaces/:workspaceId/connections", () =>
-		HttpResponse.json(identityConnections),
-	),
-	http.post("*/api/v1/workspaces/:workspaceId/connections", async ({ request }) => {
+	http.get("*/workspaces/:workspaceSlug/connections", () => HttpResponse.json(identityConnections)),
+	http.post("*/workspaces/:workspaceSlug/connections", async ({ request }) => {
 		const body = (await request.json().catch(() => ({}))) as { displayName?: string };
+		// Flat InitiateConnectionResponse: OIDC login is an inline-credential ("LINKED") flow.
 		return HttpResponse.json({
-			type: "Linked",
+			type: "LINKED",
 			connectionId: 599,
 			displayName: body.displayName ?? "New login provider",
 		});
 	}),
-	http.post("*/api/v1/workspaces/:workspaceId/connections/:id/disconnect", () =>
-		HttpResponse.json({ ok: true }),
-	),
-	http.post("*/api/v1/workspaces/:workspaceId/connections/:id/suspend", () =>
-		HttpResponse.json({ ok: true }),
-	),
-	http.post("*/api/v1/workspaces/:workspaceId/connections/:id/reactivate", () =>
+	// Single lifecycle endpoint replacing the old suspend/reactivate/disconnect verbs;
+	// the target `state` in the body distinguishes the transition.
+	http.patch("*/workspaces/:workspaceSlug/connections/:id/status", () =>
 		HttpResponse.json({ ok: true }),
 	),
 ];

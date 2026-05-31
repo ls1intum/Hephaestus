@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
-import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
@@ -22,7 +21,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Default {@link OAuthStateService} impl: HMAC-SHA256 over
- * {@code workspaceId | kind | issuedAt | nonce}, base64url-encoded.
+ * {@code workspaceId | kind | issuedAt | nonce | actorSegment} (five pipe-delimited
+ * fields; {@code actorSegment} is the base64url-encoded actorRef, empty when null),
+ * base64url-encoded. The emitted token appends the signature as a sixth segment, so
+ * {@link #consume} splits on exactly six parts.
  *
  * <p>Verifies the MAC + freshness; rejects expired tokens (10-minute TTL by default).
  * The nonce makes every issued state unique, so even simultaneous concurrent OAuth
@@ -147,15 +149,6 @@ public class HmacOAuthStateService implements OAuthStateService {
      */
     @Override
     public String issue(long workspaceId, IntegrationKind kind, @Nullable String actorRef) {
-        return doIssue(workspaceId, kind, actorRef, null);
-    }
-
-    private String doIssue(
-        long workspaceId,
-        IntegrationKind kind,
-        @Nullable String actorRef,
-        @Nullable String codeVerifier
-    ) {
         long issuedAt = Instant.now().getEpochSecond();
         byte[] nonceBytes = new byte[12];
         RANDOM.nextBytes(nonceBytes);
@@ -166,33 +159,11 @@ public class HmacOAuthStateService implements OAuthStateService {
         // Persist the nonce BEFORE returning so a fast OAuth roundtrip can't race the
         // first consume to an empty row. Skipped when no store is wired (test path).
         if (nonceStore != null) {
-            nonceStore.issue(nonce, workspaceId, kind, Instant.ofEpochSecond(issuedAt), codeVerifier);
+            nonceStore.issue(nonce, workspaceId, kind, Instant.ofEpochSecond(issuedAt));
         }
         return Base64.getUrlEncoder()
             .withoutPadding()
             .encodeToString((payload + "|" + sig).getBytes(StandardCharsets.UTF_8));
-    }
-
-    /**
-     * RFC 7636 PKCE issue: generates a 256-bit verifier ({@code SecureRandom} → 43-char
-     * base64url, lower bound of §4.1), derives the SHA-256 {@code code_challenge}, and
-     * persists the verifier on the nonce row. The verifier surfaces in
-     * {@link StateBinding#codeVerifier()} at consume time; the strategy's
-     * {@code finalizeConnect} MUST include it as {@code code_verifier} on the
-     * token-exchange POST per RFC 7636 §4.5.
-     */
-    @Override
-    public IssuedState issueWithPkce(long workspaceId, IntegrationKind kind, @Nullable String actorRef) {
-        // Generate the verifier first so we can hand it to issue() inside the nonce
-        // creation. 256 bits per RFC 7636 §7.1; 32 bytes base64url-without-padding =
-        // 43 chars, matching the spec's minimum.
-        byte[] verifierBytes = new byte[32];
-        RANDOM.nextBytes(verifierBytes);
-        String codeVerifier = Base64.getUrlEncoder().withoutPadding().encodeToString(verifierBytes);
-        String codeChallenge = sha256Base64Url(codeVerifier);
-
-        String state = doIssue(workspaceId, kind, actorRef, codeVerifier);
-        return new IssuedState(state, codeChallenge, "S256");
     }
 
     @Override
@@ -251,30 +222,13 @@ public class HmacOAuthStateService implements OAuthStateService {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("OAuth state workspaceId malformed", e);
         }
-        // Single-use enforcement via atomic UPDATE inside tryConsumeWithVerifier. The
-        // HMAC + TTL are already verified — any forged or stale token has been rejected.
-        // The PKCE verifier (if any) is fetched in the SAME transaction as the consume
-        // so the pair is atomic: a replay attacker observes either both or neither.
-        String codeVerifier = null;
-        if (nonceStore != null) {
-            OAuthStateNonceStore.ConsumeResult result = nonceStore.tryConsumeWithVerifier(nonce);
-            if (!result.consumed()) {
-                throw new IllegalArgumentException("OAuth state already consumed");
-            }
-            codeVerifier = result.verifier().orElse(null);
+        // Single-use enforcement via atomic UPDATE inside tryConsume. The HMAC + TTL are
+        // already verified — any forged or stale token has been rejected.
+        if (nonceStore != null && !nonceStore.tryConsume(nonce)) {
+            throw new IllegalArgumentException("OAuth state already consumed");
         }
         String actorRef = decodeActor(actorSegment);
-        return new StateBinding(workspaceId, kind, issued, actorRef, codeVerifier);
-    }
-
-    private static String sha256Base64Url(String input) {
-        try {
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            byte[] digest = sha.digest(input.getBytes(StandardCharsets.US_ASCII));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
+        return new StateBinding(workspaceId, kind, issued, actorRef);
     }
 
     private static String encodeActor(@Nullable String actorRef) {

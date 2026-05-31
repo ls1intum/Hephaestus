@@ -527,10 +527,9 @@ hephaestus:
             token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
         slack:
             enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
-            # App-global signing secret — verifies inbound webhook signatures. The OAuth
-            # client-id/client-secret below drive the per-workspace install flow (Slack does
-            # NOT support refresh-token rotation for legacy bot tokens, so no refresher ships).
-            signing-secret: ${SLACK_SIGNING_SECRET:}
+            # OAuth client-id/client-secret drive the per-workspace install flow (Slack does NOT
+            # support refresh-token rotation for legacy bot tokens, so no refresher ships). Slack
+            # is outbound-only today; there is no inbound webhook signing secret.
             client-id: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}
             client-secret: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}
             redirect-uri: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:}
@@ -577,6 +576,20 @@ logging:
         # full per-event firehose for diagnosis (no redeploy needed):
         #   logging.level.de.tum.cit.aet.hephaestus.integration.scm: DEBUG
 #
-# The `local` profile overlay (docker.compose disable, lazy jwk-set-uri, management exposure,
-# devtools, SpringDoc banner) lives entirely in application-local.yml so this base file carries
-# zero spring.config.activate.on-profile documents.
+# Secret-bearing local overlay (vendor tokens, encryption key, lazy jwk-set-uri, management
+# exposure, devtools, SpringDoc banner) lives in the gitignored application-local.yml. The infra
+# auto-start below is tracked here so `mvn spring-boot:run` works out of the box without it.
+---
+# Local-profile overlay (the `local` profile is the default for `mvn spring-boot:run` /
+# `pnpm dev:server`). Auto-starts server/compose.yaml — Postgres, Keycloak, NATS — through Spring
+# Boot's docker-compose support and waits for readiness, so a bare `mvn spring-boot:run` brings its
+# own infra up. lifecycle-management=start-only: Ctrl-C never stops the stack, and a stack that
+# `pnpm dev:compose` started first is detected and reused rather than fought.
+spring:
+    config:
+        activate:
+            on-profile: local
+    docker:
+        compose:
+            enabled: true
+            lifecycle-management: start-only

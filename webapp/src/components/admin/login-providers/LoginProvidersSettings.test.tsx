@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { identityConnections } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { LoginProvidersSettings } from "./LoginProvidersSettings";
@@ -37,7 +37,7 @@ function fillDialog(dialog: HTMLElement) {
 describe("LoginProvidersSettings", () => {
 	it("lists the IDENTITY-family providers from the connection registry", async () => {
 		renderWithClient(
-			<LoginProvidersSettings workspaceId={1} apiOrigin="https://hephaestus.test" />,
+			<LoginProvidersSettings workspaceSlug="acme" apiOrigin="https://hephaestus.test" />,
 		);
 
 		for (const c of identityConnections) {
@@ -50,7 +50,7 @@ describe("LoginProvidersSettings", () => {
 		// must show the newly created provider. We flip the GET to include it on the second call.
 		let listCalls = 0;
 		server.use(
-			http.get("*/api/v1/workspaces/:workspaceId/connections", () => {
+			http.get("*/workspaces/:workspaceSlug/connections", () => {
 				listCalls += 1;
 				if (listCalls === 1) return HttpResponse.json(identityConnections);
 				return HttpResponse.json([
@@ -67,13 +67,13 @@ describe("LoginProvidersSettings", () => {
 					},
 				]);
 			}),
-			http.post("*/api/v1/workspaces/:workspaceId/connections", () =>
-				HttpResponse.json({ type: "Linked", connectionId: 599, displayName: "Freshly Added GHE" }),
+			http.post("*/workspaces/:workspaceSlug/connections", () =>
+				HttpResponse.json({ type: "LINKED", connectionId: 599, displayName: "Freshly Added GHE" }),
 			),
 		);
 
 		renderWithClient(
-			<LoginProvidersSettings workspaceId={1} apiOrigin="https://hephaestus.test" />,
+			<LoginProvidersSettings workspaceSlug="acme" apiOrigin="https://hephaestus.test" />,
 		);
 		await screen.findByText("GitHub Enterprise (login)");
 
@@ -87,7 +87,7 @@ describe("LoginProvidersSettings", () => {
 
 	it("renders the RFC-9457 problem+json `detail` inline when the issuer probe fails", async () => {
 		server.use(
-			http.post("*/api/v1/workspaces/:workspaceId/connections", () =>
+			http.post("*/workspaces/:workspaceSlug/connections", () =>
 				HttpResponse.json(
 					{
 						type: "https://hephaestus.test/problems/issuer-unreachable",
@@ -101,7 +101,7 @@ describe("LoginProvidersSettings", () => {
 		);
 
 		renderWithClient(
-			<LoginProvidersSettings workspaceId={1} apiOrigin="https://hephaestus.test" />,
+			<LoginProvidersSettings workspaceSlug="acme" apiOrigin="https://hephaestus.test" />,
 		);
 		await screen.findByText("GitHub Enterprise (login)");
 
@@ -116,12 +116,36 @@ describe("LoginProvidersSettings", () => {
 		).toBeTruthy();
 	});
 
-	it("shows the empty state when no IDENTITY connections exist", async () => {
+	it("suspends an active provider via the unified status endpoint", async () => {
+		// The old per-verb endpoints are gone: suspend now PATCHes .../status with
+		// { state: "SUSPENDED" }. Capture the request to prove the transition is encoded
+		// in the body and the list is refetched afterwards.
+		let patchedBody: { state?: string; reason?: string } | undefined;
 		server.use(
-			http.get("*/api/v1/workspaces/:workspaceId/connections", () => HttpResponse.json([])),
+			http.patch("*/workspaces/:workspaceSlug/connections/:id/status", async ({ request }) => {
+				patchedBody = (await request.json().catch(() => ({}))) as typeof patchedBody;
+				return HttpResponse.json({ ok: true });
+			}),
 		);
+
 		renderWithClient(
-			<LoginProvidersSettings workspaceId={1} apiOrigin="https://hephaestus.test" />,
+			<LoginProvidersSettings workspaceSlug="acme" apiOrigin="https://hephaestus.test" />,
+		);
+		// The ACTIVE GHE provider exposes a Suspend control; the SUSPENDED GitLab one does not.
+		const suspendButton = await screen.findByRole("button", {
+			name: /Suspend GitHub Enterprise/,
+		});
+		fireEvent.click(suspendButton);
+
+		await vi.waitFor(() => {
+			expect(patchedBody?.state).toBe("SUSPENDED");
+		});
+	});
+
+	it("shows the empty state when no IDENTITY connections exist", async () => {
+		server.use(http.get("*/workspaces/:workspaceSlug/connections", () => HttpResponse.json([])));
+		renderWithClient(
+			<LoginProvidersSettings workspaceSlug="acme" apiOrigin="https://hephaestus.test" />,
 		);
 		expect(await screen.findByText("No login providers yet")).toBeTruthy();
 	});
@@ -129,12 +153,12 @@ describe("LoginProvidersSettings", () => {
 	it("renders a load-error alert when the registry query fails", async () => {
 		server.use(
 			http.get(
-				"*/api/v1/workspaces/:workspaceId/connections",
+				"*/workspaces/:workspaceSlug/connections",
 				() => new HttpResponse(null, { status: 500 }),
 			),
 		);
 		renderWithClient(
-			<LoginProvidersSettings workspaceId={1} apiOrigin="https://hephaestus.test" />,
+			<LoginProvidersSettings workspaceSlug="acme" apiOrigin="https://hephaestus.test" />,
 		);
 		const alert = await screen.findByRole("alert");
 		expect(alert.textContent).toContain("Failed to load login providers");

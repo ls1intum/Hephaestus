@@ -590,6 +590,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
                                 "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
                                 "WorkspaceCreatedEvent", // Carries workspaceId + kind
+                                "WorkspaceScheduleChangedEvent", // Carries workspaceId for leaderboard reschedule
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed

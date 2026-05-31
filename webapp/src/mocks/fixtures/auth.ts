@@ -135,7 +135,6 @@ export const identityConnections: Wire<ConnectionSummary>[] = [
 		capabilities: [],
 		createdAt: "2026-03-01T12:00:00Z",
 		updatedAt: "2026-05-01T12:00:00Z",
-		lastActivityAt: "2026-05-28T18:30:00Z",
 	},
 	{
 		id: 502,

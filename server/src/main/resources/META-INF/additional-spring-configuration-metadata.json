@@ -30,7 +30,7 @@
     },
     {
       "name": "hephaestus.integration.slack",
-      "description": "Slack integration toggle, app-global signing secret, and OAuth client credentials"
+      "description": "Slack integration toggle and OAuth client credentials"
     },
     {
       "name": "hephaestus.sentry",
@@ -128,14 +128,9 @@
       "description": "Whether to bootstrap a PAT-based workspace on startup (for local development)"
     },
     {
-      "name": "hephaestus.integration.slack.signing-secret",
-      "type": "java.lang.String",
-      "description": "Slack signing secret for webhook verification (app-global)"
-    },
-    {
       "name": "hephaestus.integration.slack.enabled",
       "type": "java.lang.Boolean",
-      "description": "Master toggle for the Slack integration (OAuth, webhook verifier, lifecycle listeners, messaging)"
+      "description": "Master toggle for the Slack integration (OAuth install, lifecycle listeners, outbound messaging)"
     },
     {
       "name": "hephaestus.integration.slack.client-id",

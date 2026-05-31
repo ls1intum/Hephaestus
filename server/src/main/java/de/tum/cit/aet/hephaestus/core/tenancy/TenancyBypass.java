@@ -23,8 +23,8 @@ public final class TenancyBypass {
     public static Scope open(String reason) {
         int next = depth.get() + 1;
         depth.set(next);
-        if (log.isDebugEnabled()) {
-            log.debug("Tenancy bypass opened (depth={}): {}", next, reason);
+        if (log.isTraceEnabled()) {
+            log.trace("Tenancy bypass opened (depth={}): {}", next, reason);
         }
         return () -> {
             int current = depth.get();

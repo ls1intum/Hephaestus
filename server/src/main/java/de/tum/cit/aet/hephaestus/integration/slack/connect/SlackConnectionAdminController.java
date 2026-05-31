@@ -4,23 +4,25 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /** Slack admin connectivity probe — test-message dispatch. */
-@RestController
-@RequestMapping("/api/v1/workspaces/{workspaceId}/connections/slack")
+@WorkspaceScopedController
+@RequestMapping("/connections/slack")
 @RequireAtLeastWorkspaceAdmin
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
+@Tag(name = "Connections", description = "Workspace integration connection management")
 public class SlackConnectionAdminController {
 
     private static final Logger log = LoggerFactory.getLogger(SlackConnectionAdminController.class);
@@ -37,7 +39,8 @@ public class SlackConnectionAdminController {
     }
 
     @PostMapping("/test-message")
-    public ResponseEntity<SlackTestMessageResponseDTO> sendTestMessage(@PathVariable Long workspaceId) {
+    public ResponseEntity<SlackTestMessageResponseDTO> sendTestMessage(WorkspaceContext workspace) {
+        long workspaceId = workspace.id();
         var config = connectionService
             .findSlackNotificationConfig(workspaceId)
             .orElseThrow(() ->

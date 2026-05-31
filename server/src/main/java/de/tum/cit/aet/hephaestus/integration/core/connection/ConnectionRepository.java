@@ -30,24 +30,6 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
     @Query("SELECT c FROM Connection c WHERE c.workspace.id = :workspaceId")
     List<Connection> findByWorkspaceId(@Param("workspaceId") long workspaceId);
 
-    List<Connection> findByKindAndInstanceKey(IntegrationKind kind, String instanceKey);
-
-    /**
-     * All Connections of a given {@code kind} in {@code state}, across workspaces. Used by
-     * the weekly Slack leaderboard task to fan out across every workspace that has an
-     * ACTIVE Slack Connection — replaces the old workspace-slug allow-list. Joined fetch
-     * on {@code workspace} avoids the N+1 the task would otherwise trigger.
-     *
-     * <p>Intentionally cross-tenant: a scheduled task running on the server role iterates
-     * every workspace that has opted in to Slack notifications, then re-scopes per row.
-     */
-    @WorkspaceAgnostic("Scheduled cross-workspace fan-out for weekly leaderboard Slack post")
-    @Query("SELECT c FROM Connection c JOIN FETCH c.workspace WHERE c.kind = :kind AND c.state = :state")
-    List<Connection> findByKindAndStateWithWorkspace(
-        @Param("kind") IntegrationKind kind,
-        @Param("state") IntegrationState state
-    );
-
     /**
      * All ACTIVE Connections in a given {@code family}, across workspaces. Used by the
      * core.auth composite ClientRegistrationRepository to materialize workspace-scoped

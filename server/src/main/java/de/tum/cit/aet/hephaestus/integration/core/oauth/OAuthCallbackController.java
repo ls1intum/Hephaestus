@@ -44,9 +44,6 @@ public class OAuthCallbackController {
 
     private static final Logger log = LoggerFactory.getLogger(OAuthCallbackController.class);
 
-    /** PKCE {@code code_verifier} key carried through callback params per RFC 7636 §4.5. */
-    public static final String PKCE_VERIFIER_PARAM = "_pkce_verifier";
-
     private final IntegrationKindRouting kindRouting;
     private final OAuthStateService oauthStateService;
     private final OAuthCallbackService callbackService;
@@ -196,9 +193,6 @@ public class OAuthCallbackController {
         try {
             Map<String, String> callbackParams = new HashMap<>(allParams == null ? Map.of() : allParams);
             callbackParams.remove("state");
-            if (binding.codeVerifier() != null) {
-                callbackParams.put(PKCE_VERIFIER_PARAM, binding.codeVerifier());
-            }
             result = strategy.finalizeConnect(ref, callbackParams);
         } catch (RuntimeException e) {
             log.warn(

@@ -188,12 +188,13 @@ function AdminSettings() {
 			}}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
-			workspaceId={workspaceData?.id}
 			workspaceSlug={workspaceSlug ?? undefined}
 			hasSlackConnection={workspaceData?.hasSlackToken ?? false}
 			slackChannelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
 			slackTeamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
 			slackNotificationsEnabled={workspaceData?.leaderboardNotificationEnabled ?? false}
+			slackScheduleDay={workspaceData?.leaderboardScheduleDay ?? undefined}
+			slackScheduleTime={workspaceData?.leaderboardScheduleTime ?? undefined}
 			onSlackSaved={() =>
 				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
 			}

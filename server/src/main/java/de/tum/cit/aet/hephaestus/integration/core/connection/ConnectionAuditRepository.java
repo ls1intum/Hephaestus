@@ -10,8 +10,12 @@ import org.springframework.stereotype.Repository;
 public interface ConnectionAuditRepository extends JpaRepository<ConnectionAudit, Long> {
     List<ConnectionAudit> findByConnectionIdOrderByOccurredAtDesc(long connectionId);
 
-    boolean existsByConnectionIdAndEventTypeAndCorrelationId(long connectionId, String eventType, String correlationId);
-
+    /**
+     * Workspace-scoped audit lookup. Retained as the tenancy-compliant query surface required by
+     * {@code MultiTenancyArchitectureTest.repositoriesHaveWorkspaceScopedAlternatives}: connection
+     * audit rows are workspace-scoped data, so the repository must expose a way to read them bounded
+     * to a single workspace (e.g. a future workspace-wide audit view), not only by connection id.
+     */
     @Query(
         "SELECT a FROM ConnectionAudit a " +
             "WHERE a.connection.workspace.id = :workspaceId " +

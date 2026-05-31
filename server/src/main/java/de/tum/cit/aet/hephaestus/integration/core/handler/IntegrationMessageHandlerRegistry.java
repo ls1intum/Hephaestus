@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.handler;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -60,18 +59,6 @@ public class IntegrationMessageHandlerRegistry {
             return Optional.empty();
         }
         return Optional.ofNullable(handlers.get(key));
-    }
-
-    /**
-     * Convenience shim for callers that already have the (kind, eventType) pair split out.
-     * Returns empty when either argument is null/blank rather than constructing an
-     * obviously-invalid key.
-     */
-    public Optional<IntegrationMessageHandler> resolve(IntegrationKind kind, String eventType) {
-        if (kind == null || eventType == null || eventType.isBlank()) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(handlers.get(new EventTypeKey(kind, eventType)));
     }
 
     /**

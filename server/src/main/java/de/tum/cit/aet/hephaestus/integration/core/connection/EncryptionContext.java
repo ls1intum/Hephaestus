@@ -17,12 +17,12 @@ import org.jspecify.annotations.Nullable;
  * <p>Layout (per AWS Encryption SDK + Vault Transit conventions: length-prefix every
  * variable field, no delimiters):
  * <pre>
- *   "hephaestus-credential-bundle" || 0x1F      // 28-byte domain separator + US
+ *   "hephaestus-credential-bundle"              // 28-byte domain separator
  *   u8(2)                                       // AAD schema version
  *   u16_be(len(workspaceId_ascii)) || ascii     // Long → decimal string
  *   u16_be(len(kind))               || utf8     // e.g. "GITHUB"
  *   u16_be(len(instanceKey))        || utf8     // "" when null (pre-bind OAuth slot)
- *   u16_be(len(columnFqn))          || utf8     // e.g. "connection.credentials"
+ *   u16_be(len(columnFqn))          || utf8     // e.g. "connection.credentials_encrypted"
  * </pre>
  *
  * @param workspaceId Hephaestus workspace primary key
@@ -36,7 +36,7 @@ public record EncryptionContext(
     @Nullable String instanceKey,
     String columnFqn
 ) {
-    /** AAD schema version. Bump when fields change shape; tolerant decrypt switches on this byte. */
+    /** AAD schema version. Only V2 is supported; decrypt rejects any other version byte. */
     public static final byte SCHEMA_VERSION_V2 = 0x02;
 
     private static final byte[] DOMAIN_SEPARATOR = "hephaestus-credential-bundle".getBytes(StandardCharsets.UTF_8);

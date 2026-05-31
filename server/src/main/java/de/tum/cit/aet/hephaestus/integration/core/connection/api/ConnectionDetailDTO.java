@@ -6,17 +6,18 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO} with the
- * typed config serialized as a tree node. NEVER carries credentials; the encrypted
- * blob stays inside the entity and is not exposed by this DTO.
+ * sealed config serialized to a free-form JSON object ({@code Map<String, Object>} →
+ * {@code type: object, additionalProperties: true} in the spec, so it round-trips through
+ * client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
+ * and is not exposed by this DTO.
  *
  * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
  * the JSON shape flat — the API consumer sees one record, not a nested {@code summary}
@@ -32,14 +33,12 @@ public record ConnectionDetailDTO(
     @Nullable String stateReason,
     Instant createdAt,
     Instant updatedAt,
-    @Nullable Instant lastActivityAt,
     Set<Capability> capabilities,
-    @Nullable
-    @Schema(type = "object", description = "Opaque, typed connection config tree (no credentials).")
-    JsonNode config
+    @Nullable Map<String, Object> config
 ) {
+    @SuppressWarnings("unchecked")
     public static ConnectionDetailDTO from(Connection c, IntegrationManifestRegistry manifests, ObjectMapper mapper) {
-        JsonNode configNode = c.getConfig() == null ? null : mapper.valueToTree(c.getConfig());
+        Map<String, Object> configMap = c.getConfig() == null ? null : mapper.convertValue(c.getConfig(), Map.class);
         return new ConnectionDetailDTO(
             c.getId(),
             c.getKind(),
@@ -50,9 +49,8 @@ public record ConnectionDetailDTO(
             c.getStateReason(),
             c.getCreatedAt(),
             c.getUpdatedAt(),
-            c.getLastActivityAt(),
             manifests.capabilitiesFor(c.getKind()),
-            configNode
+            configMap
         );
     }
 }

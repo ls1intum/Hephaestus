@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -116,24 +115,6 @@ public class IntegrationFrameworkBootstrap {
             require(kind, "SubjectKeyDeriver", anyMatchKind(subjectKeyDerivers, s -> s.kind() == kind), violations);
             require(kind, "SubjectParser", anyMatchKind(subjectParsers, s -> s.kind() == kind), violations);
         }
-        if (declared.contains(Capability.URL_VERIFICATION_HANDSHAKE)) {
-            // Currently piggy-backs on WebhookSignatureVerifier (Slack's verifier short-
-            // circuits on url_verification). Enforce both so the manifest can't drift.
-            require(
-                kind,
-                "WebhookSignatureVerifier (url_verification handshake)",
-                anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
-                violations
-            );
-        }
-        if (declared.contains(Capability.REPLAY_PROTECTION)) {
-            require(
-                kind,
-                "WebhookSignatureVerifier (replay-window check)",
-                anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
-                violations
-            );
-        }
         if (declared.contains(Capability.TOKEN_REFRESH)) {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
@@ -165,8 +146,11 @@ public class IntegrationFrameworkBootstrap {
 
         // Forward-compat: the moment a new Capability is added to the enum without a
         // matching check above, fail loud at boot instead of silently treating it as
-        // satisfied.
-        Set<Capability> unmapped = EnumSet.copyOf(declared);
+        // satisfied. (Built via noneOf+addAll, not EnumSet.copyOf, because a manifest may
+        // legitimately declare no capabilities — e.g. outbound-only Slack — and
+        // EnumSet.copyOf rejects an empty collection.)
+        Set<Capability> unmapped = EnumSet.noneOf(Capability.class);
+        unmapped.addAll(declared);
         unmapped.removeAll(ENFORCED_CAPABILITIES);
         for (Capability cap : unmapped) {
             violations.add(
@@ -181,8 +165,6 @@ public class IntegrationFrameworkBootstrap {
     /** Capabilities the {@link #checkRequired} switch above pins to a bean check. */
     private static final Set<Capability> ENFORCED_CAPABILITIES = EnumSet.of(
         Capability.WEBHOOK_INGEST,
-        Capability.URL_VERIFICATION_HANDSHAKE,
-        Capability.REPLAY_PROTECTION,
         Capability.TOKEN_REFRESH,
         Capability.FEEDBACK_DELIVERY,
         Capability.INLINE_FINDINGS,
@@ -198,14 +180,5 @@ public class IntegrationFrameworkBootstrap {
         if (!present) {
             violations.add(kind + " declares capability but no " + spi + " bean is wired");
         }
-    }
-
-    /** Returns the union of capabilities for the given set of active kinds. */
-    public Set<Capability> capabilitiesFor(Set<IntegrationKind> activeKinds) {
-        Set<Capability> all = new HashSet<>();
-        for (IntegrationKind kind : activeKinds) {
-            all.addAll(manifests.capabilitiesFor(kind));
-        }
-        return Set.copyOf(all);
     }
 }

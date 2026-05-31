@@ -67,12 +67,6 @@ class SlackMessageServiceLiveTest {
         SlackCredentialProvider credentialProvider = new SlackCredentialProvider(connectionService, converter);
         SlackMessageService service = new SlackMessageService(credentialProvider);
 
-        // initTest → auth.test through the decrypted token.
-        assertThatCode(() -> {
-            boolean authed = service.initTest(workspaceId);
-            org.assertj.core.api.Assertions.assertThat(authed).as("Slack auth.test via app path").isTrue();
-        }).doesNotThrowAnyException();
-
         // The real send: block-kit payload through the app's SlackMessageService to the live channel.
         assertThatCode(() ->
             service.sendForWorkspace(
