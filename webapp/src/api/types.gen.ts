@@ -199,10 +199,6 @@ export type Workspace = {
      */
     hasPersonalAccessToken: boolean;
     /**
-     * Deprecated; signing secret is app-global. Always false.
-     */
-    hasSlackSigningSecret: boolean;
-    /**
      * Whether Slack token is configured
      */
     hasSlackToken: boolean;
@@ -282,6 +278,10 @@ export type Workspace = {
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
     serverUrl?: string;
+    /**
+     * ID of the active Slack connection, if any — addresses PATCH /connections/{id}/status
+     */
+    slackConnectionId?: number;
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -731,6 +731,15 @@ export type SlackTestMessageResponse = {
     channelId?: string;
     ok?: boolean;
     slackError?: string;
+};
+
+/**
+ * Optional body for the Slack test-message probe. When <code>channelId</code> is present and non-blank,
+ * the probe targets that channel (so an admin can validate a typed-but-unsaved channel); otherwise
+ * it falls back to the persisted notification channel.
+ */
+export type SlackTestMessageRequest = {
+    channelId?: string;
 };
 
 /**
@@ -2732,7 +2741,10 @@ export type InitiateResponses = {
 export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
 
 export type SendTestMessageData = {
-    body?: never;
+    /**
+     * optional channel override; when blank, the persisted notification channel is used.
+     */
+    body?: SlackTestMessageRequest;
     path: {
         /**
          * Workspace slug

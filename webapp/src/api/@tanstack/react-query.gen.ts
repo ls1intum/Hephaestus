@@ -624,6 +624,15 @@ export const initiateMutation = (options?: Partial<Options<InitiateData>>): UseM
     return mutationOptions;
 };
 
+/**
+ * Probe the Slack connection by posting a test message.
+ *
+ * Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
+ * — success, a Slack-side rejection (e.g. <code>not_in_channel</code>), or a missing channel — is a
+ * 200 result carrying <code>ok</code>/<code>slackError</code>, never an HTTP error. That lets the admin UI
+ * test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
+ * with a transport failure.
+ */
 export const sendTestMessageMutation = (options?: Partial<Options<SendTestMessageData>>): UseMutationOptions<SendTestMessageResponse, DefaultError, Options<SendTestMessageData>> => {
     const mutationOptions: UseMutationOptions<SendTestMessageResponse, DefaultError, Options<SendTestMessageData>> = {
         mutationFn: async (fnOptions) => {

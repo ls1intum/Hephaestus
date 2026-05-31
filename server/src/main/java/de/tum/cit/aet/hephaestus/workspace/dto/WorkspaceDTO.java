@@ -40,9 +40,8 @@ public record WorkspaceDTO(
     @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
-    @NonNull
-    @Schema(description = "Deprecated; signing secret is app-global. Always false.")
-    Boolean hasSlackSigningSecret,
+    @Schema(description = "ID of the active Slack connection, if any — addresses PATCH /connections/{id}/status")
+    Long slackConnectionId,
     @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
     Boolean gitlabWebhookRegistered,
@@ -98,6 +97,11 @@ public record WorkspaceDTO(
             .map(b -> b.token() != null && !b.token().isEmpty())
             .orElse(false);
 
+        Long slackConnectionId = connectionService
+            .findActive(workspaceId, IntegrationKind.SLACK)
+            .map(c -> c.getId())
+            .orElse(null);
+
         String leaderboardTeam = slackCfg.map(s -> s.teamLabel() != null ? s.teamLabel() : s.teamName()).orElse(null);
         String leaderboardChannelId = slackCfg.map(ConnectionConfig.SlackConfig::notificationChannelId).orElse(null);
 
@@ -124,7 +128,7 @@ public record WorkspaceDTO(
             leaderboardChannelId,
             hasPat,
             hasSlackToken,
-            false,
+            slackConnectionId,
             gitlabWebhookRegistered,
             workspace.getFeatures().getPracticesEnabled(),
             workspace.getFeatures().getMentorEnabled(),

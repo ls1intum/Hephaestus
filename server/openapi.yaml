@@ -795,6 +795,12 @@ paths:
       - Connections
   /workspaces/{workspaceSlug}/connections/slack/test-message:
     post:
+      description: |-
+        Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
+         — success, a Slack-side rejection (e.g. <code>not_in_channel</code>), or a missing channel — is a
+         200 result carrying <code>ok</code>/<code>slackError</code>, never an HTTP error. That lets the admin UI
+         test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
+         with a transport failure.
       operationId: sendTestMessage
       parameters:
       - description: Workspace slug
@@ -804,6 +810,13 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlackTestMessageRequest"
+        description: "optional channel override; when blank, the persisted notification\
+          \ channel is used."
       responses:
         "200":
           content:
@@ -811,6 +824,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SlackTestMessageResponse"
           description: OK
+      summary: Probe the Slack connection by posting a test message.
       tags:
       - Connections
   /workspaces/{workspaceSlug}/connections/{id}:
@@ -4615,6 +4629,15 @@ components:
       - id
       - name
       - nameWithOwner
+    SlackTestMessageRequest:
+      type: object
+      description: |-
+        Optional body for the Slack test-message probe. When <code>channelId</code> is present and non-blank,
+         the probe targets that channel (so an admin can validate a typed-but-unsaved channel); otherwise
+         it falls back to the persisted notification channel.
+      properties:
+        channelId:
+          type: string
     SlackTestMessageResponse:
       type: object
       description: Result of the Slack test-message probe; carries the Slack error
@@ -5071,9 +5094,6 @@ components:
         hasPersonalAccessToken:
           type: boolean
           description: Whether a Personal Access Token is configured
-        hasSlackSigningSecret:
-          type: boolean
-          description: Deprecated; signing secret is app-global. Always false.
         hasSlackToken:
           type: boolean
           description: Whether Slack token is configured
@@ -5147,6 +5167,11 @@ components:
           type: string
           description: Custom server URL for self-hosted instances (null for cloud
             defaults)
+        slackConnectionId:
+          type: integer
+          format: int64
+          description: "ID of the active Slack connection, if any — addresses PATCH\
+            \ /connections/{id}/status"
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
@@ -5166,7 +5191,6 @@ components:
       - displayName
       - gitlabWebhookRegistered
       - hasPersonalAccessToken
-      - hasSlackSigningSecret
       - hasSlackToken
       - id
       - isPubliclyViewable

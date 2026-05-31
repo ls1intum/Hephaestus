@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { CheckCircleIcon, XCircleIcon } from "lucide-react";
+import { CheckCircleIcon, InfoIcon, XCircleIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -47,22 +47,32 @@ function IntegrationsCallback() {
 			toast.error("Integration connection failed", { description: reason });
 	}, [status, reason]);
 
-	const ok = status === "success";
-	const Icon = ok ? CheckCircleIcon : XCircleIcon;
+	// A bare /integrations visit (no ?status — e.g. the user reloaded after the
+	// beforeLoad redirect already consumed the return-slug) is NOT a failure. Only an
+	// explicit ?status=error renders the destructive card; missing status is a neutral
+	// terminal state, and ?status=success is the connected confirmation.
+	const failed = status === "error";
+	const succeeded = status === "success";
+	const Icon = failed ? XCircleIcon : succeeded ? CheckCircleIcon : InfoIcon;
+	const iconClass = failed
+		? "size-12 text-destructive"
+		: succeeded
+			? // no semantic success token in the kit
+				"size-12 text-green-600 dark:text-green-400"
+			: "size-12 text-muted-foreground";
+	const title = failed
+		? "Connection failed"
+		: succeeded
+			? "Integration connected"
+			: "Nothing to show here";
 	return (
 		<div className="mx-auto max-w-md py-12">
 			<Card>
 				<CardContent className="flex flex-col items-center gap-4 py-8">
-					<Icon
-						className={
-							ok ? "size-12 text-green-600 dark:text-green-400" : "size-12 text-destructive"
-						}
-					/>
+					<Icon className={iconClass} />
 					<div className="text-center">
-						<h1 className="text-xl font-semibold">
-							{ok ? "Integration connected" : "Connection failed"}
-						</h1>
-						{!ok && reason && <p className="mt-2 text-sm text-muted-foreground">{reason}</p>}
+						<h1 className="text-xl font-semibold">{title}</h1>
+						{failed && reason && <p className="mt-2 text-sm text-muted-foreground">{reason}</p>}
 					</div>
 					<Button onClick={() => navigate({ to: "/" })}>Return to dashboard</Button>
 				</CardContent>
