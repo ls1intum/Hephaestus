@@ -190,6 +190,7 @@ function AdminSettings() {
 			onToggleFeature={handleToggleFeature}
 			workspaceSlug={workspaceSlug ?? undefined}
 			hasSlackConnection={workspaceData?.hasSlackToken ?? false}
+			slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
 			slackChannelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
 			slackTeamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
 			slackNotificationsEnabled={workspaceData?.leaderboardNotificationEnabled ?? false}

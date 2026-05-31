@@ -8,14 +8,13 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.server.ResponseStatusException;
 
 /** Slack admin connectivity probe — test-message dispatch. */
 @WorkspaceScopedController
@@ -38,24 +37,33 @@ public class SlackConnectionAdminController {
         this.slackMessageService = slackMessageService;
     }
 
+    /**
+     * Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
+     * — success, a Slack-side rejection (e.g. {@code not_in_channel}), or a missing channel — is a
+     * 200 result carrying {@code ok}/{@code slackError}, never an HTTP error. That lets the admin UI
+     * test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
+     * with a transport failure.
+     *
+     * @param body optional channel override; when blank, the persisted notification channel is used.
+     */
     @PostMapping("/test-message")
-    public ResponseEntity<SlackTestMessageResponseDTO> sendTestMessage(WorkspaceContext workspace) {
+    public SlackTestMessageResponseDTO sendTestMessage(
+        WorkspaceContext workspace,
+        @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body
+    ) {
         long workspaceId = workspace.id();
-        var config = connectionService
-            .findSlackNotificationConfig(workspaceId)
-            .orElseThrow(() ->
-                new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "No ACTIVE Slack Connection for workspace=" + workspaceId
-                )
-            );
-        String channelId = config.notificationChannelId();
+        String override = body == null ? null : body.channelId();
+        String channelId = (override != null && !override.isBlank())
+            ? override.trim()
+            : connectionService
+                  .findSlackNotificationConfig(workspaceId)
+                  .map(c -> c.notificationChannelId())
+                  .orElse(null);
+
         if (channelId == null || channelId.isBlank()) {
-            throw new ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Slack notification channel not configured for workspace=" + workspaceId
-            );
+            return new SlackTestMessageResponseDTO(false, null, "no_channel_configured");
         }
+
         try {
             slackMessageService.sendForWorkspace(
                 workspaceId,
@@ -63,7 +71,7 @@ public class SlackConnectionAdminController {
                 List.of(),
                 "Hephaestus test message — your Slack integration is wired up."
             );
-            return ResponseEntity.ok(new SlackTestMessageResponseDTO(true, channelId, null));
+            return new SlackTestMessageResponseDTO(true, channelId, null);
         } catch (SlackSendException e) {
             log.warn(
                 "Slack test message failed: workspaceId={}, channelId={}, error={}",
@@ -71,25 +79,7 @@ public class SlackConnectionAdminController {
                 channelId,
                 e.slackError()
             );
-            return ResponseEntity.status(statusForSlackError(e.slackError())).body(
-                new SlackTestMessageResponseDTO(false, channelId, e.slackError())
-            );
+            return new SlackTestMessageResponseDTO(false, channelId, e.slackError());
         }
-    }
-
-    private static HttpStatus statusForSlackError(String slackError) {
-        if (slackError == null) {
-            return HttpStatus.BAD_GATEWAY;
-        }
-        return switch (slackError) {
-            case
-                "channel_not_found",
-                "is_archived",
-                "invalid_blocks",
-                "invalid_arguments",
-                "msg_too_long" -> (HttpStatus.BAD_REQUEST);
-            case "not_in_channel", "missing_scope", "cannot_dm_bot" -> HttpStatus.FORBIDDEN;
-            default -> HttpStatus.BAD_GATEWAY;
-        };
     }
 }

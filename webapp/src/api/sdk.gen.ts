@@ -422,10 +422,23 @@ export const initiate = <ThrowOnError extends boolean = false>(options: Options<
     }
 });
 
+/**
+ * Probe the Slack connection by posting a test message.
+ *
+ * Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
+ * — success, a Slack-side rejection (e.g. <code>not_in_channel</code>), or a missing channel — is a
+ * 200 result carrying <code>ok</code>/<code>slackError</code>, never an HTTP error. That lets the admin UI
+ * test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
+ * with a transport failure.
+ */
 export const sendTestMessage = <ThrowOnError extends boolean = false>(options: Options<SendTestMessageData, ThrowOnError>) => (options.client ?? client).post<SendTestMessageResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/connections/slack/test-message',
-    ...options
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 export const read = <ThrowOnError extends boolean = false>(options: Options<ReadData, ThrowOnError>) => (options.client ?? client).get<ReadResponses, unknown, ThrowOnError>({

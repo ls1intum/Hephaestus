@@ -32,6 +32,7 @@ export interface AdminSettingsPageProps {
 	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
 	workspaceSlug?: string;
 	hasSlackConnection: boolean;
+	slackConnectionId?: number;
 	slackChannelId?: string;
 	slackTeamLabel?: string;
 	slackNotificationsEnabled: boolean;
@@ -59,6 +60,7 @@ export function AdminSettingsPage({
 	onToggleFeature,
 	workspaceSlug,
 	hasSlackConnection,
+	slackConnectionId,
 	slackChannelId,
 	slackTeamLabel,
 	slackNotificationsEnabled,
@@ -99,9 +101,14 @@ export function AdminSettingsPage({
 				)}
 
 				{workspaceSlug != null && (
+					// key derived from the server snapshot: when a post-OAuth/save refetch lands,
+					// the key changes and React remounts the form with fresh server truth instead
+					// of leaning on prop→state sync effects.
 					<AdminSlackNotificationSettings
+						key={`slack:${slackConnectionId ?? "none"}:${slackChannelId ?? ""}:${slackNotificationsEnabled}:${slackScheduleDay ?? ""}:${slackScheduleTime ?? ""}:${slackTeamLabel ?? ""}`}
 						workspaceSlug={workspaceSlug}
 						hasSlackConnection={hasSlackConnection}
+						slackConnectionId={slackConnectionId}
 						channelId={slackChannelId}
 						teamLabel={slackTeamLabel}
 						enabled={slackNotificationsEnabled}
