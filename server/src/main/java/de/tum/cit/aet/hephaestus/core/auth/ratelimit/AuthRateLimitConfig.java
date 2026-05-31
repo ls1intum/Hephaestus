@@ -80,8 +80,9 @@ public class AuthRateLimitConfig {
     AuthRateLimitFilter authRateLimitFilter(
         AuthRateLimitProperties properties,
         BucketResolver bucketResolver,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics metrics
     ) {
-        return new AuthRateLimitFilter(properties, bucketResolver, objectMapper);
+        return new AuthRateLimitFilter(properties, bucketResolver, objectMapper, metrics);
     }
 }

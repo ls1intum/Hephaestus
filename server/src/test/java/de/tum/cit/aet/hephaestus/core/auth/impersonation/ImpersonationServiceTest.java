@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.impersonation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +15,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipal;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationCacheEvictor;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -63,6 +65,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
             principalFactory,
             issuedJwtRepository,
             logger,
+            mock(RevocationCacheEvictor.class),
             objectMapper,
             clock
         );

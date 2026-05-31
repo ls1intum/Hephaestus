@@ -22,17 +22,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * shared across replicas when a Postgres-backed {@code ProxyManager} is wired (production); see
  * {@link AuthRateLimitConfig} for the per-replica fallback trade-off.
  *
- * <p>{@code trustedProxyCount} is retained for backward compatibility but is no longer used to parse
- * {@code X-Forwarded-For} in the filter: proxy trust is owned by the servlet container via
- * {@code server.forward-headers-strategy: native} (prod), which rewrites {@code getRemoteAddr()} to
- * the real client before the filter runs. The filter keys IP buckets purely off {@code getRemoteAddr()}.
- * Configure the trusted-proxy topology through {@code server.tomcat.remoteip.*} instead. (Validation of
- * {@code >= 0} is kept so a stray negative value still fails fast.)
+ * <p>Proxy trust is owned by the servlet container via {@code server.forward-headers-strategy: native}
+ * (prod), which rewrites {@code getRemoteAddr()} to the real client before the filter runs; the filter
+ * keys IP buckets purely off {@code getRemoteAddr()}. Configure proxy topology via
+ * {@code server.tomcat.remoteip.*}, not here.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth.rate-limit")
 public record AuthRateLimitProperties(
     @DefaultValue("true") boolean enabled,
-    @DefaultValue("1") int trustedProxyCount,
     @DefaultValue Limit oauthAuthorization,
     @DefaultValue Limit refresh,
     @DefaultValue Limit impersonate,
@@ -45,9 +42,6 @@ public record AuthRateLimitProperties(
         refresh = refresh != null ? refresh : Limit.of(60, Duration.ofMinutes(1));
         impersonate = impersonate != null ? impersonate : Limit.of(10, Duration.ofMinutes(1));
         deleteUser = deleteUser != null ? deleteUser : Limit.of(3, Duration.ofHours(1));
-        if (trustedProxyCount < 0) {
-            throw new IllegalArgumentException("trustedProxyCount must be >= 0, got: " + trustedProxyCount);
-        }
     }
 
     /**

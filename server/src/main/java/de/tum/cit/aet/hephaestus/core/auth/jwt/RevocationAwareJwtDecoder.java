@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.proc.JWSKeySelector;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -34,8 +33,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * <h2>Cache strategy</h2>
  * Lookups are cached by {@code jti} in the {@code auth_jwt_revoked} Spring cache (TTL ~1
  * minute — see {@code CacheConfig}). The cache stores either a {@link Status#ACTIVE} sentinel
- * or {@link Status#REVOKED}; both short-circuit the DB. Cross-pod invalidation lands in a
- * later commit via NATS subject {@code auth.jwt.revoked}.
+ * or {@link Status#REVOKED}; both short-circuit the DB. On revoke, {@code RevocationCacheEvictor}
+ * evicts the {@code jti} on the acting pod (after commit) so logout/sign-out take effect
+ * immediately there. Other pods converge within the TTL; a cross-pod NATS push
+ * ({@code auth.jwt.revoked}) to make that immediate cluster-wide is a tracked follow-up.
  *
  * <h2>Failure mode</h2>
  * If the DB is unreachable, this decoder fails closed — it surfaces an
@@ -130,7 +131,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         return new JwtException(error.getDescription());
     }
 
-    /** Invalidate a single jti in the local cache — used by the NATS listener (later commit). */
+    /** Evict a single jti from this pod's cache; called by {@code RevocationCacheEvictor} on revoke. */
     public void invalidate(UUID jti) {
         if (cache != null) {
             cache.evict(jti);
@@ -144,10 +145,5 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     public enum Status {
         ACTIVE,
         REVOKED,
-    }
-
-    /** Defensive accessor for tests that need the public JWK set without rebuilding the decoder. */
-    public static JWKSet publicJwkSet(JwtSigningKeyService keyService) {
-        return keyService.publicJwkSet();
     }
 }

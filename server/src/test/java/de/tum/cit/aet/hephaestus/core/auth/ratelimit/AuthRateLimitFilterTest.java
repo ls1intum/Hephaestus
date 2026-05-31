@@ -6,9 +6,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.time.Duration;
 import java.util.Map;
@@ -44,23 +46,22 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     };
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private final AuthMetrics metrics = new AuthMetrics(meterRegistry);
 
     private AuthRateLimitFilter filter(AuthRateLimitProperties props) {
-        return new AuthRateLimitFilter(props, resolver, objectMapper);
+        return new AuthRateLimitFilter(props, resolver, objectMapper, metrics);
+    }
+
+    private double blockedCount(String bucket) {
+        var counter = meterRegistry.find("auth.ratelimit.blocked").tag("bucket", bucket).counter();
+        return counter == null ? 0d : counter.count();
     }
 
     private static AuthRateLimitProperties props(AuthRateLimitProperties.Limit... overrides) {
-        return propsWithTrustedProxies(1, overrides);
-    }
-
-    private static AuthRateLimitProperties propsWithTrustedProxies(
-        int trustedProxyCount,
-        AuthRateLimitProperties.Limit... overrides
-    ) {
-        // Defaults from the spec; tests override specific limits via the canonical constructor.
+        // Defaults from the spec; tests override the oauth-authz limit via the first vararg.
         return new AuthRateLimitProperties(
             true,
-            trustedProxyCount,
             overrides.length > 0 ? overrides[0] : new AuthRateLimitProperties.Limit(20, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(60, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(10, Duration.ofMinutes(1)),
@@ -100,7 +101,6 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     void disabledFilterPassesThroughWithoutTouchingBuckets() throws Exception {
         AuthRateLimitProperties disabled = new AuthRateLimitProperties(
             false,
-            1,
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
@@ -147,6 +147,9 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         assertThat(Long.parseLong(res.getHeader(HttpHeaders.RETRY_AFTER))).isGreaterThanOrEqualTo(1);
         assertThat(res.getContentAsString()).contains("Too Many Requests").contains("retryAfterSeconds");
         assertThat(store).containsOnlyKeys("oauth-authz:ip:203.0.113.7");
+        // the 429 path increments the rate-limit metric, tagged by the bucket namespace
+        assertThat(blockedCount("oauth-authz")).isEqualTo(1d);
+        assertThat(blockedCount("refresh")).isEqualTo(0d);
     }
 
     @Test
@@ -259,33 +262,24 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
     }
 
     @Test
-    void xffHeaderIsIgnoredClientIpComesFromRemoteAddr() throws Exception {
-        // The filter never parses X-Forwarded-For itself. Under forward-headers-strategy=native,
-        // Tomcat's RemoteIpValve validates the proxy chain upstream and rewrites getRemoteAddr() to
-        // the real client, so a raw XFF header must NOT influence the bucket key here.
+    void xffIsIgnoredClientIpAlwaysFromRemoteAddr() throws Exception {
+        // The filter never parses X-Forwarded-For: under forward-headers-strategy=native the
+        // RemoteIpValve validates the proxy chain upstream and rewrites getRemoteAddr() to the real
+        // client. So neither a single spoofed XFF value nor a multi-hop "evil1, evil2, fake" chain
+        // can influence the bucket key — getRemoteAddr() is authoritative.
         AuthRateLimitFilter f = filter(props());
 
-        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        req.addHeader("X-Forwarded-For", "203.0.113.7");
-        req.setRemoteAddr("10.0.0.1");
-        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
+        MockHttpServletRequest single = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        single.addHeader("X-Forwarded-For", "203.0.113.7");
+        single.setRemoteAddr("10.0.0.1");
+        f.doFilter(single, new MockHttpServletResponse(), mock(FilterChain.class));
 
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
-    }
+        MockHttpServletRequest multiHop = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        multiHop.addHeader("X-Forwarded-For", "1.1.1.1, 2.2.2.2, 203.0.113.50");
+        multiHop.setRemoteAddr("10.0.0.2");
+        f.doFilter(multiHop, new MockHttpServletResponse(), mock(FilterChain.class));
 
-    @Test
-    void spoofedXffEntriesCannotForgeABucketKey() throws Exception {
-        // Attacker prepends bogus hops trying to forge a fresh bucket: "evil1, evil2, <fake>".
-        // Because the key derives from the unforgeable getRemoteAddr() (set by the trusted valve),
-        // none of the attacker-supplied XFF values can key the bucket.
-        AuthRateLimitFilter f = filter(props());
-
-        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        req.addHeader("X-Forwarded-For", "1.1.1.1, 2.2.2.2, 203.0.113.50");
-        req.setRemoteAddr("10.0.0.1");
-        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
-
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
+        assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1", "oauth-authz:ip:10.0.0.2");
     }
 
     @Test
@@ -312,32 +306,5 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         verify(secondChain, never()).doFilter(second, secondRes);
         assertThat(secondRes.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
         assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
-    }
-
-    @Test
-    void tooFewHopsForTrustedProxiesFallsBackToRemoteAddr() throws Exception {
-        // Two trusted proxies configured but only one XFF hop present → the chain is shorter than
-        // claimed, so the header is untrustworthy and we fall back to the unforgeable remote address.
-        AuthRateLimitFilter f = filter(propsWithTrustedProxies(2));
-
-        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        req.addHeader("X-Forwarded-For", "203.0.113.99");
-        req.setRemoteAddr("198.51.100.200");
-        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
-
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:198.51.100.200");
-    }
-
-    @Test
-    void zeroTrustedProxiesAlwaysUsesRemoteAddr() throws Exception {
-        // trustedProxyCount=0 disables XFF trust entirely — only getRemoteAddr() keys the bucket.
-        AuthRateLimitFilter f = filter(propsWithTrustedProxies(0));
-
-        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
-        req.addHeader("X-Forwarded-For", "203.0.113.7");
-        req.setRemoteAddr("198.51.100.5");
-        f.doFilter(req, new MockHttpServletResponse(), mock(FilterChain.class));
-
-        assertThat(store).containsOnlyKeys("oauth-authz:ip:198.51.100.5");
     }
 }

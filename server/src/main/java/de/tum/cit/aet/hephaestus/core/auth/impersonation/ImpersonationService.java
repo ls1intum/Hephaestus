@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationCacheEvictor;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
@@ -43,6 +44,7 @@ public class ImpersonationService {
     private final JwtPrincipalFactory principalFactory;
     private final IssuedJwtRepository issuedJwtRepository;
     private final AuthEventLogger authEventLogger;
+    private final RevocationCacheEvictor revocationCacheEvictor;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -52,6 +54,7 @@ public class ImpersonationService {
         JwtPrincipalFactory principalFactory,
         IssuedJwtRepository issuedJwtRepository,
         AuthEventLogger authEventLogger,
+        RevocationCacheEvictor revocationCacheEvictor,
         ObjectMapper objectMapper,
         Clock clock
     ) {
@@ -60,6 +63,7 @@ public class ImpersonationService {
         this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
         this.authEventLogger = authEventLogger;
+        this.revocationCacheEvictor = revocationCacheEvictor;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -118,6 +122,7 @@ public class ImpersonationService {
     @Transactional
     public Result exit(Long operatorAccountId, Long targetAccountId, UUID currentJti, HttpServletRequest request) {
         issuedJwtRepository.revoke(currentJti, clock.instant(), IssuedJwt.RevokedReason.IMPERSONATION_EXIT);
+        revocationCacheEvictor.evictAfterCommit(currentJti);
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(
             principalFactory.forAccountId(operatorAccountId),
             null,

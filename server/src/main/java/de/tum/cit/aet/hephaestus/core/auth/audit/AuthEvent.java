@@ -22,18 +22,19 @@ import org.jspecify.annotations.Nullable;
  * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed
  * in-app by {@link AuthEventPartitionManager} (create-ahead + 12-month retention, oldest dropped) —
  * runs on stock Postgres with no {@code pg_partman} / custom image. Records the
- * {@code (account_id, acting_account_id)} pair for every
- * {@code SwitchUserFilter}-driven impersonation so every action attributable to an impersonator
- * is reconstructible.
+ * {@code (account_id, acting_account_id)} pair for every impersonation so every action attributable
+ * to an impersonator is reconstructible.
  *
- * <h2>Tamper-evidence</h2>
- * Non-test environments revoke UPDATE / DELETE on this table at the SQL grant level — the
- * row is insert-only. Backups + WAL archive provide forensic recovery.
+ * <h2>Append-only</h2>
+ * The table is insert-only by application convention: {@link AuthEventWriter} only ever INSERTs,
+ * there is no update/delete code path, and the 12-month partition retention is the only deletion.
+ * (A future hardening could add a non-owner role with UPDATE/DELETE revoked at the SQL grant level;
+ * not done today.) Backups + WAL archive provide forensic recovery.
  *
- * <h2>IP truncation</h2>
- * {@code ip_inet} is stored verbatim for 30 days then truncated to /24 (IPv4) / /48 (IPv6) by
- * a scheduled job — meets GDPR Art. 30 records-of-processing without exposing precise IPs in
- * long-term storage.
+ * <h2>IP retention</h2>
+ * {@code ip_inet} is stored verbatim for the audit-partition window (12 months) as a security
+ * measure (legitimate interest) and dropped when its monthly partition is retired. There is no
+ * separate truncation job today.
  *
  * <p>Composite PK {@code (id, occurred_at)} because partitioned tables in Postgres require
  * the partition key in every unique index.

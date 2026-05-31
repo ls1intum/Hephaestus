@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
@@ -55,15 +56,18 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final AuthRateLimitProperties properties;
     private final BucketResolver bucketResolver;
     private final ObjectMapper objectMapper;
+    private final AuthMetrics metrics;
 
     public AuthRateLimitFilter(
         AuthRateLimitProperties properties,
         BucketResolver bucketResolver,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        AuthMetrics metrics
     ) {
         this.properties = properties;
         this.bucketResolver = bucketResolver;
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
     }
 
     /** Identifies which configured limit (if any) applies to a request, and how to key it. */
@@ -110,6 +114,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         long retryAfterSeconds = Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
         // key is namespaced (no raw account-id PII beyond what already exists in auth logs); safe at WARN.
         log.warn("Auth rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
+        // Tag by bucket namespace (oauth-authz/refresh/impersonate/delete-user) — bounded, no PII.
+        metrics.recordRateLimitBlocked(endpoint.namespace);
         writeTooManyRequests(request, response, retryAfterSeconds);
     }
 

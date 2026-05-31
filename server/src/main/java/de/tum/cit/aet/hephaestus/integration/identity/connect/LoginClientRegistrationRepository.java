@@ -37,8 +37,9 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
  * default login-page discovery (we don't use Spring's default page, but the contract is
  * honoured), and {@link IdentityProviderCatalog} so {@code core.auth}'s discovery controller
  * can list the sign-in options without importing this integration class. The dynamic set is
- * Caffeine-cached for 5 minutes — eviction on Connection mutation is wired via an event
- * listener in a later commit; the TTL is the safety net.
+ * Caffeine-cached for 5 minutes; that TTL is the invalidation mechanism — a rotated/added/removed
+ * workspace login provider takes effect within 5 minutes. (Event-driven eviction is intentionally
+ * not implemented: login-provider changes are rare and the bounded staleness is acceptable.)
  */
 public class LoginClientRegistrationRepository
     implements ClientRegistrationRepository, Iterable<ClientRegistration>, IdentityProviderCatalog
@@ -118,12 +119,6 @@ public class LoginClientRegistrationRepository
             .map(this::toRegistration)
             .forEach(all::add);
         return all;
-    }
-
-    /** Evict a single workspace registration — called by the Connection-mutation listener. */
-    public void evict(long connectionId) {
-        dynamicCache.invalidate(registrationIdFor(connectionId, IntegrationKind.OIDC_LOGIN_GITHUB));
-        dynamicCache.invalidate(registrationIdFor(connectionId, IntegrationKind.OIDC_LOGIN_GITLAB));
     }
 
     private ClientRegistration toRegistration(Connection connection) {

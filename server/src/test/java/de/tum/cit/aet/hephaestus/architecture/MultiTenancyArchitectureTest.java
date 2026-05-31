@@ -594,7 +594,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
-                                "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
+                                "WorkspacesInitializedEvent", // Startup lifecycle, signals all workspaces ready
+                                // core.auth (ADR 0017): authentication is USER/SYSTEM-scoped, never
+                                // workspace-scoped (same rationale as the @WorkspaceAgnostic auth controllers
+                                // exempted below). These Spring Security login events drive auth.login metrics
+                                // in AuthLoginEventMetrics and carry no workspace by design.
+                                "InteractiveAuthenticationSuccessEvent",
+                                "AbstractAuthenticationFailureEvent"
                             );
 
                             boolean isWorkspaceAware = workspaceAwareEventPrefixes

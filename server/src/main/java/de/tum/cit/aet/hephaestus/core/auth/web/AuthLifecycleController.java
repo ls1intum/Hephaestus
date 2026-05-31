@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
@@ -63,7 +64,7 @@ public class AuthLifecycleController {
     @PreAuthorize("hasAuthority('admin')")
     @Operation(summary = "Begin impersonating another account", operationId = "impersonate")
     public ResponseEntity<Void> impersonate(
-        @RequestBody ImpersonateRequestDTO body,
+        @Valid @RequestBody ImpersonateRequestDTO body,
         HttpServletRequest request,
         HttpServletResponse response
     ) {

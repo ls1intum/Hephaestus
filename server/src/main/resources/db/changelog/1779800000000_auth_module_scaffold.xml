@@ -172,15 +172,16 @@
             <column name="enabled_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
                 <constraints nullable="false"/>
             </column>
-            <column name="enabled_by_account_id" type="BIGINT">
-                <constraints foreignKeyName="fk_account_feature_enabled_by"
-                             referencedTableName="account"
-                             referencedColumnNames="id"
-                             deleteSetNull="true"/>
-            </column>
+            <column name="enabled_by_account_id" type="BIGINT"/>
         </createTable>
         <addPrimaryKey tableName="account_feature" columnNames="account_id, flag"
                        constraintName="pk_account_feature"/>
+        <!-- ON DELETE SET NULL has no inline <constraints> form in Liquibase (only deleteCascade);
+             it must be an explicit addForeignKeyConstraint. -->
+        <addForeignKeyConstraint baseTableName="account_feature" baseColumnNames="enabled_by_account_id"
+                                 constraintName="fk_account_feature_enabled_by"
+                                 referencedTableName="account" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1779800000000-5-jwt-signing-key">

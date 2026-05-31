@@ -8,6 +8,11 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.PlainHeader;
+import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
@@ -17,6 +22,9 @@ import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.PlainJWT;
+import com.nimbusds.jwt.SignedJWT;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.net.URI;
@@ -24,6 +32,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -227,5 +236,58 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
 
         RevocationAwareJwtDecoder decoder = decoder(repo, cm);
         assertThatThrownBy(() -> decoder.decode(validToken(jti))).isInstanceOf(JwtException.class);
+    }
+
+    /**
+     * Algorithm-confusion guard (a): an {@code alg:none} token must be rejected. The decoder pins
+     * verification to ES256 via {@code JWSVerificationKeySelector<>(JWSAlgorithm.ES256, …)}; an
+     * unsigned ("none") token has no signature to verify and must never be accepted. This fails if
+     * the algorithm pin is loosened to allow unsecured JWTs.
+     */
+    @Test
+    void rejectsAlgNoneToken() {
+        UUID jti = UUID.randomUUID();
+        JWTClaimsSet claims = confusionClaims(jti);
+        PlainHeader header = new PlainHeader.Builder().type(JOSEObjectType.JWT).build();
+        String unsigned = new PlainJWT(header, claims).serialize();
+
+        IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
+        assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(unsigned)).isInstanceOf(JwtException.class);
+    }
+
+    /**
+     * Algorithm-confusion guard (b): the classic RS/ES→HS downgrade. An attacker who knows the EC
+     * <em>public</em> key (it is public by design — published at {@code /.well-known/jwks.json}) tries
+     * to forge a token by using the public-key bytes as an HMAC (HS256) shared secret. A decoder that
+     * resolved the verification key by {@code kid} without pinning the algorithm family would verify
+     * the HMAC with the very bytes the attacker used and accept the forgery. Pinning the
+     * {@code JWSVerificationKeySelector} to ES256 rejects the HS256 header outright. This fails if the
+     * pin is loosened to accept HMAC algorithms.
+     */
+    @Test
+    void rejectsHs256TokenSignedWithEcPublicKeyAsHmacSecret() throws Exception {
+        UUID jti = UUID.randomUUID();
+        // The public key bytes — exactly what a JWKS exposes — abused as the HMAC secret.
+        byte[] publicKeyBytes = signingKey.toECPublicKey().getEncoded();
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.HS256).keyID(signingKey.getKeyID()).build();
+        SignedJWT forged = new SignedJWT(header, confusionClaims(jti));
+        forged.sign(new MACSigner(publicKeyBytes));
+        String token = forged.serialize();
+
+        IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
+        assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(token)).isInstanceOf(JwtException.class);
+    }
+
+    /** Claims that are valid in every dimension except the (forged) signing algorithm. */
+    private JWTClaimsSet confusionClaims(UUID jti) {
+        Instant exp = NOW.plus(Duration.ofMinutes(15));
+        return new JWTClaimsSet.Builder()
+            .issuer(ISSUER.toString())
+            .subject("42")
+            .audience(AUDIENCE)
+            .jwtID(jti.toString())
+            .issueTime(Date.from(exp.minus(Duration.ofMinutes(30))))
+            .expirationTime(Date.from(exp))
+            .build();
     }
 }

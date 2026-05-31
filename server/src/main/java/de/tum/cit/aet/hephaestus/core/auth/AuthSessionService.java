@@ -9,7 +9,10 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationCacheEvictor;
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
+import io.micrometer.core.instrument.Timer;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,8 +37,10 @@ public class AuthSessionService {
     private final AccountRepository accountRepository;
     private final HephaestusJwtIssuer jwtIssuer;
     private final AuthEventLogger authEventLogger;
+    private final RevocationCacheEvictor revocationCacheEvictor;
     private final AuthProperties properties;
     private final Clock clock;
+    private final AuthMetrics metrics;
 
     public AuthSessionService(
         JwtPrincipalFactory principalFactory,
@@ -43,22 +48,27 @@ public class AuthSessionService {
         AccountRepository accountRepository,
         HephaestusJwtIssuer jwtIssuer,
         AuthEventLogger authEventLogger,
+        RevocationCacheEvictor revocationCacheEvictor,
         AuthProperties properties,
-        Clock clock
+        Clock clock,
+        AuthMetrics metrics
     ) {
         this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
         this.accountRepository = accountRepository;
         this.jwtIssuer = jwtIssuer;
         this.authEventLogger = authEventLogger;
+        this.revocationCacheEvictor = revocationCacheEvictor;
         this.properties = properties;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /** Revoke the presenting token and clear the cookie. */
     @Transactional
     public void logout(Long accountId, UUID jti, HttpServletResponse response) {
         issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.LOGOUT);
+        revocationCacheEvictor.evictAfterCommit(jti);
         authEventLogger.event(AuthEvent.EventType.LOGOUT, AuthEvent.Result.SUCCESS).account(accountId).record();
         clearCookie(response);
     }
@@ -72,31 +82,42 @@ public class AuthSessionService {
         HttpServletRequest request,
         HttpServletResponse response
     ) {
-        // Atomically revoke the presenting token. The conditional UPDATE (revokedAt IS NULL) affects
-        // 0 rows when a concurrent refresh/logout already rotated this jti — in that race we must NOT
-        // mint a fresh token (it would resurrect a session the other request meant to end). No-op and
-        // clear the cookie so the client re-authenticates.
-        int revoked = issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
-        if (revoked == 0) {
-            clearCookie(response);
-            return;
+        // Time the full rotation critical section (revoke + status-gate + re-mint), including the
+        // early-return races — those are the cheap paths and keep the timer's count == refresh calls.
+        Timer.Sample sample = metrics.startRefreshTimer();
+        try {
+            // Atomically revoke the presenting token. The conditional UPDATE (revokedAt IS NULL) affects
+            // 0 rows when a concurrent refresh/logout already rotated this jti — in that race we must NOT
+            // mint a fresh token (it would resurrect a session the other request meant to end). No-op and
+            // clear the cookie so the client re-authenticates.
+            int revoked = issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
+            if (revoked == 0) {
+                clearCookie(response);
+                return;
+            }
+            revocationCacheEvictor.evictAfterCommit(jti);
+            // Account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must not be able to
+            // rotate its session into a fresh JWT — that would keep a suspended/deleting principal alive
+            // indefinitely. The presenting token is already revoked above; we simply do NOT re-mint, clear
+            // the cookie, and end the session. (forAccountId would also reject as defense-in-depth.)
+            Account account = accountRepository.findById(accountId).orElse(null);
+            if (account == null || account.getStatus() != Account.Status.ACTIVE) {
+                clearCookie(response);
+                return;
+            }
+            HephaestusJwtIssuer.Token token = jwtIssuer.issue(
+                principalFactory.forAccountId(accountId),
+                impersonatorId,
+                request
+            );
+            authEventLogger
+                .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .record();
+            setCookie(response, token);
+        } finally {
+            metrics.stopRefreshTimer(sample);
         }
-        // Account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must not be able to
-        // rotate its session into a fresh JWT — that would keep a suspended/deleting principal alive
-        // indefinitely. The presenting token is already revoked above; we simply do NOT re-mint, clear
-        // the cookie, and end the session. (forAccountId would also reject as defense-in-depth.)
-        Account account = accountRepository.findById(accountId).orElse(null);
-        if (account == null || account.getStatus() != Account.Status.ACTIVE) {
-            clearCookie(response);
-            return;
-        }
-        HephaestusJwtIssuer.Token token = jwtIssuer.issue(
-            principalFactory.forAccountId(accountId),
-            impersonatorId,
-            request
-        );
-        authEventLogger.event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS).account(accountId).record();
-        setCookie(response, token);
     }
 
     /** Write a freshly-minted token to the {@code __Host-} access cookie. */
@@ -122,18 +143,30 @@ public class AuthSessionService {
         issuedJwtRepository
             .findById(jti)
             .filter(j -> j.getAccountId().equals(accountId))
-            .ifPresent(j -> issuedJwtRepository.revoke(jti, clock.instant(), RevokedReason.ADMIN_REVOKE));
+            .ifPresent(j -> {
+                issuedJwtRepository.revoke(jti, clock.instant(), RevokedReason.ADMIN_REVOKE);
+                revocationCacheEvictor.evictAfterCommit(jti);
+            });
     }
 
     /** Sign out everywhere except the presenting session. */
     @Transactional
     public void revokeAllExcept(Long accountId, UUID currentJti) {
+        // Snapshot the jtis being revoked BEFORE the bulk update so we can evict each from the
+        // local revocation cache; the bulk UPDATE returns only a count.
+        List<UUID> revoking = issuedJwtRepository
+            .findActiveByAccountId(accountId, clock.instant())
+            .stream()
+            .map(IssuedJwt::getJti)
+            .filter(j -> !j.equals(currentJti))
+            .toList();
         issuedJwtRepository.revokeAllForAccountExcept(
             accountId,
             currentJti,
             clock.instant(),
             RevokedReason.SIGN_OUT_EVERYWHERE
         );
+        revoking.forEach(revocationCacheEvictor::evictAfterCommit);
     }
 
     public void clearCookie(HttpServletResponse response) {

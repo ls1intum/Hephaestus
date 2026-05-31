@@ -19,7 +19,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.Optional;
+import java.util.Set;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -271,34 +273,28 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
-        IntegrationKind expected = switch (config) {
-            case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
-            case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
-            case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
-            case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
-            // OidcLoginConfig binds to either OIDC_LOGIN_GITHUB or OIDC_LOGIN_GITLAB —
-            // the kind disambiguates which provider type the issuer URL refers to.
-            // Both are valid; the assertion below short-circuits this case via the
-            // kind-side check rather than a direct equality.
-            case ConnectionConfig.OidcLoginConfig __ -> kind;
-        };
-        if (
-            config instanceof ConnectionConfig.OidcLoginConfig &&
-            kind != IntegrationKind.OIDC_LOGIN_GITHUB &&
-            kind != IntegrationKind.OIDC_LOGIN_GITLAB
-        ) {
-            throw new IllegalStateException(
-                "Connection kind=" + kind + " incompatible with OidcLoginConfig (expected OIDC_LOGIN_*)"
+        // Each config subtype yields the set of kinds it may legally bind to — most are a singleton,
+        // OidcLoginConfig spans both OIDC_LOGIN_* (the issuer URL alone can't disambiguate provider
+        // type). One membership check covers every subtype, so adding a new ConnectionConfig is a
+        // compile error here (exhaustive switch) rather than a silent runtime mismatch.
+        Set<IntegrationKind> allowed = switch (config) {
+            case ConnectionConfig.GitHubAppConfig __ -> EnumSet.of(IntegrationKind.GITHUB);
+            case ConnectionConfig.GitHubPatConfig __ -> EnumSet.of(IntegrationKind.GITHUB);
+            case ConnectionConfig.GitLabConfig __ -> EnumSet.of(IntegrationKind.GITLAB);
+            case ConnectionConfig.SlackConfig __ -> EnumSet.of(IntegrationKind.SLACK);
+            case ConnectionConfig.OidcLoginConfig __ -> EnumSet.of(
+                IntegrationKind.OIDC_LOGIN_GITHUB,
+                IntegrationKind.OIDC_LOGIN_GITLAB
             );
-        }
-        if (expected != kind) {
+        };
+        if (!allowed.contains(kind)) {
             throw new IllegalStateException(
                 "Connection kind=" +
                     kind +
                     " incompatible with config=" +
                     config.getClass().getSimpleName() +
-                    " (expected kind=" +
-                    expected +
+                    " (expected kind in " +
+                    allowed +
                     ")"
             );
         }
