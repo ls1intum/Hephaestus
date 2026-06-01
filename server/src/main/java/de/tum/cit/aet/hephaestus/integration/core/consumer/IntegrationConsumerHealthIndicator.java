@@ -45,13 +45,13 @@ import org.springframework.stereotype.Component;
  *
  * <h2>Status decision</h2>
  * <ul>
- *   <li>{@code UP} — connection is reported as {@code CONNECTED} (any case).</li>
+ *   <li>{@code UP} — connection is {@code CONNECTED}, or the consumer is intentionally
+ *       disabled by config ({@code DISABLED}). A disabled consumer is a valid runtime
+ *       (the webhook pod owns consumption) and must not 503 the app-server.</li>
  *   <li>{@code OUT_OF_SERVICE} — consumer fleet has not been initialised yet (the
  *       {@link IntegrationConsumerStats} bean is present but no orchestrator has written
- *       to it). Typical on worker / webhook-only pods where the sync consumer is
- *       disabled. We deliberately do NOT report DOWN so the pod stays in the load
- *       balancer for its other roles.</li>
- *   <li>{@code DOWN} — connection is not {@code CONNECTED}.</li>
+ *       to it).</li>
+ *   <li>{@code DOWN} — consumer is enabled but not {@code CONNECTED}.</li>
  * </ul>
  *
  * <h2>Bean wiring</h2>
@@ -67,6 +67,7 @@ import org.springframework.stereotype.Component;
 public class IntegrationConsumerHealthIndicator implements HealthIndicator {
 
     private static final String STATUS_CONNECTED = "CONNECTED";
+    private static final String STATUS_DISABLED = "DISABLED";
 
     private final IntegrationConsumerStats stats;
     private final IntegrationMessageHandlerRegistry handlerRegistry;
@@ -96,7 +97,9 @@ public class IntegrationConsumerHealthIndicator implements HealthIndicator {
         }
 
         String connectionStatus = stats.natsConnectionStatus().orElseThrow();
-        Health.Builder builder = STATUS_CONNECTED.equalsIgnoreCase(connectionStatus) ? Health.up() : Health.down();
+        boolean healthy =
+            STATUS_CONNECTED.equalsIgnoreCase(connectionStatus) || STATUS_DISABLED.equalsIgnoreCase(connectionStatus);
+        Health.Builder builder = healthy ? Health.up() : Health.down();
 
         builder
             .withDetail("natsConnectionStatus", connectionStatus)
