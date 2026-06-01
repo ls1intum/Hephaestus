@@ -147,7 +147,7 @@ class ConnectionControllerTest extends BaseUnitTest {
         URI vendor = URI.create("https://github.com/apps/x/installations/new?state=abc");
         githubStrategy.nextInitiation = new ConnectInitiation.RedirectToVendor(vendor, "abc");
 
-        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.GITHUB, Map.of(), null);
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.GITHUB, Map.of());
         ResponseEntity<InitiateConnectionResponseDTO> response = controller.initiate(ctx(7L), req, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
@@ -177,8 +177,7 @@ class ConnectionControllerTest extends BaseUnitTest {
 
         InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(
             IntegrationKind.GITLAB,
-            Map.of("pat", "glpat-fake", "group_id", "200", "server_url", "https://gitlab.com"),
-            null
+            Map.of("pat", "glpat-fake", "group_id", "200", "server_url", "https://gitlab.com")
         );
         Authentication auth = new UsernamePasswordAuthenticationToken("alice@example.com", "");
         ResponseEntity<InitiateConnectionResponseDTO> response = controller.initiate(ctx(workspaceId), req, auth);
@@ -203,7 +202,7 @@ class ConnectionControllerTest extends BaseUnitTest {
     @DisplayName("initiate with no registered strategy throws IllegalArgumentException (→ 400 via advice)")
     void initiate_unknownKind_throwsBadRequest() {
         ConnectionController bare = new ConnectionController(admin, connectionService, objectMapper, List.of());
-        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.SLACK, Map.of(), null);
+        InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.SLACK, Map.of());
         assertThatThrownBy(() -> bare.initiate(ctx(1L), req, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("No ConnectionStrategy registered");

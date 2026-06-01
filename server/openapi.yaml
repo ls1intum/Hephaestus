@@ -3763,9 +3763,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-        redirectAfter:
-          type: string
-          format: uri
         userInput:
           type: object
           additionalProperties:

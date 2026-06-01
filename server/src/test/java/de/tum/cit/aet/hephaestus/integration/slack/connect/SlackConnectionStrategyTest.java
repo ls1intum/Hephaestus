@@ -112,7 +112,7 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void initiate_buildsAuthorizeUrlWithLockedScopes() {
-        when(oauthStateService.issue(42L, IntegrationKind.SLACK)).thenReturn("state-abc");
+        when(oauthStateService.issue(42L, IntegrationKind.SLACK, null)).thenReturn("state-abc");
 
         var initiation = strategy.initiate(
             new de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.InitiateRequest(

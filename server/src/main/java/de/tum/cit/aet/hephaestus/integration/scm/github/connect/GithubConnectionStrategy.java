@@ -58,7 +58,7 @@ public class GithubConnectionStrategy implements ConnectionStrategy {
                 "hephaestus.integration.github.app.install-url is not configured — cannot initiate GitHub App install"
             );
         }
-        String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB);
+        String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB, request.actorRef());
         String separator = installUrl.contains("?") ? "&" : "?";
         URI vendorUrl = URI.create(
             installUrl + separator + CALLBACK_PARAM_STATE + "=" + URLEncoder.encode(state, StandardCharsets.UTF_8)

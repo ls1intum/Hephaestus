@@ -1518,7 +1518,6 @@ export type InitiateConnectionResponse = {
  */
 export type InitiateConnectionRequest = {
     kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
-    redirectAfter?: string;
     userInput?: {
         [key: string]: string;
     };

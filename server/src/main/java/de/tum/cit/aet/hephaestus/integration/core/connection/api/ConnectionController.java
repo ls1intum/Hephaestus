@@ -132,7 +132,7 @@ public class ConnectionController {
         // IllegalArgumentException → 400 ProblemDetail via GlobalControllerAdvice.
         Map<String, String> userInput = body.userInput() == null ? Map.of() : body.userInput();
         ConnectInitiation initiation = strategy.initiate(
-            new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, body.redirectAfter())
+            new ConnectionStrategy.InitiateRequest(workspaceId, body.kind(), userInput, actorRef(authentication))
         );
 
         return switch (initiation) {
