@@ -12,7 +12,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -179,10 +180,13 @@ public class OAuthCallbackController {
         ConnectionStrategy strategy = strategies.get(kind);
         if (strategy == null) {
             log.error("No ConnectionStrategy bean for kind={} but routing accepted it — wiring bug", kind);
-            // 500 is a server-side wiring bug — always JSON, no point redirecting the user
+            // 500 is a server-side wiring bug — always problem+json, no point redirecting the user
             // to a broken flow they'll just retry.
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                errorBody(kind.name(), "no_strategy", "No ConnectionStrategy registered for kind=" + kind)
+            return problemDetail(
+                kind.name(),
+                "no_strategy",
+                "No ConnectionStrategy registered for kind=" + kind,
+                HttpStatus.INTERNAL_SERVER_ERROR
             );
         }
 
@@ -253,7 +257,7 @@ public class OAuthCallbackController {
         boolean wantsJson
     ) {
         if (wantsJson) {
-            return ResponseEntity.status(jsonStatus).body(errorBody(kind, error, description));
+            return problemDetail(kind, error, description, jsonStatus);
         }
         return redirect(buildFailureRedirect(kind, error, description));
     }
@@ -287,12 +291,22 @@ public class OAuthCallbackController {
         return lower.contains("application/json") && !lower.contains("text/html");
     }
 
-    private static Map<String, String> errorBody(@Nullable String kind, String error, @Nullable String description) {
-        Map<String, String> body = new HashMap<>();
-        body.put("kind", kind == null ? "unknown" : kind);
-        body.put("error", error);
-        if (description != null) body.put("errorDescription", description);
-        return Collections.unmodifiableMap(body);
+    /**
+     * RFC-7807 {@code application/problem+json} body for an OAuth-callback failure, matching the
+     * project's central error-handling contract. {@code kind} and {@code error} ride as extension
+     * members so an API client can branch on the Slack/GitHub error code.
+     */
+    private static ResponseEntity<ProblemDetail> problemDetail(
+        @Nullable String kind,
+        String error,
+        @Nullable String description,
+        HttpStatus status
+    ) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, description != null ? description : error);
+        pd.setTitle("OAuth callback failed");
+        pd.setProperty("kind", kind == null ? "unknown" : kind);
+        pd.setProperty("error", error);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(pd);
     }
 
     @Nullable

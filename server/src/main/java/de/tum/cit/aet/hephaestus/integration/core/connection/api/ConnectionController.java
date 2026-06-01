@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -148,7 +149,9 @@ public class ConnectionController {
                     userInput,
                     actorRef(authentication)
                 );
-                yield ResponseEntity.ok(InitiateConnectionResponseDTO.linked(connection.getId()));
+                // Real resource creation → 201 + Location of the canonical connection URL.
+                URI location = URI.create("/workspaces/" + workspace.slug() + "/connections/" + connection.getId());
+                yield ResponseEntity.created(location).body(InitiateConnectionResponseDTO.linked(connection.getId()));
             }
         };
     }

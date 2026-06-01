@@ -182,7 +182,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         Authentication auth = new UsernamePasswordAuthenticationToken("alice@example.com", "");
         ResponseEntity<InitiateConnectionResponseDTO> response = controller.initiate(ctx(workspaceId), req, auth);
 
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(response.getHeaders().getLocation()).hasToString("/workspaces/ws-17/connections/99");
         InitiateConnectionResponseDTO linked = response.getBody();
         assertThat(linked.type()).isEqualTo(InitiateConnectionResponseDTO.Type.LINKED);
         assertThat(linked.connectionId()).isEqualTo(99L);
