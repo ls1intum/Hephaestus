@@ -1659,9 +1659,7 @@ export type FeatureFlags = {
 };
 
 /**
- * Status view for <code>GET /user/exports/{id</code>}. <code>status</code> ∈
- * PENDING/PROCESSING/READY/FAILED/EXPIRED. Timestamps are null until the corresponding lifecycle
- * transition occurs.
+ * Status of a requested data export; timestamps are null until the matching transition occurs.
  */
 export type ExportStatus = {
     completedAt?: Date;
@@ -1672,8 +1670,7 @@ export type ExportStatus = {
 };
 
 /**
- * Small acknowledgement body returned by <code>POST /user/exports</code> alongside the
- * <code>202 Accepted</code> + <code>Location</code> header. The client polls the status endpoint next.
+ * Acknowledgement returned when a data export is requested.
  */
 export type ExportCreated = {
     id?: number;

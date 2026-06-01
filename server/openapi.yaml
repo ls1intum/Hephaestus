@@ -3806,9 +3806,7 @@ components:
           type: string
     ExportCreated:
       type: object
-      description: |-
-        Small acknowledgement body returned by <code>POST /user/exports</code> alongside the
-         <code>202 Accepted</code> + <code>Location</code> header. The client polls the status endpoint next.
+      description: Acknowledgement returned when a data export is requested.
       properties:
         id:
           type: integer
@@ -3817,10 +3815,8 @@ components:
           type: string
     ExportStatus:
       type: object
-      description: |-
-        Status view for <code>GET /user/exports/{id</code>}. <code>status</code> ∈
-         PENDING/PROCESSING/READY/FAILED/EXPIRED. Timestamps are null until the corresponding lifecycle
-         transition occurs.
+      description: Status of a requested data export; timestamps are null until the
+        matching transition occurs.
       properties:
         completedAt:
           type: string
