@@ -73,7 +73,7 @@ services:
         max-file: "3"
 
   nats-server:
-    image: nats:alpine
+    image: nats:alpine@sha256:ea17b9b7f74279b9239cf65e5786c0133e9a7c353bf218d29004abf2e7a33181
     restart: unless-stopped
     # Lock down the 4222 port from the internet for production
     # We expose it to the host so we can interact with it from the host machine via the nats cli
@@ -160,7 +160,7 @@ services:
       retries: 10
 
   keycloak-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
     restart: unless-stopped
     networks:
       - shared-network
