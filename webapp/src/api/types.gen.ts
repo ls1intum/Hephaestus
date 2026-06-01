@@ -549,6 +549,32 @@ export type UpdatePracticeActiveRequest = {
 };
 
 /**
+ * Request to update the entire weekly leaderboard digest configuration atomically
+ */
+export type UpdateLeaderboardDigestRequest = {
+    /**
+     * Slack channel ID for notifications
+     */
+    channelId?: string;
+    /**
+     * Day of week (1=Monday, 7=Sunday)
+     */
+    day: number;
+    /**
+     * Whether leaderboard notifications are enabled
+     */
+    enabled?: boolean;
+    /**
+     * Team name for filtering leaderboard notifications
+     */
+    team?: string;
+    /**
+     * Time in 24-hour format (HH:mm)
+     */
+    time: string;
+};
+
+/**
  * Request to update a connection's lifecycle status
  */
 export type UpdateConnectionStatusRequest = {
@@ -1464,7 +1490,7 @@ export type LeaderboardEntry = {
  * <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
  * <ul>
  * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
- * URL to bounce the browser to; {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#state #state} is the signed OAuth state.</li>
+ * URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
  * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
  * newly-created Connection; no further round-trip is needed.</li>
  * </ul>
@@ -1477,7 +1503,6 @@ export type LeaderboardEntry = {
  */
 export type InitiateConnectionResponse = {
     connectionId?: number;
-    state?: string;
     type?: 'REDIRECT' | 'LINKED';
     vendorUrl?: string;
 };
@@ -1678,9 +1703,9 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
-     * Integration kind to provision. Must be GITHUB or GITLAB; SLACK flows through OAuth, not this endpoint.
+     * Integration kind to provision. SLACK flows through OAuth, not this endpoint.
      */
-    kind: 'GITHUB' | 'GITLAB' | 'SLACK';
+    kind: 'GITHUB' | 'GITLAB';
     /**
      * Deprecated: ignored by the server. The authenticated user always becomes the owner.
      *
@@ -2892,6 +2917,27 @@ export type GetLeaderboardResponses = {
 };
 
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
+
+export type UpdateLeaderboardDigestData = {
+    body: UpdateLeaderboardDigestRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/leaderboard-digest';
+};
+
+export type UpdateLeaderboardDigestResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateLeaderboardDigestResponse = UpdateLeaderboardDigestResponses[keyof UpdateLeaderboardDigestResponses];
 
 export type ComputeUserLeagueStatsData = {
     body?: never;

@@ -343,6 +343,29 @@ public class WorkspaceService {
         return updateNotifications(requireSlug(workspaceContext), enabled, team, channelId);
     }
 
+    public Workspace updateLeaderboardDigest(
+        String slug,
+        Integer day,
+        String time,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateLeaderboardDigest(workspace.getId(), day, time, enabled, team, channelId);
+    }
+
+    public Workspace updateLeaderboardDigest(
+        WorkspaceContext workspaceContext,
+        Integer day,
+        String time,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
+        return updateLeaderboardDigest(requireSlug(workspaceContext), day, time, enabled, team, channelId);
+    }
+
     public Workspace updateToken(String slug, String personalAccessToken) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updateToken(workspace.getId(), personalAccessToken);

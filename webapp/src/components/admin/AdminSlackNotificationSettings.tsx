@@ -5,8 +5,7 @@ import { toast } from "sonner";
 import {
 	initiateMutation,
 	sendTestMessageMutation,
-	updateNotificationsMutation,
-	updateScheduleMutation,
+	updateLeaderboardDigestMutation,
 	updateStatus1Mutation,
 } from "@/api/@tanstack/react-query.gen";
 import {
@@ -110,26 +109,11 @@ export function AdminSlackNotificationSettings({
 	const channelValid = SLACK_CHANNEL_ID.test(channelInput);
 	const timeInvalid = !TIME_24H.test(timeInput);
 
-	const updateSchedule = useMutation(updateScheduleMutation());
-	const updateNotifications = useMutation(updateNotificationsMutation());
-
-	// Save schedule (day/time) and notification (channel/team/enabled) together so the admin
-	// configures the whole weekly digest in one action.
+	// One atomic endpoint persists schedule (day/time) + notification (channel/team/enabled)
+	// in a single transaction, so a mid-save failure can't leave the schedule changed but the
+	// channel not (the prior two-call pattern could).
 	const save = useMutation({
-		mutationFn: async () => {
-			await updateSchedule.mutateAsync({
-				path: { workspaceSlug },
-				body: { day: Number(dayInput), time: timeInput },
-			});
-			await updateNotifications.mutateAsync({
-				path: { workspaceSlug },
-				body: {
-					enabled: enabledInput,
-					channelId: channelInput.length > 0 ? channelInput : undefined,
-					team: teamInput.length > 0 ? teamInput : undefined,
-				},
-			});
-		},
+		...updateLeaderboardDigestMutation(),
 		onSuccess: () => {
 			toast.success("Slack notification settings saved");
 			onSaved();
@@ -342,7 +326,18 @@ export function AdminSlackNotificationSettings({
 
 								<div className="flex gap-2 pt-2">
 									<Button
-										onClick={() => save.mutate()}
+										onClick={() =>
+											save.mutate({
+												path: { workspaceSlug },
+												body: {
+													day: Number(dayInput),
+													time: timeInput,
+													enabled: enabledInput,
+													channelId: channelInput.length > 0 ? channelInput : undefined,
+													team: teamInput.length > 0 ? teamInput : undefined,
+												},
+											})
+										}
 										disabled={save.isPending || channelInvalid || timeInvalid}
 									>
 										{save.isPending ? "Saving…" : "Save"}

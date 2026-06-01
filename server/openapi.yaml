@@ -1014,6 +1014,34 @@ paths:
       summary: Generate leaderboard
       tags:
       - Leaderboard
+  /workspaces/{workspaceSlug}/leaderboard-digest:
+    patch:
+      operationId: updateLeaderboardDigest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaderboardDigestRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update the whole weekly leaderboard digest config (schedule + notifications)
+        atomically
+      tags:
+      - workspace
   /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
     get:
       description: Computes projected league point changes for a specific user using
@@ -3507,12 +3535,11 @@ components:
           minLength: 0
         kind:
           type: string
-          description: "Integration kind to provision. Must be GITHUB or GITLAB; SLACK\
-            \ flows through OAuth, not this endpoint."
+          description: "Integration kind to provision. SLACK flows through OAuth,\
+            \ not this endpoint."
           enum:
           - GITHUB
           - GITLAB
-          - SLACK
           example: GITLAB
         ownerUserId:
           type: integer
@@ -3751,7 +3778,7 @@ components:
          <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
          <ul>
            <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
-               URL to bounce the browser to; {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#state #state} is the signed OAuth state.</li>
+               URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
            <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
                newly-created Connection; no further round-trip is needed.</li>
          </ul>
@@ -3765,8 +3792,6 @@ components:
         connectionId:
           type: integer
           format: int64
-        state:
-          type: string
         type:
           type: string
           enum:
@@ -4834,6 +4859,37 @@ components:
           - UNINSTALLED
       required:
       - state
+    UpdateLeaderboardDigestRequest:
+      type: object
+      description: Request to update the entire weekly leaderboard digest configuration
+        atomically
+      properties:
+        channelId:
+          type: string
+          description: Slack channel ID for notifications
+          example: C01234567AB
+          pattern: "^[CGD][A-Z0-9]{8,}$"
+        day:
+          type: integer
+          format: int32
+          description: "Day of week (1=Monday, 7=Sunday)"
+          example: 1
+          maximum: 7
+          minimum: 1
+        enabled:
+          type: boolean
+          description: Whether leaderboard notifications are enabled
+        team:
+          type: string
+          description: Team name for filtering leaderboard notifications
+        time:
+          type: string
+          description: Time in 24-hour format (HH:mm)
+          example: 09:00
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+      required:
+      - day
+      - time
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state

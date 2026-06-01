@@ -137,7 +137,7 @@ public class ConnectionController {
 
         return switch (initiation) {
             case ConnectInitiation.RedirectToVendor r -> ResponseEntity.ok(
-                InitiateConnectionResponseDTO.redirect(r.vendorUrl(), r.oauthState())
+                InitiateConnectionResponseDTO.redirect(r.vendorUrl())
             );
             case ConnectInitiation.AcceptInline inline -> {
                 Connection connection = admin.createInlineConnection(
