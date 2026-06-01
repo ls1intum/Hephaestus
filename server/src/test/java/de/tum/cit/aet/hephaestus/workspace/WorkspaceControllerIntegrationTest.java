@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.dto.UpdateLeaderboardDigestRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceNotificationsRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceScheduleRequestDTO;
@@ -500,6 +501,56 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         Workspace reloaded = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(reloaded.getLeaderboardScheduleDay()).isEqualTo(3);
         assertThat(reloaded.getLeaderboardScheduleTime()).isEqualTo("08:30");
+    }
+
+    @Test
+    @WithAdminUser
+    void leaderboardDigestEndpointAtomicallyPersistsScheduleAndEnabled() {
+        User owner = persistUser("digest-owner");
+        Workspace workspace = createWorkspace("digest-space", "Digest", "digest", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        ProblemDetail invalid = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateLeaderboardDigestRequestDTO(9, "99:00", true, null, null))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(invalid).isNotNull();
+        assertThat(invalid.getProperties().get("errors"))
+            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+            .containsKeys("day", "time");
+
+        // Schedule + enabled are workspace-level (no Slack connection required) — one atomic call.
+        WorkspaceDTO updated = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateLeaderboardDigestRequestDTO(5, "17:30", true, null, null))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(updated).isNotNull();
+        assertThat(updated.leaderboardScheduleDay()).isEqualTo(5);
+        assertThat(updated.leaderboardScheduleTime()).isEqualTo("17:30");
+        assertThat(updated.leaderboardNotificationEnabled()).isTrue();
+
+        Workspace reloaded = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(reloaded.getLeaderboardScheduleDay()).isEqualTo(5);
+        assertThat(reloaded.getLeaderboardScheduleTime()).isEqualTo("17:30");
+        assertThat(reloaded.getLeaderboardNotificationEnabled()).isTrue();
     }
 
     @Test

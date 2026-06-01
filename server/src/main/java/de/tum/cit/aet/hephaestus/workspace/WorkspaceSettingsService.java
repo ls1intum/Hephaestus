@@ -127,6 +127,26 @@ public class WorkspaceSettingsService {
     }
 
     /**
+     * Atomically update the entire weekly digest configuration — schedule (day/time) plus
+     * notification settings (enabled/team/channel) — in a single transaction. Composes
+     * {@link #updateSchedule} and {@link #updateNotifications} so a mid-failure can never leave the
+     * schedule changed but the channel not (or vice versa); the schedule-changed event is published
+     * once. Same-bean calls run inside this method's transaction, so the whole change is all-or-nothing.
+     */
+    @Transactional
+    public Workspace updateLeaderboardDigest(
+        Long workspaceId,
+        Integer day,
+        String time,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
+        updateSchedule(workspaceId, day, time);
+        return updateNotifications(workspaceId, enabled, team, channelId);
+    }
+
+    /**
      * Update the personal access token for a workspace. Rotates the bearer credential on
      * whichever SCM Connection (GitHub PAT or GitLab) is currently active — the caller
      * controls which workspace this hits via {@code workspaceId}, the kind is resolved

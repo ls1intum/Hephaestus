@@ -118,6 +118,29 @@ public class WorkspaceController {
         return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
+    @PatchMapping("/leaderboard-digest")
+    @Operation(summary = "Update the whole weekly leaderboard digest config (schedule + notifications) atomically")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Workspace updated",
+        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<WorkspaceDTO> updateLeaderboardDigest(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody UpdateLeaderboardDigestRequestDTO request
+    ) {
+        Workspace workspace = workspaceService.updateLeaderboardDigest(
+            workspaceContext,
+            request.day(),
+            request.time(),
+            request.enabled(),
+            request.team(),
+            request.channelId()
+        );
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
+    }
+
     @PatchMapping("/token")
     @Operation(summary = "Update workspace Personal Access Token")
     @ApiResponse(

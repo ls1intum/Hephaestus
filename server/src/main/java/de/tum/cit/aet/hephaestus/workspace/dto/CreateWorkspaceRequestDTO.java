@@ -51,7 +51,8 @@ public record CreateWorkspaceRequestDTO(
 
     @NotNull(message = "Integration kind is required")
     @Schema(
-        description = "Integration kind to provision. Must be GITHUB or GITLAB; SLACK flows through OAuth, not this endpoint.",
+        description = "Integration kind to provision. SLACK flows through OAuth, not this endpoint.",
+        allowableValues = { "GITHUB", "GITLAB" },
         example = "GITLAB"
     )
     IntegrationKind kind,

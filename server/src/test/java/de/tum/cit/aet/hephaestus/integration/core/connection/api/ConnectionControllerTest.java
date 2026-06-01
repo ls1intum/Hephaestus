@@ -154,7 +154,6 @@ class ConnectionControllerTest extends BaseUnitTest {
         InitiateConnectionResponseDTO redirect = response.getBody();
         assertThat(redirect.type()).isEqualTo(InitiateConnectionResponseDTO.Type.REDIRECT);
         assertThat(redirect.vendorUrl()).isEqualTo(vendor);
-        assertThat(redirect.state()).isEqualTo("abc");
         assertThat(redirect.connectionId()).isNull();
         verify(admin, never()).createInlineConnection(anyLong(), any(), any(), any(), any(), any());
     }

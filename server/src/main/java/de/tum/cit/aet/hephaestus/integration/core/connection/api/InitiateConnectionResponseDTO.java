@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Two outcomes, distinguished by {@link #type}:
  * <ul>
  *   <li>{@code REDIRECT} — OAuth / App-install flows (GitHub, Slack). {@link #vendorUrl} is the
- *       URL to bounce the browser to; {@link #state} is the signed OAuth state.</li>
+ *       URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
  *   <li>{@code LINKED} — inline-credential flows (GitLab PAT). {@link #connectionId} is the
  *       newly-created Connection; no further round-trip is needed.</li>
  * </ul>
@@ -20,22 +20,17 @@ import org.jspecify.annotations.Nullable;
  * round-trips cleanly through code generation, so the webapp consumes the generated client
  * instead of a hand-rolled fetch wrapper.
  */
-public record InitiateConnectionResponseDTO(
-    Type type,
-    @Nullable URI vendorUrl,
-    @Nullable String state,
-    @Nullable Long connectionId
-) {
+public record InitiateConnectionResponseDTO(Type type, @Nullable URI vendorUrl, @Nullable Long connectionId) {
     public enum Type {
         REDIRECT,
         LINKED,
     }
 
-    public static InitiateConnectionResponseDTO redirect(URI vendorUrl, String state) {
-        return new InitiateConnectionResponseDTO(Type.REDIRECT, vendorUrl, state, null);
+    public static InitiateConnectionResponseDTO redirect(URI vendorUrl) {
+        return new InitiateConnectionResponseDTO(Type.REDIRECT, vendorUrl, null);
     }
 
     public static InitiateConnectionResponseDTO linked(Long connectionId) {
-        return new InitiateConnectionResponseDTO(Type.LINKED, null, null, connectionId);
+        return new InitiateConnectionResponseDTO(Type.LINKED, null, connectionId);
     }
 }
