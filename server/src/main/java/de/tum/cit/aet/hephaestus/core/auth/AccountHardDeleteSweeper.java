@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>What it purges</h2>
  * The account's child auth rows — {@code identity_link}, {@code account_feature}, {@code issued_jwt},
  * {@code account_export} — are removed via the {@code ON DELETE CASCADE} FK on each
- * {@code account_id} (see {@code 1779800000000_auth_module_scaffold.xml}). We trigger that cascade
+ * {@code account_id} (see the auth-module changelog). We trigger that cascade
  * with a single {@code DELETE FROM account WHERE id = ?} would also drop the tombstone, so instead we
  * delete the children explicitly and keep a minimal {@code account} tombstone (status DELETED, PII
  * fields cleared). The tombstone preserves referential integrity for retained, lawful-basis rows

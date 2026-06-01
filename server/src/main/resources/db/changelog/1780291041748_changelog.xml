@@ -31,7 +31,7 @@
         Subsequent commits in this PR add behavior; this commit ships schema only.
     -->
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-1-extensions">
+    <changeSet author="FelixTJDietrich" id="1780291041748-1-extensions">
         <sql splitStatements="false"><![CDATA[
             CREATE EXTENSION IF NOT EXISTS citext;
         ]]></sql>
@@ -40,7 +40,7 @@
         <rollback/>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-2-account">
+    <changeSet author="FelixTJDietrich" id="1780291041748-2-account">
         <preConditions onFail="MARK_RAN" onFailMessage="account table already present">
             <not><tableExists tableName="account"/></not>
         </preConditions>
@@ -94,7 +94,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-3-identity-link">
+    <changeSet author="FelixTJDietrich" id="1780291041748-3-identity-link">
         <preConditions onFail="MARK_RAN" onFailMessage="identity_link already present">
             <not><tableExists tableName="identity_link"/></not>
         </preConditions>
@@ -154,7 +154,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-4-account-feature">
+    <changeSet author="FelixTJDietrich" id="1780291041748-4-account-feature">
         <preConditions onFail="MARK_RAN" onFailMessage="account_feature already present">
             <not><tableExists tableName="account_feature"/></not>
         </preConditions>
@@ -184,7 +184,7 @@
                                  onDelete="SET NULL"/>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-5-jwt-signing-key">
+    <changeSet author="FelixTJDietrich" id="1780291041748-5-jwt-signing-key">
         <preConditions onFail="MARK_RAN" onFailMessage="jwt_signing_key already present">
             <not><tableExists tableName="jwt_signing_key"/></not>
         </preConditions>
@@ -220,7 +220,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1779800000000-6-issued-jwt">
+    <changeSet author="FelixTJDietrich" id="1780291041748-6-issued-jwt">
         <preConditions onFail="MARK_RAN" onFailMessage="issued_jwt already present">
             <not><tableExists tableName="issued_jwt"/></not>
         </preConditions>
@@ -269,7 +269,7 @@
              than 12 months. It runs once on ApplicationReadyEvent and monthly thereafter.
         This replaces the prior pg_partman dependency entirely — no non-stock extension required.
     -->
-    <changeSet author="FelixTJDietrich" id="1779800000000-7-auth-event-parent">
+    <changeSet author="FelixTJDietrich" id="1780291041748-7-auth-event-parent">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent already present">
             <not><tableExists tableName="auth_event"/></not>
         </preConditions>
@@ -324,7 +324,7 @@
         every CREATE, and the month names are computed from now() at migration time. Naming
         convention auth_event_pYYYYMM and auth_event_default MUST match AuthEventPartitionManager.
     -->
-    <changeSet author="FelixTJDietrich" id="1779800000000-8-auth-event-bootstrap-partitions">
+    <changeSet author="FelixTJDietrich" id="1780291041748-8-auth-event-bootstrap-partitions">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent missing — partitioning skipped">
             <tableExists tableName="auth_event"/>
         </preConditions>
@@ -376,7 +376,7 @@
         auth lookup is login → preferred_username, never this column. No backward compat.
         Idempotent (IF EXISTS) so it's safe whether or not 1779790459343 reached the DB.
     -->
-    <changeSet author="FelixTJDietrich" id="1779800000000-9-drop-keycloak-subject">
+    <changeSet author="FelixTJDietrich" id="1780291041748-9-drop-keycloak-subject">
         <preConditions onFail="MARK_RAN" onFailMessage="user.keycloak_subject already removed">
             <columnExists tableName="user" columnName="keycloak_subject"/>
         </preConditions>
@@ -395,14 +395,6 @@
         </rollback>
     </changeSet>
 
-    <!--
-        ── Consolidated below per CLAUDE.md §5 (one changelog file per branch) ──
-        The auth_rate_limit_bucket + account_export changeSets were originally separate files
-        (1779850000000_*, 1779860000000_*); they are folded in here as additional changeSets.
-        Their ids are kept verbatim. Liquibase keys DATABASECHANGELOG on id+author+filename, so a
-        dev DB that already ran the old files sees these as "new" rows under the new filename — the
-        MARK_RAN preconditions short-circuit on the existing tables, so no DDL re-executes.
-    -->
 
     <!--
         Backing table for Bucket4j Postgres ProxyManager (SELECT … FOR UPDATE) used by the
@@ -413,7 +405,7 @@
           - expires_at: epoch-millis expiry (BIGINT), nullable.
         Not a JPA entity (managed by the Bucket4j library, like the shedlock table).
     -->
-    <changeSet author="FelixTJDietrich" id="1779850000000-1-auth-rate-limit-bucket">
+    <changeSet author="FelixTJDietrich" id="1780291041748-10-auth-rate-limit-bucket">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_rate_limit_bucket already present">
             <not><tableExists tableName="auth_rate_limit_bucket"/></not>
         </preConditions>
@@ -436,7 +428,7 @@
         bundle is stored inline in `payload` (BYTEA). The payload never contains tokens,
         credential blobs, or signing keys — see ExportBundle (the disclosure contract).
     -->
-    <changeSet author="FelixTJDietrich" id="1779860000000-1-account-export">
+    <changeSet author="FelixTJDietrich" id="1780291041748-11-account-export">
         <preConditions onFail="MARK_RAN" onFailMessage="account_export already present">
             <not><tableExists tableName="account_export"/></not>
         </preConditions>
