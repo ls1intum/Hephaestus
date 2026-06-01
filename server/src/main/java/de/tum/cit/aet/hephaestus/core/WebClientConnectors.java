@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.config;
+package de.tum.cit.aet.hephaestus.core;
 
 import io.netty.resolver.DefaultAddressResolverGroup;
 import org.springframework.http.client.reactive.ClientHttpConnector;
