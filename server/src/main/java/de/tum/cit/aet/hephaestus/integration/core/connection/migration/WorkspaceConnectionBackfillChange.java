@@ -72,7 +72,7 @@ import tools.jackson.databind.json.JsonMapper;
  * encrypted credential. Sources are the same two paths
  * {@link de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter} reads:
  * the {@code hephaestus.security.encryption-key} system property (Spring binds
- * Maven/JVM properties there) or the {@code HEPHAESTUS_ENCRYPTION_KEY} env var.
+ * Maven/JVM properties there) or the {@code HEPHAESTUS_SECURITY_ENCRYPTION_KEY} env var.
  * Workspaces without an encrypted credential to rewrap (App mode, or rows with
  * NULL PAT) never trigger the lookup — a local dev DB with no key still
  * migrates App-mode rows cleanly.
@@ -376,7 +376,7 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
             if (cachedKey == null) {
                 throw new IllegalStateException(
                     "WorkspaceConnectionBackfillChange found an encrypted credential to rewrap, " +
-                        "but hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is not set. " +
+                        "but hephaestus.security.encryption-key / HEPHAESTUS_SECURITY_ENCRYPTION_KEY is not set. " +
                         "Re-run Liquibase with the same 32-character key the running application uses."
                 );
             }
@@ -385,9 +385,12 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
 
         @Nullable
         private static byte[] resolveKey() {
+            // Liquibase runs outside Spring, so we can't rely on relaxed-binding — read the same
+            // value the app's @ConfigurationProperties("hephaestus.security") would: the system
+            // property, then the canonical env var Spring maps `hephaestus.security.encryption-key` to.
             String key = System.getProperty("hephaestus.security.encryption-key");
             if (key == null || key.isBlank()) {
-                key = System.getenv("HEPHAESTUS_ENCRYPTION_KEY");
+                key = System.getenv("HEPHAESTUS_SECURITY_ENCRYPTION_KEY");
             }
             if (key == null || key.isBlank()) {
                 return null;

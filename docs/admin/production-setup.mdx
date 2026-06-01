@@ -23,6 +23,7 @@ Set the following secrets before starting the stack:
 
 | Variable | Purpose |
 | --- | --- |
+| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | **Required.** AES-256 key (EXACTLY 32 chars) for credentials encrypted at rest in the `connection` table. Must be set **before the first deploy** of the unified integration framework — the Liquibase backfill re-encrypts existing credentials on boot and fails fast (or HALTs the migration) without it. Keep it stable; rotating requires re-encrypting all rows. Generate: `openssl rand -base64 24 \| cut -c1-32`. |
 | `WEBHOOK_SECRET` | HMAC secret for GitHub and GitLab webhooks (prefer SHA-256; e.g., `openssl rand -hex 32`) |
 | `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
 | `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |

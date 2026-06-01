@@ -35,7 +35,7 @@ Shipping infrastructure that does not run is a tax on every future reader. The a
 
 - **Stage A (this PR):**
   - Delete `HephaestusUser`, `HephaestusUserRepository`, `IntegrationIdentity`, `IntegrationIdentityRepository`, `UserDirectory`, `JpaUserDirectory` and the now-empty `integration.identity` package.
-  - Remove the `hephaestus_user` + `integration_identity` table creates from the unmerged `1779790459343_changelog.xml` changelog (endorsed Liquibase practice for changes that have not yet shipped to any environment).
+  - Remove the `hephaestus_user` + `integration_identity` table creates from the unmerged `1780313973588_changelog.xml` changelog (endorsed Liquibase practice for changes that have not yet shipped to any environment).
   - Delete the dead webapp helper `getGitProviderId()` from `keycloak.ts` + `AuthContext.tsx`.
   - Add `User.keycloakSubject` (column + partial unique index `uq_user_keycloak_subject WHERE keycloak_subject IS NOT NULL`).
   - Wire `AuthenticatedGitProviderUserService.upsertUser` to seed `keycloak_subject` from the JWT `sub` claim on every authenticated upsert. Sync paths (`GitLabIssueProcessor.findOrCreateUser` etc.) explicitly do NOT populate this column — they upsert vendor users we have never authenticated.
@@ -75,4 +75,4 @@ The partial unique index is the correct uniqueness contract for the seeded colum
 - Liquibase docs on editing unmerged changesets vs. shipping forward-only — endorsed practice for branch-local cleanup.
 - `WorkspaceContextFilter`, `SecurityUtils` — current `preferred_username → User.login` lookup that Stage B will flip.
 - `AuthenticatedGitProviderUserService.upsertUser` — the seed point for `keycloak_subject` populated in this PR.
-- `1779790459343_changelog.xml` — the new `keycloak_subject` column + partial unique index.
+- `1780313973588_changelog.xml` — the new `keycloak_subject` column + partial unique index.

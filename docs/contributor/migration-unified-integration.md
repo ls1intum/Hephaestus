@@ -35,7 +35,7 @@ env keys are unchanged in shape.
 ## 2. Database migration (VERIFIED — automatic)
 
 Liquibase applies on startup. Verified on a fresh DB: all changesets apply cleanly and the
-schema validates. The credential migration is changeset `1779790459343` →
+schema validates. The credential migration is changeset `1780313973588` →
 `WorkspaceConnectionBackfillChange`:
 
 1. **Backfills** each workspace's legacy credential columns into the encrypted `connection`

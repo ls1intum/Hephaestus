@@ -21,9 +21,10 @@
               table with empty connection table.
           9.  Drop of eleven superseded Workspace columns; account_login stays.
           10. user.keycloak_subject + partial unique (ADR 0016 Stage A).
+          11. workspace.leaderboard_league_cycle_at (per-workspace league-cycle idempotency marker).
 
         Section 8 needs hephaestus.security.encryption-key (system property) or
-        HEPHAESTUS_ENCRYPTION_KEY (env var) — the same 32-char key the app uses.
+        HEPHAESTUS_SECURITY_ENCRYPTION_KEY (env var) — the same 32-char key the app uses.
         Missing key + an encrypted PAT in scope → fail-fast, no silent drop.
 
         Every changeset uses onFail="MARK_RAN" preconditions so re-apply against
@@ -31,7 +32,7 @@
     -->
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-1">
+    <changeSet author="hephaestus-1198" id="1780313973588-1">
         <preConditions onFail="MARK_RAN" onFailMessage="connection table already present">
             <not><tableExists tableName="connection"/></not>
         </preConditions>
@@ -90,7 +91,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-2">
+    <changeSet author="hephaestus-1198" id="1780313973588-2">
         <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_pending partial index already present">
             <not><indexExists indexName="uq_connection_pending"/></not>
         </preConditions>
@@ -110,7 +111,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-2b">
+    <changeSet author="hephaestus-1198" id="1780313973588-2b">
         <preConditions onFail="MARK_RAN" onFailMessage="uq_connection_one_active_scm_per_workspace already present">
             <not><indexExists indexName="uq_connection_one_active_scm_per_workspace"/></not>
         </preConditions>
@@ -132,7 +133,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-3">
+    <changeSet author="hephaestus-1198" id="1780313973588-3">
         <preConditions onFail="MARK_RAN" onFailMessage="connection_audit already present">
             <not><tableExists tableName="connection_audit"/></not>
         </preConditions>
@@ -185,7 +186,7 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-6">
+    <changeSet author="hephaestus-1198" id="1780313973588-6">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_post already present">
             <not><tableExists tableName="feedback_post"/></not>
         </preConditions>
@@ -231,7 +232,7 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-9">
+    <changeSet author="hephaestus-1198" id="1780313973588-9">
         <preConditions onFail="MARK_RAN" onFailMessage="agent_job.integration_kind already present">
             <not><columnExists tableName="agent_job" columnName="integration_kind"/></not>
         </preConditions>
@@ -244,7 +245,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-10">
+    <changeSet author="hephaestus-1198" id="1780313973588-10">
         <preConditions onFail="MARK_RAN" onFailMessage="agent_job.subject_class already present">
             <not><columnExists tableName="agent_job" columnName="subject_class"/></not>
         </preConditions>
@@ -257,7 +258,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-11">
+    <changeSet author="hephaestus-1198" id="1780313973588-11">
         <preConditions onFail="MARK_RAN" onFailMessage="idx_agent_job_subject already present">
             <not><indexExists indexName="idx_agent_job_subject"/></not>
         </preConditions>
@@ -278,7 +279,7 @@
 
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-20">
+    <changeSet author="hephaestus-1198" id="1780313973588-20">
         <preConditions onFail="MARK_RAN" onFailMessage="shedlock table already present">
             <not><tableExists tableName="shedlock"/></not>
         </preConditions>
@@ -306,7 +307,7 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-21">
+    <changeSet author="hephaestus-1198" id="1780313973588-21">
         <preConditions onFail="MARK_RAN" onFailMessage="oauth_state_nonce table already present">
             <not><tableExists tableName="oauth_state_nonce"/></not>
         </preConditions>
@@ -338,7 +339,7 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-21b" runOnChange="false">
+    <changeSet author="hephaestus-1198" id="1780313973588-21b" runOnChange="false">
         <preConditions onFail="MARK_RAN" onFailMessage="no workspace rows to backfill from (fresh DB)">
             <sqlCheck expectedResult="t">
                 SELECT EXISTS (SELECT 1 FROM workspace)
@@ -357,8 +358,8 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-21c" runOnChange="false">
-        <preConditions onFail="HALT" onFailMessage="ABORTED: workspace rows exist but no connection rows were backfilled before the section-9 column drops. Section 8 (WorkspaceConnectionBackfillChange) must succeed before legacy columns are dropped. Verify hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is set, inspect the migration logs, then re-run.">
+    <changeSet author="hephaestus-1198" id="1780313973588-21c" runOnChange="false">
+        <preConditions onFail="HALT" onFailMessage="ABORTED: workspace rows exist but no connection rows were backfilled before the section-9 column drops. Section 8 (WorkspaceConnectionBackfillChange) must succeed before legacy columns are dropped. Verify hephaestus.security.encryption-key / HEPHAESTUS_SECURITY_ENCRYPTION_KEY is set, inspect the migration logs, then re-run.">
             <or>
                 <!-- Safe state #1: no workspace rows (fresh DB / CI). -->
                 <sqlCheck expectedResult="f">SELECT EXISTS (SELECT 1 FROM workspace)</sqlCheck>
@@ -391,7 +392,7 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-22">
+    <changeSet author="hephaestus-1198" id="1780313973588-22">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.installation_id already dropped">
             <columnExists tableName="workspace" columnName="installation_id"/>
         </preConditions>
@@ -403,7 +404,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-23">
+    <changeSet author="hephaestus-1198" id="1780313973588-23">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.personal_access_token already dropped">
             <columnExists tableName="workspace" columnName="personal_access_token"/>
         </preConditions>
@@ -415,7 +416,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-24">
+    <changeSet author="hephaestus-1198" id="1780313973588-24">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.git_provider_mode already dropped">
             <columnExists tableName="workspace" columnName="git_provider_mode"/>
         </preConditions>
@@ -427,7 +428,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-25">
+    <changeSet author="hephaestus-1198" id="1780313973588-25">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.gitlab_group_id already dropped">
             <columnExists tableName="workspace" columnName="gitlab_group_id"/>
         </preConditions>
@@ -439,7 +440,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-26">
+    <changeSet author="hephaestus-1198" id="1780313973588-26">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.gitlab_webhook_id already dropped">
             <columnExists tableName="workspace" columnName="gitlab_webhook_id"/>
         </preConditions>
@@ -451,7 +452,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-27">
+    <changeSet author="hephaestus-1198" id="1780313973588-27">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.server_url already dropped">
             <columnExists tableName="workspace" columnName="server_url"/>
         </preConditions>
@@ -463,7 +464,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-28">
+    <changeSet author="hephaestus-1198" id="1780313973588-28">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.slack_token already dropped">
             <columnExists tableName="workspace" columnName="slack_token"/>
         </preConditions>
@@ -475,7 +476,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-29">
+    <changeSet author="hephaestus-1198" id="1780313973588-29">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.slack_signing_secret already dropped">
             <columnExists tableName="workspace" columnName="slack_signing_secret"/>
         </preConditions>
@@ -487,7 +488,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-30">
+    <changeSet author="hephaestus-1198" id="1780313973588-30">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_team already dropped">
             <columnExists tableName="workspace" columnName="leaderboard_notification_team"/>
         </preConditions>
@@ -499,7 +500,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-31">
+    <changeSet author="hephaestus-1198" id="1780313973588-31">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_notification_channel_id already dropped">
             <columnExists tableName="workspace" columnName="leaderboard_notification_channel_id"/>
         </preConditions>
@@ -511,7 +512,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-32">
+    <changeSet author="hephaestus-1198" id="1780313973588-32">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.installation_linked_at already dropped">
             <columnExists tableName="workspace" columnName="installation_linked_at"/>
         </preConditions>
@@ -524,7 +525,7 @@
     </changeSet>
 
 
-    <changeSet author="hephaestus-1198" id="1779790459343-33">
+    <changeSet author="hephaestus-1198" id="1780313973588-33">
         <preConditions onFail="MARK_RAN" onFailMessage="user.keycloak_subject already present">
             <not><columnExists tableName="user" columnName="keycloak_subject"/></not>
         </preConditions>
@@ -537,7 +538,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-1198" id="1779790459343-34">
+    <changeSet author="hephaestus-1198" id="1780313973588-34">
         <preConditions onFail="MARK_RAN" onFailMessage="uq_user_keycloak_subject already present">
             <not><indexExists indexName="uq_user_keycloak_subject"/></not>
         </preConditions>
@@ -555,6 +556,21 @@
         </sql>
         <rollback>
             <sql>DROP INDEX IF EXISTS uq_user_keycloak_subject;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- 11. Per-workspace league-cycle idempotency marker (moved here from the main-owned
+         changelog so this branch ships exactly one consolidated changelog). -->
+    <changeSet author="hephaestus-1198" id="1780313973588-35">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_league_cycle_at already present">
+            <not><columnExists tableName="workspace" columnName="leaderboard_league_cycle_at"/></not>
+        </preConditions>
+        <comment>Idempotency marker: end instant of the last league-points cycle applied per workspace.</comment>
+        <addColumn tableName="workspace">
+            <column name="leaderboard_league_cycle_at" type="timestamp with time zone"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="leaderboard_league_cycle_at"/>
         </rollback>
     </changeSet>
 

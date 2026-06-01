@@ -64,17 +64,4 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780067945030-4">
-        <preConditions onFail="MARK_RAN" onFailMessage="workspace.leaderboard_league_cycle_at already present">
-            <not><columnExists tableName="workspace" columnName="leaderboard_league_cycle_at"/></not>
-        </preConditions>
-        <comment>Idempotency marker: end instant of the last league-points cycle applied per workspace.</comment>
-        <addColumn tableName="workspace">
-            <column name="leaderboard_league_cycle_at" type="timestamp with time zone"/>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="workspace" columnName="leaderboard_league_cycle_at"/>
-        </rollback>
-    </changeSet>
-
 </databaseChangeLog>

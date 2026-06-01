@@ -79,7 +79,7 @@ bulk re-encrypt of all connection rows with the new key (the AAD is
 reproducible from the row, so the same context applies).
 
 The consolidated Liquibase migration
-(`1779790459343_changelog.xml`) runs an idempotent
+(`1780313973588_changelog.xml`) runs an idempotent
 `WorkspaceConnectionBackfillChange` customChange (changeset 8) that migrates
 legacy `Workspace` credential columns into AES-GCM v2 blobs in new
 `connection` rows. Changeset 9 verifies and then drops the legacy columns.
@@ -145,7 +145,7 @@ Re-open this decision if any of the following land:
 
 - `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContext.java`
 - `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/CredentialBundleConverter.java`
-- `server/src/main/resources/db/changelog/1779790459343_changelog.xml`
+- `server/src/main/resources/db/changelog/1780313973588_changelog.xml`
   (changesets 8–9: backfill + legacy column drop)
 - AWS Database Encryption SDK — Concepts (record identity): https://docs.aws.amazon.com/database-encryption-sdk/latest/devguide/concepts.html
 - AWS KMS — Encryption Context: https://docs.aws.amazon.com/kms/latest/developerguide/encrypt_context.html
