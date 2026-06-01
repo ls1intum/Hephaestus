@@ -340,10 +340,13 @@
 
 
     <changeSet author="hephaestus-1198" id="1780313973588-21b" runOnChange="false">
-        <preConditions onFail="MARK_RAN" onFailMessage="no workspace rows to backfill from (fresh DB)">
-            <sqlCheck expectedResult="t">
-                SELECT EXISTS (SELECT 1 FROM workspace)
-            </sqlCheck>
+        <preConditions onFail="MARK_RAN" onFailMessage="nothing to backfill (fresh DB or legacy columns already dropped)">
+            <and>
+                <columnExists tableName="workspace" columnName="git_provider_mode"/>
+                <sqlCheck expectedResult="t">
+                    SELECT EXISTS (SELECT 1 FROM workspace)
+                </sqlCheck>
+            </and>
         </preConditions>
         <comment>
             Lift legacy Workspace integration columns into Connection rows BEFORE the
