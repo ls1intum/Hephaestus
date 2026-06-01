@@ -85,6 +85,24 @@ class IntegrationConsumerHealthIndicatorTest extends BaseUnitTest {
 
             assertThat(indicator(stats).health().getStatus()).isEqualTo(Status.UP);
         }
+
+        @Test
+        void disabledConsumer_reportsUp() {
+            // A server-role pod with hephaestus.sync.nats.enabled=false reports DISABLED
+            // (IntegrationNatsConsumer): the webhook pod owns consumption, so this is a
+            // valid runtime and must not 503 the app-server's readiness probe.
+            IntegrationConsumerStats stats = mock(IntegrationConsumerStats.class);
+            when(stats.natsConnectionStatus()).thenReturn(Optional.of("DISABLED"));
+            when(stats.activeScopeConsumerCount()).thenReturn(0);
+            when(stats.installationConsumerActive()).thenReturn(false);
+            when(stats.lastDispatchAt()).thenReturn(Optional.empty());
+            when(stats.lastNakAt()).thenReturn(Optional.empty());
+
+            Health health = indicator(stats).health();
+
+            assertThat(health.getStatus()).isEqualTo(Status.UP);
+            assertThat(health.getDetails()).containsEntry("natsConnectionStatus", "DISABLED");
+        }
     }
 
     @Nested
