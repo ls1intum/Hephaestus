@@ -73,13 +73,13 @@
         <okhttp.version>5.3.2</okhttp.version>
         <docker-java.version>3.7.1</docker-java.version>
         <archunit.version>1.4.2</archunit.version>
-        <spring-modulith.version>2.0.0</spring-modulith.version>
+        <spring-modulith.version>2.0.6</spring-modulith.version>
         <liquibase-hibernate7.version>5.0.3</liquibase-hibernate7.version>
         <springdoc.version>3.0.3</springdoc.version>
         <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
-        <sentry.version>8.41.0</sentry.version>
-        <slack-bolt.version>1.48.1</slack-bolt.version>
-        <jnats.version>2.25.2</jnats.version>
+        <sentry.version>8.43.0</sentry.version>
+        <slack-bolt.version>1.49.0</slack-bolt.version>
+        <jnats.version>2.25.3</jnats.version>
         <jgit.version>7.6.0.202603022253-r</jgit.version>
         <keycloak-admin.version>26.0.9</keycloak-admin.version>
         <java-jwt.version>4.5.2</java-jwt.version>
@@ -861,8 +861,8 @@
                     <maxAttempts>100</maxAttempts>
                     <!-- Rationale + digest refresh: docs/admin/buildpacks-cds-decision.md -->
                     <image>
-                        <builder>paketobuildpacks/builder-noble-java-tiny@sha256:c8b5f936e6d9af492af4a493b4a03eaf496fe51f206c5d53ccddab7871ed4ef5</builder>
-                        <runImage>paketobuildpacks/ubuntu-noble-run-tiny@sha256:b5a167cf9a8021e289e5701a82f7c6b430ba85bb8360e9ddc767340e3f8824c3</runImage>
+                        <builder>paketobuildpacks/builder-noble-java-tiny@sha256:403ac8e4632a54eaa2d20e5401afcdfc44884a9a8b42616584960c67e0597d7e</builder>
+                        <runImage>paketobuildpacks/ubuntu-noble-run-tiny@sha256:dc1e606db3ed30dc561e65f06b65128130ea1f3cbd7a623e636d20fc34f45bc9</runImage>
                         <env>
                             <BP_JVM_VERSION>21</BP_JVM_VERSION>
                             <BP_JVM_CDS_ENABLED>true</BP_JVM_CDS_ENABLED>
