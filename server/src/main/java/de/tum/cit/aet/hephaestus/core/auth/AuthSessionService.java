@@ -92,6 +92,7 @@ public class AuthSessionService {
             // clear the cookie so the client re-authenticates.
             int revoked = issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.ROTATE);
             if (revoked == 0) {
+                metrics.recordRefreshResult(AuthMetrics.RefreshResult.NOOP);
                 clearCookie(response);
                 return;
             }
@@ -102,6 +103,7 @@ public class AuthSessionService {
             // the cookie, and end the session. (forAccountId would also reject as defense-in-depth.)
             Account account = accountRepository.findById(accountId).orElse(null);
             if (account == null || account.getStatus() != Account.Status.ACTIVE) {
+                metrics.recordRefreshResult(AuthMetrics.RefreshResult.SUSPENDED);
                 clearCookie(response);
                 return;
             }
@@ -115,6 +117,7 @@ public class AuthSessionService {
                 .account(accountId)
                 .record();
             setCookie(response, token);
+            metrics.recordRefreshResult(AuthMetrics.RefreshResult.SUCCESS);
         } finally {
             metrics.stopRefreshTimer(sample);
         }

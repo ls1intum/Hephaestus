@@ -50,9 +50,17 @@ public class AuthJwtConfig {
         IssuedJwtRepository issuedJwtRepository,
         AuthProperties properties,
         CacheManager cacheManager,
-        Clock authClock
+        Clock authClock,
+        de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics authMetrics
     ) {
-        return new RevocationAwareJwtDecoder(keyService, issuedJwtRepository, properties, cacheManager, authClock);
+        return new RevocationAwareJwtDecoder(
+            keyService,
+            issuedJwtRepository,
+            properties,
+            cacheManager,
+            authClock,
+            authMetrics
+        );
     }
 
     /**

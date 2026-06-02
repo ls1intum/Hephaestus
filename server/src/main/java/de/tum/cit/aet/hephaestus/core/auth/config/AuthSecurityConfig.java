@@ -14,8 +14,10 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -131,13 +133,19 @@ public class AuthSecurityConfig {
     }
 
     @Bean
-    public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(AuthProperties properties) {
-        return new CookieOAuth2AuthorizationRequestRepository(resolveStateCookieKey(properties));
+    public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(
+        AuthProperties properties,
+        @Value("${spring.profiles.active:}") String activeProfiles
+    ) {
+        return new CookieOAuth2AuthorizationRequestRepository(resolveStateCookieKey(properties, activeProfiles));
     }
 
     @Bean
-    public AuthIntentCookie authIntentCookie(AuthProperties properties) {
-        return new AuthIntentCookie(resolveStateCookieKey(properties));
+    public AuthIntentCookie authIntentCookie(
+        AuthProperties properties,
+        @Value("${spring.profiles.active:}") String activeProfiles
+    ) {
+        return new AuthIntentCookie(resolveStateCookieKey(properties, activeProfiles));
     }
 
     @Bean
@@ -194,8 +202,13 @@ public class AuthSecurityConfig {
      * {@code hephaestus.auth.state-cookie-key} to a base64-encoded 32-byte value; absence is
      * tolerated only for dev / CI where we generate a per-boot ephemeral key and log a
      * warning (in-flight logins are abandoned across restarts).
+     *
+     * <p>In the {@code prod} profile a blank key is fatal (fail-closed) — mirroring
+     * {@code JwtSigningKeySealer}'s prod fail-fast — because an ephemeral key silently
+     * invalidates every in-flight login on each pod restart and differs per replica, which
+     * {@link AuthProperties} documents as a misconfiguration rather than a degraded mode.
      */
-    private static byte[] resolveStateCookieKey(AuthProperties properties) {
+    private static byte[] resolveStateCookieKey(AuthProperties properties, @Nullable String activeProfiles) {
         if (!properties.stateCookieKey().isBlank()) {
             byte[] decoded = Base64.getDecoder().decode(properties.stateCookieKey());
             if (decoded.length != 32) {
@@ -204,6 +217,12 @@ public class AuthSecurityConfig {
                 );
             }
             return decoded;
+        }
+        if (activeProfiles != null && activeProfiles.contains("prod")) {
+            throw new IllegalStateException(
+                "hephaestus.auth.state-cookie-key is required in production (fail-closed). " +
+                    "Set it to a base64-encoded 32-byte (256-bit AES) value."
+            );
         }
         byte[] ephemeral = new byte[32];
         new SecureRandom().nextBytes(ephemeral);

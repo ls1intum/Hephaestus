@@ -36,6 +36,8 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -159,11 +161,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("kind", "SLACK");
-        assertThat(body).containsEntry("error", "access_denied");
-        assertThat(body).containsEntry("errorDescription", "The user denied the request");
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("kind", "SLACK").containsEntry("error", "access_denied");
+        assertThat(body.getDetail()).isEqualTo("The user denied the request");
 
         // State was never consumed — the user might retry without re-issuing.
         verify(oauthStateService, never()).consume(any());
@@ -205,9 +207,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             jsonRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "missing_state");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "missing_state");
     }
 
     @Test
@@ -240,10 +242,10 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "invalid_state");
-        assertThat(body.get("errorDescription")).contains("signature mismatch");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "invalid_state");
+        assertThat(body.getDetail()).contains("signature mismatch");
         // Critical: strategy NEVER invoked when the state is bad.
         assertThat(slackStrategy.finalizeCalls).isEqualTo(0);
         verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
@@ -265,10 +267,10 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "kind_mismatch");
-        assertThat(body.get("errorDescription")).contains("SLACK").contains("github");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "kind_mismatch");
+        assertThat(body.getDetail()).contains("SLACK").contains("github");
         assertThat(slackStrategy.finalizeCalls).isEqualTo(0);
         verify(callbackService, never()).findOrCreatePendingConnection(anyLong(), any());
     }
@@ -294,10 +296,10 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "finalize_failed");
-        assertThat(body.get("errorDescription")).contains("vendor rejected");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "finalize_failed");
+        assertThat(body.getDetail()).contains("vendor rejected");
         // No completion issued on a Failed result.
         verify(callbackService, never()).completeConnection(any(), any(), any());
     }
@@ -344,9 +346,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             jsonRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "strategy_error");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "strategy_error");
     }
 
     // Transition guard rejection
@@ -372,9 +374,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "transition_conflict");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "transition_conflict");
     }
 
     @Test
@@ -414,9 +416,9 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             jsonRequest()
         );
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "unknown_kind");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "unknown_kind");
         verify(oauthStateService, never()).consume(any());
     }
 
@@ -457,11 +459,11 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             Map.of("code", "c", "state", "s"),
             htmlRequest()
         );
-        // Server-side wiring bug — always JSON 500, no point redirecting a broken flow.
+        // Server-side wiring bug — always problem+json 500, no point redirecting a broken flow.
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        @SuppressWarnings("unchecked")
-        Map<String, String> body = (Map<String, String>) response.getBody();
-        assertThat(body).containsEntry("error", "no_strategy");
+        ProblemDetail body = (ProblemDetail) response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.getProperties()).containsEntry("error", "no_strategy");
     }
 
     // POST callback
