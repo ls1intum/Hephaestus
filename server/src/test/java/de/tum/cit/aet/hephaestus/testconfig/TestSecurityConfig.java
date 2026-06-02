@@ -76,6 +76,25 @@ public class TestSecurityConfig {
                     .build();
             }
 
+            // Dynamic numeric-subject token: "mock-jwt-sub-<accountId>" decodes to that exact `sub`,
+            // so a test can authenticate AS a specific (DB-assigned) Account id — required since the
+            // native-auth migration keys currentAccountId() on a numeric JWT sub (ADR 0017). Carries the
+            // common roles so it works for both authenticated and mentor-gated endpoints.
+            if (token.startsWith("mock-jwt-sub-")) {
+                String sub = token.substring("mock-jwt-sub-".length());
+                return Jwt.withTokenValue(token)
+                    .header("alg", "HS256")
+                    .header("typ", "JWT")
+                    .claim("sub", sub)
+                    .claim("preferred_username", "account-" + sub)
+                    .claim("iss", "https://test-issuer")
+                    .claim("aud", "test-audience")
+                    .claim("roles", Arrays.asList("mentor_access", "admin"))
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+            }
+
             // Determine user based on token pattern
             String username;
             String userId;
