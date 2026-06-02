@@ -37,12 +37,19 @@ public record AuthProperties(
     @DefaultValue("http://localhost:38080") URI issuer,
     @DefaultValue("hephaestus-spa") String audience,
     @DefaultValue("15m") Duration accessTtl,
-    @DefaultValue("__Host-HEPHAESTUS_AT") String cookieName,
+    @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,
     @DefaultValue("") String stateCookieKey,
     @DefaultValue("48h") Duration deleteCooldown,
     @DefaultValue GithubLogin github,
     @DefaultValue GitlabLrzLogin gitlabLrz
 ) {
+    /**
+     * Access-token cookie name. The {@code __Host-} prefix forces Secure + host-only (no Domain),
+     * so the browser drops it if a proxy injects a Domain attribute. Single source of truth — also
+     * referenced by {@code SecurityConfig}'s CSRF cookie check so the two cannot drift.
+     */
+    public static final String DEFAULT_COOKIE_NAME = "__Host-HEPHAESTUS_AT";
+
     /**
      * Default GitHub OAuth login provider credentials. The registration is wired only when
      * {@link #configured()} so CI / specs / worker-only pods boot without OAuth credentials.

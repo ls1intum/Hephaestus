@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus;
 
 import de.tum.cit.aet.hephaestus.config.CorsProperties;
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.security.CsrfCookieFilter;
 import de.tum.cit.aet.hephaestus.core.security.ImpersonationGuard;
@@ -46,13 +47,16 @@ public class SecurityConfig {
 
     private final CorsProperties corsProperties;
     private final boolean devTriggerEnabled;
+    private final String authCookieName;
 
     public SecurityConfig(
         CorsProperties corsProperties,
-        @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled
+        @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
+        @Value("${hephaestus.auth.cookie-name:" + AuthProperties.DEFAULT_COOKIE_NAME + "}") String authCookieName
     ) {
         this.corsProperties = corsProperties;
         this.devTriggerEnabled = devTriggerEnabled;
+        this.authCookieName = authCookieName;
     }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
@@ -164,6 +168,9 @@ public class SecurityConfig {
                 }
                 requests.anyRequest().denyAll();
             });
+            // Same security headers as the resource-server chain — a no-decoder pod still serves
+            // OpenAPI / OPTIONS / denied responses, so HSTS/CSP/COOP/etc. should apply here too.
+            SecurityHeaders.apply(http);
             return http.build();
         }
 
@@ -300,8 +307,12 @@ public class SecurityConfig {
         if (SAFE_METHODS.contains(request.getMethod())) {
             return false;
         }
+        // A bearer-token request is not CSRF-vulnerable (a browser never auto-attaches an Authorization
+        // header cross-site). But CookieBearerTokenResolver is cookie-FIRST: a request that ALSO carries
+        // the __Host- auth cookie is authenticated by the cookie regardless of the header, so it must
+        // still present the double-submit token. Skip CSRF only for a PURE bearer request (no auth cookie).
         String authorization = request.getHeader("Authorization");
-        if (authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+        if (authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7) && !hasAuthCookie(request)) {
             return false;
         }
         // No path skips for /webhooks/, /oauth/callback/, or /login/oauth2/code/ here: those are owned
@@ -312,6 +323,20 @@ public class SecurityConfig {
             return false;
         }
         return true;
+    }
+
+    /** True if the request carries the {@code __Host-} access-token cookie (CookieBearerTokenResolver's primary source). */
+    private boolean hasAuthCookie(jakarta.servlet.http.HttpServletRequest request) {
+        jakarta.servlet.http.Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return false;
+        }
+        for (jakarta.servlet.http.Cookie cookie : cookies) {
+            if (authCookieName.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Bean
