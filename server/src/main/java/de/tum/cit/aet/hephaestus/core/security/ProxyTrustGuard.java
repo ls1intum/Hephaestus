@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.core.security;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.stereotype.Component;
 
 /**
  * Fail-closed guard for the Tomcat {@code RemoteIpValve} proxy-trust configuration in prod.
@@ -20,7 +20,7 @@ import org.springframework.core.env.Profiles;
  * <p>Mirrors {@link de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService#assertProdKeysSealed()}:
  * prod-only, throws {@link IllegalStateException} from a non-swallowed {@code @PostConstruct}.
  */
-@Configuration
+@Component
 public class ProxyTrustGuard {
 
     private final Environment environment;
