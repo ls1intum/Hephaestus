@@ -23,7 +23,7 @@
           10. user.keycloak_subject + partial unique (ADR 0016 Stage A).
 
         Section 8 needs hephaestus.security.encryption-key (system property) or
-        HEPHAESTUS_ENCRYPTION_KEY (env var) — the same 32-char key the app uses.
+        HEPHAESTUS_SECURITY_ENCRYPTION_KEY (env var) — the same 32-char key the app uses.
         Missing key + an encrypted PAT in scope → fail-fast, no silent drop.
 
         Every changeset uses onFail="MARK_RAN" preconditions so re-apply against
@@ -358,7 +358,7 @@
 
 
     <changeSet author="hephaestus-1198" id="1779790459343-21c" runOnChange="false">
-        <preConditions onFail="HALT" onFailMessage="ABORTED: workspace rows exist but no connection rows were backfilled before the section-9 column drops. Section 8 (WorkspaceConnectionBackfillChange) must succeed before legacy columns are dropped. Verify hephaestus.security.encryption-key / HEPHAESTUS_ENCRYPTION_KEY is set, inspect the migration logs, then re-run.">
+        <preConditions onFail="HALT" onFailMessage="ABORTED: workspace rows exist but no connection rows were backfilled before the section-9 column drops. Section 8 (WorkspaceConnectionBackfillChange) must succeed before legacy columns are dropped. Verify hephaestus.security.encryption-key / HEPHAESTUS_SECURITY_ENCRYPTION_KEY is set, inspect the migration logs, then re-run.">
             <or>
                 <!-- Safe state #1: no workspace rows (fresh DB / CI). -->
                 <sqlCheck expectedResult="f">SELECT EXISTS (SELECT 1 FROM workspace)</sqlCheck>
