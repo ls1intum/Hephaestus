@@ -999,12 +999,25 @@
                         hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
                     <!--
-                        Exclude Liquibase-managed sidecar tables that have no JPA entity
-                        and never will (managed by external libraries).
-                          - shedlock: ShedLock distributed lock table (managed by the
-                            ShedLock library via JdbcTemplateLockProvider, not JPA).
+                        Exclude objects that exist in the Liquibase-managed schema but that Hibernate
+                        cannot (and must not) generate, so the JPA-vs-DB drift diff stays empty for them.
+                        Scoped to specific names/types — NOT a blanket `foreignkey:.*` — so genuine drift
+                        on the ~50 entities that DO model FKs via JPA associations is still caught.
+
+                        Sidecar tables (no JPA entity, managed by external libraries):
+                          - shedlock: ShedLock distributed lock table (JdbcTemplateLockProvider, not JPA).
+                          - auth_rate_limit_bucket: token-bucket store managed outside JPA.
+
+                        ADR 0017 native-auth schema:
+                          - auth_event_default / auth_event_p<yyyymm>: declarative range PARTITIONS of the
+                            partitioned auth_event table. Hibernate models only the parent table; it has no
+                            concept of PG partitions, so the children always read as "extra" tables.
+                          - The auth_event_*_fkey + fk_account_export/feature/identity_link/issued_jwt
+                            constraints back SCALAR foreign-key columns (Long ids, no @ManyToOne) chosen to
+                            break module cycles. Hibernate emits the column but never the FK constraint, so
+                            each reads as an "extra" constraint. Add new scalar-FK constraint names here.
                     -->
-                    <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket</diffExcludeObjects>
+                    <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket,table:auth_event_default,table:auth_event_p\d+,foreignkey:auth_event_.*_fkey,foreignkey:fk_account_export_account,foreignkey:fk_account_feature_account,foreignkey:fk_account_feature_enabled_by,foreignkey:fk_identity_link_git_provider,foreignkey:fk_issued_jwt_account</diffExcludeObjects>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>
