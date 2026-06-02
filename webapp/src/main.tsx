@@ -11,6 +11,7 @@ import { StrictMode, useEffect } from "react";
 
 import environment from "@/environment";
 import { AuthProvider, csrfHeaders, useAuth } from "@/integrations/auth";
+import { handlePossibleSessionExpiry } from "@/integrations/auth/sessionExpiry";
 import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
 import { PostHogIdentity } from "@/integrations/posthog";
@@ -42,6 +43,15 @@ client.interceptors.request.use((request) => {
 		}
 	}
 	return request;
+});
+
+// Mid-session cookie-expiry handler: when an authenticated in-app request 401s, drop the cached
+// identity and redirect to /login with the current path preserved as returnTo. The `GET /user`
+// probe and /auth/* are exempt so a logged-out probe never loops (ADR 0017). Uses the SAME shared
+// QueryClient the guards/useAuth read.
+client.interceptors.response.use((response) => {
+	handlePossibleSessionExpiry(response, TanstackQuery.getContext().queryClient);
+	return response;
 });
 
 // Create a new router instance

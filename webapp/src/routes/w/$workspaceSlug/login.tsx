@@ -50,7 +50,7 @@ function WorkspaceLoginPage() {
 			title={heading}
 			description="Continue with your Git provider to access this workspace."
 			error={error}
-			onSignIn={(registrationId) => login(registrationId)}
+			onSignIn={(registrationId) => login(registrationId, `/w/${workspaceSlug}`)}
 		/>
 	);
 }

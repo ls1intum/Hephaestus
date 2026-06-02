@@ -28,7 +28,14 @@ const exportPolls = new Map<string, number>();
 export const handlers = [
 	// --- current user -------------------------------------------------------
 	http.get("*/user", () => HttpResponse.json(currentUser)),
-	http.delete("*/user", () => new HttpResponse(null, { status: 204 })),
+	// Mirror the server contract: the confirmation header MUST equal the caller's
+	// account id, else 400. A `"true"`-style placeholder must NOT pass — that mismatch
+	// is exactly the regression a unconditional-204 mock would hide.
+	http.delete("*/user", ({ request }) =>
+		request.headers.get("X-Confirm-Delete") === String(currentUser.id)
+			? new HttpResponse(null, { status: 204 })
+			: new HttpResponse(null, { status: 400 }),
+	),
 
 	// --- identity providers + linked identities -----------------------------
 	http.get("*/identity-providers", () => HttpResponse.json(identityProviders)),

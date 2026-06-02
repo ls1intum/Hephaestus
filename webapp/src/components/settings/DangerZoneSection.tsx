@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/integrations/auth/AuthContext";
 
 const DELETE_CONFIRM_PHRASE = "delete my account";
 
@@ -172,6 +173,7 @@ function DataExportRow() {
  * destructive action enables.
  */
 function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
+	const { getUserId } = useAuth();
 	const [confirmText, setConfirmText] = useState("");
 	const confirmed = confirmText.trim().toLowerCase() === DELETE_CONFIRM_PHRASE;
 
@@ -187,8 +189,11 @@ function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
 	});
 
 	const handleConfirm = () => {
-		if (!confirmed) return;
-		deleteAccount.mutate({ headers: { "X-Confirm-Delete": "true" } });
+		// The server requires the confirmation header to equal the caller's own account id
+		// (a deliberate "you know who you are" guard against forged/CSRF-style deletes).
+		const userId = getUserId();
+		if (!confirmed || !userId) return;
+		deleteAccount.mutate({ headers: { "X-Confirm-Delete": userId } });
 	};
 
 	return (
@@ -239,7 +244,7 @@ function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={handleConfirm}
-							disabled={!confirmed || deleteAccount.isPending}
+							disabled={!confirmed || !getUserId() || deleteAccount.isPending}
 							className="bg-destructive hover:bg-destructive/90"
 						>
 							{deleteAccount.isPending ? "Deleting…" : "Delete account"}

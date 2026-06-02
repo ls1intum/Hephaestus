@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { resolveCurrentUser } from "@/integrations/auth/guard";
+import { isAppAdmin, resolveCurrentUser } from "@/integrations/auth/guard";
 
 /**
  * Super-admin (APP_ADMIN) layout route (ADR 0017 native auth).
@@ -16,8 +16,7 @@ import { resolveCurrentUser } from "@/integrations/auth/guard";
 export const Route = createFileRoute("/_authenticated/admin")({
 	beforeLoad: async ({ context }) => {
 		const user = await resolveCurrentUser(context.queryClient);
-		const isAppAdmin = user?.appRole === "APP_ADMIN" || (user?.roles ?? []).includes("admin");
-		if (!isAppAdmin) {
+		if (!isAppAdmin(user)) {
 			throw redirect({ to: "/" });
 		}
 	},

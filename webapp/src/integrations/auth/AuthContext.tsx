@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { createContext, useContext } from "react";
 import { getCurrentUserOptions } from "@/api/@tanstack/react-query.gen";
 import { authClient, toUserProfile, type UserProfile } from "./authClient";
+import { isAppAdmin as computeIsAppAdmin } from "./guard";
 
 export type { UserProfile } from "./authClient";
 
@@ -24,7 +25,6 @@ export interface AuthContextType {
 	getUserId: () => string | undefined;
 	getGitProviderId: () => string | undefined;
 	getUserProfilePictureUrl: () => string;
-	getUserProfileUrl: () => string;
 	/** Whether the user has a linked GitLab identity (logged in via GitLab or account linked) */
 	hasGitLabIdentity: boolean;
 	/** True when the current session is impersonating another account. */
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	// values and stable callbacks automatically (see webapp/AGENTS.md).
 	const userProfile = user ? toUserProfile(user) : undefined;
 
-	const isAppAdmin = user?.appRole === "APP_ADMIN" || (user?.roles ?? []).includes("admin");
+	const isAppAdmin = computeIsAppAdmin(user);
 
 	const login = async (idpHint?: string, returnTo?: string) => {
 		authClient.login(idpHint, returnTo);
@@ -119,8 +119,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		return "";
 	};
 
-	const getUserProfileUrl = () => user?.profileUrl ?? "";
-
 	const value: AuthContextType = {
 		isAuthenticated: user !== null,
 		isLoading,
@@ -137,7 +135,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		getUserId,
 		getGitProviderId,
 		getUserProfilePictureUrl,
-		getUserProfileUrl,
 		hasGitLabIdentity: user?.hasGitLabIdentity ?? false,
 		isImpersonating: user?.impersonating ?? false,
 		impersonatedDisplayName: user?.displayName ?? undefined,

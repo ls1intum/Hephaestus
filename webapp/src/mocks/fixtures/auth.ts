@@ -39,7 +39,8 @@ export const currentUser: CurrentUserView = {
 	appRole: "APP_ADMIN",
 	roles: ["ROLE_USER", "ROLE_ADMIN"],
 	status: "ACTIVE",
-	identityProvider: "github",
+	// Uppercase to match the server, which serializes GitProviderType.name() (GITHUB/GITLAB).
+	identityProvider: "GITHUB",
 	gitProviderId: "583231",
 	hasGitLabIdentity: true,
 	impersonating: false,

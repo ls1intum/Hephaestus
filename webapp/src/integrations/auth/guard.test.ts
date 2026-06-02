@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeReturnTo } from "./guard";
+import { isAppAdmin, safeReturnTo } from "./guard";
 
 // `safeReturnTo` is the single open-redirect defense for the post-login `?returnTo` param.
 // A regression here is a security bug (open redirect / XSS via javascript: URLs), so the
@@ -82,5 +82,23 @@ describe("safeReturnTo", () => {
 				expect(safeReturnTo("/%2525252f%2525252fevil")).toBe("/");
 			});
 		});
+	});
+});
+
+describe("isAppAdmin", () => {
+	it("is true when appRole is APP_ADMIN", () => {
+		expect(isAppAdmin({ appRole: "APP_ADMIN", roles: [] })).toBe(true);
+	});
+	it("is true when the admin role is present even if appRole is not APP_ADMIN", () => {
+		expect(isAppAdmin({ appRole: "APP_USER", roles: ["user", "admin"] })).toBe(true);
+	});
+	it("is false for a plain user", () => {
+		expect(isAppAdmin({ appRole: "APP_USER", roles: ["user"] })).toBe(false);
+	});
+	it.each([null, undefined])("is false for %s", (u) => {
+		expect(isAppAdmin(u)).toBe(false);
+	});
+	it("tolerates a missing roles array", () => {
+		expect(isAppAdmin({ appRole: "APP_USER" })).toBe(false);
 	});
 });

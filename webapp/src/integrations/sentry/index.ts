@@ -38,9 +38,9 @@ export function disableSentry() {
 	if (!initialized) {
 		return;
 	}
-	// `close()` flushes any buffered events and shuts down the transport. We don't await it:
-	// teardown is fire-and-forget from the render/effect path, and a withdrawn consent must
-	// stop *future* capture immediately, which detaching the client achieves synchronously.
+	// Detach the client synchronously so no *future* event is captured the moment consent is
+	// withdrawn. `close()` also flushes buffered events and tears down the transport, but it is
+	// async; we don't await it (best-effort flush) since teardown runs from a render/effect path.
 	void Sentry.getClient()?.close();
 	initialized = false;
 }

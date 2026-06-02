@@ -23,6 +23,18 @@ export async function resolveCurrentUser(
 }
 
 /**
+ * Whether an account is an application super-admin: `appRole === "APP_ADMIN"` OR the `admin` role is
+ * present. We accept either so the check tolerates server-side role-representation differences
+ * (ADR 0017). Accepts the raw generated `CurrentUserView` (or null) so route guards and `useAuth()`
+ * share one definition rather than each re-deriving it.
+ */
+export function isAppAdmin(
+	user: Partial<Pick<CurrentUserView, "appRole" | "roles">> | null | undefined,
+): boolean {
+	return user?.appRole === "APP_ADMIN" || (user?.roles ?? []).includes("admin");
+}
+
+/**
  * Fully percent-decode a value, bounded against malicious double/triple-encoding.
  *
  * A single `decodeURIComponent` leaves `%252f` as `%2f`, so a payload like `/%252f%252fevil`

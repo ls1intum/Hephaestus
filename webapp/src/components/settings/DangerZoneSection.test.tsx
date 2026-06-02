@@ -7,6 +7,8 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "@/integrations/auth/AuthContext";
+import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { DangerZoneSection } from "./DangerZoneSection";
 
@@ -14,7 +16,11 @@ function renderWithClient(node: ReactNode) {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 	});
-	return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
+	return render(
+		<QueryClientProvider client={queryClient}>
+			<AuthProvider>{node}</AuthProvider>
+		</QueryClientProvider>,
+	);
 }
 
 describe("DangerZoneSection — data export", () => {
@@ -61,17 +67,21 @@ describe("DangerZoneSection — account deletion", () => {
 		fireEvent.change(input, { target: { value: "delete my acc" } });
 		expect(confirmButton.disabled).toBe(true);
 
+		// Enables only once the phrase matches AND the session (account id) has resolved.
 		fireEvent.change(input, { target: { value: "delete my account" } });
-		expect(confirmButton.disabled).toBe(false);
+		await waitFor(() => expect(confirmButton.disabled).toBe(false));
 	});
 
-	it("calls deleteCurrentUser and the onAccountDeleted callback once confirmed", async () => {
+	it("sends the account id in X-Confirm-Delete and fires onAccountDeleted once confirmed", async () => {
 		const onAccountDeleted = vi.fn();
-		let deleteHit = false;
+		let sentHeader: string | null = null;
 		server.use(
-			http.delete("*/user", () => {
-				deleteHit = true;
-				return new HttpResponse(null, { status: 204 });
+			http.delete("*/user", ({ request }) => {
+				sentHeader = request.headers.get("X-Confirm-Delete");
+				// Enforce the real server contract: header must equal the account id.
+				return sentHeader === String(currentUser.id)
+					? new HttpResponse(null, { status: 204 })
+					: new HttpResponse(null, { status: 400 });
 			}),
 		);
 
@@ -79,13 +89,18 @@ describe("DangerZoneSection — account deletion", () => {
 		openDeleteDialog();
 
 		const dialog = await screen.findByRole("alertdialog");
+		const confirmButton = within(dialog).getByRole("button", {
+			name: "Delete account",
+		}) as HTMLButtonElement;
 		fireEvent.change(within(dialog).getByLabelText("Confirmation phrase"), {
 			target: { value: "  Delete My Account  " }, // trimmed + case-insensitive match
 		});
-		fireEvent.click(within(dialog).getByRole("button", { name: "Delete account" }));
+		// Button only enables once the session (account id) has resolved.
+		await waitFor(() => expect(confirmButton.disabled).toBe(false));
+		fireEvent.click(confirmButton);
 
 		await waitFor(() => expect(onAccountDeleted).toHaveBeenCalledTimes(1));
-		expect(deleteHit).toBe(true);
+		expect(sentHeader).toBe(String(currentUser.id));
 	});
 
 	it("does not call the deletion endpoint when the phrase is wrong (button stays disabled)", async () => {
