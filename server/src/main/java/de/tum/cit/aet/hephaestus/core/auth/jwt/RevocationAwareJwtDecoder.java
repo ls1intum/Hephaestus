@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import java.time.Clock;
 import java.util.UUID;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
@@ -54,24 +53,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     private final IssuedJwtRepository repository;
     private final Cache cache;
     private final Clock clock;
-
-    @Nullable
     private final AuthMetrics metrics;
-
-    /**
-     * Test seam — no metrics. Production wiring uses the
-     * {@link #RevocationAwareJwtDecoder(JwtSigningKeyService, IssuedJwtRepository, AuthProperties,
-     * CacheManager, Clock, AuthMetrics) six-arg} constructor so a DB-outage mass-401 is observable.
-     */
-    public RevocationAwareJwtDecoder(
-        JwtSigningKeyService keyService,
-        IssuedJwtRepository repository,
-        AuthProperties properties,
-        CacheManager cacheManager,
-        Clock clock
-    ) {
-        this(keyService, repository, properties, cacheManager, clock, null);
-    }
 
     public RevocationAwareJwtDecoder(
         JwtSigningKeyService keyService,
@@ -79,7 +61,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         AuthProperties properties,
         CacheManager cacheManager,
         Clock clock,
-        @Nullable AuthMetrics metrics
+        AuthMetrics metrics
     ) {
         this.delegate = buildNimbus(keyService, properties);
         this.repository = repository;
@@ -143,9 +125,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         } catch (JwtException rethrow) {
             throw rethrow;
         } catch (RuntimeException dbError) {
-            if (metrics != null) {
-                metrics.recordRevocationCheckFailed();
-            }
+            metrics.recordRevocationCheckFailed();
             log.error("auth.jwt: revocation lookup failed for jti={}", jti, dbError);
             throw new JwtException("revocation check failed", dbError);
         }

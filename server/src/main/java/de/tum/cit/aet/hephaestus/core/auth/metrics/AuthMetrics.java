@@ -62,7 +62,9 @@ public class AuthMetrics {
         /** Conditional revoke affected 0 rows (a concurrent refresh/logout already rotated the jti). */
         NOOP("noop"),
         /** Account was not ACTIVE (SUSPENDED / DELETING / DELETED / missing) — session ended, no re-mint. */
-        SUSPENDED("suspended");
+        SUSPENDED("suspended"),
+        /** The rotation threw after the presenting token was revoked (re-mint / cookie failure). */
+        ERROR("error");
 
         private final String tag;
 

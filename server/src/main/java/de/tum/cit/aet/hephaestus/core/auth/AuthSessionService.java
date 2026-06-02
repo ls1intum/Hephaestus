@@ -118,6 +118,12 @@ public class AuthSessionService {
                 .record();
             setCookie(response, token);
             metrics.recordRefreshResult(AuthMetrics.RefreshResult.SUCCESS);
+        } catch (RuntimeException e) {
+            // The presenting token is already revoked at this point; a re-mint / cookie failure ends the
+            // session. Record it so sum(result) == refresh count and an error spike is alertable (the
+            // transaction still rolls back and the exception propagates to the controller advice).
+            metrics.recordRefreshResult(AuthMetrics.RefreshResult.ERROR);
+            throw e;
         } finally {
             metrics.stopRefreshTimer(sample);
         }

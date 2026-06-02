@@ -26,7 +26,9 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -67,6 +69,8 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     private NimbusJwtEncoder encoder;
     private AuthProperties properties;
     private Clock clock;
+    private SimpleMeterRegistry meterRegistry;
+    private AuthMetrics metrics;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -82,6 +86,9 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         properties = mock(AuthProperties.class);
         lenient().when(properties.issuer()).thenReturn(ISSUER);
         lenient().when(properties.audience()).thenReturn(AUDIENCE);
+
+        meterRegistry = new SimpleMeterRegistry();
+        metrics = new AuthMetrics(meterRegistry);
     }
 
     /** A JwtSigningKeyService stub that exposes the test JWK source — the decoder's only key boundary. */
@@ -94,7 +101,7 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     }
 
     private RevocationAwareJwtDecoder decoder(IssuedJwtRepository repo, CacheManager cacheManager) {
-        return new RevocationAwareJwtDecoder(keyService(jwkSource), repo, properties, cacheManager, clock);
+        return new RevocationAwareJwtDecoder(keyService(jwkSource), repo, properties, cacheManager, clock, metrics);
     }
 
     private static CacheManager cacheManager() {
@@ -227,6 +234,9 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(validToken(jti)))
             .isInstanceOf(JwtException.class)
             .hasMessageContaining("revocation check failed");
+
+        // …and the fail-closed rejection is observable (a DB-outage mass-401 must not be silent).
+        assertThat(meterRegistry.counter("auth.revocation.check_failed").count()).isEqualTo(1.0);
     }
 
     @Test

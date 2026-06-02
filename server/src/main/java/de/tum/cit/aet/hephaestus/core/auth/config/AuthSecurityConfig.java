@@ -14,14 +14,14 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -135,17 +135,18 @@ public class AuthSecurityConfig {
     @Bean
     public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(
         AuthProperties properties,
-        @Value("${spring.profiles.active:}") String activeProfiles
+        Environment environment
     ) {
-        return new CookieOAuth2AuthorizationRequestRepository(resolveStateCookieKey(properties, activeProfiles));
+        return new CookieOAuth2AuthorizationRequestRepository(resolveStateCookieKey(properties, isProd(environment)));
     }
 
     @Bean
-    public AuthIntentCookie authIntentCookie(
-        AuthProperties properties,
-        @Value("${spring.profiles.active:}") String activeProfiles
-    ) {
-        return new AuthIntentCookie(resolveStateCookieKey(properties, activeProfiles));
+    public AuthIntentCookie authIntentCookie(AuthProperties properties, Environment environment) {
+        return new AuthIntentCookie(resolveStateCookieKey(properties, isProd(environment)));
+    }
+
+    private static boolean isProd(Environment environment) {
+        return environment.acceptsProfiles(Profiles.of("prod"));
     }
 
     @Bean
@@ -208,7 +209,7 @@ public class AuthSecurityConfig {
      * invalidates every in-flight login on each pod restart and differs per replica, which
      * {@link AuthProperties} documents as a misconfiguration rather than a degraded mode.
      */
-    private static byte[] resolveStateCookieKey(AuthProperties properties, @Nullable String activeProfiles) {
+    static byte[] resolveStateCookieKey(AuthProperties properties, boolean prodProfile) {
         if (!properties.stateCookieKey().isBlank()) {
             byte[] decoded = Base64.getDecoder().decode(properties.stateCookieKey());
             if (decoded.length != 32) {
@@ -218,7 +219,7 @@ public class AuthSecurityConfig {
             }
             return decoded;
         }
-        if (activeProfiles != null && activeProfiles.contains("prod")) {
+        if (prodProfile) {
             throw new IllegalStateException(
                 "hephaestus.auth.state-cookie-key is required in production (fail-closed). " +
                     "Set it to a base64-encoded 32-byte (256-bit AES) value."
