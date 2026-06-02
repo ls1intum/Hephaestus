@@ -110,8 +110,6 @@ erDiagram
         VARCHAR(48) integration_kind
         VARCHAR(48) subject_class
         VARCHAR(255) worker_id
-        VARCHAR(48) integration_kind
-        VARCHAR(48) subject_class
     }
 
     AuthEvent {
@@ -127,8 +125,6 @@ erDiagram
         BIGINT identity_link_id FK
         INET ip_inet "NOT NULL"
         VARCHAR(512) user_agent
-        BYTEA session_hash
-        UUID request_id
         JSONB details
     }
 
@@ -145,26 +141,6 @@ erDiagram
         BIGINT identity_link_id FK
         INET ip_inet "NOT NULL"
         VARCHAR(512) user_agent
-        BYTEA session_hash
-        UUID request_id
-        JSONB details
-    }
-
-    AuthEventP202604 {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at PK
-        BIGINT account_id FK
-        BIGINT acting_account_id FK
-        VARCHAR(48) event_type "NOT NULL"
-        VARCHAR(16) result "NOT NULL"
-        VARCHAR(64) failure_reason
-        BIGINT git_provider_id FK
-        BIGINT workspace_id FK
-        BIGINT identity_link_id FK
-        INET ip_inet "NOT NULL"
-        VARCHAR(512) user_agent
-        BYTEA session_hash
-        UUID request_id
         JSONB details
     }
 
@@ -181,8 +157,6 @@ erDiagram
         BIGINT identity_link_id FK
         INET ip_inet "NOT NULL"
         VARCHAR(512) user_agent
-        BYTEA session_hash
-        UUID request_id
         JSONB details
     }
 
@@ -199,8 +173,22 @@ erDiagram
         BIGINT identity_link_id FK
         INET ip_inet "NOT NULL"
         VARCHAR(512) user_agent
-        BYTEA session_hash
-        UUID request_id
+        JSONB details
+    }
+
+    AuthEventP202607 {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at PK
+        BIGINT account_id FK
+        BIGINT acting_account_id FK
+        VARCHAR(48) event_type "NOT NULL"
+        VARCHAR(16) result "NOT NULL"
+        VARCHAR(64) failure_reason
+        BIGINT git_provider_id FK
+        BIGINT workspace_id FK
+        BIGINT identity_link_id FK
+        INET ip_inet "NOT NULL"
+        VARCHAR(512) user_agent
         JSONB details
     }
 
@@ -884,7 +872,6 @@ erDiagram
         VARCHAR(255) type
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
-        VARCHAR(128) keycloak_subject
     }
 
     UserAchievement {
@@ -1043,11 +1030,6 @@ erDiagram
     GitProvider ||--o{ AuthEventDefault : has
     IdentityLink ||--o{ AuthEventDefault : has
     Workspace ||--o{ AuthEventDefault : has
-    Account ||--o{ AuthEventP202604 : has
-    Account ||--o{ AuthEventP202604 : has
-    GitProvider ||--o{ AuthEventP202604 : has
-    IdentityLink ||--o{ AuthEventP202604 : has
-    Workspace ||--o{ AuthEventP202604 : has
     Account ||--o{ AuthEventP202605 : has
     Account ||--o{ AuthEventP202605 : has
     GitProvider ||--o{ AuthEventP202605 : has
@@ -1058,6 +1040,11 @@ erDiagram
     GitProvider ||--o{ AuthEventP202606 : has
     IdentityLink ||--o{ AuthEventP202606 : has
     Workspace ||--o{ AuthEventP202606 : has
+    Account ||--o{ AuthEventP202607 : has
+    Account ||--o{ AuthEventP202607 : has
+    GitProvider ||--o{ AuthEventP202607 : has
+    IdentityLink ||--o{ AuthEventP202607 : has
+    Workspace ||--o{ AuthEventP202607 : has
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
