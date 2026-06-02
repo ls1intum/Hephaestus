@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.workspace.dto.GitLabGroupDTO;
@@ -43,7 +44,7 @@ public class GitLabPreflightService {
 
     public GitLabPreflightService(GitLabProperties gitLabProperties) {
         this.gitLabProperties = gitLabProperties;
-        this.webClient = WebClient.builder().build();
+        this.webClient = WebClient.builder().clientConnector(WebClientConnectors.systemDns()).build();
     }
 
     /**

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +48,7 @@ public class GitHubInstallationRepositoryEnumerationService {
             .build();
 
         this.webClient = WebClient.builder()
+            .clientConnector(WebClientConnectors.systemDns())
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")

@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRepository
 import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRequestedReviewerMixin;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -163,7 +164,9 @@ public class GitHubGraphQlConfig {
             .lifo() // Use last-in-first-out to prefer fresh connections
             .build();
 
-        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(135)); // Must exceed longest block() timeout (backfillGraphqlTimeout=120s)
+        HttpClient httpClient = HttpClient.create(connectionProvider)
+            .resolver(DefaultAddressResolverGroup.INSTANCE)
+            .responseTimeout(Duration.ofSeconds(135)); // Must exceed longest block() timeout (backfillGraphqlTimeout=120s)
 
         return WebClient.builder()
             .clientConnector(new ReactorClientHttpConnector(httpClient))

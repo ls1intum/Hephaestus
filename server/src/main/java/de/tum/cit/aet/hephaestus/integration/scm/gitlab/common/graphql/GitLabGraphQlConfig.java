@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumen
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;
@@ -96,7 +97,9 @@ public class GitLabGraphQlConfig {
             .build();
 
         // 75s response timeout covers the extended GraphQL timeout (60s) with margin
-        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(75));
+        HttpClient httpClient = HttpClient.create(connectionProvider)
+            .resolver(DefaultAddressResolverGroup.INSTANCE)
+            .responseTimeout(Duration.ofSeconds(75));
 
         return WebClient.builder()
             .clientConnector(new ReactorClientHttpConnector(httpClient))

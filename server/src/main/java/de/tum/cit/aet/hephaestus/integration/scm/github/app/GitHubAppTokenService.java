@@ -10,6 +10,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationSuspendedException;
 import de.tum.cit.aet.hephaestus.integration.scm.github.GitHubProperties;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -27,9 +28,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.netty.http.client.HttpClient;
 
 /**
  * Service for generating GitHub App JWT tokens and installation access tokens.
@@ -71,7 +74,9 @@ public class GitHubAppTokenService {
         this.appId = appId;
         this.credentialsConfigured = isKeyMaterialPresent(appId, privateKeyRes, privateKeyPem);
         this.privateKey = credentialsConfigured ? loadKey(privateKeyRes, privateKeyPem) : generateEphemeralRsaKey();
+        HttpClient httpClient = HttpClient.create().resolver(DefaultAddressResolverGroup.INSTANCE);
         this.webClient = WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")

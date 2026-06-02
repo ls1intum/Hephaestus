@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
@@ -87,6 +88,7 @@ public class WorkspaceProvisioningService {
         }
         this.providerAvailability = map;
         this.webClient = WebClient.builder()
+            .clientConnector(WebClientConnectors.systemDns())
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
@@ -384,7 +386,7 @@ public class WorkspaceProvisioningService {
             }
         }
 
-        WebClient gitlabClient = WebClient.builder().build();
+        WebClient gitlabClient = WebClient.builder().clientConnector(WebClientConnectors.systemDns()).build();
 
         // Try personal access token endpoint first
         GitLabTokenUserResponse userInfo = null;

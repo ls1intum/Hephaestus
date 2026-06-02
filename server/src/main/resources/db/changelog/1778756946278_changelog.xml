@@ -288,6 +288,15 @@
          claim was a lie. JPA-side cascade walks the tree per row (N round-trips); a DB-level
          ON DELETE CASCADE is one statement and survives bulk SQL deletes (reaper sweeps, GDPR
          scrubs). Both correctness and performance win. -->
+    <changeSet id="mentor-1071-chat-message-vote-orphan-purge" author="hephaestus">
+        <preConditions onFail="MARK_RAN" onFailMessage="chat_message_vote FK already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_chat_message_vote_message"/></not>
+        </preConditions>
+        <comment>Drop chat_message_vote rows orphaned from chat_message before adding the cascade FK</comment>
+        <sql>DELETE FROM chat_message_vote v WHERE NOT EXISTS (SELECT 1 FROM chat_message m WHERE m.id = v.message_id)</sql>
+        <rollback/>
+    </changeSet>
+
     <changeSet id="mentor-1071-chat-message-vote-fk" author="hephaestus">
         <preConditions onFail="MARK_RAN" onFailMessage="chat_message_vote FK already exists">
             <not><foreignKeyConstraintExists foreignKeyName="fk_chat_message_vote_message"/></not>
