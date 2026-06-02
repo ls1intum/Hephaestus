@@ -15,14 +15,14 @@ ADR 0016 (Stage A) already added `User.keycloak_subject` and explicitly anticipa
 ## Decision drivers
 
 - **Single owner of identity.** The current Keycloak ↔ Hephaestus "two parallel concepts of user" is the largest source of mental friction in the codebase. After this PR there is one model, one schema, one debugger.
-- **Net complexity must go down.** We remove external complexity (a container, an SDK, a realm export, an `idp_link` action UX) and add internal complexity (our JWT issuer, JWK rotation, revocation propagation). The trade is correct because internal complexity is debuggable in our language, our tests, our IDE.
+- **Net complexity must go down.** We remove external complexity (a container, an SDK, a realm export, an `idp_link` action UX) and add internal complexity (our JWT issuer, JWK rotation, per-request revocation checks). The trade is correct because internal complexity is debuggable in our language, our tests, our IDE.
 - **Future fit.** Per-workspace self-hosted GitLab / GHE OAuth apps + Issue #1200 (Sign-in-with-Slack as secondary identity) fit Spring Security's `ClientRegistrationRepository` model better than Keycloak's per-realm IdP brokering. PR #1306's `Connection` aggregate is the natural home — one row per (workspace, kind, instance_key), sealed JSONB config, AAD-bound AES-GCM credentials.
-- **No new external service.** No Spring Authorization Server, no Spring Session JDBC, no Redis. Stateless cookie-JWT issued by Hephaestus, revocation propagated over the NATS we already run for the worker substrate.
+- **No new external service.** No Spring Authorization Server, no Spring Session JDBC, no Redis. Stateless cookie-JWT issued by Hephaestus, revoked via a per-request `issued_jwt` check (negative-cached) — no cross-pod protocol needed.
 - **Standards alignment.** OIDC ID-Token claim shape (`iss`, `sub`, `aud`, `iat`, `exp`, `jti`, `scope`, `act` for impersonation per RFC 8693). Discovery published at `/.well-known/openid-configuration` + `/.well-known/jwks.json` from day one. If Issue #1200 ever needs third-party clients, Spring Authorization Server can be mounted as a second issuer alongside — zero resource-server changes required.
 
 ## Considered options
 
-1. **Replace Keycloak with Spring Security 7 native auth (this ADR).** `oauth2Login` federates upstream, custom `AuthSuccessHandler` mints a short-lived ES256 cookie-JWT via Spring's `NimbusJwtEncoder` + DB-backed `JWKSource`. Workspace-scoped IdPs ride `Connection` rows of new `kind=OIDC_LOGIN_*`. Revocation via `issued_jwt` table + NATS propagation. No Keycloak.
+1. **Replace Keycloak with Spring Security 7 native auth (this ADR).** `oauth2Login` federates upstream, custom `AuthSuccessHandler` mints a short-lived ES256 cookie-JWT via Spring's `NimbusJwtEncoder` + DB-backed `JWKSource`. Workspace-scoped IdPs ride `Connection` rows of new `kind=OIDC_LOGIN_*`. Revocation via the `issued_jwt` table (per-request, negative-cached check). No Keycloak.
 
 2. **Replace Keycloak with Spring Authorization Server.** Hephaestus becomes its own OAuth 2.1 / OIDC server. SAS handles `/oauth2/authorize`, `/token`, `/jwks`, federation to upstream. Cleaner long-term *if* we ever need third-party OAuth clients — but SAS docs explicitly treat the "BFF for own SPA" case as a legacy edge ([SAS issue #297](https://github.com/spring-projects/spring-authorization-server/issues/297)). SAS adds ~6 endpoints we don't need and forces a custom cookie wrapper around `/token` anyway. Net code we own is ~the same; attack surface is larger.
 
@@ -39,9 +39,9 @@ ADR 0016 (Stage A) already added `User.keycloak_subject` and explicitly anticipa
 - **Data-model split.** `gitprovider.user.User` (a documented-as-such denormalized git-provider cache) is renamed to `gitprovider.actor.ExternalActor`; bots / orgs live there exclusively. The Hephaestus-native principal is `core.auth.domain.Account`. The federated-login association is `core.auth.domain.IdentityLink` per Issue #1200's spec (incl. `team_id`). `workspace_membership.user_id → account_id`.
 - **JWT format = strict OIDC subset.** No proprietary claims. `iss=https://hephaestus.aet.cit.tum.de`, `sub=<account_id>`, `scope` encodes `app_role` + active feature flags space-delimited. `act` (RFC 8693) carries impersonator id. `/.well-known/openid-configuration` + `/.well-known/jwks.json` shipped on day one.
 - **Stateless multi-pod.** Custom `CookieOAuth2AuthorizationRequestRepository` (AEAD-signed cookie binding workspace_id + returnTo + nonce + PKCE verifier, multi-flight LRU cap of 4). Spring's default would require a session — incompatible with the existing STATELESS filter chains.
-- **Revocation propagation.** `issued_jwt` row updated + `auth.jwt.revoked` published on NATS; pods invalidate their Caffeine cache on receive. p99 < 500ms cross-pod (Caffeine TTL is safety-net, not primary correctness).
+- **Revocation.** Logout / refresh / sign-out-everywhere / admin-revoke set `issued_jwt.revoked_at`; `RevocationAwareJwtDecoder` does an indexed `jti` lookup on every request, so a revocation takes effect on every pod within DB visibility lag — no cross-pod protocol needed. The cache is a *negative* cache (REVOKED verdicts only, monotonic) that merely sheds replay load. Cross-pod NATS push (`auth.jwt.revoked`) is a tracked follow-up, not shipped.
 - **Account linking — explicit re-login only.** Never by email. nOAuth (Descope 2023) defense at the lookup level: `IdentityLinkRepository.findByProviderAndSubject(...)` is the only path; `findByEmail` is forbidden by ArchUnit in any code reachable from a controller.
-- **Impersonation.** `SwitchUserFilter` + `act` claim + required `reason` + `ImpersonationGuard` write-block at HTTP layer. Audit row per begin/exit captures `(account_id=target, acting_account_id=impersonator)`.
+- **Impersonation.** `act`-claim JWT reissuance (no `SwitchUserFilter` — there is no session) + required `reason` + `ImpersonationGuard` write-block at HTTP layer. Audit row per begin/exit captures `(account_id=target, acting_account_id=impersonator)`.
 - **GDPR.** 48-hour soft-delete cooldown → hard-delete cascades through `identity_link`, `oauth_authorized_client`, `account_feature`, `workspace_membership`, `issued_jwt`. `ExternalActor` is **pseudonymized**, not deleted (Art. 17(3) legitimate-interest — preserves PR-authorship history on other users' work). Art. 20 async export. Art. 30 monthly RANGE-partitioned `auth_event` log (12-month retention, self-managed in-app by `AuthEventPartitionManager` on stock Postgres — no `pg_partman`).
 - **No Spring Session, no Redis, no SAS.** Discipline-of-no.
 
@@ -63,7 +63,7 @@ This ADR supersedes ADR 0016 Stage A only on the column placement and lookup mec
 - Contributors must configure real GitHub/GitLab OAuth credentials for local dev. Same friction as Keycloak's realm-JSON seed users today; documented in `docs/contributor/local-development.mdx`.
 
 **Reversible escape hatch**
-- The cutover commit is identified by hash and intentionally `git revert`-able for 30 days post-launch. Keycloak compose lives at `docker-compose.keycloak-backup.yaml` (gitignored from primary compose) so a fast rollback restores the prior path.
+- The cutover commit is identified by hash and intentionally `git revert`-able for 30 days post-launch. The revert restores the inline Keycloak compose service blocks and the resource-server chain in one step.
 
 ## Out of scope (named follow-up issues)
 

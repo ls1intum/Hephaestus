@@ -13,9 +13,9 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
       (AES-256-GCM); **prod refuses to boot if an active signing key is unsealed** — so this
       must be set before first boot and kept stable, or all sessions invalidate when it changes.
 - [ ] `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` registered (GitHub OAuth App,
-      callback `https://<host>/login/oauth2/code/github`).
+      callback `https://<host>/api/login/oauth2/code/github`) (the `/api` prefix is stripped by Traefik before Spring sees it).
 - [ ] `GITLAB_LRZ_OAUTH_CLIENT_ID` / `GITLAB_LRZ_OAUTH_CLIENT_SECRET` registered (gitlab.lrz.de
-      application, callback `https://<host>/login/oauth2/code/gitlab-lrz`,
+      application, callback `https://<host>/api/login/oauth2/code/gitlab-lrz`,
       scopes `openid profile email read_user`).
 - [ ] Reverse proxy (Coolify / TUM) verified to NOT inject a `Domain=` on Set-Cookie — a
       `__Host-` cookie with a Domain attribute is silently dropped by browsers → infinite
@@ -37,8 +37,8 @@ The cutover commit (the one that flips the resource-server decoder from Keycloak
 commit. For 30 days post-launch:
 
 1. `git revert <cutover-sha>` restores the Keycloak resource-server chain.
-2. Re-enable the Keycloak service (kept at `docker-compose.keycloak-backup.yaml`, gitignored
-   from the primary compose) and restore `KEYCLOAK_*` env vars.
+2. Re-enable Keycloak: `git revert <cutover-sha>` (step 1) restores the inline Keycloak service
+   blocks in the compose files and the `KEYCLOAK_*` env vars.
 3. Existing `account` / `identity_link` rows are harmless to leave in place — the reverted
    code simply ignores them.
 
@@ -61,12 +61,12 @@ column rename — it carries a Liquibase rollback.
 
 ## Revocation
 
-- Logout / "sign out everywhere" / admin-revoke / impersonation-exit set `issued_jwt.revoked_at`
-  and evict the affected `jti` from the decoder's Caffeine cache **after the transaction commits**
-  (`RevocationCacheEvictor`), so the revocation is effective immediately on the acting pod. Other
-  pods converge within the cache TTL (1 min). A compromised account is killed cluster-wide at once
-  by suspending it (the per-request account-status gate, independent of this cache). Cross-pod
-  sub-second propagation via a NATS `auth.jwt.revoked` push is a tracked follow-up.
+- Logout / "sign out everywhere" / admin-revoke / impersonation-exit set `issued_jwt.revoked_at`.
+  Because the decoder re-checks `issued_jwt(jti)` on every request (the cache is negative — REVOKED
+  verdicts only), the revocation is effective on every pod within DB visibility lag, not the cache
+  TTL. A compromised account is killed cluster-wide at once by suspending it (the per-request
+  account-status gate, independent of this cache). Cross-pod sub-second propagation via a NATS
+  `auth.jwt.revoked` push is a tracked follow-up.
 - The `issued_jwt` table is swept of expired rows by a scheduled job; alert if its row count
   grows > 2× baseline (sweep broken).
 
@@ -87,7 +87,7 @@ column rename — it carries a Liquibase rollback.
 ## Known follow-ups (not blocking launch)
 
 Shipped in this PR: Bucket4j rate limits, the 48-hour soft-delete + hard-delete sweep, security
-headers (CSP report-only), at-rest sealing of the JWT signing key, and same-pod revocation
-eviction. Still tracked as named follow-up issues in ADR 0017: cross-pod NATS propagation for
+headers (CSP report-only), at-rest sealing of the JWT signing key, and the per-request
+negative-cache revocation check. Still tracked as named follow-up issues in ADR 0017: cross-pod NATS propagation for
 revocation and JWK rotation, flipping CSP from report-only to enforce, the `JwtClaimsLogScrubber`
 Logback filter, and full OpenTelemetry tracing.

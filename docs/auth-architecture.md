@@ -49,9 +49,9 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
    │  RevocationAwareJwtDecoder:               │                                    
    │   verify ES256 vs JWKSource               │ ◄─────────────── jwt_signing_key   
    │   reject if jti revoked (Caffeine cache)  │ ◄─────────────── issued_jwt        
-   │  ImpersonationGuard: block writes if      │                  (NATS invalidates 
-   │   'act' claim present & no confirm header │                   the cache:        
-   └──────────────────────────────────────────┘                   auth.jwt.revoked) 
+   │  ImpersonationGuard: block writes if      │                  (per-request jti  
+   │   'act' claim present & no confirm header │                   lookup; negative 
+   └──────────────────────────────────────────┘                   cache only)       
 ```
 
 ## Key properties
@@ -64,9 +64,10 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
   Authorization Server can take over issuance without touching resource-server code.
   Discovery is published at `/.well-known/openid-configuration` + `/.well-known/jwks.json`.
 - **Revocation is real.** Every issued JWT has a `jti` row in `issued_jwt`. Logout /
-  refresh / sign-out-everywhere / account-delete revoke it; `RevocationAwareJwtDecoder`
-  consults a Caffeine-cached view on every request. Cross-pod invalidation propagates over
-  NATS (`auth.jwt.revoked`); the cache TTL is the safety net, not the primary mechanism.
+  refresh / sign-out-everywhere / account-delete set `revoked_at`; `RevocationAwareJwtDecoder`
+  re-checks `issued_jwt(jti)` on every request, so revocation takes effect on every pod within
+  DB visibility lag. The cache is a *negative* cache (REVOKED verdicts only) that merely sheds
+  replay load — no cross-pod protocol (NATS push is a tracked follow-up, not shipped).
 - **Account lookup is `(provider, subject)`, never email.** This is the structural defence
   against the nOAuth (Descope 2023) account-takeover class. `IdentityLinkRepository` has no
   `findByEmail`; ArchUnit forbids any email-based auth lookup.
@@ -94,11 +95,18 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 | `domain/` | `Account`, `IdentityLink`, `AccountFeature` (+ repositories) |
 | `audit/` | `AuthEvent`, `AuthEventLogger`, `AuthEventWriter`, `AuthEventSequence` |
 | `jwt/` | `HephaestusJwtIssuer`, `RevocationAwareJwtDecoder`, `JwtSigningKeyService`, `IssuedJwt` |
-| `oauth/` | cookie repos, success handler, `LoginClientRegistrationRepository`, `IssuerDiscoveryProbe`, OIDC-login strategies, `ImpersonationGuard` |
+| `oauth/` | cookie repos (`AuthIntentCookie`, `CookieOAuth2AuthorizationRequestRepository`), `HephaestusAuthSuccessHandler`, `AuthBeginController`, account provisioning, `ReturnToValidator` |
 | `impersonation/` | `ImpersonationService` |
+| `export/` | GDPR export (`AccountExportService`, `ExportBundleAssembler`, workers/sweepers) |
+| `metrics/` | `AuthMetrics`, `AuthLoginEventMetrics` |
+| `ratelimit/` | `AuthRateLimitFilter`, `BucketResolver`, config |
 | `web/` | `/user`, `/auth/*`, `/user/sessions`, `/admin/users`, `/.well-known/*`, `/identity-providers` controllers |
 | `config/` | `AuthJwtConfig`, `AuthSecurityConfig` |
 | `spi/` | `AccountRepository` (cross-module handle) |
+
+The OIDC-login adapters (`LoginClientRegistrationRepository`, `IssuerDiscoveryProbe`,
+OIDC-login strategies) live in `integration.identity.connect`, reached via the integration SPI;
+`ImpersonationGuard` lives in `core.security`.
 
 Boundaries: `workspace` / `gitprovider` / `notification` depend on `core.auth` (read model
 + events), never the reverse. `core.auth` reads workspace OIDC `Connection` rows through the
