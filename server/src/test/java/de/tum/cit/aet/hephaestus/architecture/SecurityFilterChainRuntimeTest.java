@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.proxy.JobTokenAuthenticationFilter;
+import de.tum.cit.aet.hephaestus.core.security.CsrfCookieFilter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import jakarta.servlet.Filter;
 import java.util.List;
@@ -18,13 +19,25 @@ class SecurityFilterChainRuntimeTest extends BaseIntegrationTest {
     private List<SecurityFilterChain> filterChains;
 
     @Test
-    void noChainContainsCsrfFilter() {
+    void csrfFilterGuardsOnlyTheCookieAppChain() {
         assertThat(filterChains).isNotEmpty();
+        // ADR 0017: the standard CsrfFilter must guard ONLY the cookie-authenticated user-facing app
+        // chain — the same chain that installs CsrfCookieFilter to render the XSRF-TOKEN double-submit
+        // cookie. The stateless chains (worker-hub: worker-JWT/HMAC/tokenless POSTs + webhooks; the
+        // oauth2-login chain; the no-decoder lockdown chain) all csrf.disable(); a CsrfFilter on any of
+        // them would 403 every tokenless worker/webhook write. So a chain carries a CsrfFilter iff it
+        // carries our CsrfCookieFilter.
         for (SecurityFilterChain chain : filterChains) {
-            assertThat(chain.getFilters())
-                .as("chain %s must not contain CsrfFilter", chain)
-                .noneMatch(CsrfFilter.class::isInstance);
+            boolean hasCsrf = chain.getFilters().stream().anyMatch(CsrfFilter.class::isInstance);
+            boolean hasCsrfCookie = chain.getFilters().stream().anyMatch(CsrfCookieFilter.class::isInstance);
+            assertThat(hasCsrf)
+                .as("only the cookie app chain (with CsrfCookieFilter) may carry a CsrfFilter: %s", chain)
+                .isEqualTo(hasCsrfCookie);
         }
+        // Guard against an accidental global CSRF disable: the cookie app chain must still enforce it.
+        assertThat(filterChains)
+            .as("the cookie app chain must enforce CSRF")
+            .anyMatch(chain -> chain.getFilters().stream().anyMatch(CsrfFilter.class::isInstance));
     }
 
     @Test

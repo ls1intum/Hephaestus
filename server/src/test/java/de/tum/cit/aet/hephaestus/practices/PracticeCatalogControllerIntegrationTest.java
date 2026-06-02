@@ -1002,9 +1002,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturnUnauthorized() {
             var request = new UpdatePracticeRequestDTO("Name", null, null, null, null);
 
+            // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
+            String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
                 .patch()
                 .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "any-slug")
+                .headers(TestAuthUtils.withCsrf(csrf))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -1153,9 +1156,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
+            // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
+            String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
                 .patch()
                 .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "any-slug")
+                .headers(TestAuthUtils.withCsrf(csrf))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new UpdatePracticeActiveRequestDTO(false))
                 .exchange()
@@ -1223,9 +1229,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
+            // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
+            String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
                 .delete()
                 .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "any-slug")
+                .headers(TestAuthUtils.withCsrf(csrf))
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();
