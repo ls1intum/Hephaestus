@@ -3,18 +3,18 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoryEnumerationService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -44,6 +44,9 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private GitProviderRepository gitProviderRepository;
 
+    @Autowired
+    private ConnectionRepository connectionRepository;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
@@ -57,7 +60,6 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureAllInstallationRepositoriesCovered adds missing monitors and prunes stale ones")
     void shouldReconcileMonitorsForInstallation() {
         Workspace workspace = persistWorkspace(RepositorySelection.ALL);
         repositoryToMonitorRepository.save(buildMonitor(workspace, "HephaestusTest/Orphaned"));
@@ -83,7 +85,6 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureAllInstallationRepositoriesCovered runs for SELECTED installations")
     void shouldRespectSelectedInstallations() {
         Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
 
@@ -101,11 +102,18 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     private Workspace persistWorkspace(RepositorySelection selection) {
-        return workspaceRepository.save(
-            WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
-                .withRepositorySelection(selection)
-                .withSlug("ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH))
-                .build()
+        var builder = WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
+            .withRepositorySelection(selection)
+            .withSlug("ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH));
+        // the provider classification used by
+        // WorkspaceRepositoryMonitorService.isGitHubAppWorkspace pulls from the
+        // Connection registry, so the fixture must persist the GitHub App connection
+        // alongside the Workspace.
+        return WorkspaceTestFixtures.persistInstallationWorkspace(
+            workspaceRepository,
+            connectionRepository,
+            builder,
+            INSTALLATION_ID
         );
     }
 

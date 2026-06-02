@@ -36,9 +36,7 @@ public final class HephaestusConditions {
         // Utility class - prevent instantiation
     }
 
-    // ========================================================================
     // CLASS CONDITIONS - Complexity & Structure
-    // ========================================================================
 
     /**
      * Condition that checks if a class has at most the specified number of
@@ -272,9 +270,7 @@ public final class HephaestusConditions {
         };
     }
 
-    // ========================================================================
     // CLASS CONDITIONS - Interface Segregation
-    // ========================================================================
 
     /**
      * Condition that checks if an interface has at most the specified number of
@@ -311,9 +307,7 @@ public final class HephaestusConditions {
         };
     }
 
-    // ========================================================================
     // METHOD CONDITIONS - Parameters & Security
-    // ========================================================================
 
     /**
      * Condition that checks if a method has at most the specified number of parameters.
@@ -516,9 +510,7 @@ public final class HephaestusConditions {
         };
     }
 
-    // ========================================================================
     // FIELD CONDITIONS
-    // ========================================================================
 
     /**
      * Condition that checks if a field's owner has a specific annotation.
@@ -610,9 +602,7 @@ public final class HephaestusConditions {
         };
     }
 
-    // ========================================================================
     // HELPER METHODS - Predicates
-    // ========================================================================
 
     /**
      * Checks if a method is an HTTP endpoint (has @GetMapping, @PostMapping, etc.).
@@ -669,9 +659,7 @@ public final class HephaestusConditions {
         return method -> !isSyntheticMethod(method) && !isBoilerplateMethod(method);
     }
 
-    // ========================================================================
     // WORKSPACE/TENANT CONDITIONS
-    // ========================================================================
 
     /**
      * Condition that checks if a class has workspace-related dependencies.

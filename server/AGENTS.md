@@ -38,7 +38,7 @@ Built with Paketo Cloud Native Buildpacks (Application CDS enabled); `pom.xml` `
 
 ### Optional integrations
 
-`SlackAppConfig`, `PosthogClient` are gated by `@ConditionalOnProperty`. Tolerant consumers (`AccountService`, `LeaderboardTaskScheduler`) take `ObjectProvider<T>`. `SlackMessageService` injects `App` directly on purpose: `notification.enabled=true` with `slack.token` unset must crash context refresh, not silently no-op cron ticks.
+`PosthogClient` is gated by `@ConditionalOnProperty`. Tolerant consumers (`AccountService`, `LeaderboardTaskScheduler`) take `ObjectProvider<T>`. `SlackMessageService` resolves bot tokens per-workspace at send time via `ConnectionService` — there is no global `App` bean and no `slack.token` property; admins connect each workspace via the Slack OAuth flow exposed at `/oauth/callback/slack`.
 
 ### Removing Liquibase changesets
 
@@ -87,18 +87,21 @@ src/main/java/de/tum/cit/aet/hephaestus/
 ├── Application.java              # Entry point (@SpringBootApplication)
 ├── config/                       # @Configuration beans
 ├── workspace/                    # Multi-tenant workspace management
-├── gitprovider/                  # GitHub API integration
-│   ├── common/                   # Base entities, converters
-│   ├── pullrequest/              # PR entity, sync service
-│   ├── issue/                    # Issue entity (PR inherits from Issue)
-│   ├── user/                     # GitHub user sync
-│   ├── team/                     # Team management
-│   └── sync/                     # Data synchronization orchestration
+├── integration/                  # Unified integration framework
+│   ├── core/                     # Vendor-agnostic substrate (webhook, consumer, oauth, …)
+│   │   └── webhook/              # Shared inbound webhook substrate (all kinds)
+│   ├── scm/                      # Provider-agnostic git domain + SCM vendor adapters
+│   │   ├── common/               # Base entities, converters
+│   │   ├── domain/               # PR, issue, review, team, user, … entities
+│   │   ├── sync/                 # Data synchronization orchestration
+│   │   ├── github/               # GitHub vendor adapter (REST + GraphQL + webhook ingest)
+│   │   └── gitlab/               # GitLab vendor adapter (REST + GraphQL + webhook ingest)
+│   └── slack/                    # Slack adapter
 ├── leaderboard/                  # Scoring, rankings, league points
 ├── activity/                     # Activity tracking (XP, leaderboard gamification)
 ├── mentor/                       # AI mentor (in-process Pi agent)
 ├── profile/                      # User profiles
-└── notification/                 # Email and Slack messaging
+└── notification/                 # Email messaging (Slack messaging lives in integration/slack/messaging/)
 ```
 
 ## Architecture Patterns
@@ -137,7 +140,7 @@ public class PullRequest extends Issue { ... }
 ### DTOs and Mappers
 
 - Use Java records for DTOs
-- Annotate required fields with `@NonNull` (from `org.springframework.lang`)
+- Annotate required fields with `@NonNull` (from `org.jspecify.annotations`)
 - Keep mapping logic in dedicated `*Mapper` classes or static factory methods
 
 ```java

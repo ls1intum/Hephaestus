@@ -6,7 +6,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -20,7 +20,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -30,13 +29,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * membership pre-check and the {@code @PreAuthorize("@workspaceSecure.isMember()")} expression
  * — survive future regressions.
  */
-@TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
-@DisplayName("MentorChatController auth integration")
 class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private WebTestClient webTestClient;
 
+    // The mentor beans now wire unconditionally; InteractiveSandboxService is part of the
+    // worker capability (absent in the test profile, where the worker role is off), so mock it.
     @MockitoBean
     private InteractiveSandboxService interactiveSandboxService;
 
@@ -87,7 +86,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated non-member → 403 (filter rejects with FORBIDDEN_MEMBERSHIP)")
     void authenticatedButNotMember_returnsForbidden() {
         persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-test");
@@ -107,7 +105,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated member → 200 SSE with AI-SDK header and service is dispatched")
     void authenticatedMember_returnsOkSseStreamAndDispatchesService() throws Exception {
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
@@ -148,7 +145,6 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
 
     @Test
     @WithMentorUser
-    @DisplayName("authenticated member of workspace with mentorEnabled=false → 404 (per-workspace gate)")
     void authenticatedMember_mentorDisabled_returnsNotFound() {
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-disabled");

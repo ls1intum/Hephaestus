@@ -1,10 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent.TriggerEventNames;
+import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,17 +11,17 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.common.DataSource;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
@@ -39,7 +38,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,7 +45,6 @@ import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 
-@DisplayName("AgentJobEventListener")
 class AgentJobEventListenerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -72,10 +69,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // Helpers
 
-    private EventPayload.PullRequestData createPrData(Issue.State state, boolean isDraft, boolean isMerged) {
-        return new EventPayload.PullRequestData(
+    private ScmEventPayload.PullRequestData createPrData(Issue.State state, boolean isDraft, boolean isMerged) {
+        return new ScmEventPayload.PullRequestData(
             PR_ID,
             PR_NUMBER,
             "Test PR",
@@ -115,22 +112,22 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     /**
-     * Creates a mock PullRequest with lenient stubs — not all fields are accessed
-     * depending on the code path (e.g., closed PR skips branch info checks).
+     * Creates a real PullRequest with the fields the listener reads set — not all fields
+     * are accessed depending on the code path (e.g., closed PR skips branch info checks).
      */
     private PullRequest mockPullRequest(String headRefOid, String headRefName, String baseRefName) {
-        PullRequest pr = mock(PullRequest.class);
-        lenient().when(pr.getId()).thenReturn(PR_ID);
-        lenient().when(pr.getHeadRefOid()).thenReturn(headRefOid);
-        lenient().when(pr.getHeadRefName()).thenReturn(headRefName);
-        lenient().when(pr.getBaseRefName()).thenReturn(baseRefName);
-        lenient().when(pr.getState()).thenReturn(Issue.State.OPEN);
-        lenient().when(pr.isMerged()).thenReturn(false);
+        PullRequest pr = new PullRequest();
+        pr.setId(PR_ID);
+        pr.setHeadRefOid(headRefOid);
+        pr.setHeadRefName(headRefName);
+        pr.setBaseRefName(baseRefName);
+        pr.setState(Issue.State.OPEN);
+        pr.setMerged(false);
         return pr;
     }
 
-    private EventPayload.ReviewData createReviewData() {
-        return new EventPayload.ReviewData(
+    private ScmEventPayload.ReviewData createReviewData() {
+        return new ScmEventPayload.ReviewData(
             100L,
             "LGTM",
             PullRequestReview.State.APPROVED,
@@ -157,17 +154,15 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         return pr;
     }
 
-    // ── Test Groups ─────────────────────────────────────────────────────────
+    // Test Groups
 
     @Nested
-    @DisplayName("Filtering")
     class FilteringTests {
 
         @Test
-        @DisplayName("should skip sync events")
         void shouldSkipSyncEvents() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, syncContext());
+            var event = new ScmDomainEvent.PullRequestCreated(prData, syncContext());
 
             listener.onPullRequestCreated(event);
 
@@ -176,10 +171,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip closed PRs")
         void shouldSkipClosedPRs() {
             var prData = createPrData(Issue.State.CLOSED, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             listener.onPullRequestCreated(event);
 
@@ -188,10 +182,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip merged PRs")
         void shouldSkipMergedPRs() {
             var prData = createPrData(Issue.State.MERGED, false, true);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             listener.onPullRequestCreated(event);
 
@@ -200,11 +193,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip PRs with isMerged=true even when state is OPEN")
         void shouldSkipWhenIsMergedTrueButStateIsOpen() {
             // Race condition: merge flag set before state update in webhook
             var prData = createPrData(Issue.State.OPEN, false, true);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             listener.onPullRequestCreated(event);
 
@@ -213,10 +205,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR entity not found")
         void shouldSkipWhenPRNotFound() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.empty());
 
             listener.onPullRequestCreated(event);
@@ -225,10 +216,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when headRefOid is null (GitLab)")
         void shouldSkipWhenHeadRefOidIsNull() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest(null, "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -240,10 +230,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when headRefName is null")
         void shouldSkipWhenHeadRefNameIsNull() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", null, "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -255,10 +244,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when baseRefName is null")
         void shouldSkipWhenBaseRefNameIsNull() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", null);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -271,14 +259,12 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Gate Integration")
     class GateIntegrationTests {
 
         @Test
-        @DisplayName("should skip when gate returns Skip decision")
         void shouldSkipWhenGateReturnsSkip() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -292,10 +278,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should submit when gate returns Detect decision")
         void shouldSubmitWhenGateReturnsDetect() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(99L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(99L));
 
             PullRequest pr = setupHappyPath();
 
@@ -309,11 +294,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should use workspace ID from gate decision, not from context scopeId")
         void shouldUseWorkspaceIdFromGateNotContext() {
             var prData = createPrData(Issue.State.OPEN, false, false);
             // Context has scopeId=99, but gate resolves workspace with id=42
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(99L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(99L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -332,10 +316,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should build correct submission request with branch info from entity")
         void shouldBuildCorrectSubmissionRequest() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("sha256abc", "feature/my-branch", "develop");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -359,10 +342,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should delegate draft filtering to gate (not filter in listener)")
         void shouldDelegateDraftFilteringToGate() {
             var prData = createPrData(Issue.State.OPEN, true, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -378,34 +360,31 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should pass PullRequestCreated trigger event name")
         void shouldPassPullRequestCreatedTriggerEventName() {
             PullRequest pr = setupHappyPath();
             var prData = createPrData(Issue.State.OPEN, false, false);
 
-            listener.onPullRequestCreated(new DomainEvent.PullRequestCreated(prData, webhookContext(1L)));
+            listener.onPullRequestCreated(new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO);
         }
 
         @Test
-        @DisplayName("should pass PullRequestReady trigger event name")
         void shouldPassPullRequestReadyTriggerEventName() {
             PullRequest pr = setupHappyPath();
             var prData = createPrData(Issue.State.OPEN, false, false);
 
-            listener.onPullRequestReady(new DomainEvent.PullRequestReady(prData, webhookContext(1L)));
+            listener.onPullRequestReady(new ScmDomainEvent.PullRequestReady(prData, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_READY, TriggerMode.AUTO);
         }
 
         @Test
-        @DisplayName("should pass PullRequestSynchronized trigger event name")
         void shouldPassPullRequestSynchronizedTriggerEventName() {
             PullRequest pr = setupHappyPath();
             var prData = createPrData(Issue.State.OPEN, false, false);
 
-            listener.onPullRequestSynchronized(new DomainEvent.PullRequestSynchronized(prData, webhookContext(1L)));
+            listener.onPullRequestSynchronized(new ScmDomainEvent.PullRequestSynchronized(prData, webhookContext(1L)));
 
             verify(practiceReviewDetectionGate).evaluate(
                 pr,
@@ -415,10 +394,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from submit")
         void shouldNotPropagateExceptionsFromSubmit() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -435,10 +413,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from gate evaluation")
         void shouldNotPropagateExceptionsFromGate() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -454,14 +431,12 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("PullRequestSynchronized")
     class PullRequestSynchronizedTests {
 
         @Test
-        @DisplayName("should submit job when gate passes")
         void shouldSubmitWhenGatePasses() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestSynchronized(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestSynchronized(prData, webhookContext(1L));
 
             setupHappyPath();
 
@@ -475,10 +450,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip sync events")
         void shouldSkipSyncEvents() {
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestSynchronized(prData, syncContext());
+            var event = new ScmDomainEvent.PullRequestSynchronized(prData, syncContext());
 
             listener.onPullRequestSynchronized(event);
 
@@ -488,14 +462,12 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("ReviewSubmitted")
     class ReviewSubmittedTests {
 
         @Test
-        @DisplayName("should submit job when gate passes")
         void shouldSubmitWhenGatePasses() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             // ReviewSubmitted path calls PullRequestData.from(pr), which needs repository + author
@@ -503,10 +475,10 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             repo.setId(100L);
             repo.setNameWithOwner("owner/repo");
             repo.setDefaultBranch("main");
-            when(pr.getRepository()).thenReturn(repo);
-            when(pr.getNumber()).thenReturn(PR_NUMBER);
-            when(pr.getTitle()).thenReturn("Test PR");
-            when(pr.getHtmlUrl()).thenReturn("https://github.com/owner/repo/pull/42");
+            pr.setRepository(repo);
+            pr.setNumber(PR_NUMBER);
+            pr.setTitle("Test PR");
+            pr.setHtmlUrl("https://github.com/owner/repo/pull/42");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             Workspace workspace = new Workspace();
@@ -527,10 +499,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip sync events")
         void shouldSkipSyncEvents() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, syncContext());
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, syncContext());
 
             listener.onReviewSubmitted(event);
 
@@ -539,10 +510,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR not found")
         void shouldSkipWhenPRNotFound() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.empty());
 
             listener.onReviewSubmitted(event);
@@ -551,13 +521,12 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR is closed")
         void shouldSkipWhenPRIsClosed() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
-            PullRequest pr = mock(PullRequest.class);
-            when(pr.getState()).thenReturn(Issue.State.CLOSED);
+            PullRequest pr = new PullRequest();
+            pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             listener.onReviewSubmitted(event);
@@ -567,15 +536,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR is merged")
         void shouldSkipWhenPRIsMerged() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
-            PullRequest pr = mock(PullRequest.class);
-            when(pr.getState()).thenReturn(Issue.State.MERGED);
-            // Lenient: isMerged() may not be reached when getState() == MERGED short-circuits the || chain
-            lenient().when(pr.isMerged()).thenReturn(true);
+            PullRequest pr = new PullRequest();
+            pr.setState(Issue.State.MERGED);
+            pr.setMerged(true);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             listener.onReviewSubmitted(event);
@@ -585,14 +552,13 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when PR has isMerged=true even with OPEN state")
         void shouldSkipWhenIsMergedTrueButStateIsOpen() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
-            PullRequest pr = mock(PullRequest.class);
-            when(pr.getState()).thenReturn(Issue.State.OPEN);
-            when(pr.isMerged()).thenReturn(true);
+            PullRequest pr = new PullRequest();
+            pr.setState(Issue.State.OPEN);
+            pr.setMerged(true);
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             listener.onReviewSubmitted(event);
@@ -602,10 +568,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when missing branch info")
         void shouldSkipWhenMissingBranchInfo() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest(null, "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -617,10 +582,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip when gate returns Skip")
         void shouldSkipWhenGateReturnsSkip() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -634,20 +598,19 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from submit")
         void shouldNotPropagateExceptionsFromSubmit() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             Repository repo = new Repository();
             repo.setId(100L);
             repo.setNameWithOwner("owner/repo");
             repo.setDefaultBranch("main");
-            when(pr.getRepository()).thenReturn(repo);
-            when(pr.getNumber()).thenReturn(PR_NUMBER);
-            when(pr.getTitle()).thenReturn("Test PR");
-            when(pr.getHtmlUrl()).thenReturn("https://github.com/owner/repo/pull/42");
+            pr.setRepository(repo);
+            pr.setNumber(PR_NUMBER);
+            pr.setTitle("Test PR");
+            pr.setHtmlUrl("https://github.com/owner/repo/pull/42");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
 
             Workspace workspace = new Workspace();
@@ -662,10 +625,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not propagate exceptions from gate evaluation")
         void shouldNotPropagateExceptionsFromGate() {
             var reviewData = createReviewData();
-            var event = new DomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
+            var event = new ScmDomainEvent.ReviewSubmitted(reviewData, webhookContext(1L));
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
@@ -681,7 +643,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Collaboration (real gate)")
     class CollaborationTests {
 
         /**
@@ -723,28 +684,26 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         /**
-         * Creates a mock PR for collaboration tests. Uses lenient stubs because the real gate
-         * accesses different fields depending on which gate step short-circuits.
+         * Creates a real PR for collaboration tests with the fields the gate reads set.
          */
         private PullRequest setupCollaborationPR() {
-            PullRequest pr = mock(PullRequest.class);
-            lenient().when(pr.getId()).thenReturn(PR_ID);
-            lenient().when(pr.getHeadRefOid()).thenReturn("abc123");
-            lenient().when(pr.getHeadRefName()).thenReturn("feature/test");
-            lenient().when(pr.getBaseRefName()).thenReturn("main");
-            lenient().when(pr.getState()).thenReturn(Issue.State.OPEN);
-            lenient().when(pr.isDraft()).thenReturn(false);
+            PullRequest pr = new PullRequest();
+            pr.setId(PR_ID);
+            pr.setHeadRefOid("abc123");
+            pr.setHeadRefName("feature/test");
+            pr.setBaseRefName("main");
+            pr.setState(Issue.State.OPEN);
+            pr.setDraft(false);
 
             Repository repo = new Repository();
             repo.setNameWithOwner("owner/repo");
-            lenient().when(pr.getRepository()).thenReturn(repo);
+            pr.setRepository(repo);
 
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
             return pr;
         }
 
         @Test
-        @DisplayName("should submit job when real gate returns Detect")
         void listenerWithRealGateSubmitsOnDetect() {
             var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
 
@@ -768,7 +727,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             fixture.listener().onPullRequestCreated(event);
 
             verify(agentJobService).submit(
@@ -779,7 +738,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("real gate should skip when no matching practices")
         void realGateSkipsWhenNoMatchingPractices() {
             var fixture = CollaborationFixture.create(agentJobService, pullRequestRepository);
 
@@ -802,7 +760,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             setupCollaborationPR();
 
             var prData = createPrData(Issue.State.OPEN, false, false);
-            var event = new DomainEvent.PullRequestCreated(prData, webhookContext(1L));
+            var event = new ScmDomainEvent.PullRequestCreated(prData, webhookContext(1L));
             fixture.listener().onPullRequestCreated(event);
 
             verify(agentJobService, never()).submit(any(), any(), any());

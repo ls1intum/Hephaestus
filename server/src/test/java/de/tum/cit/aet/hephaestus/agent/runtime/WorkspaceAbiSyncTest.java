@@ -17,11 +17,9 @@ import org.junit.jupiter.api.Test;
  * constants the Java side uses. The Java side itself is single-sourced from {@code WorkspaceAbi};
  * this test catches drift only on the JavaScript runner.
  */
-@DisplayName("WorkspaceAbi cross-language sync")
 class WorkspaceAbiSyncTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("pi-runner.mjs hardcodes the same task.json path, schemaVersion, and exit code as the Java ABI")
     void runnerLiteralsMatchAbi() throws IOException {
         Path runner = resolveResource("agent/pi-runner.mjs");
         assertThat(runner).isRegularFile();

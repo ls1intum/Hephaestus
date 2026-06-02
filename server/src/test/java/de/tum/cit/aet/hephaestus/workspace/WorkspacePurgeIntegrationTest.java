@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.Organization;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -26,7 +26,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * Integration tests for workspace purge (deletion) covering data cleanup completeness,
  * idempotency, shared entity protection, credential clearing, and authorization.
  */
-@DisplayName("Workspace purge integration")
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -53,9 +52,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private ChatThreadRepository chatThreadRepository;
 
-    // -------------------------------------------------------------------------
     // Helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Creates a GitLab workspace with typical associated data for purge testing.
@@ -69,18 +66,17 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 slug + "-group",
                 AccountType.ORG,
                 owner.getId(),
-                Workspace.GitProviderMode.GITLAB_PAT,
+                de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                 "glpat-purge-test-token",
                 null
             )
         );
 
-        // Set GitLab webhook fields (simulates a registered webhook)
-        workspace.setGitlabGroupId(42L);
-        workspace.setGitlabWebhookId(99L);
-        workspace.setSlackToken("xoxb-test-slack-token");
-        workspace.setSlackSigningSecret("test-signing-secret");
-        workspace = workspaceRepository.save(workspace);
+        // GitLab webhook ids + Slack credentials live on Connection rows now (the
+        // Connection registry); the legacy Workspace columns are scheduled for removal.
+        // The PAT was already encrypted onto the GitLab Connection by the workspace
+        // creation request above, which is what the credential-clearing assertion below
+        // exercises.
 
         // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
         RepositoryToMonitor monitor = new RepositoryToMonitor();
@@ -129,16 +125,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return workspace;
     }
 
-    // -------------------------------------------------------------------------
     // Data cleanup completeness
-    // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Data cleanup")
     class DataCleanup {
 
         @Test
-        @DisplayName("purge deletes all workspace-scoped data and marks workspace as PURGED")
         void purgeDeletesAllWorkspaceScopedData() {
             User owner = persistUser("cleanup-owner");
             Workspace workspace = workspaceService.createWorkspace(
@@ -148,7 +140,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-cleanup-token",
                     null
                 )
@@ -198,12 +190,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Idempotency
-    // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Idempotency")
     class Idempotency {
 
         @Test
@@ -217,7 +206,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "idempotent-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-idempotent-token",
                     null
                 )
@@ -234,16 +223,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Shared entity protection
-    // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Shared entity protection")
     class SharedEntityProtection {
 
         @Test
-        @DisplayName("purge unlinks but preserves the Organization entity")
         void purgePreservesOrganization() {
             Workspace workspace = createGitLabWorkspaceWithData("org-protect");
             Long workspaceId = workspace.getId();
@@ -260,44 +245,55 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Credential and sensitive field clearing
-    // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Sensitive field clearing")
     class SensitiveFieldClearing {
 
+        @Autowired
+        private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository connectionRepository;
+
+        /**
+         * Per-workspace credentials now live on the {@code Connection} aggregate (PAT,
+         * Slack token, GitLab webhook ids). On workspace purge,
+         * {@code ConnectionPurgeContributor} transitions every still-ACTIVE Connection to
+         * {@code UNINSTALLED}, which clears the encrypted credential blob inside the
+         * same transaction. We assert the post-purge state of those rows directly here
+         * — the legacy {@code Workspace.personal_access_token / slack_token / …} columns
+         * no longer carry runtime state.
+         */
         @Test
-        @DisplayName("purge clears PAT, Slack tokens, and GitLab webhook fields")
-        void purgeClearsSensitiveFields() {
+        void purgeClearsCredentialBlobsOnConnections() {
             Workspace workspace = createGitLabWorkspaceWithData("sensitive");
             Long workspaceId = workspace.getId();
 
-            // Verify fields set before purge
-            assertThat(workspace.getPersonalAccessToken()).isNotNull();
-            assertThat(workspace.getSlackToken()).isNotNull();
-            assertThat(workspace.getSlackSigningSecret()).isNotNull();
-            assertThat(workspace.getGitlabGroupId()).isNotNull();
-            assertThat(workspace.getGitlabWebhookId()).isNotNull();
+            // Pre-purge: the GitLab Connection from createGitLabWorkspaceWithData carries an
+            // encrypted PAT blob and is ACTIVE.
+            var connections = connectionRepository.findByWorkspaceId(workspaceId);
+            assertThat(connections).isNotEmpty();
+            assertThat(connections).anyMatch(
+                c ->
+                    c.getKind() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB &&
+                    c.getState() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE &&
+                    c.getCredentialsEncrypted() != null
+            );
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
-            Workspace purged = workspaceRepository.findById(workspaceId).orElseThrow();
-            assertThat(purged.getPersonalAccessToken()).isNull();
-            assertThat(purged.getSlackToken()).isNull();
-            assertThat(purged.getSlackSigningSecret()).isNull();
-            assertThat(purged.getGitlabGroupId()).isNull();
-            assertThat(purged.getGitlabWebhookId()).isNull();
+            // Post-purge: every Connection is UNINSTALLED and its credential blob is null.
+            var postPurge = connectionRepository.findByWorkspaceId(workspaceId);
+            assertThat(postPurge).allMatch(
+                c -> c.getState() == de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.UNINSTALLED
+            );
+            assertThat(postPurge).allMatch(c -> c.getCredentialsEncrypted() == null);
+            assertThat(postPurge).allMatch(c -> c.getCredentialsAlg() == null);
         }
     }
 
     @Nested
-    @DisplayName("Chat thread cleanup")
     class ChatThreadCleanup {
 
         @Test
-        @DisplayName("purge deletes mentor chat threads via WorkspacePurgeContributor")
         void purgeDeletesChatThreads() {
             User owner = persistUser("chat-cleanup-owner");
             Workspace workspace = workspaceService.createWorkspace(
@@ -307,7 +303,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "chat-cleanup-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-chat-cleanup-token",
                     null
                 )
@@ -333,17 +329,13 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Authorization
-    // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("Authorization")
     class Authorization {
 
         @Test
         @WithAdminUser
-        @DisplayName("OWNER can purge workspace via DELETE endpoint")
         void ownerCanPurge() {
             Workspace workspace = createGitLabWorkspaceWithData("owner-purge");
             // ensureOwnerMembership already called in createGitLabWorkspaceWithData
@@ -362,7 +354,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         @Test
         @WithMentorUser
-        @DisplayName("non-owner is denied access to DELETE endpoint")
         void nonOwnerIsDeniedAccess() {
             // Create workspace with a different owner — mentor user is NOT the owner
             User owner = persistUser("non-owner-test-owner");
@@ -373,7 +364,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "non-owner-group",
                     AccountType.ORG,
                     owner.getId(),
-                    Workspace.GitProviderMode.GITLAB_PAT,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                     "glpat-non-owner-token",
                     null
                 )

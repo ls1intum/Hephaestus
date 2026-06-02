@@ -8,13 +8,12 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEvent;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -74,19 +73,16 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("recalculateUserInternal")
     class RecalculateTests {
 
         @Test
-        @DisplayName("wipes progress and replays events")
         void wipesAndReplays() {
             ActivityEvent event1 = createActivityEvent(ActivityEventType.PULL_REQUEST_MERGED);
             ActivityEvent event2 = createActivityEvent(ActivityEventType.COMMIT_CREATED);
 
             // TransactionTemplate.executeWithoutResult -> just run the consumer
             doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                var consumer = invocation.getArgument(0, java.util.function.Consumer.class);
+                java.util.function.Consumer<Object> consumer = invocation.getArgument(0);
                 consumer.accept(null);
                 return null;
             })
@@ -116,11 +112,9 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles empty activity history")
         void handlesEmptyHistory() {
             doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                var consumer = invocation.getArgument(0, java.util.function.Consumer.class);
+                java.util.function.Consumer<Object> consumer = invocation.getArgument(0);
                 consumer.accept(null);
                 return null;
             })

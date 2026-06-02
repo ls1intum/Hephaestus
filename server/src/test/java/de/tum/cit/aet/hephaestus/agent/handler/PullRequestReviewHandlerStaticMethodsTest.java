@@ -14,15 +14,13 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("PullRequestReviewHandler static methods")
 class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // ── parseDiffStatPaths ──────────────────────────────────────────────────
+    // parseDiffStatPaths
 
     @Nested
-    @DisplayName("parseDiffStatPaths")
     class ParseDiffStatPaths {
 
         @Test
@@ -38,7 +36,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles full rename (old.txt => new.txt)")
         void fullRename() {
             String diffStat = """
                  old.swift => new.swift | 0
@@ -48,7 +45,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles partial rename with braces")
         void partialRename() {
             String diffStat = """
                  src/{OldDir => NewDir}/File.swift | 5 +++--
@@ -58,7 +54,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles partial rename with empty target (directory removal)")
         void partialRenameEmptyTarget() {
             String diffStat = """
                  iHabit/{HabitLogic => }/HabitAddView.swift | 3 ++-
@@ -68,7 +63,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips summary line and empty lines")
         void skipsSummaryAndEmpty() {
             String diffStat = """
                  File.swift | 1 +
@@ -80,7 +74,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips --- separator lines")
         void skipsSeparatorLine() {
             String diffStat = """
                 ---
@@ -91,16 +84,14 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty set for empty input")
         void emptyInput() {
             assertThat(PullRequestReviewHandler.parseDiffStatPaths("")).isEmpty();
         }
     }
 
-    // ── filterByDiffScope ───────────────────────────────────────────────────
+    // filterByDiffScope
 
     @Nested
-    @DisplayName("filterByDiffScope")
     class FilterByDiffScope {
 
         private PracticeDetectionResultParser.ValidatedFinding makeFinding(String slug, List<String> filePaths) {
@@ -141,7 +132,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns all findings when diffFiles is empty (no filter)")
         void emptyDiffFilesReturnsAll() {
             var finding = makeFinding("test", List.of("some/file.swift"));
             var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of());
@@ -149,7 +139,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("keeps findings with matching file paths")
         void keepsMatchingFindings() {
             var finding = makeFinding("test", List.of("src/Main.swift"));
             var result = PullRequestReviewHandler.filterByDiffScope(
@@ -160,7 +149,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("removes findings with no matching file paths")
         void removesNonMatchingFindings() {
             var finding = makeFinding("test", List.of("src/Other.swift"));
             var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
@@ -168,7 +156,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("keeps findings with no evidence (cannot filter)")
         void keepsNoEvidenceFindings() {
             var finding = makeFindingNoEvidence("mr-description");
             var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
@@ -176,7 +163,6 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("keeps finding if ANY location is in scope")
         void keepsIfAnyLocationInScope() {
             var finding = makeFinding("test", List.of("out-of-scope.swift", "src/Main.swift"));
             var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));

@@ -9,15 +9,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("SandboxSpec")
 class SandboxSpecTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("should reject null jobId")
     void shouldRejectNullJobId() {
         assertThatNullPointerException()
             .isThrownBy(() ->
@@ -38,7 +35,6 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should reject null image")
     void shouldRejectNullImage() {
         assertThatNullPointerException()
             .isThrownBy(() ->
@@ -59,7 +55,6 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should reject blank image")
     void shouldRejectBlankImage() {
         assertThatThrownBy(() ->
             new SandboxSpec(
@@ -80,7 +75,6 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should reject null resourceLimits")
     void shouldRejectNullResourceLimits() {
         assertThatNullPointerException()
             .isThrownBy(() ->
@@ -101,7 +95,6 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should accept valid spec with nullable fields and default collections to empty")
     void shouldAcceptValidSpec() {
         // networkPolicy, securityProfile can be null
         // command, environment, inputFiles are defaulted to empty collections
@@ -125,7 +118,6 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("rejects null outputPath")
     void rejectsNullOutputPath() {
         assertThatThrownBy(() ->
             new SandboxSpec(
@@ -146,11 +138,9 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("ResourceLimits validation")
     class ResourceLimitsValidation {
 
         @Test
-        @DisplayName("should reject zero memoryBytes")
         void shouldRejectZeroMemory() {
             assertThatThrownBy(() -> new ResourceLimits(0, 2.0, 256, Duration.ofMinutes(10)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -158,7 +148,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject negative cpus")
         void shouldRejectNegativeCpus() {
             assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, -1.0, 256, Duration.ofMinutes(10)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -166,7 +155,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject zero pidsLimit")
         void shouldRejectZeroPids() {
             assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 0, Duration.ofMinutes(10)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -174,7 +162,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null maxRuntime")
         void shouldRejectNullMaxRuntime() {
             assertThatNullPointerException()
                 .isThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, null))
@@ -182,7 +169,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject zero maxRuntime")
         void shouldRejectZeroMaxRuntime() {
             assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, Duration.ZERO))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -190,7 +176,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept DEFAULT constants")
         void shouldAcceptDefaults() {
             assertThat(ResourceLimits.DEFAULT.memoryBytes()).isEqualTo(4L * 1024 * 1024 * 1024);
             assertThat(ResourceLimits.DEFAULT.cpus()).isEqualTo(2.0);
@@ -199,7 +184,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject memoryBytes exceeding maximum")
         void shouldRejectExcessiveMemory() {
             assertThatThrownBy(() ->
                 new ResourceLimits(ResourceLimits.MAX_MEMORY_BYTES + 1, 2.0, 256, Duration.ofMinutes(10))
@@ -209,7 +193,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject cpus exceeding maximum")
         void shouldRejectExcessiveCpus() {
             assertThatThrownBy(() ->
                 new ResourceLimits(4L * 1024 * 1024 * 1024, ResourceLimits.MAX_CPUS + 0.1, 256, Duration.ofMinutes(10))
@@ -219,7 +202,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject pidsLimit exceeding maximum")
         void shouldRejectExcessivePids() {
             assertThatThrownBy(() ->
                 new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, ResourceLimits.MAX_PIDS + 1, Duration.ofMinutes(10))
@@ -229,7 +211,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject maxRuntime exceeding maximum")
         void shouldRejectExcessiveRuntime() {
             assertThatThrownBy(() ->
                 new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, ResourceLimits.MAX_RUNTIME.plusSeconds(1))
@@ -239,7 +220,6 @@ class SandboxSpecTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept values at maximum bounds")
         void shouldAcceptAtMaximumBounds() {
             var limits = new ResourceLimits(
                 ResourceLimits.MAX_MEMORY_BYTES,

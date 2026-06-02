@@ -4,9 +4,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -17,8 +17,10 @@ import org.springframework.validation.annotation.Validated;
  *
  * <h2>Activation</h2>
  *
- * <p>The sandbox subsystem is disabled by default ({@code enabled=false}). Set {@code
- * hephaestus.sandbox.enabled=true} to activate. Requires a reachable Docker daemon.
+ * <p>The Docker sandbox <em>is</em> the worker capability (ADR 0005): activation is gated on the
+ * worker role ({@code hephaestus.runtime.worker.enabled}, default true → active in the monolith),
+ * not on a separate sandbox flag. See {@code DockerSandboxConfiguration}. Requires a reachable
+ * Docker daemon when the worker role actually runs jobs.
  *
  * <h2>Deployment Requirements</h2>
  *
@@ -30,7 +32,6 @@ import org.springframework.validation.annotation.Validated;
  *   <li>Optional: gVisor for {@code container-runtime=runsc}
  * </ul>
  *
- * @param enabled whether the sandbox subsystem is active
  * @param dockerHost Docker daemon endpoint
  * @param tlsVerify enable TLS verification for TCP connections
  * @param certPath path to TLS certificates (required when tlsVerify=true)
@@ -48,7 +49,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sandbox")
 public record SandboxProperties(
-    @DefaultValue("false") boolean enabled,
     @DefaultValue("unix:///var/run/docker.sock") @NotBlank String dockerHost,
     @DefaultValue("false") boolean tlsVerify,
     @Nullable String certPath,

@@ -4,26 +4,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
-import java.time.Duration;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
+@Tag("unit")
 class WorkspaceProvisioningServiceTest {
 
     @Mock
@@ -34,15 +40,6 @@ class WorkspaceProvisioningServiceTest {
 
     @Mock
     private WorkspaceService workspaceService;
-
-    @Mock
-    private WorkspaceInstallationService workspaceInstallationService;
-
-    @Mock
-    private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
-
-    @Mock
-    private GitHubAppTokenService gitHubAppTokenService;
 
     @Mock
     private UserRepository userRepository;
@@ -57,10 +54,10 @@ class WorkspaceProvisioningServiceTest {
     private WorkspaceMembershipService workspaceMembershipService;
 
     @Mock
-    private WorkspaceScopeFilter workspaceScopeFilter;
+    private AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
     @Mock
-    private AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
+    private ConnectionService connectionService;
 
     private WorkspaceProvisioningService provisioningService;
 
@@ -75,29 +72,18 @@ class WorkspaceProvisioningServiceTest {
             null
         );
 
-        var gitLabProperties = new GitLabProperties(
-            "https://gitlab.com",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
-
         provisioningService = new WorkspaceProvisioningService(
             workspaceProperties,
             workspaceRepository,
             repositoryToMonitorRepository,
             workspaceService,
-            workspaceInstallationService,
-            workspaceRepositoryMonitorService,
-            gitHubAppTokenService,
             userRepository,
             gitProviderRepository,
             workspaceMembershipRepository,
             workspaceMembershipService,
-            workspaceScopeFilter,
-            gitLabProperties,
-            authenticatedGitProviderUserService
+            authenticatedGitProviderUserService,
+            connectionService,
+            List.of()
         );
     }
 
@@ -124,6 +110,11 @@ class WorkspaceProvisioningServiceTest {
         admin.setHtmlUrl("https://example.com/admin");
         admin.setType(User.Type.USER);
 
+        GitProvider githubProvider = TestEntities.gitProvider(100L, GitProviderType.GITHUB);
+        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
+            Optional.of(githubProvider)
+        );
+
         when(workspaceRepository.count()).thenReturn(0L);
         when(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(1L, admin.getId())).thenReturn(
             Optional.empty()
@@ -132,8 +123,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        // User lookup for PAT bootstrap - user already exists
-        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
+        // User lookup for PAT bootstrap — scoped by provider id post-#1198
+        when(userRepository.findByLoginAndProviderId("aet-org", 100L)).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.of(admin));
 
         provisioningService.bootstrapDefaultPatWorkspace();
@@ -146,7 +137,16 @@ class WorkspaceProvisioningServiceTest {
         // Default admin handling should not throw and should not trigger redundant
         // workspace creations
         verify(workspaceService).createWorkspace(anyString(), anyString(), anyString(), any(), anyLong());
-        assertThat(workspace.getPersonalAccessToken()).isEqualTo("pat-token");
+
+        verify(connectionService).provisionPatConnection(
+            eq(workspace),
+            eq(IntegrationKind.GITHUB),
+            eq("pat"),
+            any(ConnectionConfig.GitHubPatConfig.class),
+            eq("pat-token"),
+            anyString()
+        );
+        assertThat(workspace.getId()).isEqualTo(1L);
     }
 
     @Test
@@ -164,13 +164,17 @@ class WorkspaceProvisioningServiceTest {
         owner.setHtmlUrl("https://example.com");
         owner.setType(User.Type.USER);
 
+        GitProvider githubProvider = TestEntities.gitProvider(100L, GitProviderType.GITHUB);
+        when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
+            Optional.of(githubProvider)
+        );
+
         when(workspaceRepository.count()).thenReturn(0L);
         when(
             workspaceService.createWorkspace(anyString(), anyString(), anyString(), any(AccountType.class), anyLong())
         ).thenReturn(workspace);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        // User lookup for PAT bootstrap - user already exists
-        when(userRepository.findByLogin("aet-org")).thenReturn(Optional.of(owner));
+        when(userRepository.findByLoginAndProviderId("aet-org", 100L)).thenReturn(Optional.of(owner));
         when(userRepository.findByLogin("admin")).thenReturn(Optional.empty());
 
         provisioningService.bootstrapDefaultPatWorkspace();

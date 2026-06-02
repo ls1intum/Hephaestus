@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Set;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Record acting as the central source of truth for all achievement definitions.

@@ -4,15 +4,12 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("ServerUrlValidator")
 class ServerUrlValidatorTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("scheme validation")
     class SchemeValidation {
 
         @Test
@@ -45,7 +42,6 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("hostname validation")
     class HostnameValidation {
 
         @Test
@@ -106,7 +102,6 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("TLD validation")
     class TldValidation {
 
         @Test
@@ -132,7 +127,6 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("URL structure validation")
     class StructureValidation {
 
         @Test
@@ -172,7 +166,6 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("valid URLs")
     class ValidUrls {
 
         @Test

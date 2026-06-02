@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.activity.scoring;
 
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -42,9 +42,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     private final Set<String> selfReviewAuthorLogins;
     private final ExperiencePointProperties properties;
 
-    // ========================================================================
     // Default Experience Point Constants (overridable via properties)
-    // ========================================================================
 
     /**
      * Default XP awarded when a pull request is opened.
@@ -77,9 +75,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             .collect(Collectors.toUnmodifiableSet());
     }
 
-    // ========================================================================
     // XP Accessors (use configured values from properties)
-    // ========================================================================
 
     /**
      * Get XP for pull request opened (configurable).
@@ -165,9 +161,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return properties.xpAwards().discussionCommentCreated();
     }
 
-    // ========================================================================
     // Review Experience Points
-    // ========================================================================
 
     /**
      * Calculate experience points for a list of reviews on the same pull request.
@@ -442,9 +436,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return (10 * weightComment * complexityScore) / (weightComment + complexityScore);
     }
 
-    // ========================================================================
     // Complexity Calculation
-    // ========================================================================
 
     /**
      * Calculate complexity score for a pull request.
@@ -481,9 +473,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return 33; // Overly complex
     }
 
-    // ========================================================================
     // Private Helpers
-    // ========================================================================
 
     /**
      * Calculate code review bonus based on thoroughness.

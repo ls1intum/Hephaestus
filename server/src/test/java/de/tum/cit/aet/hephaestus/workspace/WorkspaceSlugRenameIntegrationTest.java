@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -10,7 +12,6 @@ import de.tum.cit.aet.hephaestus.workspace.dto.RenameWorkspaceSlugRequestDTO;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -18,7 +19,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@DisplayName("Workspace slug rename integration")
 class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -29,6 +29,9 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Autowired
     private WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Test
     @WithAdminUser
@@ -149,8 +152,8 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
             "beta-account",
             AccountType.ORG,
             ownerB.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 
@@ -176,7 +179,7 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         workspaceService.renameSlug(workspace.getId(), "install-alpha-renamed");
 
-        Workspace created = workspaceInstallationService.createOrUpdateFromInstallation(
+        Workspace created = githubLifecycleListener.createOrUpdateFromInstallation(
             999L,
             "install-alpha",
             RepositorySelection.ALL
@@ -185,7 +188,10 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(created).as("workspace should be created with fallback slug").isNotNull();
         assertThat(created.getWorkspaceSlug()).isNotEqualTo("install-alpha");
         assertThat(created.getWorkspaceSlug()).startsWith("install-alpha".substring(0, 3));
-        assertThat(created.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITHUB_APP_INSTALLATION);
+        // provider mode lives on the Connection registry now, not on Workspace.
+        assertThat(connectionService.findActiveGitHubAppConfig(created.getId()))
+            .as("GitHub App Connection should be active after createOrUpdateFromInstallation")
+            .isPresent();
     }
 
     @Test
@@ -198,7 +204,7 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         persistUser("install-owner-collision");
         persistUser("collision");
 
-        Workspace linked = workspaceInstallationService.createOrUpdateFromInstallation(
+        Workspace linked = githubLifecycleListener.createOrUpdateFromInstallation(
             1111L,
             "collision",
             RepositorySelection.ALL

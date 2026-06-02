@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.VerdictCount;
@@ -30,7 +30,6 @@ import org.springframework.data.domain.Pageable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("FindingsHistoryAspectProvider")
 class FindingsHistoryAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -52,7 +51,6 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
     FindingsHistoryAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes findings_history.json with empty defaults when no data")
     void emptyDefaults() throws Exception {
         User user = new User();
         user.setLogin("octo");
@@ -77,7 +75,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/findings_history.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("user").get("login").asText()).isEqualTo("octo");
+        assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(0L);
         // All verdicts present even when count is 0 — keeps the wire shape stable.
         for (Verdict v : Verdict.values()) {

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
  *       enforced so a misplaced provider fails the build.</li>
  * </ul>
  */
-@DisplayName("Agent runtime / context architecture")
 class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
 
     private static final String RUNTIME = "..agent.runtime..";
@@ -30,7 +29,6 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     private static final String TASK = "..agent.task..";
 
     @Nested
-    @DisplayName("runtime kernel boundary")
     class RuntimeBoundary {
 
         @Test
@@ -48,7 +46,6 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("task envelope boundary")
     class TaskBoundary {
 
         @Test
@@ -66,11 +63,9 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("ContentProvider placement")
     class ContentProviderPlacement {
 
         @Test
-        @DisplayName("ContentProvider implementations reside in agent.context.providers")
         void providersInProviderPackage() {
             ArchRule rule = classes()
                 .that()
@@ -83,7 +78,6 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("PiRunnerProfile placement")
     class PiRunnerProfilePlacement {
 
         @Test
@@ -100,7 +94,6 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
     }
 
     @Nested
-    @DisplayName("context module boundary")
     class ContextBoundary {
 
         @Test

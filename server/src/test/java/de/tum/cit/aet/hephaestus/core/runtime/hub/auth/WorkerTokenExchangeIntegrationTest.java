@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.core.runtime.hub.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -12,7 +11,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /** Status-code-only assertions are unit-level; this IT proves end-to-end sig/verify round-trip through the full context. */
-@DisplayName("Worker token exchange — integration")
 class WorkerTokenExchangeIntegrationTest extends BaseIntegrationTest {
 
     @DynamicPropertySource

@@ -32,15 +32,11 @@ import org.junit.jupiter.api.Test;
  *
  * @see ArchitectureTestConstants
  */
-@DisplayName("Code Quality")
 class CodeQualityTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // GOD CLASS DETECTION
-    // ========================================================================
 
     @Nested
-    @DisplayName("God Class Prevention")
     class GodClassTests {
 
         /**
@@ -49,19 +45,22 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * <p>More than 12 dependencies indicates a God class that needs splitting.
          *
          * <p><strong>Exceptions:</strong> Orchestrator services that coordinate many sub-services
-         * (e.g., GitHubDataSyncService) may legitimately have more dependencies.
+         * (e.g., GithubDataSyncService) may legitimately have more dependencies.
          * These should be explicitly named here with justification.
          */
         @Test
-        @DisplayName("Services have max 12 constructor dependencies")
         void servicesHaveLimitedConstructorParams() {
             // Orchestrator services that coordinate many sub-services are allowed more dependencies
             Set<String> orchestratorExceptions = Set.of(
-                "GitHubDataSyncService", // Coordinates 15 entity-specific sync services
-                "HistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
+                "GithubDataSyncService", // Coordinates 15 entity-specific sync services
+                "GitHubHistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
                 "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync services
                 "WorkspaceProvisioningService", // Orchestrates provisioning across GitHub and GitLab providers
-                "MentorChatService" // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config, context build
+                "MentorChatService", // Coordinates persistence, SSE, runner, lock, metrics, executor, llm config, context build
+                // Full provider-lifecycle orchestrators with broad ConnectionService usage —
+                // splitting them further scatters related logic without reducing coupling.
+                "GitLabWorkspaceInitializationService",
+                "WorkspaceRepositoryMonitorService"
             );
 
             ArchRule rule = classes()
@@ -97,7 +96,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * Business methods exclude getters, setters, equals, hashCode, toString, and constructors.
          */
         @Test
-        @DisplayName("Services have limited business methods (max 25)")
         void servicesHaveLimitedBusinessMethods() {
             ArchRule rule = classes()
                 .that()
@@ -111,12 +109,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // METHOD COMPLEXITY LIMITS
-    // ========================================================================
 
     @Nested
-    @DisplayName("Method Complexity")
     class MethodComplexityTests {
 
         /** Maximum parameters per method - indicates complex method. */
@@ -136,11 +131,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Methods have limited parameters (max 6)")
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
             Set<String> allowedOverloads = Set.of(
                 "ActivityEventService.record", // Has RecordActivityCommand overload for cleaner API
+                "ActivityRecorder.record", // SPI mirror of ActivityEventService.record — same shape by design
                 // @Bean factory wiring Spring dependencies — not business logic complexity
                 "DockerSandboxConfiguration.dockerSandboxAdapter",
                 "DockerSandboxConfiguration.dockerInteractiveSandboxAdapter"
@@ -238,7 +233,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * This is a proxy check since ArchUnit cannot directly measure cyclomatic complexity.
          */
         @Test
-        @DisplayName("Service methods avoid excessive boolean parameters")
         void serviceMethodsAvoidExcessiveBooleanParams() {
             ArchCondition<JavaClass> avoidManyBooleans = new ArchCondition<>(
                 "avoid methods with more than 2 boolean parameters"
@@ -283,9 +277,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SECURITY PATTERNS
-    // ========================================================================
 
     @Nested
     @DisplayName("Security Patterns")
@@ -303,7 +295,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Token services in appropriate packages")
         void tokenServicesInSecurityPackages() {
             ArchCondition<JavaClass> beInTokenAppropriatePackage = new ArchCondition<>(
                 "be in security, auth, app, common, or github package"
@@ -344,12 +335,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // INTERFACE SEGREGATION PRINCIPLE (merged from SolidPrinciplesTest)
-    // ========================================================================
 
     @Nested
-    @DisplayName("Interface Segregation Principle")
     class InterfaceSegregationTests {
 
         /**
@@ -359,7 +347,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * don't need. Prefer small, focused interfaces.
          */
         @Test
-        @DisplayName("Interfaces have limited methods (max 8)")
         void interfacesHaveLimitedMethods() {
             ArchCondition<JavaClass> haveLimitedMethods = new ArchCondition<>(
                 "have at most " + MAX_INTERFACE_METHODS + " methods"
@@ -410,19 +397,30 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         /**
          * SPI interfaces should be particularly focused.
          *
-         * <p>Service Provider Interfaces define module contracts -
-         * they should be minimal.
+         * <p>Service Provider Interfaces define module contracts - they should be minimal.
+         *
+         * <p><b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
+         * methods would let an interface hide its true surface behind {@code default} no-op
+         * bodies — a default no-op is still part of the contract every caller can invoke, so it
+         * counts toward ISP width exactly like an abstract method. Static and private (helper)
+         * methods are excluded — they are not part of the implementable contract.
+         *
+         * <p>Applies to every interface under {@code ..spi..} with no exemptions.
          */
         @Test
-        @DisplayName("SPI interfaces are focused (max 8 methods)")
         void spiInterfacesAreFocused() {
-            ArchCondition<JavaClass> beFocused = new ArchCondition<>("have at most " + MAX_SPI_METHODS + " methods") {
+            ArchCondition<JavaClass> beFocused = new ArchCondition<>(
+                "have at most " + MAX_SPI_METHODS + " abstract+default methods"
+            ) {
                 @Override
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
-                        .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
+                        // Implementable contract surface: every non-static, non-private instance
+                        // method a caller can invoke or an implementer can override — abstract OR default.
+                        .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
+                        .filter(m -> !m.getModifiers().contains(JavaModifier.PRIVATE))
                         .count();
 
                     if (methodCount > MAX_SPI_METHODS) {
@@ -430,7 +428,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                             SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "SPI %s has %d methods (max %d) - split interface",
+                                    "SPI %s has %d abstract+default methods (max %d) - split interface",
                                     javaClass.getSimpleName(),
                                     methodCount,
                                     MAX_SPI_METHODS
@@ -447,18 +445,16 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 .and()
                 .resideInAPackage("..spi..")
                 .should(beFocused)
+                .allowEmptyShould(false) // strict: ..spi.. is populated; an empty match would mean the rule silently stopped seeing SPIs
                 .because("SPI interfaces should be minimal");
 
             rule.check(classes);
         }
     }
 
-    // ========================================================================
     // DEPENDENCY INVERSION (merged from SolidPrinciplesTest)
-    // ========================================================================
 
     @Nested
-    @DisplayName("Dependency Inversion")
     class DependencyInversionTests {
 
         /**
@@ -468,22 +464,22 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * be used sparingly. Known usages are documented here.
          */
         @Test
-        @DisplayName("ObjectProvider usage is limited to known cases")
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
                 "WorkspaceActivationService",
-                "WorkspaceInstallationService", // NatsConsumerService absent under the webhook runtime role (server.enabled=false) — see ADR 0008
-                "WorkspaceLifecycleService", // NatsConsumerService absent under the webhook runtime role
-                "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
+                "GithubLifecycleListener", // IntegrationNatsConsumer absent under the webhook runtime role (server.enabled=false) — see ADR 0008
+                "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
+                "GitHubWorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GithubDataSyncService
                 "WorkspaceRepositoryMonitorService",
                 "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
-                "GitLabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
+                "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
                 "AccountService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
-                "LeaderboardTaskScheduler", // SlackWeeklyLeaderboardTask is optional, gated by leaderboard.notification.enabled=true
-                "WorkspaceScopedTables" // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
+                "GitHubWorkspaceDataSyncTrigger", // Lazy-loads GithubDataSyncService + SyncTargetProvider to break the same circular reference WorkspaceProvisioningAdapter handled; the workspace-side trigger sits on the GitHub adapter post-SPI extraction
+                "WorkspaceScopedTables", // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
+                "MentorChatService" // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
@@ -514,12 +510,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // LISKOV SUBSTITUTION PRINCIPLE (merged from SolidPrinciplesTest)
-    // ========================================================================
 
     @Nested
-    @DisplayName("Liskov Substitution Principle")
     class LiskovSubstitutionTests {
 
         /**
@@ -528,7 +521,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * <p>LSP principle: methods should declare specific exceptions.
          */
         @Test
-        @DisplayName("Service methods do not declare generic Exception")
         void serviceMethodsDoNotDeclareGenericException() {
             ArchCondition<JavaClass> notDeclareGenericException = new ArchCondition<>(
                 "not declare generic Exception in methods"
@@ -585,7 +577,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
          * and throws via utility methods.
          */
         @Test
-        @DisplayName("Service implementations do not throw UnsupportedOperationException")
         void serviceImplementationsDoNotThrowUnsupportedOperationException() {
             ArchCondition<JavaClass> notThrowUnsupportedOperationException = new ArchCondition<>(
                 "not throw UnsupportedOperationException"

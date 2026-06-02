@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
@@ -31,7 +31,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 
-@DisplayName("FindingFeedbackService")
 class FindingFeedbackServiceTest extends BaseUnitTest {
 
     private static final Long WORKSPACE_ID = 1L;
@@ -72,14 +71,12 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         return user;
     }
 
-    // ── Submit Feedback ──────────────────────────────────────────────────
+    // Submit Feedback
 
     @Nested
-    @DisplayName("submitFeedback")
     class SubmitFeedback {
 
         @Test
-        @DisplayName("APPLIED feedback saves successfully")
         void appliedFeedbackSaves() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -103,7 +100,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("DISPUTED feedback with explanation saves successfully")
         void disputedWithExplanationSaves() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -122,7 +118,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("NOT_APPLICABLE feedback saves successfully")
         void notApplicableSaves() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -143,7 +138,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("DISPUTED without explanation throws IllegalArgumentException")
         void disputedWithoutExplanationThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -156,7 +150,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("DISPUTED with blank explanation throws IllegalArgumentException")
         void disputedWithBlankExplanationThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -169,7 +162,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("non-contributor throws AccessForbiddenException")
         void nonContributorThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -182,7 +174,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("finding not found throws EntityNotFoundException")
         void findingNotFoundThrows() {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
 
@@ -193,14 +184,12 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── Get Latest Feedback ──────────────────────────────────────────────
+    // Get Latest Feedback
 
     @Nested
-    @DisplayName("getLatestFeedback")
     class GetLatestFeedback {
 
         @Test
-        @DisplayName("returns latest feedback when present")
         void returnsLatestWhenPresent() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -226,7 +215,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns empty when no feedback exists")
         void returnsEmptyWhenNone() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
@@ -241,7 +229,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws EntityNotFoundException when finding not in workspace")
         void throwsWhenFindingNotInWorkspace() {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
 
@@ -251,14 +238,12 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── Get Engagement ───────────────────────────────────────────────────
+    // Get Engagement
 
     @Nested
-    @DisplayName("getEngagement")
     class GetEngagement {
 
         @Test
-        @DisplayName("returns correct counts with workspace scoping")
         void returnsCorrectCounts() {
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
 
@@ -312,14 +297,12 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
     }
 
-    // ── Get Latest Feedback By Finding IDs ───────────────────────────────
+    // Get Latest Feedback By Finding IDs
 
     @Nested
-    @DisplayName("getLatestFeedbackByFindingIds")
     class GetLatestFeedbackByFindingIds {
 
         @Test
-        @DisplayName("returns empty map for empty input")
         void returnsEmptyForEmptyInput() {
             Map<UUID, FindingFeedbackDTO> result = service.getLatestFeedbackByFindingIds(List.of(), CONTRIBUTOR_ID);
 
@@ -327,7 +310,6 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("returns map keyed by finding ID")
         void returnsMappedByFindingId() {
             UUID findingId1 = UUID.randomUUID();
             UUID findingId2 = UUID.randomUUID();

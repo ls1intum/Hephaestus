@@ -19,7 +19,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("PiRuntimeFactory")
 class PiRuntimeFactoryTest extends BaseUnitTest {
 
     private static final PracticeRunnerProfile PRACTICE = new PracticeRunnerProfile();
@@ -66,11 +65,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("network policy")
     class NetworkPolicyContract {
 
         @Test
-        @DisplayName("PROXY forwards allowInternet=false + jobToken")
         void proxyForwardsToken() {
             var policy = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).networkPolicy();
             assertThat(policy.internetAccess()).isFalse();
@@ -78,7 +75,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("API_KEY allows internet, no proxy token")
         void apiKeyAllowsInternet() {
             var policy = factory.build(apiKeySpec(LlmProvider.OPENAI)).networkPolicy();
             assertThat(policy.internetAccess()).isTrue();
@@ -87,11 +83,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("input files")
     class InputFiles {
 
         @Test
-        @DisplayName("loads pi-orchestrator.md and the runner from classpath")
         void loadsClasspathResources() {
             var inputs = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, null)).inputFiles();
             assertThat(inputs.get(WorkspaceAbi.ORCHESTRATOR_PATH)).isNotNull();
@@ -102,7 +96,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("extra inputs merge into the input-files map when path is whitelisted")
         void extraInputsMerge() {
             byte[] payload = "deadbeef".getBytes(StandardCharsets.UTF_8);
             PiPlanSpec spec = new PiPlanSpec(
@@ -125,7 +118,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("settings JSON")
     class SettingsJson {
 
         @ParameterizedTest(name = "{0} → defaultProvider {1}")
@@ -133,13 +125,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         void mapsProvider(LlmProvider provider, String expected) throws Exception {
             byte[] json = factory.buildPiSettingsJson(provider, "some-model");
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
-            assertThat(root.path("defaultProvider").asText()).isEqualTo(expected);
-            assertThat(root.path("defaultModel").asText()).isEqualTo("some-model");
-            assertThat(root.path("transport").asText()).isEqualTo("sse");
+            assertThat(root.path("defaultProvider").asString()).isEqualTo(expected);
+            assertThat(root.path("defaultModel").asString()).isEqualTo("some-model");
+            assertThat(root.path("transport").asString()).isEqualTo("sse");
         }
 
         @Test
-        @DisplayName("omits defaultModel when null/blank and includes compaction config")
         void omitsModelAndIncludesCompaction() throws Exception {
             byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
@@ -150,11 +141,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("environment")
     class Environment {
 
         @Test
-        @DisplayName("AGENT_BUDGET_MS stays strictly below the spec hard timeout (leaves grace)")
         void budget_leavesGraceUnderSpecTimeout() {
             var spec = proxySpec(LlmProvider.AZURE_OPENAI, null);
             String budget = factory.build(spec).environment().get("AGENT_BUDGET_MS");
@@ -178,14 +167,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("No image-wide UV_THREADPOOL_SIZE override (would serialise libuv fs bursts)")
         void uvThreadpoolNotForced() {
             var env = factory.build(proxySpec(LlmProvider.OPENAI, null)).environment();
             assertThat(env).doesNotContainKey("UV_THREADPOOL_SIZE");
         }
 
         @Test
-        @DisplayName("Azure deployment map is set with explicit model")
         void azureDeploymentMap() {
             var env = factory.build(proxySpec(LlmProvider.AZURE_OPENAI, "gpt-5.4-mini")).environment();
             assertThat(env).containsEntry(
@@ -203,7 +190,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("baseUrl override exports PI_HEPHAESTUS_* env vars (routes via custom Pi provider)")
         void baseUrlExported() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -227,7 +213,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("baseUrl is ignored in PROXY mode (proxy URL comes from $LLM_PROXY_URL)")
         void baseUrlIgnoredInProxyMode() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -249,7 +234,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("custom provider routing")
     class CustomProvider {
 
         @Test
@@ -277,7 +261,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("baseUrl-pinned spec writes defaultProvider=hephaestus in settings.json")
         void baseUrlPinnedSpecSetsHephaestusDefault() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -298,12 +281,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asText()).isEqualTo("gpt-x");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("hephaestus");
+            assertThat(settings.path("defaultModel").asString()).isEqualTo("gpt-x");
         }
 
         @Test
-        @DisplayName("model id passed verbatim — gateway-routed providers need the full id on the wire")
         void modelIdPassedVerbatim() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -327,12 +309,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             // defaultProvider=hephaestus pins the provider explicitly, so Pi does not parse the
             // slash in defaultModel as a provider/model reference; the full id is what the
             // runner-script's registerProvider() call matches AND what the gateway expects on the wire.
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("hephaestus");
-            assertThat(settings.path("defaultModel").asText()).isEqualTo("openai/gpt-oss-120b");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("hephaestus");
+            assertThat(settings.path("defaultModel").asString()).isEqualTo("openai/gpt-oss-120b");
         }
 
         @Test
-        @DisplayName("no baseUrl → defaultProvider=openai (built-in provider, no runner registration)")
         void noBaseUrlUsesBuiltInProvider() throws Exception {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -353,7 +334,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("openai");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("openai");
         }
 
         @Test
@@ -378,12 +359,11 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                     StandardCharsets.UTF_8
                 )
             );
-            assertThat(settings.path("defaultProvider").asText()).isEqualTo("azure-openai-responses");
+            assertThat(settings.path("defaultProvider").asString()).isEqualTo("azure-openai-responses");
         }
     }
 
     @Nested
-    @DisplayName("command")
     class CommandAssembly {
 
         @Test
@@ -405,7 +385,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Mentor profile contributes heap cap, --expose-gc, and jemalloc preload scoped to node")
         void mentorProfileContributesMentorFlagsAndEnv() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,
@@ -434,7 +413,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Mentor and practice profiles resolve to distinct runner scripts")
         void profilesResolveToDistinctScripts() {
             PiPlanSpec base = proxySpec(LlmProvider.AZURE_OPENAI, null);
             byte[] practiceBytes = factory.build(base).inputFiles().get(WorkspaceAbi.RUNNER_SCRIPT_FILENAME);
@@ -456,7 +434,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("[sh, -c, <assembled>] with node runner at the end and precompute prepended")
         void shCommandWithPrecomputeOrder() {
             PiPlanSpec spec = new PiPlanSpec(
                 LlmProvider.OPENAI,

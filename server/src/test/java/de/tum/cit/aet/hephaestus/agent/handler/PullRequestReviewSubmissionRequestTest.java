@@ -3,20 +3,18 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("PullRequestReviewSubmissionRequest")
 class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
 
-    private EventPayload.PullRequestData samplePullRequestData() {
-        return new EventPayload.PullRequestData(
+    private ScmEventPayload.PullRequestData samplePullRequestData() {
+        return new ScmEventPayload.PullRequestData(
             456L,
             42,
             "Fix bug",
@@ -39,11 +37,9 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Construction")
     class Construction {
 
         @Test
-        @DisplayName("should accept valid input")
         void shouldAcceptValidInput() {
             var request = new PullRequestReviewSubmissionRequest(
                 samplePullRequestData(),
@@ -59,7 +55,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null pullRequest")
         void shouldRejectNullPullRequest() {
             assertThatThrownBy(() -> new PullRequestReviewSubmissionRequest(null, "branch", "sha", "main"))
                 .isInstanceOf(NullPointerException.class)
@@ -67,9 +62,8 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject pull request with null repository")
         void shouldRejectNullRepository() {
-            var prDataNoRepo = new EventPayload.PullRequestData(
+            var prDataNoRepo = new ScmEventPayload.PullRequestData(
                 456L,
                 42,
                 "Fix bug",
@@ -96,7 +90,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null headRefName")
         void shouldRejectNullHeadRefName() {
             assertThatThrownBy(() ->
                 new PullRequestReviewSubmissionRequest(samplePullRequestData(), null, "sha", "main")
@@ -106,7 +99,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject blank headRefName")
         void shouldRejectBlankHeadRefName() {
             assertThatThrownBy(() ->
                 new PullRequestReviewSubmissionRequest(samplePullRequestData(), "  ", "sha", "main")
@@ -116,7 +108,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null headRefOid")
         void shouldRejectNullHeadRefOid() {
             assertThatThrownBy(() ->
                 new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", null, "main")
@@ -126,7 +117,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject blank headRefOid")
         void shouldRejectBlankHeadRefOid() {
             assertThatThrownBy(() ->
                 new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", " ", "main")
@@ -136,7 +126,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null baseRefName")
         void shouldRejectNullBaseRefName() {
             assertThatThrownBy(() ->
                 new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", "sha", null)
@@ -146,7 +135,6 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject blank baseRefName")
         void shouldRejectBlankBaseRefName() {
             assertThatThrownBy(() ->
                 new PullRequestReviewSubmissionRequest(samplePullRequestData(), "branch", "sha", "  ")

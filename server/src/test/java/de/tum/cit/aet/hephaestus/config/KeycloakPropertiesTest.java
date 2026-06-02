@@ -16,7 +16,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * @see KeycloakProperties
  */
 @Tag("unit")
-@DisplayName("KeycloakProperties Configuration Binding")
 class KeycloakPropertiesTest {
 
     @EnableConfigurationProperties(KeycloakProperties.class)
@@ -30,7 +29,6 @@ class KeycloakPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Valid Configuration")
     class ValidConfiguration {
 
         @Test
@@ -58,7 +56,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("should compute effective internal URL when not specified")
         void effectiveInternalUrl_fallsBackToPublicUrl() {
             contextRunner()
                 .withPropertyValues(
@@ -73,7 +70,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("should compute effective JWK Set URI when not specified")
         void effectiveJwkSetUri_computedFromInternalUrl() {
             contextRunner()
                 .withPropertyValues(
@@ -91,7 +87,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("should default validateOnStartup to false when not specified")
         void validateOnStartup_defaultsToFalse() {
             contextRunner()
                 .withPropertyValues(
@@ -107,7 +102,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("should bind validateOnStartup when set to true")
         void validateOnStartup_whenTrue_bindCorrectly() {
             contextRunner()
                 .withPropertyValues(
@@ -124,7 +118,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("should bind validateOnStartup when set to false")
         void validateOnStartup_whenFalse_bindCorrectly() {
             contextRunner()
                 .withPropertyValues(
@@ -142,11 +135,9 @@ class KeycloakPropertiesTest {
     }
 
     @Nested
-    @DisplayName("isConfigured() contract")
     class IsConfiguredContract {
 
         @Test
-        @DisplayName("isConfigured() returns false when URL is blank — non-server roles boot without Keycloak")
         void blankUrl_isConfiguredFalse() {
             contextRunner()
                 .withPropertyValues(
@@ -161,7 +152,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("isConfigured() returns false when realm is whitespace")
         void blankRealm_isConfiguredFalse() {
             contextRunner()
                 .withPropertyValues(
@@ -176,7 +166,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("isConfigured() returns false when client ID is blank")
         void blankClientId_isConfiguredFalse() {
             contextRunner()
                 .withPropertyValues(
@@ -191,7 +180,6 @@ class KeycloakPropertiesTest {
         }
 
         @Test
-        @DisplayName("should allow null client secret (for public clients)")
         void nullClientSecret_allowed() {
             contextRunner()
                 .withPropertyValues(

@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -49,7 +49,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group/my-project",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             "glpat-test-token-12345",
             "https://gitlab.example.com"
         );
@@ -69,18 +69,20 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
         assertThat(workspace.workspaceSlug()).isEqualTo("gitlab-space");
-        assertThat(workspace.gitProviderMode()).isEqualTo("GITLAB_PAT");
+        // provider classification is derived from the active Connection
+        // and surfaced via `kind` (the renamed field). The legacy gitProviderMode field
+        // is gone.
+        assertThat(workspace.kind()).isEqualTo("GITLAB");
         assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITLAB);
         assertThat(workspace.serverUrl()).isEqualTo("https://gitlab.example.com");
         assertThat(workspace.status()).isEqualTo("ACTIVE");
         assertThat(workspace.hasPersonalAccessToken()).isTrue();
 
-        // Verify persisted entity
+        // Verify persisted entity exists; provider mode / PAT / server URL now live on
+        // the workspace's GitLab Connection row rather than legacy Workspace columns,
+        // which the WorkspaceDTO assertions above already cover end-to-end.
         Workspace persisted = workspaceRepository.findById(workspace.id()).orElseThrow();
-        assertThat(persisted.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITLAB_PAT);
-        assertThat(persisted.getServerUrl()).isEqualTo("https://gitlab.example.com");
-        assertThat(persisted.getPersonalAccessToken()).isNotNull();
-        assertThat(persisted.getPersonalAccessToken()).isNotBlank();
+        assertThat(persisted.getAccountLogin()).isEqualTo("my-group/my-project");
     }
 
     @Test
@@ -94,7 +96,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             "glpat-test-token-67890",
             null
         );
@@ -128,7 +130,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             null, // missing token
             null
         );
@@ -150,7 +152,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKey("tokenProvidedForGitLab");
+            .containsKey("tokenProvided");
 
         assertThat(workspaceRepository.findByWorkspaceSlug("gitlab-notoken")).isEmpty();
     }
@@ -166,7 +168,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "my-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             "glpat-test-token",
             "http://insecure.example.com" // not HTTPS
         );
@@ -204,7 +206,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "owner-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             "glpat-owner-token",
             null
         );
@@ -242,7 +244,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "secret-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             secretToken,
             null
         );
@@ -281,7 +283,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             "gitlab-group",
             AccountType.ORG,
             owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
+            de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             "glpat-list-token",
             null
         );
@@ -312,9 +314,12 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         assertThat(workspaces).isNotNull();
-        assertThat(workspaces)
-            .extracting(WorkspaceListItemDTO::providerType)
-            .contains(GitProviderType.GITHUB, GitProviderType.GITLAB);
+        // providerType is now derived from the active Connection. The
+        // GitHub workspace created via the 5-arg path has no Connection (App
+        // installations come in via GithubLifecycleListener), so its providerType is
+        // null. The GitLab workspace created via the REST API path provisions a GitLab
+        // Connection inline and surfaces as GITLAB.
+        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).contains(GitProviderType.GITLAB);
     }
 
     @Test
@@ -328,23 +333,20 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 "lifecycle-group",
                 AccountType.ORG,
                 owner.getId(),
-                Workspace.GitProviderMode.GITLAB_PAT,
+                de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
                 "glpat-lifecycle-token",
                 null
             )
         );
         ensureOwnerMembership(workspace);
 
-        // Verify it's ACTIVE and GITLAB
-        assertThat(workspace.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITLAB_PAT);
+        // Verify it's ACTIVE
         assertThat(workspace.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
 
         // Suspend
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
         Workspace suspended = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(suspended.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
-        // GitLab mode preserved after suspend
-        assertThat(suspended.getGitProviderMode()).isEqualTo(Workspace.GitProviderMode.GITLAB_PAT);
 
         // Resume
         workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug());

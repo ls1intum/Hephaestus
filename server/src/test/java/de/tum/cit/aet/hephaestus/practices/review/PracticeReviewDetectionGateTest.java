@@ -8,10 +8,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.AgentConfigChecker;
@@ -72,7 +72,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         );
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // Helpers
 
     private PullRequest createPullRequest() {
         PullRequest pr = new PullRequest();
@@ -132,14 +132,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return workspace;
     }
 
-    // ── Gate Check Tests ────────────────────────────────────────────────────
+    // Gate Check Tests
 
     @Nested
-    @DisplayName("1. Draft Gate")
     class DraftGateTests {
 
         @Test
-        @DisplayName("Should SKIP when PR is draft and skipDrafts=true")
         void skipDraftPr() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
@@ -151,7 +149,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should continue when PR is draft but skipDrafts=false")
         void continueWhenSkipDraftsDisabled() {
             PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, "", 15);
             PracticeReviewDetectionGate noSkipGate = new PracticeReviewDetectionGate(
@@ -175,7 +172,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Draft skip should prevent any DB calls")
         void draftSkipPreventsDbCalls() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
@@ -187,11 +183,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("2. Workspace Resolution Gate")
     class WorkspaceResolutionTests {
 
         @Test
-        @DisplayName("Should SKIP when workspace cannot be resolved")
         void skipWhenNoWorkspace() {
             PullRequest pr = createPullRequest();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.empty());
@@ -203,7 +197,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP when PR has null repository")
         void skipWhenNullRepository() {
             PullRequest pr = createPullRequest();
             pr.setRepository(null);
@@ -217,11 +210,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("2a. Practices Enabled Gate")
     class PracticesEnabledTests {
 
         @Test
-        @DisplayName("Should SKIP when practicesEnabled is false")
         void skipWhenPracticesDisabled() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -237,11 +228,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("2b. Trigger Mode Gate")
     class TriggerModeTests {
 
         @Test
-        @DisplayName("Should SKIP when auto-trigger is disabled and mode is AUTO")
         void skipWhenAutoTriggerDisabled() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -256,7 +245,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP when manual trigger is disabled and mode is MANUAL")
         void skipWhenManualTriggerDisabled() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -271,7 +259,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP when both triggers are disabled regardless of mode")
         void skipWhenBothTriggersDisabled() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -291,7 +278,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should continue when auto-trigger is disabled but mode is MANUAL")
         void continueWhenAutoTriggerDisabledButModeIsManual() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -306,7 +292,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should continue when manual trigger is disabled but mode is AUTO")
         void continueWhenManualTriggerDisabledButModeIsAuto() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -322,11 +307,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("3. Agent Config Gate")
     class AgentConfigGateTests {
 
         @Test
-        @DisplayName("Should SKIP when no enabled agent config exists")
         void skipWhenNoEnabledAgentConfig() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -341,11 +324,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("4. Practice Matching Gate")
     class PracticeMatchingTests {
 
         @Test
-        @DisplayName("Should SKIP when no active practices match trigger event")
         void skipWhenNoMatchingPractices() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice("ReviewSubmitted");
@@ -358,7 +339,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should handle practice with null triggerEvents gracefully")
         void handleNullTriggerEvents() {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
@@ -376,7 +356,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return all matching practices in Detect result")
         void returnsAllMatchingPractices() {
             PullRequest pr = createPullRequest();
             Practice matching1 = createPractice(TRIGGER_EVENT, "ReviewSubmitted");
@@ -404,11 +383,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("5. Run-for-All Bypass")
     class RunForAllTests {
 
         @Test
-        @DisplayName("Should DETECT without role check when runForAllUsers=true")
         void detectWhenRunForAllUsers() {
             PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "", 15);
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
@@ -436,7 +413,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("6. Assignee Gate")
     class AssigneeGateTests {
 
         @Test
@@ -454,7 +430,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP when PR has null assignees")
         void skipWhenNullAssignees() {
             PullRequest pr = createPullRequest();
             pr.setAssignees(null);
@@ -469,11 +444,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("7. Circuit Breaker Gate")
     class CircuitBreakerTests {
 
         @Test
-        @DisplayName("Should SKIP when Keycloak circuit breaker is open")
         void skipWhenCircuitBreakerOpen() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
@@ -493,11 +466,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("8. Role Check Gate")
     class RoleCheckTests {
 
         @Test
-        @DisplayName("Should DETECT when assignee has run_practice_review role")
         void detectWhenHasRole() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
@@ -517,7 +488,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP when assignee is missing run_practice_review role")
         void skipWhenMissingRole() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
@@ -537,7 +507,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should DETECT if ANY assignee has the role (multi-assignee)")
         void detectWhenAnyAssigneeHasRole() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
@@ -560,7 +529,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP when ALL assignees lack the role (multi-assignee)")
         void skipWhenNoAssigneeHasRole() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
@@ -582,7 +550,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should SKIP gracefully when hasRole throws exception")
         void skipWhenRoleCheckThrowsException() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);
@@ -603,7 +570,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Happy Path")
     class HappyPathTests {
 
         @Test
@@ -629,7 +595,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Detect should throw on null workspace")
         void detectThrowsOnNullWorkspace() {
             Practice practice = createPractice(TRIGGER_EVENT);
 
@@ -639,7 +604,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Detect should throw on null matchedPractices")
         void detectThrowsOnNullMatchedPractices() {
             Workspace workspace = createWorkspace();
 
@@ -649,7 +613,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Detect matchedPractices list should be unmodifiable")
         void detectMatchedPracticesIsUnmodifiable() {
             Practice practice = createPractice(TRIGGER_EVENT);
             Workspace workspace = createWorkspace();

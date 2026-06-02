@@ -45,11 +45,9 @@ class WorkspaceResolverTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Null and empty input handling")
     class NullInputTests {
 
         @Test
-        @DisplayName("Should return empty for null nameWithOwner")
         void returnsEmptyForNull() {
             Optional<Workspace> result = resolver.resolveForRepository(null);
 
@@ -59,7 +57,6 @@ class WorkspaceResolverTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Authoritative resolution (monitor lookup)")
     class AuthoritativeResolutionTests {
 
         @Test
@@ -80,7 +77,6 @@ class WorkspaceResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return empty when monitor exists but workspace is null")
         void returnsEmptyForMonitorWithNullWorkspace() {
             RepositoryToMonitor monitor = createMonitor(null);
             when(repositoryToMonitorRepository.findByNameWithOwner("ls1intum/Hephaestus")).thenReturn(
@@ -94,11 +90,9 @@ class WorkspaceResolverTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Heuristic resolution (owner login fallback)")
     class HeuristicResolutionTests {
 
         @Test
-        @DisplayName("Should fall back to owner-based lookup when no monitor exists")
         void fallsBackToOwnerLookup() {
             when(repositoryToMonitorRepository.findByNameWithOwner("ls1intum/Hephaestus")).thenReturn(Optional.empty());
             Workspace workspace = createWorkspace("ls1intum-workspace");
@@ -111,7 +105,6 @@ class WorkspaceResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return empty when no monitor and no owner match")
         void returnsEmptyWhenNoMatch() {
             when(repositoryToMonitorRepository.findByNameWithOwner("unknown/repo")).thenReturn(Optional.empty());
             when(workspaceRepository.findByAccountLoginIgnoreCase("unknown")).thenReturn(Optional.empty());
@@ -122,7 +115,6 @@ class WorkspaceResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should return empty for input without slash")
         void returnsEmptyForNoSlash() {
             when(repositoryToMonitorRepository.findByNameWithOwner("noslash")).thenReturn(Optional.empty());
 
@@ -133,7 +125,6 @@ class WorkspaceResolverTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Should skip heuristic when owner is empty (leading slash)")
         void skipsHeuristicForEmptyOwner() {
             when(repositoryToMonitorRepository.findByNameWithOwner("/repo")).thenReturn(Optional.empty());
 

@@ -23,6 +23,7 @@ Set the following secrets before starting the stack:
 
 | Variable | Purpose |
 | --- | --- |
+| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | **Required.** AES-256 key (EXACTLY 32 chars) for credentials encrypted at rest in the `connection` table. Must be set **before the first deploy** of the unified integration framework — the Liquibase backfill re-encrypts existing credentials on boot and fails fast (or HALTs the migration) without it. Keep it stable; rotating requires re-encrypting all rows. Generate: `openssl rand -base64 24 \| cut -c1-32`. |
 | `WEBHOOK_SECRET` | HMAC secret for GitHub and GitLab webhooks (prefer SHA-256; e.g., `openssl rand -hex 32`) |
 | `KEYCLOAK_GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
 | `KEYCLOAK_GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
@@ -30,9 +31,15 @@ Set the following secrets before starting the stack:
 | `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
 | `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
-| `SLACK_BOT_TOKEN` | Optional: Slack bot token for notifications |
-| `SLACK_SIGNING_SECRET` | Optional: Slack signing secret for webhook verification |
+| `HEPHAESTUS_INTEGRATION_SLACK_ENABLED` | Optional: enables the Slack OAuth admin surface (per-workspace connect) |
+| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID` | Optional: Slack app client ID used by the OAuth flow |
+| `HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET` | Optional: Slack app client secret used by the OAuth flow |
+| `HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI` | Optional: Slack OAuth callback URL (typically `https://<host>/oauth/callback/slack`) |
+| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` | Optional: post-callback landing URL on success. Defaults to `/integrations?status=success`. Set the absolute URL when the SPA host differs from the API host. |
+| `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Optional: post-callback landing URL on failure. Defaults to the success base + `?status=error`. |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
+
+Per-workspace bot tokens are issued via OAuth and encrypted at rest in the `connection` table; there is no longer a global bot token.
 
 ### GitHub integration
 

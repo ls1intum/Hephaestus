@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding.feedback;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.profile;
 
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.Set;

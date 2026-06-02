@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
@@ -13,9 +13,10 @@ import jakarta.validation.constraints.Size;
 /**
  * DTO for creating a new workspace.
  *
- * <p>Supports both GitHub and GitLab workspaces via the optional {@code gitProviderMode} field.
- * When creating a GitLab workspace, {@code personalAccessToken} is required and
- * {@code serverUrl} may be provided for self-hosted instances.
+ * <p>Supports PAT-backed GitHub and GitLab workspaces. {@code kind} discriminates;
+ * {@code personalAccessToken} carries the PAT (encrypted at rest by the registry);
+ * {@code serverUrl} is optional for self-hosted instances. GitHub App workspaces are
+ * provisioned automatically by the lifecycle listener, not via this endpoint.
  */
 @Schema(description = "Request to create a new workspace")
 public record CreateWorkspaceRequestDTO(
@@ -48,16 +49,18 @@ public record CreateWorkspaceRequestDTO(
     )
     Long ownerUserId,
 
+    @NotNull(message = "Integration kind is required")
     @Schema(
-        description = "Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.",
-        example = "GITLAB_PAT"
+        description = "Integration kind to provision. SLACK flows through OAuth, not this endpoint.",
+        allowableValues = { "GITHUB", "GITLAB" },
+        example = "GITLAB"
     )
-    Workspace.GitProviderMode gitProviderMode,
+    IntegrationKind kind,
 
     @Size(max = 512, message = "Personal access token must not exceed 512 characters")
     @Schema(
-        description = "Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.",
-        example = "your-gitlab-token"
+        description = "Personal Access Token. Required for both kinds (GitLab API or GitHub PAT). Stored encrypted at rest.",
+        example = "glpat-..."
     )
     String personalAccessToken,
 
@@ -67,13 +70,16 @@ public record CreateWorkspaceRequestDTO(
     )
     String serverUrl
 ) {
-    @AssertTrue(message = "Personal access token is required for GitLab PAT workspaces")
+    @AssertTrue(message = "Personal access token is required")
     @Schema(hidden = true)
-    private boolean isTokenProvidedForGitLab() {
-        if (gitProviderMode == Workspace.GitProviderMode.GITLAB_PAT) {
-            return personalAccessToken != null && !personalAccessToken.isBlank();
-        }
-        return true;
+    private boolean isTokenProvided() {
+        return personalAccessToken != null && !personalAccessToken.isBlank();
+    }
+
+    @AssertTrue(message = "kind must be GITHUB or GITLAB; SLACK flows through OAuth")
+    @Schema(hidden = true)
+    private boolean isKindSupported() {
+        return kind == IntegrationKind.GITHUB || kind == IntegrationKind.GITLAB;
     }
 
     @AssertTrue(message = "Server URL must use HTTPS and must not point to private/reserved addresses")

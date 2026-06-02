@@ -13,7 +13,6 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +31,6 @@ import org.junit.jupiter.api.Test;
  * @see MultiTenancyArchitectureTest for runtime context enforcement
  * @see ArchitectureTestConstants
  */
-@DisplayName("Data Isolation Architecture")
 class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
 
     /**
@@ -77,7 +75,11 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         // Through repository (discussion -> Repository -> Organization <- Workspace)
         "Discussion", // through Repository -> Organization <- Workspace
         "DiscussionCategory", // through Repository -> Organization <- Workspace
-        "DiscussionComment" // through Discussion -> Repository -> Organization <- Workspace
+        "DiscussionComment", // through Discussion -> Repository -> Organization <- Workspace
+        // Unified integration framework
+        "Connection", // has direct Workspace field
+        "ConnectionAudit", // through Connection.workspace
+        "FeedbackPost" // through Connection.workspace
     );
 
     /**
@@ -97,12 +99,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "WorkerRegistry" // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
     );
 
-    // ========================================================================
     // ENTITY WORKSPACE RELATIONSHIPS
-    // ========================================================================
 
     @Nested
-    @DisplayName("Entity Workspace Relationships")
     class EntityWorkspaceRelationshipTests {
 
         /**
@@ -112,7 +111,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * either directly (workspace field) or through relationships (repository.organization.workspaceId).
          */
         @Test
-        @DisplayName("JPA entities have workspace relationship path")
         void entitiesHaveWorkspaceRelationshipPath() {
             ArchCondition<JavaClass> haveWorkspacePath = new ArchCondition<>(
                 "have a path to workspace (direct or through relationships)"
@@ -192,7 +190,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * use @NotNull or equivalent to prevent orphaned data.
          */
         @Test
-        @DisplayName("Direct workspace relationships are not nullable")
         void directWorkspaceRelationshipsNotNullable() {
             ArchRule rule = fields()
                 .that()
@@ -205,12 +202,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DTO WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
-    @DisplayName("DTO Workspace Context")
     class DtoWorkspaceContextTests {
 
         /**
@@ -221,7 +215,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * data from other workspaces through eager fetching or incorrect joins.
          */
         @Test
-        @DisplayName("DTOs do not expose cross-workspace references")
         void dtosDoNotExposeCrossWorkspaceReferences() {
             ArchCondition<JavaClass> notExposeCrossWorkspaceData = new ArchCondition<>(
                 "not expose fields that could leak cross-workspace data"
@@ -288,12 +281,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // REPOSITORY RETURN TYPE SAFETY
-    // ========================================================================
 
     @Nested
-    @DisplayName("Repository Return Type Safety")
     class RepositoryReturnTypeSafetyTests {
 
         /**
@@ -304,7 +294,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * are a data isolation risk.
          */
         @Test
-        @DisplayName("Entity-returning repository methods are workspace-scoped")
         void entityReturningMethodsAreWorkspaceScoped() {
             ArchCondition<JavaMethod> beWorkspaceScopedIfReturningEntity = new ArchCondition<>(
                 "be workspace-scoped if returning entity types"
@@ -424,12 +413,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CASCADE DELETE WORKSPACE SAFETY
-    // ========================================================================
 
     @Nested
-    @DisplayName("Cascade Delete Safety")
     class CascadeDeleteSafetyTests {
 
         /**
@@ -440,7 +426,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
          * be cascade-deleted from workspace.
          */
         @Test
-        @DisplayName("Workspace does not cascade delete global entities")
         void workspaceDoesNotCascadeDeleteGlobalEntities() {
             ArchCondition<JavaClass> notCascadeDeleteGlobalEntities = new ArchCondition<>(
                 "not cascade delete global entities"

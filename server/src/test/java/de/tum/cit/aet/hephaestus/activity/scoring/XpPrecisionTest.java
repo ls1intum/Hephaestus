@@ -15,22 +15,18 @@ import org.junit.jupiter.params.provider.CsvSource;
  *
  * <p>Verifies that XP rounding is consistent and uses HALF_UP mode.
  */
-@DisplayName("XpPrecision")
 class XpPrecisionTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("round(double)")
     class RoundDouble {
 
         @Test
-        @DisplayName("rounds to 2 decimal places")
         void roundsToTwoDecimalPlaces() {
             assertThat(XpPrecision.round(1.234)).isEqualTo(1.23);
             assertThat(XpPrecision.round(1.239)).isEqualTo(1.24);
         }
 
         @Test
-        @DisplayName("uses HALF_UP rounding mode")
         void usesHalfUpRounding() {
             // 0.5 rounds up
             assertThat(XpPrecision.round(1.125)).isEqualTo(1.13);
@@ -46,13 +42,11 @@ class XpPrecisionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles zero")
         void handlesZero() {
             assertThat(XpPrecision.round(0.0)).isEqualTo(0.0);
         }
 
         @Test
-        @DisplayName("handles large values")
         void handlesLargeValues() {
             assertThat(XpPrecision.round(999.999)).isEqualTo(1000.0);
             assertThat(XpPrecision.round(1000.004)).isEqualTo(1000.0);
@@ -60,7 +54,6 @@ class XpPrecisionTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("roundToInt(double)")
     class RoundToIntDouble {
 
         @ParameterizedTest(name = "{0} rounds to {1}")
@@ -78,13 +71,11 @@ class XpPrecisionTest extends BaseUnitTest {
                 "99.9, 100",
             }
         )
-        @DisplayName("uses HALF_UP rounding for integer conversion")
         void usesHalfUpForIntegers(double input, int expected) {
             assertThat(XpPrecision.roundToInt(input)).isEqualTo(expected);
         }
 
         @Test
-        @DisplayName("handles large aggregated values")
         void handlesLargeAggregatedValues() {
             assertThat(XpPrecision.roundToInt(10000.5)).isEqualTo(10001);
             assertThat(XpPrecision.roundToInt(99999.4)).isEqualTo(99999);
@@ -92,17 +83,14 @@ class XpPrecisionTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("roundToInt(Double)")
     class RoundToIntDoubleObject {
 
         @Test
-        @DisplayName("handles null as zero")
         void handlesNullAsZero() {
             assertThat(XpPrecision.roundToInt((Double) null)).isEqualTo(0);
         }
 
         @Test
-        @DisplayName("rounds non-null values")
         void roundsNonNullValues() {
             assertThat(XpPrecision.roundToInt(Double.valueOf(99.5))).isEqualTo(100);
             assertThat(XpPrecision.roundToInt(Double.valueOf(99.4))).isEqualTo(99);
@@ -110,28 +98,23 @@ class XpPrecisionTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Constants")
     class Constants {
 
         @Test
-        @DisplayName("DECIMAL_PLACES is 2")
         void decimalPlacesIsTwo() {
             assertThat(XpPrecision.DECIMAL_PLACES).isEqualTo(2);
         }
 
         @Test
-        @DisplayName("ROUNDING_MODE is HALF_UP")
         void roundingModeIsHalfUp() {
             assertThat(XpPrecision.ROUNDING_MODE).isEqualTo(RoundingMode.HALF_UP);
         }
     }
 
     @Nested
-    @DisplayName("Fairness scenarios")
     class FairnessScenarios {
 
         @Test
-        @DisplayName("users with 99.9 vs 99.1 XP get different integer scores")
         void differentXpGetsDifferentScores() {
             // This was the bug - truncation gave both users 99
             int userA = XpPrecision.roundToInt(99.9);
@@ -153,7 +136,6 @@ class XpPrecisionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("aggregating many small XP values maintains precision")
         void aggregationMaintainsPrecision() {
             // Simulate summing 10,000 events of 0.5 XP each
             // This is the classic floating-point concern: 0.5 can't be represented exactly in IEEE 754
@@ -174,7 +156,6 @@ class XpPrecisionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("classic 0.1 + 0.2 problem is avoided by pre-rounding")
         void classicFloatingPointProblemAvoided() {
             // Without rounding: 0.1 + 0.2 = 0.30000000000000004
             // With rounding: each value is clean before storage
@@ -187,7 +168,6 @@ class XpPrecisionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("leaderboard ranking is stable with maximum practical XP")
         void leaderboardStableAtMaxXp() {
             // Two users with very close scores at high XP levels
             double userA = 1_000_000.45;

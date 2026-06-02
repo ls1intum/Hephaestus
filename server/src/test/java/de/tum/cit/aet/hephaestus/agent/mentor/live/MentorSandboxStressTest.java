@@ -52,7 +52,6 @@ import tools.jackson.databind.node.ObjectNode;
  * Defaults to N=5 to stay polite on shared infra.
  */
 @LiveLlmTest
-@DisplayName("Mentor sandbox stress — multi-user runner footprint")
 class MentorSandboxStressTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -113,7 +112,6 @@ class MentorSandboxStressTest {
      * <p>Run: {@code N=3 K=5 ./mvnw -Plive-tests test -Dtest=MentorSandboxStressTest#multiSessionPerRunner}.
      */
     @Test
-    @DisplayName("N runners × K sessions each: per-user multi-thread footprint")
     void multiSessionPerRunner() throws Exception {
         int n = Integer.parseInt(System.getenv().getOrDefault("N", "3"));
         int k = Integer.parseInt(System.getenv().getOrDefault("K", "5"));
@@ -323,9 +321,9 @@ class MentorSandboxStressTest {
             // Listen for agent_end (turn complete signal) for this thread.
             CompletableFuture<Void> turnComplete = new CompletableFuture<>();
             sandbox.subscribe(frame -> {
-                if (!"event".equals(frame.path("method").asText())) return;
-                if (!threadId.toString().equals(frame.path("params").path("threadId").asText())) return;
-                if ("agent_end".equals(frame.path("params").path("event").path("type").asText())) {
+                if (!"event".equals(frame.path("method").asString())) return;
+                if (!threadId.toString().equals(frame.path("params").path("threadId").asString())) return;
+                if ("agent_end".equals(frame.path("params").path("event").path("type").asString())) {
                     turnComplete.complete(null);
                 }
             });
@@ -392,15 +390,15 @@ class MentorSandboxStressTest {
             // Subscribe once for all per-thread agent_end signals.
             var turnCompletes = new ConcurrentHashMap<UUID, CompletableFuture<Void>>();
             sandbox.subscribe(frame -> {
-                if (!"event".equals(frame.path("method").asText())) return;
-                String tid = frame.path("params").path("threadId").asText();
+                if (!"event".equals(frame.path("method").asString())) return;
+                String tid = frame.path("params").path("threadId").asString();
                 UUID parsed;
                 try {
                     parsed = UUID.fromString(tid);
                 } catch (Exception e) {
                     return;
                 }
-                if ("agent_end".equals(frame.path("params").path("event").path("type").asText())) {
+                if ("agent_end".equals(frame.path("params").path("event").path("type").asString())) {
                     CompletableFuture<Void> cf = turnCompletes.get(parsed);
                     if (cf != null) cf.complete(null);
                 }
@@ -898,8 +896,8 @@ class MentorSandboxStressTest {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
                 } else if (
-                    "event".equals(frame.path("method").asText()) &&
-                    "runner_ready".equals(frame.path("params").path("event").path("type").asText())
+                    "event".equals(frame.path("method").asString()) &&
+                    "runner_ready".equals(frame.path("params").path("event").path("type").asString())
                 ) {
                     ready.add(frame);
                 }
@@ -932,7 +930,7 @@ class MentorSandboxStressTest {
             ObjectNode params = MAPPER.createObjectNode();
             params.put("threadId", threadId.toString());
             JsonNode resp = call("open_thread", params, timeout);
-            if (!threadId.toString().equals(resp.path("result").path("threadId").asText())) {
+            if (!threadId.toString().equals(resp.path("result").path("threadId").asString())) {
                 throw new IllegalStateException("open_thread did not echo threadId");
             }
         }

@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
@@ -36,7 +36,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("Finding feedback controller integration")
 class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -105,9 +104,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practiceFindingRepository.save(finding);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // POST /{findingId}/feedback
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("POST /{findingId}/feedback")
@@ -115,7 +112,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("APPLIED feedback returns 201")
         void appliedReturns201() {
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
 
@@ -141,7 +137,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("DISPUTED with explanation returns 201")
         void disputedWithExplanationReturns201() {
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "The AI is wrong about this");
 
@@ -165,7 +160,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("DISPUTED without explanation returns 400")
         void disputedWithoutExplanationReturns400() {
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, null);
 
@@ -182,7 +176,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("append-only: second feedback creates new row")
         void appendOnlyCreatesNewRow() {
             var request1 = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
             var request2 = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "Changed my mind");
@@ -215,7 +208,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("non-existent finding returns 404")
         void nonExistentFindingReturns404() {
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
 
@@ -232,7 +224,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        @DisplayName("non-contributor returns 403")
         void nonContributorReturns403() {
             // "mentor" user exists in DB and has workspace membership, but is NOT the finding's contributor
             User mentorUser = persistUser("mentor");
@@ -252,7 +243,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        @DisplayName("unauthenticated returns 401")
         void unauthenticatedReturns401() {
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
 
@@ -267,12 +257,9 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /{findingId}/feedback
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /{findingId}/feedback")
     class GetLatestFeedback {
 
         @Test
@@ -290,7 +277,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 404 for non-existent finding")
         void returns404ForNonExistentFinding() {
             webTestClient
                 .get()
@@ -303,7 +289,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns latest feedback after multiple submissions")
         void returnsLatestAfterMultipleSubmissions() {
             // Submit two feedbacks
             var request1 = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
@@ -347,12 +332,9 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Workspace isolation
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("Workspace isolation")
     class WorkspaceIsolation {
 
         @Test
@@ -394,17 +376,13 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /engagement
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /engagement")
     class GetEngagement {
 
         @Test
         @WithAdminUser
-        @DisplayName("returns all zeros when no feedback exists")
         void returnsZerosWhenNoFeedback() {
             FindingFeedbackEngagementDTO response = webTestClient
                 .get()
@@ -425,7 +403,6 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("returns correct action counts")
         void returnsCorrectCounts() {
             // Submit multiple feedbacks
             webTestClient

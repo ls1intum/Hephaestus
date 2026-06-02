@@ -2,15 +2,15 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.commit.Commit;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -30,7 +30,6 @@ import org.springframework.beans.factory.annotation.Autowired;
  * {@code git_commit.author_id} is backfilled via email match, this native UPDATE
  * rewrites the activity-event columns so the contributor actually receives XP.
  */
-@DisplayName("ActivityEventRepository.backfillCommitActors Integration")
 class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -142,7 +141,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("rewrites actor_id and xp for orphan COMMIT_CREATED events once git_commit.author_id is set")
     void backfillsOrphanCommitEvents() {
         Commit commit = persistCommit("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", targetRepository, null);
         ActivityEvent persisted = persistCommitCreatedEvent(commit, null, 0.0);
@@ -172,7 +170,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("does not touch events whose actor was already resolved at ingest time")
     void skipsEventsAlreadyHavingActor() {
         Commit commit = persistCommit("cccccccccccccccccccccccccccccccccccccccc", targetRepository, author);
         ActivityEvent persisted = persistCommitCreatedEvent(commit, author, 5.0);
@@ -185,7 +182,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("scopes backfill to the requested repository id")
     void scopesBackfillToRequestedRepository() {
         Commit targetCommit = persistCommit("dddddddddddddddddddddddddddddddddddddddd", targetRepository, null);
         Commit otherCommit = persistCommit("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", otherRepository, null);
@@ -210,7 +206,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ignores non-commit activity events for the same repository")
     void ignoresNonCommitEvents() {
         Instant occurredAt = Instant.parse("2024-06-01T10:00:00Z");
         ActivityEvent prEvent = ActivityEvent.builder()

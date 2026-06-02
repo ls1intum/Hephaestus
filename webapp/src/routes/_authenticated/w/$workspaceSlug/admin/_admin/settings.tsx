@@ -31,7 +31,7 @@ function AdminSettings() {
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
-	// Fetch full workspace data for gitProviderMode
+	// Fetch full workspace data to detect GitHub App installation workspaces.
 	const workspaceQueryOptions = getWorkspaceOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
@@ -40,9 +40,12 @@ function AdminSettings() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	// Check if repository management is allowed
-	// For GitHub App Installation workspaces, repositories are managed by the installation
-	const isAppInstallationWorkspace = workspaceData?.gitProviderMode === "GITHUB_APP_INSTALLATION";
+	// For GitHub App Installation workspaces, repositories are managed by the installation,
+	// so the admin UI must not allow add/remove. PAT-backed workspaces (GitHub PAT or GitLab)
+	// leave `installationId` null on the DTO and remain editable. (Post #1198 the
+	// gitProviderMode discriminator was replaced by `kind` + `installationId`.)
+	const isAppInstallationWorkspace =
+		workspaceData?.kind === "GITHUB" && workspaceData?.installationId != null;
 
 	// Repositories query
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({
@@ -184,6 +187,17 @@ function AdminSettings() {
 			}}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
+			workspaceSlug={workspaceSlug ?? undefined}
+			hasSlackConnection={workspaceData?.hasSlackToken ?? false}
+			slackConnectionId={workspaceData?.slackConnectionId ?? undefined}
+			slackChannelId={workspaceData?.leaderboardNotificationChannelId ?? undefined}
+			slackTeamLabel={workspaceData?.leaderboardNotificationTeam ?? undefined}
+			slackNotificationsEnabled={workspaceData?.leaderboardNotificationEnabled ?? false}
+			slackScheduleDay={workspaceData?.leaderboardScheduleDay ?? undefined}
+			slackScheduleTime={workspaceData?.leaderboardScheduleTime ?? undefined}
+			onSlackSaved={() =>
+				queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey })
+			}
 		/>
 	);
 }

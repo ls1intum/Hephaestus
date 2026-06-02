@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -24,7 +23,6 @@ import org.springframework.cache.CacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("PracticeCatalogAspectProvider")
 class PracticeCatalogAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -43,7 +41,6 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
     PracticeCatalogAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes practice_catalog.json with slug + criteria")
     void writesCatalog() throws Exception {
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
@@ -61,13 +58,13 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/practice_catalog.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("workspace").get("slug").asText()).isEqualTo("acme");
+        assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
         assertThat(root.get("practices").isArray()).isTrue();
         assertThat(root.get("practices")).hasSize(1);
         JsonNode entry = root.get("practices").get(0);
-        assertThat(entry.get("slug").asText()).isEqualTo("error-state-handling");
-        assertThat(entry.get("displayName").asText()).isEqualTo("Error State Handling");
-        assertThat(entry.get("criteria").asText()).contains("Show an error view");
+        assertThat(entry.get("slug").asString()).isEqualTo("error-state-handling");
+        assertThat(entry.get("displayName").asString()).isEqualTo("Error State Handling");
+        assertThat(entry.get("criteria").asString()).contains("Show an error view");
         assertThat(entry.has("description")).isFalse();
     }
 }

@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent.TriggerEventNames;
+import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
@@ -69,35 +69,35 @@ public class AgentJobEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
+    public void onPullRequestCreated(ScmDomainEvent.PullRequestCreated event) {
         handlePullRequestEvent(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_CREATED);
     }
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestReady(DomainEvent.PullRequestReady event) {
+    public void onPullRequestReady(ScmDomainEvent.PullRequestReady event) {
         handlePullRequestEvent(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_READY);
     }
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestSynchronized(DomainEvent.PullRequestSynchronized event) {
+    public void onPullRequestSynchronized(ScmDomainEvent.PullRequestSynchronized event) {
         handlePullRequestEvent(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_SYNCHRONIZED);
     }
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
+    public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
         handleReviewEvent(event.review(), event.context());
     }
 
-    // ── PR event handling ───────────────────────────────────────────────────
+    // PR event handling
 
     private void handlePullRequestEvent(
-        EventPayload.PullRequestData prData,
+        ScmEventPayload.PullRequestData prData,
         EventContext context,
         String triggerEventName
     ) {
@@ -146,9 +146,9 @@ public class AgentJobEventListener {
         }
     }
 
-    // ── Review event handling ───────────────────────────────────────────────
+    // Review event handling
 
-    private void handleReviewEvent(EventPayload.ReviewData reviewData, EventContext context) {
+    private void handleReviewEvent(ScmEventPayload.ReviewData reviewData, EventContext context) {
         // 1. Skip sync events
         if (context.isSync()) {
             return;
@@ -186,7 +186,7 @@ public class AgentJobEventListener {
                 );
                 case GateDecision.Detect detect -> {
                     // 6. Construct PullRequestData from entity (ReviewSubmitted does not carry it)
-                    EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+                    ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
                     submitJob(prData, pr, detect, TriggerEventNames.REVIEW_SUBMITTED);
                 }
             }
@@ -200,7 +200,7 @@ public class AgentJobEventListener {
         }
     }
 
-    // ── Shared helpers ──────────────────────────────────────────────────────
+    // Shared helpers
 
     private boolean hasBranchInfo(PullRequest pr, Long prId) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
@@ -217,7 +217,7 @@ public class AgentJobEventListener {
     }
 
     private void submitJob(
-        EventPayload.PullRequestData prData,
+        ScmEventPayload.PullRequestData prData,
         PullRequest pr,
         GateDecision.Detect detect,
         String triggerEventName

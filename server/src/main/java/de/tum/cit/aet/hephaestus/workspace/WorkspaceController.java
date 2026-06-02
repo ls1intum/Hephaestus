@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireWorkspaceOwner;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -39,6 +39,7 @@ public class WorkspaceController {
     private final WorkspaceLifecycleService workspaceLifecycleService;
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final WorkspaceTeamLabelService workspaceTeamLabelService;
+    private final WorkspaceQueryService workspaceQueryService;
 
     @GetMapping
     @Operation(summary = "Fetch a workspace by slug")
@@ -52,7 +53,7 @@ public class WorkspaceController {
         Workspace workspace = workspaceService
             .getWorkspaceBySlug(workspaceContext.slug())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/status")
@@ -68,7 +69,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceStatusRequestDTO request
     ) {
         Workspace workspace = workspaceLifecycleService.updateStatus(workspaceContext, request.status());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @DeleteMapping
@@ -93,7 +94,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceScheduleRequestDTO request
     ) {
         Workspace workspace = workspaceService.updateSchedule(workspaceContext, request.day(), request.time());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/notifications")
@@ -114,7 +115,30 @@ public class WorkspaceController {
             request.team(),
             request.channelId()
         );
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
+    }
+
+    @PatchMapping("/leaderboard-digest")
+    @Operation(summary = "Update the whole weekly leaderboard digest config (schedule + notifications) atomically")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Workspace updated",
+        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<WorkspaceDTO> updateLeaderboardDigest(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody UpdateLeaderboardDigestRequestDTO request
+    ) {
+        Workspace workspace = workspaceService.updateLeaderboardDigest(
+            workspaceContext,
+            request.day(),
+            request.time(),
+            request.enabled(),
+            request.team(),
+            request.channelId()
+        );
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/token")
@@ -130,27 +154,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceTokenRequestDTO request
     ) {
         Workspace workspace = workspaceService.updateToken(workspaceContext, request.personalAccessToken());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
-    }
-
-    @PatchMapping("/slack-credentials")
-    @Operation(summary = "Update Slack credentials for a workspace")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Workspace updated",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<WorkspaceDTO> updateSlackCredentials(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateWorkspaceSlackCredentialsRequestDTO request
-    ) {
-        Workspace workspace = workspaceService.updateSlackCredentials(
-            workspaceContext,
-            request.slackToken(),
-            request.slackSigningSecret()
-        );
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/public-visibility")
@@ -166,7 +170,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspacePublicVisibilityRequestDTO request
     ) {
         Workspace workspace = workspaceService.updatePublicVisibility(workspaceContext, request.isPubliclyViewable());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/features")
@@ -182,7 +186,7 @@ public class WorkspaceController {
         @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request
     ) {
         Workspace workspace = workspaceService.updateFeatures(workspaceContext, request);
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @PatchMapping("/slug")
@@ -198,7 +202,7 @@ public class WorkspaceController {
         @Valid @RequestBody RenameWorkspaceSlugRequestDTO request
     ) {
         Workspace workspace = workspaceService.renameSlug(workspaceContext, request.newSlug());
-        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+        return ResponseEntity.ok(workspaceQueryService.toWorkspaceDTO(workspace));
     }
 
     @GetMapping("/repositories")

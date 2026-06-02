@@ -5,8 +5,8 @@ import {
 } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
+import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
 
-// Use the RepositoryItem type from the AdminRepositoriesSettings component
 type RepositoryItem = {
 	nameWithOwner: string;
 };
@@ -27,6 +27,17 @@ export interface AdminSettingsPageProps {
 	features: FeatureValues;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
+	// Slack notification card props (rendered for any workspace with a slug — the weekly
+	// digest is a Slack feature, independent of whether the leaderboard page is enabled).
+	workspaceSlug?: string;
+	hasSlackConnection: boolean;
+	slackConnectionId?: number;
+	slackChannelId?: string;
+	slackTeamLabel?: string;
+	slackNotificationsEnabled: boolean;
+	slackScheduleDay?: number;
+	slackScheduleTime?: string;
+	onSlackSaved: () => void;
 }
 
 export function AdminSettingsPage({
@@ -44,6 +55,15 @@ export function AdminSettingsPage({
 	features,
 	isSavingFeatures,
 	onToggleFeature,
+	workspaceSlug,
+	hasSlackConnection,
+	slackConnectionId,
+	slackChannelId,
+	slackTeamLabel,
+	slackNotificationsEnabled,
+	slackScheduleDay,
+	slackScheduleTime,
+	onSlackSaved,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -70,6 +90,24 @@ export function AdminSettingsPage({
 
 				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />
+				)}
+
+				{workspaceSlug != null && (
+					// key derived from the server snapshot: when a post-OAuth/save refetch lands,
+					// the key changes and React remounts the form with fresh server truth instead
+					// of leaning on prop→state sync effects.
+					<AdminSlackNotificationSettings
+						key={`slack:${slackConnectionId ?? "none"}:${slackChannelId ?? ""}:${slackNotificationsEnabled}:${slackScheduleDay ?? ""}:${slackScheduleTime ?? ""}:${slackTeamLabel ?? ""}`}
+						workspaceSlug={workspaceSlug}
+						hasSlackConnection={hasSlackConnection}
+						slackConnectionId={slackConnectionId}
+						channelId={slackChannelId}
+						teamLabel={slackTeamLabel}
+						enabled={slackNotificationsEnabled}
+						scheduleDay={slackScheduleDay}
+						scheduleTime={slackScheduleTime}
+						onSaved={onSlackSaved}
+					/>
 				)}
 			</div>
 		</div>

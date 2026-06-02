@@ -123,7 +123,7 @@ git commit -m "<type>(<scope>): <description>"
 
 - Service: `webapp`, `server`, `docs`
 - Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
-- Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
+- Feature: `integration`, `scm`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
 ## 11. Push
 

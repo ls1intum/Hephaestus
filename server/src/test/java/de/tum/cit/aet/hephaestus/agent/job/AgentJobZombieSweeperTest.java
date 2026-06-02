@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("AgentJobZombieSweeper")
 class AgentJobZombieSweeperTest extends BaseUnitTest {
 
     @Mock
@@ -181,11 +180,9 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("republishStaleQueuedJobs")
     class RepublishStaleQueued {
 
         @Test
-        @DisplayName("should republish stale QUEUED jobs")
         void shouldRepublishStaleQueuedJobs() {
             UUID jobId1 = UUID.randomUUID();
             UUID jobId2 = UUID.randomUUID();
@@ -200,7 +197,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should do nothing when no stale queued jobs")
         void shouldDoNothingWhenNoStaleQueuedJobs() {
             when(jobRepository.findStaleQueuedJobs(any())).thenReturn(List.of());
 
@@ -210,7 +206,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle publish failure gracefully")
         void shouldHandlePublishFailureGracefully() {
             UUID jobId1 = UUID.randomUUID();
             UUID jobId2 = UUID.randomUUID();
@@ -228,11 +223,9 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("reapStaleRunningJobs")
     class ReapStaleRunning {
 
         @Test
-        @DisplayName("should reap stale RUNNING jobs past timeout + buffer")
         void shouldReapStaleRunningJobs() {
             UUID jobId = UUID.randomUUID();
             // Started 20 minutes ago with 600s (10min) timeout + 5min buffer = 15min
@@ -254,7 +247,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip RUNNING jobs not yet stale")
         void shouldSkipRunningJobsNotYetStale() {
             UUID jobId = UUID.randomUUID();
             // Started 5 minutes ago with 600s (10min) timeout + 5min buffer = 15min
@@ -269,7 +261,6 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should do nothing when no stale running jobs")
         void shouldDoNothingWhenNoStaleRunningJobs() {
             when(jobRepository.findStaleRunningJobs(any())).thenReturn(List.of());
 

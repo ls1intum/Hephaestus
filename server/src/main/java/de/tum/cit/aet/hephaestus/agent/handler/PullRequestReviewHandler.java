@@ -15,8 +15,8 @@ import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
@@ -118,7 +118,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        EventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
+        ScmEventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
 
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", pullRequestData.repository().id());
@@ -230,9 +230,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return prompt;
     }
 
-    // -------------------------------------------------------------------------
     // Practice catalog injection (intentionally kept here — per-job, not provider-shaped)
-    // -------------------------------------------------------------------------
 
     /**
      * Inject the practice registry, criteria, and precompute scripts into the workspace. These
@@ -321,9 +319,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Delivery
-    // -------------------------------------------------------------------------
 
     @Override
     public void deliver(AgentJob job) {
@@ -417,9 +413,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         feedbackService.deliverFeedback(job, delivery);
     }
 
-    // -------------------------------------------------------------------------
     // Delivery-phase diff helpers (use GitDiffOperations; no longer duplicated in the handler)
-    // -------------------------------------------------------------------------
 
     private Map<String, TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
         JsonNode metadata = job.getMetadata();
@@ -546,7 +540,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (pathNode == null || pathNode.isNull() || pathNode.isMissingNode()) {
                     continue;
                 }
-                String path = pathNode.asText();
+                String path = pathNode.asString();
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
@@ -568,16 +562,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
     }
 
-    // -------------------------------------------------------------------------
     // Metadata field helpers
-    // -------------------------------------------------------------------------
 
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asText().isBlank()) {
+        if (node == null || node.isNull() || node.asString().isBlank()) {
             throw new JobPreparationException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     private static int requireInt(JsonNode metadata, String field) {

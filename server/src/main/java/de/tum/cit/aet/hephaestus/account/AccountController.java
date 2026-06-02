@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.account;
 
+import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClientException;
 import de.tum.cit.aet.hephaestus.config.KeycloakProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integrations.posthog.PosthogClientException;
+import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

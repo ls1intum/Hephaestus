@@ -57,7 +57,6 @@ import tools.jackson.databind.node.ObjectNode;
  * masks the bug.
  */
 @LiveLlmTest
-@DisplayName("Mentor runner — live LLM round-trip")
 class MentorLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -144,7 +143,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("hero: single turn streams text + Finish carries authoritative usage")
     void hero_singleTurnStreamsTextAndFinishesWithUsage() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -169,7 +167,7 @@ class MentorLiveLlmTest {
             chunks.addAll(translator.translate(event, state));
             // Pi's terminal event for a turn is `agent_end`; the translator turns it into a
             // Finish chunk. We signal completion off that, not by polling.
-            if ("agent_end".equals(event.path("type").asText())) {
+            if ("agent_end".equals(event.path("type").asString())) {
                 translationDone.complete(null);
             }
         });
@@ -177,12 +175,12 @@ class MentorLiveLlmTest {
         driver.prompt(threadId, "Briefly explain unit testing in one sentence.");
         translationDone.get(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
 
-        // ─── Lifecycle invariants ──────────────────────────────────────────────────────
+        // Lifecycle invariants
         assertThat(chunks).isNotEmpty();
         assertThat(chunks.get(0)).as("first chunk is Start").isInstanceOf(UIMessageChunk.Start.class);
         assertThat(chunks.get(chunks.size() - 1)).as("last chunk is Finish").isInstanceOf(UIMessageChunk.Finish.class);
 
-        // ─── Streaming-merge invariant ────────────────────────────────────────────────
+        // Streaming-merge invariant
         // Every TextDelta in the stream must share the same block id as the opening TextStart;
         // a regression here breaks AI SDK's client-side reconciliation (deltas get split into
         // separate parts).
@@ -201,7 +199,7 @@ class MentorLiveLlmTest {
         // when the response is unexpected.
         System.out.printf("[hero] LLM response (%d chars): %s%n", concatenated.length(), trim(concatenated, 200));
 
-        // ─── Usage capture ────────────────────────────────────────────────────────────
+        // Usage capture
         // Pi pumps {input, output, totalTokens, ...} on every message_end. The translator threads
         // them into the Finish chunk's messageMetadata.usage. If `stream_options.include_usage`
         // ever regresses these go to zero — exactly the failure mode this test exists to catch.
@@ -219,7 +217,7 @@ class MentorLiveLlmTest {
             finish.messageMetadata().model()
         );
 
-        // ─── Persistence snapshot ─────────────────────────────────────────────────────
+        // Persistence snapshot
         // partsSnapshot is what lands in chat_message.parts JSONB — a single text part once the
         // turn closes. Asserts that closeTextBlock() actually flushed our text into the array.
         // Note: AI SDK's UIMessage has the text part populated on `text-end`. Pi emits agent_end
@@ -233,18 +231,17 @@ class MentorLiveLlmTest {
         // UIMessage carries the concatenated text exactly.
         JsonNode textPart = null;
         for (JsonNode p : partsSnapshot) {
-            if ("text".equals(p.path("type").asText())) {
+            if ("text".equals(p.path("type").asString())) {
                 textPart = p;
                 break;
             }
         }
         if (textPart != null) {
-            assertThat(textPart.path("text").asText()).isEqualTo(concatenated);
+            assertThat(textPart.path("text").asString()).isEqualTo(concatenated);
         }
     }
 
     @Test
-    @DisplayName("multi-turn (warm runner): turn 2 recalls a fact from turn 1")
     void multiTurn_secondTurnRecallsFirst() throws Exception {
         // Pin Pi SDK's session-bound agent._state.messages threading: a single long-lived
         // runner must keep both turns' messages in its in-memory state across message_end
@@ -345,7 +342,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("cold-restart preserves session JSONL: runner-B recalls a fact planted on runner-A")
     void coldRestart_preservesHistoryViaSessionJsonl() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -369,7 +365,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("tool use: agent uses read/bash to explore a staged git repo")
     void toolUse_agentExploresRepoWithReadOrBash() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -390,7 +385,7 @@ class MentorLiveLlmTest {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
-            if ("agent_end".equals(event.path("type").asText())) {
+            if ("agent_end".equals(event.path("type").asString())) {
                 done.complete(null);
             }
         });
@@ -440,7 +435,6 @@ class MentorLiveLlmTest {
     }
 
     @Test
-    @DisplayName("session JSONL is byte-identical across cold restarts (prompt-cache prefix preserved)")
     void coldRestart_sessionJsonlIsByteIdentical() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         UUID threadId = UUID.randomUUID();
@@ -475,8 +469,8 @@ class MentorLiveLlmTest {
         sandbox.subscribe(frame -> {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
-            if ("session_persisted".equals(event.path("type").asText())) {
-                String jsonl = event.path("jsonl").asText("");
+            if ("session_persisted".equals(event.path("type").asString())) {
+                String jsonl = event.path("jsonl").asString("");
                 if (!jsonl.isEmpty()) captured.set(jsonl.getBytes(StandardCharsets.UTF_8));
             }
         });
@@ -536,7 +530,7 @@ class MentorLiveLlmTest {
             if (!isThreadEvent(frame, threadId)) return;
             JsonNode event = frame.path("params").path("event");
             chunks.addAll(translator.translate(event, state));
-            if ("agent_end".equals(event.path("type").asText())) {
+            if ("agent_end".equals(event.path("type").asString())) {
                 done.complete(null);
             }
         });
@@ -554,9 +548,7 @@ class MentorLiveLlmTest {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // Workspace + process plumbing
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private Path stageWorkspace(LiveLlmCredentials creds) throws IOException {
         Path tmp = Files.createTempDirectory("hephaestus-mentor-live-");
@@ -712,8 +704,8 @@ class MentorLiveLlmTest {
     }
 
     private static boolean isThreadEvent(JsonNode frame, UUID threadId) {
-        if (!"event".equals(frame.path("method").asText())) return false;
-        String observedThreadId = frame.path("params").path("threadId").asText();
+        if (!"event".equals(frame.path("method").asString())) return false;
+        String observedThreadId = frame.path("params").path("threadId").asString();
         // runner_ready notification has no threadId — we filter it out here intentionally.
         return threadId.toString().equals(observedThreadId);
     }
@@ -722,9 +714,7 @@ class MentorLiveLlmTest {
         return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // RunnerDriver — same handshake MentorRunnerClient drives in prod
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private static final class RunnerDriver {
 
@@ -740,8 +730,8 @@ class MentorLiveLlmTest {
                 if (frame.has("id") && (frame.has("result") || frame.has("error"))) {
                     responses.add(frame);
                 } else if (
-                    "event".equals(frame.path("method").asText()) &&
-                    "runner_ready".equals(frame.path("params").path("event").path("type").asText())
+                    "event".equals(frame.path("method").asString()) &&
+                    "runner_ready".equals(frame.path("params").path("event").path("type").asString())
                 ) {
                     readyNotifications.add(frame);
                 }
@@ -766,7 +756,7 @@ class MentorLiveLlmTest {
             ObjectNode params = MAPPER.createObjectNode();
             params.put("threadId", threadId.toString());
             JsonNode response = call("open_thread", params, Duration.ofSeconds(30));
-            assertThat(response.path("result").path("threadId").asText())
+            assertThat(response.path("result").path("threadId").asString())
                 .as("open_thread acks with threadId")
                 .isEqualTo(threadId.toString());
         }

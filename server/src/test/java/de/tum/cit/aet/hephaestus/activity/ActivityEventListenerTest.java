@@ -4,27 +4,26 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.Commit;
-import de.tum.cit.aet.hephaestus.gitprovider.common.DataSource;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.gitprovider.discussion.Discussion;
-import de.tum.cit.aet.hephaestus.gitprovider.discussioncomment.DiscussionComment;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.discussioncomment.DiscussionComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;
@@ -74,9 +73,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     @Mock
-    private ProjectRepository projectRepository;
-
-    @Mock
     private IssueRepository issueRepository;
 
     private ActivityEventListener listener;
@@ -111,7 +107,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
             reviewThreadRepository,
             userRepository,
             repositoryRepository,
-            projectRepository,
             issueRepository
         );
 
@@ -130,15 +125,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Created Event")
     class PullRequestCreatedTests {
 
         @Test
-        @DisplayName("records pull request opened with fixed XP using event data directly")
         void recordsPullRequestOpened() {
             PullRequest pullRequest = createPullRequest(1L);
 
-            var event = new DomainEvent.PullRequestCreated(createPullRequestData(pullRequest), createContext());
+            var event = new ScmDomainEvent.PullRequestCreated(createPullRequestData(pullRequest), createContext());
 
             listener.onPullRequestCreated(event);
 
@@ -158,12 +151,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does nothing when authorId is missing from event data")
         void noOpWhenAuthorIdMissing() {
             PullRequest pullRequest = createPullRequest(1L);
             pullRequest.setAuthor(null); // No author
 
-            var event = new DomainEvent.PullRequestCreated(createPullRequestData(pullRequest), createContext());
+            var event = new ScmDomainEvent.PullRequestCreated(createPullRequestData(pullRequest), createContext());
 
             listener.onPullRequestCreated(event);
 
@@ -172,17 +164,15 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Merged Event")
     class PullRequestMergedTests {
 
         @Test
-        @DisplayName("records pull request merged with fixed XP using event data")
         void recordsPullRequestMerged() {
             PullRequest pullRequest = createPullRequest(2L);
             pullRequest.setMergedAt(Instant.now());
             pullRequest.setMergedBy(testUser);
 
-            var event = new DomainEvent.PullRequestMerged(createPullRequestData(pullRequest), createContext());
+            var event = new ScmDomainEvent.PullRequestMerged(createPullRequestData(pullRequest), createContext());
 
             listener.onPullRequestMerged(event);
 
@@ -200,16 +190,18 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Closed Event")
     class PullRequestClosedTests {
 
         @Test
-        @DisplayName("records pull request closed with zero XP when not merged")
         void recordsPullRequestClosedWithZeroXp() {
             PullRequest pullRequest = createPullRequest(3L);
             pullRequest.setClosedAt(Instant.now());
 
-            var event = new DomainEvent.PullRequestClosed(createPullRequestData(pullRequest), false, createContext());
+            var event = new ScmDomainEvent.PullRequestClosed(
+                createPullRequestData(pullRequest),
+                false,
+                createContext()
+            );
 
             listener.onPullRequestClosed(event);
 
@@ -228,7 +220,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
         @Test
         @DisplayName("does nothing when pull request was merged (handled by onPullRequestMerged)")
         void noOpWhenMerged() {
-            var event = new DomainEvent.PullRequestClosed(
+            var event = new ScmDomainEvent.PullRequestClosed(
                 createPullRequestData(createPullRequest(4L)),
                 true,
                 createContext()
@@ -241,15 +233,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Reopened Event")
     class PullRequestReopenedTests {
 
         @Test
-        @DisplayName("records pull request reopened with zero XP (lifecycle tracking only)")
         void recordsPullRequestReopenedWithZeroXp() {
             PullRequest pullRequest = createPullRequest(5L);
 
-            var event = new DomainEvent.PullRequestReopened(createPullRequestData(pullRequest), createContext());
+            var event = new ScmDomainEvent.PullRequestReopened(createPullRequestData(pullRequest), createContext());
 
             listener.onPullRequestReopened(event);
 
@@ -267,15 +257,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Pull Request Ready Event")
     class PullRequestReadyTests {
 
         @Test
-        @DisplayName("records pull request ready for review with XP")
         void recordsPullRequestReady() {
             PullRequest pullRequest = createPullRequest(6L);
 
-            var event = new DomainEvent.PullRequestReady(createPullRequestData(pullRequest), createContext());
+            var event = new ScmDomainEvent.PullRequestReady(createPullRequestData(pullRequest), createContext());
 
             listener.onPullRequestReady(event);
 
@@ -293,7 +281,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Review Submitted Event")
     class ReviewSubmittedTests {
 
         @Test
@@ -306,7 +293,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
             when(reviewRepository.findById(5L)).thenReturn(Optional.of(review));
             when(experiencePointCalculator.calculateReviewExperiencePoints(review)).thenReturn(7.5);
 
-            var event = new DomainEvent.ReviewSubmitted(createReviewData(review), createContext());
+            var event = new ScmDomainEvent.ReviewSubmitted(createReviewData(review), createContext());
 
             listener.onReviewSubmitted(event);
 
@@ -324,13 +311,12 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("handles missing author gracefully")
         void handlesMissingAuthor() {
             PullRequest pullRequest = createPullRequest(1L);
             PullRequestReview review = createReview(6L, pullRequest);
             review.setAuthor(null); // No author
 
-            var event = new DomainEvent.ReviewSubmitted(createReviewData(review), createContext());
+            var event = new ScmDomainEvent.ReviewSubmitted(createReviewData(review), createContext());
 
             listener.onReviewSubmitted(event);
 
@@ -339,15 +325,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Issue Created Event")
     class IssueCreatedTests {
 
         @Test
-        @DisplayName("records issue created with XP for regular issues")
         void recordsIssueCreatedWithXp() {
             Issue issue = createIssue(10L);
 
-            var event = new DomainEvent.IssueCreated(createIssueData(issue), createContext());
+            var event = new ScmDomainEvent.IssueCreated(createIssueData(issue), createContext());
 
             listener.onIssueCreated(event);
 
@@ -364,11 +348,10 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips pull requests (they have PULL_REQUEST_OPENED event)")
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(11L);
 
-            var event = new DomainEvent.IssueCreated(EventPayload.IssueData.from(pullRequest), createContext());
+            var event = new ScmDomainEvent.IssueCreated(ScmEventPayload.IssueData.from(pullRequest), createContext());
 
             listener.onIssueCreated(event);
 
@@ -376,13 +359,12 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records issue with null author and zero XP (deleted user or bot)")
         void recordsIssueWithNullAuthorAndZeroXp() {
             // Create issue WITHOUT author - simulates deleted GitHub user or bot
             Issue issue = createIssue(14L);
             issue.setAuthor(null);
 
-            var event = new DomainEvent.IssueCreated(createIssueData(issue), createContext());
+            var event = new ScmDomainEvent.IssueCreated(createIssueData(issue), createContext());
 
             listener.onIssueCreated(event);
 
@@ -401,16 +383,14 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Issue Closed Event")
     class IssueClosedTests {
 
         @Test
-        @DisplayName("records issue closed with zero XP (lifecycle tracking only)")
         void recordsIssueClosedWithZeroXp() {
             Issue issue = createIssue(12L);
             issue.setClosedAt(Instant.now());
 
-            var event = new DomainEvent.IssueClosed(createIssueData(issue), null, createContext());
+            var event = new ScmDomainEvent.IssueClosed(createIssueData(issue), null, createContext());
 
             listener.onIssueClosed(event);
 
@@ -427,11 +407,14 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips pull requests (they have their own close event)")
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(13L);
 
-            var event = new DomainEvent.IssueClosed(EventPayload.IssueData.from(pullRequest), null, createContext());
+            var event = new ScmDomainEvent.IssueClosed(
+                ScmEventPayload.IssueData.from(pullRequest),
+                null,
+                createContext()
+            );
 
             listener.onIssueClosed(event);
 
@@ -439,14 +422,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records issue closed with null author (deleted user or bot)")
         void recordsIssueClosedWithNullAuthor() {
             // Create issue WITHOUT author - simulates deleted GitHub user or bot
             Issue issue = createIssue(15L);
             issue.setAuthor(null);
             issue.setClosedAt(Instant.now());
 
-            var event = new DomainEvent.IssueClosed(createIssueData(issue), null, createContext());
+            var event = new ScmDomainEvent.IssueClosed(createIssueData(issue), null, createContext());
 
             listener.onIssueClosed(event);
 
@@ -465,15 +447,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Commit Created Event")
     class CommitCreatedTests {
 
         @Test
-        @DisplayName("records commit created with XP for known author")
         void recordsCommitCreatedWithXp() {
             Commit commit = createCommit(20L);
 
-            var event = new DomainEvent.CommitCreated(createCommitData(commit), createContext());
+            var event = new ScmDomainEvent.CommitCreated(createCommitData(commit), createContext());
 
             listener.onCommitCreated(event);
 
@@ -490,12 +470,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records commit with null author and zero XP (deleted user or bot)")
         void recordsCommitWithNullAuthorAndZeroXp() {
             Commit commit = createCommit(21L);
             commit.setAuthor(null);
 
-            var event = new DomainEvent.CommitCreated(createCommitData(commit), createContext());
+            var event = new ScmDomainEvent.CommitCreated(createCommitData(commit), createContext());
 
             listener.onCommitCreated(event);
 
@@ -513,7 +492,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips commit when scopeId is null")
         void skipsCommitWhenScopeIdIsNull() {
             Commit commit = createCommit(22L);
 
@@ -528,7 +506,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 UUID.randomUUID().toString(),
                 null
             );
-            var event = new DomainEvent.CommitCreated(createCommitData(commit), contextWithNullScope);
+            var event = new ScmDomainEvent.CommitCreated(createCommitData(commit), contextWithNullScope);
 
             listener.onCommitCreated(event);
 
@@ -537,15 +515,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Created Event")
     class DiscussionCreatedTests {
 
         @Test
-        @DisplayName("records discussion created with XP for known author")
         void recordsDiscussionCreatedWithXp() {
             Discussion discussion = createDiscussion(30L);
 
-            var event = new DomainEvent.DiscussionCreated(createDiscussionData(discussion), createContext());
+            var event = new ScmDomainEvent.DiscussionCreated(createDiscussionData(discussion), createContext());
 
             listener.onDiscussionCreated(event);
 
@@ -562,12 +538,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records discussion with null author and zero XP")
         void recordsDiscussionWithNullAuthorAndZeroXp() {
             Discussion discussion = createDiscussion(31L);
             discussion.setAuthor(null);
 
-            var event = new DomainEvent.DiscussionCreated(createDiscussionData(discussion), createContext());
+            var event = new ScmDomainEvent.DiscussionCreated(createDiscussionData(discussion), createContext());
 
             listener.onDiscussionCreated(event);
 
@@ -585,16 +560,18 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Closed Event")
     class DiscussionClosedTests {
 
         @Test
-        @DisplayName("records discussion closed with zero XP (lifecycle tracking)")
         void recordsDiscussionClosedWithZeroXp() {
             Discussion discussion = createDiscussion(32L);
             discussion.setClosedAt(Instant.now());
 
-            var event = new DomainEvent.DiscussionClosed(createDiscussionData(discussion), "resolved", createContext());
+            var event = new ScmDomainEvent.DiscussionClosed(
+                createDiscussionData(discussion),
+                "resolved",
+                createContext()
+            );
 
             listener.onDiscussionClosed(event);
 
@@ -612,15 +589,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Reopened Event")
     class DiscussionReopenedTests {
 
         @Test
-        @DisplayName("records discussion reopened with zero XP (lifecycle tracking)")
         void recordsDiscussionReopenedWithZeroXp() {
             Discussion discussion = createDiscussion(33L);
 
-            var event = new DomainEvent.DiscussionReopened(createDiscussionData(discussion), createContext());
+            var event = new ScmDomainEvent.DiscussionReopened(createDiscussionData(discussion), createContext());
 
             listener.onDiscussionReopened(event);
 
@@ -638,16 +613,14 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Answered Event")
     class DiscussionAnsweredTests {
 
         @Test
-        @DisplayName("records discussion answered with XP for author")
         void recordsDiscussionAnsweredWithXp() {
             Discussion discussion = createDiscussion(34L);
             discussion.setAnswerChosenAt(Instant.now());
 
-            var event = new DomainEvent.DiscussionAnswered(createDiscussionData(discussion), 999L, createContext());
+            var event = new ScmDomainEvent.DiscussionAnswered(createDiscussionData(discussion), 999L, createContext());
 
             listener.onDiscussionAnswered(event);
 
@@ -664,13 +637,12 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("records discussion answered with null author and zero XP")
         void recordsDiscussionAnsweredWithNullAuthorAndZeroXp() {
             Discussion discussion = createDiscussion(35L);
             discussion.setAuthor(null);
             discussion.setAnswerChosenAt(Instant.now());
 
-            var event = new DomainEvent.DiscussionAnswered(createDiscussionData(discussion), 999L, createContext());
+            var event = new ScmDomainEvent.DiscussionAnswered(createDiscussionData(discussion), 999L, createContext());
 
             listener.onDiscussionAnswered(event);
 
@@ -688,13 +660,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Deleted Event")
     class DiscussionDeletedTests {
 
         @Test
-        @DisplayName("records discussion deleted audit trail")
         void recordsDiscussionDeleted() {
-            var event = new DomainEvent.DiscussionDeleted(36L, createContext());
+            var event = new ScmDomainEvent.DiscussionDeleted(36L, createContext());
 
             listener.onDiscussionDeleted(event);
 
@@ -709,11 +679,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Review Comment Created Event")
     class ReviewCommentCreatedTests {
 
         @Test
-        @DisplayName("standalone comment (reviewId=null) awards XP from calculator")
         void onReviewCommentCreated_standaloneComment_awardsXp() {
             PullRequest pullRequest = createPullRequest(50L);
             // Different author so it's not a self-review
@@ -725,7 +693,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
             when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
             when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), anyInt())).thenReturn(0.5);
 
-            var commentData = new EventPayload.ReviewCommentData(
+            var commentData = new ScmEventPayload.ReviewCommentData(
                 77L, // id
                 "This is a substantive review comment with enough length", // body
                 "src/Main.java", // path
@@ -737,7 +705,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 50L, // pullRequestId
                 200L // repositoryId
             );
-            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+            var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
@@ -756,9 +724,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("comment linked to review (reviewId!=null) awards zero XP")
         void onReviewCommentCreated_linkedToReview_awardsZeroXp() {
-            var commentData = new EventPayload.ReviewCommentData(
+            var commentData = new ScmEventPayload.ReviewCommentData(
                 78L, // id
                 "Some comment", // body
                 "src/Main.java", // path
@@ -770,7 +737,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 50L, // pullRequestId
                 200L // repositoryId
             );
-            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+            var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
@@ -789,9 +756,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips recording when scopeId is null")
         void onReviewCommentCreated_nullScopeId_skips() {
-            var commentData = new EventPayload.ReviewCommentData(
+            var commentData = new ScmEventPayload.ReviewCommentData(
                 79L,
                 "body",
                 "path.java",
@@ -814,7 +780,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 UUID.randomUUID().toString(),
                 null
             );
-            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, contextWithNullScope);
+            var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, contextWithNullScope);
 
             listener.onReviewCommentCreated(event);
 
@@ -822,9 +788,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips recording when authorId is null")
         void onReviewCommentCreated_nullAuthorId_skips() {
-            var commentData = new EventPayload.ReviewCommentData(
+            var commentData = new ScmEventPayload.ReviewCommentData(
                 80L,
                 "body",
                 "path.java",
@@ -836,7 +801,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 50L,
                 200L
             );
-            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+            var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
@@ -844,11 +809,10 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("standalone comment with PR not found records zero XP")
         void onReviewCommentCreated_prNotFound_recordsZeroXp() {
             when(pullRequestRepository.findById(999L)).thenReturn(Optional.empty());
 
-            var commentData = new EventPayload.ReviewCommentData(
+            var commentData = new ScmEventPayload.ReviewCommentData(
                 81L,
                 "This comment's PR doesn't exist yet",
                 "src/Main.java",
@@ -860,7 +824,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 999L, // pullRequestId - not found
                 200L
             );
-            var event = new DomainEvent.ReviewCommentCreated(commentData, 999L, createContext());
+            var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 999L, createContext());
 
             listener.onReviewCommentCreated(event);
 
@@ -878,7 +842,6 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("standalone comment with null body passes 0 as body length")
         void onReviewCommentCreated_nullBody_passesZeroLength() {
             PullRequest pullRequest = createPullRequest(50L);
             User prAuthor = new User();
@@ -889,7 +852,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
             when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
             when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), eq(0))).thenReturn(0.25);
 
-            var commentData = new EventPayload.ReviewCommentData(
+            var commentData = new ScmEventPayload.ReviewCommentData(
                 82L,
                 null, // null body
                 "src/Main.java",
@@ -901,7 +864,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 50L,
                 200L
             );
-            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+            var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
@@ -911,15 +874,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Discussion Comment Created Event")
     class DiscussionCommentCreatedTests {
 
         @Test
-        @DisplayName("records discussion comment created with XP")
         void recordsDiscussionCommentCreatedWithXp() {
             DiscussionComment comment = createDiscussionComment(37L);
 
-            var event = new DomainEvent.DiscussionCommentCreated(
+            var event = new ScmDomainEvent.DiscussionCommentCreated(
                 createDiscussionCommentData(comment),
                 30L, // discussionId
                 createContext()
@@ -940,12 +901,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips comment when author is null")
         void skipsCommentWhenAuthorIsNull() {
             DiscussionComment comment = createDiscussionComment(38L);
             comment.setAuthor(null);
 
-            var event = new DomainEvent.DiscussionCommentCreated(
+            var event = new ScmDomainEvent.DiscussionCommentCreated(
                 createDiscussionCommentData(comment),
                 30L,
                 createContext()
@@ -958,15 +918,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Commit Authors Reconciled Event")
     class CommitAuthorsReconciledTests {
 
         @Test
-        @DisplayName("backfills commit actors using configured xp-per-commit when event has repository id")
         void backfillsCommitActorsOnReconciliation() {
             when(activityEventRepository.backfillCommitActors(eq(200L), eq(0.5))).thenReturn(3);
 
-            var event = new DomainEvent.CommitAuthorsReconciled(200L, createContext());
+            var event = new ScmDomainEvent.CommitAuthorsReconciled(200L, createContext());
 
             listener.onCommitAuthorsReconciled(event);
 
@@ -974,9 +932,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does nothing when repository id is missing from event")
         void noOpWhenRepositoryIdMissing() {
-            var event = new DomainEvent.CommitAuthorsReconciled(null, createContext());
+            var event = new ScmDomainEvent.CommitAuthorsReconciled(null, createContext());
 
             listener.onCommitAuthorsReconciled(event);
 
@@ -984,13 +941,12 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("swallows backfill exceptions so the event pipeline does not break")
         void swallowsBackfillExceptions() {
             when(activityEventRepository.backfillCommitActors(eq(200L), anyDouble())).thenThrow(
                 new RuntimeException("db outage")
             );
 
-            var event = new DomainEvent.CommitAuthorsReconciled(200L, createContext());
+            var event = new ScmDomainEvent.CommitAuthorsReconciled(200L, createContext());
 
             listener.onCommitAuthorsReconciled(event);
 
@@ -998,9 +954,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
     }
 
-    // ========================================================================
     // Helpers
-    // ========================================================================
 
     private Commit createCommit(Long id) {
         Commit commit = new Commit();
@@ -1014,8 +968,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
         return commit;
     }
 
-    private EventPayload.CommitData createCommitData(Commit commit) {
-        return EventPayload.CommitData.from(commit);
+    private ScmEventPayload.CommitData createCommitData(Commit commit) {
+        return ScmEventPayload.CommitData.from(commit);
     }
 
     private PullRequest createPullRequest(Long id) {
@@ -1056,16 +1010,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
         return review;
     }
 
-    private EventPayload.PullRequestData createPullRequestData(PullRequest pullRequest) {
-        return EventPayload.PullRequestData.from(pullRequest);
+    private ScmEventPayload.PullRequestData createPullRequestData(PullRequest pullRequest) {
+        return ScmEventPayload.PullRequestData.from(pullRequest);
     }
 
-    private EventPayload.ReviewData createReviewData(PullRequestReview review) {
-        return EventPayload.ReviewData.from(review).orElseThrow();
+    private ScmEventPayload.ReviewData createReviewData(PullRequestReview review) {
+        return ScmEventPayload.ReviewData.from(review).orElseThrow();
     }
 
-    private EventPayload.IssueData createIssueData(Issue issue) {
-        return EventPayload.IssueData.from(issue);
+    private ScmEventPayload.IssueData createIssueData(Issue issue) {
+        return ScmEventPayload.IssueData.from(issue);
     }
 
     private EventContext createContext() {
@@ -1108,11 +1062,11 @@ class ActivityEventListenerTest extends BaseUnitTest {
         return comment;
     }
 
-    private EventPayload.DiscussionData createDiscussionData(Discussion discussion) {
-        return EventPayload.DiscussionData.from(discussion);
+    private ScmEventPayload.DiscussionData createDiscussionData(Discussion discussion) {
+        return ScmEventPayload.DiscussionData.from(discussion);
     }
 
-    private EventPayload.DiscussionCommentData createDiscussionCommentData(DiscussionComment comment) {
-        return EventPayload.DiscussionCommentData.from(comment);
+    private ScmEventPayload.DiscussionCommentData createDiscussionCommentData(DiscussionComment comment) {
+        return ScmEventPayload.DiscussionCommentData.from(comment);
     }
 }

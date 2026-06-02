@@ -97,8 +97,8 @@ public class SecurityConfig {
                 "/actuator/health",
                 "/actuator/health/**",
                 "/actuator/info",
-                "/gitlab",
-                "/github"
+                "/webhooks/**",
+                "/oauth/callback/**"
             )
             .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .csrf(csrf -> csrf.disable())
@@ -135,6 +135,13 @@ public class SecurityConfig {
         if (jwtDecoder == null) {
             http.authorizeHttpRequests(requests -> {
                 requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                // OpenAPI / Swagger endpoints are public on the resource-server chain; they must
+                // also be public on the lockdown chain so spec generation works on no-Keycloak boots
+                // (the `specs` profile boots without a JwtDecoder and would otherwise 403 on
+                // `mvn verify -Dapp.profiles=specs`).
+                requests
+                    .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
+                    .permitAll();
                 if (devTriggerEnabled) {
                     requests.requestMatchers("/api/dev/**").permitAll();
                 }
@@ -161,9 +168,14 @@ public class SecurityConfig {
             // Without this, OPTIONS requests are rejected with 403 before CORS headers can be added.
             requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
             // Webhook endpoints — authenticated by HMAC (GitHub) or shared-token (GitLab) at the
-            // controller layer. Spring Security must not block these or external providers can
-            // never reach the receiver. See gitprovider.webhook.* and ADR 0008.
-            requests.requestMatchers(HttpMethod.POST, "/gitlab", "/github").permitAll();
+            // pipeline layer. Spring Security must not block these or external providers can
+            // never reach the receiver. See integration.webhook.* and ADR 0008. The unified
+            // {@code /webhooks/{kind}} entry point serves GitHub, GitLab and Slack.
+            requests.requestMatchers(HttpMethod.POST, "/webhooks/**").permitAll();
+            // OAuth vendor callbacks — authenticated by HMAC-signed state parameter at the
+            // controller layer (see OAuthCallbackController). The vendor redirect arrives
+            // unauthenticated; Spring Security MUST NOT block it or no OAuth flow ever completes.
+            requests.requestMatchers("/oauth/callback/**").permitAll();
             // NOTE: /api/workers/** and /actuator/** are handled by workerHubSecurityFilterChain
             // (highest precedence) which skips the OAuth2 resource server entirely — the worker
             // hub validates its own JWTs via WorkerJwtHandshakeInterceptor.

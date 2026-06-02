@@ -37,12 +37,9 @@ import org.springframework.web.bind.annotation.*;
 @DisplayName("Spring & DDD Architecture")
 class AdvancedArchitectureTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // LAYERED ARCHITECTURE - Strict dependency direction
-    // ========================================================================
 
     @Nested
-    @DisplayName("Layered Architecture")
     class LayeredArchitectureTests {
 
         /**
@@ -52,7 +49,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * in the stack and should not know about presentation layer.
          */
         @Test
-        @DisplayName("Services do not depend on controllers")
         void servicesDoNotDependOnControllers() {
             ArchRule rule = noClasses()
                 .that()
@@ -71,7 +67,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * business logic in services.
          */
         @Test
-        @DisplayName("Repositories do not depend on services")
         void repositoriesDoNotDependOnServices() {
             ArchRule rule = noClasses()
                 .that()
@@ -84,9 +79,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DTO BOUNDARIES - Protect domain from data transfer objects
-    // ========================================================================
 
     @Nested
     @DisplayName("DTO Boundaries")
@@ -99,7 +92,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * not be polluted with DTO dependencies. DTOs exist at the boundaries.
          */
         @Test
-        @DisplayName("Entities do not depend on DTOs")
         void entitiesDoNotDependOnDtos() {
             ArchRule rule = noClasses()
                 .that()
@@ -118,7 +110,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * business logic. Factory methods (fromEntity) are acceptable.
          */
         @Test
-        @DisplayName("DTOs are records (immutable)")
         void dtosAreImmutableRecords() {
             ArchRule rule = classes()
                 .that()
@@ -144,7 +135,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("DTOs in dto packages or colocated with domain")
         void dtosInDtoPackages() {
             ArchRule rule = classes()
                 .that()
@@ -162,12 +152,9 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SECURITY - Ensure all endpoints are protected
-    // ========================================================================
 
     @Nested
-    @DisplayName("Security Enforcement")
     class SecurityTests {
 
         /**
@@ -177,7 +164,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * via @PreAuthorize at class or method level. No exceptions allowed.
          */
         @Test
-        @DisplayName("Controller methods have security annotations")
         void controllerMethodsHaveSecurityAnnotations() {
             ArchRule rule = methods()
                 .that()
@@ -192,9 +178,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // DOMAIN-DRIVEN DESIGN - Aggregate and event patterns
-    // ========================================================================
 
     @Nested
     @DisplayName("DDD Patterns")
@@ -207,7 +191,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * and use record types for automatic equals/hashCode/toString.
          */
         @Test
-        @DisplayName("Domain events are immutable records")
         void domainEventsAreRecords() {
             ArchRule rule = classes()
                 .that()
@@ -231,7 +214,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * <p>NOTE: Previously had 6 orShould() clauses. Simplified: we trust domain colocation.
          */
         @Test
-        @DisplayName("Event listeners are in application packages")
         void eventListenersInApplicationPackages() {
             ArchRule rule = classes()
                 .that()
@@ -255,7 +237,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * that connect modules - they belong in adapter packages.
          */
         @Test
-        @DisplayName("SPI implementations in adapter packages")
         void spiImplementationsInAdapterPackages() {
             ArchCondition<JavaClass> implementSpiInterfaces = new ArchCondition<>("implement SPI interfaces properly") {
                 @Override
@@ -277,14 +258,46 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
+                    // Sub-SPI interfaces (e.g. family-typed extensions like ScmFeedbackChannel,
+                    // sealed permits like FindingAnchor.DocumentAnchor) are contracts, not adapters.
+                    if (javaClass.isInterface()) {
+                        return;
+                    }
+
+                    // Any class under integration.<kind>.* is a per-vendor adapter by
+                    // definition (webhook/credentials/connect/lifecycle/sync/…).
+                    boolean inIntegrationVendorPackage = javaClass
+                        .getPackageName()
+                        .matches("^de\\.tum\\.cit\\.aet\\.hephaestus\\.integration\\.[a-z]+\\..*");
+
+                    // Same-module SPI impl: the class lives in the same top-level module as
+                    // the SPI interface it implements (e.g. activity/ActivityEventService implements
+                    // activity/spi/ActivityRecorder). The module exposes its own contract; this is
+                    // not an adapter pattern, it's a "this module IS the implementation" pattern.
+                    boolean implementsSpiFromSameModule = javaClass
+                        .getRawInterfaces()
+                        .stream()
+                        .filter(i -> i.getPackageName().startsWith(BASE_PACKAGE) && i.getPackageName().contains(".spi"))
+                        .anyMatch(spiInterface -> {
+                            String classModule = topLevelModule(javaClass.getPackageName());
+                            String spiModule = topLevelModule(spiInterface.getPackageName());
+                            return classModule != null && classModule.equals(spiModule);
+                        });
+
                     boolean inAdapterPackage =
+                        inIntegrationVendorPackage ||
+                        implementsSpiFromSameModule ||
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
+                        javaClass.getPackageName().contains(".manifest") || // IntegrationManifest impls + bootstrap utilities
+                        javaClass.getPackageName().contains(".registry") || // ConnectionPurgeContributor lives with the entity
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||
-                        javaClass.getSimpleName().endsWith("Tracker"); // Rate limit trackers implement RateLimitTracker SPI
+                        javaClass.getSimpleName().endsWith("Tracker") || // Rate limit trackers implement RateLimitTracker SPI
+                        javaClass.getSimpleName().endsWith("Manifest") || // Per-kind IntegrationManifest impls
+                        javaClass.getSimpleName().endsWith("Contributor"); // SPI suffix used by WorkspacePurgeContributor + similar
 
                     if (!inAdapterPackage) {
                         events.add(
@@ -305,9 +318,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CONTROLLER PATTERNS - Thin controllers
-    // ========================================================================
 
     @Nested
     @DisplayName("Controller Patterns")
@@ -320,7 +331,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * to services, and format responses. Complex logic belongs in services.
          */
         @Test
-        @DisplayName("Controllers don't access JPA directly (frozen)")
         void controllersDoNotAccessJpaDirectly() {
             ArchRule rule = noClasses()
                 .that()
@@ -341,7 +351,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * issues and exposes internal structure. Use DTOs instead.
          */
         @Test
-        @DisplayName("Controllers do not return entities directly")
         void controllersDoNotReturnEntities() {
             ArchCondition<JavaMethod> notReturnEntity = new ArchCondition<>("not return JPA entity") {
                 @Override
@@ -360,7 +369,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     String returnType = method.getRawReturnType().getName();
                     // Check if return type is in entity packages
                     if (
-                        returnType.contains(".gitprovider.") &&
+                        returnType.contains(".integration.scm.") &&
                         !returnType.endsWith("DTO") &&
                         !returnType.contains("ResponseEntity") &&
                         !returnType.contains("Void") &&
@@ -392,19 +401,15 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // PACKAGE STRUCTURE - Consistent organization
-    // ========================================================================
 
     @Nested
-    @DisplayName("Package Structure")
     class PackageStructureTests {
 
         /**
          * Each module should have consistent subpackage structure.
          */
         @Test
-        @DisplayName("No cycles within feature modules")
         void noCyclesWithinFeatureModules() {
             ArchRule rule = slices()
                 .matching(BASE_PACKAGE + ".workspace.(*)..")
@@ -426,7 +431,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Utility classes in util packages")
         void utilityClassesInUtilPackages() {
             ArchRule rule = classes()
                 .that()
@@ -460,7 +464,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * The actual enforcement is that custom exceptions extend RuntimeException.
          */
         @Test
-        @DisplayName("Exceptions are in the application package")
         void exceptionsInApplicationPackage() {
             ArchRule rule = classes()
                 .that()
@@ -476,12 +479,9 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // TEST ARCHITECTURE - Tests follow patterns
-    // ========================================================================
 
     @Nested
-    @DisplayName("Test Architecture")
     class TestArchitectureTests {
 
         /**
@@ -491,7 +491,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * database cleanup between tests.
          */
         @Test
-        @DisplayName("Integration tests extend base classes")
         void integrationTestsExtendBaseClasses() {
             // Base classes that are excluded from the check
             java.util.Set<String> baseClassNames = java.util.Set.of(
@@ -504,7 +503,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
             // Recognized base classes that integration tests should extend
             java.util.Set<String> validBaseClasses = java.util.Set.of(
                 "de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest",
-                "de.tum.cit.aet.hephaestus.gitprovider.github.AbstractGitHubLiveSyncIntegrationTest",
+                "de.tum.cit.aet.hephaestus.integration.scm.github.AbstractGitHubLiveSyncIntegrationTest",
                 "de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest"
             );
 
@@ -552,7 +551,6 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
          * Test classes should follow naming conventions.
          */
         @Test
-        @DisplayName("Test classes end with Test suffix")
         void testClassesEndWithTestSuffix() {
             ArchRule rule = classes()
                 .that()
@@ -586,5 +584,18 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                 .because("Test classes should be easily identifiable");
             rule.check(classesWithTests);
         }
+    }
+
+    /**
+     * Returns the top-level module name ({@code activity}, {@code workspace}, …) for a
+     * package, or {@code null} if the package is outside {@code BASE_PACKAGE}.
+     */
+    private static String topLevelModule(String packageName) {
+        if (!packageName.startsWith(BASE_PACKAGE + ".")) {
+            return null;
+        }
+        String tail = packageName.substring(BASE_PACKAGE.length() + 1);
+        int dot = tail.indexOf('.');
+        return dot < 0 ? tail : tail.substring(0, dot);
     }
 }

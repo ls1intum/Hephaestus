@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.*;
 
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -18,20 +17,16 @@ import org.junit.jupiter.api.Test;
  *   <li><b>config</b> - Application configuration</li>
  *   <li><b>core</b> - Shared core utilities</li>
  *   <li><b>shared</b> - Cross-cutting shared code</li>
- *   <li><b>integrations</b> - External service integrations</li>
+ *   <li><b>analytics</b> - Product analytics adapters (PostHog)</li>
  * </ul>
  *
  * @see ArchitectureTestConstants
  */
-@DisplayName("Cross-Cutting Module Boundaries")
 class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
 
-    // ========================================================================
     // CONTRIBUTORS MODULE ISOLATION
-    // ========================================================================
 
     @Nested
-    @DisplayName("Contributors Module Isolation")
     class ContributorsModuleTests {
 
         /**
@@ -42,7 +37,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * scoring logic.
          */
         @Test
-        @DisplayName("Contributors does not depend on leaderboard internals")
         void contributorsDoesNotDependOnLeaderboardInternals() {
             ArchRule rule = noClasses()
                 .that()
@@ -58,7 +52,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * Contributors module should not depend on activity internals.
          */
         @Test
-        @DisplayName("Contributors does not depend on activity internals")
         void contributorsDoesNotDependOnActivityInternals() {
             ArchRule rule = noClasses()
                 .that()
@@ -74,7 +67,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * Contributors module should not depend on mentor module.
          */
         @Test
-        @DisplayName("Contributors does not depend on mentor module")
         void contributorsDoesNotDependOnMentor() {
             ArchRule rule = noClasses()
                 .that()
@@ -87,12 +79,9 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // ACCOUNT MODULE ISOLATION
-    // ========================================================================
 
     @Nested
-    @DisplayName("Account Module Isolation")
     class AccountModuleTests {
 
         /**
@@ -102,7 +91,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * Feature modules depend on account, not vice versa.
          */
         @Test
-        @DisplayName("Account does not depend on feature modules")
         void accountDoesNotDependOnFeatureModules() {
             ArchRule rule = noClasses()
                 .that()
@@ -122,30 +110,26 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Account module should not depend on gitprovider sync logic.
+         * Account module should not depend on integration.scm sync logic.
          *
          * <p>Account handles user sessions and preferences, not data sync.
          */
         @Test
-        @DisplayName("Account does not depend on gitprovider sync")
         void accountDoesNotDependOnGitproviderSync() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..account..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..gitprovider..sync..")
+                .resideInAPackage("..integration.scm.sync..")
                 .because("Account handles user management, not data sync");
             rule.check(classes);
         }
     }
 
-    // ========================================================================
     // CORE & SHARED PACKAGE PROTECTION
-    // ========================================================================
 
     @Nested
-    @DisplayName("Core & Shared Package Protection")
     class CoreSharedPackageTests {
 
         /**
@@ -155,11 +139,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * modules depend on. It should be dependency-free regarding features.
          */
         @Test
-        @DisplayName("Core does not depend on feature modules")
         void coreDoesNotDependOnFeatureModules() {
+            // NOTE: `..core..` would also match `integration.core.*` after the integration restructure,
+            // which is undesired — we want the framework-foundation `core` only. Anchor to the FQN root.
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..core..")
+                .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
@@ -176,19 +161,20 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         }
 
         /**
-         * Core package should not depend on gitprovider.
+         * Core package should not depend on integration.scm.
          *
          * <p>Core utilities should be git-provider agnostic.
          */
         @Test
-        @DisplayName("Core does not depend on gitprovider")
         void coreDoesNotDependOnGitprovider() {
+            // Anchor to the FQN root to exclude `integration.core.*` (which is the integration core
+            // and is allowed to know the scm aggregate during the migration).
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..core..")
+                .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..gitprovider..")
+                .resideInAPackage("..integration.scm..")
                 .because("Core should be infrastructure-agnostic");
             rule.check(classes);
         }
@@ -199,7 +185,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * <p>Shared code should only depend on core and external libraries.
          */
         @Test
-        @DisplayName("Shared has minimal module dependencies")
         void sharedHasMinimalDependencies() {
             ArchRule rule = noClasses()
                 .that()
@@ -213,33 +198,29 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
                     "..notification..",
                     "..profile..",
                     "..contributors..",
-                    "..gitprovider.."
+                    "..integration.scm.."
                 )
                 .because("Shared code should not depend on feature modules");
             rule.check(classes);
         }
     }
 
-    // ========================================================================
-    // INTEGRATIONS MODULE ISOLATION
-    // ========================================================================
+    // ANALYTICS MODULE ISOLATION
 
     @Nested
-    @DisplayName("Integrations Module Isolation")
-    class IntegrationsModuleTests {
+    class AnalyticsModuleTests {
 
         /**
-         * Integrations module should not depend on feature module internals.
+         * Analytics module should not depend on feature module internals.
          *
-         * <p>Integrations connect to external services. Feature modules
-         * should consume integrations, not vice versa.
+         * <p>Analytics adapters (PostHog) are outbound clients. Feature modules
+         * may consume them; they must not pull feature internals.
          */
         @Test
-        @DisplayName("Integrations does not depend on feature module internals")
-        void integrationsDoesNotDependOnFeatureInternals() {
+        void analyticsDoesNotDependOnFeatureInternals() {
             ArchRule rule = noClasses()
                 .that()
-                .resideInAPackage("..integrations..")
+                .resideInAPackage("..analytics..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
@@ -248,17 +229,14 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
                     "..mentor..service..",
                     "..profile..service.."
                 )
-                .because("Integrations are consumed by features, not vice versa");
+                .because("Analytics adapters are consumed by features, not vice versa");
             rule.check(classes);
         }
     }
 
-    // ========================================================================
     // CONFIG MODULE ISOLATION
-    // ========================================================================
 
     @Nested
-    @DisplayName("Config Module Isolation")
     class ConfigModuleTests {
 
         /**
@@ -267,7 +245,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * <p>Configuration wires up beans but should not contain feature logic.
          */
         @Test
-        @DisplayName("Config does not depend on feature service implementations")
         void configDoesNotDependOnFeatureServiceImplementations() {
             ArchRule rule = noClasses()
                 .that()
@@ -286,12 +263,9 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
     // which means they pass even when there's nothing to check.
     // The top-level cycle test in ArchitectureTest.noCyclesBetweenModules() is sufficient.
 
-    // ========================================================================
     // WORKSPACE ADAPTER PATTERN VERIFICATION
-    // ========================================================================
 
     @Nested
-    @DisplayName("Workspace Cross-Cutting Concerns")
     class WorkspaceCrossCuttingTests {
 
         /**
@@ -301,7 +275,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * Other modules should use workspace's public API.
          */
         @Test
-        @DisplayName("Workspace adapters are internal")
         void workspaceAdaptersAreInternal() {
             ArchRule rule = noClasses()
                 .that()
@@ -320,14 +293,13 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * making external service calls.
          */
         @Test
-        @DisplayName("Workspace validation has minimal dependencies")
         void workspaceValidationHasMinimalDependencies() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..workspace.validation..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..gitprovider..sync..")
+                .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..integration.scm.sync..")
                 .because("Validation should be pure logic without external service dependencies");
             rule.check(classes);
         }
@@ -339,7 +311,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
          * to context internals should be limited.
          */
         @Test
-        @DisplayName("Workspace context internals are protected")
         void workspaceContextInternalsAreProtected() {
             ArchRule rule = classes()
                 .that()

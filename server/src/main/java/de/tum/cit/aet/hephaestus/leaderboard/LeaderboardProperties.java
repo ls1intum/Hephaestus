@@ -1,22 +1,22 @@
 package de.tum.cit.aet.hephaestus.leaderboard;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration properties for leaderboard scheduling and notifications.
+ * Type-safe configuration properties for leaderboard scheduling and notification toggle.
  *
  * <p>Binds to the {@code hephaestus.leaderboard} prefix in application configuration.
- * Controls when leaderboard cycles end and how Slack notifications are sent.
+ * Controls when leaderboard cycles end and whether the weekly Slack post runs at all
+ * (per-workspace channel / team filter live on the Slack
+ * {@link de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig.SlackConfig},
+ * not in YAML).
  *
  * <h2>Configuration Example</h2>
  * <pre>{@code
@@ -27,13 +27,10 @@ import org.springframework.validation.annotation.Validated;
  *       time: "09:00"
  *     notification:
  *       enabled: true
- *       team: engineering
- *       channel-id: C0123456789
- *       workspace-slugs: [acme]
  * }</pre>
  *
  * @param schedule     schedule configuration for when the leaderboard cycle ends
- * @param notification Slack notification configuration
+ * @param notification global on/off switch for the weekly Slack post
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.leaderboard")
@@ -46,7 +43,7 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
             schedule = new Schedule(1, "09:00");
         }
         if (notification == null) {
-            notification = new Notification(false, null, null, List.of());
+            notification = new Notification(false);
         }
     }
 
@@ -71,32 +68,13 @@ public record LeaderboardProperties(@Valid Schedule schedule, @Valid Notificatio
     ) {}
 
     /**
-     * Slack notification configuration for weekly leaderboard announcements.
+     * Global on/off switch for the weekly Slack post.
      *
-     * @param enabled        whether to send Slack notifications at the end of each cycle
-     * @param team           optional team filter for the leaderboard (null means all teams)
-     * @param channelId      Slack channel ID to send notifications to (required if enabled)
-     * @param workspaceSlugs slugs of workspaces opted in to notifications; empty list disables all.
-     *                       Temporary allowlist until per-workspace Slack routing replaces the global channel.
+     * <p>Per-workspace fan-out is driven by ACTIVE Slack Connections — the channel and
+     * optional team filter live on the Slack {@code SlackConfig}. This flag is the
+     * kill-switch that stops the scheduled task from firing at all.
+     *
+     * @param enabled whether to run the weekly Slack post task
      */
-    public record Notification(
-        @DefaultValue("false") boolean enabled,
-        @Nullable String team,
-        @Nullable String channelId,
-        @DefaultValue({}) List<String> workspaceSlugs
-    ) {
-        public Notification {
-            workspaceSlugs = workspaceSlugs == null ? List.of() : List.copyOf(workspaceSlugs);
-        }
-
-        @AssertTrue(message = "channelId must be provided when notifications are enabled")
-        public boolean isChannelIdValid() {
-            return !enabled || (channelId != null && !channelId.isBlank());
-        }
-
-        @AssertTrue(message = "workspaceSlugs must be non-empty when notifications are enabled")
-        public boolean isWorkspaceSlugsValid() {
-            return !enabled || !workspaceSlugs.isEmpty();
-        }
-    }
+    public record Notification(@DefaultValue("false") boolean enabled) {}
 }

@@ -4,23 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("JobSubmission")
 class JobSubmissionTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Nested
-    @DisplayName("Construction")
     class Construction {
 
         @Test
-        @DisplayName("should accept valid metadata and idempotency key")
         void shouldAcceptValidInput() {
             ObjectNode metadata = objectMapper.createObjectNode().put("key", "value");
             var submission = new JobSubmission(metadata, "pr_review:owner/repo:42:abc123");
@@ -30,7 +26,6 @@ class JobSubmissionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null metadata")
         void shouldRejectNullMetadata() {
             assertThatThrownBy(() -> new JobSubmission(null, "key"))
                 .isInstanceOf(NullPointerException.class)
@@ -38,7 +33,6 @@ class JobSubmissionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null idempotency key")
         void shouldRejectNullIdempotencyKey() {
             ObjectNode metadata = objectMapper.createObjectNode();
             assertThatThrownBy(() -> new JobSubmission(metadata, null))
@@ -47,7 +41,6 @@ class JobSubmissionTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject blank idempotency key")
         void shouldRejectBlankIdempotencyKey() {
             ObjectNode metadata = objectMapper.createObjectNode();
             assertThatThrownBy(() -> new JobSubmission(metadata, "  "))

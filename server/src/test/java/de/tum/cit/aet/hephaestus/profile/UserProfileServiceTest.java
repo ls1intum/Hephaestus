@@ -8,17 +8,17 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEvent;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
@@ -42,10 +42,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
  *
  * <p>Tests verify the CQRS pattern: ActivityEvent is the source of truth for
  * what activity exists (same as leaderboard), with entity details hydrated
- * from gitprovider tables.
+ * from integration.scm tables.
  */
 @Tag("unit")
-@DisplayName("UserProfileService")
 @ExtendWith(MockitoExtension.class)
 class UserProfileServiceTest {
 
@@ -124,13 +123,10 @@ class UserProfileServiceTest {
     }
 
     @Nested
-    @DisplayName("CQRS Architecture Tests")
     class CqrsArchitectureTests {
 
         @Test
-        @DisplayName("queries ActivityEvent first then hydrates from gitprovider")
         void queriesActivityEventFirstThenHydrates() {
-            // Arrange
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
             PullRequest pr = createPullRequest(300L, user, repo);
@@ -153,13 +149,12 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(event));
 
-            // Hydrate review details from gitprovider
+            // Hydrate review details from integration.scm
             when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(400L))).thenReturn(List.of(review));
 
             // Mock assembler
             when(reviewActivityAssembler.assemble(eq(review), eq(15))).thenReturn(createProfileReviewDTO(400L, 15));
 
-            // Act
             Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
                 USER_LOGIN,
                 WORKSPACE_ID,
@@ -169,7 +164,6 @@ class UserProfileServiceTest {
                 null
             );
 
-            // Assert
             assertThat(result).isPresent();
 
             // Verify ActivityEvent queried first (source of truth)
@@ -180,7 +174,7 @@ class UserProfileServiceTest {
                 any()
             );
 
-            // Verify entity hydrated from gitprovider
+            // Verify entity hydrated from integration.scm
             verify(pullRequestReviewRepository).findAllByIdWithRelations(Set.of(400L));
 
             // Verify assembler was called with XP from ActivityEvent
@@ -188,9 +182,7 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("returns empty activity when no ActivityEvents exist")
         void returnsEmptyWhenNoActivityEvents() {
-            // Arrange
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
@@ -209,7 +201,6 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of());
 
-            // Act
             Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
                 USER_LOGIN,
                 WORKSPACE_ID,
@@ -219,7 +210,6 @@ class UserProfileServiceTest {
                 null
             );
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
 
@@ -230,9 +220,7 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("batch-fetches reviews and comments efficiently (no N+1)")
         void batchFetchesEntitiesEfficiently() {
-            // Arrange
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
             PullRequest pr = createPullRequest(300L, user, repo);
@@ -276,7 +264,6 @@ class UserProfileServiceTest {
             when(reviewActivityAssembler.assemble(eq(review2), eq(20))).thenReturn(createProfileReviewDTO(401L, 20));
             when(reviewActivityAssembler.assemble(eq(comment), eq(5))).thenReturn(createProfileReviewDTO(500L, 5));
 
-            // Act
             service.getActivityMonitor(USER_LOGIN, WORKSPACE_ID, AFTER, BEFORE, null, null);
 
             // Assert: Single batch query for each entity type (no N+1)
@@ -291,9 +278,7 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("skips missing entities gracefully (logs warning)")
         void skipsMissingEntitiesGracefully() {
-            // Arrange
             User user = createUser(USER_ID, USER_LOGIN);
 
             when(userRepository.findByLogin(USER_LOGIN)).thenReturn(Optional.of(user));
@@ -313,10 +298,9 @@ class UserProfileServiceTest {
                 )
             ).thenReturn(List.of(event));
 
-            // Entity not found in gitprovider
+            // Entity not found in integration.scm
             when(pullRequestReviewRepository.findAllByIdWithRelations(Set.of(999L))).thenReturn(List.of());
 
-            // Act
             Optional<ProfileActivityMonitorDTO> result = service.getActivityMonitor(
                 USER_LOGIN,
                 WORKSPACE_ID,
@@ -326,7 +310,6 @@ class UserProfileServiceTest {
                 null
             );
 
-            // Assert
             assertThat(result).isPresent();
             assertThat(result.get().reviewActivity()).isEmpty();
 
@@ -335,7 +318,6 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("hydrates review comments on other users pull requests from activity events")
         void hydratesReviewCommentsOnOtherUsersPullRequestsFromActivityEvents() {
             User actor = createUser(USER_ID, USER_LOGIN);
             User prAuthor = createUser(99L, "pr-author");
@@ -387,7 +369,6 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("skips own pull request review comments from scored activity feed")
         void skipsOwnPullRequestReviewCommentsFromScoredActivityFeed() {
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
@@ -436,7 +417,6 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("skips issue comments on regular issues")
         void skipsIssueCommentsOnRegularIssues() {
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
@@ -483,7 +463,6 @@ class UserProfileServiceTest {
         }
 
         @Test
-        @DisplayName("keeps issue comments and review comments when IDs collide across target types")
         void keepsDifferentTargetTypesWhenIdsCollide() {
             User user = createUser(USER_ID, USER_LOGIN);
             Repository repo = createRepository(200L);
@@ -693,7 +672,6 @@ class UserProfileServiceTest {
 
     // ========================================================================
     // Helper Methods
-    // ========================================================================
 
     private PullRequest createOpenPullRequest(Long id, User author, Repository repo) {
         PullRequest pr = createPullRequest(id, author, repo);

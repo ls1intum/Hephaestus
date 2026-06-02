@@ -3,18 +3,24 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import de.tum.cit.aet.hephaestus.workspace.exception.*;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>{@link WorkspaceQueryService} – Read-only queries and lookups</li>
  *   <li>{@link WorkspaceLifecycleService} – Status transitions (suspend/resume/purge)</li>
- *   <li>{@link WorkspaceInstallationService} – GitHub App installation handling</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GithubLifecycleListener} – GitHub App installation handling</li>
  *   <li>{@link WorkspaceRepositoryMonitorService} – Repository monitoring configuration</li>
  *   <li>{@link WorkspaceActivationService} – Activation/startup orchestration</li>
  *   <li>{@link WorkspaceTeamSettingsService} – Workspace-scoped team settings</li>
@@ -67,7 +73,10 @@ public class WorkspaceService {
     private final WorkspaceSettingsService workspaceSettingsService;
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService;
+    private final ConnectionService connectionService;
+
+    /** Fires {@link WorkspaceCreatedEvent} after workspace commit; vendor adapters subscribe. */
+    private final ApplicationEventPublisher eventPublisher;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
@@ -76,7 +85,8 @@ public class WorkspaceService {
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService,
-        GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService
+        ConnectionService connectionService,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
@@ -84,12 +94,11 @@ public class WorkspaceService {
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.gitLabWorkspaceInitializationService = gitLabWorkspaceInitializationService;
+        this.connectionService = connectionService;
+        this.eventPublisher = eventPublisher;
     }
 
-    // ========================================================================
     // Workspace Lookup
-    // ========================================================================
 
     public Optional<Workspace> getWorkspaceBySlug(String slug) {
         return workspaceRepository.findByWorkspaceSlug(slug);
@@ -121,9 +130,7 @@ public class WorkspaceService {
         return Optional.empty();
     }
 
-    // ========================================================================
     // Workspace Creation
-    // ========================================================================
 
     @Transactional
     public Workspace createWorkspace(
@@ -159,11 +166,9 @@ public class WorkspaceService {
     }
 
     /**
-     * Creates a workspace from a DTO, including optional git provider configuration.
-     *
-     * <p>For GitLab workspaces, the DTO should include {@code gitProviderMode = GITLAB_PAT}
-     * along with a personal access token and optional server URL. The PAT is automatically
-     * encrypted at rest via {@link de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter}.
+     * Creates a workspace from a DTO and provisions the matching {@link IntegrationKind}
+     * Connection. The PAT travels through {@code ConnectionService.rotateBearerToken}
+     * which encrypts at rest under the registry's AES-256-GCM converter.
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
@@ -179,26 +184,49 @@ public class WorkspaceService {
             ownerUserId
         );
 
-        if (request.gitProviderMode() != null) {
-            workspace.setGitProviderMode(request.gitProviderMode());
-        }
-        if (request.personalAccessToken() != null && !request.personalAccessToken().isBlank()) {
-            workspace.setPersonalAccessToken(request.personalAccessToken());
-        }
-        if (request.serverUrl() != null && !request.serverUrl().isBlank()) {
-            workspace.setServerUrl(request.serverUrl().trim());
-        }
+        boolean isGitLab = request.kind() == IntegrationKind.GITLAB;
 
-        // GitLab PAT workspaces monitor all repositories in the group by default
-        if (request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+        if (isGitLab) {
+            // GitLab PAT workspaces monitor all repositories in the group by default.
             workspace.setRepositorySelection(RepositorySelection.ALL);
+            workspaceRepository.save(workspace);
+
+            String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
+                ? request.serverUrl().trim()
+                : null;
+            connectionService.provisionPatConnection(
+                workspace,
+                IntegrationKind.GITLAB,
+                serverUrl,
+                new ConnectionConfig.GitLabConfig(
+                    serverUrl,
+                    /* gitlabGroupId */ null,
+                    /* gitlabWebhookId */ null,
+                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                    Set.of()
+                ),
+                request.personalAccessToken(),
+                "create-workspace-" + workspace.getId()
+            );
+        } else {
+            // kind == GITHUB → PAT-backed; App installations bypass this DTO entirely
+            // (they arrive via GithubLifecycleListener.createOrUpdateFromInstallation).
+            // The DTO validator rejects any other kind.
+            workspaceRepository.save(workspace);
+            String serverUrl = (request.serverUrl() != null && !request.serverUrl().isBlank())
+                ? request.serverUrl().trim()
+                : null;
+            connectionService.provisionPatConnection(
+                workspace,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig(request.accountLogin(), serverUrl, Set.of()),
+                request.personalAccessToken(),
+                "create-workspace-" + workspace.getId()
+            );
         }
 
-        // Explicit save required: when called via createWorkspaceWithInitialization(),
-        // self-invocation bypasses @Transactional proxy, so dirty-checking flush won't
-        // happen automatically. The inner createWorkspace(5-args) saved the base entity,
-        // but these additional fields (gitProviderMode, PAT, serverUrl) need a second save.
-        return workspaceRepository.save(workspace);
+        return workspace;
     }
 
     /**
@@ -214,12 +242,11 @@ public class WorkspaceService {
     public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
         Workspace workspace = createWorkspace(request);
 
-        // Trigger async repository discovery for GitLab PAT workspaces.
-        // The @Transactional createWorkspace() has already committed at this point,
-        // so the async thread will find the workspace in the database.
-        if (workspace.getGitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
-            gitLabWorkspaceInitializationService.initializeAsync(workspace.getId());
-        }
+        // Trigger async vendor-specific initialization (e.g. GitLab group discovery + webhook
+        // setup). The @Transactional createWorkspace() has already committed by the time we
+        // dispatch, so the async thread can find the workspace. Hooks are kind-keyed so
+        // adding a new SCM is a matter of registering an impl, not editing this class.
+        eventPublisher.publishEvent(new WorkspaceCreatedEvent(workspace.getId(), request.kind()));
 
         return workspace;
     }
@@ -236,9 +263,7 @@ public class WorkspaceService {
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
-    // ========================================================================
     // Workspace Account Login Management
-    // ========================================================================
 
     @Transactional
     public Workspace updateAccountLogin(Long workspaceId, String accountLogin) {
@@ -254,9 +279,7 @@ public class WorkspaceService {
         return workspace;
     }
 
-    // ========================================================================
     // League Points Recalculation
-    // ========================================================================
 
     /**
      * Reset and recalculate league points for all users by replaying their
@@ -295,9 +318,7 @@ public class WorkspaceService {
         leaguePointsRecalculator.recalculate(workspace);
     }
 
-    // ========================================================================
     // Settings Delegation
-    // ========================================================================
 
     public Workspace updateSchedule(String slug, Integer day, String time) {
         Workspace workspace = requireWorkspace(slug);
@@ -322,6 +343,29 @@ public class WorkspaceService {
         return updateNotifications(requireSlug(workspaceContext), enabled, team, channelId);
     }
 
+    public Workspace updateLeaderboardDigest(
+        String slug,
+        Integer day,
+        String time,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateLeaderboardDigest(workspace.getId(), day, time, enabled, team, channelId);
+    }
+
+    public Workspace updateLeaderboardDigest(
+        WorkspaceContext workspaceContext,
+        Integer day,
+        String time,
+        Boolean enabled,
+        String team,
+        String channelId
+    ) {
+        return updateLeaderboardDigest(requireSlug(workspaceContext), day, time, enabled, team, channelId);
+    }
+
     public Workspace updateToken(String slug, String personalAccessToken) {
         Workspace workspace = requireWorkspace(slug);
         return workspaceSettingsService.updateToken(workspace.getId(), personalAccessToken);
@@ -329,19 +373,6 @@ public class WorkspaceService {
 
     public Workspace updateToken(WorkspaceContext workspaceContext, String personalAccessToken) {
         return updateToken(requireSlug(workspaceContext), personalAccessToken);
-    }
-
-    public Workspace updateSlackCredentials(String slug, String slackToken, String slackSigningSecret) {
-        Workspace workspace = requireWorkspace(slug);
-        return workspaceSettingsService.updateSlackCredentials(workspace.getId(), slackToken, slackSigningSecret);
-    }
-
-    public Workspace updateSlackCredentials(
-        WorkspaceContext workspaceContext,
-        String slackToken,
-        String slackSigningSecret
-    ) {
-        return updateSlackCredentials(requireSlug(workspaceContext), slackToken, slackSigningSecret);
     }
 
     public Workspace updatePublicVisibility(String slug, Boolean isPubliclyViewable) {
@@ -362,9 +393,7 @@ public class WorkspaceService {
         return updateFeatures(requireSlug(workspaceContext), request);
     }
 
-    // ========================================================================
     // Slug Renaming
-    // ========================================================================
 
     @Transactional
     public Workspace renameSlug(WorkspaceContext workspaceContext, String newSlug) {
@@ -420,9 +449,7 @@ public class WorkspaceService {
         return saved;
     }
 
-    // ========================================================================
     // Helper Methods
-    // ========================================================================
 
     private Workspace requireWorkspace(String slug) {
         if (isBlank(slug)) {

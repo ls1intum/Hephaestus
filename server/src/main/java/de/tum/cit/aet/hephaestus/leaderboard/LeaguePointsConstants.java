@@ -39,9 +39,7 @@ public final class LeaguePointsConstants {
     /** K-factor for high-points players (more stable rating) */
     public static final double K_FACTOR_HIGH_POINTS = 1.1;
 
-    // ========================================================================
     // Performance & Placement Bonus Constants
-    // ========================================================================
 
     /** Seconds in 30 days for new player threshold */
     public static final long NEW_PLAYER_THRESHOLD_SECONDS = 30L * 24 * 60 * 60;

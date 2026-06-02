@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -45,7 +47,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-@DisplayName("DockerClientOperations")
 class DockerClientOperationsTest extends BaseUnitTest {
 
     @Mock
@@ -59,11 +60,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("ping")
     class Ping {
 
         @Test
-        @DisplayName("should return true when daemon is reachable")
         void shouldReturnTrueOnSuccess() {
             PingCmd pingCmd = mock(PingCmd.class);
             when(dockerClient.pingCmd()).thenReturn(pingCmd);
@@ -73,7 +72,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return false when daemon throws")
         void shouldReturnFalseOnException() {
             PingCmd pingCmd = mock(PingCmd.class);
             when(dockerClient.pingCmd()).thenReturn(pingCmd);
@@ -84,11 +82,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("createNetwork")
     class CreateNetwork {
 
         @Test
-        @DisplayName("should create internal network and return ID")
         void shouldCreateNetwork() {
             CreateNetworkCmd cmd = mock(CreateNetworkCmd.class);
             CreateNetworkResponse response = mock(CreateNetworkResponse.class);
@@ -107,7 +103,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw SandboxException on Docker failure")
         void shouldThrowOnFailure() {
             CreateNetworkCmd cmd = mock(CreateNetworkCmd.class);
             when(dockerClient.createNetworkCmd()).thenReturn(cmd);
@@ -124,11 +119,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("connectToNetwork")
     class ConnectToNetwork {
 
         @Test
-        @DisplayName("should strip CIDR suffix from IP address")
         void shouldStripCidrSuffix() {
             ConnectToNetworkCmd connectCmd = mock(ConnectToNetworkCmd.class);
             when(dockerClient.connectToNetworkCmd()).thenReturn(connectCmd);
@@ -151,7 +144,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return IP without CIDR when no suffix")
         void shouldReturnIpWithoutCidr() {
             ConnectToNetworkCmd connectCmd = mock(ConnectToNetworkCmd.class);
             when(dockerClient.connectToNetworkCmd()).thenReturn(connectCmd);
@@ -174,7 +166,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when container not found in network after connect")
         void shouldThrowWhenContainerNotInNetwork() {
             ConnectToNetworkCmd connectCmd = mock(ConnectToNetworkCmd.class);
             when(dockerClient.connectToNetworkCmd()).thenReturn(connectCmd);
@@ -196,11 +187,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("disconnectFromNetwork")
     class DisconnectFromNetwork {
 
         @Test
-        @DisplayName("should be idempotent on NotFoundException")
         void shouldBeIdempotentOnNotFound() {
             DisconnectFromNetworkCmd cmd = mock(DisconnectFromNetworkCmd.class);
             when(dockerClient.disconnectFromNetworkCmd()).thenReturn(cmd);
@@ -214,7 +203,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should be idempotent on NotModifiedException")
         void shouldBeIdempotentOnNotModified() {
             DisconnectFromNetworkCmd cmd = mock(DisconnectFromNetworkCmd.class);
             when(dockerClient.disconnectFromNetworkCmd()).thenReturn(cmd);
@@ -229,11 +217,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("removeNetwork")
     class RemoveNetwork {
 
         @Test
-        @DisplayName("should be idempotent on NotFoundException")
         void shouldBeIdempotentOnNotFound() {
             RemoveNetworkCmd cmd = mock(RemoveNetworkCmd.class);
             when(dockerClient.removeNetworkCmd("net-gone")).thenReturn(cmd);
@@ -245,7 +231,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("stopContainer")
     class StopContainer {
 
         @Test
@@ -261,7 +246,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw SandboxException on Docker failure")
         void shouldThrowOnFailure() {
             StopContainerCmd cmd = mock(StopContainerCmd.class);
             when(dockerClient.stopContainerCmd("ctr-1")).thenReturn(cmd);
@@ -275,11 +259,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("removeContainer")
     class RemoveContainer {
 
         @Test
-        @DisplayName("should be idempotent on NotFoundException")
         void shouldBeIdempotentOnNotFound() {
             RemoveContainerCmd cmd = mock(RemoveContainerCmd.class);
             when(dockerClient.removeContainerCmd("ctr-gone")).thenReturn(cmd);
@@ -293,15 +275,13 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("listContainersByLabel")
     class ListContainersByLabel {
 
         @Test
-        @DisplayName("should map container fields correctly")
         void shouldMapContainerFields() {
             ListContainersCmd cmd = mock(ListContainersCmd.class);
             when(dockerClient.listContainersCmd()).thenReturn(cmd);
-            when(cmd.withLabelFilter(any(Map.class))).thenReturn(cmd);
+            when(cmd.withLabelFilter(anyMap())).thenReturn(cmd);
             when(cmd.withShowAll(true)).thenReturn(cmd);
 
             Container container = mock(Container.class);
@@ -322,11 +302,10 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should handle null names and labels gracefully")
         void shouldHandleNullFields() {
             ListContainersCmd cmd = mock(ListContainersCmd.class);
             when(dockerClient.listContainersCmd()).thenReturn(cmd);
-            when(cmd.withLabelFilter(any(Map.class))).thenReturn(cmd);
+            when(cmd.withLabelFilter(anyMap())).thenReturn(cmd);
             when(cmd.withShowAll(true)).thenReturn(cmd);
 
             Container container = mock(Container.class);
@@ -347,11 +326,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("listNetworksByName")
     class ListNetworksByName {
 
         @Test
-        @DisplayName("should map network fields correctly")
         void shouldMapNetworkFields() {
             ListNetworksCmd cmd = mock(ListNetworksCmd.class);
             when(dockerClient.listNetworksCmd()).thenReturn(cmd);
@@ -372,11 +349,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("copyArchive")
     class CopyArchive {
 
         @Test
-        @DisplayName("should delegate copyArchiveToContainer to docker client")
         void shouldCopyToContainer() {
             CopyArchiveToContainerCmd cmd = mock(CopyArchiveToContainerCmd.class);
             when(dockerClient.copyArchiveToContainerCmd("ctr-1")).thenReturn(cmd);
@@ -390,7 +365,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw SandboxException on copyArchiveToContainer failure")
         void shouldThrowOnCopyToFailure() {
             CopyArchiveToContainerCmd cmd = mock(CopyArchiveToContainerCmd.class);
             when(dockerClient.copyArchiveToContainerCmd("ctr-1")).thenReturn(cmd);
@@ -405,7 +379,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw SandboxException on copyArchiveFromContainer failure")
         void shouldThrowOnCopyFromFailure() {
             CopyArchiveFromContainerCmd cmd = mock(CopyArchiveFromContainerCmd.class);
             when(dockerClient.copyArchiveFromContainerCmd("ctr-1", "/output")).thenReturn(cmd);
@@ -418,11 +391,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("createContainer")
     class CreateContainer {
 
         @Test
-        @DisplayName("should create container with full spec")
         void shouldCreateWithFullSpec() {
             CreateContainerCmd cmd = mock(CreateContainerCmd.class);
             CreateContainerResponse response = mock(CreateContainerResponse.class);
@@ -430,8 +401,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
             when(cmd.withHostConfig(any())).thenReturn(cmd);
             when(cmd.withNetworkMode(anyString())).thenReturn(cmd);
             when(cmd.withLabels(any())).thenReturn(cmd);
-            when(cmd.withCmd(any(List.class))).thenReturn(cmd);
-            when(cmd.withEnv(any(List.class))).thenReturn(cmd);
+            when(cmd.withCmd(anyList())).thenReturn(cmd);
+            when(cmd.withEnv(anyList())).thenReturn(cmd);
             when(cmd.withHostName("agent")).thenReturn(cmd);
             when(cmd.withUser("1000:1000")).thenReturn(cmd);
             when(cmd.exec()).thenReturn(response);
@@ -473,7 +444,6 @@ class DockerClientOperationsTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip optional fields when null/empty")
         void shouldSkipOptionalFields() {
             CreateContainerCmd cmd = mock(CreateContainerCmd.class);
             CreateContainerResponse response = mock(CreateContainerResponse.class);
@@ -514,19 +484,17 @@ class DockerClientOperationsTest extends BaseUnitTest {
             ops.createContainer(spec);
 
             // cmd, env, hostname, user should NOT be called
-            verify(cmd, never()).withCmd(any(List.class));
-            verify(cmd, never()).withEnv(any(List.class));
+            verify(cmd, never()).withCmd(anyList());
+            verify(cmd, never()).withEnv(anyList());
             verify(cmd, never()).withHostName(anyString());
             verify(cmd, never()).withUser(anyString());
         }
     }
 
     @Nested
-    @DisplayName("waitContainer")
     class WaitContainer {
 
         @Test
-        @DisplayName("should return exit code from wait")
         void shouldReturnExitCode() {
             WaitContainerCmd cmd = mock(WaitContainerCmd.class);
             WaitContainerResultCallback callback = mock(WaitContainerResultCallback.class);
@@ -541,11 +509,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("startContainer")
     class StartContainer {
 
         @Test
-        @DisplayName("should throw SandboxException on failure")
         void shouldThrowOnStartFailure() {
             StartContainerCmd cmd = mock(StartContainerCmd.class);
             when(dockerClient.startContainerCmd("ctr-bad")).thenReturn(cmd);

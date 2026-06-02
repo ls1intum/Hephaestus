@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * Simple conversation thread for AI SDK that contains a tree of messages.

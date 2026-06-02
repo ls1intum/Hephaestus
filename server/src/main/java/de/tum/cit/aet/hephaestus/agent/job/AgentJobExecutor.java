@@ -48,6 +48,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -58,7 +59,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -297,7 +297,7 @@ public class AgentJobExecutor {
         // Any survivors will be NAK'd on connection close.
     }
 
-    // ── Pull loop ──
+    // Pull loop
 
     private void pullLoop() {
         while (running.get()) {
@@ -352,7 +352,7 @@ public class AgentJobExecutor {
         log.info("Agent job executor pull loop stopped");
     }
 
-    // ── Job execution ──
+    // Job execution
 
     void executeJob(Message msg) {
         Optional<UUID> parsed = parseJobId(msg);
@@ -408,7 +408,7 @@ public class AgentJobExecutor {
      *     {@code false} otherwise.
      */
     private boolean claimAndExecute(UUID jobId, Message msg) {
-        // ── CLAIM (micro-transaction #1) — may throw CannotAcquireLockException ──
+        // CLAIM (micro-transaction #1) — may throw CannotAcquireLockException
         Optional<ClaimResult> claimed;
         try {
             claimed = dispatchClaimResult(jobId, msg, claimJob(jobId));
@@ -430,7 +430,7 @@ public class AgentJobExecutor {
         Instant startTime = Instant.now();
         ScheduledFuture<?> heartbeat = startHeartbeat(msg);
         try {
-            // ── PREPARE + EXECUTE + COMPLETE ──
+            // PREPARE + EXECUTE + COMPLETE
             SandboxResult result = prepareAndExecute(jobId, job, snapshot);
             AgentResult agentResult = practiceAgent.parseResult(result);
 
@@ -633,7 +633,7 @@ public class AgentJobExecutor {
         msg.ack();
     }
 
-    // ── Claim: micro-transaction #1 ──
+    // Claim: micro-transaction #1
 
     /** Sentinel values for claimJob results that require post-transaction NATS actions. */
     private enum ClaimOutcome {
@@ -717,7 +717,7 @@ public class AgentJobExecutor {
             : jobRepository.transitionStatus(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING));
     }
 
-    // ── Complete: micro-transaction #2 ──
+    // Complete: micro-transaction #2
 
     private void completeJob(
         UUID jobId,

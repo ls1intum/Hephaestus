@@ -3,6 +3,14 @@ spring:
         name: Hephaestus
         version: "${APP_VERSION:0.0.0-development}"
 
+    # Deploy-role aliases (see docker/compose.core.yaml + ADR 0008). Activating a group
+    # name expands to its member profiles, so SPRING_PROFILES_ACTIVE=webhook-server is
+    # equivalent to prod,webhook (and worker-node to prod,worker).
+    profiles:
+        group:
+            webhook-server: prod,webhook
+            worker-node: prod,worker
+
     config:
         import: optional:file:.env[.properties]
 
@@ -119,6 +127,14 @@ management:
             enabled: true
         readinessState:
             enabled: true
+        # Spring Boot derives indicator bean names from the class by stripping the
+        # "HealthIndicator" suffix and lowercasing the first letter. Adding the
+        # integration-consumer probe to the readiness group makes a degraded NATS
+        # consumer (DOWN) take the pod out of the load balancer without crash-
+        # looping it — the indicator's javadoc explicitly promises this.
+        group:
+            readiness:
+                include: readinessState,integrationConsumer
 
 springdoc:
     default-produces-media-type: application/json
@@ -132,11 +148,11 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # Three property keys (see ADR 0005 baseline + ADR 0008 webhook role):
     #   server  — WIRED. Gates ServerSchedulingConfig (@EnableScheduling),
-    #     NatsConsumerService (sync NATS pull consumer), and WorkspaceStartupListener.
+    #     IntegrationNatsConsumer (the unified NATS pull consumer), and WorkspaceStartupListener.
     #     Setting false silences all @Scheduled methods and prevents workspace bootstrap.
     #   worker  — WIRED. Gates DockerSandboxConfiguration + AgentNatsConsumerConfig.
     #     Setting false removes the Docker sandbox runtime + agent NATS pull consumer.
-    #   webhook — WIRED. Gates the gitprovider.webhook receiver (controllers, HMAC
+    #   webhook — WIRED. Gates the integration.webhook receiver (controllers, HMAC
     #     verifier, JetStream publisher, stream bootstrap, health, lifecycle).
     #     The webhook-server production container deploys with server=false + worker=false
     #     + webhook=true so it runs webhook reception in isolation — restart-independent
@@ -164,138 +180,38 @@ hephaestus:
     tenancy:
         enforcement: ${HEPHAESTUS_TENANCY_ENFORCEMENT:log}
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SYNC CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Settings for GitHub data synchronization operations.
-    # These control GraphQL timeouts and incremental sync behavior.
+    # Provider-agnostic sync scheduler (SyncSchedulerProperties). The GitHub-specific sync
+    # tuning (GraphQL timeouts, incremental buffer, backfill page size) lives under
+    # hephaestus.integration.github.sync (GitHubSyncProperties); per-field rationale is on each
+    # record's Javadoc, surfaced in the IDE via spring-configuration-processor.
     sync:
-        # Timeout for standard GraphQL operations (default: 30s)
-        # Accepts duration format: 60s, 1m, PT60S
-        # Increase if experiencing timeouts on large repositories
-        graphql-timeout: ${HEPHAESTUS_SYNC_GRAPHQL_TIMEOUT:60s}
-        # Extended timeout for complex operations like review comments (default: 60s)
-        # Accepts duration format: 120s, 2m, PT2M
-        extended-graphql-timeout: ${HEPHAESTUS_SYNC_EXTENDED_GRAPHQL_TIMEOUT:120s}
-        # Delay between pagination requests (default: 200ms)
-        # Accepts duration format: 200ms, PT0.2S
-        # Reduces 502/504 errors caused by rapid-fire complex queries
-        pagination-throttle: ${HEPHAESTUS_SYNC_PAGINATION_THROTTLE:200ms}
-        # Whether to use incremental sync based on last sync timestamp (default: true)
-        # When enabled, only issues/PRs updated since last sync are fetched
-        # This significantly reduces API calls for active repositories
-        incremental-sync-enabled: ${HEPHAESTUS_SYNC_INCREMENTAL_ENABLED:true}
-        # Safety buffer subtracted from last sync timestamp (default: 5m)
-        # Handles clock skew between application server and GitHub
-        # Ensures items updated just before the recorded timestamp are still fetched
-        # Accepts duration format: 5m, 300s, PT5M
-        incremental-sync-buffer: ${HEPHAESTUS_SYNC_INCREMENTAL_BUFFER:5m}
-        # Timeout for historical backfill operations (default: 120s)
-        # Needs to be longer than regular timeout for large repositories
-        # because backfill responses include embedded reviews/threads/comments
-        backfill-graphql-timeout: ${HEPHAESTUS_SYNC_BACKFILL_TIMEOUT:120s}
-        # Page size for pull request backfill queries (default: 10)
-        # Smaller than regular PR sync because backfill includes embedded
-        # reviews/threads/comments which creates very large responses
-        backfill-pr-page-size: ${HEPHAESTUS_SYNC_BACKFILL_PR_PAGE_SIZE:10}
         run-on-startup: true
-        # Fetching timeframe in days for recent data sync
         timeframe-days: 7
         cron: "0 0 3 * * *"
-        # Cooldown in minutes before running the monitoring again
         cooldown-minutes: 15
-        # ═══════════════════════════════════════════════════════════════════════════
-        # FEATURE TOGGLES (disabled by default — currently unused and slow)
-        # ═══════════════════════════════════════════════════════════════════════════
-        # GitHub Discussions sync paginates discussions → comments → replies (three
-        # nested GraphQL levels). GitHub Projects V2 sync walks projects → fields →
-        # status updates → items → item field values. Both are the slowest parts of a
-        # sync and aren't consumed yet, so they're off by default. Flip to true per
-        # environment when the data is actually needed.
+        # Discussions + Projects V2 sync are the slowest passes and not consumed yet, so off by
+        # default (see DiscussionsProperties/ProjectsProperties). Flip per environment when needed.
         discussions:
             enabled: ${HEPHAESTUS_SYNC_DISCUSSIONS_ENABLED:false}
         projects:
             enabled: ${HEPHAESTUS_SYNC_PROJECTS_ENABLED:false}
-        # ═══════════════════════════════════════════════════════════════════════════
-        # BACKFILL CONFIGURATION
-        # ═══════════════════════════════════════════════════════════════════════════
-        # Historical data synchronization settings for ISSUES and PULL REQUESTS only.
-        # When enabled, backfill runs AFTER recent sync completes, in small batches
-        # to avoid exhausting GitHub API rate limits.
-        #
-        # NOTE: Backfill does NOT affect GitHub Projects V2 sync. Projects are always
-        # fully synced during incremental sync because:
-        # 1. GitHub API doesn't support server-side filtering for project items
-        # 2. Project items are metadata views on issues/PRs, not source data
-        # 3. Subsequent syncs use client-side incremental filtering (skip unchanged items)
+        # Historical issue/PR backfill (not projects); runs after recent sync, throttled by rate limit.
         backfill:
-            # Whether to backfill historical issues and pull requests
             enabled: false
-            # Number of pages to sync per repository per cycle (default: 25)
             batch-size: 25
-            # Minimum rate limit remaining before backfill runs (default: 500)
-            # Backfill skips if remaining < threshold to preserve rate limit for real-time sync
             rate-limit-threshold: 500
-            # Seconds between backfill cycles (default: 60)
-            # Rate limit is the actual throttle - cycles run frequently to maximize throughput
             interval-seconds: 60
-        # ═══════════════════════════════════════════════════════════════════════════
-        # DEVELOPMENT FILTERS
-        # ═══════════════════════════════════════════════════════════════════════════
-        # Limit which organizations/repositories are actively synced.
-        # Useful in development to avoid syncing hundreds of repos from GitHub App installations.
-        #
-        # Empty lists = no filtering (production behavior, sync everything)
-        # Non-empty = only sync matching items
-        #
-        # Configure these in application-local.yml for development:
-        #   hephaestus:
-        #     sync:
-        #       filters:
-        #         allowed-organizations:
-        #           - ls1intum
-        #           - HephaestusTest
-        #         allowed-repositories:
-        #           - ls1intum/Hephaestus
-        #           - ls1intum/Artemis
-        # ═══════════════════════════════════════════════════════════════════════════
-        # Note: filters.allowed-organizations and filters.allowed-repositories are
-        # intentionally not defined here to allow profile-specific overrides.
-        # Configure them in application-local.yml for development filtering.
-        # ═══════════════════════════════════════════════════════════════════════════
-        # NATS CONFIGURATION
-        # ═══════════════════════════════════════════════════════════════════════════
+        # filters.allowed-organizations / allowed-repositories are intentionally unset here so
+        # each profile can override; set them in application-local.yml to scope dev syncs.
         nats:
             enabled: false
             replay-timeframe-days: 7
             durable-consumer-name: ""
             server: ""
             consumer:
-                # How long to wait for acknowledgment before redelivery (Duration format: 5m, PT5M, etc.)
-                ack-wait: 5m
-                # Maximum pending unacknowledged messages per consumer (1-10000)
-                max-ack-pending: 500
-                # ═══════════════════════════════════════════════════════════════════════════
-                # HEARTBEAT CONFIGURATION (tuned for remote/WAN NATS connections)
-                # ═══════════════════════════════════════════════════════════════════════════
-                # Idle heartbeat: Server sends heartbeats when no data is available.
-                # Default NATS client uses 15s which is too aggressive for remote servers.
-                # 30s+ recommended for cloud/WAN connections to tolerate latency spikes.
-                # Alarm fires after ~3x this interval without server contact.
-                idle-heartbeat: 30s
-                # Number of consecutive heartbeat alarms before triggering consumer restart.
-                # With 30s idle heartbeat, alarms fire every ~90s when stuck.
-                # Threshold of 60 means restart after ~90 minutes of no progress.
-                # This tolerates extended idle periods (no GitHub events) without false positives.
-                heartbeat-restart-threshold: 60
-                # Minimum interval between heartbeat alarm log messages (Duration format: 5m, PT5M, etc.)
-                # Prevents log spam while still providing visibility
-                heartbeat-log-interval: 5m
-                # ═══════════════════════════════════════════════════════════════════════════
-                # Delay between reconnection attempts (Duration format: 2s, PT2S, etc.)
-                reconnect-delay: 2s
-                # Request timeout for JetStream API calls (Duration format: 60s, PT60S, etc.)
-                # Increase for workspaces with many repositories
+                # Request timeout for JetStream API calls. Increase for workspaces with many
+                # repositories. The remaining consumer tuning (ack-wait, poison handling, …)
+                # lives on hephaestus.integration.consumer.* (NatsConsumerProperties).
                 request-timeout: 60s
 
     cors:
@@ -322,62 +238,32 @@ hephaestus:
             day: 2
             time: "9:00"
         notification:
+            # Global on/off for the weekly Slack post; per-workspace channel + team filter
+            # live on the Slack Connection's SlackConfig (set via the connection admin API).
             enabled: false
-            team: "all"
-            channel-id: ""
-            # Workspace slugs opted in to Slack notifications. Temporary allowlist while the
-            # global Slack channel/token is shared across tenants — remove once per-workspace
-            # Slack routing lands.
-            workspace-slugs: []
         # PR authors whose assignee-reviewers don't earn points (e.g., AI bots)
         self-review-author-logins:
             - Copilot
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # WORKSPACE CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Hephaestus supports two GitHub authentication modes:
-    #
-    # 1. GITHUB APP MODE (recommended for production)
-    #    - Workspaces are automatically created from GitHub App installations
-    #    - Repository monitors are managed by installation events (webhooks)
-    #    - Configure: github.app.id and github.app.privateKey
-    #    - Set init-default: false (workspaces come from installations)
-    #
-    # 2. PAT MODE (recommended for local development)
-    #    - A single workspace is bootstrapped from configuration below
-    #    - You manually specify which repositories to monitor
-    #    - Configure: hephaestus.workspace.default.token
-    #    - Set init-default: true
-    #
-    # The init-default setting only affects PAT-based workspace creation.
-    # GitHub App installations are always processed regardless of this setting.
-    # ═══════════════════════════════════════════════════════════════════════════
+    # PAT-mode bootstrap for local dev. init-default only gates PAT workspace creation;
+    # GitHub App installations are always processed regardless. Mode docs + cross-field
+    # validation live on WorkspaceProperties (IDE-surfaced via spring-configuration-processor).
     workspace:
-        # Set to true to bootstrap a PAT workspace on startup (for local development)
-        # Set to false in production when using GitHub App installations
         init-default: true
         slug:
-            # TTL (in days) for slug redirects; set to 0 to disable redirects while preserving history
+            # TTL (days) for slug redirects; 0 disables redirects while preserving history.
             redirect:
                 ttl-days: 30
         default:
-            # GitHub organization or user login for the PAT workspace
             login: ${GITHUB_PAT_LOGIN:ls1intum}
-            # Personal Access Token with repo, read:org, and read:user scopes
             token: ${GITHUB_PAT:}
-            # Repositories to monitor (PAT mode always uses explicit list)
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
-        # Set to true to bootstrap a GitLab PAT workspace on startup (for local development)
         init-gitlab-default: ${GITLAB_WORKSPACE_INIT_DEFAULT:false}
         gitlab-default:
-            # GitLab group full path (e.g., my-org/my-team)
             login: ${GITLAB_GROUP_PATH:}
-            # GitLab Group or Personal Access Token
             token: ${GITLAB_PAT:}
-            # Custom server URL for self-hosted GitLab (optional, defaults to https://gitlab.com)
             server-url: ${GITLAB_SERVER_URL:}
 
     cache:
@@ -421,20 +307,8 @@ hephaestus:
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SANDBOX CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Docker sandbox for running coding agent containers in isolation.
-    # Disabled by default — requires a reachable Docker daemon.
-    # Deployment requirements:
-    #   - Docker Engine >= 25.0.5 (CVE-2024-29018 fix)
-    #   - iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP (cloud metadata blocking)
-    #   - Recommended: Tecnativa docker-socket-proxy with EXEC=0
-    # ═══════════════════════════════════════════════════════════════════════════
-    # LLM PROXY CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Upstream provider URLs for the LLM proxy. Override these for Azure OpenAI,
-    # testing with WireMock, or alternative API-compatible endpoints.
+    # LLM proxy upstream URLs. Override for Azure OpenAI, WireMock, or other API-compatible
+    # endpoints. Docker sandbox deployment requirements are documented on SandboxProperties.
     llm-proxy:
         anthropic-upstream-url: ${LLM_PROXY_ANTHROPIC_URL:https://api.anthropic.com}
         openai-upstream-url: ${LLM_PROXY_OPENAI_URL:https://api.openai.com}
@@ -452,7 +326,6 @@ hephaestus:
         # workers opt in by setting this on the worker pod and false on the server pod.
         llm-proxy:
             enabled: ${HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED:true}
-        enabled: ${SANDBOX_ENABLED:false}
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
         tls-verify: ${SANDBOX_TLS_VERIFY:false}
         max-concurrent-containers: ${SANDBOX_MAX_CONCURRENT:5}
@@ -497,33 +370,12 @@ hephaestus:
             heartbeat-interval: 25s
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # GITLAB CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════════════════
-    # Settings for GitLab API integration. Used by GitLab-mode workspaces
-    # (GitProviderMode.GITLAB_PAT). Override default-server-url for self-hosted instances.
-    gitlab:
-        # Set to true to enable GitLab integration (loads all GitLab beans)
-        enabled: ${GITLAB_ENABLED:false}
-        # Default GitLab server URL (used when workspace has no custom serverUrl).
-        # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
-        # automatically use the same instance for workspace creation.
-        default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${KEYCLOAK_GITLAB_BASE_URL:https://gitlab.com}}
-        # Timeout for standard GraphQL operations (default: 30s)
-        graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
-        # Extended timeout for complex operations (default: 60s)
-        extended-graphql-timeout: ${GITLAB_EXTENDED_GRAPHQL_TIMEOUT:60s}
-        # Delay between pagination requests (default: 200ms)
-        pagination-throttle: ${GITLAB_PAGINATION_THROTTLE:200ms}
-        # Cache duration for token validation results (default: 5m)
-        token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
-
-    # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
     # Single `hephaestus.webhook` block consumed by both webhook sides (ADR 0008):
     #   - workspace.GitLabWebhookService reads external-url, secret, token-rotation.* for
     #     auto-registration with the provider.
-    #   - gitprovider.webhook.* reads secret (HMAC / token verification) and the nested
+    #   - integration.webhook.* reads secret (HMAC / token verification) and the nested
     #     publish/stream/http blocks for the inbound receiver.
     # `secret` is shared by design — same value registered with the provider and used
     # to verify incoming bodies. The receiver runs in the `webhook-server` container.
@@ -533,13 +385,16 @@ hephaestus:
         token-rotation:
             threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}
             validity-days: ${WEBHOOK_TOKEN_ROTATION_VALIDITY_DAYS:90}
-        # ─── Inbound receiver (gitprovider.webhook.*) ───
+        # ─── Inbound receiver (integration.webhook.*) ───
         publish:
             timeout: 9s          # fits within GitHub's 10s response budget
             max-retries: 5
             retry-base-delay: 200ms
         stream:
-            duplicate-window: 2m # JetStream default; provider redelivery is by delivery-UUID
+            # Must be >= the max vendor replay tolerance (5m: GitLab whsec + Slack v0). GitHub has
+            # no timestamp, so this dedup window keyed on X-GitHub-Delivery is its only replay
+            # defense; 10m also covers provider redelivery horizons. See WebhookProperties.Stream.
+            duplicate-window: 10m
             max-age: 180d
             max-messages: 2000000
         shutdown:
@@ -554,18 +409,14 @@ hephaestus:
             max-payload-bytes: 26214400
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # GITHUB AUTHENTICATION
+    # CONTRIBUTORS (Hephaestus meta — who built the app)
     # ═══════════════════════════════════════════════════════════════════════════
-    # Can be any OAuth token, such as the PAT
-    github:
-        app:
-            # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
-            id: ${GH_APP_ID:0}
-            privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
-            privateKey: ${GH_APP_PRIVATE_KEY:}
-            # URL where users install the GitHub App (shown in workspace creation UI)
-            installation-url: ${GH_APP_INSTALLATION_URL:}
-        meta:
+    # Token used by ContributorService to fetch the ls1intum/Hephaestus contributor
+    # graph. Detached from `hephaestus.integration.github` so SCM-integration code no longer
+    # carries an unrelated PAT. Defaults to the legacy GH_AUTH_TOKEN env var so
+    # existing deployments keep working without touching their secrets stores.
+    contributors:
+        github:
             auth-token: ${GH_AUTH_TOKEN:}
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -580,11 +431,72 @@ hephaestus:
         client-secret: ${KEYCLOAK_CLIENT_SECRET:hephaestus-dev-secret}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # SLACK INTEGRATION
+    # INTEGRATION FEATURE FLAGS + SCM/SLACK CONFIG
     # ═══════════════════════════════════════════════════════════════════════════
-    slack:
-        token: ${SLACK_BOT_TOKEN:${SLACK_TOKEN:}}
-        signing-secret: ${SLACK_SIGNING_SECRET:}
+    # Slack and Outline integrations are opt-in. Every bean under
+    # integration/slack/** and integration/outline/** carries
+    # @ConditionalOnProperty(...enabled, matchIfMissing=false), so leaving these
+    # unset keeps the OAuth flows, webhook verifiers, and lifecycle listeners
+    # inert. Flip `enabled` to `true` once client-id + client-secret + redirect-uri
+    # are configured.
+    integration:
+        # ─── GitHub authentication (GitHubProperties) ───
+        # Can be any OAuth token, such as the PAT.
+        github:
+            app:
+                # Set to 0 to disable GitHub App mode and use Personal Access Tokens instead
+                id: ${GH_APP_ID:0}
+                privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
+                privateKey: ${GH_APP_PRIVATE_KEY:}
+                # URL where users install the GitHub App (shown in workspace creation UI)
+                installation-url: ${GH_APP_INSTALLATION_URL:}
+            meta:
+                # DEPRECATED: token used to live here; the Hephaestus-contributor
+                # endpoint now reads hephaestus.contributors.github.auth-token instead.
+                # Binding kept for backwards compatibility — remove once all environments
+                # have been migrated.
+                auth-token: ${GH_AUTH_TOKEN:}
+            # GitHub-specific sync tuning (GitHubSyncProperties). Provider-agnostic scheduler
+            # knobs (run-on-startup, cron, cooldown, backfill, filters, …) stay under
+            # hephaestus.sync (SyncSchedulerProperties).
+            sync:
+                graphql-timeout: ${HEPHAESTUS_SYNC_GRAPHQL_TIMEOUT:60s}
+                extended-graphql-timeout: ${HEPHAESTUS_SYNC_EXTENDED_GRAPHQL_TIMEOUT:120s}
+                pagination-throttle: ${HEPHAESTUS_SYNC_PAGINATION_THROTTLE:200ms}
+                incremental-sync-enabled: ${HEPHAESTUS_SYNC_INCREMENTAL_ENABLED:true}
+                incremental-sync-buffer: ${HEPHAESTUS_SYNC_INCREMENTAL_BUFFER:5m}
+                backfill-graphql-timeout: ${HEPHAESTUS_SYNC_BACKFILL_TIMEOUT:120s}
+                backfill-pr-page-size: ${HEPHAESTUS_SYNC_BACKFILL_PR_PAGE_SIZE:10}
+        # GitLab is opt-in (default off). Flip GITLAB_ENABLED=true to load the GitLab beans +
+        # manifest. The gated beans and GitLabManifest both read the `enabled` gate; the
+        # sibling url/timeout/throttle keys bind GitLabProperties via @ConfigurationProperties.
+        # Used by GitLab-mode workspaces (GitProviderMode.GITLAB_PAT); override default-server-url
+        # for self-hosted instances.
+        gitlab:
+            enabled: ${GITLAB_ENABLED:false}
+            # Default GitLab server URL (used when workspace has no custom serverUrl).
+            # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
+            # automatically use the same instance for workspace creation.
+            default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${KEYCLOAK_GITLAB_BASE_URL:https://gitlab.com}}
+            # Timeout for standard GraphQL operations (default: 30s)
+            graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
+            # Extended timeout for complex operations (default: 60s)
+            extended-graphql-timeout: ${GITLAB_EXTENDED_GRAPHQL_TIMEOUT:60s}
+            # Delay between pagination requests (default: 200ms)
+            pagination-throttle: ${GITLAB_PAGINATION_THROTTLE:200ms}
+            # Cache duration for token validation results (default: 5m)
+            token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
+        slack:
+            enabled: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:false}
+            # OAuth client-id/client-secret drive the per-workspace install flow (Slack does NOT
+            # support refresh-token rotation for legacy bot tokens, so no refresher ships). Slack
+            # is outbound-only today; there is no inbound webhook signing secret.
+            client-id: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:}
+            client-secret: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET:}
+            redirect-uri: ${HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI:}
+            api-base: ${HEPHAESTUS_INTEGRATION_SLACK_API_BASE:https://slack.com}
+    #     outline:
+    #         enabled: false
 
     sentry:
         dsn: ${SENTRY_DSN:}
@@ -623,46 +535,22 @@ logging:
         # Webhook receipts and per-event bookkeeping are logged at DEBUG at the source, so
         # per-repo sync rollups stay the only INFO. Flip the package to DEBUG to restore the
         # full per-event firehose for diagnosis (no redeploy needed):
-        #   logging.level.de.tum.cit.aet.hephaestus.gitprovider: DEBUG
-
-# Local profile (tracked defaults; per-developer secrets stay in gitignored application-local.yml).
+        #   logging.level.de.tum.cit.aet.hephaestus.integration.scm: DEBUG
+#
+# Secret-bearing local overlay (vendor tokens, encryption key, lazy jwk-set-uri, management
+# exposure, devtools, SpringDoc banner) lives in the gitignored application-local.yml. The infra
+# auto-start below is tracked here so `mvn spring-boot:run` works out of the box without it.
 ---
+# Local-profile overlay (the `local` profile is the default for `mvn spring-boot:run` /
+# `pnpm dev:server`). Auto-starts server/compose.yaml — Postgres, Keycloak, NATS — through Spring
+# Boot's docker-compose support and waits for readiness, so a bare `mvn spring-boot:run` brings its
+# own infra up. lifecycle-management=start-only: Ctrl-C never stops the stack, and a stack that
+# `pnpm dev:compose` started first is detected and reused rather than fought.
 spring:
     config:
         activate:
             on-profile: local
-
     docker:
         compose:
-            # `pnpm dev` brings compose up explicitly; spring.datasource.url is set, so Spring
-            # never needs to parse compose.yaml.
-            enabled: false
-
-    security:
-        oauth2:
-            resourceserver:
-                jwt:
-                    # Pair jwk-set-uri with issuer-uri so the decoder is lazy: it skips the startup
-                    # discovery ping, so a boot before Keycloak is ready doesn't fail and auth
-                    # self-heals on first token use (iss is still validated against issuer-uri).
-                    jwk-set-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus/protocol/openid-connect/certs
-
-hephaestus:
-    sandbox:
-        # On by default for local dev. Boots without Docker or an LLM key (image pull is
-        # skipped/lazy); workspaces supply provider credentials at runtime, stored in the DB.
-        enabled: ${SANDBOX_ENABLED:true}
-
-management:
-    endpoints:
-        web:
-            exposure:
-                include: health,info,prometheus,metrics,startup
-    endpoint:
-        startup:
-            access: read_only
-
-logging:
-    level:
-        # Silence SpringDoc's "endpoint enabled by default — disable in production" banner.
-        org.springdoc.core.events.SpringDocAppInitializer: ERROR
+            enabled: true
+            lifecycle-management: start-only

@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -28,7 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -39,8 +39,12 @@ import tools.jackson.databind.node.ObjectNode;
  * Postgres container: DB unique partial index, JSONB metadata round-trip, status transitions,
  * reaper sweep.
  */
-@TestPropertySource(properties = "hephaestus.sandbox.enabled=true")
-@DisplayName("MentorTurnPersistence integration")
+// This class performs raw schema DDL against the SHARED singleton Testcontainer in @BeforeEach:
+// it DROPs and re-ADDs chk_chat_message_status and creates a partial unique index on chat_message.
+// Those mutations survive on the shared schema and would pollute any sibling class that touches
+// chat_message (same bug class fixed in WorkspaceConnectionBackfillChangeIntegrationTest). Recycle
+// the context after this class so ddl-auto rebuilds a clean schema for everyone after us.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -67,9 +71,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private DataSource dataSource;
 
     /**
-     * {@link MentorChatService} pulls in this collaborator unconditionally; the production bean
-     * is only registered when {@code hephaestus.sandbox.enabled=true} (Docker required). Provide
-     * a mock so the integration context loads — this test never touches the sandbox boundary.
+     * {@link MentorChatService} pulls in this collaborator (via an {@code ObjectProvider}); the
+     * production bean belongs to the worker capability ({@code DockerSandboxConfiguration}, gated
+     * on the worker role, which is off in the test profile). Provide a mock so the integration
+     * context loads — this test never touches the sandbox boundary.
      */
     @MockitoBean
     @SuppressWarnings("unused")
@@ -122,7 +127,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureThread creates a thread when absent")
     void ensureThread_createsWhenAbsent() {
         UUID threadId = UUID.randomUUID();
         ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user, "Hello mentor");
@@ -134,7 +138,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureThread returns the existing row when one already exists")
     void ensureThread_returnsExisting() {
         UUID threadId = UUID.randomUUID();
         ChatThread first = persistence.ensureThread(workspace.getId(), threadId, user, "first prompt");
@@ -146,7 +149,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("ensureThread hides foreign-owner reads as 404 (no thread enumeration)")
     void ensureThread_foreignOwnerThrows() {
         UUID threadId = UUID.randomUUID();
         persistence.ensureThread(workspace.getId(), threadId, user, "hello");
@@ -170,7 +172,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight writes user+assistant rows, returns assistant id, status=in_flight")
     void persistInFlight_happyPath() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -188,11 +189,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         ChatMessage userMessage = chatMessageRepository.findById(cookie.userMessageId()).orElseThrow();
         assertThat(userMessage.getRole()).isEqualTo(ChatMessage.Role.USER);
-        assertThat(userMessage.getParts().get(0).path("text").asText()).isEqualTo("hello mentor");
+        assertThat(userMessage.getParts().get(0).path("text").asString()).isEqualTo("hello mentor");
     }
 
     @Test
-    @DisplayName("persistInFlight honours the client-supplied user message id")
     void persistInFlight_honorsClientUserMessageId() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID clientUserId = UUID.randomUUID();
@@ -208,7 +208,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight throws TurnAlreadyInFlightException on the DB unique partial index")
     void persistInFlight_secondCallThrows() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         persistence.persistInFlight(thread, "first", UUID.randomUUID(), null);
@@ -218,7 +217,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("persistInFlight: TWO REAL THREADS race the same thread row — exactly one wins, exactly one 409s")
     void persistInFlight_concurrentRace_exactlyOneWins() throws Exception {
         // Sequential calls only prove the SQL `WHERE in_flight` semantics fire. The dual-lock
         // defence (Java MentorTurnLock + DB partial unique index) is supposed to handle the
@@ -270,7 +268,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("finalise flips status to completed and writes parts + usage")
     void finalise_writesCompletedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -303,8 +300,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.completed);
         JsonNode meta = assistant.getMetadata();
-        assertThat(meta.path("finishReason").asText()).isEqualTo("stop");
-        assertThat(meta.path("model").asText()).isEqualTo("openai/gpt-oss-120b");
+        assertThat(meta.path("finishReason").asString()).isEqualTo("stop");
+        assertThat(meta.path("model").asString()).isEqualTo("openai/gpt-oss-120b");
         // Nested wire shape — must match UIMessageChunk.MessageMetadata + webapp MessageMetadata
         // so a rehydrated thread renders identically to the live stream.
         assertThat(meta.path("usage").path("input").asLong()).isEqualTo(123);
@@ -312,7 +309,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(meta.path("usage").path("totalTokens").asLong()).isEqualTo(168);
         assertThat(meta.has("inputTokens")).as("flat keys retired").isFalse();
         assertThat(assistant.getParts().isArray()).isTrue();
-        assertThat(assistant.getParts().get(0).path("text").asText()).isEqualTo("Hello there!");
+        assertThat(assistant.getParts().get(0).path("text").asString()).isEqualTo("Hello there!");
     }
 
     @Test
@@ -401,7 +398,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("interrupt flips status to interrupted and stores the error message")
     void interrupt_writesInterruptedRow() {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
@@ -416,11 +412,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
         ChatMessage assistant = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(assistant.getMetadata().path("error").asText()).isEqualTo("upstream timeout");
+        assertThat(assistant.getMetadata().path("error").asString()).isEqualTo("upstream timeout");
     }
 
     @Test
-    @DisplayName("@Version: reaper bumps version, then a stale-snapshot save throws OptimisticLockingFailureException")
     void optimisticLocking_staleSnapshotSaveFails() {
         // Root-cause protection against the reaper-vs-late-finalise data corruption: a
         // writer that loaded the entity at version=N can no longer overwrite a row the
@@ -454,11 +449,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // After the failed save attempt, the row in the DB still reflects the reaper's verdict.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(finalState.getMetadata().path("error").asText()).isEqualTo("server restart");
+        assertThat(finalState.getMetadata().path("error").asString()).isEqualTo("server restart");
     }
 
     @Test
-    @DisplayName("reapStaleInFlight flips in-flight rows older than the cutoff")
     void reaper_flipsStaleInFlightRows() throws Exception {
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "stuck");
         UUID assistantId = UUID.randomUUID();
@@ -476,7 +470,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThat(updatedSweep).isEqualTo(1);
         ChatMessage reaped = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(reaped.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
-        assertThat(reaped.getMetadata().path("error").asText()).isEqualTo("server restart");
+        assertThat(reaped.getMetadata().path("error").asString()).isEqualTo("server restart");
     }
 
     @Test

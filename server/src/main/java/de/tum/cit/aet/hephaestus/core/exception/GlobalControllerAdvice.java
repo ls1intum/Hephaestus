@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -34,9 +35,7 @@ public class GlobalControllerAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalControllerAdvice.class);
 
-    // ========================================================================
     // STANDARD EXCEPTIONS
-    // ========================================================================
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
@@ -74,9 +73,14 @@ public class GlobalControllerAdvice {
         return problem(HttpStatus.CONFLICT, "Invalid state", exception.getMessage());
     }
 
-    // ========================================================================
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        // Unique/FK constraint races (e.g. concurrent connection installs) → 409, not a 500.
+        log.warn("Handled data integrity violation: message={}", exception.getMostSpecificCause().getMessage());
+        return problem(HttpStatus.CONFLICT, "Conflict", "The request conflicts with the current resource state.");
+    }
+
     // VALIDATION EXCEPTIONS
-    // ========================================================================
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
@@ -121,9 +125,7 @@ public class GlobalControllerAdvice {
         return problem;
     }
 
-    // ========================================================================
     // EXTERNAL SERVICE EXCEPTIONS
-    // ========================================================================
 
     @ExceptionHandler(WebClientRequestException.class)
     ProblemDetail handleWebClientRequestException(WebClientRequestException exception) {
@@ -138,9 +140,7 @@ public class GlobalControllerAdvice {
         );
     }
 
-    // ========================================================================
     // FALLBACK HANDLER
-    // ========================================================================
 
     @ExceptionHandler(TenancyViolationException.class)
     ProblemDetail handleTenancyViolation(TenancyViolationException ex) {
@@ -164,9 +164,7 @@ public class GlobalControllerAdvice {
         );
     }
 
-    // ========================================================================
     // HELPER METHODS
-    // ========================================================================
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);

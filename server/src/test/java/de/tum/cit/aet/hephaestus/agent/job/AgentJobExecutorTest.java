@@ -52,7 +52,6 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("AgentJobExecutor")
 class AgentJobExecutorTest extends BaseUnitTest {
 
     @Mock
@@ -246,7 +245,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
     class ClaimPhase {
 
         @Test
-        @DisplayName("should ack and return when SKIP LOCKED returns empty")
         void shouldAckWhenSkipLockedReturnsEmpty() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.empty());
@@ -258,7 +256,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should NAK with delay when concurrency limit reached")
         void shouldNakWithDelayWhenConcurrencyLimitReached() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -273,7 +270,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should transition to RUNNING on successful claim")
         void shouldTransitionToRunningOnSuccessfulClaim() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -294,11 +290,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Full execution")
     class FullExecution {
 
         @Test
-        @DisplayName("should complete job successfully and verify COMPLETED transition")
         void shouldCompleteJobSuccessfully() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -330,7 +324,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should mark FAILED on non-zero exit code")
         void shouldMarkFailedOnNonZeroExitCode() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -360,7 +353,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("emits agent.pi.envelope.mismatch counter on exit code 42")
         void emitsEnvelopeMismatchOnExit42() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -396,7 +388,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should mark TIMED_OUT on timeout")
         void shouldMarkTimedOutOnTimeout() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -427,11 +418,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Error handling")
     class ErrorHandling {
 
         @Test
-        @DisplayName("should transition to CANCELLED on SandboxCancelledException")
         void shouldTransitionToCancelledOnCancellation() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -454,7 +443,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should mark FAILED on generic exception (only from RUNNING)")
         void shouldMarkFailedOnGenericException() {
             Message msg = createMessage(jobId);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(jobId)).thenReturn(Optional.of(job));
@@ -478,11 +466,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Message handling")
     class MessageHandling {
 
         @Test
-        @DisplayName("should ack invalid UUID payload to discard")
         void shouldAckInvalidPayload() {
             Message msg = mock(Message.class);
             when(msg.getData()).thenReturn("not-a-uuid".getBytes(StandardCharsets.UTF_8));
@@ -495,11 +481,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Worker LLM override")
     class WorkerLlmOverride {
 
         @Test
-        @DisplayName("overrides credentialMode/credential/baseUrl when WorkerProperties.llm is configured")
         void overridesPracticeRequestWhenWorkerLlmConfigured() {
             // Configured worker LLM: PROXY snapshot must be overridden to API_KEY with the
             // worker's apiKey and baseUrl so agent-pi reaches the operator's gateway directly.
@@ -548,7 +532,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("leaves snapshot credentialMode untouched when WorkerProperties.llm is unset")
         void leavesSnapshotCredentialModeWhenWorkerLlmUnset() {
             executor = new AgentJobExecutor(
                 natsConnection,
@@ -593,7 +576,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    // ── Helpers ──
+    // Helpers
 
     private JobTypeHandler setupFullExecution() {
         SandboxResult successResult = new SandboxResult(0, Map.of(), "success", false, Duration.ofMinutes(2));

@@ -5,9 +5,6 @@ spring:
             lifecycle-management: none
             skip:
                 in-tests: true
-    mail:
-        host: localhost
-        port: 25
     liquibase:
         enabled: false
     datasource:
@@ -22,17 +19,18 @@ spring:
             hibernate:
                 dialect: org.hibernate.dialect.H2Dialect
 
-monitoring:
-    run-on-startup: false
-
-github:
-    app:
-        id: 0
-        privateKey: ""
-        privateKeyLocation: ""
-    auth-token: ""
-
 hephaestus:
+    # OpenAPI generation boots the full Spring context; HmacOAuthStateService fails fast
+    # without a webhook/oauth-state secret. Use a deterministic placeholder for the spec run.
+    webhook:
+        secret: "specs-only-placeholder-secret-do-not-use-in-prod"
+    # Enable Slack admin endpoints so they surface in the generated client. The OAuth
+    # client itself isn't called during the spec run — just the controller is loaded.
+    integration:
+        slack:
+            enabled: true
+            client-id: "specs-only-placeholder-client-id"
+            client-secret: "specs-only-placeholder-client-secret"
     workspace:
         init-default: false
     keycloak:
@@ -40,9 +38,6 @@ hephaestus:
         realm: hephaestus
         client-id: hephaestus-confidential
         client-secret: dummy
-    mail:
-        enabled: false
-        sender: noreply@example.com
     sync:
         nats:
             enabled: false
@@ -51,5 +46,3 @@ hephaestus:
         nats:
             enabled: false
             server: "nats://localhost:4222"
-    mentor:
-        enabled: false

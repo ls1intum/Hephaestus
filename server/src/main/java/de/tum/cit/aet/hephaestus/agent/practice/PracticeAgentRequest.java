@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.practice;
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Input for {@link PracticePiAdapter#buildSandboxSpec}. PROXY mode requires {@code jobToken};

@@ -2,7 +2,7 @@ services:
   # ─────────────────────────────────────────────────────────────────────────────
   # webhook-server — inbound webhook receiver (same image as application-server,
   # activated with SPRING_PROFILES_ACTIVE=prod,webhook so only the
-  # gitprovider.webhook beans load). Deployed as a separate container from
+  # integration.core.webhook beans load). Deployed as a separate container from
   # application-server so an app-server restart doesn't drop incoming webhooks
   # (push events aren't manually redeliverable on GitHub/GitLab). See ADR 0008.
   # ─────────────────────────────────────────────────────────────────────────────

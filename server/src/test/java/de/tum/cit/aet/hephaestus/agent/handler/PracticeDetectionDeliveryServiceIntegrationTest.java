@@ -12,14 +12,14 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Val
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
@@ -30,7 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -55,7 +55,6 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>No mocks required — this service layer does not call external APIs. It resolves practice
  * slugs against the DB and persists findings via {@code PracticeFindingRepository.insertIfAbsent()}.
  */
-@DisplayName("PracticeDetectionDeliveryService Integration")
 @RecordApplicationEvents
 class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTest {
 
@@ -103,7 +102,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("delivery-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("delivery-test"));
 
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");
@@ -204,11 +203,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("End-to-end delivery")
     class EndToEnd {
 
         @Test
-        @DisplayName("valid findings create PracticeFinding rows in DB")
         void validFindingsPersistedToDb() {
             var findings = List.of(
                 finding("pr-description-quality", Verdict.POSITIVE),
@@ -247,11 +244,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Practice resolution")
     class PracticeResolution {
 
         @Test
-        @DisplayName("unknown slugs are skipped without failing")
         void unknownSlugsSkipped() {
             var findings = List.of(
                 finding("pr-description-quality", Verdict.POSITIVE),
@@ -267,11 +262,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Negative cap enforcement")
     class NegativeCapEnforcement {
 
         @Test
-        @DisplayName("caps negatives per practice at configured limit")
         void capsNegatives() {
             // Each finding gets a unique idempotency key (includes index), so all
             // 7 findings are distinct. maxNegativeFindingsPerPractice=5 caps at 5,
@@ -302,11 +295,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Event publication")
     class EventPublication {
 
         @Test
-        @DisplayName("publishes PracticeDetectionCompletedEvent after persistence")
         void publishesEvent() {
             var findings = List.of(finding("pr-description-quality", Verdict.POSITIVE));
 
@@ -328,7 +319,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("empty findings list publishes event with zero counts")
         void emptyFindingsPublishesZeroEvent() {
             var result = deliveryService.deliver(agentJob, List.of());
 
@@ -346,11 +336,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Non-negative verdicts")
     class NonNegativeVerdicts {
 
         @Test
-        @DisplayName("POSITIVE verdicts persisted without triggering hasNegative")
         void positiveVerdictsDoNotTriggerHasNegative() {
             var findings = List.of(
                 finding("pr-description-quality", Verdict.POSITIVE),
@@ -371,11 +359,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    @DisplayName("Error cases")
     class ErrorCases {
 
         @Test
-        @DisplayName("throws when PR not found")
         void throwsWhenPrNotFound() {
             ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
             metadata.put("pull_request_id", 999999L);

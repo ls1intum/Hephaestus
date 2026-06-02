@@ -157,9 +157,9 @@ export type WorkspaceListItem = {
      */
     progressionEnabled: boolean;
     /**
-     * High-level git provider type (GITHUB or GITLAB)
+     * High-level git provider type (GITHUB or GITLAB), or null if no SCM connection bound
      */
-    providerType: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB';
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -191,10 +191,6 @@ export type Workspace = {
      */
     displayName: string;
     /**
-     * Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)
-     */
-    gitProviderMode?: string;
-    /**
      * Whether a GitLab webhook has been auto-registered for this workspace
      */
     gitlabWebhookRegistered: boolean;
@@ -202,10 +198,6 @@ export type Workspace = {
      * Whether a Personal Access Token is configured
      */
     hasPersonalAccessToken: boolean;
-    /**
-     * Whether Slack signing secret is configured
-     */
-    hasSlackSigningSecret: boolean;
     /**
      * Whether Slack token is configured
      */
@@ -226,6 +218,10 @@ export type Workspace = {
      * Whether the workspace is publicly viewable without authentication
      */
     isPubliclyViewable: boolean;
+    /**
+     * Integration kind backing this workspace (GITHUB or GITLAB)
+     */
+    kind?: string;
     /**
      * Whether the leaderboard is enabled
      */
@@ -275,13 +271,17 @@ export type Workspace = {
      */
     progressionEnabled: boolean;
     /**
-     * High-level git provider type derived from the authentication mode
+     * High-level git provider type for the workspace's SCM connection (null if none bound)
      */
-    providerType: 'GITHUB' | 'GITLAB';
+    providerType?: 'GITHUB' | 'GITLAB';
     /**
      * Custom server URL for self-hosted instances (null for cloud defaults)
      */
     serverUrl?: string;
+    /**
+     * ID of the active Slack connection, if any — addresses PATCH /connections/{id}/status
+     */
+    slackConnectionId?: number;
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -410,20 +410,6 @@ export type UpdateWorkspaceStatusRequest = {
      * New lifecycle status (PENDING, ACTIVE, ARCHIVED)
      */
     status: 'ACTIVE' | 'SUSPENDED' | 'PURGED';
-};
-
-/**
- * Request to update Slack integration credentials
- */
-export type UpdateWorkspaceSlackCredentialsRequest = {
-    /**
-     * Slack Signing Secret for webhook verification
-     */
-    slackSigningSecret: string;
-    /**
-     * Slack Bot User OAuth Token for API access
-     */
-    slackToken: string;
 };
 
 /**
@@ -560,6 +546,46 @@ export type UpdatePracticeActiveRequest = {
      * Whether the practice should be active
      */
     active: boolean;
+};
+
+/**
+ * Request to update the entire weekly leaderboard digest configuration atomically
+ */
+export type UpdateLeaderboardDigestRequest = {
+    /**
+     * Slack channel ID for notifications
+     */
+    channelId?: string;
+    /**
+     * Day of week (1=Monday, 7=Sunday)
+     */
+    day: number;
+    /**
+     * Whether leaderboard notifications are enabled
+     */
+    enabled?: boolean;
+    /**
+     * Team name for filtering leaderboard notifications
+     */
+    team?: string;
+    /**
+     * Time in 24-hour format (HH:mm)
+     */
+    time: string;
+};
+
+/**
+ * Request to update a connection's lifecycle status
+ */
+export type UpdateConnectionStatusRequest = {
+    /**
+     * Optional human-readable reason recorded on the audit trail
+     */
+    reason?: string;
+    /**
+     * Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED, UNINSTALLED.
+     */
+    state: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
 };
 
 /**
@@ -722,6 +748,24 @@ export type SortObject = {
     empty?: boolean;
     sorted?: boolean;
     unsorted?: boolean;
+};
+
+/**
+ * Result of the Slack test-message probe; carries the Slack error code on failure.
+ */
+export type SlackTestMessageResponse = {
+    channelId?: string;
+    ok?: boolean;
+    slackError?: string;
+};
+
+/**
+ * Optional body for the Slack test-message probe. When <code>channelId</code> is present and non-blank,
+ * the probe targets that channel (so an admin can validate a typed-but-unsaved channel); otherwise
+ * it falls back to the persisted notification channel.
+ */
+export type SlackTestMessageRequest = {
+    channelId?: string;
 };
 
 /**
@@ -1441,6 +1485,45 @@ export type LeaderboardEntry = {
 };
 
 /**
+ * Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+ *
+ * <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+ * <ul>
+ * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+ * URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
+ * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+ * newly-created Connection; no further round-trip is needed.</li>
+ * </ul>
+ *
+ * <p>Deliberately a flat record (nullable per-variant fields) rather than a sealed
+ * <code>oneOf</code> hierarchy: a discriminated union serialises to OpenAPI <code>oneOf +
+ * discriminator</code>, which the webapp's hey-api react-query transformer mishandles. A flat shape
+ * round-trips cleanly through code generation, so the webapp consumes the generated client
+ * instead of a hand-rolled fetch wrapper.
+ */
+export type InitiateConnectionResponse = {
+    connectionId?: number;
+    type?: 'REDIRECT' | 'LINKED';
+    vendorUrl?: string;
+};
+
+/**
+ * Inbound payload for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+ *
+ * <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
+ * implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
+ * <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
+ * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
+ * <code>IllegalArgumentException</code>.
+ */
+export type InitiateConnectionRequest = {
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    userInput?: {
+        [key: string]: string;
+    };
+};
+
+/**
  * An enabled identity provider available for login
  */
 export type IdentityProvider = {
@@ -1619,9 +1702,9 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
-     * Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.
+     * Integration kind to provision. SLACK flows through OAuth, not this endpoint.
      */
-    gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
+    kind: 'GITHUB' | 'GITLAB';
     /**
      * Deprecated: ignored by the server. The authenticated user always becomes the owner.
      *
@@ -1629,7 +1712,7 @@ export type CreateWorkspaceRequest = {
      */
     ownerUserId?: number;
     /**
-     * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
+     * Personal Access Token. Required for both kinds (GitLab API or GitHub PAT). Stored encrypted at rest.
      */
     personalAccessToken?: string;
     /**
@@ -1794,6 +1877,69 @@ export type Contributor = {
      * Display name of the contributor
      */
     name: string;
+};
+
+/**
+ * Wire shape returned by the <code>GET /workspaces/{workspaceSlug</code>/connections}
+ * list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+ * credentials, no audit. Capabilities are looked up from the per-kind manifest at
+ * response build time so adding/removing a capability needs no DB migration.
+ */
+export type ConnectionSummary = {
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    createdAt?: Date;
+    displayName?: string;
+    family?: 'SCM' | 'MESSAGING';
+    id?: number;
+    instanceKey?: string;
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    stateReason?: string;
+    updatedAt?: Date;
+};
+
+/**
+ * Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
+ * sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
+ * <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
+ * client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
+ * and is not exposed by this DTO.
+ *
+ * <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+ * the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
+ * object.
+ */
+export type ConnectionDetail = {
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    config?: {
+        [key: string]: unknown;
+    };
+    createdAt?: Date;
+    displayName?: string;
+    family?: 'SCM' | 'MESSAGING';
+    id?: number;
+    instanceKey?: string;
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
+    state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    stateReason?: string;
+    updatedAt?: Date;
+};
+
+/**
+ * Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
+ *
+ * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
+ * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+ * want to serialize on every response.
+ */
+export type ConnectionAuditEntry = {
+    actorKind?: string;
+    actorRef?: string;
+    correlationId?: string;
+    eventType?: string;
+    fromState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
+    occurredAt?: Date;
+    toState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
 };
 
 /**
@@ -2003,6 +2149,60 @@ export type ListGlobalContributorsResponses = {
 
 export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
 
+export type CallbackGetData = {
+    body?: never;
+    path: {
+        kind: string;
+    };
+    query: {
+        state?: string;
+        error?: string;
+        error_description?: string;
+        allParams: {
+            [key: string]: string;
+        };
+    };
+    url: '/oauth/callback/{kind}';
+};
+
+export type CallbackGetResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type CallbackGetResponse = CallbackGetResponses[keyof CallbackGetResponses];
+
+export type CallbackPostData = {
+    body?: never;
+    path: {
+        kind: string;
+    };
+    query: {
+        state?: string;
+        error?: string;
+        error_description?: string;
+        allParams: {
+            [key: string]: string;
+        };
+    };
+    url: '/oauth/callback/{kind}';
+};
+
+export type CallbackPostResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type CallbackPostResponse = CallbackPostResponses[keyof CallbackPostResponses];
+
 export type DeleteUserData = {
     body?: never;
     path?: never;
@@ -2112,6 +2312,26 @@ export type UpdateUserSettingsResponses = {
 };
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
+
+export type IngestData = {
+    body?: never;
+    path: {
+        kind: string;
+    };
+    query?: never;
+    url: '/webhooks/{kind}';
+};
+
+export type IngestResponses = {
+    /**
+     * OK
+     */
+    200: {
+        [key: string]: unknown;
+    };
+};
+
+export type IngestResponse = IngestResponses[keyof IngestResponses];
 
 export type ListWorkspacesData = {
     body?: never;
@@ -2502,6 +2722,138 @@ export type RetryDeliveryResponses = {
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
 
+export type ListData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections';
+};
+
+export type ListResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionSummary>;
+};
+
+export type ListResponse = ListResponses[keyof ListResponses];
+
+export type InitiateData = {
+    body: InitiateConnectionRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections';
+};
+
+export type InitiateResponses = {
+    /**
+     * OK
+     */
+    200: InitiateConnectionResponse;
+};
+
+export type InitiateResponse = InitiateResponses[keyof InitiateResponses];
+
+export type SendTestMessageData = {
+    /**
+     * optional channel override; when blank, the persisted notification channel is used.
+     */
+    body?: SlackTestMessageRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/slack/test-message';
+};
+
+export type SendTestMessageResponses = {
+    /**
+     * OK
+     */
+    200: SlackTestMessageResponse;
+};
+
+export type SendTestMessageResponse = SendTestMessageResponses[keyof SendTestMessageResponses];
+
+export type ReadData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}';
+};
+
+export type ReadResponses = {
+    /**
+     * OK
+     */
+    200: ConnectionDetail;
+};
+
+export type ReadResponse = ReadResponses[keyof ReadResponses];
+
+export type AuditData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}/audit';
+};
+
+export type AuditResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConnectionAuditEntry>;
+};
+
+export type AuditResponse = AuditResponses[keyof AuditResponses];
+
+export type UpdateStatus1Data = {
+    body: UpdateConnectionStatusRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/connections/{id}/status';
+};
+
+export type UpdateStatus1Responses = {
+    /**
+     * OK
+     */
+    200: ConnectionSummary;
+};
+
+export type UpdateStatus1Response = UpdateStatus1Responses[keyof UpdateStatus1Responses];
+
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;
     path: {
@@ -2564,6 +2916,27 @@ export type GetLeaderboardResponses = {
 };
 
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
+
+export type UpdateLeaderboardDigestData = {
+    body: UpdateLeaderboardDigestRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/leaderboard-digest';
+};
+
+export type UpdateLeaderboardDigestResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateLeaderboardDigestResponse = UpdateLeaderboardDigestResponses[keyof UpdateLeaderboardDigestResponses];
 
 export type ComputeUserLeagueStatsData = {
     body?: never;
@@ -3456,27 +3829,6 @@ export type UpdateScheduleResponses = {
 };
 
 export type UpdateScheduleResponse = UpdateScheduleResponses[keyof UpdateScheduleResponses];
-
-export type UpdateSlackCredentialsData = {
-    body: UpdateWorkspaceSlackCredentialsRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/slack-credentials';
-};
-
-export type UpdateSlackCredentialsResponses = {
-    /**
-     * Workspace updated
-     */
-    200: Workspace;
-};
-
-export type UpdateSlackCredentialsResponse = UpdateSlackCredentialsResponses[keyof UpdateSlackCredentialsResponses];
 
 export type RenameSlugData = {
     body: RenameWorkspaceSlugRequest;

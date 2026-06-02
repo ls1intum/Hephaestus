@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +31,6 @@ import org.springframework.beans.factory.annotation.Autowired;
  *   <li>Cache eviction behavior</li>
  * </ul>
  */
-@DisplayName("ActivityEventService Integration")
 class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -107,11 +105,9 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Event Recording")
     class EventRecording {
 
         @Test
-        @DisplayName("persists event with all fields correctly")
         void persistsEventWithAllFields() {
             Instant occurredAt = Instant.parse("2024-01-15T10:30:00Z");
 
@@ -143,7 +139,6 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("persists event without optional fields")
         void persistsEventWithoutOptionalFields() {
             boolean result = activityEventService.record(
                 testWorkspace.getId(),
@@ -166,11 +161,9 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Idempotency")
     class Idempotency {
 
         @Test
-        @DisplayName("rejects duplicate events with same event key")
         void rejectsDuplicateEvents() {
             Instant occurredAt = Instant.now();
 
@@ -204,7 +197,6 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("allows same event type with different timestamps")
         void allowsSameEventTypeWithDifferentTimestamps() {
             Instant time1 = Instant.parse("2024-01-15T10:00:00Z");
             Instant time2 = Instant.parse("2024-01-15T11:00:00Z");
@@ -238,11 +230,9 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("XP Handling")
     class XpHandling {
 
         @Test
-        @DisplayName("clamps negative XP to zero")
         void clampsNegativeXpToZero() {
             activityEventService.record(
                 testWorkspace.getId(),
@@ -261,7 +251,6 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("rounds XP to 2 decimal places using HALF_UP")
         void roundsXpTo2DecimalPlaces() {
             activityEventService.record(
                 testWorkspace.getId(),
@@ -280,7 +269,6 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("rounds XP correctly with HALF_UP (0.005 → 0.01)")
         void roundsXpWithHalfUp() {
             activityEventService.record(
                 testWorkspace.getId(),
@@ -300,11 +288,9 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Workspace Validation")
     class WorkspaceValidation {
 
         @Test
-        @DisplayName("returns false when workspace does not exist")
         void returnsFalseForNonExistentWorkspace() {
             boolean result = activityEventService.record(
                 999999L, // Non-existent workspace ID
@@ -323,11 +309,9 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Event Key Generation")
     class EventKeyGeneration {
 
         @Test
-        @DisplayName("generates correct event key format")
         void generatesCorrectEventKey() {
             Instant occurredAt = Instant.parse("2024-01-15T10:30:00.000Z");
 

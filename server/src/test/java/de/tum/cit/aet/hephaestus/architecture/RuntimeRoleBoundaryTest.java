@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -33,34 +32,54 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>See ADR 0005 (baseline) and ADR 0008 (webhook role + SERVER_PROPERTY wiring).
  */
-@Tag("architecture")
 class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
 
     /** Container annotation Spring Boot 4 uses for repeated {@code @ConditionalOnProperty}. */
     private static final String CONDITIONAL_CONTAINER =
         "org.springframework.boot.autoconfigure.condition.ConditionalOnProperties";
 
+    /** SpEL-based conditional; scanned textually for retired-flag references. */
+    private static final String CONDITIONAL_ON_EXPRESSION =
+        "org.springframework.boot.autoconfigure.condition.ConditionalOnExpression";
+
     /**
-     * Single property-gated config per role. Controllers inside {@code gitprovider.webhook} are
+     * Single property-gated config per role. Controllers inside {@code integration.webhook} are
      * implicitly gated via {@code @ConditionalOnBean(JetStreamPublisher.class)} — they auto-load
-     * iff {@link de.tum.cit.aet.hephaestus.gitprovider.webhook.WebhookConfiguration} loads, so
+     * iff {@link de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration} loads, so
      * listing them here would just duplicate the WebhookConfiguration gate.
      */
     private static final Map<String, String> EXPECTED_GATES = Map.of(
-        "de.tum.cit.aet.hephaestus.gitprovider.webhook.WebhookConfiguration",
+        "de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration",
         RuntimeRole.WEBHOOK_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig",
         RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService",
+        "de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerConfiguration",
         RuntimeRole.WORKER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.agent.sandbox.docker.DockerSandboxConfiguration",
+        RuntimeRole.WORKER_PROPERTY,
+        "de.tum.cit.aet.hephaestus.agent.sandbox.docker.AgentImagePullBootstrapper",
+        RuntimeRole.WORKER_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration",
         RuntimeRole.SERVER_PROPERTY,
         "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
         RuntimeRole.SERVER_PROPERTY
+    );
+
+    /**
+     * Beans that must wire <em>unconditionally</em> (no {@code @ConditionalOnProperty}): mentoring
+     * is always-on; per-workspace enablement lives in the DB ({@code WorkspaceFeatures.mentor_enabled}),
+     * not in a capability flag. These previously carried a (now-removed) {@code hephaestus.sandbox.enabled}
+     * gate — see the group-1 config-cohesion change.
+     */
+    private static final List<String> UNCONDITIONAL_MENTOR_BEANS = List.of(
+        "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatService",
+        "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatController",
+        "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatExecutorConfig",
+        "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatMetrics"
     );
 
     @Test
@@ -127,7 +146,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     void webhookPackageIsIsolatedFromServerWorkerConcerns() {
         noClasses()
             .that()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.gitprovider.webhook..")
+            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.core.webhook..")
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(
@@ -155,6 +174,60 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 .anyMatch(ref -> ref.propertyNames().anyMatch(name -> name.equals(expectedProperty)));
             assertThat(matched).as("%s must be gated by @ConditionalOnProperty('%s')", fqn, expectedProperty).isTrue();
         });
+    }
+
+    @Test
+    void mentorBeansWireUnconditionally() {
+        List<String> stillGated = UNCONDITIONAL_MENTOR_BEANS.stream()
+            .map(fqn ->
+                classes
+                    .stream()
+                    .filter(c -> c.getFullName().equals(fqn))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Expected class not found in ArchUnit scan: " + fqn))
+            )
+            .filter(clazz -> conditionalOnPropertyAnnotations(clazz).findAny().isPresent())
+            .map(JavaClass::getFullName)
+            .collect(Collectors.toList());
+
+        assertThat(stillGated)
+            .as(
+                "Mentor beans must wire unconditionally — mentoring is always-on (per-workspace enable " +
+                    "lives in WorkspaceFeatures.mentor_enabled), not behind a capability flag."
+            )
+            .isEmpty();
+    }
+
+    @Test
+    void noBeanIsGatedOnTheRetiredSandboxEnabledFlag() {
+        // hephaestus.sandbox.enabled was a conflated capability flag: the Docker sandbox IS the
+        // worker role (now gated on WORKER_PROPERTY), and mentoring is always-on. The flag is gone;
+        // nothing — @ConditionalOnProperty or @ConditionalOnExpression — may reference it again.
+        List<String> violations = classes
+            .stream()
+            .filter(c -> c.getFullName().startsWith("de.tum.cit.aet.hephaestus."))
+            .filter(clazz -> referencesRetiredSandboxFlag(clazz))
+            .map(JavaClass::getFullName)
+            .collect(Collectors.toList());
+
+        assertThat(violations).as("No bean may be gated on the retired hephaestus.sandbox.enabled flag").isEmpty();
+    }
+
+    private static boolean referencesRetiredSandboxFlag(JavaClass clazz) {
+        boolean viaProperty = conditionalOnPropertyAnnotations(clazz)
+            .map(ann -> new ConditionalRef(clazz, ann))
+            .anyMatch(ref -> ref.propertyNames().anyMatch(name -> name.equals("hephaestus.sandbox.enabled")));
+        if (viaProperty) {
+            return true;
+        }
+        // @ConditionalOnExpression carries a single String SpEL value — scan it textually so a
+        // re-introduced compound gate (e.g. "${hephaestus.sandbox.enabled} and ...") is caught too.
+        return clazz
+            .getAnnotations()
+            .stream()
+            .filter(a -> a.getRawType().getFullName().equals(CONDITIONAL_ON_EXPRESSION))
+            .map(a -> String.valueOf(a.getProperties().get("value")))
+            .anyMatch(expr -> expr.contains("hephaestus.sandbox.enabled"));
     }
 
     private static Stream<JavaAnnotation<?>> conditionalOnPropertyAnnotations(JavaClass clazz) {

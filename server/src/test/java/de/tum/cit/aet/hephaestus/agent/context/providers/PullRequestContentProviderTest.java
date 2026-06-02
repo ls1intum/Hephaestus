@@ -9,13 +9,13 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -35,7 +34,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("PullRequestContentProvider")
 class PullRequestContentProviderTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -55,6 +53,9 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     @Mock
     private GitDiffOperations gitDiffOperations;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+
     private static final Long WORKSPACE_ID = 99L;
 
     private PullRequestContentProvider provider;
@@ -68,7 +69,8 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             reviewCommentRepository,
             contributorHistoryProvider,
             gitDiffOperations,
-            null
+            connectionService,
+            List.of()
         );
     }
 
@@ -107,22 +109,18 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("supports")
     class Supports {
 
         @Test
-        @DisplayName("supports PracticeReviewRequest")
         void supportsPracticeReview() {
             assertThat(provider.supports(request(sampleMetadata()))).isTrue();
         }
     }
 
     @Nested
-    @DisplayName("metadata + comments")
     class MetadataAndComments {
 
         @Test
-        @DisplayName("writes context/target/metadata.json with job-metadata fields")
         void writesMetadataJson() throws Exception {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
@@ -134,12 +132,11 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             assertThat(files).containsKey("context/target/metadata.json");
             JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
             assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
-            assertThat(metadataJson.get("repository_full_name").asText()).isEqualTo("owner/repo");
+            assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadataJson.get("enriched").asBoolean()).isFalse();
         }
 
         @Test
-        @DisplayName("enriches metadata from DB when the pull request is present")
         void enrichesFromDb() throws Exception {
             PullRequest pr = new PullRequest();
             pr.setTitle("Fix authentication bug");
@@ -159,13 +156,12 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
             JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
             assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
-            assertThat(metadataJson.get("title").asText()).isEqualTo("Fix authentication bug");
-            assertThat(metadataJson.get("author").asText()).isEqualTo("testuser");
+            assertThat(metadataJson.get("title").asString()).isEqualTo("Fix authentication bug");
+            assertThat(metadataJson.get("author").asString()).isEqualTo("testuser");
             assertThat(metadataJson.get("additions").asInt()).isEqualTo(10);
         }
 
         @Test
-        @DisplayName("writes comments.json with createdAt and author when present")
         void writesCommentsJson() throws Exception {
             PullRequestReviewComment full = new PullRequestReviewComment();
             full.setPath("src/Main.java");
@@ -192,13 +188,12 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
             JsonNode comments = objectMapper.readTree(files.get("context/target/comments.json"));
             assertThat(comments).hasSize(2);
-            assertThat(comments.get(0).get("created_at").asText()).isEqualTo("2025-06-01T12:00:00Z");
-            assertThat(comments.get(0).get("author").asText()).isEqualTo("reviewer");
+            assertThat(comments.get(0).get("created_at").asString()).isEqualTo("2025-06-01T12:00:00Z");
+            assertThat(comments.get(0).get("author").asString()).isEqualTo("reviewer");
             assertThat(comments.get(1).has("author")).isFalse();
         }
 
         @Test
-        @DisplayName("truncates comments to MAX_COMMENTS keeping the most recent")
         void truncatesComments() throws Exception {
             var comments = new java.util.ArrayList<PullRequestReviewComment>();
             for (int i = 0; i < PullRequestContentProvider.MAX_COMMENTS + 100; i++) {
@@ -218,16 +213,14 @@ class PullRequestContentProviderTest extends BaseUnitTest {
 
             JsonNode commentsJson = objectMapper.readTree(files.get("context/target/comments.json"));
             assertThat(commentsJson).hasSize(PullRequestContentProvider.MAX_COMMENTS);
-            assertThat(commentsJson.get(0).get("body").asText()).isEqualTo("Comment 100");
+            assertThat(commentsJson.get(0).get("body").asString()).isEqualTo("Comment 100");
         }
     }
 
     @Nested
-    @DisplayName("contributor history")
     class ContributorHistory {
 
         @Test
-        @DisplayName("includes contributor_history.json when the provider returns data")
         void includesContributorHistory() {
             PullRequest pr = new PullRequest();
             pr.setTitle("Fix bug");
@@ -250,7 +243,6 @@ class PullRequestContentProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("omits contributor_history.json when the provider returns empty")
         void omitsWhenEmpty() {
             PullRequest pr = new PullRequest();
             pr.setTitle("New PR");
@@ -271,7 +263,6 @@ class PullRequestContentProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("continues gracefully when contributor history provider throws")
         void continuesWhenHistoryThrows() {
             PullRequest pr = new PullRequest();
             pr.setTitle("Broken history");
@@ -295,7 +286,6 @@ class PullRequestContentProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips contributor history when PR has no author")
         void skipsWhenNoAuthor() {
             PullRequest pr = new PullRequest();
             pr.setTitle("Orphan PR");
@@ -313,11 +303,9 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("repository availability")
     class RepositoryAvailability {
 
         @Test
-        @DisplayName("throws when the local checkout is missing")
         void throwsWhenCheckoutMissing() {
             lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(false);
@@ -328,7 +316,6 @@ class PullRequestContentProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws when metadata is missing")
         void throwsWhenMetadataMissing() {
             var job = new AgentJob();
             assertThatThrownBy(() ->

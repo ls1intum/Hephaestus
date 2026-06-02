@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.exception;
 
 import java.io.Serial;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import tools.jackson.databind.JsonNode;
 

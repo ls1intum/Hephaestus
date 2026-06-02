@@ -3,11 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.github.GitHubProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -29,13 +27,7 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Mock
-    private GitHubProperties gitHubProperties;
-
-    @Mock
-    private GitLabProperties gitLabProperties;
-
-    @Mock
-    private FeatureFlagService featureFlagService;
+    private ConnectionService connectionService;
 
     @Test
     void findAccessibleWorkspacesSortsByDisplayNameAndDeduplicatesMemberships() {
@@ -54,9 +46,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             workspaceMembershipRepository,
             repositoryToMonitorRepository,
             userRepository,
-            gitHubProperties,
-            gitLabProperties,
-            featureFlagService
+            connectionService,
+            List.of()
         );
 
         when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(
@@ -82,9 +73,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             workspaceMembershipRepository,
             repositoryToMonitorRepository,
             userRepository,
-            gitHubProperties,
-            gitLabProperties,
-            featureFlagService
+            connectionService,
+            List.of()
         );
 
         when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(

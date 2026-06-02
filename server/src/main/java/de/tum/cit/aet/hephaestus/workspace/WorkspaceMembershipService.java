@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
 
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -408,9 +408,7 @@ public class WorkspaceMembershipService {
         return member;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Hidden member methods
-    // ══════════════════════════════════════════════════════════════════════════
 
     /**
      * Toggle the hidden flag for a workspace member.
@@ -440,9 +438,7 @@ public class WorkspaceMembershipService {
         return workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspaceId);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Query methods for controller
-    // ══════════════════════════════════════════════════════════════════════════
 
     /**
      * Gets a workspace membership by workspace and user ID.

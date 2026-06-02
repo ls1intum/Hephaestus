@@ -12,7 +12,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -53,9 +52,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("record saves event and returns true on success")
     void record_success_savesEvent() {
-        // Arrange
         when(workspaceRepository.existsById(1L)).thenReturn(true);
         // insertIfAbsent returns 1 = event was inserted
         when(
@@ -73,7 +70,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             )
         ).thenReturn(1);
 
-        // Act
         boolean result = service.record(
             1L,
             ActivityEventType.PULL_REQUEST_OPENED,
@@ -85,7 +81,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             1.0
         );
 
-        // Assert
         assertThat(result).isTrue();
         verify(eventRepository).insertIfAbsent(
             any(UUID.class),
@@ -103,9 +98,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("record returns false when event already exists (duplicate)")
     void record_duplicate_returnsFalse() {
-        // Arrange
         when(workspaceRepository.existsById(1L)).thenReturn(true);
         // insertIfAbsent returns 0 = duplicate (ON CONFLICT DO NOTHING)
         when(
@@ -123,7 +116,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             )
         ).thenReturn(0);
 
-        // Act
         boolean result = service.record(
             1L,
             ActivityEventType.PULL_REQUEST_OPENED,
@@ -135,19 +127,15 @@ class ActivityEventServiceTest extends BaseUnitTest {
             1.0
         );
 
-        // Assert
         assertThat(result).isFalse();
         assertThat(meterRegistry.counter("activity.events.recorded").count()).isEqualTo(0.0);
         assertThat(meterRegistry.counter("activity.events.duplicate").count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("record returns false when workspace not found")
     void record_workspaceNotFound_returnsFalse() {
-        // Arrange
         when(workspaceRepository.existsById(999L)).thenReturn(false);
 
-        // Act
         boolean result = service.record(
             999L,
             ActivityEventType.PULL_REQUEST_OPENED,
@@ -159,15 +147,12 @@ class ActivityEventServiceTest extends BaseUnitTest {
             1.0
         );
 
-        // Assert
         assertThat(result).isFalse();
         verifyNoInteractions(eventRepository);
     }
 
     @Test
-    @DisplayName("record clamps negative XP to zero")
     void record_negativeXp_clampsToZero() {
-        // Arrange
         when(workspaceRepository.existsById(1L)).thenReturn(true);
         // Capture the XP value passed to insertIfAbsent
         when(
@@ -185,7 +170,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             )
         ).thenReturn(1);
 
-        // Act
         boolean result = service.record(
             1L,
             ActivityEventType.PULL_REQUEST_OPENED,
@@ -197,7 +181,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             -50.0 // negative XP
         );
 
-        // Assert
         assertThat(result).isTrue();
         // Verify XP was clamped to 0.0
         verify(eventRepository).insertIfAbsent(
@@ -215,9 +198,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("record clamps XP above maximum to maxXpPerEvent")
     void record_excessiveXp_clampsToMax() {
-        // Arrange
         when(workspaceRepository.existsById(1L)).thenReturn(true);
         // Verify XP was clamped to max (1000.0 as configured in setUp)
         when(
@@ -235,7 +216,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             )
         ).thenReturn(1);
 
-        // Act
         boolean result = service.record(
             1L,
             ActivityEventType.PULL_REQUEST_OPENED,
@@ -247,7 +227,6 @@ class ActivityEventServiceTest extends BaseUnitTest {
             9999.0 // excessive XP
         );
 
-        // Assert
         assertThat(result).isTrue();
         // Verify XP was clamped to 1000.0
         verify(eventRepository).insertIfAbsent(

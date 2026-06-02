@@ -6,14 +6,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.DataSource;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventContext;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -21,7 +21,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -36,7 +35,6 @@ import org.springframework.cache.CacheManager;
  * annotation is metadata for the runtime — invoking the method directly tests the
  * business logic).
  */
-@DisplayName("MentorContextInvalidator")
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MentorContextInvalidatorTest extends BaseUnitTest {
 
@@ -66,7 +64,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PR update evicts per-user caches for author")
     void prUpdateEvictsAuthor() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.of(7L));
 
@@ -78,7 +75,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PR update with mergedBy evicts BOTH author and merger when distinct")
     void prUpdateEvictsMerger() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.of(7L));
 
@@ -89,7 +85,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PR update is a no-op when workspace can't be resolved")
     void prUpdateUnknownWorkspace() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.empty());
 
@@ -99,7 +94,6 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Issue update evicts per-user caches for author")
     void issueUpdateEvictsAuthor() {
         when(workspaceRepository.findWorkspaceIdByRepositoryId(eq(42L))).thenReturn(Optional.of(7L));
 
@@ -110,12 +104,10 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         verify(findingsCache).evict(eq("7:9"));
     }
 
-    // ════════════════════════════════════════════════════════════════════════
     // Event builders
-    // ════════════════════════════════════════════════════════════════════════
 
-    private static DomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
-        EventPayload.PullRequestData pr = new EventPayload.PullRequestData(
+    private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(long repoId, Long authorId, Long mergedById) {
+        ScmEventPayload.PullRequestData pr = new ScmEventPayload.PullRequestData(
             1L,
             42,
             "title",
@@ -135,11 +127,11 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
             mergedById != null ? Instant.now() : null,
             mergedById
         );
-        return new DomainEvent.PullRequestUpdated(pr, Set.of(), buildContext(repoId));
+        return new ScmDomainEvent.PullRequestUpdated(pr, Set.of(), buildContext(repoId));
     }
 
-    private static DomainEvent.IssueUpdated buildIssueUpdated(long repoId, Long authorId) {
-        EventPayload.IssueData issue = new EventPayload.IssueData(
+    private static ScmDomainEvent.IssueUpdated buildIssueUpdated(long repoId, Long authorId) {
+        ScmEventPayload.IssueData issue = new ScmEventPayload.IssueData(
             1L,
             17,
             "title",
@@ -154,7 +146,7 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
             Instant.now(),
             null
         );
-        return new DomainEvent.IssueUpdated(issue, Set.of(), buildContext(repoId));
+        return new ScmDomainEvent.IssueUpdated(issue, Set.of(), buildContext(repoId));
     }
 
     private static EventContext buildContext(long repoId) {

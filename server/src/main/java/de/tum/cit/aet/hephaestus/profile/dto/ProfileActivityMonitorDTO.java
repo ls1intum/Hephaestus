@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.profile.dto;
 
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Configurable activity monitor data for a contributor profile")
 public record ProfileActivityMonitorDTO(

@@ -19,8 +19,8 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import io.micrometer.core.instrument.Timer;
@@ -36,10 +36,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.lang.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.core.JacksonException;
@@ -53,7 +53,6 @@ import tools.jackson.databind.node.JsonNodeFactory;
  * submitted to the virtual-thread executor; all blocking work happens off the request thread.
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class MentorChatService {
 
@@ -66,7 +65,11 @@ public class MentorChatService {
     private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final MentorPiAdapter mentorPiAdapter;
-    private final InteractiveSandboxService interactiveSandboxService;
+    // Resolved lazily: the InteractiveSandboxService bean is part of the worker capability
+    // (DockerSandboxConfiguration, gated on the worker role). On a non-worker pod the bean is
+    // absent and this provider yields none — the controller + persistence still wire so the API
+    // surface loads, but attaching a live turn requires a worker. getObject() fails loudly there.
+    private final ObjectProvider<InteractiveSandboxService> interactiveSandboxServiceProvider;
     private final PiEventToUiChunkTranslator translator;
     private final MentorTurnLock turnLock;
     private final MentorTurnPersistence persistence;
@@ -232,7 +235,7 @@ public class MentorChatService {
                 aspectInputs,
                 sessionRestore
             );
-            sandbox = interactiveSandboxService.attach(spec);
+            sandbox = interactiveSandboxServiceProvider.getObject().attach(spec);
 
             // If the client disconnected during the (potentially seconds-long) cold-start
             // attach, short-circuit BEFORE wiring up the runner subscription + 20s hello

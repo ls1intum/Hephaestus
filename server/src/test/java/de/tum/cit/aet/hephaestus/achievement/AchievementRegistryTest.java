@@ -27,18 +27,15 @@ class AchievementRegistryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("YAML Loading")
     class YamlLoadingTests {
 
         @Test
-        @DisplayName("loads all achievements from achievements.yml")
         void loadsAllAchievements() {
             assertThat(registry.values()).isNotEmpty();
             assertThat(registry.getAchievementIds()).isNotEmpty();
         }
 
         @Test
-        @DisplayName("getById returns correct achievement")
         void getByIdReturnsCorrectAchievement() {
             AchievementDefinition def = registry.getById("pr.merged.common.1");
             assertThat(def.id()).isEqualTo("pr.merged.common.1");
@@ -47,7 +44,6 @@ class AchievementRegistryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getById throws for unknown ID")
         void getByIdThrowsForUnknownId() {
             assertThatThrownBy(() -> registry.getById("nonexistent.achievement")).isInstanceOf(
                 IllegalArgumentException.class
@@ -56,11 +52,9 @@ class AchievementRegistryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Commit Achievement Trigger Events")
     class CommitTriggerTests {
 
         @Test
-        @DisplayName("all mainline commit achievements have COMMIT_CREATED trigger")
         void allCommitAchievementsHaveCommitCreatedTrigger() {
             List<String> commitMainlineIds = List.of(
                 "commit.common.1",
@@ -82,7 +76,6 @@ class AchievementRegistryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("getByTriggerEvent returns commit achievements for COMMIT_CREATED")
         void getByTriggerEventReturnsCommitAchievements() {
             List<AchievementDefinition> commitAchievements = registry.getByTriggerEvent(
                 ActivityEventType.COMMIT_CREATED
@@ -114,7 +107,6 @@ class AchievementRegistryTest extends BaseUnitTest {
         );
 
         @Test
-        @DisplayName("only standalone achievements reference themselves as parent")
         void shouldOnlyReferenceItselfWhenAchievementIsStandalone() {
             for (AchievementDefinition def : registry.values()) {
                 if (def.parent() != null && !def.parent().isEmpty()) {
@@ -128,7 +120,6 @@ class AchievementRegistryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("all parent references point to existing achievements")
         void shouldHaveExistingParentWhenParentIsSpecified() {
             Set<String> allIds = registry.getAchievementIds();
             for (AchievementDefinition def : registry.values()) {
@@ -162,11 +153,9 @@ class AchievementRegistryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Evaluator-Trigger Consistency")
     class EvaluatorTriggerTests {
 
         @Test
-        @DisplayName("DummyEvaluator achievements have no trigger events")
         void dummyEvaluatorHasNoTriggers() {
             for (AchievementDefinition def : registry.values()) {
                 if ("DummyEvaluator".equals(def.evaluatorClass())) {
@@ -202,18 +191,15 @@ class AchievementRegistryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Milestone First Action")
     class MilestoneFirstActionTests {
 
         @Test
-        @DisplayName("milestone.first_action includes PULL_REQUEST_MERGED trigger")
         void includesPullRequestMergedTrigger() {
             AchievementDefinition def = registry.getById("milestone.first_action");
             assertThat(def.triggerEvents()).contains(ActivityEventType.PULL_REQUEST_MERGED);
         }
 
         @Test
-        @DisplayName("milestone.first_action includes COMMIT_CREATED trigger")
         void includesCommitCreatedTrigger() {
             AchievementDefinition def = registry.getById("milestone.first_action");
             assertThat(def.triggerEvents()).contains(ActivityEventType.COMMIT_CREATED);

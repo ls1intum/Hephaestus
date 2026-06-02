@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Map;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
@@ -14,11 +13,9 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
  * Pins the operational contract on {@code hephaestus.mentor.*}: defaults are the production
  * tuning documented on the record, and overrides bind through the prefix.
  */
-@DisplayName("InteractiveSandboxProperties")
 class InteractiveSandboxPropertiesTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("defaults match the documented production tuning; overrides bind through the prefix")
     void bindsDefaultsAndOverrides() {
         InteractiveSandboxProperties defaults = bind(Map.of());
         assertThat(defaults.idleTtlSeconds()).isEqualTo(300);

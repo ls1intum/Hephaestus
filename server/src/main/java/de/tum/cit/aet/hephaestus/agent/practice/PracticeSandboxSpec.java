@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Sandbox configuration produced by {@link PracticePiAdapter#buildSandboxSpec}.

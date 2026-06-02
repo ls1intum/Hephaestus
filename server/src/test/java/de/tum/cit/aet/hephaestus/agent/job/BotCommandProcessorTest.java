@@ -9,10 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
@@ -22,14 +23,12 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 @Tag("unit")
-@DisplayName("BotCommandProcessor")
 class BotCommandProcessorTest extends BaseUnitTest {
 
     private static final long REPO_ID = 100L;
@@ -49,15 +48,18 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        processor = new BotCommandProcessor(agentJobService, pullRequestRepository, practiceReviewDetectionGate, null);
+        processor = new BotCommandProcessor(
+            agentJobService,
+            pullRequestRepository,
+            practiceReviewDetectionGate,
+            List.of()
+        );
     }
 
     @Nested
-    @DisplayName("Command matching")
     class CommandMatching {
 
         @Test
-        @DisplayName("exact '/hephaestus review' triggers review")
         void exactReviewCommand_triggersReview() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -70,7 +72,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("'/hephaestus review' with trailing whitespace triggers review")
         void reviewCommandWithTrailingSpace_triggersReview() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -83,7 +84,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("case-insensitive matching works")
         void caseInsensitive_triggersReview() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -96,7 +96,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("'/hephaestus review-all' does NOT trigger (word boundary)")
         void reviewAllCommand_doesNotTrigger() {
             processor.onBotCommandReceived(event("/hephaestus review-all"));
 
@@ -104,7 +103,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("'/hephaestus reviewcode' does NOT trigger (no space boundary)")
         void reviewcodeCommand_doesNotTrigger() {
             processor.onBotCommandReceived(event("/hephaestus reviewcode"));
 
@@ -112,7 +110,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("unknown command is silently ignored")
         void unknownCommand_silentlyIgnored() {
             processor.onBotCommandReceived(event("/hephaestus deploy"));
 
@@ -122,11 +119,9 @@ class BotCommandProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("PR validation")
     class PrValidation {
 
         @Test
-        @DisplayName("PR not found skips processing")
         void prNotFound_skipsProcessing() {
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER)).thenReturn(Optional.empty());
 
@@ -136,7 +131,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("closed PR skips processing")
         void closedPr_skipsProcessing() {
             PullRequest pr = createPrWithState(PullRequest.State.CLOSED);
             mockPrLookup(pr);
@@ -148,7 +142,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("merged PR skips processing")
         void mergedPr_skipsProcessing() {
             PullRequest pr = createPrWithState(PullRequest.State.MERGED);
             mockPrLookup(pr);
@@ -160,7 +153,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("PR with missing branch info skips processing")
         void missingBranchInfo_skipsProcessing() {
             PullRequest pr = createOpenPr();
             pr.setHeadRefOid(null);
@@ -174,11 +166,9 @@ class BotCommandProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Gate evaluation")
     class GateEvaluation {
 
         @Test
-        @DisplayName("gate Skip decision prevents job submission")
         void gateSkip_noJobSubmitted() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -192,7 +182,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("gate Detect decision submits job")
         void gateDetect_submitsJob() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -205,7 +194,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("gate is invoked with TriggerMode.MANUAL")
         void gateReceivesManualTriggerMode() {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
@@ -219,11 +207,9 @@ class BotCommandProcessorTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Error handling")
     class ErrorHandling {
 
         @Test
-        @DisplayName("exception during processing does not propagate")
         void exceptionDuringProcessing_doesNotPropagate() {
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER)).thenThrow(
                 new RuntimeException("DB connection failed")
@@ -236,10 +222,10 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
     }
 
-    // -- Test helpers --
+    // Test helpers
 
     private BotCommandReceivedEvent event(String noteBody) {
-        return new BotCommandReceivedEvent(REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null, null);
+        return new BotCommandReceivedEvent(IntegrationKind.GITLAB, REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null);
     }
 
     private PullRequest createOpenPr() {

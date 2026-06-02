@@ -37,6 +37,10 @@ const meta = {
 		features: allOff,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
+		workspaceSlug: "demo",
+		hasSlackConnection: false,
+		slackNotificationsEnabled: false,
+		onSlackSaved: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 
@@ -69,5 +73,16 @@ export const PracticeReviewWithSubToggles: Story = {
 			practiceReviewAutoTriggerEnabled: true,
 			practiceReviewManualTriggerEnabled: false,
 		},
+	},
+};
+
+/** Slack connected + configured — pins that the Slack digest card renders within the page. */
+export const SlackConfigured: Story = {
+	args: {
+		hasSlackConnection: true,
+		slackChannelId: "C0974LJBPBK",
+		slackNotificationsEnabled: true,
+		slackScheduleDay: 3,
+		slackScheduleTime: "09:00",
 	},
 };

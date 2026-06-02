@@ -8,7 +8,7 @@
 # Services:
 #   - nats-server: Message queue for webhook + sync events
 #   - webhook-server: Java inbound webhook receiver (application-server image with
-#     SPRING_PROFILES_ACTIVE=prod,webhook so only gitprovider.webhook beans load — see ADR 0008)
+#     SPRING_PROFILES_ACTIVE=prod,webhook so only integration.core.webhook beans load — see ADR 0008)
 #   - keycloak + keycloak-db: Authentication (wildcard redirect URIs)
 #
 # Coolify Setup:
@@ -58,7 +58,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Webhook Server - Java inbound webhook receiver. Same image as application-server
-  # but with SPRING_PROFILES_ACTIVE=prod,webhook so only gitprovider.webhook beans load.
+  # but with SPRING_PROFILES_ACTIVE=prod,webhook so only integration.core.webhook beans load.
   # Restart-independent from application-server (push events on GitHub/GitLab are
   # not manually redeliverable). See ADR 0008.
   # Configure domain in Coolify UI: https://example.com/webhooks:8080

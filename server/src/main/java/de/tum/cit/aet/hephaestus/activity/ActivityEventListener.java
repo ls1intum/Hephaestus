@@ -1,27 +1,25 @@
 package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointCalculator;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.project.Project;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.event.EventListener;
-import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -59,7 +57,6 @@ public class ActivityEventListener {
     private final PullRequestReviewThreadRepository reviewThreadRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
-    private final ProjectRepository projectRepository;
     private final IssueRepository issueRepository;
 
     /**
@@ -135,7 +132,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestCreated(DomainEvent.PullRequestCreated event) {
+    public void onPullRequestCreated(ScmDomainEvent.PullRequestCreated event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR created", pr.id(), event.context().scopeId())) {
             return;
@@ -166,7 +163,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestMerged(DomainEvent.PullRequestMerged event) {
+    public void onPullRequestMerged(ScmDomainEvent.PullRequestMerged event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR merged", pr.id(), event.context().scopeId())) {
             return;
@@ -199,7 +196,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestClosed(DomainEvent.PullRequestClosed event) {
+    public void onPullRequestClosed(ScmDomainEvent.PullRequestClosed event) {
         if (event.wasMerged()) {
             return;
         }
@@ -233,7 +230,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestReopened(DomainEvent.PullRequestReopened event) {
+    public void onPullRequestReopened(ScmDomainEvent.PullRequestReopened event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR reopened", pr.id(), event.context().scopeId())) {
             return;
@@ -260,7 +257,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestReady(DomainEvent.PullRequestReady event) {
+    public void onPullRequestReady(ScmDomainEvent.PullRequestReady event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR ready", pr.id(), event.context().scopeId())) {
             return;
@@ -293,7 +290,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestDrafted(DomainEvent.PullRequestDrafted event) {
+    public void onPullRequestDrafted(ScmDomainEvent.PullRequestDrafted event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR drafted", pr.id(), event.context().scopeId())) {
             return;
@@ -326,7 +323,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestSynchronized(DomainEvent.PullRequestSynchronized event) {
+    public void onPullRequestSynchronized(ScmDomainEvent.PullRequestSynchronized event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR synchronized", pr.id(), event.context().scopeId())) {
             return;
@@ -359,7 +356,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestLabeled(DomainEvent.PullRequestLabeled event) {
+    public void onPullRequestLabeled(ScmDomainEvent.PullRequestLabeled event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR labeled", pr.id(), event.context().scopeId())) {
             return;
@@ -392,7 +389,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestUnlabeled(DomainEvent.PullRequestUnlabeled event) {
+    public void onPullRequestUnlabeled(ScmDomainEvent.PullRequestUnlabeled event) {
         var pr = event.pullRequest();
         if (!hasValidScopeId("PR unlabeled", pr.id(), event.context().scopeId())) {
             return;
@@ -419,7 +416,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
+    public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
         var reviewData = event.review();
         log.debug(
             "Received ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
@@ -467,7 +464,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewDismissed(DomainEvent.ReviewDismissed event) {
+    public void onReviewDismissed(ScmDomainEvent.ReviewDismissed event) {
         var reviewData = event.review();
         if (!hasValidScopeId("Review dismissed", reviewData.id(), event.context().scopeId())) {
             return;
@@ -513,7 +510,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewEdited(DomainEvent.ReviewEdited event) {
+    public void onReviewEdited(ScmDomainEvent.ReviewEdited event) {
         var reviewData = event.review();
         if (!hasValidScopeId("Review edited", reviewData.id(), event.context().scopeId())) {
             return;
@@ -547,7 +544,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCommentCreated(DomainEvent.CommentCreated event) {
+    public void onCommentCreated(ScmDomainEvent.CommentCreated event) {
         var commentData = event.comment();
         if (!hasValidScopeId("Comment created", commentData.id(), event.context().scopeId())) {
             return;
@@ -595,7 +592,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCommentUpdated(DomainEvent.CommentUpdated event) {
+    public void onCommentUpdated(ScmDomainEvent.CommentUpdated event) {
         var commentData = event.comment();
         if (!hasValidScopeId("Comment updated", commentData.id(), event.context().scopeId())) {
             return;
@@ -633,7 +630,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCommentDeleted(DomainEvent.CommentDeleted event) {
+    public void onCommentDeleted(ScmDomainEvent.CommentDeleted event) {
         Long commentId = event.commentId();
         if (!hasValidScopeId("Comment deleted", commentId, event.context().scopeId())) {
             return;
@@ -666,7 +663,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewCommentCreated(DomainEvent.ReviewCommentCreated event) {
+    public void onReviewCommentCreated(ScmDomainEvent.ReviewCommentCreated event) {
         var commentData = event.comment();
         if (!hasValidScopeId("Review comment created", commentData.id(), event.context().scopeId())) {
             return;
@@ -710,7 +707,7 @@ public class ActivityEventListener {
      * Self-review check and XP formula are handled inside the calculator
      * to maintain the single-source-of-truth contract.
      */
-    private double calculateStandaloneReviewCommentXp(EventPayload.ReviewCommentData commentData) {
+    private double calculateStandaloneReviewCommentXp(ScmEventPayload.ReviewCommentData commentData) {
         PullRequest pr = pullRequestRepository.findById(commentData.pullRequestId()).orElse(null);
         if (pr == null) {
             log.warn("PR not found for standalone review comment XP: prId={}", commentData.pullRequestId());
@@ -733,7 +730,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewCommentEdited(DomainEvent.ReviewCommentEdited event) {
+    public void onReviewCommentEdited(ScmDomainEvent.ReviewCommentEdited event) {
         var commentData = event.comment();
         if (!hasValidScopeId("Review comment edited", commentData.id(), event.context().scopeId())) {
             return;
@@ -771,7 +768,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewCommentDeleted(DomainEvent.ReviewCommentDeleted event) {
+    public void onReviewCommentDeleted(ScmDomainEvent.ReviewCommentDeleted event) {
         Long commentId = event.commentId();
         if (!hasValidScopeId("Review comment deleted", commentId, event.context().scopeId())) {
             return;
@@ -788,9 +785,7 @@ public class ActivityEventListener {
         );
     }
 
-    // ========================================================================
     // Review Thread Events (Code Review Effectiveness)
-    // ========================================================================
 
     /**
      * Handle review thread resolved events.
@@ -803,7 +798,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewThreadResolved(DomainEvent.ReviewThreadResolved event) {
+    public void onReviewThreadResolved(ScmDomainEvent.ReviewThreadResolved event) {
         var threadData = event.thread();
         if (!hasValidScopeId("Review thread resolved", threadData.id(), event.context().scopeId())) {
             return;
@@ -851,7 +846,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onReviewThreadUnresolved(DomainEvent.ReviewThreadUnresolved event) {
+    public void onReviewThreadUnresolved(ScmDomainEvent.ReviewThreadUnresolved event) {
         var threadData = event.thread();
         if (!hasValidScopeId("Review thread unresolved", threadData.id(), event.context().scopeId())) {
             return;
@@ -902,7 +897,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueCreated(DomainEvent.IssueCreated event) {
+    public void onIssueCreated(ScmDomainEvent.IssueCreated event) {
         var issueData = event.issue();
         // Skip pull requests - they have their own event (PULL_REQUEST_OPENED)
         if (issueData.isPullRequest()) {
@@ -945,7 +940,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueClosed(DomainEvent.IssueClosed event) {
+    public void onIssueClosed(ScmDomainEvent.IssueClosed event) {
         var issueData = event.issue();
         // Skip pull requests - they have their own events
         if (issueData.isPullRequest()) {
@@ -984,7 +979,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueReopened(DomainEvent.IssueReopened event) {
+    public void onIssueReopened(ScmDomainEvent.IssueReopened event) {
         var issueData = event.issue();
         // Skip pull requests - they have their own events
         if (issueData.isPullRequest()) {
@@ -1017,7 +1012,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueDeleted(DomainEvent.IssueDeleted event) {
+    public void onIssueDeleted(ScmDomainEvent.IssueDeleted event) {
         Long issueId = event.issueId();
         if (!hasValidScopeId("Issue deleted", issueId, event.context().scopeId())) {
             return;
@@ -1045,7 +1040,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueLabeled(DomainEvent.IssueLabeled event) {
+    public void onIssueLabeled(ScmDomainEvent.IssueLabeled event) {
         var issueData = event.issue();
         // Skip pull requests - they have their own events
         if (issueData.isPullRequest()) {
@@ -1080,7 +1075,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueUnlabeled(DomainEvent.IssueUnlabeled event) {
+    public void onIssueUnlabeled(ScmDomainEvent.IssueUnlabeled event) {
         var issueData = event.issue();
         // Skip pull requests - they have their own events
         if (issueData.isPullRequest()) {
@@ -1115,7 +1110,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueTyped(DomainEvent.IssueTyped event) {
+    public void onIssueTyped(ScmDomainEvent.IssueTyped event) {
         var issueData = event.issue();
         // Skip pull requests
         if (issueData.isPullRequest()) {
@@ -1150,7 +1145,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onIssueUntyped(DomainEvent.IssueUntyped event) {
+    public void onIssueUntyped(ScmDomainEvent.IssueUntyped event) {
         var issueData = event.issue();
         // Skip pull requests
         if (issueData.isPullRequest()) {
@@ -1174,462 +1169,6 @@ public class ActivityEventListener {
         );
     }
 
-    // ========================================================================
-    // Project Events (Project Management Tracking)
-    // ========================================================================
-
-    /**
-     * Handle project created events.
-     *
-     * <p>Records PROJECT_CREATED activity event with 0 XP. Project creation is
-     * tracked for activity completeness and audit trail purposes.
-     *
-     * <p>The actor is the project creator if available.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectCreated(DomainEvent.ProjectCreated event) {
-        var projectData = event.project();
-        if (!hasValidScopeId("Project created", projectData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt =
-            projectData.createdAt() != null
-                ? projectData.createdAt()
-                : projectData.updatedAt() != null
-                    ? projectData.updatedAt()
-                    : Instant.now();
-        safeRecord("project created", projectData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_CREATED,
-                occurredAt,
-                getActorOrNull(projectData.creatorId()),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
-                projectData.id(),
-                0.0 // Project creation is tracked without XP
-            )
-        );
-    }
-
-    /**
-     * Handle project updated events.
-     *
-     * <p>Records PROJECT_UPDATED activity event with 0 XP. Updates are tracked
-     * for audit trail purposes.
-     *
-     * <p>The actor is the user who performed the update (from webhook sender),
-     * falling back to the project creator for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectUpdated(DomainEvent.ProjectUpdated event) {
-        var projectData = event.project();
-        if (!hasValidScopeId("Project updated", projectData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
-        // Use actorId (webhook sender) if available, fall back to creatorId for sync
-        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
-        safeRecord("project updated", projectData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_UPDATED,
-                occurredAt,
-                getActorOrNull(actorId),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
-                projectData.id(),
-                0.0 // Project updates are workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project closed events.
-     *
-     * <p>Records PROJECT_CLOSED activity event with 0 XP. Closing a project
-     * indicates completion or archival.
-     *
-     * <p>The actor is the user who closed the project (from webhook sender),
-     * falling back to the project creator for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectClosed(DomainEvent.ProjectClosed event) {
-        var projectData = event.project();
-        if (!hasValidScopeId("Project closed", projectData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt =
-            projectData.closedAt() != null
-                ? projectData.closedAt()
-                : projectData.updatedAt() != null
-                    ? projectData.updatedAt()
-                    : Instant.now();
-        // Use actorId (webhook sender) if available, fall back to creatorId for sync
-        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
-        safeRecord("project closed", projectData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_CLOSED,
-                occurredAt,
-                getActorOrNull(actorId),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
-                projectData.id(),
-                0.0 // Project closure is workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project reopened events.
-     *
-     * <p>Records PROJECT_REOPENED activity event with 0 XP. Reopening indicates
-     * the project is being reactivated.
-     *
-     * <p>The actor is the user who reopened the project (from webhook sender),
-     * falling back to the project creator for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectReopened(DomainEvent.ProjectReopened event) {
-        var projectData = event.project();
-        if (!hasValidScopeId("Project reopened", projectData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
-        // Use actorId (webhook sender) if available, fall back to creatorId for sync
-        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
-        safeRecord("project reopened", projectData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_REOPENED,
-                occurredAt,
-                getActorOrNull(actorId),
-                getRepositoryForProject(projectData),
-                ActivityTargetType.PROJECT,
-                projectData.id(),
-                0.0 // Project reopening is workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project deleted events.
-     *
-     * <p>Records PROJECT_DELETED activity event with 0 XP. Note that we only
-     * have the project ID since the entity was deleted.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectDeleted(DomainEvent.ProjectDeleted event) {
-        Long projectId = event.projectId();
-        if (!hasValidScopeId("Project deleted", projectId, event.context().scopeId())) {
-            return;
-        }
-        log.debug("Recording project deleted event: projectId={}", projectId);
-        safeRecord("project deleted", projectId, () ->
-            activityEventService.recordDeleted(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_DELETED,
-                Instant.now(),
-                ActivityTargetType.PROJECT,
-                projectId
-            )
-        );
-    }
-
-    // ========================================================================
-    // Project Item Events (Work Item Tracking)
-    // ========================================================================
-
-    /**
-     * Handle project item created events.
-     *
-     * <p>Records PROJECT_ITEM_CREATED activity event with 0 XP. Adding items to
-     * a project is tracked for activity completeness.
-     *
-     * <p>The actor is the user who created the item (from webhook sender),
-     * which may be null for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemCreated(DomainEvent.ProjectItemCreated event) {
-        var itemData = event.item();
-        if (!hasValidScopeId("Project item created", itemData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt =
-            itemData.createdAt() != null
-                ? itemData.createdAt()
-                : itemData.updatedAt() != null
-                    ? itemData.updatedAt()
-                    : Instant.now();
-        User actor = getActorOrNull(itemData.actorId());
-        safeRecord("project item created", itemData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_CREATED,
-                occurredAt,
-                actor,
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemData.id(),
-                0.0 // Project item events are tracked without XP
-            )
-        );
-    }
-
-    /**
-     * Handle project item updated events.
-     *
-     * <p>Records PROJECT_ITEM_UPDATED activity event with 0 XP. Updates to item
-     * field values or status are tracked for audit purposes.
-     *
-     * <p>The actor is the user who updated the item (from webhook sender),
-     * which may be null for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemUpdated(DomainEvent.ProjectItemUpdated event) {
-        var itemData = event.item();
-        if (!hasValidScopeId("Project item updated", itemData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item updated", itemData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_UPDATED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemData.id(),
-                0.0 // Item updates are workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project item archived events.
-     *
-     * <p>Records PROJECT_ITEM_ARCHIVED activity event with 0 XP. Archiving
-     * hides items from active view.
-     *
-     * <p>The actor is the user who archived the item (from webhook sender),
-     * which may be null for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemArchived(DomainEvent.ProjectItemArchived event) {
-        var itemData = event.item();
-        if (!hasValidScopeId("Project item archived", itemData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item archived", itemData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_ARCHIVED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemData.id(),
-                0.0 // Item archiving is workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project item restored events.
-     *
-     * <p>Records PROJECT_ITEM_RESTORED activity event with 0 XP. Restoring
-     * brings archived items back to active view.
-     *
-     * <p>The actor is the user who restored the item (from webhook sender),
-     * which may be null for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemRestored(DomainEvent.ProjectItemRestored event) {
-        var itemData = event.item();
-        if (!hasValidScopeId("Project item restored", itemData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item restored", itemData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_RESTORED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemData.id(),
-                0.0 // Item restoration is workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project item deleted events.
-     *
-     * <p>Records PROJECT_ITEM_DELETED activity event with 0 XP. Note that we
-     * only have the item ID since the entity was deleted.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemDeleted(DomainEvent.ProjectItemDeleted event) {
-        Long itemId = event.itemId();
-        if (!hasValidScopeId("Project item deleted", itemId, event.context().scopeId())) {
-            return;
-        }
-        log.debug("Recording project item deleted event: itemId={}", itemId);
-        safeRecord("project item deleted", itemId, () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_DELETED,
-                Instant.now(),
-                null,
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemId,
-                0.0
-            )
-        );
-    }
-
-    /**
-     * Handle project item converted events.
-     *
-     * <p>Records PROJECT_ITEM_CONVERTED activity event with 0 XP. Conversion
-     * occurs when a draft issue is converted to a real issue.
-     *
-     * <p>The actor is the user who converted the item (from webhook sender),
-     * which may be null for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemConverted(DomainEvent.ProjectItemConverted event) {
-        var itemData = event.item();
-        if (!hasValidScopeId("Project item converted", itemData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item converted", itemData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_CONVERTED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemData.id(),
-                0.0 // Item conversion is workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Handle project item reordered events.
-     *
-     * <p>Records PROJECT_ITEM_REORDERED activity event with 0 XP. Reordering
-     * occurs when item position changes in the project view.
-     *
-     * <p>The actor is the user who reordered the item (from webhook sender),
-     * which may be null for sync operations.
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectItemReordered(DomainEvent.ProjectItemReordered event) {
-        var itemData = event.item();
-        if (!hasValidScopeId("Project item reordered", itemData.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
-        safeRecord("project item reordered", itemData.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_ITEM_REORDERED,
-                occurredAt,
-                getActorOrNull(itemData.actorId()),
-                resolveRepositoryForProjectItem(itemData, event.projectId()),
-                ActivityTargetType.PROJECT_ITEM,
-                itemData.id(),
-                0.0 // Item reordering is workflow tracking, no XP reward
-            )
-        );
-    }
-
-    /**
-     * Get the repository reference for a project, or null if the project is
-     * organization-scoped (not associated with a specific repository).
-     *
-     * @param projectData the project data from the event
-     * @return Repository reference if repository-scoped, null otherwise
-     */
-    @Nullable
-    private de.tum.cit.aet.hephaestus.gitprovider.repository.Repository getRepositoryForProject(
-        EventPayload.ProjectData projectData
-    ) {
-        if (projectData.ownerType() == Project.OwnerType.REPOSITORY) {
-            return repositoryRepository.getReferenceById(projectData.ownerId());
-        }
-        // Organization or user-scoped projects don't have a direct repository link
-        return null;
-    }
-
-    @Nullable
-    private de.tum.cit.aet.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectId(
-        @Nullable Long projectId
-    ) {
-        if (projectId == null) {
-            return null;
-        }
-        Project project = projectRepository.findById(projectId).orElse(null);
-        if (project == null) {
-            return null;
-        }
-        if (project.getOwnerType() == Project.OwnerType.REPOSITORY) {
-            return repositoryRepository.getReferenceById(project.getOwnerId());
-        }
-        return null;
-    }
-
-    @Nullable
-    private de.tum.cit.aet.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectItem(
-        EventPayload.ProjectItemData itemData,
-        @Nullable Long projectId
-    ) {
-        if (itemData == null) {
-            return resolveRepositoryForProjectId(projectId);
-        }
-        if (itemData.issueId() != null) {
-            var issue = issueRepository.findById(itemData.issueId()).orElse(null);
-            if (issue != null && issue.getRepository() != null) {
-                return repositoryRepository.getReferenceById(issue.getRepository().getId());
-            }
-        }
-        return resolveRepositoryForProjectId(projectId);
-    }
-
     private ActivityEventType mapReviewState(PullRequestReview.State state) {
         if (state == PullRequestReview.State.APPROVED) {
             return ActivityEventType.REVIEW_APPROVED;
@@ -1643,9 +1182,7 @@ public class ActivityEventListener {
         return ActivityEventType.REVIEW_COMMENTED;
     }
 
-    // ========================================================================
     // Commit Events
-    // ========================================================================
 
     /**
      * Handle commit created events.
@@ -1658,7 +1195,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onCommitCreated(DomainEvent.CommitCreated event) {
+    public void onCommitCreated(ScmDomainEvent.CommitCreated event) {
         var commitData = event.commit();
         if (!hasValidScopeId("Commit created", commitData.id(), event.context().scopeId())) {
             return;
@@ -1680,7 +1217,7 @@ public class ActivityEventListener {
     }
 
     /**
-     * Handle commit author reconciliation events emitted by the gitprovider module
+     * Handle commit author reconciliation events emitted by the integration.scm module
      * after commit author identities have been resolved (via email lookup, provider
      * user API, or server-side author harvest) for a repository.
      *
@@ -1702,7 +1239,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @EventListener
-    public void onCommitAuthorsReconciled(DomainEvent.CommitAuthorsReconciled event) {
+    public void onCommitAuthorsReconciled(ScmDomainEvent.CommitAuthorsReconciled event) {
         Long repositoryId = event.repositoryId();
         if (repositoryId == null) {
             return;
@@ -1721,9 +1258,7 @@ public class ActivityEventListener {
         }
     }
 
-    // ========================================================================
     // Discussion Events (Community Engagement Tracking)
-    // ========================================================================
 
     /**
      * Handle discussion created events.
@@ -1736,7 +1271,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionCreated(DomainEvent.DiscussionCreated event) {
+    public void onDiscussionCreated(ScmDomainEvent.DiscussionCreated event) {
         var discussion = event.discussion();
         if (!hasValidScopeId("Discussion created", discussion.id(), event.context().scopeId())) {
             return;
@@ -1768,7 +1303,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionClosed(DomainEvent.DiscussionClosed event) {
+    public void onDiscussionClosed(ScmDomainEvent.DiscussionClosed event) {
         var discussion = event.discussion();
         if (!hasValidScopeId("Discussion closed", discussion.id(), event.context().scopeId())) {
             return;
@@ -1804,7 +1339,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionReopened(DomainEvent.DiscussionReopened event) {
+    public void onDiscussionReopened(ScmDomainEvent.DiscussionReopened event) {
         var discussion = event.discussion();
         if (!hasValidScopeId("Discussion reopened", discussion.id(), event.context().scopeId())) {
             return;
@@ -1841,7 +1376,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionAnswered(DomainEvent.DiscussionAnswered event) {
+    public void onDiscussionAnswered(ScmDomainEvent.DiscussionAnswered event) {
         var discussion = event.discussion();
         if (!hasValidScopeId("Discussion answered", discussion.id(), event.context().scopeId())) {
             return;
@@ -1876,7 +1411,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionDeleted(DomainEvent.DiscussionDeleted event) {
+    public void onDiscussionDeleted(ScmDomainEvent.DiscussionDeleted event) {
         Long discussionId = event.discussionId();
         if (!hasValidScopeId("Discussion deleted", discussionId, event.context().scopeId())) {
             return;
@@ -1893,9 +1428,7 @@ public class ActivityEventListener {
         );
     }
 
-    // ========================================================================
     // Discussion Comment Events
-    // ========================================================================
 
     /**
      * Handle discussion comment created events.
@@ -1906,7 +1439,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionCommentCreated(DomainEvent.DiscussionCommentCreated event) {
+    public void onDiscussionCommentCreated(ScmDomainEvent.DiscussionCommentCreated event) {
         var commentData = event.comment();
         if (!hasValidScopeId("Discussion comment created", commentData.id(), event.context().scopeId())) {
             return;
@@ -1944,7 +1477,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionCommentEdited(DomainEvent.DiscussionCommentEdited event) {
+    public void onDiscussionCommentEdited(ScmDomainEvent.DiscussionCommentEdited event) {
         var commentData = event.comment();
         if (!hasValidScopeId("Discussion comment edited", commentData.id(), event.context().scopeId())) {
             return;
@@ -1982,7 +1515,7 @@ public class ActivityEventListener {
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onDiscussionCommentDeleted(DomainEvent.DiscussionCommentDeleted event) {
+    public void onDiscussionCommentDeleted(ScmDomainEvent.DiscussionCommentDeleted event) {
         Long commentId = event.commentId();
         if (!hasValidScopeId("Discussion comment deleted", commentId, event.context().scopeId())) {
             return;
@@ -1995,79 +1528,6 @@ public class ActivityEventListener {
                 Instant.now(),
                 ActivityTargetType.DISCUSSION_COMMENT,
                 commentId
-            )
-        );
-    }
-
-    // ========================================================================
-    // Project Status Update Events
-    // ========================================================================
-
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectStatusUpdateCreated(DomainEvent.ProjectStatusUpdateCreated event) {
-        var data = event.statusUpdate();
-        if (!hasValidScopeId("Project status update created", data.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt =
-            data.createdAt() != null ? data.createdAt() : data.updatedAt() != null ? data.updatedAt() : Instant.now();
-        safeRecord("project status update created", data.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
-                occurredAt,
-                getActorOrNull(data.creatorId()),
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_STATUS_UPDATE,
-                data.id(),
-                0.0 // Status updates tracked without XP
-            )
-        );
-    }
-
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectStatusUpdateUpdated(DomainEvent.ProjectStatusUpdateUpdated event) {
-        var data = event.statusUpdate();
-        if (!hasValidScopeId("Project status update updated", data.id(), event.context().scopeId())) {
-            return;
-        }
-        Instant occurredAt = data.updatedAt() != null ? data.updatedAt() : Instant.now();
-        safeRecord("project status update updated", data.id(), () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
-                occurredAt,
-                getActorOrNull(data.creatorId()),
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_STATUS_UPDATE,
-                data.id(),
-                0.0
-            )
-        );
-    }
-
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onProjectStatusUpdateDeleted(DomainEvent.ProjectStatusUpdateDeleted event) {
-        Long id = event.statusUpdateId();
-        if (!hasValidScopeId("Project status update deleted", id, event.context().scopeId())) {
-            return;
-        }
-        safeRecord("project status update deleted", id, () ->
-            activityEventService.record(
-                event.context().scopeId(),
-                ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
-                Instant.now(),
-                null,
-                resolveRepositoryForProjectId(event.projectId()),
-                ActivityTargetType.PROJECT_STATUS_UPDATE,
-                id,
-                0.0
             )
         );
     }

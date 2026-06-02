@@ -14,7 +14,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,7 +28,6 @@ import tools.jackson.databind.ObjectMapper;
  * mentor virtual-thread executor; the orchestration lives in {@link MentorChatService}.
  */
 @WorkspaceScopedController
-@ConditionalOnProperty(prefix = "hephaestus.sandbox", name = "enabled", havingValue = "true")
 @RequestMapping("/mentor/chat")
 @Tag(name = "Mentor Chat", description = "Mentor chat SSE stream")
 @RequiredArgsConstructor
@@ -123,7 +121,7 @@ public class MentorChatController {
     }
 
     private static String textOrNull(JsonNode node, String field) {
-        return node.has(field) && node.get(field).isTextual() ? node.get(field).asText() : null;
+        return node.has(field) && node.get(field).isString() ? node.get(field).asString() : null;
     }
 
     /** Emit one error chunk + the AI-SDK [DONE] sentinel; complete the emitter. */

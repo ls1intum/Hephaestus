@@ -5,7 +5,7 @@
 This file governs the entire repository. Each service has its own `AGENTS.md` with service-specific patterns:
 
 - `webapp/AGENTS.md` — React, TanStack, Tailwind patterns
-- `server/AGENTS.md` — Spring Boot, JPA, testing (includes the `gitprovider.webhook` receiver)
+- `server/AGENTS.md` — Spring Boot, JPA, testing (includes the `integration.core.webhook` receiver)
 
 ## 1. Architecture map
 
@@ -109,20 +109,20 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Keep business logic in services annotated with `@Service` and transactional boundaries (`@Transactional`) where needed. Controllers should be thin (input validation + delegation).
 - Use Lombok consistently (`@Getter`, `@Setter`, etc.) but prefer explicit builders or records when immutability helps.
 - Group new tests under the proper JUnit tag so CI picks them up (`@Tag("unit")`, `@Tag("integration")`, or `@Tag("live")`). Follow AAA structure, single assertion focus, deterministic data. See `server/AGENTS.md` for testing patterns.
-- Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `gitprovider.team` for established patterns.
+- Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `integration.scm.domain.team` for established patterns.
 - Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
 - Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.
-- Annotate record components in DTOs with `org.springframework.lang.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
+- Annotate record components in DTOs with `org.jspecify.annotations.NonNull` when the API requires a value; leave optional fields bare so the OpenAPI spec stays minimal without extra schema annotations.
 - Prefer resource-oriented workspace endpoints: express lifecycle transitions via HTTP methods (for example `PATCH /workspaces/{workspaceSlug}/status`) instead of RPC-style verbs and return consistent `ProblemDetail` payloads for errors.
 - When adding or changing REST endpoints, follow the centralized exception-handling rules in `docs/contributor/api-error-handling.md` so every controller returns RFC-7807 `ProblemDetail` responses via `@RestControllerAdvice`.
 - Controller-level integration tests should extend `AbstractWorkspaceIntegrationTest` (or an equivalent domain-specific base), exercise access control through `WebTestClient` + `TestAuthUtils`, and follow the contributor testing guide's checklist. This keeps authentication, validation, and persistence assertions consistent across new endpoints.
 
 ## 8. Webhook receiver (Java) expectations
 
-- Lives at `server/src/main/java/de/tum/cit/aet/hephaestus/gitprovider/webhook/`. Pure verifier/builder classes (HMAC, GitLab token, subject builders, dedup-id) sit beside Spring-backed controllers, JetStream publisher, and stream bootstrap — all gated together via `RuntimeRole.WEBHOOK_PROPERTY`.
+- Lives at `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/`. Pure verifier/builder classes (HMAC, GitLab token, subject builders, dedup-id) sit beside Spring-backed controllers, JetStream publisher, and stream bootstrap — all gated together via `RuntimeRole.WEBHOOK_PROPERTY`.
 - Production runs the receiver in a dedicated `webhook-server` container (same image as `application-server`, `SPRING_PROFILES_ACTIVE=prod,webhook`). The app-server's deploy cycle therefore does not interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable.
-- NATS subject grammar: `github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`. Dots in path segments are replaced with `~`; nested GitLab groups join with `~`. The consumer-side prefix builder at `gitprovider.sync.NatsConsumerService#buildSubjectPrefix` must agree — `SubjectGrammarRoundTripTest` enforces this for every committed fixture.
-- HMAC / hex / locale safety enforced by ArchUnit: `HexEncodingArchTest` (only `HexFormat.of()`), `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). Coverage gate: `gitprovider.webhook` package ≥ 0.95 branch coverage in JaCoCo.
+- NATS subject grammar: `github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`. Dots in path segments are replaced with `~`; nested GitLab groups join with `~`. The consumer-side prefix builder at `integration.core.consumer.ConsumerSubjectMath#buildSubjectPrefix` must agree — `SubjectGrammarRoundTripTest` enforces this for every committed fixture.
+- HMAC / hex / locale safety enforced by ArchUnit: `HexEncodingArchTest` (only `HexFormat.of()`), `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). Coverage gate: `integration.core.webhook` package ≥ 0.95 branch coverage in JaCoCo.
 - Configuration: bound to `hephaestus.webhook.*` via `core.webhook.WebhookProperties` (shared with auto-registration in `workspace/GitLabWebhookService`).
 
 ## 9. Documentation & assets

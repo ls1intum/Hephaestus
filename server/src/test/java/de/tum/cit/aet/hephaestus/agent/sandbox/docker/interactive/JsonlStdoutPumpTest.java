@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("JsonlStdoutPump")
 class JsonlStdoutPumpTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -62,12 +61,11 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("parses well-formed JSONL frames in order")
     void parsesFrames() {
         Captured c = runPump("{\"t\":\"a\"}\n{\"t\":\"b\"}\n{\"t\":\"c\"}\n");
         assertThat(c.frames()).hasSize(3);
-        assertThat(c.frames().get(0).get("t").asText()).isEqualTo("a");
-        assertThat(c.frames().get(2).get("t").asText()).isEqualTo("c");
+        assertThat(c.frames().get(0).get("t").asString()).isEqualTo("a");
+        assertThat(c.frames().get(2).get("t").asString()).isEqualTo("c");
     }
 
     @Test
@@ -77,7 +75,7 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
         String line = "{\"t\":\"echo\",\"p\":\"x" + LINE_SEP + "y" + PARA_SEP + "z\"}\n";
         Captured c = runPump(line);
         assertThat(c.frames()).hasSize(1);
-        String decoded = c.frames().get(0).get("p").asText();
+        String decoded = c.frames().get(0).get("p").asString();
         assertThat(decoded).contains(LINE_SEP).contains(PARA_SEP);
         assertThat(LINE_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
         assertThat(PARA_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
@@ -90,24 +88,22 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
         String line = "{\"t\":\"echo\",\"p\":\"a\\nb\\rc\"}\n";
         Captured c = runPump(line);
         assertThat(c.frames()).hasSize(1);
-        String decoded = c.frames().get(0).get("p").asText();
+        String decoded = c.frames().get(0).get("p").asString();
         assertThat(decoded).isEqualTo("a\nb\rc");
     }
 
     @Test
-    @DisplayName("malformed line increments parse counter and pump continues")
     void malformedLineSurvived() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
         Captured c = runPump("{\"t\":\"a\"}\n{not json}\n{\"t\":\"c\"}\n", parseErrors, LINE_CAP);
         assertThat(c.frames()).hasSize(2);
-        assertThat(c.frames().get(0).get("t").asText()).isEqualTo("a");
-        assertThat(c.frames().get(1).get("t").asText()).isEqualTo("c");
+        assertThat(c.frames().get(0).get("t").asString()).isEqualTo("a");
+        assertThat(c.frames().get(1).get("t").asString()).isEqualTo("c");
         assertThat(parseErrors.count()).isEqualTo(1.0);
     }
 
     @Test
-    @DisplayName("blank lines are silently skipped (not counted as errors)")
     void blankLinesSkipped() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
@@ -117,18 +113,16 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("oversized line is dropped (parse error counter), pump terminates")
     void oversizedLineRejected() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         Counter parseErrors = reg.counter("test.parse.error");
         String big = "{\"t\":\"" + "x".repeat(200) + "\"}\n{\"t\":\"after\"}\n";
         Captured c = runPump(big, parseErrors, 64);
         assertThat(parseErrors.count()).isGreaterThanOrEqualTo(1.0);
-        assertThat(c.frames()).noneMatch(f -> "after".equals(f.get("t").asText()));
+        assertThat(c.frames()).noneMatch(f -> "after".equals(f.get("t").asString()));
     }
 
     @Test
-    @DisplayName("raw \\r bytes between would-be frames do NOT split: only \\n is a terminator")
     void rawCarriageReturnBetweenFramesIsNotASplitter() {
         // BufferedReader.readLine splits on CR; our \n-only pump must not. (Jackson is lenient with trailing
         // content after the first complete value — up to one frame may parse, but never two.)

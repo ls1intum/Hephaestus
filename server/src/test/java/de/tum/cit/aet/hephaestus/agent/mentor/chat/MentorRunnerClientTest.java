@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.MentorRunnerException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,7 +34,6 @@ import tools.jackson.databind.node.ObjectNode;
  * implementation of {@link AttachedSandbox} that buffers sent frames and pushes replies through
  * a registered listener — letting us drive the JSON-RPC protocol synchronously without Docker.
  */
-@DisplayName("MentorRunnerClient")
 class MentorRunnerClientTest extends BaseUnitTest {
 
     private FakeSandbox sandbox;
@@ -76,7 +76,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
         // Drain the sent frame and respond with a matching id.
         JsonNode request = sandbox.takeFrame();
         long id = request.get("id").asLong();
-        assertThat(request.get("method").asText()).isEqualTo("hello");
+        assertThat(request.get("method").asString()).isEqualTo("hello");
 
         sandbox.pushFrame(responseOf(id, mapper.createObjectNode().put("protocolVersion", 1)));
 
@@ -85,7 +85,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Error response surfaces as MentorRunnerException with the code")
     void errorResponseBecomesException() throws Exception {
         CompletableFuture<JsonNode> future = client.openThread(UUID.randomUUID());
         JsonNode request = sandbox.takeFrame();
@@ -105,7 +104,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PI_ERROR / INVALID_STATE codes mark the exception as sandbox-poisoning")
     void poisoningErrorCodes() {
         MentorRunnerException pi = new MentorRunnerException(
             MentorRunnerException.CODE_PI_ERROR,
@@ -125,7 +123,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("Event notifications flow to the registered consumer")
     void eventFanOutToConsumer() {
         ObjectNode notification = mapper.createObjectNode();
         notification.put("jsonrpc", "2.0");
@@ -137,11 +134,10 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(notification);
 
         assertThat(events).hasSize(1);
-        assertThat(events.get(0).get("type").asText()).isEqualTo("runner_ready");
+        assertThat(events.get(0).get("type").asString()).isEqualTo("runner_ready");
     }
 
     @Test
-    @DisplayName("fetch_context callback writes back a result frame on stdin")
     void fetchContextRoundTrip() {
         ObjectNode callback = mapper.createObjectNode();
         callback.put("jsonrpc", "2.0");
@@ -161,7 +157,6 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("fetch_context callback preserves string ids — the runner uses fc-<uuid>, not numerics")
     void fetchContextRoundTrip_preservesStringIds() {
         // Regression: an earlier impl coerced frame.get("id").asLong() → 0 for any non-numeric
         // id, then echoed back `id: 0` which the runner's pendingFetchContexts (keyed by the
@@ -179,13 +174,12 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(callback);
 
         JsonNode response = sandbox.takeFrame();
-        assertThat(response.get("id").isTextual()).as("id must remain a string").isTrue();
-        assertThat(response.get("id").asText()).isEqualTo(callbackId);
+        assertThat(response.get("id").isString()).as("id must remain a string").isTrue();
+        assertThat(response.get("id").asString()).isEqualTo(callbackId);
         assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
     }
 
     @Test
-    @DisplayName("fetch_context error response preserves string id")
     void fetchContextErrorRoundTrip_preservesStringIds() {
         String callbackId = "fc-" + UUID.randomUUID();
         ObjectNode callback = mapper.createObjectNode();
@@ -197,12 +191,12 @@ class MentorRunnerClientTest extends BaseUnitTest {
         sandbox.pushFrame(callback);
 
         JsonNode response = sandbox.takeFrame();
-        assertThat(response.get("id").isTextual()).isTrue();
-        assertThat(response.get("id").asText()).isEqualTo(callbackId);
+        assertThat(response.get("id").isString()).isTrue();
+        assertThat(response.get("id").asString()).isEqualTo(callbackId);
         assertThat(response.get("error").get("code").asInt()).isEqualTo(-32600);
     }
 
-    // ─── helpers ─────────────────────────────────────────────────────────────────────────
+    // helpers
 
     private ObjectNode responseOf(long id, JsonNode result) {
         ObjectNode out = mapper.createObjectNode();
@@ -221,18 +215,8 @@ class MentorRunnerClientTest extends BaseUnitTest {
         private final CopyOnWriteArrayList<Consumer<JsonNode>> listeners = new CopyOnWriteArrayList<>();
 
         @Override
-        public UUID sessionId() {
-            return sessionId;
-        }
-
-        @Override
-        public String userId() {
-            return "u1";
-        }
-
-        @Override
-        public String workspaceId() {
-            return "w1";
+        public SandboxIdentity identity() {
+            return new SandboxIdentity(sessionId, "u1", "w1");
         }
 
         @Override

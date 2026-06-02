@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.finding;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -25,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("Practice finding controller integration")
 class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -112,17 +111,13 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return id;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /practices/findings")
     class ListFindings {
 
         @Test
         @WithUser
-        @DisplayName("returns empty page when no findings exist")
         void shouldReturnEmptyPage() {
             webTestClient
                 .get()
@@ -140,7 +135,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns only current user's findings")
         void shouldReturnOnlyOwnFindings() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "My finding", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
@@ -167,7 +161,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("filters by practice slug")
         void shouldFilterByPracticeSlug() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "Practice A", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
@@ -191,7 +184,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("filters by verdict")
         void shouldFilterByVerdict() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "Good", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
@@ -213,7 +205,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("filters by practice slug AND verdict combined")
         void shouldFilterByPracticeSlugAndVerdict() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "A pos", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
@@ -281,7 +272,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("caps page size at 100")
         void shouldCapPageSize() {
             insertFinding(
                 practiceA,
@@ -341,7 +331,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("does not leak internal fields and returns complete list-item shape")
         void shouldReturnCorrectShapeWithoutInternalFields() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "Shape check", "NEGATIVE", "MAJOR", 0.85f, "PULL_REQUEST", 42L, now);
@@ -391,7 +380,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        @DisplayName("returns 401 for unauthenticated request")
         void shouldReturn401ForUnauthenticated() {
             webTestClient.get().uri(BASE_URI, workspace.getWorkspaceSlug()).exchange().expectStatus().isUnauthorized();
         }
@@ -443,7 +431,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("does not return findings from a different workspace")
         void shouldNotReturnFindingsFromDifferentWorkspace() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "My WS finding", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
@@ -512,17 +499,13 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings/summary
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /practices/findings/summary")
     class GetSummary {
 
         @Test
         @WithUser
-        @DisplayName("returns empty list when no findings exist")
         void shouldReturnEmptyList() {
             webTestClient
                 .get()
@@ -538,7 +521,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns per-practice aggregation with correct counts and all fields")
         void shouldReturnCorrectCountsAndFields() {
             Instant now = Instant.now();
             Instant oldest = now.minus(2, ChronoUnit.HOURS);
@@ -609,7 +591,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        @DisplayName("returns 401 for unauthenticated request")
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()
@@ -621,7 +602,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("excludes other users' findings from summary")
         void shouldExcludeOtherUsersFindings() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "Mine", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
@@ -646,17 +626,13 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings/{findingId}
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /practices/findings/{findingId}")
     class GetFindingDetail {
 
         @Test
         @WithUser
-        @DisplayName("returns full detail for own finding")
         void shouldReturnDetailForOwnFinding() {
             Instant now = Instant.now();
             UUID findingId = insertFinding(
@@ -714,7 +690,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns 404 for other user's finding")
         void shouldReturn404ForOtherUserFinding() {
             User otherUser = persistUser("other-contributor");
             UUID otherId = insertFinding(
@@ -739,7 +714,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        @DisplayName("returns 401 for unauthenticated request")
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()
@@ -751,7 +725,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns 404 for non-existent finding")
         void shouldReturn404ForNonExistentFinding() {
             webTestClient
                 .get()
@@ -764,7 +737,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns evidence JSON in detail view when present")
         void shouldReturnEvidenceWhenPresent() {
             UUID findingId = UUID.randomUUID();
             String evidenceJson = "{\"locations\":[{\"file\":\"README.md\",\"line\":42}]}";
@@ -804,7 +776,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns 404 for finding in different workspace")
         void shouldReturn404ForFindingInDifferentWorkspace() {
             // Create finding in current workspace
             UUID findingId = insertFinding(
@@ -841,12 +812,9 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // GET /practices/findings/pull-request/{prId}
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("GET /practices/findings/pull-request/{prId}")
     class GetPullRequestFindings {
 
         @Test
@@ -888,7 +856,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("includes other users' findings for same PR")
         void shouldIncludeOtherUsersFindingsForSamePr() {
             Instant now = Instant.now();
             insertFinding(practiceA, contributor, "My PR finding", "POSITIVE", "INFO", 0.9f, "PULL_REQUEST", 100L, now);
@@ -927,7 +894,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        @DisplayName("returns 401 for unauthenticated request")
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()
@@ -939,7 +905,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("returns empty list for unknown PR")
         void shouldReturnEmptyForUnknownPr() {
             webTestClient
                 .get()
@@ -987,7 +952,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        @DisplayName("does not return PR findings from a different workspace")
         void shouldNotReturnPrFindingsFromDifferentWorkspace() {
             Instant now = Instant.now();
             insertFinding(

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -33,6 +35,7 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -86,6 +89,30 @@ public class AgentJob {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private AgentJobStatus status = AgentJobStatus.QUEUED;
+
+    /**
+     * Identifies which external system this job runs against. Resolves the per-kind
+     * {@code FeedbackChannel} / {@code InlineFindingChannel}. New rows MUST set this
+     * at submit time; nullable on the column only because legacy rows are backfilled.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "integration_kind", length = 48)
+    @Nullable
+    private IntegrationKind integrationKind;
+
+    /**
+     * Discriminator for the work subject this job analyses. Drives polymorphic agent
+     * dispatch — for example {@code DiffNotePoster} short-circuits when this is not
+     * {@link SubjectClass#PULL_REQUEST} so issues / docs / threads don't attempt
+     * diff-note delivery.
+     *
+     * <p>Nullable for legacy rows; backfill assumes {@code PULL_REQUEST} because
+     * today's review pipeline only operates on PRs/MRs.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subject_class", length = 48)
+    @Nullable
+    private SubjectClass subjectClass;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
@@ -172,7 +199,7 @@ public class AgentJob {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    // -- LLM usage aggregates (populated at job completion from agent-reported usage) --
+    // LLM usage aggregates (populated at job completion from agent-reported usage)
 
     @Column(name = "llm_model", length = 100)
     private String llmModel;

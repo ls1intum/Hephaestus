@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.workspace;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.context.properties.bind.Name;
-import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -65,7 +65,6 @@ import org.springframework.validation.annotation.Validated;
  * @param initGitlabDefault whether to initialize a default GitLab PAT workspace at startup (default: {@code false})
  * @param gitlabDefault configuration for the default GitLab workspace; required when {@code initGitlabDefault} is {@code true}
  * @see DefaultProperties
- * @see Workspace.GitProviderMode
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.workspace")

@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -44,7 +44,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  *   <li>Security requirements (admin-only mutations)</li>
  * </ul>
  */
-@DisplayName("Workspace Team Settings Controller")
 @Tag("integration")
 class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -96,22 +95,16 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         label = createLabel("feature", "0366d6", repository);
     }
 
-    // ========================================================================
     // Team Visibility Settings Tests
-    // ========================================================================
 
     @Nested
-    @DisplayName("Team Visibility Settings")
     class TeamVisibilitySettingsTests {
 
         @Test
         @WithAdminUser
-        @DisplayName("GET /teams/{teamId}/settings - as admin returns settings")
         void getTeamSettings_asAdmin_shouldReturnSettings() {
-            // Arrange
             ensureAdminMembership(workspace);
 
-            // Act & Assert
             WorkspaceTeamSettingsDTO result = webTestClient
                 .get()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -130,9 +123,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
 
         @Test
-        @DisplayName("GET /teams/{teamId}/settings - as non-member returns 403")
         void getTeamSettings_asNonMember_shouldReturn403() {
-            // Act & Assert
             webTestClient
                 .get()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -145,11 +136,9 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("PATCH /teams/{teamId}/settings - as admin updates and returns 200")
         void updateTeamHidden_asAdmin_shouldUpdateAndReturn200() {
-            // Arrange
             ensureAdminMembership(workspace);
             var request = new UpdateTeamSettingsRequestDTO(true);
 
-            // Act
             WorkspaceTeamSettingsDTO result = webTestClient
                 .patch()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -163,7 +152,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 .returnResult()
                 .getResponseBody();
 
-            // Assert
             assertThat(result).isNotNull();
             assertThat(result.hidden()).isTrue();
 
@@ -177,7 +165,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithMentorUser
         @DisplayName("PATCH /teams/{teamId}/settings - as non-admin returns 403")
         void updateTeamHidden_asNonAdmin_shouldReturn403() {
-            // Arrange
             persistUser("mentor");
             User memberUser = persistUser("member-" + System.nanoTime());
             ensureWorkspaceMembership(
@@ -187,7 +174,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             );
             var request = new UpdateTeamSettingsRequestDTO(true);
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), team.getId())
@@ -203,12 +189,10 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("PATCH /teams/{teamId}/settings - invalid team returns 404")
         void updateTeamHidden_invalidTeam_shouldReturn404() {
-            // Arrange
             ensureAdminMembership(workspace);
             var request = new UpdateTeamSettingsRequestDTO(true);
             Long nonExistentTeamId = 999999L;
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri("/workspaces/{slug}/teams/{teamId}/settings", workspace.getWorkspaceSlug(), nonExistentTeamId)
@@ -221,22 +205,16 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    // ========================================================================
     // Repository Visibility Settings Tests
-    // ========================================================================
 
     @Nested
-    @DisplayName("Repository Visibility Settings")
     class RepositoryVisibilitySettingsTests {
 
         @Test
         @WithAdminUser
-        @DisplayName("GET /teams/{teamId}/settings/repositories/{repoId} - as admin returns settings")
         void getRepositorySettings_asAdmin_shouldReturnSettings() {
-            // Arrange
             ensureAdminMembership(workspace);
 
-            // Act & Assert
             WorkspaceTeamRepositorySettingsDTO result = webTestClient
                 .get()
                 .uri(
@@ -261,9 +239,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
 
         @Test
-        @DisplayName("GET /teams/{teamId}/settings/repositories/{repoId} - as non-member returns 401")
         void getRepositorySettings_asNonMember_shouldReturn403() {
-            // Act & Assert
             webTestClient
                 .get()
                 .uri(
@@ -281,11 +257,9 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("PATCH /teams/{teamId}/settings/repositories/{repoId} - as admin updates and returns 200")
         void updateRepositoryHidden_asAdmin_shouldUpdateAndReturn200() {
-            // Arrange
             ensureAdminMembership(workspace);
             var request = new UpdateRepositorySettingsRequestDTO(true);
 
-            // Act
             WorkspaceTeamRepositorySettingsDTO result = webTestClient
                 .patch()
                 .uri(
@@ -304,7 +278,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 .returnResult()
                 .getResponseBody();
 
-            // Assert
             assertThat(result).isNotNull();
             assertThat(result.hiddenFromContributions()).isTrue();
 
@@ -322,7 +295,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithMentorUser
         @DisplayName("PATCH /teams/{teamId}/settings/repositories/{repoId} - as non-admin returns 403")
         void updateRepositoryHidden_asNonAdmin_shouldReturn403() {
-            // Arrange
             persistUser("mentor");
             User memberUser = persistUser("member-repo-" + System.nanoTime());
             ensureWorkspaceMembership(
@@ -332,7 +304,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             );
             var request = new UpdateRepositorySettingsRequestDTO(true);
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri(
@@ -353,12 +324,10 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("PATCH /teams/{teamId}/settings/repositories/{repoId} - invalid repository returns 404")
         void updateRepositoryHidden_invalidRepository_shouldReturn404() {
-            // Arrange
             ensureAdminMembership(workspace);
             var request = new UpdateRepositorySettingsRequestDTO(true);
             Long nonExistentRepoId = 999999L;
 
-            // Act & Assert
             webTestClient
                 .patch()
                 .uri(
@@ -376,22 +345,16 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         }
     }
 
-    // ========================================================================
     // Label Filter Settings Tests
-    // ========================================================================
 
     @Nested
-    @DisplayName("Label Filter Settings")
     class LabelFilterSettingsTests {
 
         @Test
         @WithAdminUser
-        @DisplayName("GET /teams/{teamId}/settings/label-filters - as admin returns filters")
         void getLabelFilters_asAdmin_shouldReturnFilters() {
-            // Arrange
             ensureAdminMembership(workspace);
 
-            // Act & Assert
             List<LabelInfoDTO> result = webTestClient
                 .get()
                 .uri(
@@ -415,10 +378,8 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("POST /teams/{teamId}/settings/label-filters/{labelId} - as admin adds and returns 201")
         void addLabelFilter_asAdmin_shouldAddAndReturn201() {
-            // Arrange
             ensureAdminMembership(workspace);
 
-            // Act
             webTestClient
                 .post()
                 .uri(
@@ -442,7 +403,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithMentorUser
         @DisplayName("POST /teams/{teamId}/settings/label-filters/{labelId} - as non-admin returns 403")
         void addLabelFilter_asNonAdmin_shouldReturn403() {
-            // Arrange
             persistUser("mentor");
             User memberUser = persistUser("member-label-" + System.nanoTime());
             ensureWorkspaceMembership(
@@ -451,7 +411,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole.MEMBER
             );
 
-            // Act & Assert
             webTestClient
                 .post()
                 .uri(
@@ -468,9 +427,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
 
         @Test
         @WithAdminUser
-        @DisplayName("POST /teams/{teamId}/settings/label-filters/{labelId} - duplicate label returns existing filter")
         void addLabelFilter_duplicateLabel_shouldReturnExisting() {
-            // Arrange
             ensureAdminMembership(workspace);
 
             // Add the filter first
@@ -510,7 +467,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("DELETE /teams/{teamId}/settings/label-filters/{labelId} - as admin removes and returns 204")
         void removeLabelFilter_asAdmin_shouldRemoveAndReturn204() {
-            // Arrange
             ensureAdminMembership(workspace);
             // First add the filter
             webTestClient
@@ -530,7 +486,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
             var filtersBefore = labelFilterRepository.findByWorkspaceIdAndTeamId(workspace.getId(), team.getId());
             assertThat(filtersBefore).hasSize(1);
 
-            // Act
             webTestClient
                 .delete()
                 .uri(
@@ -553,11 +508,9 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         @WithAdminUser
         @DisplayName("DELETE /teams/{teamId}/settings/label-filters/{labelId} - not exists returns 404")
         void removeLabelFilter_notExists_shouldReturn404() {
-            // Arrange
             ensureAdminMembership(workspace);
             Long nonExistentLabelId = 999999L;
 
-            // Act & Assert
             webTestClient
                 .delete()
                 .uri(
@@ -574,9 +527,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
 
         @Test
         @WithAdminUser
-        @DisplayName("GET /teams/{teamId}/settings/label-filters - after adding filters returns them")
         void getLabelFilters_afterAdding_shouldReturnFilters() {
-            // Arrange
             ensureAdminMembership(workspace);
             Label secondLabel = createLabel("bug", "d73a4a", repository);
 
@@ -607,7 +558,6 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 .expectStatus()
                 .isCreated();
 
-            // Act
             List<LabelInfoDTO> result = webTestClient
                 .get()
                 .uri(
@@ -623,26 +573,20 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 .returnResult()
                 .getResponseBody();
 
-            // Assert
             assertThat(result).isNotNull();
             assertThat(result).hasSize(2);
             assertThat(result).extracting(LabelInfoDTO::name).containsExactlyInAnyOrder("feature", "bug");
         }
     }
 
-    // ========================================================================
     // XP Filtering Integration Tests
-    // ========================================================================
 
     @Nested
-    @DisplayName("XP Filtering Integration")
     class XpFilteringIntegrationTests {
 
         @Test
         @WithAdminUser
-        @DisplayName("Hidden team settings persist across requests")
         void hiddenTeamSettings_shouldPersistAcrossRequests() {
-            // Arrange
             ensureAdminMembership(workspace);
 
             // Act: Hide the team
@@ -674,9 +618,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
 
         @Test
         @WithAdminUser
-        @DisplayName("Hidden repository settings persist across requests")
         void hiddenRepositorySettings_shouldPersistAcrossRequests() {
-            // Arrange
             ensureAdminMembership(workspace);
 
             // Act: Hide the repository from contributions
@@ -718,9 +660,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
 
         @Test
         @WithAdminUser
-        @DisplayName("Can toggle team visibility back to visible")
         void toggleTeamVisibility_shouldWorkBothWays() {
-            // Arrange
             ensureAdminMembership(workspace);
 
             // Act: Hide the team
@@ -748,15 +688,12 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
                 .returnResult()
                 .getResponseBody();
 
-            // Assert
             assertThat(result).isNotNull();
             assertThat(result.hidden()).isFalse();
         }
     }
 
-    // ========================================================================
     // Test Helper Methods
-    // ========================================================================
 
     /**
      * Creates and persists a team entity for testing.

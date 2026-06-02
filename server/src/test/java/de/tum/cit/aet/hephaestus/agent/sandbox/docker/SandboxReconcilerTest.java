@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
-@DisplayName("SandboxReconciler")
 class SandboxReconcilerTest extends BaseUnitTest {
 
     @Mock
@@ -40,98 +38,16 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        SandboxProperties properties = new SandboxProperties(
-            true,
-            "unix:///var/run/docker.sock",
-            false,
-            null,
-            5,
-            10,
-            60,
-            null,
-            8080,
-            null,
-            209_715_200L,
-            500_000,
-            null
-        );
+        // The reconciler only exists when the worker role is active (DockerSandboxConfiguration is
+        // worker-role-gated); there is no longer a property-level disable, so no SandboxProperties.
         meterRegistry = new SimpleMeterRegistry();
-        reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, properties, meterRegistry);
+        reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
     }
 
     @Nested
-    @DisplayName("Disabled guard")
-    class DisabledGuard {
-
-        @Test
-        @DisplayName("should skip startup reconciliation when disabled")
-        void shouldSkipStartupWhenDisabled() {
-            SandboxProperties disabledProps = new SandboxProperties(
-                false,
-                "unix:///var/run/docker.sock",
-                false,
-                null,
-                5,
-                10,
-                60,
-                null,
-                8080,
-                null,
-                209_715_200L,
-                500_000,
-                null
-            );
-            var disabledReconciler = new SandboxReconciler(
-                jobRepository,
-                containerManager,
-                networkManager,
-                disabledProps,
-                meterRegistry
-            );
-
-            disabledReconciler.onStartup();
-
-            verify(jobRepository, never()).findByStatus(any());
-        }
-
-        @Test
-        @DisplayName("should skip periodic reconciliation when disabled")
-        void shouldSkipPeriodicWhenDisabled() {
-            SandboxProperties disabledProps = new SandboxProperties(
-                false,
-                "unix:///var/run/docker.sock",
-                false,
-                null,
-                5,
-                10,
-                60,
-                null,
-                8080,
-                null,
-                209_715_200L,
-                500_000,
-                null
-            );
-            var disabledReconciler = new SandboxReconciler(
-                jobRepository,
-                containerManager,
-                networkManager,
-                disabledProps,
-                meterRegistry
-            );
-
-            disabledReconciler.periodicReconciliation();
-
-            verify(jobRepository, never()).findByStatusIn(any());
-        }
-    }
-
-    @Nested
-    @DisplayName("Startup reconciliation")
     class StartupReconciliation {
 
         @Test
-        @DisplayName("should mark orphaned RUNNING jobs as FAILED when no container exists")
         void shouldMarkOrphanedJobsAsFailed() {
             UUID jobId = UUID.randomUUID();
             AgentJob orphanedJob = new AgentJob();
@@ -158,7 +74,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should also cleanup Docker resources during startup")
         void shouldCleanupDockerResourcesDuringStartup() {
             UUID orphanedJobId = UUID.randomUUID();
 
@@ -186,7 +101,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not mark jobs with active containers matched by label")
         void shouldNotMarkActiveContainerJobs() {
             UUID jobId = UUID.randomUUID();
             AgentJob activeJob = new AgentJob();
@@ -215,7 +129,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not mark any jobs as FAILED when no RUNNING jobs exist")
         void shouldDoNothingWithNoRunningJobs() {
             when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
             // Startup always runs Docker resource cleanup
@@ -230,11 +143,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Periodic reconciliation")
     class PeriodicReconciliation {
 
         @Test
-        @DisplayName("should remove orphaned containers")
         void shouldRemoveOrphanedContainers() {
             UUID orphanedJobId = UUID.randomUUID();
             String orphanedContainerId = "orphaned-container";
@@ -263,7 +174,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not remove containers with active jobs")
         void shouldNotRemoveActiveContainers() {
             UUID activeJobId = UUID.randomUUID();
             String containerId = "active-container";
@@ -293,7 +203,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove orphaned networks")
         void shouldRemoveOrphanedNetworks() {
             UUID orphanedJobId = UUID.randomUUID();
             String networkId = "net-orphaned";
@@ -351,7 +260,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should continue cleaning networks when container scan fails")
         void shouldContinueNetworkCleanupOnContainerScanFailure() {
             UUID orphanedJobId = UUID.randomUUID();
 
@@ -371,7 +279,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should cleanup all managed resources when DB query fails")
         void shouldCleanupAllWhenDbQueryFails() {
             UUID orphanedJobId = UUID.randomUUID();
 
@@ -402,7 +309,6 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should record reconciliation duration")
         void shouldRecordReconciliationDuration() {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(List.of());

@@ -1,24 +1,27 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Duration;
-import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -41,49 +44,51 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final WorkspaceService workspaceService;
-    private final WorkspaceInstallationService workspaceInstallationService;
-    private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
-    private final GitHubAppTokenService gitHubAppTokenService;
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final GitLabProperties gitLabProperties;
     private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
+    private final ConnectionService connectionService;
     private final WebClient webClient;
+
+    /**
+     * Per-kind availability providers — used to derive default server URLs for PAT
+     * bootstrap without binding to a specific vendor's {@code Properties} bean. The
+     * workspace module never has to know which vendor owns which property prefix.
+     */
+    private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     public WorkspaceProvisioningService(
         WorkspaceProperties workspaceProperties,
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceService workspaceService,
-        WorkspaceInstallationService workspaceInstallationService,
-        WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
-        GitHubAppTokenService gitHubAppTokenService,
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceScopeFilter workspaceScopeFilter,
-        GitLabProperties gitLabProperties,
-        AuthenticatedGitProviderUserService authenticatedGitProviderUserService
+        AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
+        ConnectionService connectionService,
+        List<WorkspaceProviderAvailability> providerAvailabilityList
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceService = workspaceService;
-        this.workspaceInstallationService = workspaceInstallationService;
-        this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
-        this.gitHubAppTokenService = gitHubAppTokenService;
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
-        this.workspaceScopeFilter = workspaceScopeFilter;
-        this.gitLabProperties = gitLabProperties;
         this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
+        this.connectionService = connectionService;
+        Map<IntegrationKind, WorkspaceProviderAvailability> map = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceProviderAvailability a : providerAvailabilityList) {
+            map.put(a.kind(), a);
+        }
+        this.providerAvailability = map;
         this.webClient = WebClient.builder()
+            .clientConnector(WebClientConnectors.systemDns())
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
@@ -135,11 +140,21 @@ public class WorkspaceProvisioningService {
             ownerUserId
         );
 
-        workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
-        workspace.setPersonalAccessToken(config.token());
         workspace.setRepositorySelection(RepositorySelection.SELECTED);
-
         Workspace savedWorkspace = workspaceRepository.save(workspace);
+
+        // Provision the GitHub PAT Connection row. instance_key="pat" matches the
+        // backfill convention for legacy PAT workspaces — single PAT row per workspace,
+        // ACTIVE state, bearer credential stored encrypted via the per-row AAD.
+        connectionService.provisionPatConnection(
+            savedWorkspace,
+            IntegrationKind.GITHUB,
+            "pat",
+            new ConnectionConfig.GitHubPatConfig(accountLogin, /* serverUrl */ null, Set.of()),
+            config.token(),
+            "bootstrap-pat-workspace-" + savedWorkspace.getId()
+        );
+
         log.info(
             "Created default PAT workspace: accountLogin={}, workspaceId={}",
             savedWorkspace.getAccountLogin(),
@@ -192,9 +207,27 @@ public class WorkspaceProvisioningService {
             );
         }
 
-        // Check if a workspace already exists for this group path
-        if (workspaceRepository.findByAccountLoginIgnoreCase(groupPath).isPresent()) {
-            log.debug("Skipped GitLab PAT workspace creation: reason=workspaceAlreadyExists, groupPath={}", groupPath);
+        // A workspace already exists for this account-login. Two cases:
+        //   (a) it has an ACTIVE GitLab Connection → already bootstrapped, no-op.
+        //   (b) it has an ACTIVE non-GitLab Connection (e.g. GitHub) → refuse cross-vendor
+        //       attach. Symmetric with GithubLifecycleListener#createOrUpdateFromInstallation.
+        //       Falling through to createWorkspace would crash on the slug unique constraint.
+        Optional<Workspace> existing = workspaceRepository.findByAccountLoginIgnoreCase(groupPath);
+        if (existing.isPresent()) {
+            long existingId = existing.get().getId();
+            if (connectionService.findActive(existingId, IntegrationKind.GITLAB).isPresent()) {
+                log.debug(
+                    "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
+                    existingId,
+                    groupPath
+                );
+                return;
+            }
+            log.warn(
+                "Skipped GitLab PAT workspace creation, workspace has ACTIVE non-GITLAB Connection (cross-vendor refuse): workspaceId={}, groupPath={}",
+                existingId,
+                groupPath
+            );
             return;
         }
 
@@ -214,14 +247,28 @@ public class WorkspaceProvisioningService {
             ownerUserId
         );
 
-        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
-        workspace.setPersonalAccessToken(config.token());
         workspace.setRepositorySelection(RepositorySelection.ALL);
-        if (!isBlank(config.serverUrl())) {
-            workspace.setServerUrl(config.serverUrl().trim());
-        }
-
         Workspace savedWorkspace = workspaceRepository.save(workspace);
+
+        // instance_key derived from "<serverUrl>:<groupId>" lets multiple GitLab orgs
+        // co-exist if needed; the group id isn't known yet at bootstrap so we use the
+        // server URL alone — webhook registration will fill in the group id later.
+        String instanceKey = serverUrl;
+        connectionService.provisionPatConnection(
+            savedWorkspace,
+            IntegrationKind.GITLAB,
+            instanceKey,
+            new ConnectionConfig.GitLabConfig(
+                serverUrl,
+                /* gitlabGroupId */ null,
+                /* gitlabWebhookId */ null,
+                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                Set.of()
+            ),
+            config.token(),
+            "bootstrap-gitlab-pat-workspace-" + savedWorkspace.getId()
+        );
+
         log.info(
             "Created default GitLab PAT workspace: groupPath={}, workspaceId={}",
             savedWorkspace.getAccountLogin(),
@@ -290,14 +337,31 @@ public class WorkspaceProvisioningService {
 
     /**
      * Resolves the GitLab server URL from the workspace config or falls back to the
-     * global default from {@link GitLabProperties}.
+     * global default exposed via {@link WorkspaceProviderAvailability}.
+     *
+     * <p>The availability port exposes the same URL the wizard would show — that URL is the
+     * one configured under {@code hephaestus.integration.gitlab.default-server-url} (the historical
+     * single source of truth). When availability is unset (feature flag off), throws —
+     * bootstrap of a GitLab workspace cannot proceed without one.
      */
     private String resolveGitLabServerUrl(String configServerUrl) {
         if (!isBlank(configServerUrl)) {
             String url = configServerUrl.trim();
             return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
         }
-        return gitLabProperties.defaultServerUrl();
+        WorkspaceProviderAvailability gitLabAvailability = providerAvailability.get(IntegrationKind.GITLAB);
+        if (gitLabAvailability == null) {
+            throw new IllegalStateException(
+                "GitLab provider availability port is not configured; cannot resolve default GitLab server URL"
+            );
+        }
+        return gitLabAvailability
+            .hintUrl()
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitLab provider availability has no connection hint; default server URL unavailable"
+                )
+            );
     }
 
     /**
@@ -322,7 +386,7 @@ public class WorkspaceProvisioningService {
             }
         }
 
-        WebClient gitlabClient = WebClient.builder().build();
+        WebClient gitlabClient = WebClient.builder().clientConnector(WebClientConnectors.systemDns()).build();
 
         // Try personal access token endpoint first
         GitLabTokenUserResponse userInfo = null;
@@ -482,177 +546,8 @@ public class WorkspaceProvisioningService {
             });
     }
 
-    /**
-     * Enumerates GitHub App installations and ensures each has a corresponding workspace.
-     * <p>
-     * Intentionally NOT {@code @Transactional}: each installation is provisioned
-     * in its own transaction so that a failure in one does not roll back others.
-     */
-    public void ensureGitHubAppInstallations() {
-        if (!gitHubAppTokenService.isConfigured()) {
-            log.info(
-                "Skipped GitHub App installation processing: reason=credentialsNotConfigured, appId={}",
-                gitHubAppTokenService.getConfiguredAppId()
-            );
-            return;
-        }
-
-        try {
-            String appJwt = gitHubAppTokenService.generateAppJWT();
-
-            // Get app info
-            AppInfoResponse appInfo = webClient
-                .get()
-                .uri("/app")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToMono(AppInfoResponse.class)
-                .block();
-
-            if (appInfo == null) {
-                log.warn("Skipped GitHub App processing: reason=nullAppInfoResponse");
-                return;
-            }
-
-            String ownerLogin = appInfo.owner() != null ? appInfo.owner().login() : "unknown";
-            log.info(
-                "Authenticated as GitHub App: appName={}, appSlug={}, appId={}, ownerLogin={}",
-                appInfo.name(),
-                appInfo.slug(),
-                appInfo.id(),
-                ownerLogin
-            );
-
-            // List installations
-            List<InstallationDto> installations = webClient
-                .get()
-                .uri("/app/installations")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToFlux(InstallationDto.class)
-                .collectList()
-                .block();
-
-            if (installations == null || installations.isEmpty()) {
-                log.warn(
-                    "Skipped GitHub App processing: reason=noInstallations, appSlug={}, appId={}",
-                    appInfo.slug(),
-                    appInfo.id()
-                );
-                return;
-            }
-
-            log.info(
-                "Ensured GitHub App installations reflected as workspaces: installationCount={}",
-                installations.size()
-            );
-
-            for (InstallationDto installation : installations) {
-                String accountLogin = installation.account() != null ? installation.account().login() : "<unknown>";
-                log.info(
-                    "Processed GitHub App installation: installationId={}, accountLogin={}, selection={}",
-                    installation.id(),
-                    accountLogin,
-                    installation.repositorySelection()
-                );
-                synchronizeInstallation(installation);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to reconcile GitHub App installations: reason=apiError", e);
-        }
-    }
-
-    private void synchronizeInstallation(InstallationDto installation) {
-        if (installation.account() == null) {
-            log.warn("Skipped installation sync: reason=noAccountInfo, installationId={}", installation.id());
-            return;
-        }
-
-        // Check if installation is suspended - don't waste cycles on suspended installations
-        if (installation.suspendedAt() != null) {
-            log.info("Skipped installation sync: reason=suspended, installationId={}", installation.id());
-            gitHubAppTokenService.markInstallationSuspended(installation.id());
-            // If workspace exists, ensure it's marked suspended
-            workspaceRepository
-                .findByInstallationId(installation.id())
-                .ifPresent(ws -> {
-                    if (ws.getStatus() != Workspace.WorkspaceStatus.SUSPENDED) {
-                        workspaceInstallationService.updateWorkspaceStatus(
-                            installation.id(),
-                            Workspace.WorkspaceStatus.SUSPENDED
-                        );
-                    }
-                });
-            return;
-        }
-        // Mark active in memory for fast fail-fast checks
-        gitHubAppTokenService.markInstallationActive(installation.id());
-
-        String login = installation.account().login();
-
-        if (workspaceScopeFilter.isActive() && !workspaceScopeFilter.isOrganizationAllowed(login)) {
-            log.info(
-                "Skipped installation sync: reason=filteredByScope, installationId={}, accountLogin={}",
-                installation.id(),
-                login
-            );
-            return;
-        }
-
-        String accountType = installation.account().type();
-        long installationId = installation.id();
-        RepositorySelection selection = convertRepositorySelection(installation.repositorySelection());
-
-        log.info(
-            "Ensured installation workspace: installationId={}, orgLogin={}, selection={}",
-            installationId,
-            login,
-            selection
-        );
-
-        var account = installation.account();
-        ProvisioningListener.AccountType wsAccountType = "Organization".equalsIgnoreCase(accountType)
-            ? ProvisioningListener.AccountType.ORGANIZATION
-            : ProvisioningListener.AccountType.USER;
-
-        Workspace workspace = workspaceInstallationService.createOrUpdateFromInstallation(
-            installationId,
-            account.id(),
-            login,
-            wsAccountType,
-            account.avatarUrl(),
-            selection
-        );
-
-        if (workspace == null) {
-            log.warn(
-                "Skipped workspace creation: reason=userNotFound, installationId={}, orgLogin={}",
-                installationId,
-                login
-            );
-            return;
-        }
-
-        workspace = workspaceService.updateAccountLogin(workspace.getId(), login);
-
-        log.info("Configured organization sync via webhooks: workspaceSlug={}", workspace.getWorkspaceSlug());
-
-        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(installationId, null, true);
-    }
-
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private RepositorySelection convertRepositorySelection(String selection) {
-        if (selection == null) {
-            return null;
-        }
-        return switch (selection.toLowerCase()) {
-            case "all" -> RepositorySelection.ALL;
-            case "selected" -> RepositorySelection.SELECTED;
-            default -> null;
-        };
     }
 
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
@@ -721,22 +616,7 @@ public class WorkspaceProvisioningService {
         @JsonProperty("html_url") String htmlUrl
     ) {}
 
-    // ============ DTOs for GitHub REST API ============
-
-    private record AppInfoResponse(long id, String name, String slug, OwnerDto owner) {}
-
-    private record OwnerDto(String login) {}
-
-    private record InstallationDto(
-        long id,
-        AccountDto account,
-        @JsonProperty("repository_selection") String repositorySelection,
-        @JsonProperty("suspended_at") Instant suspendedAt
-    ) {}
-
-    private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
-
-    // ============ DTOs for GitLab REST API ============
+    // DTOs for GitLab REST API
 
     private record GitLabTokenUserResponse(
         Long id,

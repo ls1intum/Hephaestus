@@ -8,27 +8,26 @@ import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +39,6 @@ import tools.jackson.databind.ObjectMapper;
  * Integration test for {@link AgentJobService#submit} exercising real PostgreSQL
  * idempotency (partial unique index), config snapshot capture, and event publication.
  */
-@DisplayName("AgentJobService submission integration")
 @RecordApplicationEvents
 class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
@@ -82,7 +80,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("submit-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("submit-test"));
 
         agentConfig = new AgentConfig();
         agentConfig.setWorkspace(workspace);
@@ -151,7 +149,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
     private PullRequestReviewSubmissionRequest createRequest(String commitSha) {
         RepositoryRef repoRef = new RepositoryRef(repo.getId(), repo.getNameWithOwner(), repo.getDefaultBranch());
-        EventPayload.PullRequestData prData = new EventPayload.PullRequestData(
+        ScmEventPayload.PullRequestData prData = new ScmEventPayload.PullRequestData(
             prId,
             10,
             "Submit Test PR",
@@ -175,11 +173,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("submits job with correct metadata, status, and config snapshot")
         void submitsJobWithCorrectState() {
             var request = createRequest("abc123");
 
@@ -199,7 +195,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
-            assertThat(job.getMetadata().get("commit_sha").asText()).isEqualTo("abc123");
+            assertThat(job.getMetadata().get("commit_sha").asString()).isEqualTo("abc123");
 
             // Verify persisted in DB
             AgentJob fromDb = agentJobRepository.findById(job.getId()).orElseThrow();
@@ -207,7 +203,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("publishes AgentJobCreatedEvent with correct fields")
         void publishesAgentJobCreatedEvent() {
             var request = createRequest("event123");
 
@@ -226,11 +221,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Idempotency")
     class Idempotency {
 
         @Test
-        @DisplayName("deduplicates submissions with same commit SHA")
         void deduplicatesSameCommitSha() {
             var request = createRequest("dedup123");
 
@@ -254,7 +247,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("allows different commit SHAs as separate jobs")
         void allowsDifferentCommitSha() {
             var request1 = createRequest("sha_v1");
             var request2 = createRequest("sha_v2");
@@ -278,7 +270,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("deduplicates against pre-existing job with same idempotency key")
         void deduplicatesAgainstPreExistingJob() {
             // Pre-insert a QUEUED job with the same idempotency key via raw repository,
             // simulating a job created by a concurrent request before this one.
@@ -307,11 +298,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("No config")
     class NoConfig {
 
         @Test
-        @DisplayName("returns empty when no agent config exists")
         void returnsEmptyWhenNoConfig() {
             agentConfigRepository.deleteAll();
 
@@ -326,7 +315,6 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("returns empty when config is disabled")
         void returnsEmptyWhenDisabled() {
             agentConfig.setEnabled(false);
             agentConfigRepository.save(agentConfig);
@@ -343,11 +331,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Config snapshot")
     class ConfigSnapshot {
 
         @Test
-        @DisplayName("captures config snapshot at submit time, immune to later changes")
         void capturesSnapshotAtSubmitTime() {
             var request = createRequest("snapshot123");
 

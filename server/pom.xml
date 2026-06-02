@@ -86,8 +86,18 @@
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
+        <shedlock.version>5.16.0</shedlock.version>
     </properties>
     <dependencies>
+        <!-- JSpecify nullness annotations (@NonNull/@Nullable). The forward-looking standard
+             adopted by Spring Framework 7 / Boot 4, replacing the deprecated
+             org.springframework.lang.* annotations. Version managed by the Spring Boot BOM.
+             A custom ModelConverter (JSpecifyRequiredModelConverter) teaches SpringDoc to read
+             these for OpenAPI `required`, since swagger-core only recognises the Spring ones. -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -100,6 +110,18 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- ShedLock: distributed lock for @Scheduled methods so multi-pod replicas don't double-run.
+             JDBC-template provider piggybacks on the existing DataSource (no new infra). -->
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>${shedlock.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+            <version>${shedlock.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -504,9 +526,9 @@
 
                             <!-- Output configuration -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
-                            <packageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github</packageName>
-                            <apiPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github.api</apiPackageName>
-                            <modelPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.github.model
+                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model
                             </modelPackageName>
                             <modelNamePrefix>GH</modelNamePrefix>
 
@@ -589,9 +611,9 @@
 
                             <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
                             <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
-                            <packageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab</packageName>
-                            <apiPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab.api</apiPackageName>
-                            <modelPackageName>de.tum.cit.aet.hephaestus.gitprovider.graphql.gitlab.model
+                            <packageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql</packageName>
+                            <apiPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.api</apiPackageName>
+                            <modelPackageName>de.tum.cit.aet.hephaestus.integration.scm.gitlab.graphql.model
                             </modelPackageName>
                             <modelNamePrefix>GL</modelNamePrefix>
 
@@ -690,7 +712,7 @@
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
                                         <include name="RelayQueryRequest.java"/>
                                         <include name="RelayQueryResponse.java"/>
                                     </fileset>
@@ -702,7 +724,7 @@
                                     <substitution
                                             expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model">
                                         <include name="ProjectPendingCardsParametrizedInput.java"/>
                                         <include name="IssueProjectCardsParametrizedInput.java"/>
                                         <include name="PullRequestProjectCardsParametrizedInput.java"/>
@@ -763,13 +785,23 @@
                                         </limit>
                                     </limits>
                                 </rule>
-                                <!-- Webhook receiver pure-class layer (subject grammar, dedup ID,
-                                     HMAC, hex): ≥95% branch coverage so refactors fail loudly. -->
+                                <!-- Webhook pure-class layer (ingest pipeline + per-vendor subject
+                                     grammar, dedup ID, HMAC signature verification): ≥95% branch
+                                     coverage so a refactor that drops a case fails loudly. The
+                                     Spring-wired *WebhookSecretSource adapters are excluded — they
+                                     are credential lookups exercised by integration tests, not pure
+                                     classes. Each listed package is gated independently. -->
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
-                                        <include>de.tum.cit.aet.hephaestus.gitprovider.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.core.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.scm.github.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook</include>
+                                        <include>de.tum.cit.aet.hephaestus.integration.slack.webhook</include>
                                     </includes>
+                                    <excludes>
+                                        <exclude>*WebhookSecretSource</exclude>
+                                    </excludes>
                                     <limits>
                                         <limit>
                                             <counter>BRANCH</counter>
@@ -953,6 +985,13 @@
                     <referenceUrl>
                         hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
+                    <!--
+                        Exclude Liquibase-managed sidecar tables that have no JPA entity
+                        and never will (managed by external libraries).
+                          - shedlock: ShedLock distributed lock table (managed by the
+                            ShedLock library via JdbcTemplateLockProvider, not JPA).
+                    -->
+                    <diffExcludeObjects>table:shedlock</diffExcludeObjects>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>
@@ -1045,7 +1084,7 @@
               ./mvnw test -Parchitecture-tests
 
             These tests verify:
-            - Module boundaries (gitprovider isolation, SPI patterns)
+            - Module boundaries (integration.scm isolation, SPI patterns)
             - SOLID principles (SRP, DIP, ISP)
             - Spring best practices (layered architecture, security)
             - Code quality (complexity limits, naming conventions)
@@ -1097,7 +1136,7 @@
                      compile failures because the model classes don't exist. The
                      `model` subdirectory is only present when codegen actually ran. -->
                 <file>
-                    <exists>${basedir}/target/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/gitprovider/graphql/github/model</exists>
+                    <exists>${basedir}/target/generated-sources/graphql-github/de/tum/cit/aet/hephaestus/integration/scm/github/graphql/model</exists>
                 </file>
             </activation>
             <properties>

@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
@@ -57,9 +57,7 @@ public class WorkspaceTeamLabelService {
         this.workspaceTeamSettingsService = workspaceTeamSettingsService;
     }
 
-    // ========================================================================
     // User/Team Queries
-    // ========================================================================
 
     public List<UserTeamsDTO> getUsersWithTeams(String slug) {
         Workspace workspace = requireWorkspace(slug);
@@ -83,9 +81,7 @@ public class WorkspaceTeamLabelService {
         return getUsersWithTeams(requireSlug(workspaceContext));
     }
 
-    // ========================================================================
     // Label Management
-    // ========================================================================
 
     /**
      * Adds a label as a filter for a team in a workspace.
@@ -167,9 +163,7 @@ public class WorkspaceTeamLabelService {
         return removeLabelFromTeam(requireSlug(workspaceContext), teamId, labelId);
     }
 
-    // ========================================================================
     // Helper Methods
-    // ========================================================================
 
     /**
      * Creates a TeamInfoDTO with workspace-scoped settings applied.

@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
@@ -29,10 +29,10 @@ public class WorkspaceLifecycleService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceLifecycleService.class);
 
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
     /** Absent under webhook profile (server.enabled=false). */
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     // Repositories for workspace-scoped data cleanup
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
@@ -46,9 +46,9 @@ public class WorkspaceLifecycleService {
     private final List<WorkspacePurgeContributor> purgeContributors;
 
     public WorkspaceLifecycleService(
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,
@@ -217,19 +217,11 @@ public class WorkspaceLifecycleService {
         // Step 7: Unlink organization (don't delete - Organization is a shared entity)
         workspace.setOrganization(null);
 
-        // Step 7b: Clear sensitive credentials (defense in depth — purged workspaces
-        // are retained for audit but should not hold decryptable secrets)
-        workspace.setPersonalAccessToken(null);
-        workspace.setSlackToken(null);
-        workspace.setSlackSigningSecret(null);
-
-        // Step 7c: Clear GitLab webhook references on the managed entity.
-        // The GitLabWebhookPurgeAdapter already deregistered the webhook via a suspended
-        // transaction (NOT_SUPPORTED), but that operates on a separate entity instance.
-        // We must clear these on the managed instance to prevent step 9's save from
-        // re-persisting stale values.
-        workspace.setGitlabGroupId(null);
-        workspace.setGitlabWebhookId(null);
+        // Step 7b: Per-workspace credentials and integration metadata (PAT / Slack tokens,
+        // GitLab webhook ids) live on Connection rows now. The ConnectionPurgeContributor
+        // (order=-100, runs as part of step 4 above) already transitions every active
+        // Connection to UNINSTALLED, which clears credential blobs atomically inside the
+        // transition. No explicit clearing needed here.
 
         // Step 8: Clear sync timestamps for clean slate on potential reactivation
         // This ensures that if the workspace is ever reactivated, sync will fetch fresh data
@@ -301,9 +293,7 @@ public class WorkspaceLifecycleService {
         return slug;
     }
 
-    // -------------------------------------------------------------------------
     // NATS consumer lifecycle helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Stop NATS consumer for a workspace.

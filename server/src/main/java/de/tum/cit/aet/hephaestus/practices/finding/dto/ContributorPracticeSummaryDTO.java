@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Per-practice aggregation of findings for a contributor. Used by dashboard practice cards

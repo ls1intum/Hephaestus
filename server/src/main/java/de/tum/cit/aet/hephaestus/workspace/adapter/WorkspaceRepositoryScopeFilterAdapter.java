@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import org.springframework.stereotype.Component;
 
 /**
- * Adapter that bridges the workspace's scope filter to the gitprovider SPI.
+ * Adapter that bridges the workspace's scope filter to the integration.scm SPI.
  * <p>
- * This allows the gitprovider module (specifically {@code ProcessingContextFactory})
+ * This allows the integration.scm module (specifically {@code integration.scm.github.common.ProcessingContextFactory})
  * to apply repository filtering without directly depending on workspace internals.
  */
 @Component

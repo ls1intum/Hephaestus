@@ -406,9 +406,7 @@ public class DockerClientOperations
         }
     }
 
-    // -------------------------------------------------------------------------
     // Internal helpers
-    // -------------------------------------------------------------------------
 
     private HostConfig buildHostConfig(DockerOperations.HostConfigSpec spec) {
         HostConfig hostConfig = HostConfig.newHostConfig()

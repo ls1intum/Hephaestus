@@ -10,11 +10,9 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** Bans unnamed {@code @UniqueConstraint} on JPA entities so Hibernate's implicit naming can't drift from Liquibase. */
-@DisplayName("JPA entity naming hygiene")
 class JpaEntityNamingArchitectureTest extends HephaestusArchitectureTest {
 
     @Test

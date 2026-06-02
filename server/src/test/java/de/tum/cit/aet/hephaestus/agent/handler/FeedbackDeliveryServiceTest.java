@@ -12,10 +12,10 @@ import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -30,7 +30,6 @@ import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("FeedbackDeliveryService")
 class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -99,11 +98,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("deliverFeedback")
     class DeliverFeedback {
 
         @Test
-        @DisplayName("posts summary note and diff notes when negative findings present")
         void postsNoteAndDiffNotes() {
             AgentJob job = createJob();
             stubOpenPr();
@@ -120,7 +117,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when PR not found in DB (no stub)")
         void skipsWhenPrNotStubbed() {
             AgentJob job = createJob();
 
@@ -131,7 +127,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when delivery is null")
         void skipsWhenDeliveryNull() {
             AgentJob job = createJob();
 
@@ -142,7 +137,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when PR is closed")
         void skipsWhenPrClosed() {
             AgentJob job = createJob();
             var pr = createOpenPr();
@@ -156,7 +150,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when PR is merged and deliverToMerged is false")
         void skipsWhenPrMerged() {
             AgentJob job = createJob();
             var pr = createOpenPr();
@@ -170,7 +163,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when PR is draft")
         void skipsWhenPrDraft() {
             AgentJob job = createJob();
             var pr = createOpenPr();
@@ -184,7 +176,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when user opted out of AI review")
         void skipsWhenAiReviewDisabled() {
             AgentJob job = createJob();
             stubOpenPr();
@@ -199,7 +190,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when PR not found")
         void skipsWhenPrNotFound() {
             AgentJob job = createJob();
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.empty());
@@ -211,7 +201,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not set delivery status when postFormattedBody returns null")
         void doesNotSetDeliveryStatusWhenNoteNull() {
             AgentJob job = createJob();
             stubOpenPr();
@@ -224,7 +213,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("delivers feedback when PR author is null (skips preference check)")
         void deliversWhenAuthorNull() {
             AgentJob job = createJob();
             var pr = createOpenPr();
@@ -240,7 +228,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("entity state unchanged after delivery failure")
         void entityStateUnchangedAfterFailure() {
             AgentJob job = createJob();
             stubOpenPr();
@@ -254,7 +241,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("posts diff notes when mrNote is null but hasNegative is true")
         void postsDiffNotesWhenMrNoteNull() {
             AgentJob job = createJob();
             stubOpenPr();
@@ -271,7 +257,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not throw on feedback delivery failure (soft failure)")
         void doesNotThrowOnFailure() {
             AgentJob job = createJob();
             stubOpenPr();
@@ -282,7 +267,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when metadata is null")
         void skipsWhenMetadataNull() {
             AgentJob job = createJob();
             job.setMetadata(null);
@@ -294,7 +278,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when pull_request_id missing from metadata")
         void skipsWhenPullRequestIdMissing() {
             AgentJob job = createJob();
             ObjectNode metadata = objectMapper.createObjectNode();
@@ -311,7 +294,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("formatPracticeNote")
     class FormatPracticeNote {
 
         @Test
@@ -331,7 +313,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not include preferences or app link in footer")
         void noPreferencesLink() {
             AgentJob job = createJob();
             job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));

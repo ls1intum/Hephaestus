@@ -21,13 +21,11 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-@DisplayName("AgentConfigService")
 class AgentConfigServiceTest extends BaseUnitTest {
 
     @Mock
@@ -63,11 +61,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Credential mode validation")
     class CredentialModeValidation {
 
         @Test
-        @DisplayName("should reject API_KEY mode without internet access")
         void shouldRejectApiKeyWithoutInternet() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -92,7 +88,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject OAUTH mode without internet access")
         void shouldRejectOauthWithoutInternet() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -117,7 +112,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept API_KEY mode with internet access")
         void shouldAcceptApiKeyWithInternet() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -142,7 +136,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept PROXY mode without internet access")
         void shouldAcceptProxyWithoutInternet() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -167,7 +160,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should default to PROXY mode when credentialMode is null")
         void shouldDefaultToProxy() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -191,7 +183,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject credential mode change on update when internet is disabled")
         void shouldRejectCredentialModeChangeOnUpdate() {
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
@@ -220,7 +211,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject disabling internet on existing API_KEY config")
         void shouldRejectDisablingInternetOnApiKeyConfig() {
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
@@ -240,11 +230,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Read")
     class Read {
 
         @Test
-        @DisplayName("should return configs for workspace")
         void shouldReturnConfigsForWorkspace() {
             var configs = java.util.List.of(new AgentConfig(), new AgentConfig());
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(configs);
@@ -256,7 +244,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return single config by ID")
         void shouldReturnConfigById() {
             AgentConfig config = new AgentConfig();
             config.setId(10L);
@@ -268,7 +255,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw not found for non-existent config")
         void shouldThrowNotFoundForNonExistentConfig() {
             when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 
@@ -279,11 +265,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Create")
     class Create {
 
         @Test
-        @DisplayName("should create new config with all fields")
         void shouldCreateNewConfig() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -315,7 +299,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject duplicate name within workspace")
         void shouldRejectDuplicateName() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
 
@@ -339,11 +322,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Update")
     class Update {
 
         @Test
-        @DisplayName("should update existing config and preserve API key when null")
         void shouldUpdateExistingConfigAndPreserveApiKeyWhenNull() {
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
@@ -374,7 +355,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw not found when updating non-existent config")
         void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
             when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 
@@ -387,11 +367,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Delete")
     class Delete {
 
         @Test
-        @DisplayName("should delete config when no active jobs")
         void shouldDeleteConfigWhenNoActiveJobs() {
             AgentConfig config = new AgentConfig();
             config.setId(10L);
@@ -411,7 +389,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject delete when active jobs exist")
         void shouldRejectDeleteWhenActiveJobsExist() {
             AgentConfig config = new AgentConfig();
             config.setId(10L);
@@ -433,7 +410,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw not found when deleting non-existent config")
         void shouldThrowNotFoundWhenDeletingNonExistentConfig() {
             when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 

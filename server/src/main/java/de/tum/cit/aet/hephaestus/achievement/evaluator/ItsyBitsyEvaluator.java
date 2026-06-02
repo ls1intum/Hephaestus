@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.achievement.evaluator;
 import de.tum.cit.aet.hephaestus.achievement.UserAchievement;
 import de.tum.cit.aet.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

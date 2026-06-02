@@ -1,22 +1,24 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.gitprovider.common.events.DomainEvent.TriggerEventNames;
+import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import java.time.Duration;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,7 +29,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * Processes bot commands from MR comments (e.g., {@code /hephaestus review}).
  *
  * <p>Listens for {@link BotCommandReceivedEvent} published by
- * {@link de.tum.cit.aet.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteMessageHandler}
+ * {@link de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabNoteMessageHandler}
  * when a non-system MR comment matches a known command pattern. Runs asynchronously
  * to avoid blocking webhook processing.
  *
@@ -45,23 +47,26 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class BotCommandProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(BotCommandProcessor.class);
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(10);
 
     private final AgentJobService agentJobService;
     private final PullRequestRepository pullRequestRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
-    private final @Nullable GitLabGraphQlClientProvider gitLabGraphQlProvider;
+    private final Map<IntegrationKind, ScmCommentReactionSink> reactionSinks;
 
     public BotCommandProcessor(
         AgentJobService agentJobService,
         PullRequestRepository pullRequestRepository,
         PracticeReviewDetectionGate practiceReviewDetectionGate,
-        @Nullable GitLabGraphQlClientProvider gitLabGraphQlProvider
+        List<ScmCommentReactionSink> reactionSinkList
     ) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
-        this.gitLabGraphQlProvider = gitLabGraphQlProvider;
+        Map<IntegrationKind, ScmCommentReactionSink> map = new EnumMap<>(IntegrationKind.class);
+        for (ScmCommentReactionSink sink : reactionSinkList) {
+            map.put(sink.kind(), sink);
+        }
+        this.reactionSinks = map;
     }
 
     /**
@@ -151,7 +156,7 @@ public class BotCommandProcessor {
                     noteAuthor
                 );
                 case GateDecision.Detect detect -> {
-                    EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+                    ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
                     PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
                         prData,
                         pr.getHeadRefName(),
@@ -191,42 +196,22 @@ public class BotCommandProcessor {
         }
     }
 
-    // ── Emoji reaction ──
+    // Emoji reaction
 
     /**
-     * Add an eyes emoji reaction to the bot command note via GitLab GraphQL
-     * ({@code awardEmojiAdd} mutation). Best-effort — failures are logged but never propagated.
+     * Add an eyes emoji reaction to the bot command note. Dispatches through the
+     * {@link ScmCommentReactionSink} SPI keyed by the event's {@link IntegrationKind};
+     * the publishing vendor adapter stamps its own kind, so a future GitHub or Bitbucket
+     * publisher slots in without touching this class — no vendor constant is named here.
      */
     private void addEyesReaction(BotCommandReceivedEvent event) {
-        if (event.noteId() == null || event.scopeId() == null) {
+        if (event.commentId() == null || event.scopeId() == null) {
             return;
         }
-        if (gitLabGraphQlProvider == null) {
+        ScmCommentReactionSink sink = reactionSinks.get(event.kind());
+        if (sink == null) {
             return;
         }
-
-        try {
-            String awardableId = "gid://gitlab/Note/" + event.noteId();
-
-            var response = gitLabGraphQlProvider
-                .forScope(event.scopeId())
-                .documentName("AwardEmojiAdd")
-                .variable("awardableId", awardableId)
-                .variable("name", "eyes")
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
-
-            if (response != null && response.isValid()) {
-                log.debug("Added eyes reaction: noteId={}, scopeId={}", event.noteId(), event.scopeId());
-            } else {
-                log.debug(
-                    "Eyes reaction GraphQL response invalid: noteId={}, errors={}",
-                    event.noteId(),
-                    response != null ? response.getErrors() : "null"
-                );
-            }
-        } catch (Exception e) {
-            log.debug("Failed to add eyes reaction (non-fatal): noteId={}, error={}", event.noteId(), e.getMessage());
-        }
+        sink.react(event.scopeId(), event.commentId(), "eyes");
     }
 }

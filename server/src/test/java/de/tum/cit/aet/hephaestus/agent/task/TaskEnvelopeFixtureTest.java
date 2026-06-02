@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -20,13 +19,11 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Uses {@link JsonMapper#builder()} to mirror the production bean configuration.
  * A future change to that configuration that alters byte output is intentionally caught here.
  */
-@DisplayName("TaskEnvelope fixture (v1)")
 class TaskEnvelopeFixtureTest extends BaseUnitTest {
 
     private static final String FIXTURE_PATH = "task-fixtures/v1/practice-review.json";
 
     @Test
-    @DisplayName("PracticeReview envelope matches the committed fixture byte-for-byte")
     void matchesFixture() throws IOException {
         JsonMapper productionMapper = JsonMapper.builder().build();
         TaskEnvelopeWriter writer = new TaskEnvelopeWriter(productionMapper);

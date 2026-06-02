@@ -1,11 +1,19 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.AuthMode;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import java.util.Optional;
 
 /**
  * Factory class for creating SyncTarget instances from workspace and repository monitor entities.
- * Centralizes the conversion logic that was previously duplicated across multiple services.
+ *
+ * <p>Integration metadata (installation id, PAT, auth mode) is now pulled from the
+ * {@link ConnectionService} rather than the legacy {@code Workspace} columns. The factory
+ * accepts the service so each call resolves the current Connection state within the
+ * caller's transaction — there's no static cache that could go stale across a rotation.
  */
 public final class SyncTargetFactory {
 
@@ -18,20 +26,39 @@ public final class SyncTargetFactory {
      *
      * @param workspace the workspace containing the repository monitor
      * @param rtm the repository to monitor entity
+     * @param connectionService authoritative source for the workspace's active Connection
      * @return a SyncTarget instance for use with sync services
      */
-    public static SyncTarget create(Workspace workspace, RepositoryToMonitor rtm) {
-        AuthMode authMode = switch (workspace.getGitProviderMode()) {
-            case GITHUB_APP_INSTALLATION -> AuthMode.GITHUB_APP;
-            case PAT_ORG, GITLAB_PAT -> AuthMode.PERSONAL_ACCESS_TOKEN;
-            case null -> AuthMode.GITHUB_APP;
-        };
+    public static SyncTarget create(Workspace workspace, RepositoryToMonitor rtm, ConnectionService connectionService) {
+        long workspaceId = workspace.getId();
+        var gitHubApp = connectionService.findActiveGitHubAppConfig(workspaceId);
+        var gitHubPat = connectionService.findActiveGitHubPatConfig(workspaceId);
+        var gitLab = connectionService.findActiveGitLabConfig(workspaceId);
+
+        AuthMode authMode;
+        Long installationId = null;
+        String personalAccessToken = null;
+
+        if (gitHubApp.isPresent()) {
+            authMode = AuthMode.INSTALLATION_APP;
+            installationId = gitHubApp.get().installationId();
+        } else if (gitHubPat.isPresent()) {
+            authMode = AuthMode.PERSONAL_ACCESS_TOKEN;
+            personalAccessToken = resolveBearerToken(connectionService, workspaceId, IntegrationKind.GITHUB);
+        } else if (gitLab.isPresent()) {
+            authMode = AuthMode.PERSONAL_ACCESS_TOKEN;
+            personalAccessToken = resolveBearerToken(connectionService, workspaceId, IntegrationKind.GITLAB);
+        } else {
+            // No SCM connection bound — caller is responsible for filtering these out
+            // before scheduling work; default to INSTALLATION_APP for backward-compat shape.
+            authMode = AuthMode.INSTALLATION_APP;
+        }
 
         return new SyncTarget(
             rtm.getId(),
-            workspace.getId(),
-            workspace.getInstallationId(),
-            workspace.getPersonalAccessToken(),
+            workspaceId,
+            installationId,
+            personalAccessToken,
             authMode,
             rtm.getNameWithOwner(),
             rtm.getLabelsSyncedAt(),
@@ -50,5 +77,14 @@ public final class SyncTargetFactory {
             rtm.getPullRequestSyncCursor(),
             rtm.getDiscussionSyncCursor()
         );
+    }
+
+    private static String resolveBearerToken(
+        ConnectionService connectionService,
+        long workspaceId,
+        IntegrationKind kind
+    ) {
+        Optional<BearerToken> bundle = connectionService.findActiveBearerToken(workspaceId, kind);
+        return bundle.map(BearerToken::token).orElse(null);
     }
 }

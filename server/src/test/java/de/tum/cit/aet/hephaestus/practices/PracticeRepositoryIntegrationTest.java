@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("PracticeRepository Integration")
 class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -33,7 +32,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("practice-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("practice-test"));
     }
 
     private Practice createPractice(String slug, String name, String category) {
@@ -48,11 +47,9 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("CRUD operations")
     class CrudTests {
 
         @Test
-        @DisplayName("saves and retrieves a practice with all fields")
         void savesAndRetrieves() {
             Practice practice = createPractice("test-slug", "Test Practice", "test-category");
             practice.setCriteria("Check for quality");
@@ -75,11 +72,9 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Unique constraint")
     class UniqueConstraintTests {
 
         @Test
-        @DisplayName("rejects duplicate slug within same workspace")
         void rejectsDuplicateSlugInWorkspace() {
             practiceRepository.save(createPractice("unique-slug", "First", "cat"));
 
@@ -90,12 +85,11 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("allows same slug in different workspaces")
         void allowsSameSlugInDifferentWorkspaces() {
             practiceRepository.save(createPractice("shared-slug", "First", "cat"));
 
             Workspace otherWorkspace = workspaceRepository.save(
-                WorkspaceTestFactory.activeWorkspace("other-workspace")
+                WorkspaceTestFixtures.activeWorkspace("other-workspace")
             );
             Practice otherPractice = createPractice("shared-slug", "Second", "cat");
             otherPractice.setWorkspace(otherWorkspace);
@@ -106,11 +100,9 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Query methods")
     class QueryTests {
 
         @Test
-        @DisplayName("findByWorkspaceIdAndActiveTrue returns only active practices")
         void findsActivePracticesOnly() {
             Practice active = createPractice("active", "Active", "cat");
             Practice inactive = createPractice("inactive", "Inactive", "cat");
@@ -137,7 +129,6 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("existsByWorkspaceId returns true when practices exist")
         void existsByWorkspace() {
             assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isFalse();
 
@@ -147,12 +138,11 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("deleteAllByWorkspaceId removes all practices for workspace")
         void deletesAllByWorkspace() {
             practiceRepository.save(createPractice("one", "One", "cat"));
             practiceRepository.save(createPractice("two", "Two", "cat"));
 
-            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("other-ws"));
+            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
             Practice otherPractice = createPractice("other", "Other", "cat");
             otherPractice.setWorkspace(otherWorkspace);
             practiceRepository.save(otherPractice);

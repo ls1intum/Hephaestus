@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -11,7 +10,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 @Tag("unit")
-@DisplayName("JwtDecoderConfig")
 class JwtDecoderConfigTest {
 
     @EnableConfigurationProperties(KeycloakProperties.class)
@@ -31,7 +29,6 @@ class JwtDecoderConfigTest {
     }
 
     @Test
-    @DisplayName("creates NimbusJwtDecoder in prod when JWK set URI is configured")
     void createsDecoderWhenJwkSetUriConfigured() {
         contextRunner()
             .withPropertyValues(
@@ -45,7 +42,6 @@ class JwtDecoderConfigTest {
     }
 
     @Test
-    @DisplayName("does not create custom decoder when JWK set URI is blank")
     void doesNotCreateDecoderWhenJwkSetUriBlank() {
         contextRunner()
             .withPropertyValues("hephaestus.keycloak.jwk-set-uri=")

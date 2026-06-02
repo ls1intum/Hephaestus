@@ -10,7 +10,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -26,7 +25,6 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Reference: https://github.com/vercel/ai/blob/main/packages/ai/src/ui-message-stream/ui-message-chunks.ts
  */
-@DisplayName("UIMessageChunk wire serialisation")
 class UIMessageChunkSerializationTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -143,7 +141,6 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("chunkFixtures")
-    @DisplayName("chunk → JSON shape matches AI SDK upstream")
     void serialisesMatchesUpstreamShape(UIMessageChunk chunk, String expectedJson) throws Exception {
         String json = MAPPER.writeValueAsString(chunk);
         JsonNode actual = MAPPER.readTree(json);
@@ -157,7 +154,6 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     // BEFORE reaching the spelling assertion.
 
     @Test
-    @DisplayName("Every UIMessageChunk subtype is registered in @JsonSubTypes — silent polymorphism drift trap")
     void everyChunkSubtypeIsRegisteredInJsonSubTypes() {
         // Jackson's @JsonTypeInfo(use=NAME, property="type") only writes the discriminator for
         // subtypes listed in @JsonSubTypes. Adding a new `record Foo implements UIMessageChunk`
@@ -188,7 +184,6 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
 
     @ParameterizedTest
     @EnumSource(UIMessageChunk.FinishReason.class)
-    @DisplayName("FinishReason enum serialises to canonical wire string and round-trips")
     void finishReasonRoundTrips(UIMessageChunk.FinishReason reason) throws Exception {
         String wire = MAPPER.writeValueAsString(reason);
         // Wire form is the kebab-case string literal — NOT the enum constant name.
@@ -198,7 +193,6 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("FinishReason rejects unknown wire strings (defensive against AI SDK drift)")
     void finishReasonRejectsUnknown() {
         // If AI SDK ever ships a `finish` chunk with a new value (e.g. "rate-limit"), we want a
         // fast, loud failure — not a silent null fallback that hides the protocol drift.

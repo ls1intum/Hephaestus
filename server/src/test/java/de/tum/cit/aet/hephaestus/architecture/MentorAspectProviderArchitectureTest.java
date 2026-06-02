@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
 import com.tngtech.archunit.lang.ArchRule;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,13 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
  * refactor that moves the annotation back onto the helper fails at architecture-test time
  * instead of at runtime via {@code LazyInitializationException} on the SSE wire.
  */
-@DisplayName("Mentor aspect provider transactional placement")
 class MentorAspectProviderArchitectureTest extends HephaestusArchitectureTest {
 
     private static final String MENTOR_PROVIDERS_PACKAGE = "..agent.context.providers.mentor..";
 
     @Test
-    @DisplayName("contribute(ContextRequest, Map) on every *AspectProvider must be @Transactional")
     void contributeIsTransactional() {
         ArchRule rule = methods()
             .that()
@@ -55,7 +52,6 @@ class MentorAspectProviderArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    @DisplayName("buildPayload(...) on every *AspectProvider must NOT be @Transactional (self-invocation no-op)")
     void buildPayloadIsNotTransactional() {
         ArchRule rule = noMethods()
             .that()

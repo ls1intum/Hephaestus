@@ -4,8 +4,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.NonNull;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Response DTO for practice definitions.

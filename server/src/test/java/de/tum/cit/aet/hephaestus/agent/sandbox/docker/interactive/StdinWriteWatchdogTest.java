@@ -5,14 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("StdinWriteWatchdog")
 class StdinWriteWatchdogTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("register / unregister are reflected in activeTargets()")
     void registerUnregister() {
         StdinWriteWatchdog wd = new StdinWriteWatchdog();
         UUID id = UUID.randomUUID();
@@ -35,7 +32,6 @@ class StdinWriteWatchdogTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("tick() invokes onWriteTimeout for stalled targets and ignores healthy ones")
     void tickFiresOnStalled() {
         StdinWriteWatchdog wd = new StdinWriteWatchdog();
         AtomicInteger stalledHits = new AtomicInteger();
@@ -74,7 +70,6 @@ class StdinWriteWatchdogTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a throwing target does not prevent other targets from being inspected")
     void throwingTargetIsolated() {
         StdinWriteWatchdog wd = new StdinWriteWatchdog();
         AtomicInteger goodHits = new AtomicInteger();

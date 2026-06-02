@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import tools.jackson.databind.JsonNode;
@@ -53,7 +52,6 @@ import tools.jackson.databind.node.ObjectNode;
  * /workspace} directly. The harness runs as root and the directory is cleaned between tests.
  */
 @LiveLlmTest
-@DisplayName("Practice runner — live LLM round-trip")
 class PracticeRunnerLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -148,7 +146,6 @@ class PracticeRunnerLiveLlmTest {
 
     @Test
     @Timeout(value = 300, unit = TimeUnit.SECONDS)
-    @DisplayName("hardcoded-secrets practice flags a planted API key in a single-file diff")
     void flagsHardcodedSecret_inOneFileDiff() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
 
@@ -211,11 +208,13 @@ class PracticeRunnerLiveLlmTest {
         for (int i = 0; i < findings.size(); i++) {
             JsonNode finding = findings.get(i);
             String tag = "finding[" + i + "]";
-            assertThat(finding.path("practiceSlug").asText()).as(tag + ".practiceSlug").isEqualTo("hardcoded-secrets");
-            assertThat(finding.path("verdict").asText())
+            assertThat(finding.path("practiceSlug").asString())
+                .as(tag + ".practiceSlug")
+                .isEqualTo("hardcoded-secrets");
+            assertThat(finding.path("verdict").asString())
                 .as(tag + ".verdict")
                 .isIn("POSITIVE", "NEGATIVE", "NOT_APPLICABLE");
-            assertThat(finding.path("severity").asText())
+            assertThat(finding.path("severity").asString())
                 .as(tag + ".severity")
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
             double confidence = finding.path("confidence").asDouble(-1.0);
@@ -230,8 +229,8 @@ class PracticeRunnerLiveLlmTest {
         boolean foundNegative = false;
         for (JsonNode finding : findings) {
             if (
-                "hardcoded-secrets".equals(finding.path("practiceSlug").asText()) &&
-                "NEGATIVE".equals(finding.path("verdict").asText())
+                "hardcoded-secrets".equals(finding.path("practiceSlug").asString()) &&
+                "NEGATIVE".equals(finding.path("verdict").asString())
             ) {
                 foundNegative = true;
                 break;
@@ -261,9 +260,7 @@ class PracticeRunnerLiveLlmTest {
         System.out.printf("[practice-live] %d finding(s); negative=%s%n", findings.size(), foundNegative);
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // Workspace staging
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private void stageWorkspace(LiveLlmCredentials creds) throws IOException {
         // ESM resolution walks node_modules upward from the importing file. Production binds the
@@ -401,9 +398,7 @@ class PracticeRunnerLiveLlmTest {
         Files.copy(FIXTURE_DIR.resolve(relativePath), dest, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    // ────────────────────────────────────────────────────────────────────────────────
     // Process plumbing
-    // ────────────────────────────────────────────────────────────────────────────────
 
     private static Process spawnRunner(LiveLlmCredentials creds) throws IOException {
         ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.mjs");

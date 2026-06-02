@@ -51,22 +51,36 @@ spring:
                 jwt:
                     issuer-uri: http://localhost:8081/realms/test
 
-# GitHub configuration for tests (matches actual property)
-github:
-    auth-token: test-token-not-real
-    app:
-        id: 0
-        privateKey: ""
-
 # Disable workspace bootstrapping during tests to prevent API calls
 hephaestus:
+    # Worker role off in tests: the worker capability is the Docker sandbox
+    # (DockerSandboxConfiguration + AgentImagePullBootstrapper), which has no Docker daemon in
+    # CI. Disabling the role keeps those beans out of the context — mentor beans still wire
+    # (they're unconditional) and mock InteractiveSandboxService where they need it.
+    runtime:
+        worker:
+            enabled: false
     # Loud enforcement under test: any unguarded scoped-table query throws.
     # Production runs in 'log' mode for the staging canary period; this override
     # ensures tenancy bugs surface in CI rather than being masked.
     tenancy:
         enforcement: throw
+    security:
+        # 32-char (256-bit) AES key for CredentialBundleConverter under test.
+        # Encrypted credential blobs only persist when a key is configured; without
+        # this, integration tests that go through ConnectionService.rotateBearerToken
+        # fail at the boot stage where the converter requires a key.
+        encryption-key: test-encryption-key-32-bytes-aes
     workspace:
         init-default: false # Disable PAT workspace bootstrap
+    # OAuth state HMAC secret + webhook secret — required by HmacOAuthStateService
+    # at boot. Without these the integration framework can't construct.
+    integration:
+        oauth-state:
+            secret: test-oauth-state-hmac-secret-not-real
+    webhook:
+        secret: test-webhook-shared-secret-not-real
+        external-url: http://localhost:38080
     cors:
         allowed-origins:
             - http://localhost:4200
@@ -83,9 +97,6 @@ hephaestus:
     git:
         enabled: false
         storage-path: /tmp/hephaestus-test-git-repos
-    detection:
-        legacy:
-            enabled: false
     practice-review:
         cooldown-minutes: 0
 

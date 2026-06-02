@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.lang.ArchRule;
 import java.util.Locale;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -12,10 +11,9 @@ import org.junit.jupiter.api.Test;
  * subject grammar must never depend on locale, so every case-fold inside the package must pass
  * {@code Locale.ROOT} explicitly, and {@link Locale#getDefault()} is banned.
  */
-@Tag("architecture")
 class LocaleSafetyArchTest extends HephaestusArchitectureTest {
 
-    private static final String WEBHOOK_PACKAGE = "..gitprovider.webhook..";
+    private static final String WEBHOOK_PACKAGE = "..integration.core.webhook..";
 
     @Test
     void noNakedToLowerCase() {

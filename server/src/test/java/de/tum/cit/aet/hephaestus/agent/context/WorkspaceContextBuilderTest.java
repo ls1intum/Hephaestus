@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("WorkspaceContextBuilder")
 class WorkspaceContextBuilderTest extends BaseUnitTest {
 
     private static AgentJob anyJob() {
@@ -70,11 +69,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("metrics")
     class Metrics {
 
         @Test
-        @DisplayName("records build duration timer keyed by request kind")
         void recordsBuildDurationTimer() {
             var p = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
             builderWithSharedRegistry(p).build(reviewRequest());
@@ -84,7 +81,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("emits required-failure counter before throwing")
         void emitsRequiredFailureCounter() {
             var bad = stubProvider(true, "x.txt", new byte[0], true);
             try {
@@ -101,11 +97,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("invokes all matching providers")
         void invokesAllMatching() {
             var a = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
             var b = stubProvider(false, "b.txt", "B".getBytes(StandardCharsets.UTF_8), false);
@@ -144,11 +138,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("failure policy")
     class FailurePolicy {
 
         @Test
-        @DisplayName("REQUIRED provider failure translates to JobPreparationException")
         void requiredFailureThrows() {
             var bad = stubProvider(true, "x.txt", new byte[0], true);
             assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
@@ -157,7 +149,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("OPTIONAL provider failure is logged and skipped")
         void optionalFailureSkipped() {
             var bad = stubProvider(false, "x.txt", new byte[0], true);
             var good = stubProvider(true, "y.txt", "Y".getBytes(StandardCharsets.UTF_8), false);
@@ -186,7 +177,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("output-key dedup")
     class OutputKeyDedup {
 
         @Test
@@ -228,7 +218,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("path-prefix enforcement")
     class PrefixEnforcement {
 
         @Test
@@ -252,7 +241,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("provider ordering")
     class ProviderOrdering {
 
         @Test
@@ -269,7 +257,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("single-flight per repository")
     class SingleFlight {
 
         @Test

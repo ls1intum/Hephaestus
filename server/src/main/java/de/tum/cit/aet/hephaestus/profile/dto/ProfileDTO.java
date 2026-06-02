@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "User profile header: identity, league standing, contribution surface, XP")

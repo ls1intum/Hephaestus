@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.UserAspectProvider.ActivityInsights;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashMap;
@@ -26,7 +26,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("UserAspectProvider")
 class UserAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -45,7 +44,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     UserAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes user.json under context/target/ with all expected keys")
     void writesUserJson() throws Exception {
         User user = new User();
         user.setLogin("octo");
@@ -73,7 +71,7 @@ class UserAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/user.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("user").get("login").asText()).isEqualTo("octo");
+        assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
         assertThat(root.get("thisWeek").get("prsOpen").asLong()).isEqualTo(2L);
         assertThat(root.get("thisWeek").get("prsMerged").asLong()).isEqualTo(5L);
         assertThat(root.get("lastWeek").get("prsMerged").asLong()).isEqualTo(3L);
@@ -82,7 +80,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("insights: shipping velocity up surfaces increase message")
     void velocityUp() {
         ActivityInsights insights = UserAspectProvider.generateInsights(0, 5, 2, 3, 3, 0, 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("velocity increased"));
@@ -90,7 +87,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("insights: shipping velocity down surfaces reflection topic")
     void velocityDown() {
         ActivityInsights insights = UserAspectProvider.generateInsights(0, 1, 5, 3, 3, 0, 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("Shipping slowed"));
@@ -98,7 +94,6 @@ class UserAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("insights: too many open PRs nudges focus")
     void manyOpenPrs() {
         ActivityInsights insights = UserAspectProvider.generateInsights(10, 0, 0, 0, 0, 0, 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("open PRs"));

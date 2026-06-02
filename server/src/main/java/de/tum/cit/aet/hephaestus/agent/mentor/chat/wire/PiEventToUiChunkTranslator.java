@@ -6,9 +6,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -35,7 +35,7 @@ public class PiEventToUiChunkTranslator {
             log.debug("Skipping malformed Pi event (missing type): {}", piEvent);
             return List.of();
         }
-        String type = piEvent.get("type").asText();
+        String type = piEvent.get("type").asString();
         return switch (type) {
             case "message_start" -> handleMessageStart(piEvent, state);
             case "message_update" -> handleMessageUpdate(piEvent, state);
@@ -70,7 +70,7 @@ public class PiEventToUiChunkTranslator {
         };
     }
 
-    // ─── session_persisted → capture verbatim Pi session JSONL into state ─────────────────
+    // session_persisted → capture verbatim Pi session JSONL into state
 
     private List<UIMessageChunk> handleSessionPersisted(JsonNode event, TranslatorState state) {
         String jsonl = optionalString(event, "jsonl");
@@ -84,7 +84,7 @@ public class PiEventToUiChunkTranslator {
         return List.of();
     }
 
-    // ─── turn_watchdog_fired → Error with user-friendly text ──────────────────────────────
+    // turn_watchdog_fired → Error with user-friendly text
 
     private List<UIMessageChunk> handleWatchdogFired(TranslatorState state) {
         // Runner emits this when the per-turn budget is exceeded; the bare type string
@@ -97,7 +97,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── message_end → no chunks, but captures the authoritative usage snapshot ───────────
+    // message_end → no chunks, but captures the authoritative usage snapshot
 
     private List<UIMessageChunk> handleMessageEnd(JsonNode event, TranslatorState state) {
         // Per pi-coding-agent dist/core/extensions/types.d.ts MessageEndEvent.message: AgentMessage.
@@ -114,7 +114,7 @@ public class PiEventToUiChunkTranslator {
         return List.of();
     }
 
-    // ─── message_start / Start + StartStep ────────────────────────────────────────────────
+    // message_start / Start + StartStep
 
     private List<UIMessageChunk> handleMessageStart(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts MessageStartEvent:
@@ -148,7 +148,7 @@ public class PiEventToUiChunkTranslator {
         return List.of(new UIMessageChunk.StartStep());
     }
 
-    // ─── message_update: text_delta + thinking_delta ──────────────────────────────────────
+    // message_update: text_delta + thinking_delta
 
     private List<UIMessageChunk> handleMessageUpdate(JsonNode event, TranslatorState state) {
         // Pi shape: {type:"message_update", message: AgentMessage, assistantMessageEvent: {...}}
@@ -172,7 +172,7 @@ public class PiEventToUiChunkTranslator {
      * snapshot on {@code message_end.message.usage}, which is the authoritative source.
      */
     private List<UIMessageChunk> handleAssistantMessageEvent(JsonNode ame, JsonNode parent, TranslatorState state) {
-        String innerType = ame.get("type").asText();
+        String innerType = ame.get("type").asString();
         // Best-effort usage + model capture from `partial.usage` / `partial.model`. message_end
         // overwrites with the final snapshot. agent_end has no usage on the event itself.
         capturePartialUsage(ame.path("partial"), state);
@@ -245,8 +245,8 @@ public class PiEventToUiChunkTranslator {
         if (messageNode == null || messageNode.isMissingNode() || !messageNode.isObject()) {
             return;
         }
-        if (messageNode.has("model") && messageNode.get("model").isTextual()) {
-            state.observeModel(messageNode.get("model").asText());
+        if (messageNode.has("model") && messageNode.get("model").isString()) {
+            state.observeModel(messageNode.get("model").asString());
         }
         JsonNode usage = messageNode.path("usage");
         if (usage.isObject()) {
@@ -278,7 +278,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── tool_execution_start / end ───────────────────────────────────────────────────────
+    // tool_execution_start / end
 
     private List<UIMessageChunk> handleToolStart(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent extensions/types.ts ToolExecutionStartEvent:
@@ -340,14 +340,14 @@ public class PiEventToUiChunkTranslator {
         JsonNode content = event.path("result").path("content");
         if (content.isArray() && !content.isEmpty()) {
             JsonNode first = content.get(0);
-            if (first.isObject() && first.path("text").isTextual()) {
-                return first.get("text").asText();
+            if (first.isObject() && first.path("text").isString()) {
+                return first.get("text").asString();
             }
         }
         return null;
     }
 
-    // ─── turn_end ─────────────────────────────────────────────────────────────────────────
+    // turn_end
 
     private List<UIMessageChunk> handleTurnEnd(TranslatorState state) {
         List<UIMessageChunk> out = closeOpenStreamingBlocks(state);
@@ -371,7 +371,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── agent_end → Finish ──────────────────────────────────────────────────────────────
+    // agent_end → Finish
 
     private List<UIMessageChunk> handleAgentEnd(JsonNode event, TranslatorState state) {
         // Pi shape per pi-coding-agent/dist/core/extensions/types.d.ts AgentEndEvent:
@@ -420,8 +420,7 @@ public class PiEventToUiChunkTranslator {
      * {@code STOP} would mask provider regressions (e.g. an upstream change dropping
      * {@code aborted}) and the AI-SDK schema accepts {@code finishReason} as optional.
      */
-    @Nullable
-    static UIMessageChunk.FinishReason mapStopReason(@Nullable String piStopReason) {
+    static UIMessageChunk.@Nullable FinishReason mapStopReason(@Nullable String piStopReason) {
         if (piStopReason == null) return null;
         return switch (piStopReason) {
             case "stop" -> UIMessageChunk.FinishReason.STOP;
@@ -432,7 +431,7 @@ public class PiEventToUiChunkTranslator {
         };
     }
 
-    // ─── link_finding → DataFinding ──────────────────────────────────────────────────────
+    // link_finding → DataFinding
 
     private List<UIMessageChunk> handleLinkFinding(JsonNode event, TranslatorState state) {
         // Runner emits camelCase `findingId` (pi-mentor-runner.mjs defineLinkFindingTool).
@@ -451,7 +450,7 @@ public class PiEventToUiChunkTranslator {
         }
     }
 
-    // ─── pi_error / turn_watchdog_fired → Error ───────────────────────────────────────────
+    // pi_error / turn_watchdog_fired → Error
 
     private List<UIMessageChunk> handleError(JsonNode event, TranslatorState state) {
         String errorText = optionalString(event, "message");
@@ -459,7 +458,7 @@ public class PiEventToUiChunkTranslator {
             errorText = optionalString(event, "error");
         }
         if (errorText == null) {
-            errorText = event.get("type").asText();
+            errorText = event.get("type").asString();
         }
         // Close any open text/reasoning block before the terminal error chunk: the AI SDK
         // reducer crashes on an `error` chunk that follows an unmatched `*-start` (vercel/ai #11700).
@@ -468,7 +467,7 @@ public class PiEventToUiChunkTranslator {
         return out;
     }
 
-    // ─── helpers ──────────────────────────────────────────────────────────────────────────
+    // helpers
 
     /**
      * Return the {@code field}'s text value, or {@code null} if absent, JSON-null, or a non-text
@@ -480,7 +479,7 @@ public class PiEventToUiChunkTranslator {
     private static String optionalString(@Nullable JsonNode node, String field) {
         if (node == null || !node.has(field)) return null;
         JsonNode value = node.get(field);
-        if (value == null || value.isNull() || !value.isTextual()) return null;
-        return value.asText();
+        if (value == null || value.isNull() || !value.isString()) return null;
+        return value.asString();
     }
 }

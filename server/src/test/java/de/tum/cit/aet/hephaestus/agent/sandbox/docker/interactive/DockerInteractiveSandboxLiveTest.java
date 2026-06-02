@@ -57,7 +57,6 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Live integration tests — boots real Docker. Run with {@code -Pgroups=live} or {@code live-tests}. */
 @LiveDockerTest
-@DisplayName("Docker Interactive Sandbox Live")
 class DockerInteractiveSandboxLiveTest {
 
     private static final String NODE_IMAGE = "node:22-slim";
@@ -86,7 +85,6 @@ class DockerInteractiveSandboxLiveTest {
     @BeforeEach
     void setUp() throws Exception {
         SandboxProperties sandboxProperties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -217,11 +215,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Handshake")
     class Handshake {
 
         @Test
-        @DisplayName("ping → pong via subscribe")
         void pingPong() {
             AttachedSandbox sb = adapter.attach(buildSpec("u1", "w1"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
@@ -231,14 +227,13 @@ class DockerInteractiveSandboxLiveTest {
             await()
                 .atMost(Duration.ofSeconds(15))
                 .untilAsserted(() ->
-                    assertThat(frames.stream().anyMatch(n -> "pong".equals(n.path("type").asText()))).isTrue()
+                    assertThat(frames.stream().anyMatch(n -> "pong".equals(n.path("type").asString()))).isTrue()
                 );
             sb.close(Duration.ofSeconds(2));
         }
     }
 
     @Nested
-    @DisplayName("Unicode safety")
     class UnicodeSafety {
 
         // Built at runtime: the U+2028/U+2029 escapes are pre-lexer line terminators in Java.
@@ -259,11 +254,11 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode echoBack = frames
                         .stream()
-                        .filter(n -> "echo_back".equals(n.path("type").asText()))
+                        .filter(n -> "echo_back".equals(n.path("type").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(echoBack).isNotNull();
-                    assertThat(echoBack.path("payload").asText()).isEqualTo(payload);
+                    assertThat(echoBack.path("payload").asString()).isEqualTo(payload);
                 });
             // 3-byte UTF-8 sequences; catches encoding regressions.
             assertThat(LINE_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
@@ -273,7 +268,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Ring buffer overflow")
     class RingBufferOverflow {
 
         @Test
@@ -302,7 +296,7 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         snapshot
                             .stream()
-                            .filter(n -> "tick".equals(n.path("type").asText()))
+                            .filter(n -> "tick".equals(n.path("type").asString()))
                             .count()
                     ).isEqualTo(ringCapacity)
                 );
@@ -311,7 +305,7 @@ class DockerInteractiveSandboxLiveTest {
             assertThat(
                 snapshot
                     .stream()
-                    .filter(n -> "tick".equals(n.path("type").asText()))
+                    .filter(n -> "tick".equals(n.path("type").asString()))
                     .map(n -> n.path("n").asInt())
             )
                 .as("subscriber must observe ticks (%d..%d)", oldestRetainedN, newestN)
@@ -324,11 +318,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Idle eviction")
     class IdleEviction {
 
         @Test
-        @DisplayName("session idle past TTL is reaped with reason=idle")
         void idleReaped() {
             double before = metrics.evictionsBy(EvictionReason.IDLE).count();
             AttachedSandbox sb = adapter.attach(buildSpec("u4", "w4"));
@@ -347,7 +339,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Concurrent attach")
     class ConcurrentAttach {
 
         @Test
@@ -411,14 +402,13 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Container labels")
     class ContainerLabels {
 
         @Test
         @DisplayName("interactive containers carry KIND=interactive + SESSION_ID")
         void labelsPresent() {
             AttachedSandbox sb = adapter.attach(buildSpec("u6", "w6"));
-            String sessionId = sb.sessionId().toString();
+            String sessionId = sb.identity().sessionId().toString();
             var match = containerManager
                 .listManagedContainers()
                 .stream()
@@ -432,7 +422,6 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Workspace mounts")
     class WorkspaceMounts {
 
         @Test
@@ -472,7 +461,6 @@ class DockerInteractiveSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("agent-pi image: workspace setup succeeds with cap-drop=ALL (uid-1000-owned /workspace)")
         void agentPiWorkspaceSetupWithCapDropAll() {
             // node:22-slim lets root create /workspace itself, so it owns it and mkdir never fails.
             // agent-pi pre-creates /workspace owned by 1000:1000 in the Dockerfile; mkdir as root
@@ -505,11 +493,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Attach failure modes")
     class AttachFailureModes {
 
         @Test
-        @DisplayName("runner that crashes before emitting a frame → attach.failure{reason=first_frame_failed}")
         void runnerCrashesBeforeFirstFrame() {
             double timeoutBefore = metrics.attachFailureFirstFrameTimeout.count();
             double failedBefore = metrics.attachFailureFirstFrameFailed.count();
@@ -584,13 +570,11 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Mentor RPC protocol")
     class MentorRpcProtocol {
 
         private static final Duration RPC_TIMEOUT = Duration.ofSeconds(25);
 
         @Test
-        @DisplayName("production bootstrap: sh -c chain succeeds and runner emits runner_ready")
         void productionBootstrapSucceeds() {
             assumeTrue(
                 dockerOps.imageIsPresent(AGENT_PI_IMAGE),
@@ -610,7 +594,9 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         frames
                             .stream()
-                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                            .anyMatch(f ->
+                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
+                            )
                     ).isTrue()
                 );
             sb.close(Duration.ofSeconds(2));
@@ -631,7 +617,9 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         frames
                             .stream()
-                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                            .anyMatch(f ->
+                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
+                            )
                     ).isTrue()
                 );
 
@@ -649,7 +637,7 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode resp = frames
                         .stream()
-                        .filter(f -> helloId.equals(f.path("id").asText()))
+                        .filter(f -> helloId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(resp).as("hello response").isNotNull();
@@ -659,7 +647,6 @@ class DockerInteractiveSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("open_thread + prompt → agent_start + text_delta + agent_end (stub turn)")
         void stubTurn() {
             assumeTrue(dockerOps.imageIsPresent(AGENT_PI_IMAGE), "agent-pi image not in local daemon");
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_turn", "w_turn"));
@@ -672,7 +659,9 @@ class DockerInteractiveSandboxLiveTest {
                     assertThat(
                         frames
                             .stream()
-                            .anyMatch(f -> "runner_ready".equals(f.path("params").path("event").path("type").asText()))
+                            .anyMatch(f ->
+                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
+                            )
                     ).isTrue()
                 );
 
@@ -688,7 +677,7 @@ class DockerInteractiveSandboxLiveTest {
             await()
                 .atMost(RPC_TIMEOUT)
                 .untilAsserted(() ->
-                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asText()))).isTrue()
+                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asString()))).isTrue()
                 );
 
             // open_thread
@@ -706,11 +695,11 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode openResp = frames
                         .stream()
-                        .filter(f -> openId.equals(f.path("id").asText()))
+                        .filter(f -> openId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(openResp).as("open_thread response").isNotNull();
-                    assertThat(openResp.path("result").path("threadId").asText()).isEqualTo(threadId);
+                    assertThat(openResp.path("result").path("threadId").asString()).isEqualTo(threadId);
                 });
 
             // prompt (stub emits: agent_start → message_update/text_delta → agent_end)
@@ -727,7 +716,7 @@ class DockerInteractiveSandboxLiveTest {
                 .untilAsserted(() -> {
                     JsonNode promptResp = frames
                         .stream()
-                        .filter(f -> promptId.equals(f.path("id").asText()))
+                        .filter(f -> promptId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
                     assertThat(promptResp).as("prompt response").isNotNull();
@@ -742,18 +731,18 @@ class DockerInteractiveSandboxLiveTest {
                         .stream()
                         .filter(
                             f ->
-                                "event".equals(f.path("method").asText()) &&
-                                threadId.equals(f.path("params").path("threadId").asText())
+                                "event".equals(f.path("method").asString()) &&
+                                threadId.equals(f.path("params").path("threadId").asString())
                         )
                         .map(f -> f.path("params").path("event"))
                         .collect(Collectors.toList());
-                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asText())))
+                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asString())))
                         .as("agent_start")
                         .isTrue();
-                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asText())))
+                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asString())))
                         .as("message_update / text_delta")
                         .isTrue();
-                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asText())))
+                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asString())))
                         .as("agent_end")
                         .isTrue();
                 });
@@ -762,11 +751,9 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     @Nested
-    @DisplayName("Close lifecycle")
     class CloseLifecycle {
 
         @Test
-        @DisplayName("close transitions to CLOSED and removes container")
         void closeRemoves() {
             AttachedSandbox sb = adapter.attach(buildSpec("u8", "w8"));
             String containerId = ((DockerAttachedSandboxAdapter) sb).containerId();
@@ -782,7 +769,6 @@ class DockerInteractiveSandboxLiveTest {
         }
 
         @Test
-        @DisplayName("send after close throws InteractiveSandboxException")
         void sendAfterClose() {
             AttachedSandbox sb = adapter.attach(buildSpec("u9", "w9"));
             sb.close(Duration.ofSeconds(2));

@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
@@ -169,9 +169,7 @@ public class WorkspaceMembershipController {
         return ResponseEntity.noContent().build();
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
     // Helper methods - throw proper exceptions for consistent RFC-7807 responses
-    // ══════════════════════════════════════════════════════════════════════════
 
     private User requireCurrentUser() {
         return userRepository

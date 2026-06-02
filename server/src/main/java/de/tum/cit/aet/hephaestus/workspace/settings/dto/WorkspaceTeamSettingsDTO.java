@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.settings.dto;
 
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettings;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 
 /**
  * DTO representing workspace-scoped team settings.

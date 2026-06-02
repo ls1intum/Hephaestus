@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -62,9 +62,7 @@ public class WorkspaceTeamSettingsController {
         this.workspaceResolver = workspaceResolver;
     }
 
-    // ========================================================================
     // Team Visibility Settings
-    // ========================================================================
 
     /**
      * Get the settings for a team in the workspace.
@@ -139,9 +137,7 @@ public class WorkspaceTeamSettingsController {
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // ========================================================================
     // Repository Contribution Visibility Settings
-    // ========================================================================
 
     /**
      * Get the settings for a repository within a team in the workspace.
@@ -228,9 +224,7 @@ public class WorkspaceTeamSettingsController {
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // ========================================================================
     // Label Filter Settings
-    // ========================================================================
 
     /**
      * Get all label filters configured for a team in the workspace.

@@ -19,7 +19,6 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("ContributorHistoryProvider")
 class ContributorHistoryProviderTest extends BaseUnitTest {
 
     private static final Long CONTRIBUTOR_ID = 42L;
@@ -38,11 +37,9 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("buildHistoryJson")
     class BuildHistoryJson {
 
         @Test
-        @DisplayName("returns empty when no findings exist")
         void returnsEmptyForNoFindings() {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of()
@@ -54,7 +51,6 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("builds correct JSON structure for single practice")
         void buildsSinglePracticeJson() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -70,14 +66,13 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             assertThat(root).hasSize(1);
 
             JsonNode entry = root.get(0);
-            assertThat(entry.get("practice").asText()).isEqualTo("pr-description-quality");
+            assertThat(entry.get("practice").asString()).isEqualTo("pr-description-quality");
             assertThat(entry.get("positive").asLong()).isEqualTo(1);
             assertThat(entry.get("negative").asLong()).isEqualTo(3);
-            assertThat(entry.get("lastSeen").asText()).isEqualTo("2026-03-20T14:30:00Z");
+            assertThat(entry.get("lastSeen").asString()).isEqualTo("2026-03-20T14:30:00Z");
         }
 
         @Test
-        @DisplayName("aggregates multiple practices with mixed verdicts")
         void aggregatesMultiplePractices() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -95,18 +90,17 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
 
             // Sorted by NEGATIVE desc: error-handling (3) before pr-description-quality (1)
             JsonNode first = root.get(0);
-            assertThat(first.get("practice").asText()).isEqualTo("error-handling");
+            assertThat(first.get("practice").asString()).isEqualTo("error-handling");
             assertThat(first.get("negative").asLong()).isEqualTo(3);
-            assertThat(first.get("lastSeen").asText()).isEqualTo("2026-03-19T12:00:00Z");
+            assertThat(first.get("lastSeen").asString()).isEqualTo("2026-03-19T12:00:00Z");
 
             JsonNode second = root.get(1);
-            assertThat(second.get("practice").asText()).isEqualTo("pr-description-quality");
+            assertThat(second.get("practice").asString()).isEqualTo("pr-description-quality");
             assertThat(second.get("positive").asLong()).isEqualTo(5);
             assertThat(second.get("negative").asLong()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("caps output at MAX_PRACTICES sorted by NEGATIVE count")
         void capsAtMaxPractices() throws Exception {
             List<ContributorPracticeSummary> summaries = new ArrayList<>();
             // Create 25 practices (exceeds MAX_PRACTICES=20)
@@ -124,15 +118,14 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             assertThat(root).hasSize(ContributorHistoryProvider.MAX_PRACTICES);
 
             // First entry should be the one with most negatives (practice-24)
-            assertThat(root.get(0).get("practice").asText()).isEqualTo("practice-24");
+            assertThat(root.get(0).get("practice").asString()).isEqualTo("practice-24");
             assertThat(root.get(0).get("negative").asLong()).isEqualTo(24);
 
             // Last entry should be practice-05 (index 19 in reversed order: 24,23,...,5)
-            assertThat(root.get(19).get("practice").asText()).isEqualTo("practice-05");
+            assertThat(root.get(19).get("practice").asString()).isEqualTo("practice-05");
         }
 
         @Test
-        @DisplayName("uses alphabetical order as tiebreaker when NEGATIVE counts are equal")
         void alphabeticalTiebreaker() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -144,12 +137,11 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             byte[] json = provider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID).orElseThrow();
             JsonNode root = objectMapper.readTree(json);
 
-            assertThat(root.get(0).get("practice").asText()).isEqualTo("alpha-practice");
-            assertThat(root.get(1).get("practice").asText()).isEqualTo("zebra-practice");
+            assertThat(root.get(0).get("practice").asString()).isEqualTo("alpha-practice");
+            assertThat(root.get(1).get("practice").asString()).isEqualTo("zebra-practice");
         }
 
         @Test
-        @DisplayName("lastSeen reflects maximum across all verdicts for a practice")
         void lastSeenReflectsMaxAcrossVerdicts() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
@@ -161,7 +153,7 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             byte[] json = provider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID).orElseThrow();
             JsonNode root = objectMapper.readTree(json);
 
-            assertThat(root.get(0).get("lastSeen").asText()).isEqualTo("2026-03-20T14:00:00Z");
+            assertThat(root.get(0).get("lastSeen").asString()).isEqualTo("2026-03-20T14:00:00Z");
         }
 
         @Test

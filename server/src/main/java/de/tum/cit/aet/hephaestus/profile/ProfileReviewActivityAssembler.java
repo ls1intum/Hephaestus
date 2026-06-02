@@ -1,17 +1,17 @@
 package de.tum.cit.aet.hephaestus.profile;
 
-import de.tum.cit.aet.hephaestus.gitprovider.issuecomment.IssueComment;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestBaseInfoDTO;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestBaseInfoDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileReviewActivityDTO;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
  * Composes git provider entities with pre-computed activity-ledger XP into profile DTOs.
- * Lives in profile (not gitprovider) because XP is unknown to the ETL layer.
+ * Lives in profile (not integration.scm) because XP is unknown to the ETL layer.
  */
 @Component
 public class ProfileReviewActivityAssembler {

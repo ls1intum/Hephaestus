@@ -45,7 +45,8 @@ const SCOPES = [
   "no-release", // Explicit opt-out
 
   // === FEATURE SCOPES (domain-specific) - WILL trigger release ===
-  "gitprovider",
+  "integration", // Cross-cutting integration framework (webhook, oauth, registry, SPI)
+  "scm", // Source-control management (GitHub, GitLab) — formerly 'gitprovider'
   "leaderboard",
   "mentor",
   "notifications",
@@ -85,7 +86,7 @@ const helpfulErrorsPlugin = {
             `  Services (release):    webapp, server, docs\n` +
             `  Infra (release):       deps, security, db, docker\n` +
             `  Infra (NO release):    ci, config, deps-dev, scripts, no-release\n` +
-            `  Features (release):    gitprovider, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
+            `  Features (release):    integration, scm, leaderboard, mentor, notifications, profile, teams, workspace\n\n` +
             `⚠️  'config' is for TOOLING only (.prettierrc, renovate.json)\n` +
             `    For runtime config use 'server', for Dockerfiles use service scope\n\n` +
             `Format: <type>(<scope>): <description>\n` +

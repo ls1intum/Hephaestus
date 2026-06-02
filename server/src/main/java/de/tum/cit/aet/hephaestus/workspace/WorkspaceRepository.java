@@ -15,7 +15,30 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
-    Optional<Workspace> findByInstallationId(Long installationId);
+    /**
+     * Reverse-lookup a workspace by its GitHub App installation id. Joins through the
+     * {@code Connection} row whose {@code kind='GITHUB'} and {@code instance_key=installationId}.
+     * Cross-workspace collision is structurally impossible at this layer because the
+     * inline-create-from-installation path in {@code GithubLifecycleListener} only writes a
+     * {@code Connection} row for the workspace it is creating, so the join is at-most-one.
+     */
+    default Optional<Workspace> findByInstallationId(Long installationId) {
+        if (installationId == null) {
+            return Optional.empty();
+        }
+        return findByGitHubInstallationInstanceKey(installationId.toString());
+    }
+
+    @Query(
+        """
+        SELECT c.workspace
+        FROM Connection c
+        WHERE c.kind = de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITHUB
+          AND c.instanceKey = :instanceKey
+        """
+    )
+    Optional<Workspace> findByGitHubInstallationInstanceKey(@Param("instanceKey") String instanceKey);
+
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
     Optional<Workspace> findByOrganization_Login(String login);
     Optional<Workspace> findByAccountLoginIgnoreCase(String login);

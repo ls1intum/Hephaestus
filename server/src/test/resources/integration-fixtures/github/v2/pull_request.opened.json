@@ -1,0 +1,42 @@
+{
+  "_comment": "SYNTHETIC forward-compatibility fixture (NOT a real GitHub schema). It is the v1 payload with fabricated unknown keys injected at the top level and at every nesting level (prefixed _ or suffixed _v2). The tolerant reader must IGNORE these unknown keys and still extract the known fields.",
+  "action": "opened",
+  "number": 42,
+  "_future_top_level": "vendor adds an opaque tracing context — must be ignored",
+  "delivery_attempt": 2,
+  "pull_request": {
+    "id": 1000000001,
+    "node_id": "PR_v2_node_1000000001",
+    "number": 42,
+    "title": "Add feature X",
+    "user": {"login": "alice", "id": 1, "type": "User", "node_id": "U_1", "_avatar_decoration_v2": "futuristic"},
+    "body": "Implements feature X",
+    "state": "open",
+    "draft": false,
+    "auto_merge": null,
+    "active_lock_reason": null,
+    "_review_blockers": ["security-scan-failed"],
+    "created_at": "2026-05-25T10:00:00Z",
+    "updated_at": "2026-05-25T10:00:00Z",
+    "merged_at": null,
+    "closed_at": null,
+    "html_url": "https://github.com/HephaestusTest/repo/pull/42",
+    "head": {"ref": "feature-x", "sha": "abc123", "label": "alice:feature-x"},
+    "base": {"ref": "main", "sha": "def456", "label": "HephaestusTest:main"},
+    "labels": [],
+    "assignees": [],
+    "requested_reviewers": []
+  },
+  "repository": {
+    "id": 12345,
+    "node_id": "R_12345",
+    "name": "repo",
+    "full_name": "HephaestusTest/repo",
+    "owner": {"login": "HephaestusTest", "id": 99, "type": "Organization", "node_id": "O_99"},
+    "html_url": "https://github.com/HephaestusTest/repo",
+    "private": false,
+    "_visibility_v2": "internal"
+  },
+  "organization": {"login": "HephaestusTest", "id": 99, "node_id": "O_99"},
+  "sender": {"login": "alice", "id": 1, "type": "User", "node_id": "U_1"}
+}

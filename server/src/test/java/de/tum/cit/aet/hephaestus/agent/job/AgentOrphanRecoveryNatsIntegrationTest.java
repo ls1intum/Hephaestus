@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.NatsTestContainer;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.nats.client.Connection;
@@ -91,7 +91,7 @@ class AgentOrphanRecoveryNatsIntegrationTest extends BaseIntegrationTest {
     void setUp() throws Exception {
         databaseTestUtils.cleanDatabase();
         ensureCleanStream();
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("nats-orphan-ws"));
+        workspace = workspaceRepository.save(TestEntities.activeWorkspace("nats-orphan-ws"));
     }
 
     @Test

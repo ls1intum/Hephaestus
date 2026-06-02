@@ -95,7 +95,7 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         return byWorkerId.size();
     }
 
-    // ── SmartLifecycle ──
+    // SmartLifecycle
 
     @Override
     public boolean isRunning() {

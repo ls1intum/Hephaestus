@@ -18,14 +18,14 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
@@ -34,7 +34,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFactory;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -60,7 +60,6 @@ import tools.jackson.databind.node.ObjectNode;
  * because they make external API calls to GitHub/GitLab. All other components (result parser,
  * delivery service, feedback service, finding repository) are real beans against PostgreSQL.
  */
-@DisplayName("Practice detection pipeline integration")
 @RecordApplicationEvents
 class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
@@ -114,7 +113,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
 
-        workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("pipeline-test"));
+        workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("pipeline-test"));
 
         createPractice("pr-description-quality", "PR Description Quality");
         createPractice("error-handling", "Error Handling");
@@ -255,11 +254,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("full pipeline: parse → persist findings → publish event → post feedback")
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
@@ -296,7 +293,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("all-positive findings: approval comment posted, no diff notes")
         void allPositiveFindingsPostsApproval() {
             String output = """
                 {
@@ -331,11 +327,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Error cases")
     class ErrorCases {
 
         @Test
-        @DisplayName("invalid JSON output throws JobDeliveryException with no findings")
         void invalidJsonOutputFailsGracefully() {
             setJobOutput("this is not valid JSON at all");
 
@@ -348,7 +342,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("unknown practice slug discarded, valid findings persisted")
         void unknownSlugDiscardedOthersKept() {
             String output = """
                 {
@@ -394,7 +387,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("closed PR: findings persisted but no comment posted")
         void closedPrSkipsDelivery() {
             // Update PR state to CLOSED
             var pr = pullRequestRepository.findById(prId).orElseThrow();
@@ -452,7 +444,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    @DisplayName("Finding idempotency")
     class FindingIdempotency {
 
         @Test

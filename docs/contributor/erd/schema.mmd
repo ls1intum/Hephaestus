@@ -76,6 +76,8 @@ erDiagram
         VARCHAR(50) llm_model_version
         VARCHAR(32) cancellation_reason
         VARCHAR(255) worker_id
+        VARCHAR(48) integration_kind
+        VARCHAR(48) subject_class
     }
 
     ChatMessage {
@@ -130,6 +132,35 @@ erDiagram
     CommitPullRequest {
         BIGINT commit_id PK,FK
         BIGINT pull_request_id PK,FK
+    }
+
+    Connection {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(48) kind UK "NOT NULL"
+        VARCHAR(128) instance_key UK
+        VARCHAR(256) display_name
+        VARCHAR(32) state "NOT NULL"
+        VARCHAR(512) state_reason
+        JSONB config "NOT NULL"
+        BYTEA credentials_encrypted
+        VARCHAR(64) credentials_alg
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+        BIGINT version "NOT NULL"
+    }
+
+    ConnectionAudit {
+        BIGINT id PK
+        BIGINT connection_id FK "NOT NULL"
+        VARCHAR(48) event_type "NOT NULL"
+        VARCHAR(32) from_state
+        VARCHAR(32) to_state
+        VARCHAR(32) actor_kind "NOT NULL"
+        VARCHAR(256) actor_ref
+        VARCHAR(64) correlation_id
+        JSONB detail
+        TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
     Discussion {
@@ -191,6 +222,17 @@ erDiagram
     DiscussionLabel {
         BIGINT discussion_id PK,FK
         BIGINT label_id PK,FK
+    }
+
+    FeedbackPost {
+        BIGINT id PK
+        BIGINT connection_id FK,UK "NOT NULL"
+        VARCHAR(256) subject_external_id UK "NOT NULL"
+        VARCHAR(48) subject_class "NOT NULL"
+        VARCHAR(48) post_kind UK "NOT NULL"
+        VARCHAR(256) external_post_id UK "NOT NULL"
+        JSONB vendor_metadata "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     FindingFeedback {
@@ -362,6 +404,14 @@ erDiagram
         NUMERIC(12,6) per_1k_cache_write_usd
         TIMESTAMPTZ valid_from "NOT NULL"
         TIMESTAMPTZ valid_to
+    }
+
+    OauthStateNonce {
+        VARCHAR(32) nonce PK
+        BIGINT workspace_id "NOT NULL"
+        VARCHAR(48) kind "NOT NULL"
+        TIMESTAMPTZ issued_at "NOT NULL"
+        TIMESTAMPTZ consumed_at
     }
 
     Organization {
@@ -617,6 +667,13 @@ erDiagram
         TIMESTAMPTZ discussions_synced_at
     }
 
+    Shedlock {
+        VARCHAR(64) name PK
+        TIMESTAMP lock_until "NOT NULL"
+        TIMESTAMP locked_at "NOT NULL"
+        VARCHAR(255) locked_by "NOT NULL"
+    }
+
     Team {
         BIGINT id PK
         VARCHAR(255) name
@@ -657,6 +714,7 @@ erDiagram
         VARCHAR(255) type
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(128) keycloak_subject
     }
 
     UserAchievement {
@@ -691,23 +749,15 @@ erDiagram
         BIGINT id PK
         TIMESTAMPTZ users_synced_at
         VARCHAR(120) account_login "NOT NULL"
-        VARCHAR(255) git_provider_mode
         VARCHAR(255) repository_selection
-        BIGINT installation_id
-        TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
-        TEXT personal_access_token
         VARCHAR(10) account_type "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         VARCHAR(120) display_name "NOT NULL"
         BOOLEAN is_publicly_viewable "NOT NULL"
-        VARCHAR(100) leaderboard_notification_channel_id
         BOOLEAN leaderboard_notification_enabled
-        VARCHAR(100) leaderboard_notification_team
         INTEGER leaderboard_schedule_day
         VARCHAR(10) leaderboard_schedule_time
-        TEXT slack_signing_secret
-        TEXT slack_token
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -716,9 +766,6 @@ erDiagram
         TIMESTAMPTZ sub_issues_synced_at
         TIMESTAMPTZ issue_types_synced_at
         TIMESTAMPTZ issue_dependencies_synced_at
-        VARCHAR(512) server_url
-        BIGINT gitlab_group_id
-        BIGINT gitlab_webhook_id
         BOOLEAN practices_enabled "NOT NULL"
         BOOLEAN achievements_enabled "NOT NULL"
         BOOLEAN leaderboard_enabled "NOT NULL"
@@ -727,6 +774,7 @@ erDiagram
         BOOLEAN practice_review_auto_trigger_enabled "NOT NULL"
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
+        TIMESTAMPTZ leaderboard_league_cycle_at
     }
 
     WorkspaceMembership {
@@ -772,11 +820,13 @@ erDiagram
     Workspace ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
+    Workspace ||--|| Connection : has
     DiscussionComment ||--|| Discussion : references
     GitProvider ||--|| Discussion : references
     Repository ||--|| Discussion : has
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
+    Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
     GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
@@ -818,6 +868,7 @@ erDiagram
     Workspace ||--o{ ChatThread : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
+    Connection ||--o{ ConnectionAudit : has
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has

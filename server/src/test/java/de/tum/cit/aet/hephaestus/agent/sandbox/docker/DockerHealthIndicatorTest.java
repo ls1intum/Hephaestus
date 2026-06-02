@@ -7,13 +7,11 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
-@DisplayName("DockerHealthIndicator")
 class DockerHealthIndicatorTest extends BaseUnitTest {
 
     @Mock
@@ -24,7 +22,6 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
-            true,
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -42,7 +39,6 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should report UP when Docker daemon is reachable")
     void shouldReportUpWhenReachable() {
         when(containerManager.ping()).thenReturn(true);
         when(containerManager.listManagedContainers()).thenReturn(List.of());
@@ -56,7 +52,6 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should report DOWN when Docker daemon is unreachable")
     void shouldReportDownWhenUnreachable() {
         when(containerManager.ping()).thenReturn(false);
 
@@ -67,7 +62,6 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should report DOWN with error details on exception")
     void shouldReportDownOnException() {
         when(containerManager.ping()).thenThrow(new RuntimeException("Connection refused"));
 

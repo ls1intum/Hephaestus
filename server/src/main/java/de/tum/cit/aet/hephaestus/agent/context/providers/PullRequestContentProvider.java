@@ -4,22 +4,24 @@ import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -55,9 +57,19 @@ public class PullRequestContentProvider implements ContentProvider {
     private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final ContributorHistoryProvider contributorHistoryProvider;
     private final GitDiffOperations gitDiffOperations;
+    private final ConnectionService connectionService;
 
-    @Nullable
-    private final GitLabTokenService gitLabTokenService;
+    /**
+     * SCM token sources keyed by integration kind. Collected via constructor injection so
+     * adding a new SCM (Bitbucket etc.) is a matter of registering a new {@link ScmTokenSource}
+     * bean — this class never has to learn the new kind.
+     *
+     * <p>Pre-fetch only fires when a token source is available for the workspace's active SCM
+     * kind (resolved via {@link ConnectionService#findActiveProviderKind}); stale repos under
+     * workspaces with no active SCM connection still get diffed against the cached clone, just
+     * without a network refresh.
+     */
+    private final Map<IntegrationKind, ScmTokenSource> tokenSources;
 
     public PullRequestContentProvider(
         ObjectMapper objectMapper,
@@ -66,7 +78,8 @@ public class PullRequestContentProvider implements ContentProvider {
         PullRequestReviewCommentRepository reviewCommentRepository,
         ContributorHistoryProvider contributorHistoryProvider,
         GitDiffOperations gitDiffOperations,
-        @Autowired(required = false) @Nullable GitLabTokenService gitLabTokenService
+        ConnectionService connectionService,
+        List<ScmTokenSource> tokenSourceList
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -74,7 +87,12 @@ public class PullRequestContentProvider implements ContentProvider {
         this.reviewCommentRepository = reviewCommentRepository;
         this.contributorHistoryProvider = contributorHistoryProvider;
         this.gitDiffOperations = gitDiffOperations;
-        this.gitLabTokenService = gitLabTokenService;
+        this.connectionService = connectionService;
+        Map<IntegrationKind, ScmTokenSource> map = new EnumMap<>(IntegrationKind.class);
+        for (ScmTokenSource src : tokenSourceList) {
+            map.put(src.kind(), src);
+        }
+        this.tokenSources = map;
     }
 
     @Override
@@ -109,9 +127,7 @@ public class PullRequestContentProvider implements ContentProvider {
         computeAndStoreDiffSummary(files);
     }
 
-    // -------------------------------------------------------------------------
     // Repository availability
-    // -------------------------------------------------------------------------
 
     private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
@@ -135,14 +151,25 @@ public class PullRequestContentProvider implements ContentProvider {
         boolean fetched = false;
         try {
             var workspace = job.getWorkspace();
-            if (workspace != null && gitLabTokenService != null) {
+            // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
+            // kind from the connection (never hardcode a vendor) and look up its token source.
+            // The fetch only actually fires when that source exposes a deterministic clone URL
+            // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
+            // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
+            // empty serverUrl; its historical fetches go through GithubDataSyncService instead).
+            var kind =
+                workspace == null
+                    ? Optional.<IntegrationKind>empty()
+                    : connectionService.findActiveProviderKind(workspace.getId());
+            ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
+            if (source != null) {
                 Long scopeId = workspace.getId();
-                String serverUrl = gitLabTokenService.resolveServerUrl(scopeId);
-                String token = gitLabTokenService.getAccessToken(scopeId);
+                String serverUrl = source.serverUrl(scopeId).orElse(null);
+                String token = source.accessToken(scopeId).orElse(null);
                 JsonNode metadata = job.getMetadata();
                 String repoFullName =
                     metadata != null && metadata.has("repository_full_name")
-                        ? metadata.get("repository_full_name").asText()
+                        ? metadata.get("repository_full_name").asString()
                         : null;
                 if (serverUrl != null && token != null && repoFullName != null) {
                     String cloneUrl = serverUrl + "/" + repoFullName + ".git";
@@ -175,9 +202,7 @@ public class PullRequestContentProvider implements ContentProvider {
         return false;
     }
 
-    // -------------------------------------------------------------------------
     // Metadata + comments
-    // -------------------------------------------------------------------------
 
     private void storeMetadataAndComments(
         Map<String, byte[]> files,
@@ -268,14 +293,14 @@ public class PullRequestContentProvider implements ContentProvider {
     }
 
     private void addCommitLog(ObjectNode metadata, JsonNode jobMetadata) {
-        String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asText() : null;
-        String targetBranch = jobMetadata.has("target_branch") ? jobMetadata.get("target_branch").asText() : null;
+        String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asString() : null;
+        String targetBranch = jobMetadata.has("target_branch") ? jobMetadata.get("target_branch").asString() : null;
         long repositoryId = requireLong(jobMetadata, "repository_id");
 
         if (sourceBranch == null || targetBranch == null) return;
 
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-        String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asText() : null;
+        String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asString() : null;
 
         String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
         String logOutput = range != null ? gitDiffOperations.shortLog(repoPath, range[0], range[1]) : null;
@@ -305,9 +330,7 @@ public class PullRequestContentProvider implements ContentProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Contributor history
-    // -------------------------------------------------------------------------
 
     private void storeContributorHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
         if (pullRequest == null || pullRequest.getAuthor() == null || job.getWorkspace() == null) {
@@ -340,12 +363,10 @@ public class PullRequestContentProvider implements ContentProvider {
         }
     }
 
-    // -------------------------------------------------------------------------
     // Diff
-    // -------------------------------------------------------------------------
 
     private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata, AgentJob job) {
-        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asText() : null;
+        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
         if (headSha == null || headSha.isBlank()) {
@@ -502,16 +523,14 @@ public class PullRequestContentProvider implements ContentProvider {
         return count;
     }
 
-    // -------------------------------------------------------------------------
     // Metadata field helpers (mirrored from former PullRequestReviewHandler helpers)
-    // -------------------------------------------------------------------------
 
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asText().isBlank()) {
+        if (node == null || node.isNull() || node.asString().isBlank()) {
             throw new JobPreparationException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
     private static int requireInt(JsonNode metadata, String field) {

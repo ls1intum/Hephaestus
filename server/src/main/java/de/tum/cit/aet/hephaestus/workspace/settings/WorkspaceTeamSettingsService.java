@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
-import de.tum.cit.aet.hephaestus.gitprovider.label.LabelRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.Repository;
-import de.tum.cit.aet.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.team.Team;
-import de.tum.cit.aet.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.HashMap;
@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>This service replaces direct modifications to the deprecated fields on
  * {@link Team#isHidden()}, {@link Team#getLabels()}, and
- * {@link de.tum.cit.aet.hephaestus.gitprovider.team.permission.TeamRepositoryPermission#isHiddenFromContributions()}.
+ * {@link de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepositoryPermission#isHiddenFromContributions()}.
  *
  * @see WorkspaceTeamSettings
  * @see WorkspaceTeamRepositorySettings
@@ -71,9 +71,7 @@ public class WorkspaceTeamSettingsService {
         this.labelRepository = labelRepository;
     }
 
-    // ========================================================================
     // Team Visibility (Hidden) Settings
-    // ========================================================================
 
     /**
      * Gets the team settings for a workspace and team.
@@ -151,9 +149,7 @@ public class WorkspaceTeamSettingsService {
         return Optional.of(saved);
     }
 
-    // ========================================================================
     // Repository Contribution Visibility Settings
-    // ========================================================================
 
     /**
      * Gets the repository settings for a workspace, team, and repository.
@@ -299,9 +295,7 @@ public class WorkspaceTeamSettingsService {
         return Optional.of(saved);
     }
 
-    // ========================================================================
     // Label Filter Settings
-    // ========================================================================
 
     /**
      * Gets all labels configured as filters for a team in a workspace.
@@ -490,9 +484,7 @@ public class WorkspaceTeamSettingsService {
         );
     }
 
-    // ========================================================================
     // Utility Methods
-    // ========================================================================
 
     private boolean belongsToWorkspace(Team team, Workspace workspace) {
         if (team == null || workspace == null || workspace.getAccountLogin() == null) {

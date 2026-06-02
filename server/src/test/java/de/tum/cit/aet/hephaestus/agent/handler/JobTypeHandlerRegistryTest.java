@@ -10,17 +10,15 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.gitprovider.git.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.json.JsonMapper;
 
-@DisplayName("JobTypeHandlerRegistry")
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
     @Mock
@@ -60,11 +58,9 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Construction")
     class Construction {
 
         @Test
-        @DisplayName("should index handlers by job type")
         void shouldIndexHandlersByJobType() {
             var handler = prReviewHandler();
             var registry = new JobTypeHandlerRegistry(List.of(handler));
@@ -73,7 +69,6 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw on duplicate handler for same type")
         void shouldThrowOnDuplicateHandler() {
             var handler1 = prReviewHandler();
             var handler2 = prReviewHandler();
@@ -85,7 +80,6 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when job type has no handler")
         void shouldThrowOnMissingHandler() {
             assertThatThrownBy(() -> new JobTypeHandlerRegistry(List.of()))
                 .isInstanceOf(IllegalStateException.class)
@@ -95,11 +89,9 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("getHandler")
     class GetHandler {
 
         @Test
-        @DisplayName("should reject null job type")
         void shouldRejectNullJobType() {
             var registry = new JobTypeHandlerRegistry(List.of(prReviewHandler()));
             assertThatThrownBy(() -> registry.getHandler(null)).isInstanceOf(NullPointerException.class);

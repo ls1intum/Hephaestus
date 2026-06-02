@@ -1,0 +1,162 @@
+package de.tum.cit.aet.hephaestus.integration.scm.domain.team;
+
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.BaseGitServiceEntity;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.permission.TeamRepositoryPermission;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.jspecify.annotations.NonNull;
+
+@Entity
+@Table(
+    name = "team",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_team_provider_organization_slug",
+            columnNames = { "provider_id", "organization", "slug" }
+        ),
+        @UniqueConstraint(name = "uq_team_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(callSuper = true)
+public class Team extends BaseGitServiceEntity {
+
+    private String name;
+
+    /**
+     * URL-safe unique identifier within the organization.
+     * <p>
+     * For GitHub: the team slug (e.g., "backend-core").
+     * For GitLab: relative path from root group (e.g., "group1/alpha").
+     * <p>
+     * Combined with {@code organization} and {@code provider_id}, this forms
+     * the natural key for team lookups.
+     */
+    @NonNull
+    @Column(length = 512)
+    private String slug;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(length = 32)
+    @Enumerated(EnumType.STRING)
+    private Privacy privacy;
+
+    private String organization;
+
+    @NonNull
+    @Column(length = 512)
+    private String htmlUrl;
+
+    private Long parentId;
+
+    /**
+     * Timestamp of the last successful sync for this team from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this team
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     *
+     * @see de.tum.cit.aet.hephaestus.integration.scm.github.team.GitHubTeamSyncService
+     */
+    private Instant lastSyncAt;
+
+    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<TeamRepositoryPermission> repoPermissions = new HashSet<>();
+
+    @OneToMany(mappedBy = "team", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<TeamMembership> memberships = new HashSet<>();
+
+    public void addMembership(TeamMembership membership) {
+        memberships.add(membership);
+        membership.setTeam(this);
+    }
+
+    public void removeMembership(TeamMembership membership) {
+        memberships.remove(membership);
+        membership.setTeam(null);
+    }
+
+    public void addRepoPermission(TeamRepositoryPermission permission) {
+        repoPermissions.add(permission);
+        permission.setTeam(this);
+    }
+
+    /**
+     * Removes a repository permission from this team and maintains bidirectional consistency.
+     *
+     * @param permission the permission to remove
+     */
+    public void removeRepoPermission(TeamRepositoryPermission permission) {
+        repoPermissions.remove(permission);
+        permission.setTeam(null);
+    }
+
+    public void clearAndAddRepoPermissions(Set<TeamRepositoryPermission> fresh) {
+        repoPermissions.clear();
+        fresh.forEach(this::addRepoPermission);
+    }
+
+    /**
+     * Clears all memberships from this team.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the team entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     */
+    public void clearMemberships() {
+        memberships.forEach(m -> m.setTeam(null));
+        memberships.clear();
+    }
+
+    /**
+     * Clears all repository permissions from this team.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the team entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     */
+    public void clearRepoPermissions() {
+        repoPermissions.forEach(p -> p.setTeam(null));
+        repoPermissions.clear();
+    }
+
+    /**
+     * Team privacy level. Maps directly to GitHub GraphQL TeamPrivacy enum.
+     *
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#teamprivacy">GitHub TeamPrivacy</a>
+     */
+    public enum Privacy {
+        /** Only organization members can view or request access. */
+        SECRET,
+        /** Visible to all members of the organization (GitHub calls this VISIBLE). */
+        VISIBLE,
+    }
+    // Ignored GitHub properties:
+    // - nodeId
+    // - apiUrl               (API URL for this team)
+    // - members_url       (templated URL for member listing)
+    // - repositories_url  (templated URL for repos listing)
+    // - parent            (if this team has a parent team)
+    // - permissions       (maps to our repoPermissions, but scoped to the OAuth user)
+    // - members_count     (cached count; we page through listMembers())
+    // - repos_count       (cached count; we page through listRepositories())
+    // - privacy_level     (older name for privacy)
+}

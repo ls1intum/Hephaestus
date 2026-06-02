@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.exception;
 
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.io.Serial;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Exception thrown when a user lacks sufficient permissions to perform an action in a workspace.

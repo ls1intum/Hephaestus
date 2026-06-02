@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.runtime.worker.protocol;
 
 import java.util.List;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * First worker-originated frame after WSS upgrade. A non-overlapping {@code supportedVersions}

@@ -6,9 +6,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -28,7 +27,6 @@ import org.springframework.cache.CacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@DisplayName("WorkspaceAspectProvider")
 class WorkspaceAspectProviderTest extends BaseUnitTest {
 
     @Mock
@@ -50,7 +48,6 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
     WorkspaceAspectProvider provider;
 
     @Test
-    @DisplayName("contribute writes workspace.json with all aspect sections")
     void writesWorkspaceJson() throws Exception {
         User user = new User();
         user.setLogin("octo");
@@ -72,8 +69,8 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
         byte[] bytes = files.get("context/target/workspace.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("workspace").get("slug").asText()).isEqualTo("acme");
-        assertThat(root.get("workspace").get("displayName").asText()).isEqualTo("Acme");
+        assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
+        assertThat(root.get("workspace").get("displayName").asString()).isEqualTo("Acme");
         assertThat(root.get("recentSessions").isArray()).isTrue();
         assertThat(root.get("assignedIssues").isArray()).isTrue();
         assertThat(root.get("pendingReviewRequests").isArray()).isTrue();
@@ -81,7 +78,6 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("focusSuggestions surfaces stale review requests")
     void staleReviewRequests() {
         PullRequest pr = new PullRequest();
         // 5 days in the past — beyond the 3-day urgency threshold.
@@ -91,7 +87,6 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("focusSuggestions skips fresh review requests")
     void freshReviewRequests() {
         PullRequest pr = new PullRequest();
         pr.setCreatedAt(Instant.now().minus(Duration.ofHours(2)));

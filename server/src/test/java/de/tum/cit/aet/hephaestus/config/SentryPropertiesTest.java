@@ -16,7 +16,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
  * @see SentryProperties
  */
 @Tag("unit")
-@DisplayName("SentryProperties Configuration Binding")
 class SentryPropertiesTest {
 
     @EnableConfigurationProperties(SentryProperties.class)
@@ -30,7 +29,6 @@ class SentryPropertiesTest {
     }
 
     @Nested
-    @DisplayName("Valid Configuration")
     class ValidConfiguration {
 
         @Test
@@ -48,7 +46,6 @@ class SentryPropertiesTest {
         }
 
         @Test
-        @DisplayName("should report not configured when DSN is missing")
         void missingDsn_notConfigured() {
             contextRunner().run(context -> {
                 SentryProperties props = context.getBean(SentryProperties.class);
@@ -57,7 +54,6 @@ class SentryPropertiesTest {
         }
 
         @Test
-        @DisplayName("should report not configured when DSN is blank")
         void blankDsn_notConfigured() {
             contextRunner()
                 .withPropertyValues("hephaestus.sentry.dsn=   ")
@@ -68,7 +64,6 @@ class SentryPropertiesTest {
         }
 
         @Test
-        @DisplayName("should allow empty DSN for disabled Sentry integration")
         void emptyDsn_allowed() {
             contextRunner()
                 .withPropertyValues("hephaestus.sentry.dsn=")

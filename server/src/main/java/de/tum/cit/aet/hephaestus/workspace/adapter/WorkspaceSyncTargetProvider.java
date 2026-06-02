@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncContextProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncContextProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncCursorKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.SyncTargetFactory;
@@ -31,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Implements the full sync provider interface hierarchy:
  * <ul>
  *   <li>{@link SyncTargetProvider} - Core sync target operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.gitprovider.common.spi.SyncTimestampProvider SyncTimestampProvider} - Sync timestamp operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.gitprovider.common.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTimestampProvider SyncTimestampProvider} - Sync timestamp operations</li>
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
  * </ul>
  */
 @Component
@@ -42,19 +44,19 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
-    private final ProjectRepository projectRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final ConnectionService connectionService;
 
     public WorkspaceSyncTargetProvider(
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
-        ProjectRepository projectRepository,
-        WorkspaceScopeFilter workspaceScopeFilter
+        WorkspaceScopeFilter workspaceScopeFilter,
+        ConnectionService connectionService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
-        this.projectRepository = projectRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
+        this.connectionService = connectionService;
     }
 
     @Override
@@ -64,16 +66,23 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findAll()
             .stream()
             .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
+            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITHUB))
             .flatMap(ws ->
                 ws
                     .getRepositoriesToMonitor()
                     .stream()
                     // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
                     .filter(workspaceScopeFilter::isRepositoryAllowed)
-                    .map(rtm -> SyncTargetFactory.create(ws, rtm))
+                    .map(rtm -> SyncTargetFactory.create(ws, rtm, connectionService))
             )
             .toList();
+    }
+
+    private boolean hasActiveProvider(Workspace workspace, IntegrationKind kind) {
+        return connectionService
+            .findActiveProviderKind(workspace.getId())
+            .map(k -> k == kind)
+            .orElse(false);
     }
 
     @Override
@@ -87,7 +96,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     .stream()
                     // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
                     .filter(workspaceScopeFilter::isRepositoryAllowed)
-                    .map(rtm -> SyncTargetFactory.create(ws, rtm))
+                    .map(rtm -> SyncTargetFactory.create(ws, rtm, connectionService))
                     .toList()
             )
             .orElse(List.of());
@@ -173,9 +182,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // USER AND TEAM SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     @Transactional(readOnly = true)
@@ -232,9 +239,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             );
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // SYNC TARGET OPERATIONS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     @Transactional(readOnly = true)
@@ -243,7 +248,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findById(syncTargetId)
             .map(rtm -> {
                 var workspace = rtm.getWorkspace();
-                return SyncTargetFactory.create(workspace, rtm);
+                return SyncTargetFactory.create(workspace, rtm, connectionService);
             });
     }
 
@@ -317,90 +322,45 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         repositoryToMonitorRepository.deleteById(syncTargetId);
     }
 
+    /**
+     * Persists the pagination cursor for the given kind onto the RepositoryToMonitor
+     * ({@code syncTargetId}-keyed) row.
+     */
     @Override
     @Transactional
-    public void updateIssueSyncCursor(Long syncTargetId, String cursor) {
+    public void updateSyncCursor(Long syncTargetId, SyncCursorKind kind, String cursor) {
         repositoryToMonitorRepository
             .findById(syncTargetId)
             .ifPresentOrElse(
                 rtm -> {
-                    rtm.setIssueSyncCursor(cursor);
+                    switch (kind) {
+                        case ISSUE -> rtm.setIssueSyncCursor(cursor);
+                        case PULL_REQUEST -> rtm.setPullRequestSyncCursor(cursor);
+                        case DISCUSSION -> rtm.setDiscussionSyncCursor(cursor);
+                    }
                     repositoryToMonitorRepository.save(rtm);
                 },
                 () ->
                     // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
                     log.debug(
-                        "Skipped issue sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
+                        "Skipped sync cursor update: reason=syncTargetNotFound, kind={}, syncTargetId={}",
+                        kind,
                         syncTargetId
                     )
             );
     }
 
-    @Override
-    @Transactional
-    public void updatePullRequestSyncCursor(Long syncTargetId, String cursor) {
-        repositoryToMonitorRepository
-            .findById(syncTargetId)
-            .ifPresentOrElse(
-                rtm -> {
-                    rtm.setPullRequestSyncCursor(cursor);
-                    repositoryToMonitorRepository.save(rtm);
-                },
-                () ->
-                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug(
-                        "Skipped pull request sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
-                        syncTargetId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateDiscussionSyncCursor(Long syncTargetId, String cursor) {
-        repositoryToMonitorRepository
-            .findById(syncTargetId)
-            .ifPresentOrElse(
-                rtm -> {
-                    rtm.setDiscussionSyncCursor(cursor);
-                    repositoryToMonitorRepository.save(rtm);
-                },
-                () ->
-                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
-                    log.debug(
-                        "Skipped discussion sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
-                        syncTargetId
-                    )
-            );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
-    // ═══════════════════════════════════════════════════════════════════════════
 
     @Override
     @Transactional(readOnly = true)
-    public List<SyncSession> getSyncSessions() {
+    public List<SyncSession> getSyncSessions(IntegrationKind kind) {
         List<Workspace> allWorkspaces = workspaceRepository.findAll();
 
         return allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
-            .filter(workspaceScopeFilter::isWorkspaceAllowed)
-            .map(this::toSyncSession)
-            .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<SyncSession> getGitLabSyncSessions() {
-        List<Workspace> allWorkspaces = workspaceRepository.findAll();
-
-        return allWorkspaces
-            .stream()
-            .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITLAB)
+            .filter(ws -> hasActiveProvider(ws, kind))
             .filter(workspaceScopeFilter::isWorkspaceAllowed)
             .map(this::toSyncSession)
             .toList();
@@ -420,7 +380,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         List<Workspace> activeGitHubWorkspaces = allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
+            .filter(ws -> hasActiveProvider(ws, IntegrationKind.GITHUB))
             .toList();
 
         int skippedByFilter = (int) activeGitHubWorkspaces
@@ -445,185 +405,45 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .getRepositoriesToMonitor()
             .stream()
             .filter(workspaceScopeFilter::isRepositoryAllowed)
-            .map(rtm -> SyncTargetFactory.create(workspace, rtm))
+            .map(rtm -> SyncTargetFactory.create(workspace, rtm, connectionService))
             .toList();
 
+        long workspaceId = workspace.getId();
+        Long installationId = connectionService
+            .findActiveGitHubAppConfig(workspaceId)
+            .map(ConnectionConfig.GitHubAppConfig::installationId)
+            .orElse(null);
+        String serverUrl = connectionService
+            .findActiveGitLabConfig(workspaceId)
+            .map(ConnectionConfig.GitLabConfig::serverUrl)
+            .or(() ->
+                connectionService
+                    .findActiveGitHubAppConfig(workspaceId)
+                    .map(ConnectionConfig.GitHubAppConfig::serverUrl)
+            )
+            .or(() ->
+                connectionService
+                    .findActiveGitHubPatConfig(workspaceId)
+                    .map(ConnectionConfig.GitHubPatConfig::serverUrl)
+            )
+            .orElse(null);
+
         SyncContextProvider.SyncContext syncContext = new SyncContextProvider.SyncContext(
-            workspace.getId(),
+            workspaceId,
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
-            workspace.getInstallationId()
+            installationId
         );
 
         return new SyncSession(
-            workspace.getId(),
+            workspaceId,
             workspace.getWorkspaceSlug(),
             workspace.getDisplayName(),
             workspace.getAccountLogin(),
-            workspace.getInstallationId(),
+            installationId,
+            serverUrl,
             syncTargets,
             syncContext
         );
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROJECT ITEM SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Override
-    @Transactional
-    public void updateProjectItemSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setItemSyncCursor(cursor);
-                    projectRepository.save(project);
-                },
-                () ->
-                    // DEBUG: Expected if project was deleted during sync
-                    log.debug(
-                        "Skipped project item sync cursor update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateProjectItemsSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setItemsSyncedAt(syncedAt);
-                    project.setItemSyncCursor(null); // Clear cursor on completion
-                    projectRepository.save(project);
-                },
-                () ->
-                    // DEBUG: Expected if project was deleted during sync
-                    log.debug(
-                        "Skipped project items sync timestamp update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<String> getProjectItemSyncCursor(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getItemSyncCursor());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Instant> getProjectItemsSyncedAt(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getItemsSyncedAt());
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROJECT FIELD SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Override
-    @Transactional
-    public void updateProjectFieldSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setFieldSyncCursor(cursor);
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project field sync cursor update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateProjectFieldsSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setFieldsSyncedAt(syncedAt);
-                    project.setFieldSyncCursor(null); // Clear cursor on completion
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project fields sync timestamp update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<String> getProjectFieldSyncCursor(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getFieldSyncCursor());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Instant> getProjectFieldsSyncedAt(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getFieldsSyncedAt());
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // PROJECT STATUS UPDATE SYNC STATE
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Override
-    @Transactional
-    public void updateProjectStatusUpdateSyncCursor(Long projectId, String cursor) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setStatusUpdateSyncCursor(cursor);
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project status update sync cursor update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional
-    public void updateProjectStatusUpdatesSyncedAt(Long projectId, Instant syncedAt) {
-        projectRepository
-            .findById(projectId)
-            .ifPresentOrElse(
-                project -> {
-                    project.setStatusUpdatesSyncedAt(syncedAt);
-                    project.setStatusUpdateSyncCursor(null); // Clear cursor on completion
-                    projectRepository.save(project);
-                },
-                () ->
-                    log.debug(
-                        "Skipped project status updates sync timestamp update: reason=projectNotFound, projectId={}",
-                        projectId
-                    )
-            );
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<String> getProjectStatusUpdateSyncCursor(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getStatusUpdateSyncCursor());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Instant> getProjectStatusUpdatesSyncedAt(Long projectId) {
-        return projectRepository.findById(projectId).map(project -> project.getStatusUpdatesSyncedAt());
     }
 }

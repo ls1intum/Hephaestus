@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 
-@DisplayName("SandboxWorkspaceManager")
 class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
     @Mock
@@ -43,7 +42,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("injectFiles")
     class InjectFiles {
 
         @Test
@@ -57,7 +55,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip injection when files map is empty")
         void shouldSkipWhenEmpty() {
             manager.injectFiles(CONTAINER_ID, Map.of());
 
@@ -65,7 +62,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip injection when files map is null")
         void shouldSkipWhenNull() {
             manager.injectFiles(CONTAINER_ID, null);
 
@@ -73,7 +69,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject paths with directory traversal")
         void shouldRejectDirectoryTraversal() {
             Map<String, byte[]> files = Map.of("../../etc/passwd", "malicious".getBytes());
 
@@ -83,7 +78,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject absolute paths")
         void shouldRejectAbsolutePaths() {
             Map<String, byte[]> files = Map.of("/etc/shadow", "malicious".getBytes());
 
@@ -93,7 +87,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject input exceeding MAX_INPUT_BYTES")
         void shouldRejectOversizedInput() {
             byte[] largeFile = new byte[(int) (SandboxWorkspaceManager.MAX_INPUT_BYTES + 1)];
             Map<String, byte[]> files = Map.of("huge.bin", largeFile);
@@ -105,11 +98,9 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("collectOutput")
     class CollectOutput {
 
         @Test
-        @DisplayName("should extract files from tar archive")
         void shouldExtractFiles() throws Exception {
             byte[] tarBytes = createTestTar(Map.of(".output/result.json", "{\"status\":\"ok\"}".getBytes()));
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
@@ -135,7 +126,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should stop collecting when output size limit is exceeded")
         void shouldEnforceOutputSizeLimit() throws Exception {
             // Use a small limit (1 KB) for this test to avoid allocating megabytes in CI
             var limitedManager = new SandboxWorkspaceManager(
@@ -163,7 +153,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip traversal paths in output archive")
         void shouldSkipTraversalPathsInOutput() throws Exception {
             byte[] tarBytes = createTestTar(
                 Map.of(
@@ -199,7 +188,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip hard links in output archive")
         void shouldSkipHardLinks() throws Exception {
             byte[] tarBytes = createTestTarWithHardLink(".output/link", ".output/target");
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
@@ -212,7 +200,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip single files exceeding per-file size limit")
         void shouldSkipOversizedSingleFile() throws Exception {
             // Use a manager with a 10-byte per-file limit to avoid allocating megabytes in tests
             var limitedManager = new SandboxWorkspaceManager(
@@ -256,16 +243,14 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("injectDirectories")
     class InjectDirectories {
 
         @TempDir
         Path tempDir;
 
-        // ---- Size limit tests (from this PR) ----
+        // Size limit tests (from this PR)
 
         @Test
-        @DisplayName("should reject directory exceeding size limit")
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
             // Use a tiny limit (1 KB) to avoid allocating megabytes in CI
             var limitedManager = new SandboxWorkspaceManager(
@@ -291,7 +276,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept directory at exact size limit (inclusive)")
         void shouldAcceptDirectoryAtExactSizeLimit() throws Exception {
             // Exactly 100 bytes of content — limit is 100
             var limitedManager = new SandboxWorkspaceManager(
@@ -313,7 +297,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should accept directory within size limit")
         void shouldAcceptDirectoryWithinSizeLimit() throws Exception {
             var limitedManager = new SandboxWorkspaceManager(
                 fileOps,
@@ -334,7 +317,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject nested subdirectories correctly")
         void shouldInjectNestedSubdirectories() throws Exception {
             var limitedManager = new SandboxWorkspaceManager(
                 fileOps,
@@ -358,15 +340,13 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should have reasonable entry count limit constant")
         void shouldHaveReasonableEntryCountLimit() {
             assertThat(SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES).isEqualTo(500_000);
         }
 
-        // ---- Validation tests (from main) ----
+        // Validation tests (from main)
 
         @Test
-        @DisplayName("should skip injection when directory mounts is null")
         void shouldSkipWhenDirectoryMountsNull() {
             manager.injectDirectories(CONTAINER_ID, null);
 
@@ -374,7 +354,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should skip injection when mounts map is empty")
         void shouldSkipWhenMountsMapIsEmpty() {
             manager.injectDirectories(CONTAINER_ID, Map.of());
 
@@ -382,7 +361,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null host path")
         void shouldRejectNullHostPath() {
             Map<String, String> mounts = new HashMap<>();
             mounts.put(null, "/container/path");
@@ -393,7 +371,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject empty host path")
         void shouldRejectEmptyHostPath() {
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of("", "/container/path")))
                 .isInstanceOf(SandboxException.class)
@@ -401,7 +378,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject relative host path")
         void shouldRejectRelativeHostPath() {
             assertThatThrownBy(() ->
                 manager.injectDirectories(CONTAINER_ID, Map.of("relative/path", "/container/path"))
@@ -411,7 +387,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject non-existent host path")
         void shouldRejectNonExistentHostPath() {
             String nonExistent = tempDir.resolve("does-not-exist").toString();
 
@@ -421,7 +396,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject symlink host path")
         void shouldRejectSymlinkHostPath() throws Exception {
             Path realDir = Files.createDirectory(tempDir.resolve("real-dir"));
             Path symlink = Files.createSymbolicLink(tempDir.resolve("symlink-dir"), realDir);
@@ -434,7 +408,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject null container path")
         void shouldRejectNullContainerPath() {
             Map<String, String> mounts = new HashMap<>();
             mounts.put(tempDir.toString(), null);
@@ -445,7 +418,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject empty container path")
         void shouldRejectEmptyContainerPath() {
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "")))
                 .isInstanceOf(SandboxException.class)
@@ -453,7 +425,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should reject relative container path")
         void shouldRejectRelativeContainerPath() {
             assertThatThrownBy(() ->
                 manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "relative/container"))
@@ -463,7 +434,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject valid directory via tar")
         void shouldInjectValidDirectory() throws Exception {
             Path subDir = Files.createDirectory(tempDir.resolve("src"));
             Files.writeString(subDir.resolve("main.py"), "print('hello')");

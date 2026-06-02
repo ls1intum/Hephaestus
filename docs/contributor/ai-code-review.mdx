@@ -156,7 +156,7 @@ Students can type `/hephaestus review` in an MR comment to retrigger a review. T
 1. `GitLabNoteMessageHandler` detects the command prefix and publishes a `BotCommandReceivedEvent`
 2. `BotCommandProcessor` listens asynchronously, validates the PR state, evaluates the detection gate, and submits a new review job
 
-This uses Spring's event system to avoid a module dependency cycle between `gitprovider` and `agent`.
+This uses Spring's event system to avoid a module dependency cycle between `integration.scm` and `agent`.
 
 ## Database schema
 

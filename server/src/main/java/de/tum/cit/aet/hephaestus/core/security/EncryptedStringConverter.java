@@ -9,6 +9,7 @@ import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,10 +62,24 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         log.debug("Instantiated EncryptedStringConverter: enabled=false, reason=no_spring_context");
     }
 
+    /**
+     * Spring-wired constructor. The key is bound via {@link SecurityProperties}; the active
+     * profile string still comes through {@code @Value} so the prod fail-fast check is identical.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
     public EncryptedStringConverter(
-        @Value("${hephaestus.security.encryption-key:}") String encryptionKey,
+        SecurityProperties securityProperties,
         @Value("${spring.profiles.active:}") String activeProfiles
     ) {
+        this(securityProperties.encryptionKey(), activeProfiles);
+    }
+
+    /**
+     * Canonical constructor (also the unit-test seam): builds the cipher key directly from the
+     * raw inputs. Same semantics as before — missing key fails fast in prod, warns elsewhere; a
+     * non-32-char key is rejected.
+     */
+    public EncryptedStringConverter(@Nullable String encryptionKey, @Nullable String activeProfiles) {
         if (encryptionKey == null || encryptionKey.isBlank()) {
             if (activeProfiles != null && activeProfiles.contains("prod")) {
                 throw new IllegalStateException(

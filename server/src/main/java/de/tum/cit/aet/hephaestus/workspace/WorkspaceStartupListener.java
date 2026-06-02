@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProvisioningHook;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -47,19 +49,22 @@ public class WorkspaceStartupListener {
     private final WorkspaceRepository workspaceRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final AsyncTaskExecutor applicationTaskExecutor;
+    private final List<WorkspaceProvisioningHook> provisioningHooks;
 
     public WorkspaceStartupListener(
         WorkspaceProvisioningService provisioningService,
         WorkspaceActivationService workspaceActivationService,
         WorkspaceRepository workspaceRepository,
         ApplicationEventPublisher eventPublisher,
-        AsyncTaskExecutor applicationTaskExecutor
+        AsyncTaskExecutor applicationTaskExecutor,
+        List<WorkspaceProvisioningHook> provisioningHooks
     ) {
         this.provisioningService = provisioningService;
         this.workspaceActivationService = workspaceActivationService;
         this.workspaceRepository = workspaceRepository;
         this.eventPublisher = eventPublisher;
         this.applicationTaskExecutor = applicationTaskExecutor;
+        this.provisioningHooks = provisioningHooks;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -81,10 +86,12 @@ public class WorkspaceStartupListener {
         } catch (Exception e) {
             log.error("GitLab PAT workspace bootstrap failed, continuing with other providers", e);
         }
-        try {
-            provisioningService.ensureGitHubAppInstallations();
-        } catch (Exception e) {
-            log.error("GitHub App installation bootstrap failed", e);
+        for (WorkspaceProvisioningHook hook : provisioningHooks) {
+            try {
+                hook.reconcile();
+            } catch (Exception e) {
+                log.error("Provisioning hook failed: kind={}", hook.kind(), e);
+            }
         }
 
         // Phase 2: Signal that workspaces are initialized

@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -18,14 +17,12 @@ import org.junit.jupiter.api.Test;
  * references that would slip past the rolling-deploy contract documented in
  * {@code docs/contributor/agent/workspace-abi.mdx}.
  */
-@DisplayName("Workspace ABI paths")
 class WorkspaceAbiPathsTest extends HephaestusArchitectureTest {
 
     /** Matches references to the legacy {@code .context/} prefix that are NOT {@code context/target/}. */
     private static final Pattern LEGACY_CONTEXT_PREFIX = Pattern.compile("(?<![A-Za-z0-9_/.])\\.context/");
 
     @Test
-    @DisplayName("agent resources contain no references to the legacy .context/ prefix")
     void agentResourcesAreOnContextTarget() throws IOException {
         Path agentResources = resolveDir("src/main/resources/agent", "server/src/main/resources/agent");
         assertThat(agentResources).isDirectory();

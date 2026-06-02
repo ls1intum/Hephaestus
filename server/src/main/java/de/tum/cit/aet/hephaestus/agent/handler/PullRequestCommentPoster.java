@@ -2,32 +2,31 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import java.time.Duration;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.lang.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Posts agent review results as comments on GitHub PRs or GitLab MRs.
- *
- * <p>This class handles sanitization (agent output is untrusted), formatting
- * (structured markdown with metadata footer), and posting via GraphQL mutations.
- * Delivery status is tracked on the {@link AgentJob} entity.
- *
- * <p>Package-private — created via {@code new} in {@link JobTypeHandlerConfiguration}
- * and injected into {@link FeedbackDeliveryService}. Not a Spring proxy, so
- * {@code @Transactional} annotations on this class would be silently ignored.
+ * Posts agent review results as comments on PRs/MRs by dispatching to the per-vendor
+ * {@link FeedbackChannel}. Owns sanitization, formatting, and metadata extraction;
+ * the GraphQL call lives in the vendor channel under
+ * {@code integration/<kind>/feedback/}.
  */
 class PullRequestCommentPoster {
 
@@ -41,7 +40,10 @@ class PullRequestCommentPoster {
     /** Maximum summary length in the collapsible header (prevents total comment from exceeding provider limits). */
     static final int MAX_SUMMARY_LENGTH = 200;
 
-    // ── Sanitization patterns ──
+    /** Marker appended to summary posts so {@code FeedbackPostService} can locate and edit them. */
+    static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus-agent-feedback:";
+
+    // Sanitization patterns
 
     /** Matches @mentions (e.g., @username) — backtick-escaped to prevent notification spam.
      *  Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
@@ -145,21 +147,24 @@ class PullRequestCommentPoster {
     /** Matches 3+ consecutive newlines — collapsed to 2. */
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
 
-    final GitHubGraphQlClientProvider gitHubProvider;
+    private final Map<IntegrationKind, FeedbackChannel> channels;
 
-    @Nullable
-    final GitLabGraphQlClientProvider gitLabProvider;
-
-    private final WorkspaceRepository workspaceRepository;
-
-    PullRequestCommentPoster(
-        GitHubGraphQlClientProvider gitHubProvider,
-        @Nullable GitLabGraphQlClientProvider gitLabProvider,
-        WorkspaceRepository workspaceRepository
-    ) {
-        this.gitHubProvider = gitHubProvider;
-        this.gitLabProvider = gitLabProvider;
-        this.workspaceRepository = workspaceRepository;
+    PullRequestCommentPoster(List<FeedbackChannel> feedbackChannels) {
+        EnumMap<IntegrationKind, FeedbackChannel> map = new EnumMap<>(IntegrationKind.class);
+        for (FeedbackChannel channel : feedbackChannels) {
+            FeedbackChannel previous = map.putIfAbsent(channel.kind(), channel);
+            if (previous != null) {
+                throw new IllegalStateException(
+                    "Duplicate FeedbackChannel for kind " +
+                        channel.kind() +
+                        ": " +
+                        previous.getClass().getName() +
+                        " conflicts with " +
+                        channel.getClass().getName()
+                );
+            }
+        }
+        this.channels = map;
     }
 
     /**
@@ -182,8 +187,6 @@ class PullRequestCommentPoster {
         return postFormattedBody(job, formatted);
     }
 
-    // ── Core posting (shared by all comment types) ──
-
     /**
      * Posts a fully formatted body to the PR/MR associated with the given job.
      *
@@ -194,174 +197,72 @@ class PullRequestCommentPoster {
      */
     @Nullable
     String postFormattedBody(AgentJob job, String formattedBody) {
-        Long workspaceId = job.getWorkspace().getId();
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new JobDeliveryException("Workspace not found: id=" + workspaceId));
-
-        String commentId;
-        if (workspace.getProviderType() == GitProviderType.GITHUB) {
-            commentId = postGitHubComment(workspaceId, job, formattedBody);
-        } else {
-            commentId = postGitLabNote(workspaceId, job, formattedBody);
-        }
-
-        log.info(
-            "Posted feedback comment: jobId={}, provider={}, commentId={}",
-            job.getId(),
-            workspace.getProviderType(),
-            commentId
+        long workspaceId = job.getWorkspace().getId();
+        IntegrationKind kind = Objects.requireNonNull(
+            job.getIntegrationKind(),
+            "AgentJob.integrationKind must not be null"
         );
-        return commentId;
+        FeedbackChannel channel = requireChannel(kind);
+        FeedbackTarget target = buildTarget(job, kind, workspaceId);
+        try {
+            SummaryHandle handle = channel.postSummary(
+                target,
+                new FeedbackContent(formattedBody, summaryMarkerFor(job))
+            );
+            log.info(
+                "Posted feedback comment: jobId={}, kind={}, commentId={}",
+                job.getId(),
+                kind,
+                handle.externalId()
+            );
+            return handle.externalId();
+        } catch (FeedbackDeliveryException e) {
+            throw new JobDeliveryException(e.getMessage(), e);
+        }
     }
 
-    // ── GitHub ──
+    // Vendor dispatch
 
-    private String postGitHubComment(Long scopeId, AgentJob job, String body) {
-        if (gitHubProvider.isRateLimitCritical(scopeId)) {
-            throw new JobDeliveryException("GitHub rate limit critical — skipping comment post for scope " + scopeId);
+    private FeedbackChannel requireChannel(IntegrationKind kind) {
+        FeedbackChannel channel = channels.get(kind);
+        if (channel == null) {
+            throw new JobDeliveryException(
+                "No FeedbackChannel wired for kind " +
+                    kind +
+                    " — check that the vendor integration is enabled and its channel bean is registered"
+            );
         }
+        return channel;
+    }
 
+    FeedbackTarget buildTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
         JsonNode metadata = job.getMetadata();
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int prNumber = requireMetadataInt(metadata, "pr_number");
 
-        String[] parts = repoFullName.split("/", 2);
-        if (parts.length != 2) {
-            throw new JobDeliveryException("Invalid repository_full_name: " + repoFullName);
+        // Vendor-specific subject formatting lives on the per-kind FeedbackChannel —
+        // see FeedbackChannel.formatPullRequestSubjectId.
+        FeedbackChannel channel = requireChannel(kind);
+        String subjectExternalId;
+        try {
+            subjectExternalId = channel.formatPullRequestSubjectId(repoFullName, prNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.getMessage());
         }
 
-        String nodeId = resolveGitHubPrNodeId(scopeId, parts[0], parts[1], prNumber);
-        return createGitHubComment(scopeId, nodeId, body);
+        // Resource URL conveys the head commit SHA for inline-finding channels that
+        // need to anchor the review to a specific commit; null/absent for the summary path.
+        String resourceUrl = optionalMetadataText(metadata, "commit_sha");
+
+        IntegrationRef ref = new IntegrationRef(kind, workspaceId, /* instanceKey */ null);
+        return new FeedbackTarget(ref, subjectExternalId, resourceUrl);
     }
 
-    String resolveGitHubPrNodeId(Long scopeId, String owner, String name, int number) {
-        ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("GetPullRequestNodeId")
-            .variable("owner", owner)
-            .variable("name", name)
-            .variable("number", number)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response resolving PR node ID: " + owner + "/" + name + "#" + number);
-        }
-        gitHubProvider.trackRateLimit(scopeId, response);
-
-        String nodeId = response.field("repository.pullRequest.id").getValue();
-        if (nodeId == null) {
-            List<?> errors = response.getErrors();
-            throw new JobDeliveryException(
-                "PR not found via GraphQL: " +
-                    owner +
-                    "/" +
-                    name +
-                    "#" +
-                    number +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
-        }
-        return nodeId;
+    private static String summaryMarkerFor(AgentJob job) {
+        return SUMMARY_MARKER_PREFIX + job.getId() + " -->";
     }
 
-    private String createGitHubComment(Long scopeId, String subjectId, String body) {
-        ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("AddPullRequestComment")
-            .variable("subjectId", subjectId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response from AddPullRequestComment mutation");
-        }
-        gitHubProvider.trackRateLimit(scopeId, response);
-
-        if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-            throw new JobDeliveryException("GitHub addComment failed: " + response.getErrors());
-        }
-
-        String commentNodeId = response.field("addComment.commentEdge.node.id").getValue();
-        if (commentNodeId == null) {
-            throw new JobDeliveryException("No comment ID in AddPullRequestComment response");
-        }
-        return commentNodeId;
-    }
-
-    // ── GitLab ──
-
-    private String postGitLabNote(Long scopeId, AgentJob job, String body) {
-        if (gitLabProvider == null) {
-            throw new JobDeliveryException("GitLab provider not configured — cannot post note for scope " + scopeId);
-        }
-        if (gitLabProvider.isRateLimitCritical(scopeId)) {
-            throw new JobDeliveryException("GitLab rate limit critical — skipping note post for scope " + scopeId);
-        }
-
-        JsonNode metadata = job.getMetadata();
-        String repoFullName = requireMetadataText(metadata, "repository_full_name");
-        int prNumber = requireMetadataInt(metadata, "pr_number");
-
-        String globalId = resolveGitLabMrGlobalId(scopeId, repoFullName, prNumber);
-        return createGitLabNote(scopeId, globalId, body);
-    }
-
-    String resolveGitLabMrGlobalId(Long scopeId, String projectPath, int mrIid) {
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("GetMergeRequestGlobalId")
-            .variable("fullPath", projectPath)
-            .variable("iid", String.valueOf(mrIid))
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response resolving MR global ID: " + projectPath + "!" + mrIid);
-        }
-
-        String globalId = response.field("project.mergeRequest.id").getValue();
-        if (globalId == null) {
-            List<?> errors = response.getErrors();
-            throw new JobDeliveryException(
-                "MR not found via GraphQL: " +
-                    projectPath +
-                    "!" +
-                    mrIid +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
-        }
-        return globalId;
-    }
-
-    private String createGitLabNote(Long scopeId, String noteableId, String body) {
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("CreateMergeRequestNote")
-            .variable("noteableId", noteableId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response from CreateMergeRequestNote mutation");
-        }
-
-        List<String> mutationErrors = response.field("createNote.errors").getValue();
-        if (mutationErrors != null && !mutationErrors.isEmpty()) {
-            throw new JobDeliveryException("GitLab createNote failed: " + mutationErrors);
-        }
-
-        String noteId = response.field("createNote.note.id").getValue();
-        if (noteId == null) {
-            throw new JobDeliveryException("No note ID in CreateMergeRequestNote response");
-        }
-        return noteId;
-    }
-
-    // ── Sanitization ──
+    // Sanitization
 
     /**
      * Sanitizes untrusted agent output for safe inclusion in git provider comments.
@@ -452,7 +353,7 @@ class PullRequestCommentPoster {
         return result;
     }
 
-    // ── Formatting ──
+    // Formatting
 
     /**
      * Formats a sanitized review comment with bot disclaimer, collapsible body, and metadata footer.
@@ -461,7 +362,7 @@ class PullRequestCommentPoster {
         var sb = new StringBuilder(sanitizedBody.length() + 512);
 
         // HTML comment marker for identifying bot comments
-        sb.append("<!-- hephaestus-agent-feedback:").append(job.getId()).append(" -->\n");
+        sb.append(SUMMARY_MARKER_PREFIX).append(job.getId()).append(" -->\n");
 
         // Collapsible review body (cap summary to prevent total comment exceeding provider limits)
         String summaryText;
@@ -491,7 +392,7 @@ class PullRequestCommentPoster {
 
         JsonNode configSnapshot = job.getConfigSnapshot();
         if (configSnapshot != null && configSnapshot.has("model_name")) {
-            String modelName = configSnapshot.get("model_name").asText();
+            String modelName = configSnapshot.get("model_name").asString();
             if (!modelName.isBlank()) {
                 sb.append(" &middot; ").append(escapeHtml(modelName));
             }
@@ -503,9 +404,7 @@ class PullRequestCommentPoster {
         }
 
         sb.append("</sub>\n");
-        sb.append(
-            "<sub>AI-generated feedback can be inaccurate. React with \uD83D\uDC4D or \uD83D\uDC4E to give feedback.</sub>\n"
-        );
+        sb.append("<sub>AI-generated feedback can be inaccurate. React with 👍 or 👎 to give feedback.</sub>\n");
     }
 
     static String formatDuration(Duration duration) {
@@ -523,17 +422,35 @@ class PullRequestCommentPoster {
         return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
-    // ── Metadata helpers ──
+    // Metadata helpers
 
-    static String requireMetadataText(JsonNode metadata, String field) {
+    static String requireMetadataText(@Nullable JsonNode metadata, String field) {
+        if (metadata == null) {
+            throw new JobDeliveryException("Missing required metadata field: " + field);
+        }
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull()) {
             throw new JobDeliveryException("Missing required metadata field: " + field);
         }
-        return node.asText();
+        return node.asString();
     }
 
-    static int requireMetadataInt(JsonNode metadata, String field) {
+    @Nullable
+    static String optionalMetadataText(@Nullable JsonNode metadata, String field) {
+        if (metadata == null) {
+            return null;
+        }
+        JsonNode node = metadata.get(field);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        return node.asString();
+    }
+
+    static int requireMetadataInt(@Nullable JsonNode metadata, String field) {
+        if (metadata == null) {
+            throw new JobDeliveryException("Missing required metadata field: " + field);
+        }
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull()) {
             throw new JobDeliveryException("Missing required metadata field: " + field);

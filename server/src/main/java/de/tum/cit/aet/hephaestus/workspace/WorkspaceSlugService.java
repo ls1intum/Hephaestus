@@ -154,9 +154,7 @@ public class WorkspaceSlugService {
             .orElse(null);
     }
 
-    // ========================================================================
     // PRIVATE HELPERS
-    // ========================================================================
 
     private boolean hasActiveHistory(String slug) {
         Instant now = Instant.now();

@@ -1,14 +1,18 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.GitHubDataSyncService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsConsumerService;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.NatsProperties;
-import de.tum.cit.aet.hephaestus.gitprovider.sync.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -31,7 +35,7 @@ public class WorkspaceActivationService {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceActivationService.class);
 
     // Configuration
-    private final NatsProperties natsProperties;
+    private final NatsConnectionProperties natsProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     // Core repositories
@@ -39,24 +43,29 @@ public class WorkspaceActivationService {
 
     // Services — natsConsumerService absent under webhook profile (server.enabled=false);
     // activation paths that need it are themselves server-only.
-    private final ObjectProvider<NatsConsumerService> natsConsumerService;
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
-    private final GitLabWorkspaceInitializationService gitLabInitService;
+    private final ConnectionService connectionService;
 
-    // Lazy-loaded to break circular reference with sync services
-    private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    /**
+     * Per-kind sync triggers, collected through the SPI so workspace activation never
+     * imports a specific provider's sync service. The dispatch dispatches strictly by the
+     * workspace's bound {@link IntegrationKind}; an unmapped kind is treated as "no sync
+     * needed for this workspace" rather than throwing — symmetric with shouldSkipActivation.
+     */
+    private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceActivationService(
-        NatsProperties natsProperties,
+        NatsConnectionProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
         WorkspaceRepository workspaceRepository,
-        ObjectProvider<NatsConsumerService> natsConsumerService,
+        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        GitLabWorkspaceInitializationService gitLabInitService,
-        ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        ConnectionService connectionService,
+        List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -64,14 +73,13 @@ public class WorkspaceActivationService {
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
-        this.gitLabInitService = gitLabInitService;
-        this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.connectionService = connectionService;
+        Map<IntegrationKind, WorkspaceDataSyncTrigger> map = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceDataSyncTrigger t : dataSyncTriggerList) {
+            map.put(t.kind(), t);
+        }
+        this.dataSyncTriggers = map;
         this.monitoringExecutor = monitoringExecutor;
-    }
-
-    /** Lazy accessor for GitHubDataSyncService to break circular dependency. */
-    private GitHubDataSyncService getGitHubDataSyncService() {
-        return gitHubDataSyncServiceProvider.getObject();
     }
 
     /**
@@ -138,6 +146,12 @@ public class WorkspaceActivationService {
 
     /**
      * Checks if a workspace should skip activation based on its configuration and status.
+     *
+     * <p>Provider classification is now driven by the active {@code GITHUB} / {@code GITLAB}
+     * Connection rather than the legacy {@code git_provider_mode} column. The PAT-bearing
+     * variants (GitHub PAT, GitLab PAT) require a bearer credential blob; the GitHub App
+     * variant mints installation tokens on demand, so its credential blob is intentionally
+     * empty and we must not gate activation on it.
      */
     private boolean shouldSkipActivation(Workspace workspace) {
         // Skip non-active workspaces (SUSPENDED, PURGED) - don't waste cycles on dead workspaces
@@ -150,9 +164,19 @@ public class WorkspaceActivationService {
             return true;
         }
 
-        return switch (workspace.getGitProviderMode()) {
-            case PAT_ORG -> {
-                if (isBlank(workspace.getPersonalAccessToken())) {
+        var providerKind = connectionService.findActiveProviderKind(workspace.getId());
+        if (providerKind.isEmpty()) {
+            // No active SCM connection — nothing to sync until one is bound.
+            return false;
+        }
+        return switch (providerKind.get()) {
+            case GITHUB -> {
+                // GitHub PAT variant requires a token; App variant mints on demand and
+                // never carries a blob, so only the PAT branch gates activation.
+                if (
+                    connectionService.findActiveGitHubPatConfig(workspace.getId()).isPresent() &&
+                    !hasBearerToken(workspace.getId(), IntegrationKind.GITHUB)
+                ) {
                     log.info(
                         "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
                         workspace.getId()
@@ -161,9 +185,8 @@ public class WorkspaceActivationService {
                 }
                 yield false;
             }
-            case GITHUB_APP_INSTALLATION -> false;
-            case GITLAB_PAT -> {
-                if (isBlank(workspace.getPersonalAccessToken())) {
+            case GITLAB -> {
+                if (!hasBearerToken(workspace.getId(), IntegrationKind.GITLAB)) {
                     log.info(
                         "Skipped workspace activation: reason=gitlabPatModeWithoutToken, workspaceId={}",
                         workspace.getId()
@@ -172,8 +195,15 @@ public class WorkspaceActivationService {
                 }
                 yield false;
             }
-            case null -> false;
+            case SLACK -> false;
         };
+    }
+
+    private boolean hasBearerToken(long workspaceId, IntegrationKind kind) {
+        return connectionService
+            .findActiveBearerToken(workspaceId, kind)
+            .map(b -> b.token() != null && !b.token().isBlank())
+            .orElse(false);
     }
 
     /** Activate a single workspace: run startup sync, then start its NATS consumer scope. */
@@ -196,22 +226,27 @@ public class WorkspaceActivationService {
         if (syncSchedulerProperties.runOnStartup()) {
             log.info("Starting monitoring on startup: workspaceId={}", workspace.getId());
 
-            // Set workspace context for the sync operations (enables proper logging via MDC)
-            WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of());
+            // Set workspace context for the sync operations (enables proper logging via MDC).
+            // installationId is sourced from the active GitHub App connection (if any).
+            Long installationId = connectionService
+                .findActiveGitHubAppConfig(workspace.getId())
+                .map(ConnectionConfig.GitHubAppConfig::installationId)
+                .orElse(null);
+            WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of(), installationId);
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
-                if (workspace.getProviderType() == GitProviderType.GITLAB) {
-                    // Core initialization: webhook, project discovery, org linking, monitors
-                    gitLabInitService.initialize(workspace);
-
-                    // Full data sync: memberships, issue types, per-repo data, teams
-                    gitLabInitService.syncFullData(workspace);
+                IntegrationKind kind = connectionService
+                    .findActiveProviderKind(workspace.getId())
+                    .orElse(IntegrationKind.GITHUB);
+                WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
+                if (trigger == null) {
+                    log.debug(
+                        "Skipped startup sync: reason=noTriggerForKind, workspaceId={}, kind={}",
+                        workspace.getId(),
+                        kind
+                    );
                 } else {
-                    // GitHub: use the central sync orchestrator which handles:
-                    // 1. Organization and teams sync (via GraphQL)
-                    // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
-                    // 3. Workspace-level relationships (issue types, issue dependencies, sub-issues)
-                    getGitHubDataSyncService().syncAllRepositories(workspace.getId());
+                    trigger.syncAllRepositories(workspace.getId());
                 }
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
@@ -241,35 +276,26 @@ public class WorkspaceActivationService {
     }
 
     /**
-     * Ensure workspace metadata is populated (git provider mode, account login).
-     * This method persists changes if metadata was missing or derived.
+     * Ensure workspace metadata (account login) is populated. This method persists
+     * changes if metadata was missing or derived.
+     *
+     * <p>The legacy {@code git_provider_mode} derivation has been removed — provider
+     * identity is now carried by the {@code Connection} registry, which the migration
+     * backfills from the legacy columns at startup. A workspace without a Connection
+     * after backfill is simply "not yet bound to a provider" and {@link #shouldSkipActivation}
+     * handles that path by returning {@code false} (nothing to sync, nothing to gate on).
      *
      * @param workspace the workspace to ensure metadata for
      * @return the workspace with metadata populated
      */
     @Transactional
     public Workspace ensureWorkspaceMetadata(Workspace workspace) {
-        boolean changed = false;
-
-        if (workspace.getGitProviderMode() == null) {
-            Workspace.GitProviderMode mode =
-                workspace.getInstallationId() != null
-                    ? Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
-                    : Workspace.GitProviderMode.PAT_ORG;
-            workspace.setGitProviderMode(mode);
-            changed = true;
-        }
-
         if (isBlank(workspace.getAccountLogin())) {
             String derived = deriveAccountLogin(workspace);
             if (!isBlank(derived)) {
                 workspace.setAccountLogin(derived);
-                changed = true;
+                workspace = workspaceRepository.save(workspace);
             }
-        }
-
-        if (changed) {
-            workspace = workspaceRepository.save(workspace);
         }
 
         return workspace;

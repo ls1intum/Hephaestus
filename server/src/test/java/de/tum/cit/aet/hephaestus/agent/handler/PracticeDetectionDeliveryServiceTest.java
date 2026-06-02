@@ -16,9 +16,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
@@ -43,7 +43,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("PracticeDetectionDeliveryService")
 class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -135,11 +134,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Happy path")
     class HappyPath {
 
         @Test
-        @DisplayName("persists valid finding and publishes event")
         void persistsValidFinding() {
             var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
 
@@ -178,11 +175,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Practice resolution")
     class PracticeResolution {
 
         @Test
-        @DisplayName("discards finding for unknown practice slug")
         void unknownSlug() {
             var findings = List.of(validFinding("unknown-practice", Verdict.POSITIVE));
 
@@ -223,7 +218,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Target resolution")
     class TargetResolution {
 
         @Test
@@ -250,11 +244,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Metadata validation")
     class MetadataValidation {
 
         @Test
-        @DisplayName("throws when metadata is null")
         void nullMetadata() {
             testJob.setMetadata(null);
             var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
@@ -265,7 +257,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("throws when pull_request_id is missing from metadata")
         void missingPullRequestId() {
             testJob.setMetadata(objectMapper.createObjectNode());
             var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
@@ -277,11 +268,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Multiple negatives")
     class MultipleNegatives {
 
         @Test
-        @DisplayName("persists all negative findings for a practice")
         void persistsAllNegativesForPractice() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
@@ -295,7 +284,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("persists many POSITIVE findings")
         void persistsManyPositiveFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
@@ -309,7 +297,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("persists negatives independently per practice")
         void persistsNegativesIndependentlyPerPractice() {
             Practice otherPractice = new Practice();
             ReflectionTestUtils.setField(otherPractice, "id", 20L);
@@ -331,7 +318,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("NOT_APPLICABLE verdict")
     class NotApplicableVerdict {
 
         @Test
@@ -346,7 +332,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("persists many NOT_APPLICABLE findings")
         void persistsManyNotApplicableFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
@@ -360,11 +345,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Idempotency")
     class Idempotency {
 
         @Test
-        @DisplayName("duplicate key returns 0 from insertIfAbsent")
         void duplicateKey() {
             when(
                 practiceFindingRepository.insertIfAbsent(
@@ -395,7 +378,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("idempotency key format is correct")
         void keyFormat() {
             var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
 
@@ -427,11 +409,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("Event publication")
     class EventPublication {
 
         @Test
-        @DisplayName("event carries correct counts")
         void correctCounts() {
             // One known slug, one unknown
             Practice otherPractice = new Practice();

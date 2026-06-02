@@ -12,7 +12,6 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.jpa.repository.Query;
@@ -35,33 +34,39 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * @see ArchitectureTestConstants
  */
-@DisplayName("Multi-Tenancy Architecture")
 class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
     /**
      * Package prefixes that are inherently workspace-agnostic.
      *
-     * <p>The gitprovider package is the ETL/sync layer that ingests data from GitHub.
-     * It operates at the external entity level (GitHub IDs) and resolves workspace
-     * context through entity relationships. The workspace filtering happens at the
-     * domain/application layer, not at the gitprovider layer.
+     * <p>The {@code integration.scm} package is the shared SCM kernel (entities, SPIs,
+     * sync orchestrator). The per-vendor ETL handlers (former {@code integration.scm.<domain>.<kind>})
+     * now live under {@code integration.<kind>}, but they still operate at the external
+     * entity level (GitHub/GitLab IDs) and resolve workspace context through entity
+     * relationships, so they remain workspace-agnostic for the purposes of this rule.
+     * Workspace filtering happens at the domain/application layer, not at the
+     * integration.scm/integration ETL layer.
      */
-    static final String GITPROVIDER_PACKAGE = BASE_PACKAGE + ".gitprovider";
+    static final String SCM_PACKAGE = BASE_PACKAGE + ".integration.scm";
+
+    static final String INTEGRATION_GITHUB_PACKAGE = BASE_PACKAGE + ".integration.scm.github";
+    static final String INTEGRATION_GITLAB_PACKAGE = BASE_PACKAGE + ".integration.scm.gitlab";
 
     /**
-     * Checks if a class belongs to a workspace-agnostic package (e.g., gitprovider).
+     * Checks if a class belongs to a workspace-agnostic package (integration.scm kernel
+     * or the per-vendor ETL handlers in integration.{github,gitlab}).
      */
     private static boolean isInWorkspaceAgnosticPackage(JavaClass javaClass) {
-        return javaClass.getPackageName().startsWith(GITPROVIDER_PACKAGE);
+        String pkg = javaClass.getPackageName();
+        return (
+            pkg.startsWith(SCM_PACKAGE) ||
+            pkg.startsWith(INTEGRATION_GITHUB_PACKAGE) ||
+            pkg.startsWith(INTEGRATION_GITLAB_PACKAGE)
+        );
     }
 
     /**
      * Schedulers that are legitimately workspace-agnostic.
-     *
-     * <p>These scheduled jobs operate on system-wide data or infrastructure,
-     * not tenant-specific data. Each entry is documented with its justification.
-     *
-     * <p><b>EMPTY:</b> All schedulers now use {@link WorkspaceAgnostic} annotation directly.
      */
     static final Set<String> WORKSPACE_AGNOSTIC_SCHEDULERS = Set.of();
 
@@ -92,12 +97,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
      */
     static final Set<String> WORKSPACE_AGNOSTIC_METHODS = Set.of();
 
-    // ========================================================================
     // REPOSITORY WORKSPACE FILTERING
-    // ========================================================================
 
     @Nested
-    @DisplayName("Repository Workspace Filtering")
     class RepositoryWorkspaceFilteringTests {
 
         /**
@@ -114,7 +116,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("@Query methods include workspace filtering (audit)")
         void queryMethodsIncludeWorkspaceFiltering() {
             ArchCondition<JavaMethod> includeWorkspaceFiltering = new ArchCondition<>(
                 "include workspace filtering in @Query"
@@ -128,7 +129,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     String repoName = method.getOwner().getSimpleName();
                     String methodKey = repoName + "." + method.getName();
 
-                    // Skip gitprovider package - inherently workspace-agnostic ETL layer
+                    // Skip integration.scm package - inherently workspace-agnostic ETL layer
                     if (isInWorkspaceAgnosticPackage(method.getOwner())) {
                         return;
                     }
@@ -235,7 +236,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * They should have workspace-scoped alternatives.
          */
         @Test
-        @DisplayName("Repositories have workspace-scoped query alternatives")
         void repositoriesHaveWorkspaceScopedAlternatives() {
             ArchCondition<JavaClass> haveWorkspaceScopedMethods = new ArchCondition<>(
                 "have workspace-scoped query methods"
@@ -244,7 +244,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                 public void check(JavaClass javaClass, ConditionEvents events) {
                     String repoName = javaClass.getSimpleName();
 
-                    // Skip gitprovider package - inherently workspace-agnostic ETL layer
+                    // Skip integration.scm package - inherently workspace-agnostic ETL layer
                     if (isInWorkspaceAgnosticPackage(javaClass)) {
                         return;
                     }
@@ -378,12 +378,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SCHEDULED JOB WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
-    @DisplayName("Scheduled Job Workspace Context")
     class ScheduledJobContextTests {
 
         /**
@@ -400,7 +397,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * then use SyncContextProvider to set/clear context.
          */
         @Test
-        @DisplayName("@Scheduled classes inject workspace iteration dependencies")
         void scheduledClassesHaveWorkspaceIterationDependencies() {
             ArchCondition<JavaClass> haveWorkspaceIterationCapability = new ArchCondition<>(
                 "have workspace iteration or context dependencies"
@@ -479,7 +475,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * be through a workspace-scoped method or after setting workspace context.
          */
         @Test
-        @DisplayName("@Scheduled methods don't bypass workspace context")
         void scheduledMethodsDontBypassWorkspaceContext() {
             ArchCondition<JavaMethod> notDirectlyAccessGlobalRepositoryMethods = new ArchCondition<>(
                 "not directly access repository methods without workspace context"
@@ -546,12 +541,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // EVENT LISTENER WORKSPACE VALIDATION
-    // ========================================================================
 
     @Nested
-    @DisplayName("Event Listener Workspace Context")
     class EventListenerContextTests {
 
         /**
@@ -562,7 +554,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * tenant context.
          */
         @Test
-        @DisplayName("Event listeners receive events with workspace context")
         void eventListenersReceiveWorkspaceContext() {
             ArchCondition<JavaMethod> handleEventsWithWorkspaceContext = new ArchCondition<>(
                 "handle events that carry workspace context"
@@ -586,7 +577,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
                             // Known event types that carry workspace context through entity relationships
                             Set<String> workspaceAwareEventPrefixes = Set.of(
-                                "DomainEvent", // Our domain events carry repository which has workspace
+                                "ScmDomainEvent", // Our domain events carry repository which has workspace
                                 "PullRequest", // Through repository.organization.workspaceId
                                 "Issue", // Through repository.organization.workspaceId
                                 "Discussion", // Through repository.organization.workspaceId
@@ -597,6 +588,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
                                 "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
+                                "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
+                                "WorkspaceCreatedEvent", // Carries workspaceId + kind
+                                "WorkspaceScheduleChangedEvent", // Carries workspaceId for leaderboard reschedule
+                                "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
@@ -649,9 +644,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             "AgentJobSubmitter",
             // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
             "AgentJobEventListener",
-            // MentorContextInvalidator handles DomainEvent.{PullRequest,Issue,Review}* whose
+            // MentorContextInvalidator handles ScmDomainEvent.{PullRequest,Issue,Review}* whose
             // EventContext carries the originating repository → workspaceId is resolved per-event
-            "MentorContextInvalidator"
+            "MentorContextInvalidator",
+            // GitHubProjectActivityListener handles GitHubProjectEvent payloads whose EventContext
+            // carries scopeId (the originating workspace) — extracted out of ActivityEventListener
+            // in the SPI-isolation refactor, same payload-carries-context contract applies
+            "GitHubProjectActivityListener"
         );
 
         /**
@@ -662,7 +661,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * is lost unless explicitly propagated.
          */
         @Test
-        @DisplayName("@Async event listeners propagate workspace context")
         void asyncEventListenersPropagateContext() {
             ArchCondition<JavaClass> propagateContextInAsyncListeners = new ArchCondition<>(
                 "propagate workspace context in async event listeners"
@@ -704,7 +702,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     // also have context propagation or use events that carry full context
                     boolean hasRepositoryDependency = dependencies.stream().anyMatch(d -> d.endsWith("Repository"));
 
-                    // Events with full entity snapshots (like DomainEvent payloads) don't need
+                    // Events with full entity snapshots (like ScmDomainEvent payloads) don't need
                     // context propagation - they carry all needed data
                     boolean usesPayloadEvents = javaClass
                         .getMethods()
@@ -712,7 +710,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .filter(m -> m.isAnnotatedWith(TransactionalEventListener.class))
                         .flatMap(m -> m.getRawParameterTypes().stream())
                         .anyMatch(
-                            p -> p.getSimpleName().contains("DomainEvent") || p.getSimpleName().contains("Event")
+                            p -> p.getSimpleName().contains("ScmDomainEvent") || p.getSimpleName().contains("Event")
                         );
 
                     if (hasRepositoryDependency && !usesPayloadEvents) {
@@ -741,12 +739,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // SERVICE LAYER WORKSPACE AWARENESS
-    // ========================================================================
 
     @Nested
-    @DisplayName("Service Layer Workspace Awareness")
     class ServiceWorkspaceAwarenessTests {
 
         /**
@@ -756,7 +751,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * to prevent accidentally returning data from all tenants.
          */
         @Test
-        @DisplayName("Service list methods are workspace-scoped")
         void serviceListMethodsAreWorkspaceScoped() {
             ArchCondition<JavaMethod> beWorkspaceScopedIfReturningList = new ArchCondition<>(
                 "be workspace-scoped if returning a list of entities"
@@ -846,12 +840,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         }
     }
 
-    // ========================================================================
     // CONTROLLER WORKSPACE CONTEXT
-    // ========================================================================
 
     @Nested
-    @DisplayName("Controller Workspace Context")
     class ControllerWorkspaceContextTests {
 
         /**
@@ -865,7 +856,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
          * </ul>
          */
         @Test
-        @DisplayName("Data endpoints receive WorkspaceContext")
         void dataEndpointsReceiveWorkspaceContext() {
             ArchCondition<JavaMethod> haveWorkspaceContextForDataEndpoints = new ArchCondition<>(
                 "have WorkspaceContext for data endpoints"
@@ -908,6 +898,27 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                     // Skip workspace registry operations - these are ADMIN operations that happen
                     // BEFORE a workspace context exists (creating/listing workspaces).
                     if (controllerName.contains("WorkspaceRegistry")) {
+                        return;
+                    }
+
+                    // Same exemption applies to vendor-specific preflight controllers under
+                    // /workspaces/<kind>/* — they validate PATs / list discoverable scopes
+                    // BEFORE a workspace exists, so there's no workspace context to enforce.
+                    if (controllerName.equals("GitLabPreflightController")) {
+                        return;
+                    }
+
+                    // Skip webhook ingress controllers — they receive unauthenticated vendor
+                    // deliveries. Workspace context is derived from the verified payload AFTER
+                    // the WebhookSignatureVerifier path, never from the inbound HTTP request.
+                    //
+                    // Same exemption applies to OAuthCallbackController — the vendor browser
+                    // redirect is unauthenticated; workspace identity is decoded from the
+                    // HMAC-signed state parameter, never from the inbound request URL.
+                    if (controllerName.equals("WebhookController") || controllerName.endsWith("WebhookController")) {
+                        return;
+                    }
+                    if (controllerName.equals("OAuthCallbackController")) {
                         return;
                     }
 

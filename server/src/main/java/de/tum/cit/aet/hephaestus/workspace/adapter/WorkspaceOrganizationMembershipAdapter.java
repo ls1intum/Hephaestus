@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMemberRole;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembership;
-import de.tum.cit.aet.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembership;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
@@ -22,11 +22,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Adapts organization membership events from gitprovider to workspace member syncing.
+ * Adapts organization membership events from integration.scm to workspace member syncing.
  * <p>
- * This implements the {@link OrganizationMembershipListener} SPI defined by gitprovider,
+ * This implements the {@link OrganizationMembershipListener} SPI defined by integration.scm,
  * allowing the workspace module to react to organization membership changes without
- * gitprovider needing to know about workspace concepts.
+ * integration.scm needing to know about workspace concepts.
  */
 @Component
 public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembershipListener {

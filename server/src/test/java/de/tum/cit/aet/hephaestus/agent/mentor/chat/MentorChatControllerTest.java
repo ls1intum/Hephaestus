@@ -26,7 +26,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@DisplayName("MentorChatController")
 class MentorChatControllerTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -46,7 +45,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("sets the AI-SDK protocol response header")
     void setsProtocolResponseHeader() {
         controller.chat(stubContext(), validBody(UUID.randomUUID(), "hi"), response);
         assertThat(response.getHeader(UIMessageChunk.RESPONSE_HEADER)).isEqualTo(UIMessageChunk.PROTOCOL_VERSION);
@@ -55,7 +53,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("dispatches to the service when the body is well-formed")
     void dispatchesToService() {
         UUID threadId = UUID.randomUUID();
         controller.chat(stubContext(), validBody(threadId, "hello mentor"), response);
@@ -68,7 +65,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("propagates the client-supplied UIMessage id to the service")
     void propagatesClientMessageId() {
         UUID clientMessageId = UUID.randomUUID();
         MentorChatRequestBody body = body(UUID.randomUUID(), clientMessageId.toString(), "hello");
@@ -81,7 +77,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("ignores non-UUID client message ids without rejecting the request")
     void ignoresNonUuidClientMessageId() {
         MentorChatRequestBody body = body(UUID.randomUUID(), "not-a-uuid", "hello");
         controller.chat(stubContext(), body, response);
@@ -93,7 +88,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("blank user message text short-circuits — service is NOT invoked, header still set")
     void blankUserMessage_shortCircuits() {
         SseEmitter emitter = controller.chat(stubContext(), body(UUID.randomUUID(), null, "   "), response);
         verify(mentorChatService, never()).start(any(), any());
@@ -102,7 +96,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("oversize user message (> MAX_PROMPT_CHARS) short-circuits with an error chunk")
     void oversizeUserMessage_shortCircuits() {
         String hugeText = "x".repeat(TEST_PROPERTIES.maxPromptChars() + 1);
         SseEmitter emitter = controller.chat(stubContext(), body(UUID.randomUUID(), null, hugeText), response);
@@ -120,7 +113,6 @@ class MentorChatControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("workspace with mentorEnabled=false → 404; service NOT invoked")
     void workspaceWithMentorDisabled_returns404() {
         WorkspaceContext disabledCtx = new WorkspaceContext(
             1L,

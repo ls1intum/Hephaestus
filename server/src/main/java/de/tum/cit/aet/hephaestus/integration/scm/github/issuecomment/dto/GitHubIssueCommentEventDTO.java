@@ -1,0 +1,76 @@
+package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto;
+
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.toInstant;
+import static de.tum.cit.aet.hephaestus.integration.scm.domain.common.DateTimeUtils.uriToString;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubWebhookEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
+import java.time.Instant;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * DTO for GitHub issue_comment webhook events.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record GitHubIssueCommentEventDTO(
+    @JsonProperty("action") String action,
+    @JsonProperty("comment") GitHubCommentDTO comment,
+    @JsonProperty("issue") GitHubIssueDTO issue,
+    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    @JsonProperty("sender") GitHubUserDTO sender
+) implements GitHubWebhookEvent {
+    @Override
+    public GitHubEventAction.IssueComment actionType() {
+        return GitHubEventAction.IssueComment.fromString(action);
+    }
+
+    @Override
+    public GitHubRepositoryRefDTO repository() {
+        return repository;
+    }
+
+    /**
+     * DTO for the comment within the event.
+     * Provides factory methods for creating from both REST (webhook) and GraphQL responses.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record GitHubCommentDTO(
+        @JsonProperty("id") Long id,
+        @JsonProperty("node_id") String nodeId,
+        @JsonProperty("html_url") String htmlUrl,
+        @JsonProperty("body") String body,
+        @JsonProperty("user") GitHubUserDTO author,
+        @JsonProperty("author_association") String authorAssociation,
+        @JsonProperty("created_at") Instant createdAt,
+        @JsonProperty("updated_at") Instant updatedAt
+    ) {
+        // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
+
+        /**
+         * Creates a GitHubCommentDTO from a GraphQL GHIssueComment model.
+         * Uses fullDatabaseId instead of databaseId to avoid integer overflow (GitHub IDs exceed 32-bit).
+         */
+        @Nullable
+        public static GitHubCommentDTO fromIssueComment(@Nullable GHIssueComment comment) {
+            if (comment == null) {
+                return null;
+            }
+            return new GitHubCommentDTO(
+                comment.getFullDatabaseId() != null ? comment.getFullDatabaseId().longValue() : null,
+                comment.getId(),
+                uriToString(comment.getUrl()),
+                comment.getBody(),
+                GitHubUserDTO.fromActor(comment.getAuthor()),
+                comment.getAuthorAssociation() != null ? comment.getAuthorAssociation().name() : null,
+                toInstant(comment.getCreatedAt()),
+                toInstant(comment.getUpdatedAt())
+            );
+        }
+    }
+}

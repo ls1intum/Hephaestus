@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.achievement.evaluator;
 import de.tum.cit.aet.hephaestus.achievement.UserAchievement;
 import de.tum.cit.aet.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.cit.aet.hephaestus.activity.ActivitySavedEvent;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;

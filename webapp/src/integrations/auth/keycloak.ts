@@ -181,14 +181,6 @@ class KeycloakService {
 	}
 
 	/**
-	 * Get the user's git provider ID if available (e.g. GitHub user ID).
-	 * Returns whichever provider ID is available (GitHub or GitLab).
-	 */
-	public getGitProviderId(): string | undefined {
-		return this.keycloak?.tokenParsed?.github_id ?? this.keycloak?.tokenParsed?.gitlab_id;
-	}
-
-	/**
 	 * Whether the user has a linked GitLab identity.
 	 * True when gitlab_id is present in the token (set by the Keycloak protocol mapper).
 	 */

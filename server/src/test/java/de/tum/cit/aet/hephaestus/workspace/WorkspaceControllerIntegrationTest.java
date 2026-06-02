@@ -3,13 +3,20 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
-import de.tum.cit.aet.hephaestus.gitprovider.user.UserTeamsDTO;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserTeamsDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import de.tum.cit.aet.hephaestus.workspace.dto.UpdateLeaderboardDigestRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceNotificationsRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceScheduleRequestDTO;
@@ -18,16 +25,16 @@ import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.assertj.core.api.InstanceOfAssertFactories;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@DisplayName("Workspace controller integration")
 class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -47,6 +54,12 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Autowired
     private WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
+    private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private ConnectionService connectionService;
 
     @Test
     @WithAdminUser
@@ -111,8 +124,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "mentor-org",
             AccountType.ORG,
             owner.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 
@@ -140,8 +153,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "controller",
             AccountType.ORG,
             owner.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 
@@ -379,6 +392,11 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         );
         ensureAdminMembership(workspace);
 
+        // Slack target + credentials live on the Connection registry now. Seed an
+        // ACTIVE Slack Connection so updateNotifications has something to update —
+        // the OAuth install flow is responsible for this in production.
+        seedSlackConnection(workspace);
+
         webTestClient
             .patch()
             .uri("/workspaces/{workspaceSlug}/notifications", workspace.getWorkspaceSlug())
@@ -411,8 +429,28 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         Workspace updated = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(updated.getLeaderboardNotificationEnabled()).isTrue();
-        assertThat(updated.getLeaderboardNotificationTeam()).isEqualTo("core-team");
-        assertThat(updated.getLeaderboardNotificationChannelId()).isEqualTo("C12345678");
+
+        ConnectionConfig.SlackConfig slackConfig = connectionService
+            .findSlackNotificationConfig(workspace.getId())
+            .orElseThrow(() ->
+                new AssertionError("Expected ACTIVE Slack Connection on workspace " + workspace.getId())
+            );
+        assertThat(slackConfig.teamLabel()).isEqualTo("core-team");
+        assertThat(slackConfig.notificationChannelId()).isEqualTo("C12345678");
+    }
+
+    private void seedSlackConnection(Workspace workspace) {
+        ConnectionConfig.SlackConfig cfg = new ConnectionConfig.SlackConfig(
+            /* teamId */ "T00000000",
+            /* teamName */ "Initial Team",
+            /* notificationChannelId */ null,
+            /* teamLabel */ null,
+            Set.of()
+        );
+        Connection connection = new Connection(workspace, IntegrationKind.SLACK, "T00000000", cfg);
+        connection.setDisplayName("Slack");
+        ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
+        connectionRepository.save(connection);
     }
 
     @Test
@@ -464,6 +502,56 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Test
     @WithAdminUser
+    void leaderboardDigestEndpointAtomicallyPersistsScheduleAndEnabled() {
+        User owner = persistUser("digest-owner");
+        Workspace workspace = createWorkspace("digest-space", "Digest", "digest", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        ProblemDetail invalid = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateLeaderboardDigestRequestDTO(9, "99:00", true, null, null))
+            .exchange()
+            .expectStatus()
+            .isBadRequest()
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(invalid).isNotNull();
+        assertThat(invalid.getProperties().get("errors"))
+            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+            .containsKeys("day", "time");
+
+        // Schedule + enabled are workspace-level (no Slack connection required) — one atomic call.
+        WorkspaceDTO updated = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/leaderboard-digest", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateLeaderboardDigestRequestDTO(5, "17:30", true, null, null))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(updated).isNotNull();
+        assertThat(updated.leaderboardScheduleDay()).isEqualTo(5);
+        assertThat(updated.leaderboardScheduleTime()).isEqualTo("17:30");
+        assertThat(updated.leaderboardNotificationEnabled()).isTrue();
+
+        Workspace reloaded = workspaceRepository.findById(workspace.getId()).orElseThrow();
+        assertThat(reloaded.getLeaderboardScheduleDay()).isEqualTo(5);
+        assertThat(reloaded.getLeaderboardScheduleTime()).isEqualTo("17:30");
+        assertThat(reloaded.getLeaderboardNotificationEnabled()).isTrue();
+    }
+
+    @Test
+    @WithAdminUser
     void unknownWorkspaceReturnsProblemDetail() {
         ProblemDetail problem = webTestClient
             .get()
@@ -495,8 +583,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "duplicate",
             AccountType.ORG,
             owner.getId(),
-            null,
-            null,
+            IntegrationKind.GITHUB,
+            "ghp_dummy_token_for_test",
             null
         );
 
@@ -806,9 +894,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .containsKey("workspaceSlug");
     }
 
-    // ========================================================================
     // Feature Flags
-    // ========================================================================
 
     @Test
     @WithAdminUser

@@ -6,18 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
  * Validates the sealed shape of {@link ContextRequest}: both variants exist + validation
  * lives in the compact constructors + sealed-switch exhaustiveness compiles.
  */
-@DisplayName("ContextRequest")
 class ContextRequestTest extends BaseUnitTest {
 
     @Test
-    @DisplayName("MentorChatRequest validates ids and threadId")
     void mentorChatRequestValidation() {
         UUID threadId = UUID.randomUUID();
         MentorChatRequest req = new MentorChatRequest(1L, 2L, threadId);

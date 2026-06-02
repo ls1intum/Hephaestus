@@ -120,7 +120,6 @@ class WorkspaceAccessServiceTest {
 
     @Test
     void isOwner_WithOwnerRole_ReturnsTrue() {
-        // Given
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",
@@ -139,7 +138,6 @@ class WorkspaceAccessServiceTest {
 
     @Test
     void isOwner_WithAdminRole_ReturnsFalse() {
-        // Given
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",
@@ -158,7 +156,6 @@ class WorkspaceAccessServiceTest {
 
     @Test
     void isAdmin_WithAdminRole_ReturnsTrue() {
-        // Given
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",
@@ -313,7 +310,6 @@ class WorkspaceAccessServiceTest {
 
     @Test
     void hasPermission_IsAliasForHasRole() {
-        // Given
         WorkspaceContext context = new WorkspaceContext(
             1L,
             "test",

@@ -25,7 +25,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.IntNode;
 import tools.jackson.databind.node.StringNode;
 
-@DisplayName("JsonlStdinWriter")
 class JsonlStdinWriterTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -87,7 +86,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("queue-full rejects send() with QUEUE_FULL counter incremented")
     void queueFullRejects() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         TestCounters c = TestCounters.of(reg);
@@ -201,7 +199,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("writeStalled returns true once an in-flight write has aged past the threshold")
     void writeStalledDetection() throws Exception {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         TestCounters c = TestCounters.of(reg);
@@ -255,7 +252,6 @@ class JsonlStdinWriterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("encodes JsonNode to one line + newline (no embedded \\n surprises)")
     void encodesAsSingleLine() {
         SimpleMeterRegistry reg = new SimpleMeterRegistry();
         TestCounters c = TestCounters.of(reg);

@@ -18,7 +18,6 @@ import org.springframework.cache.CacheManager;
  * updating the spec list — or shipping a {@code @Cacheable(value="...")} that doesn't appear
  * here — breaks the contract this test guards.
  */
-@DisplayName("CacheConfig")
 class CacheConfigTest extends BaseUnitTest {
 
     private static final List<String> EXPECTED_NAMES = List.of(
@@ -63,7 +62,6 @@ class CacheConfigTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("long-lived caches keep their pre-existing 1h TTL and 1000-entry cap")
     void longLivedCachesUnchanged() {
         for (String name : List.of("contributors", "pullRequestTemplates", "achievementProgress")) {
             CacheConfig.CacheSpec spec = findSpec(name);
@@ -73,7 +71,6 @@ class CacheConfigTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("CacheSpec rejects bad inputs (defensive)")
     void cacheSpecValidation() {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
             new CacheConfig.CacheSpec("", Duration.ofMinutes(1), 1L)

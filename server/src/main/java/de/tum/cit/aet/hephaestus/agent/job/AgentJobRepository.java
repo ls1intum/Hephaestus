@@ -39,7 +39,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     Optional<AgentJob> findByJobTokenHashAndStatus(String jobTokenHash, AgentJobStatus status);
 
-    // ── Execution pipeline queries (issue #746) ──
+    // Execution pipeline queries (issue #746)
 
     /** Idempotency check: find active job with same idempotency key in workspace. */
     Optional<AgentJob> findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
@@ -194,7 +194,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     int requeueOrphan(@Param("id") UUID id);
 
-    // ── Delivery tracking (issue #748) ──
+    // Delivery tracking (issue #748)
 
     /** Update delivery status and comment ID after feedback posting. */
     @WorkspaceAgnostic("ID-based delivery update; job ID from workspace-scoped delivery context")

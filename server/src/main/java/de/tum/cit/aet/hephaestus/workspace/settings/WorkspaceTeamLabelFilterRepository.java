@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.gitprovider.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import java.util.List;
 import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;

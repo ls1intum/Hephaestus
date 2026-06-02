@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -47,7 +46,6 @@ public class SandboxReconciler {
     private final AgentJobRepository jobRepository;
     private final SandboxContainerManager containerManager;
     private final SandboxNetworkManager networkManager;
-    private final SandboxProperties properties;
     private final Counter orphanedJobs;
     private final Counter orphanedContainers;
     private final Counter orphanedNetworks;
@@ -57,13 +55,11 @@ public class SandboxReconciler {
         AgentJobRepository jobRepository,
         SandboxContainerManager containerManager,
         SandboxNetworkManager networkManager,
-        SandboxProperties properties,
         MeterRegistry meterRegistry
     ) {
         this.jobRepository = jobRepository;
         this.containerManager = containerManager;
         this.networkManager = networkManager;
-        this.properties = properties;
         this.orphanedJobs = Counter.builder("sandbox.reconciler.orphaned")
             .tag("resource", "job")
             .description("Orphaned jobs marked as FAILED")
@@ -89,10 +85,6 @@ public class SandboxReconciler {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        if (!properties.enabled()) {
-            return;
-        }
-
         MDC.put(MDC_RECONCILER_TYPE, "startup");
         try {
             doStartup();
@@ -181,14 +173,10 @@ public class SandboxReconciler {
         timeUnit = TimeUnit.SECONDS
     )
     public void periodicReconciliation() {
-        if (!properties.enabled()) {
-            return;
-        }
-
         MDC.put(MDC_RECONCILER_TYPE, "periodic");
         try {
             reconciliationDuration.record(() -> {
-                log.debug("Sandbox reconciler: periodic sweep");
+                log.trace("Sandbox reconciler: periodic sweep");
 
                 Set<UUID> activeJobIds;
                 try {

@@ -13,9 +13,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
-import de.tum.cit.aet.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -24,13 +24,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -81,7 +81,7 @@ public class AgentJobService {
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
     }
 
-    // ── Read operations ──
+    // Read operations
 
     @Transactional(readOnly = true)
     public Page<AgentJob> getJobs(Long workspaceId, AgentJobStatus status, Long configId, Pageable pageable) {
@@ -104,7 +104,7 @@ public class AgentJobService {
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 
-    // ── Submit ──
+    // Submit
 
     /**
      * Lookup a PR by ID, build a review submission request, and submit a job.
@@ -123,7 +123,7 @@ public class AgentJobService {
             return "PR missing branch info: prId=" + prId;
         }
 
-        EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+        ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
         PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
             prData,
             pr.getHeadRefName(),
@@ -277,7 +277,7 @@ public class AgentJobService {
         });
     }
 
-    // ── Retry delivery ──
+    // Retry delivery
 
     /**
      * Retry delivery for a completed agent job whose delivery failed or was never attempted.
@@ -343,7 +343,7 @@ public class AgentJobService {
         );
     }
 
-    // ── Cancel ──
+    // Cancel
 
     /**
      * Cancel an agent job.
@@ -433,7 +433,7 @@ public class AgentJobService {
         return fresh;
     }
 
-    // ── Cooldown helpers ──
+    // Cooldown helpers
 
     /**
      * Extract the PR-scoped prefix from an idempotency key by stripping the commit-SHA segment.

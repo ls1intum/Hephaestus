@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.workspace.adapter;
 
-import de.tum.cit.aet.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * Adapter that bridges the gitprovider module's ScopeIdResolver SPI to the workspace domain.
+ * Adapter that bridges the integration.scm module's ScopeIdResolver SPI to the workspace domain.
  * <p>
  * This adapter resolves scope IDs (workspace IDs) using multiple strategies:
  * <ol>

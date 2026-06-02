@@ -3,13 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.gitprovider.issue.Issue;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 
 /**
  * Delivers practice review feedback to PRs/MRs.
@@ -63,7 +63,7 @@ class FeedbackDeliveryService {
             return;
         }
 
-        // ── Suppression guards ──────────────────────────────────────────────
+        // Suppression guards
 
         var metadata = job.getMetadata();
         Long pullRequestId = (metadata != null && metadata.has("pull_request_id"))
@@ -100,7 +100,7 @@ class FeedbackDeliveryService {
             }
         }
 
-        // ── Always post new ─────────────────────────────────────────────────
+        // Always post new
 
         postSummaryNote(job, delivery);
         postDiffNotes(job, delivery);
@@ -137,7 +137,7 @@ class FeedbackDeliveryService {
         );
     }
 
-    // ── Formatting ──────────────────────────────────────────────────────────
+    // Formatting
 
     static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);

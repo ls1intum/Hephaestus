@@ -26,6 +26,8 @@ tags:
   name: workspace-registry-controller
 - description: Read-only access to practice evaluation findings
   name: Practice Findings
+- description: Workspace integration connection management
+  name: Connections
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -40,6 +42,12 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
+     on both success and failure; only <code>Accept: application/json</code> requests get
+     4xx JSON.
+  name: o-auth-callback-controller
 - description: Authentication discovery (public)
   name: Auth
 - description: Manage practice definitions
@@ -48,10 +56,33 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: |-
+    Unified webhook ingest controller.
+
+     <p><code>POST /webhooks/{kind</code>} is the sole webhook entry point. Per-kind
+     routing resolves the {@link IntegrationKindRouting kind} from the path and
+     delegates to {@link WebhookIngestPipeline WebhookIngestPipeline}, which dispatches signature
+     verification, subject derivation and JetStream publication through the per-kind
+     {@link de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier} and
+     {@link de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver} beans.
+     GitHub, GitLab and Slack all share this endpoint.
+
+     <p>Active only on the webhook runtime role.
+  name: webhook-controller
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data
   name: Profile
+- description: |-
+    GitLab-specific REST endpoints used during the workspace creation wizard:
+     <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
+     lists accessible groups for one. Split from <code>WorkspaceRegistryController</code> so the
+     workspace module no longer imports {@link GitLabPreflightService GitLabPreflightService}; the routes keep the
+     existing <code>/workspaces/gitlab/*</code> URL space for API stability.
+
+     <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
+     <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
+  name: git-lab-preflight-controller
 - description: Contributor rankings and league statistics
   name: Leaderboard
 paths:
@@ -89,6 +120,85 @@ paths:
       summary: List global contributors
       tags:
       - Contributors
+  /oauth/callback/{kind}:
+    get:
+      operationId: callbackGet
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: state
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error_description
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: allParams
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - o-auth-callback
+    post:
+      operationId: callbackPost
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: state
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: error_description
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: allParams
+        required: true
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - o-auth-callback
   /user:
     delete:
       description: Permanently delete the current user's account and all associated
@@ -205,6 +315,24 @@ paths:
       summary: Update user settings
       tags:
       - Account
+  /webhooks/{kind}:
+    post:
+      operationId: ingest
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+          description: OK
+      tags:
+      - webhook
   /workspaces:
     get:
       operationId: listWorkspaces
@@ -258,7 +386,7 @@ paths:
           description: Accessible groups
       summary: List GitLab groups accessible to a PAT
       tags:
-      - workspace-registry
+      - git-lab-preflight
   /workspaces/gitlab/preflight:
     post:
       operationId: gitLabPreflight
@@ -277,7 +405,7 @@ paths:
           description: Validation result
       summary: Validate a GitLab PAT before workspace creation
       tags:
-      - workspace-registry
+      - git-lab-preflight
   /workspaces/providers:
     get:
       description: Returns available workspace providers with their configuration.
@@ -618,6 +746,181 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/connections:
+    get:
+      operationId: list
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      tags:
+      - Connections
+    post:
+      operationId: initiate
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiateConnectionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitiateConnectionResponse"
+          description: OK
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/slack/test-message:
+    post:
+      description: |-
+        Probe the Slack connection by posting a test message. This is a <em>probe</em>: every outcome
+         — success, a Slack-side rejection (e.g. <code>not_in_channel</code>), or a missing channel — is a
+         200 result carrying <code>ok</code>/<code>slackError</code>, never an HTTP error. That lets the admin UI
+         test a typed-but-not-yet-saved channel and render the Slack error inline without conflating it
+         with a transport failure.
+      operationId: sendTestMessage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlackTestMessageRequest"
+        description: "optional channel override; when blank, the persisted notification\
+          \ channel is used."
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlackTestMessageResponse"
+          description: OK
+      summary: Probe the Slack connection by posting a test message.
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/{id}:
+    get:
+      operationId: read
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionDetail"
+          description: OK
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/{id}/audit:
+    get:
+      operationId: audit
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectionAuditEntry"
+          description: OK
+      tags:
+      - Connections
+  /workspaces/{workspaceSlug}/connections/{id}/status:
+    patch:
+      description: |-
+        Resource-oriented lifecycle transition: <code>ACTIVE</code> (reactivate), <code>SUSPENDED</code>
+         (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
+         <code>PENDING</code> is internal to the OAuth handshake and rejected as a bad request; illegal
+         transitions surface as 400 via the state machine.
+      operationId: updateStatus_1
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConnectionStatusRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionSummary"
+          description: OK
+      summary: |-
+        Resource-oriented lifecycle transition: <code>ACTIVE</code> (reactivate), <code>SUSPENDED</code>
+         (suspend), or <code>UNINSTALLED</code> (disconnect — also best-effort revokes the vendor token).
+      tags:
+      - Connections
   /workspaces/{workspaceSlug}/features:
     patch:
       operationId: updateFeatures
@@ -711,6 +1014,34 @@ paths:
       summary: Generate leaderboard
       tags:
       - Leaderboard
+  /workspaces/{workspaceSlug}/leaderboard-digest:
+    patch:
+      operationId: updateLeaderboardDigest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLeaderboardDigestRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update the whole weekly leaderboard digest config (schedule + notifications)
+        atomically
+      tags:
+      - workspace
   /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
     get:
       description: Computes projected league point changes for a specific user using
@@ -1786,33 +2117,6 @@ paths:
       summary: Update leaderboard schedule configuration
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/slack-credentials:
-    patch:
-      operationId: updateSlackCredentials
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateWorkspaceSlackCredentialsRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Workspace"
-          description: Workspace updated
-      summary: Update Slack credentials for a workspace
-      tags:
-      - workspace
   /workspaces/{workspaceSlug}/slug:
     patch:
       operationId: renameSlug
@@ -2859,6 +3163,154 @@ components:
           format: uuid
         title:
           type: string
+    ConnectionAuditEntry:
+      type: object
+      description: |-
+        Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
+
+         <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
+         to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
+         want to serialize on every response.
+      properties:
+        actorKind:
+          type: string
+        actorRef:
+          type: string
+        correlationId:
+          type: string
+        eventType:
+          type: string
+        fromState:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        occurredAt:
+          type: string
+          format: date-time
+        toState:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+    ConnectionDetail:
+      type: object
+      description: |-
+        Detailed view of a single Connection — extends {@link ConnectionSummaryDTO ConnectionSummaryDTO} with the
+         sealed config serialized to a free-form JSON object (<code>Map&lt;String, Object&gt;</code> →
+         <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
+         client codegen). NEVER carries credentials; the encrypted blob stays inside the entity
+         and is not exposed by this DTO.
+
+         <p>Mirroring the summary fields (rather than embedding the summary record) keeps
+         the JSON shape flat — the API consumer sees one record, not a nested <code>summary</code>
+         object.
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+            - WEBHOOK_INGEST
+            - TOKEN_REFRESH
+            - FEEDBACK_DELIVERY
+            - INLINE_FINDINGS
+            - APPROVAL_WORKFLOW
+            - SCOPE_CHANGES
+          uniqueItems: true
+        config:
+          type: object
+          additionalProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        family:
+          type: string
+          enum:
+          - SCM
+          - MESSAGING
+        id:
+          type: integer
+          format: int64
+        instanceKey:
+          type: string
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        stateReason:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    ConnectionSummary:
+      type: object
+      description: |-
+        Wire shape returned by the <code>GET /workspaces/{workspaceSlug</code>/connections}
+         list + by lifecycle endpoints (suspend, reactivate). Lightweight — no config, no
+         credentials, no audit. Capabilities are looked up from the per-kind manifest at
+         response build time so adding/removing a capability needs no DB migration.
+      properties:
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+            - WEBHOOK_INGEST
+            - TOKEN_REFRESH
+            - FEEDBACK_DELIVERY
+            - INLINE_FINDINGS
+            - APPROVAL_WORKFLOW
+            - SCOPE_CHANGES
+          uniqueItems: true
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        family:
+          type: string
+          enum:
+          - SCM
+          - MESSAGING
+        id:
+          type: integer
+          format: int64
+        instanceKey:
+          type: string
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+        stateReason:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -3081,15 +3533,14 @@ components:
           example: My Workspace
           maxLength: 120
           minLength: 0
-        gitProviderMode:
+        kind:
           type: string
-          description: Git provider authentication mode. Defaults to PAT_ORG (GitHub
-            PAT) if not specified.
+          description: "Integration kind to provision. SLACK flows through OAuth,\
+            \ not this endpoint."
           enum:
-          - PAT_ORG
-          - GITHUB_APP_INSTALLATION
-          - GITLAB_PAT
-          example: GITLAB_PAT
+          - GITHUB
+          - GITLAB
+          example: GITLAB
         ownerUserId:
           type: integer
           format: int64
@@ -3098,9 +3549,9 @@ components:
             \ always becomes the owner."
         personalAccessToken:
           type: string
-          description: Personal Access Token for GitLab API access. Required when
-            gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
-          example: your-gitlab-token
+          description: Personal Access Token. Required for both kinds (GitLab API
+            or GitHub PAT). Stored encrypted at rest.
+          example: glpat-...
           maxLength: 512
           minLength: 0
         serverUrl:
@@ -3118,6 +3569,7 @@ components:
       - accountLogin
       - accountType
       - displayName
+      - kind
       - workspaceSlug
     FeatureFlags:
       type: object
@@ -3294,6 +3746,57 @@ components:
       - alias
       - displayName
       - type
+    InitiateConnectionRequest:
+      type: object
+      description: |-
+        Inbound payload for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+
+         <p><code>userInput</code> is intentionally a free-form map so per-kind ConnectionStrategy
+         implementations can dictate their own field schema (e.g. GitLab needs <code>pat</code> +
+         <code>group_id</code>; GitHub needs nothing because the install URL is server-configured).
+         Validation is the strategy's responsibility — invalid input surfaces as a 400 via
+         <code>IllegalArgumentException</code>.
+      properties:
+        kind:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+        userInput:
+          type: object
+          additionalProperties:
+            type: string
+    InitiateConnectionResponse:
+      type: object
+      description: |-
+        Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
+
+         <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+         <ul>
+           <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+               URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
+           <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+               newly-created Connection; no further round-trip is needed.</li>
+         </ul>
+
+         <p>Deliberately a flat record (nullable per-variant fields) rather than a sealed
+         <code>oneOf</code> hierarchy: a discriminated union serialises to OpenAPI <code>oneOf +
+         discriminator</code>, which the webapp's hey-api react-query transformer mishandles. A flat shape
+         round-trips cleanly through code generation, so the webapp consumes the generated client
+         instead of a hand-rolled fetch wrapper.
+      properties:
+        connectionId:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum:
+          - REDIRECT
+          - LINKED
+        vendorUrl:
+          type: string
+          format: uri
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -4148,6 +4651,26 @@ components:
       - id
       - name
       - nameWithOwner
+    SlackTestMessageRequest:
+      type: object
+      description: |-
+        Optional body for the Slack test-message probe. When <code>channelId</code> is present and non-blank,
+         the probe targets that channel (so an admin can validate a typed-but-unsaved channel); otherwise
+         it falls back to the persisted notification channel.
+      properties:
+        channelId:
+          type: string
+    SlackTestMessageResponse:
+      type: object
+      description: Result of the Slack test-message probe; carries the Slack error
+        code on failure.
+      properties:
+        channelId:
+          type: string
+        ok:
+          type: boolean
+        slackError:
+          type: string
     SortObject:
       type: object
       properties:
@@ -4315,6 +4838,55 @@ components:
           example: 600
           maximum: 3600
           minimum: 30
+    UpdateConnectionStatusRequest:
+      type: object
+      description: Request to update a connection's lifecycle status
+      properties:
+        reason:
+          type: string
+          description: Optional human-readable reason recorded on the audit trail
+        state:
+          type: string
+          description: "Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED,\
+            \ UNINSTALLED."
+          enum:
+          - PENDING
+          - ACTIVE
+          - SUSPENDED
+          - UNINSTALLED
+      required:
+      - state
+    UpdateLeaderboardDigestRequest:
+      type: object
+      description: Request to update the entire weekly leaderboard digest configuration
+        atomically
+      properties:
+        channelId:
+          type: string
+          description: Slack channel ID for notifications
+          example: C01234567AB
+          pattern: "^[CGD][A-Z0-9]{8,}$"
+        day:
+          type: integer
+          format: int32
+          description: "Day of week (1=Monday, 7=Sunday)"
+          example: 1
+          maximum: 7
+          minimum: 1
+        enabled:
+          type: boolean
+          description: Whether leaderboard notifications are enabled
+        team:
+          type: string
+          description: Team name for filtering leaderboard notifications
+        time:
+          type: string
+          description: Time in 24-hour format (HH:mm)
+          example: 09:00
+          pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+      required:
+      - day
+      - time
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state
@@ -4453,21 +5025,6 @@ components:
       required:
       - day
       - time
-    UpdateWorkspaceSlackCredentialsRequest:
-      type: object
-      description: Request to update Slack integration credentials
-      properties:
-        slackSigningSecret:
-          type: string
-          description: Slack Signing Secret for webhook verification
-          minLength: 1
-        slackToken:
-          type: string
-          description: Slack Bot User OAuth Token for API access
-          minLength: 1
-      required:
-      - slackSigningSecret
-      - slackToken
     UpdateWorkspaceStatusRequest:
       type: object
       description: Request to update the workspace lifecycle status
@@ -4583,9 +5140,6 @@ components:
         displayName:
           type: string
           description: Human-readable name of the workspace
-        gitProviderMode:
-          type: string
-          description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
         gitlabWebhookRegistered:
           type: boolean
           description: Whether a GitLab webhook has been auto-registered for this
@@ -4593,9 +5147,6 @@ components:
         hasPersonalAccessToken:
           type: boolean
           description: Whether a Personal Access Token is configured
-        hasSlackSigningSecret:
-          type: boolean
-          description: Whether Slack signing secret is configured
         hasSlackToken:
           type: boolean
           description: Whether Slack token is configured
@@ -4614,6 +5165,9 @@ components:
         isPubliclyViewable:
           type: boolean
           description: Whether the workspace is publicly viewable without authentication
+        kind:
+          type: string
+          description: Integration kind backing this workspace (GITHUB or GITLAB)
         leaderboardEnabled:
           type: boolean
           description: Whether the leaderboard is enabled
@@ -4657,8 +5211,8 @@ components:
           description: Whether the league/progression system is enabled
         providerType:
           type: string
-          description: High-level git provider type derived from the authentication
-            mode
+          description: High-level git provider type for the workspace's SCM connection
+            (null if none bound)
           enum:
           - GITHUB
           - GITLAB
@@ -4666,6 +5220,11 @@ components:
           type: string
           description: Custom server URL for self-hosted instances (null for cloud
             defaults)
+        slackConnectionId:
+          type: integer
+          format: int64
+          description: "ID of the active Slack connection, if any — addresses PATCH\
+            \ /connections/{id}/status"
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
@@ -4685,7 +5244,6 @@ components:
       - displayName
       - gitlabWebhookRegistered
       - hasPersonalAccessToken
-      - hasSlackSigningSecret
       - hasSlackToken
       - id
       - isPubliclyViewable
@@ -4696,7 +5254,6 @@ components:
       - practiceReviewManualTriggerEnabled
       - practicesEnabled
       - progressionEnabled
-      - providerType
       - status
       - updatedAt
       - workspaceSlug
@@ -4738,7 +5295,8 @@ components:
           description: Whether the league/progression system is enabled
         providerType:
           type: string
-          description: High-level git provider type (GITHUB or GITLAB)
+          description: "High-level git provider type (GITHUB or GITLAB), or null if\
+            \ no SCM connection bound"
           enum:
           - GITHUB
           - GITLAB
@@ -4761,7 +5319,6 @@ components:
       - mentorEnabled
       - practicesEnabled
       - progressionEnabled
-      - providerType
       - status
       - workspaceSlug
     WorkspaceMembership:

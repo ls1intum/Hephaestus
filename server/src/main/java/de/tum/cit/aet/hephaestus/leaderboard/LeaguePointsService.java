@@ -14,8 +14,8 @@ import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_THRESHOLD_HIGH;
 import static de.tum.cit.aet.hephaestus.leaderboard.LeaguePointsConstants.POINTS_THRESHOLD_LOW;
 
-import de.tum.cit.aet.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.gitprovider.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.time.Instant;
 import java.util.Objects;
 import org.slf4j.Logger;

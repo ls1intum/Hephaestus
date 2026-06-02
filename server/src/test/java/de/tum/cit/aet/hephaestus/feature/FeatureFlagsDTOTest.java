@@ -10,7 +10,6 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,7 +17,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-@DisplayName("FeatureFlagsDTO")
 class FeatureFlagsDTOTest extends BaseUnitTest {
 
     @Mock
@@ -28,11 +26,9 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
     private FeatureFlagService featureFlagService;
 
     @Nested
-    @DisplayName("drift detection")
     class DriftDetection {
 
         @Test
-        @DisplayName("DTO has exactly one field per FeatureFlag enum constant")
         void dtoFieldCountMatchesEnumCount() {
             assertThat(FeatureFlagsDTO.class.getRecordComponents())
                 .as("FeatureFlagsDTO must have one field per FeatureFlag constant")
@@ -40,7 +36,6 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("DTO field names match FeatureFlag enum constant names exactly")
         void dtoFieldNamesMatchEnumNames() {
             Set<String> enumNames = Arrays.stream(FeatureFlag.values()).map(Enum::name).collect(Collectors.toSet());
 
@@ -53,7 +48,6 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("from() positional mapping")
     class FromMapping {
 
         static Stream<FeatureFlag> allFlags() {
@@ -62,7 +56,6 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
 
         @ParameterizedTest(name = "from() maps {0} to the correct DTO field")
         @MethodSource("allFlags")
-        @DisplayName("from() maps each flag to its correct DTO field")
         void fromMapsEachFlagCorrectly(FeatureFlag flag) throws Exception {
             // Stub only the target flag to return true, all others return false
             for (FeatureFlag f : FeatureFlag.values()) {
@@ -91,7 +84,6 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("from() maps a CONFIG flag enabled to the correct DTO field")
         void fromMapsEnabledConfigFlag() {
             // Stub all CONFIG flags — from() calls isEnabled on every flag
             for (FeatureFlag f : FeatureFlag.values()) {

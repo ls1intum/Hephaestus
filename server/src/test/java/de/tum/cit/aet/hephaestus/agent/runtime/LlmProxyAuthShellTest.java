@@ -14,11 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-@DisplayName("LlmProxyAuthShell")
 class LlmProxyAuthShellTest extends BaseUnitTest {
 
     @Nested
-    @DisplayName("PROXY mode")
     class ProxyMode {
 
         @ParameterizedTest(name = "{0} bridges $LLM_PROXY_URL/_TOKEN")
@@ -37,7 +35,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("Azure proxy sets the 2025-04-01-preview API version")
         void azureSetsApiVersion() {
             Map<String, String> env = new HashMap<>();
             String script = LlmProxyAuthShell.build(
@@ -53,11 +50,9 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("API_KEY / OAUTH mode")
     class ApiKey {
 
         @Test
-        @DisplayName("Azure key flows through shell export, not env map (sandbox AZURE_* prefix filter)")
         void azureKeyViaShellExport() {
             Map<String, String> env = new HashMap<>();
             String script = LlmProxyAuthShell.build(
@@ -82,7 +77,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("OAUTH mode treats credential as API key (Pi has no OAuth mode)")
         void oauthBehavesAsApiKey() {
             Map<String, String> env = new HashMap<>();
             String script = LlmProxyAuthShell.build(
@@ -98,7 +92,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null credential in API_KEY mode throws")
         void nullCredentialThrows() {
             Map<String, String> env = new HashMap<>();
             assertThatThrownBy(() ->
@@ -114,7 +107,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("OPENAI baseUrl override exports ONLY PI_HEPHAESTUS_* (no OPENAI_API_KEY)")
         void openaiBaseUrlExported() {
             // Pi does NOT read OPENAI_BASE_URL natively. The base URL is consumed by the
             // hephaestus provider extension via PI_HEPHAESTUS_BASE_URL / PI_HEPHAESTUS_API_KEY.
@@ -139,7 +131,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("ANTHROPIC baseUrl override exports PI_HEPHAESTUS_* env vars")
         void anthropicBaseUrlExported() {
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(
@@ -158,7 +149,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("blank baseUrl is treated as unset (no PI_HEPHAESTUS_* vars written)")
         void blankBaseUrlSkipped() {
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", "   ", null, env);
@@ -169,7 +159,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("baseUrl null in API_KEY mode does not write any PI_HEPHAESTUS_* var")
         void nullBaseUrlOmitsHephaestusVars() {
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", null, null, env);
@@ -180,7 +169,6 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("PROXY mode never writes PI_HEPHAESTUS_* — proxy URL comes from $LLM_PROXY_URL")
         void proxyModeDoesNotWriteHephaestusVars() {
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(
