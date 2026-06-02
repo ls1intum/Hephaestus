@@ -23,7 +23,7 @@
  *       {@code occurred_at}, self-managed in-app by {@code AuthEventPartitionManager}
  *       (create-ahead + 12-month retention) on stock Postgres — no {@code pg_partman}.
  *       Records the impersonation pair {@code (account_id, acting_account_id)} per
- *       {@code SwitchUserFilter}.</li>
+ *       impersonation ({@code act}-claim) action.</li>
  * </ul>
  *
  * <h2>JWT format</h2>

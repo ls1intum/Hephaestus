@@ -4,8 +4,7 @@
  * <ul>
  *   <li><b>Provided (inbound) ports</b> — contracts {@code core.auth} implements for other modules
  *       to consume: e.g. {@code AccountIdentityQuery}, {@code AccountRoleQuery},
- *       {@code AccountPreferencesQuery}, {@code AccountWorkspaceMembershipQuery},
- *       {@code AccountRepository}.</li>
+ *       {@code AccountPreferencesQuery}, {@code AccountWorkspaceMembershipQuery}.</li>
  *   <li><b>Required (outbound) ports</b> — contracts {@code core.auth} <em>consumes</em> but expects
  *       another module (typically {@code integration}) to implement, keeping vendor knowledge out of
  *       auth: e.g. {@code GitProviderRegistry}, {@code IdentityProviderCatalog},

@@ -7,7 +7,8 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
  *
  * <p>Roles map 1:1 to {@code FeatureFlag} keys ({@code mentor_access}, {@code run_practice_review},
  * {@code notification_access}, {@code admin}). Resolution is {@code login → IdentityLink →
- * Account → account_feature}; {@code admin} additionally reflects {@code Account.appRole}.
+ * Account → account_feature} (appRole-based admin is resolved at JWT-mint time in
+ * {@code JwtPrincipalFactory}, not by this query).
  */
 public interface AccountRoleQuery {
     /**

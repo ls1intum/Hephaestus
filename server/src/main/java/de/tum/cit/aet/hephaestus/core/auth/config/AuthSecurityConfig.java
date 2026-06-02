@@ -221,7 +221,8 @@ public class AuthSecurityConfig {
         CookieOAuth2AuthorizationRequestRepository cookieRepo,
         HephaestusAuthSuccessHandler successHandler,
         AuthRateLimitFilter authRateLimitFilter,
-        ClientRegistrationRepository clientRegistrationRepository
+        ClientRegistrationRepository clientRegistrationRepository,
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService
     ) throws Exception {
         http
             .securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
@@ -246,7 +247,7 @@ public class AuthSecurityConfig {
                 );
                 // GitHub: enrich attributes with the primary+verified email from /user/emails so
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
-                oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
+                oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService));
                 oauth.successHandler(successHandler);
                 oauth.failureUrl("/auth/error?code=oauth_failure");
             });

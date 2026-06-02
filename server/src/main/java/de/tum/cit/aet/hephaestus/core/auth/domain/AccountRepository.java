@@ -1,7 +1,6 @@
-package de.tum.cit.aet.hephaestus.core.auth.spi;
+package de.tum.cit.aet.hephaestus.core.auth.domain;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
@@ -11,8 +10,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * @NamedInterface — cross-module read-only handle on {@link Account}. Concrete
- * mutations live behind {@code AccountService} in the auth module.
+ * Cross-module read-only handle on {@link Account}. Concrete mutations live behind
+ * {@code AccountService} in the auth module.
  */
 @Repository
 @WorkspaceAgnostic(

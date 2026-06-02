@@ -25,10 +25,11 @@ import org.jspecify.annotations.Nullable;
  * to an impersonator is reconstructible.
  *
  * <h2>Append-only</h2>
- * The table is insert-only by application convention: {@link AuthEventWriter} only ever INSERTs,
- * there is no update/delete code path, and the 12-month partition retention is the only deletion.
- * (A future hardening could add a non-owner role with UPDATE/DELETE revoked at the SQL grant level;
- * not done today.) Backups + WAL archive provide forensic recovery.
+ * Storage-layer append-only is enforced in prod by the {@code trg_auth_event_block_mutation} BEFORE
+ * UPDATE OR DELETE trigger (RAISES EXCEPTION) plus a {@code REVOKE UPDATE, DELETE, TRUNCATE} guardrail —
+ * the only permitted mutation is the GDPR Art. 17 redaction that NULLs ip_inet/user_agent/details. A
+ * superuser bypasses the trigger, but the app never connects as superuser. {@link AuthEventWriter} only
+ * INSERTs; partition retention is the only deletion. Backups + WAL archive provide forensic recovery.
  *
  * <h2>IP retention</h2>
  * {@code ip_inet} is stored verbatim for the audit-partition window (12 months) as a security

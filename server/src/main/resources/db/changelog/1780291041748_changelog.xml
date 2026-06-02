@@ -189,6 +189,9 @@
                                  constraintName="sfk_account_feature_enabled_by"
                                  referencedTableName="account" referencedColumnNames="id"
                                  onDelete="SET NULL"/>
+        <rollback>
+            <dropTable tableName="account_feature"/>
+        </rollback>
     </changeSet>
 
     <changeSet author="FelixTJDietrich" id="1780291041748-5-jwt-signing-key">

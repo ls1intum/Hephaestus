@@ -50,7 +50,8 @@ import tools.jackson.databind.ObjectMapper;
  * classic TOCTOU bypass: an attacker domain with a very low TTL can answer with a public IP during
  * {@link #assertPublicHost} and then flip to {@code 169.254.169.254} / {@code 127.0.0.1} for the
  * actual connection (the {@code java.net.http.HttpClient} does its OWN, un-pinnable DNS lookup at
- * connect time). To CLOSE that window — not merely narrow it — we do not connect by hostname at all:
+ * connect time). For this registration-time discovery fetch we close that window by not connecting
+ * by hostname at all:
  * <ol>
  *   <li>Resolve the host ONCE and validate every returned address is public.</li>
  *   <li>Re-resolve immediately before connecting and require the live answer to be a non-empty subset
@@ -62,6 +63,11 @@ import tools.jackson.databind.ObjectMapper;
  * </ol>
  * Redirects are NOT followed (a 30x to an internal address is a classic bypass): any non-200 is
  * rejected. A short connect/read timeout bounds slow-loris and blind-SSRF probing.
+ *
+ * <p><strong>Scope:</strong> this rebind protection covers only the registration-time discovery fetch.
+ * At login time Spring's {@code oauth2Login} re-resolves the stored issuer-derived authorization/token/
+ * userinfo URIs through its own HTTP client with no rebind guard, so the login-time leg is NOT
+ * rebind-protected and relies on the configured IdP being a trusted external host.
  */
 @Component
 public class IssuerDiscoveryProbe {

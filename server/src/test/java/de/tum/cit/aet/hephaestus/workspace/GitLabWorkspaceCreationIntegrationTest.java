@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -103,7 +103,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspacePersistsCorrectProviderModeAndServerUrl() {
         User owner = persistUser("mentor");
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");
@@ -151,7 +150,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspaceWithDefaultServerUrlOmitsServerUrl() {
         User owner = persistUser("mentor");
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");
@@ -186,7 +184,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithAdminUser
     void createGitLabWorkspaceWithoutTokenReturnsValidationError() {
         User owner = persistUser("admin");
         Consumer<HttpHeaders> auth = gitLabCaller("admin");
@@ -225,7 +222,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithAdminUser
     void createGitLabWorkspaceWithHttpServerUrlReturnsValidationError() {
         User owner = persistUser("admin");
         Consumer<HttpHeaders> auth = gitLabCaller("admin");
@@ -264,7 +260,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspaceAssignsOwnerMembership() {
         User owner = persistUser("mentor");
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");
@@ -302,7 +297,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspaceResponseNeverContainsRawToken() {
         User owner = persistUser("mentor");
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");

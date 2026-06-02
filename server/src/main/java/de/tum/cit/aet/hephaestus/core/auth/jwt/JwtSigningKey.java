@@ -21,7 +21,7 @@ import org.hibernate.annotations.CreationTimestamp;
  *
  * <h2>Encryption envelope</h2>
  * {@code private_key_pem} is sealed using the <em>system</em> master key (AAD =
- * {@code "system:jwt_signing_key:private_key_pem"}). Distinct from the tenant-bound AAD
+ * {@link JwtSigningKeySealer#AAD_STRING}). Distinct from the tenant-bound AAD
  * domain used by {@link de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter}
  * for per-workspace integration secrets — confused-deputy defense.
  */

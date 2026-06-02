@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
