@@ -54,7 +54,7 @@ function HeaderProviderButton({
 	const registrationId = provider.registrationId ?? "";
 	const label = provider.displayName ?? registrationId;
 	const handleClick = () => onSignIn(registrationId);
-	const isGitHub = provider.providerType === "github";
+	const isGitHub = provider.providerType?.toUpperCase() === "GITHUB";
 	const isGitLab = registrationId.startsWith("gitlab");
 
 	const brandClass = isGitHub
@@ -107,7 +107,7 @@ function ProviderButton({
 	const label = provider.displayName ?? registrationId;
 	const handleClick = () => onSignIn(registrationId);
 
-	if (provider.providerType === "github") {
+	if (provider.providerType?.toUpperCase() === "GITHUB") {
 		return (
 			<GitHubSignInButton
 				onClick={handleClick}

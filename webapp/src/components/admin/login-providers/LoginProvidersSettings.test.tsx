@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { identityConnections } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { LoginProvidersSettings } from "./LoginProvidersSettings";
@@ -116,7 +116,20 @@ describe("LoginProvidersSettings", () => {
 		// { state: "SUSPENDED" }. Capture the request to prove the transition is encoded
 		// in the body and the list is refetched afterwards.
 		let patchedBody: { state?: string; reason?: string } | undefined;
+		// onSuccess invalidates the list, so the GET refetches after the PATCH resolves. Flip the
+		// refetch to report the provider as SUSPENDED so we can await the re-render settling (the
+		// invalidation-driven update must land inside act, not after the test returns).
+		let listCalls = 0;
 		server.use(
+			http.get("*/workspaces/:workspaceSlug/connections", () => {
+				listCalls += 1;
+				if (listCalls === 1) return HttpResponse.json(identityConnections);
+				return HttpResponse.json(
+					identityConnections.map((c) =>
+						c.kind === "OIDC_LOGIN_GITHUB" ? { ...c, state: "SUSPENDED" } : c,
+					),
+				);
+			}),
 			http.patch("*/workspaces/:workspaceSlug/connections/:id/status", async ({ request }) => {
 				patchedBody = (await request.json().catch(() => ({}))) as typeof patchedBody;
 				return HttpResponse.json({ ok: true });
@@ -132,9 +145,15 @@ describe("LoginProvidersSettings", () => {
 		});
 		fireEvent.click(suspendButton);
 
-		await vi.waitFor(() => {
-			expect(patchedBody?.state).toBe("SUSPENDED");
-		});
+		// Await the full mutation→invalidation→refetch cycle re-rendering the GHE row as SUSPENDED:
+		// the Suspend control (and its pending-mutation state) gives way to a Reactivate control.
+		// Awaiting the terminal DOM state — not just the captured request body — keeps every update
+		// (mutation isPending flip + refetch) inside act instead of landing after the test returns.
+		await screen.findByRole("button", { name: /Reactivate GitHub Enterprise/ });
+		expect(screen.queryByRole("button", { name: /Suspend GitHub Enterprise/ })).toBeNull();
+
+		// The transition was encoded in the PATCH body, not via a removed per-verb endpoint.
+		expect(patchedBody?.state).toBe("SUSPENDED");
 	});
 
 	it("shows the empty state when no IDENTITY connections exist", async () => {

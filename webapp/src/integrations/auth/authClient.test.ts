@@ -102,23 +102,16 @@ describe("authClient.fetchCurrentUser", () => {
 		expect(user?.appRole).toBe("APP_ADMIN");
 	});
 
-	it("returns null (no throw) on a 401 — unauthenticated", async () => {
-		server.use(http.get("*/user", () => new HttpResponse(null, { status: 401 })));
-		await expect(authClient.fetchCurrentUser()).resolves.toBeNull();
-	});
-
-	it("returns null (no throw) on a 403", async () => {
-		server.use(http.get("*/user", () => new HttpResponse(null, { status: 403 })));
-		await expect(authClient.fetchCurrentUser()).resolves.toBeNull();
-	});
-
-	it("returns null on a 500 server error rather than surfacing the failure", async () => {
-		server.use(http.get("*/user", () => new HttpResponse(null, { status: 500 })));
-		await expect(authClient.fetchCurrentUser()).resolves.toBeNull();
-	});
-
-	it("returns null on a network error (fetch rejects)", async () => {
-		server.use(http.get("*/user", () => HttpResponse.error()));
+	// 401/403/500 and a rejected fetch all exercise the same branch: a non-OK response (or no
+	// response at all) resolves to null instead of throwing. One table covers it without
+	// re-asserting the identical behavior four times.
+	it.each([
+		["a 401 (unauthenticated)", () => new HttpResponse(null, { status: 401 })],
+		["a 403", () => new HttpResponse(null, { status: 403 })],
+		["a 500 server error", () => new HttpResponse(null, { status: 500 })],
+		["a network error (fetch rejects)", () => HttpResponse.error()],
+	])("returns null (no throw) on %s", async (_label, respond) => {
+		server.use(http.get("*/user", respond));
 		await expect(authClient.fetchCurrentUser()).resolves.toBeNull();
 	});
 

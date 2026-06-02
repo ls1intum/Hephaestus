@@ -60,6 +60,7 @@ export function LoginProviderRow({
 	onDisconnect,
 }: LoginProviderRowProps) {
 	const [copied, setCopied] = useState(false);
+	const [auditOpen, setAuditOpen] = useState(false);
 	const isTerminal = provider.state === "UNINSTALLED";
 
 	const copyCallback = () => {
@@ -91,7 +92,7 @@ export function LoginProviderRow({
 				</div>
 
 				<div className="flex shrink-0 items-center gap-1">
-					<Sheet>
+					<Sheet open={auditOpen} onOpenChange={setAuditOpen}>
 						<SheetTrigger
 							render={
 								<Button variant="ghost" size="icon" aria-label="View audit history">
@@ -99,7 +100,7 @@ export function LoginProviderRow({
 								</Button>
 							}
 						/>
-						<AuditSheet workspaceSlug={workspaceSlug} connectionId={provider.id} />
+						<AuditSheet workspaceSlug={workspaceSlug} connectionId={provider.id} open={auditOpen} />
 					</Sheet>
 
 					{provider.state === "ACTIVE" && (
@@ -221,13 +222,16 @@ export function LoginProviderRow({
 function AuditSheet({
 	workspaceSlug,
 	connectionId,
+	open,
 }: {
 	workspaceSlug: string;
 	connectionId?: number;
+	/** Only fetch audit history once the sheet is open — collapsed rows must not fan out N requests. */
+	open: boolean;
 }) {
 	const { data, isLoading, error } = useQuery({
 		...auditOptions({ path: { workspaceSlug, id: connectionId ?? 0 } }),
-		enabled: connectionId != null,
+		enabled: open && connectionId != null,
 	});
 
 	return (
