@@ -251,12 +251,12 @@ public class SecurityConfig {
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
                 .permitAll();
-            // Public auth discovery (core.auth module, ADR 0017): identity-provider list for
-            // the login UI, OIDC issuer metadata + JWKS, and the OAuth login kickoff/callback.
+            // Public auth discovery (core.auth module, ADR 0017): identity-provider list for the
+            // login UI plus OIDC issuer metadata + JWKS. The OAuth login kickoff/callback paths
+            // (/auth/login, /auth/error, /oauth2/authorization/**, /login/oauth2/code/**) are owned
+            // by AuthSecurityConfig's higher-precedence chain and never reach this one.
             requests.requestMatchers(HttpMethod.GET, "/identity-providers").permitAll();
             requests.requestMatchers(HttpMethod.GET, "/.well-known/**").permitAll();
-            requests.requestMatchers(HttpMethod.GET, "/auth/login", "/auth/error").permitAll();
-            requests.requestMatchers("/oauth2/authorization/**", "/login/oauth2/code/**").permitAll();
             // Public workspace provider discovery (workspace creation UI)
             requests.requestMatchers(HttpMethod.GET, "/workspaces/providers").permitAll();
             // Mentor endpoints gated by the MENTOR_ACCESS feature flag. MUST be matched BEFORE the

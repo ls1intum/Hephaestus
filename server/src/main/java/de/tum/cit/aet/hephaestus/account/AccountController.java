@@ -95,6 +95,6 @@ public class AccountController {
         if (resolveAuthentication(auth) == null) {
             return Optional.empty();
         }
-        return authenticatedGitProviderUserService.resolveOrProvisionCurrentUser(null);
+        return authenticatedGitProviderUserService.resolveOrProvisionCurrentUser();
     }
 }

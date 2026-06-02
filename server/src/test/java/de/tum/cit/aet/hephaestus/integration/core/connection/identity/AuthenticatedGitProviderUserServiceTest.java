@@ -88,7 +88,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         );
         when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
-        Optional<User> result = service.resolveOrProvisionCurrentUser(null);
+        Optional<User> result = service.resolveOrProvisionCurrentUser();
 
         assertThat(result).containsSame(provisioned);
         // native_id = numeric subject; login = usernameAtSignup; never reads a JWT claim.
@@ -124,7 +124,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         );
         when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
-        service.resolveOrProvisionCurrentUser(null);
+        service.resolveOrProvisionCurrentUser();
 
         verify(userRepository).upsertUser(
             eq(18024L),
@@ -153,7 +153,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         lenient().when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
         // No exception — a GitLab-logged-in user is allowed to create a GitLab workspace.
-        service.ensureCurrentGitLabUserExists("https://gitlab.lrz.de");
+        service.ensureCurrentGitLabUserExists();
 
         verify(accountIdentityQuery).linkExternalActor(100L, 555L);
     }
@@ -165,7 +165,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         GitProvider gh = gitProvider(GITHUB_PROVIDER_ID, GitProviderType.GITHUB, "https://github.com");
         when(gitProviderRepository.findById(GITHUB_PROVIDER_ID)).thenReturn(Optional.of(gh));
 
-        assertThatThrownBy(() -> service.ensureCurrentGitLabUserExists("https://gitlab.lrz.de"))
+        assertThatThrownBy(() -> service.ensureCurrentGitLabUserExists())
             .isInstanceOf(ResponseStatusException.class)
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
@@ -188,7 +188,7 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of());
 
-        assertThat(service.resolveOrProvisionCurrentUser(null)).isEmpty();
+        assertThat(service.resolveOrProvisionCurrentUser()).isEmpty();
     }
 
     private static IdentityLinkView view(long linkId, long providerId, String subject, String username) {

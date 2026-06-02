@@ -73,10 +73,10 @@ public class WorkspaceRegistryController {
             );
         }
 
-        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity.
-        // This creates the User entity from JWT claims or returns 409 if no GitLab account is linked.
+        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity. This provisions
+        // the User entity from the account's GitLab IdentityLink, or returns 409 if none is linked.
         if (createWorkspaceRequest.kind() == IntegrationKind.GITLAB) {
-            workspaceProvisioningService.ensureAuthenticatedUserExists(createWorkspaceRequest.serverUrl());
+            workspaceProvisioningService.ensureAuthenticatedUserExists();
         }
 
         Workspace workspace = workspaceService.createWorkspaceWithInitialization(createWorkspaceRequest);

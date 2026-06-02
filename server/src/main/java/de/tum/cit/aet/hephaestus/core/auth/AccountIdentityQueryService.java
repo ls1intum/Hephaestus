@@ -11,8 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * In-module implementation of {@link AccountIdentityQuery}. Lives in {@code core.auth} so it can
  * touch the {@code IdentityLink} domain entity directly; exposes only the narrow vendor-neutral
- * SPI to {@code integration} (which uses it to provision the SCM actor mirror from the account's
- * federated identities rather than from absent JWT claims — see {@code AuthenticatedGitProviderUserService}).
+ * SPI to {@code integration}.
+ *
+ * @see AccountIdentityQuery for the {@code sub → Account → IdentityLink} provisioning rationale.
  */
 @Service
 @WorkspaceAgnostic("Identity links are user-scoped (account → IdentityLink)")

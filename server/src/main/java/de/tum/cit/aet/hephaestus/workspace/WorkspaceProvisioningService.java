@@ -317,15 +317,14 @@ public class WorkspaceProvisioningService {
      * <p>For GitLab workspaces the account must have an active GitLab {@code IdentityLink}. A user
      * who logged in via GitLab satisfies this immediately; one who logged in only via GitHub does
      * not, and this method throws {@code 409} so the frontend can prompt them to link GitLab first.
+     * The provider server URL comes from the {@code IdentityLink}'s own {@code git_provider} row.
      *
-     * @param gitLabServerUrl retained for signature stability; the server URL now comes from the
-     *                        {@code IdentityLink}'s own {@code git_provider} row.
      * @throws org.springframework.web.server.ResponseStatusException 409 if the account has no
      *         active GitLab identity linked
      */
     @Transactional
-    public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
-        authenticatedGitProviderUserService.ensureCurrentGitLabUserExists(gitLabServerUrl);
+    public void ensureAuthenticatedUserExists() {
+        authenticatedGitProviderUserService.ensureCurrentGitLabUserExists();
     }
 
     /**

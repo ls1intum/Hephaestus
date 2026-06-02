@@ -38,16 +38,10 @@ import tools.jackson.databind.ObjectMapper;
  * configured limit pass through untouched — in particular the worker-hub / webhook paths, which live
  * on a different chain and are additionally guarded here defensively.
  *
- * <p>Keying ({@link #resolveBucketKey}):
- * <ul>
- *   <li>{@code GET /oauth2/authorization/*} → {@code oauth-authz:ip:<client-ip>} (pre-auth, no
- *       principal yet).</li>
- *   <li>{@code POST /auth/refresh} → {@code refresh:acct:<sub>}, falling back to
- *       {@code refresh:ip:<client-ip>} when unauthenticated.</li>
- *   <li>{@code POST /auth/impersonate} (begin only — not {@code impersonate:exit}) →
- *       {@code impersonate:acct:<admin-sub>}, IP fallback.</li>
- *   <li>{@code DELETE /user} → {@code delete-user:acct:<sub>}, IP fallback.</li>
- * </ul>
+ * <p>Which endpoints are limited and how each is keyed is encoded by the {@link Endpoint} enum
+ * (namespace + account-vs-IP scope) and applied in {@link #resolveBucketKey}. The namespace prefix
+ * guarantees two endpoints never share a bucket even for the same principal; account-scoped limits
+ * fall back to the client IP when the request reaches the filter unauthenticated.
  */
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 

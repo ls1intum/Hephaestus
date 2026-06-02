@@ -287,8 +287,6 @@
                 identity_link_id   BIGINT REFERENCES identity_link(id) ON DELETE SET NULL,
                 ip_inet            INET NOT NULL,
                 user_agent         VARCHAR(512),
-                session_hash       BYTEA,
-                request_id         UUID,
                 details            JSONB,
                 CONSTRAINT pk_auth_event PRIMARY KEY (id, occurred_at),
                 CONSTRAINT ck_auth_event_result CHECK (result IN ('SUCCESS', 'FAILURE')),

@@ -9,7 +9,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -92,15 +91,6 @@ public class AuthEvent {
     @Nullable
     private String userAgent;
 
-    /** SHA-256 of the JWT {@code jti} — never store the raw token / session id. */
-    @Column(name = "session_hash")
-    @Nullable
-    private byte[] sessionHash;
-
-    @Column(name = "request_id", columnDefinition = "uuid")
-    @Nullable
-    private UUID requestId;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "details", columnDefinition = "jsonb")
     @Nullable
@@ -131,7 +121,7 @@ public class AuthEvent {
      * Factory used by {@link AuthEventWriter} — the only sanctioned construction path.
      * Keeps the entity {@code @Getter}-only (append-only invariant). Business fields come
      * via the {@link AuthEventData} parameter object; request-derived metadata is supplied
-     * directly. {@code requestId} / {@code sessionHash} are reserved columns, currently null.
+     * directly.
      */
     public static AuthEvent create(
         AuthEventData data,
@@ -152,8 +142,6 @@ public class AuthEvent {
         e.identityLinkId = data.identityLinkId();
         e.ipInet = ipInet;
         e.userAgent = userAgent;
-        e.requestId = null;
-        e.sessionHash = null;
         e.details = data.details();
         return e;
     }

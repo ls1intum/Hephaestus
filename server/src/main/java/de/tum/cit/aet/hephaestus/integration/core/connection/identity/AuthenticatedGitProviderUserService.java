@@ -21,22 +21,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Resolves / provisions the SCM {@code User} row for the JWT-authenticated principal.
- *
- * <h2>Identity source</h2>
- * The Hephaestus-native cookie-JWT carries <em>only</em> {@code sub = Account.id} — it does not
- * carry the upstream provider's numeric user id ({@code HephaestusJwtIssuer} emits no
- * {@code gitlab_id} / {@code github_id} claim). The SCM actor mirror is therefore provisioned from
- * the account's federated identities via the {@link AccountIdentityQuery} SPI, following the
- * authoritative chain {@code sub → Account → active IdentityLink → User}. Each
- * {@link IdentityLinkView} supplies the IdP-stable numeric {@code subject} (the {@code native_id}),
- * the {@code usernameAtSignup} (the {@code login}), and the provider scalar id; the concrete
- * provider <em>type</em> / <em>server URL</em> is resolved here through {@link GitProviderRepository}
- * so {@code core.auth} stays vendor-neutral.
+ * Resolves / provisions the SCM {@code User} row for the JWT-authenticated principal from the
+ * account's federated identities. Each {@link IdentityLinkView} supplies the IdP-stable numeric
+ * {@code subject} (the {@code native_id}) and the {@code usernameAtSignup} (the {@code login});
+ * the provider <em>type</em> / <em>server URL</em> is resolved here through
+ * {@link GitProviderRepository} so {@code core.auth} stays vendor-neutral.
  *
  * <p>After the {@code User} is upserted, its id is wired back onto the {@code IdentityLink}'s
  * {@code externalActorId} (idempotent) so profile surfaces can resolve "your activity" without a
  * {@code (provider, subject) → (provider_id, native_id)} join.
+ *
+ * @see AccountIdentityQuery for the {@code sub → Account → IdentityLink} provisioning rationale
+ *      (why the SCM mirror comes from IdentityLinks, not absent JWT claims).
  */
 @Service
 public class AuthenticatedGitProviderUserService {
@@ -60,14 +56,12 @@ public class AuthenticatedGitProviderUserService {
     /**
      * Resolve the SCM {@code User} for the current principal, provisioning it from the account's
      * federated identities on first sight. GitLab identities take precedence over GitHub when an
-     * account has both (preserving the prior {@code gitlab_id}-first ordering).
-     *
-     * @param gitLabServerUrl ignored — retained only for signature stability; the server URL now
-     *                        comes from the {@code IdentityLink}'s own {@code git_provider} row,
-     *                        which is authoritative for the provider the user actually logged in with.
+     * account has both (preserving the prior {@code gitlab_id}-first ordering). The provider server
+     * URL comes from each {@code IdentityLink}'s own {@code git_provider} row, which is authoritative
+     * for the provider the user actually logged in with.
      */
     @Transactional
-    public Optional<User> resolveOrProvisionCurrentUser(@Nullable String gitLabServerUrl) {
+    public Optional<User> resolveOrProvisionCurrentUser() {
         var currentUser = userRepository.getCurrentUser();
         if (currentUser.isPresent()) {
             return currentUser;
@@ -94,11 +88,9 @@ public class AuthenticatedGitProviderUserService {
      * Ensure a GitLab SCM {@code User} exists for the current principal (workspace-owner bootstrap).
      * Succeeds for any account with an active GitLab {@code IdentityLink} — including a user who just
      * logged in via GitLab. Throws {@code 409} only when the account genuinely has no GitLab identity.
-     *
-     * @param gitLabServerUrl ignored — see {@link #resolveOrProvisionCurrentUser(String)}.
      */
     @Transactional
-    public void ensureCurrentGitLabUserExists(@Nullable String gitLabServerUrl) {
+    public void ensureCurrentGitLabUserExists() {
         List<IdentityLinkView> links = activeLinksForCurrentAccount();
 
         IdentityLinkView gitLabLink = firstOfType(links, GitProviderType.GITLAB);

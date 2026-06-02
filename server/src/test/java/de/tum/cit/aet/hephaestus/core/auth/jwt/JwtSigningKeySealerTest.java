@@ -79,18 +79,19 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
     }
 
     @Test
-    void unseal_rejectsWrongAad_crossSealerUnderDifferentAad() {
-        // GCM AAD is fixed in code, so a blob produced under a different AAD cannot be forged
-        // through the public API. Instead assert the binding negatively: a tag computed with the
-        // real AAD won't verify if any blob byte changes (already covered) AND a blob from a
-        // sealer with the SAME key still round-trips — proving the AAD is constant, not random.
-        JwtSigningKeySealer s1 = enabledSealer();
-        JwtSigningKeySealer s2 = enabledSealer();
+    void unseal_rejectsBlobSealedUnderDifferentAad() {
+        // Genuine AAD-binding negative: forge a blob bound to a DIFFERENT AAD domain (the kind a
+        // tenant-scoped CredentialBundleConverter would use) via the package-private seal-with-AAD
+        // seam, then prove it cannot be unsealed under this sealer's fixed system AAD. Same key,
+        // same nonce-handling, ONLY the AAD differs — so a failure here isolates the AAD binding.
+        JwtSigningKeySealer sealer = enabledSealer();
+        byte[] tenantScopedAad = "workspace:42:credential_bundle".getBytes(StandardCharsets.UTF_8);
 
-        byte[] plaintext = new byte[] { 7, 7, 7, 7 };
-        byte[] sealed = s1.seal(plaintext);
+        byte[] sealedUnderForeignAad = sealer.seal(new byte[] { 7, 7, 7, 7 }, tenantScopedAad);
 
-        assertThat(s2.unseal(sealed)).isEqualTo(plaintext); // same key + same fixed AAD
+        assertThatThrownBy(() -> sealer.unseal(sealedUnderForeignAad))
+            .isInstanceOf(EncryptionException.class)
+            .hasMessageContaining("unsealing failed");
     }
 
     @Test

@@ -35,6 +35,20 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
     }
 
     @Test
+    void identityFamilyKindIsManifestExempt() {
+        // IDENTITY-family kinds (OIDC_LOGIN_*) ship only a ConnectionStrategy — no manifest,
+        // ApiCredentialProvider, or lifecycle listener. Even if a manifest were registered for one,
+        // the bootstrap must skip it (no universal-bean demand), since login-provider wiring is
+        // validated elsewhere (LoginClientRegistrationRepository).
+        IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
+            List.of(manifest(IntegrationKind.OIDC_LOGIN_GITLAB, Set.of()))
+        );
+        IntegrationFrameworkBootstrap bootstrap = bootstrap(registry, List.of(), List.of());
+
+        assertThatCode(bootstrap::validate).doesNotThrowAnyException();
+    }
+
+    @Test
     void declaredCapabilityWithoutItsBeanFailsLoud() {
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
             List.of(manifest(IntegrationKind.GITHUB, Set.of(Capability.WEBHOOK_INGEST)))

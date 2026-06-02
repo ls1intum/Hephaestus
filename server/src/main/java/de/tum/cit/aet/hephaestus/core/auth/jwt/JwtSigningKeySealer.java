@@ -126,13 +126,23 @@ public class JwtSigningKeySealer {
      * @throws EncryptionException if sealing is disabled or the cipher fails
      */
     public byte[] seal(byte[] privateKeyDer) {
+        return seal(privateKeyDer, AAD);
+    }
+
+    /**
+     * Seal under an explicit AAD. Package-private test seam: the production path always uses the
+     * fixed system AAD via {@link #seal(byte[])}, but exposing the AAD lets a test forge a blob
+     * bound to a <em>different</em> AAD domain and assert it fails to {@link #unseal} under the
+     * system AAD — proving the GCM binding is real, not cosmetic.
+     */
+    byte[] seal(byte[] privateKeyDer, byte[] aad) {
         requireEnabled("seal");
         try {
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             byte[] iv = new byte[GCM_IV_LENGTH];
             IV_GENERATOR.nextBytes(iv);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
-            cipher.updateAAD(AAD);
+            cipher.updateAAD(aad);
             byte[] cipherText = cipher.doFinal(privateKeyDer);
 
             byte[] combined = new byte[1 + iv.length + cipherText.length];
