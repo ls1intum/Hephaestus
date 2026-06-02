@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.workspace;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProvisioningHook;
@@ -73,6 +74,7 @@ public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
         this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.webClient = WebClient.builder()
+            .clientConnector(WebClientConnectors.systemDns())
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
