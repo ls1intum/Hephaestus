@@ -68,4 +68,23 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
         """
     )
     List<IdentityLink> findActiveByAccountId(@Param("accountId") Long accountId);
+
+    /**
+     * Wire an {@link IdentityLink} to its git-provider actor mirror, but only when it is not already
+     * set — idempotent and never clobbers an existing association. Backs
+     * {@code AccountIdentityQuery.linkExternalActor} so the SCM-side provisioner can close the
+     * {@code IdentityLink → ExternalActor} gap on first login.
+     *
+     * @return number of rows updated (0 when the link is missing or already wired)
+     */
+    @Modifying
+    @Query(
+        """
+        UPDATE IdentityLink il
+           SET il.externalActorId = :externalActorId
+         WHERE il.id = :id
+           AND il.externalActorId IS NULL
+        """
+    )
+    int linkExternalActorIfAbsent(@Param("id") Long id, @Param("externalActorId") Long externalActorId);
 }

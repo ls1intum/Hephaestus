@@ -120,7 +120,12 @@ public class AuthSecurityConfig {
             .authorizationUri(base + "/oauth/authorize")
             .tokenUri(base + "/oauth/token")
             .userInfoUri(base + "/api/v4/user")
-            .userNameAttributeName("username")
+            // Subject must be the IdP-stable NUMERIC GitLab user id (GitLab's /api/v4/user returns
+            // both "id" and "username"; "username" is mutable). Keying IdentityLink.subject on the
+            // numeric id matches GitHub + the workspace-scoped gl-ws-* registrations, satisfies the
+            // "IdP-stable user id" contract on IdentityLink.subject (nOAuth defence), and lets the
+            // SCM actor-mirror provisioner derive the provider native_id from the subject.
+            .userNameAttributeName("id")
             .clientName("gitlab.lrz.de")
             .build();
     }

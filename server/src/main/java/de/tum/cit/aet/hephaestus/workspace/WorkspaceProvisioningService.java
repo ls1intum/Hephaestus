@@ -307,28 +307,21 @@ public class WorkspaceProvisioningService {
      * Ensures the currently authenticated account has a corresponding git provider
      * {@link User} entity so they can be assigned as workspace owner.
      *
-     * <p>Reads identity from JWT claims to determine the user's provider:
-     * <ul>
-     *   <li>{@code gitlab_id} → creates a GitLab user (uses the given serverUrl)</li>
-     *   <li>{@code github_id} → creates a GitHub user</li>
-     * </ul>
+     * <p>Identity is resolved from the account's federated identities, not from JWT claims: the
+     * Hephaestus cookie-JWT carries only {@code sub = Account.id}. The chain is
+     * {@code sub → Account → active GitLab IdentityLink → User} (see
+     * {@code AuthenticatedGitProviderUserService}). A first-time, login-only user therefore gets a
+     * {@code User} created here (it is normally created during sync) so workspace creation has an
+     * owner to assign.
      *
-     * <p>This is needed because first-time users may not have a {@code User} entity yet
-     * (it's normally created during sync). Without this, workspace creation would fail
-     * because there is no owner to assign.
+     * <p>For GitLab workspaces the account must have an active GitLab {@code IdentityLink}. A user
+     * who logged in via GitLab satisfies this immediately; one who logged in only via GitHub does
+     * not, and this method throws {@code 409} so the frontend can prompt them to link GitLab first.
      *
-     * @param gitLabServerUrl the GitLab server URL for GitLab users (resolved to default if blank)
-     */
-    /**
-     * Ensures the currently authenticated account has a corresponding git provider
-     * {@link User} entity so they can be assigned as workspace owner.
-     *
-     * <p>For GitLab workspaces, the user must have a linked GitLab identity ({@code gitlab_id}
-     * in their JWT). If they logged in via GitHub without linking GitLab, this method throws
-     * so the frontend can prompt them to link their account first.
-     *
-     * @param gitLabServerUrl the GitLab server URL (resolved to default if blank)
-     * @throws IllegalStateException if the user has no GitLab identity linked
+     * @param gitLabServerUrl retained for signature stability; the server URL now comes from the
+     *                        {@code IdentityLink}'s own {@code git_provider} row.
+     * @throws org.springframework.web.server.ResponseStatusException 409 if the account has no
+     *         active GitLab identity linked
      */
     @Transactional
     public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
