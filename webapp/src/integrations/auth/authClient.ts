@@ -49,28 +49,6 @@ export interface UserProfile {
 
 const serverUrl = () => environment.serverUrl.replace(/\/$/, "");
 
-/**
- * Narrow an untrusted `GET /user` body to `CurrentUser`.
- *
- * The endpoint can only be reached with a valid session, but the response is still
- * untrusted JSON at the boundary. We require the handful of fields `CurrentUser` marks
- * required (`id`, `displayName`, `appRole`, `status`) before trusting the shape — a blind
- * `as CurrentUser` cast would let a malformed/partial body flow into the auth state and
- * surface as `NaN`/`undefined` reads downstream.
- */
-function isCurrentUser(value: unknown): value is CurrentUser {
-	if (typeof value !== "object" || value === null) {
-		return false;
-	}
-	const v = value as Record<string, unknown>;
-	return (
-		typeof v.id === "number" &&
-		typeof v.displayName === "string" &&
-		typeof v.appRole === "string" &&
-		typeof v.status === "string"
-	);
-}
-
 /** Read a cookie value by name (used for the CSRF double-submit token). */
 function readCookie(name: string): string | undefined {
 	const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
@@ -84,27 +62,6 @@ export function csrfHeaders(): Record<string, string> {
 }
 
 export const authClient = {
-	/** Fetch the current user, or null when unauthenticated (401). */
-	async fetchCurrentUser(): Promise<CurrentUser | null> {
-		try {
-			const res = await fetch(`${serverUrl()}/user`, {
-				method: "GET",
-				credentials: "include",
-				headers: { Accept: "application/json" },
-			});
-			if (res.status === 401 || res.status === 403) {
-				return null;
-			}
-			if (!res.ok) {
-				return null;
-			}
-			const body: unknown = await res.json();
-			return isCurrentUser(body) ? body : null;
-		} catch {
-			return null;
-		}
-	},
-
 	/**
 	 * Begin the OAuth login flow against the given provider (default: github).
 	 *

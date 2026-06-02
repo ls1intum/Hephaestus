@@ -16,7 +16,7 @@ export async function resolveCurrentUser(
 	queryClient: QueryClient,
 ): Promise<CurrentUserView | null> {
 	try {
-		return await queryClient.ensureQueryData(getCurrentUserOptions());
+		return await queryClient.ensureQueryData({ ...getCurrentUserOptions(), retry: false });
 	} catch {
 		return null;
 	}

@@ -1,5 +1,5 @@
 import { type DefaultError, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	getUserSettingsOptions,
@@ -24,7 +24,6 @@ export const Route = createFileRoute("/_authenticated/settings")({
 });
 
 function RouteComponent() {
-	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { logout, linkAccount, hasRole } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
@@ -97,10 +96,10 @@ function RouteComponent() {
 	const handleResearchToggle = (checked: boolean) =>
 		updateSetting({ participateInResearch: checked });
 
-	// After deletion: end the session and send the user to the login page.
+	// After deletion: end the session. `logout()` performs a full reload to "/",
+	// so no further navigation is needed here.
 	const handleAccountDeleted = async () => {
 		await logout();
-		navigate({ to: "/login" });
 	};
 
 	const linkedAccountsProps: LinkedAccountsSectionProps = {

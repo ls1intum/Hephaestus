@@ -135,7 +135,7 @@ export function SessionsSection() {
 			) : (
 				<div className="space-y-3" role="list">
 					{sessions.map((session) => {
-						const lastSeen = formatTimestamp(session.issuedAt);
+						const signedInAt = formatTimestamp(session.issuedAt);
 						const deviceLabel = session.userAgent || "Unknown device";
 						// Scope the pending state to the row actually being revoked so a single revoke
 						// doesn't disable/spin every other session's button (mirrors LoginProvidersSettings).
@@ -160,7 +160,7 @@ export function SessionsSection() {
 											)}
 										</div>
 										<p className="text-xs text-muted-foreground truncate">
-											{[session.ip, lastSeen && `signed in ${lastSeen}`]
+											{[session.ip, signedInAt && `signed in ${signedInAt}`]
 												.filter(Boolean)
 												.join(" · ") || "No session details available"}
 										</p>

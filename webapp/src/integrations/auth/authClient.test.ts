@@ -1,7 +1,4 @@
-import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
-import { currentUser } from "@/mocks/fixtures/auth";
-import { server } from "@/mocks/server";
 import { authClient, type CurrentUser, toUserProfile } from "./authClient";
 
 // Object-mother for a CurrentUser (server CurrentUserView). Tests override only what they assert.
@@ -88,36 +85,6 @@ describe("toUserProfile", () => {
 		const profile = toUserProfile(makeCurrentUser({ displayName: "Cher" }));
 		expect(profile.firstName).toBe("Cher");
 		expect(profile.lastName).toBe("");
-	});
-});
-
-// Exercises the real fetch + boundary-narrowing path (MSW intercepts `*/user`, matching regardless
-// of host) rather than stubbing fetch or internal modules.
-describe("authClient.fetchCurrentUser", () => {
-	it("returns the narrowed user on a 200", async () => {
-		const user = await authClient.fetchCurrentUser();
-		expect(user).not.toBeNull();
-		expect(user?.id).toBe(currentUser.id);
-		expect(user?.displayName).toBe(currentUser.displayName);
-		expect(user?.appRole).toBe("APP_ADMIN");
-	});
-
-	// 401/403/500 and a rejected fetch all exercise the same branch: a non-OK response (or no
-	// response at all) resolves to null instead of throwing. One table covers it without
-	// re-asserting the identical behavior four times.
-	it.each([
-		["a 401 (unauthenticated)", () => new HttpResponse(null, { status: 401 })],
-		["a 403", () => new HttpResponse(null, { status: 403 })],
-		["a 500 server error", () => new HttpResponse(null, { status: 500 })],
-		["a network error (fetch rejects)", () => HttpResponse.error()],
-	])("returns null (no throw) on %s", async (_label, respond) => {
-		server.use(http.get("*/user", respond));
-		await expect(authClient.fetchCurrentUser()).resolves.toBeNull();
-	});
-
-	it("returns null when a 200 body is malformed (boundary narrowing rejects partial shapes)", async () => {
-		server.use(http.get("*/user", () => HttpResponse.json({ id: "not-a-number" })));
-		await expect(authClient.fetchCurrentUser()).resolves.toBeNull();
 	});
 });
 
