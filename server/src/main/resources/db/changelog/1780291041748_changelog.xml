@@ -22,6 +22,13 @@
           5. issued_jwt           — revocation list for our own cookie JWTs
           6. jwt_signing_key      — our ES256 signing key set (single active key; rotation is future work)
 
+        FK naming convention (ADR 0017): foreign keys backing a SCALAR id column — a plain
+        Long with NO JPA @ManyToOne, chosen here to break module cycles — are named sfk_*
+        ("scalar foreign key"). Hibernate emits the column but never the constraint, so the
+        JPA-vs-DB schema-drift gate can never see these FKs; it excludes foreignkey:sfk_.* (and
+        the fully-scalar auth_event_*_fkey set) by convention, while real @ManyToOne-backed FKs
+        keep the fk_* name and stay fully drift-checked. New scalar FKs MUST use the sfk_ prefix.
+
         Extensions enabled:
           - citext     — case-insensitive primary_email (bundled in official Postgres images)
 
@@ -111,7 +118,7 @@
             </column>
             <column name="git_provider_id" type="BIGINT">
                 <constraints nullable="false"
-                             foreignKeyName="fk_identity_link_git_provider"
+                             foreignKeyName="sfk_identity_link_git_provider"
                              referencedTableName="git_provider"
                              referencedColumnNames="id"/>
             </column>
@@ -161,7 +168,7 @@
         <createTable tableName="account_feature">
             <column name="account_id" type="BIGINT">
                 <constraints nullable="false"
-                             foreignKeyName="fk_account_feature_account"
+                             foreignKeyName="sfk_account_feature_account"
                              referencedTableName="account"
                              referencedColumnNames="id"
                              deleteCascade="true"/>
@@ -179,7 +186,7 @@
         <!-- ON DELETE SET NULL has no inline <constraints> form in Liquibase (only deleteCascade);
              it must be an explicit addForeignKeyConstraint. -->
         <addForeignKeyConstraint baseTableName="account_feature" baseColumnNames="enabled_by_account_id"
-                                 constraintName="fk_account_feature_enabled_by"
+                                 constraintName="sfk_account_feature_enabled_by"
                                  referencedTableName="account" referencedColumnNames="id"
                                  onDelete="SET NULL"/>
     </changeSet>
@@ -229,7 +236,7 @@
             </column>
             <column name="account_id" type="BIGINT">
                 <constraints nullable="false"
-                             foreignKeyName="fk_issued_jwt_account"
+                             foreignKeyName="sfk_issued_jwt_account"
                              referencedTableName="account"
                              referencedColumnNames="id"
                              deleteCascade="true"/>
@@ -276,14 +283,15 @@
             CREATE TABLE auth_event (
                 id                 BIGSERIAL,
                 occurred_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                account_id         BIGINT REFERENCES account(id) ON DELETE SET NULL,
-                acting_account_id  BIGINT REFERENCES account(id) ON DELETE SET NULL,
+                -- sfk_* = scalar FK (no JPA @ManyToOne); excluded from the JPA-vs-DB drift gate (see header).
+                account_id         BIGINT CONSTRAINT sfk_auth_event_account_id        REFERENCES account(id)       ON DELETE SET NULL,
+                acting_account_id  BIGINT CONSTRAINT sfk_auth_event_acting_account_id REFERENCES account(id)       ON DELETE SET NULL,
                 event_type         VARCHAR(48) NOT NULL,
                 result             VARCHAR(16) NOT NULL,
                 failure_reason     VARCHAR(64),
-                git_provider_id    BIGINT REFERENCES git_provider(id),
-                workspace_id       BIGINT REFERENCES workspace(id) ON DELETE SET NULL,
-                identity_link_id   BIGINT REFERENCES identity_link(id) ON DELETE SET NULL,
+                git_provider_id    BIGINT CONSTRAINT sfk_auth_event_git_provider_id   REFERENCES git_provider(id),
+                workspace_id       BIGINT CONSTRAINT sfk_auth_event_workspace_id      REFERENCES workspace(id)     ON DELETE SET NULL,
+                identity_link_id   BIGINT CONSTRAINT sfk_auth_event_identity_link_id  REFERENCES identity_link(id) ON DELETE SET NULL,
                 ip_inet            INET NOT NULL,
                 user_agent         VARCHAR(512),
                 details            JSONB,
@@ -435,7 +443,7 @@
             </column>
             <column name="account_id" type="BIGINT">
                 <constraints nullable="false"
-                             foreignKeyName="fk_account_export_account"
+                             foreignKeyName="sfk_account_export_account"
                              referencedTableName="account"
                              referencedColumnNames="id"
                              deleteCascade="true"/>
