@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,7 +21,8 @@ import org.springframework.stereotype.Repository;
 public interface AccountRepository extends JpaRepository<Account, Long> {
     /**
      * Ids of accounts whose GDPR soft-delete cooldown has elapsed: {@code status = DELETING} and
-     * {@code deleted_at} strictly older than {@code cutoff}. Backs {@code AccountHardDeleteSweeper}.
+     * {@code deleted_at} strictly older than {@code cutoff}, oldest first. Paged so a large erasure
+     * backlog is purged one bounded page at a time. Backs {@code AccountHardDeleteSweeper}.
      */
     @Query(
         """
@@ -29,7 +31,8 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
          WHERE a.status = de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.DELETING
            AND a.deletedAt IS NOT NULL
            AND a.deletedAt < :cutoff
+         ORDER BY a.deletedAt
         """
     )
-    List<Long> findDeletingPastCooldown(@Param("cutoff") Instant cutoff);
+    List<Long> findDeletingPastCooldown(@Param("cutoff") Instant cutoff, Pageable pageable);
 }

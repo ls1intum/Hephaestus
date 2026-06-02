@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -202,7 +203,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         lenient().when(draft.account(any())).thenReturn(draft);
         lenient().when(draft.details(any())).thenReturn(draft);
 
-        when(repo.save(any(AccountExport.class))).thenAnswer(inv -> {
+        when(repo.saveAndFlush(any(AccountExport.class))).thenAnswer(inv -> {
             AccountExport e = inv.getArgument(0);
             setId(e, 1234L);
             return e;
@@ -220,15 +221,18 @@ class AccountExportServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void worker_isNotInvokedOnPlainStatusRead() {
+    void requestExport_rejectsWhenInFlightExportExists() {
         AccountExportRepository repo = mock(AccountExportRepository.class);
         ExportGenerationWorker worker = mock(ExportGenerationWorker.class);
         AuthEventLogger logger = mock(AuthEventLogger.class);
-        when(repo.findByIdAndAccountId(any(), any())).thenReturn(Optional.empty());
+        when(repo.existsByAccountIdAndStatusIn(eq(ACCOUNT_ID), any())).thenReturn(true);
 
         AccountExportService service = new AccountExportService(repo, worker, logger, clock);
-        service.status(1L, ACCOUNT_ID);
 
+        assertThatExceptionOfType(org.springframework.web.server.ResponseStatusException.class)
+            .isThrownBy(() -> service.requestExport(ACCOUNT_ID))
+            .satisfies(ex -> assertThat(ex.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.CONFLICT));
+        verify(repo, never()).save(any());
         verify(worker, never()).generate(any(), any());
     }
 

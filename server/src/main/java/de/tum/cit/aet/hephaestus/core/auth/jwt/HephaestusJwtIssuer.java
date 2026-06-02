@@ -5,6 +5,8 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -22,20 +24,19 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Mints Hephaestus's cookie-bound access JWTs.
  *
- * <h2>Claim shape (strict OIDC subset — no proprietary names)</h2>
+ * <h2>Claim shape</h2>
  * <pre>
- * iss   — {@link AuthProperties#issuer}
- * sub   — {@code Account.id} as a decimal string
- * aud   — default {@link AuthProperties#audience} (caller can override per-issue)
- * jti   — fresh UUID; also INSERTed into {@code issued_jwt} so revocation can short-circuit
- * iat   — {@link Clock#instant()} of the issuing pod
- * exp   — {@code iat + accessTtl}
- * scope — space-delimited; encodes app role + active feature flag keys
- * act   — RFC 8693 actor object {@code {"sub": "<impersonator_id>"}}; absent when not impersonating
+ * iss                — {@link AuthProperties#issuer}
+ * sub                — {@code Account.id} as a decimal string
+ * aud                — default {@link AuthProperties#audience} (caller can override per-issue)
+ * jti                — fresh UUID; also INSERTed into {@code issued_jwt} so revocation can short-circuit
+ * iat                — {@link Clock#instant()} of the issuing pod
+ * exp                — {@code iat + accessTtl}
+ * preferred_username — login (standard OIDC claim)
+ * roles              — flat string array of granted roles (Hephaestus-specific; the authority converter reads it)
+ * given_name         — first name; only when known
+ * act                — RFC 8693 actor object {@code {"sub": "<impersonator_id>"}}; absent when not impersonating
  * </pre>
- *
- * Why a strict subset: lets us mount Spring Authorization Server as a second issuer later
- * (e.g. for Issue #1200 third-party clients) without touching resource-server validators.
  *
  * <h2>Issuance contract</h2>
  * Every successful {@link #issue} call is paired with an {@code issued_jwt} INSERT in the
@@ -69,12 +70,8 @@ public class HephaestusJwtIssuer {
     }
 
     /**
-     * Mint a new access JWT for {@code principal} (optionally under impersonation). Records
-     * the {@code jti} in {@code issued_jwt} in the same transaction.
-     *
-     * <p>Claim set: {@code preferred_username} = login (standard OIDC), {@code given_name} =
-     * first name, {@code roles} = flat string array, plus {@code sub} = account id and
-     * {@code jti} for the Hephaestus-native endpoints + revocation.
+     * Mint a new access JWT for {@code principal} (optionally under impersonation), recording the
+     * {@code jti} in {@code issued_jwt} in the same transaction. Claim shape: see the class Javadoc.
      *
      * @param principal      account id + login + roles to bake in.
      * @param impersonatorId if non-null, sets the RFC 8693 {@code act} claim.
@@ -93,8 +90,6 @@ public class HephaestusJwtIssuer {
             .id(jti.toString())
             .issuedAt(now)
             .expiresAt(expiresAt)
-            // Claims consumed by SecurityUtils + the authority converter. preferred_username is
-            // the standard OIDC claim; roles is a flat string array (our own — no nested realm_access).
             .claim("preferred_username", principal.login())
             .claim("roles", java.util.List.copyOf(principal.roles()));
         if (principal.givenName() != null) {
@@ -113,11 +108,39 @@ public class HephaestusJwtIssuer {
                 ua = ua.substring(0, 512);
             }
             row.setUserAgent(ua);
-            row.setIpInet(request.getRemoteAddr());
+            // Audit IP is best-effort. The ip_inet column is Postgres `inet`; an unparseable value
+            // (proxy rewrite, spoofed harness, IPv6 scope id) would make the issued_jwt INSERT throw
+            // and — because issuance is transactional — block login entirely. Drop an invalid address
+            // to null so bad audit metadata can never fail token issuance.
+            row.setIpInet(sanitizeIp(request.getRemoteAddr()));
         }
         issuedJwtRepository.save(row);
 
         return new Token(jwt.getTokenValue(), jti, expiresAt);
+    }
+
+    /**
+     * Return {@code raw} only if it parses as a literal IP address; otherwise null. The hostname
+     * pre-check (reject anything that isn't hex-digits/{@code . : %}) guarantees {@code getByName}
+     * can never trigger a DNS lookup. Keeps a malformed audit IP from failing the {@code ip_inet}
+     * (Postgres {@code inet}) INSERT and thus blocking issuance.
+     */
+    @Nullable
+    static String sanitizeIp(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        // Only IP literals contain ':' (IPv6) or are all-dotted-decimal/hex (IPv4). Reject anything
+        // that could be a hostname BEFORE calling getByName so we never perform DNS resolution.
+        if (!raw.chars().allMatch(c -> Character.digit(c, 16) >= 0 || c == '.' || c == ':' || c == '%')) {
+            return null;
+        }
+        try {
+            InetAddress.getByName(raw);
+            return raw;
+        } catch (UnknownHostException e) {
+            return null;
+        }
     }
 
     /**

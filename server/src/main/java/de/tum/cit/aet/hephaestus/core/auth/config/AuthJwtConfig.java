@@ -64,13 +64,24 @@ public class AuthJwtConfig {
     }
 
     /**
+     * Cookie-first bearer-token resolver (concrete type). Exposed as a bean so it is injectable both
+     * as the resource-server {@link BearerTokenResolver} (below) and directly by
+     * {@code AuthBeginController}, which validates the access cookie for link-mode account binding.
+     */
+    @Bean
+    public CookieBearerTokenResolver cookieBearerTokenResolver(AuthProperties properties) {
+        return new CookieBearerTokenResolver(properties);
+    }
+
+    /**
      * Resource-server bearer-token resolution from the SPA's access-token cookie, with a header
      * fallback (ADR 0017). Built in the auth module so the root {@code SecurityConfig} depends only on
      * the framework {@link BearerTokenResolver} interface, not the non-exposed {@code core} internals.
      */
     @Bean
-    public BearerTokenResolver hephaestusBearerTokenResolver(AuthProperties properties) {
-        return new CookieBearerTokenResolver(properties);
+    @org.springframework.context.annotation.Primary
+    public BearerTokenResolver hephaestusBearerTokenResolver(CookieBearerTokenResolver cookieBearerTokenResolver) {
+        return cookieBearerTokenResolver;
     }
 
     /**

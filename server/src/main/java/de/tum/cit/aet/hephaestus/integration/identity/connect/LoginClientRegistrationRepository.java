@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionStateChangedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleConverter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.OAuthClientSecret;
@@ -23,6 +24,8 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Composite {@link ClientRegistrationRepository}: env-configured default providers
@@ -37,9 +40,11 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
  * default login-page discovery (we don't use Spring's default page, but the contract is
  * honoured), and {@link IdentityProviderCatalog} so {@code core.auth}'s discovery controller
  * can list the sign-in options without importing this integration class. The dynamic set is
- * Caffeine-cached for 5 minutes; that TTL is the invalidation mechanism — a rotated/added/removed
- * workspace login provider takes effect within 5 minutes. (Event-driven eviction is intentionally
- * not implemented: login-provider changes are rare and the bounded staleness is acceptable.)
+ * Caffeine-cached; eviction is event-driven — a {@link ConnectionStateChangedEvent} (published after
+ * commit from {@code ConnectionService}) drops the affected registration immediately, so a suspended
+ * / uninstalled / rotated workspace login provider stops being usable at once rather than after a TTL.
+ * The short 60s {@code expireAfterWrite} is a backstop only (e.g. an event lost to a crash between
+ * commit and listener dispatch); it is not the primary invalidation mechanism.
  */
 public class LoginClientRegistrationRepository
     implements ClientRegistrationRepository, Iterable<ClientRegistration>, IdentityProviderCatalog
@@ -56,7 +61,7 @@ public class LoginClientRegistrationRepository
     private final ConnectionRepository connectionRepository;
     private final CredentialBundleConverter credentialConverter;
     private final Cache<String, ClientRegistration> dynamicCache = Caffeine.newBuilder()
-        .expireAfterWrite(Duration.ofMinutes(5))
+        .expireAfterWrite(Duration.ofSeconds(60))
         .maximumSize(512)
         .build();
 
@@ -103,6 +108,23 @@ public class LoginClientRegistrationRepository
                 return reg;
             })
             .orElse(null);
+    }
+
+    /**
+     * Drop the cached registration for a workspace OIDC-login Connection. Invalidates both id forms
+     * ({@code gh-ws-} / {@code gl-ws-}); the keys are disjoint so the non-matching one is a harmless no-op.
+     */
+    public void evict(long connectionId) {
+        dynamicCache.invalidate("gh-ws-" + connectionId);
+        dynamicCache.invalidate("gl-ws-" + connectionId);
+    }
+
+    /** Evict on a Connection change (AFTER_COMMIT — see class Javadoc). Non-OIDC kinds are skipped. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onConnectionStateChanged(ConnectionStateChangedEvent event) {
+        if (OIDC_KINDS.contains(event.kind())) {
+            evict(event.connectionId());
+        }
     }
 
     @Override

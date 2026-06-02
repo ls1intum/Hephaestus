@@ -45,6 +45,31 @@ public interface IssuedJwtRepository extends JpaRepository<IssuedJwt, UUID> {
     )
     int revoke(@Param("jti") UUID jti, @Param("now") Instant now, @Param("reason") IssuedJwt.RevokedReason reason);
 
+    /**
+     * Ownership-scoped single-session revoke (self/admin "revoke this session"). Atomic
+     * check-and-revoke in one UPDATE — the {@code accountId} predicate replaces a prior
+     * {@code findById}-then-filter TOCTOU and IS the access control (one account can never revoke
+     * another's session). Returns the rows revoked (0 when the jti is missing, not owned, or already
+     * revoked).
+     */
+    @Modifying
+    @Query(
+        """
+        UPDATE IssuedJwt j
+           SET j.revokedAt = :now,
+               j.revokedReason = :reason
+         WHERE j.jti = :jti
+           AND j.accountId = :accountId
+           AND j.revokedAt IS NULL
+        """
+    )
+    int revokeOwned(
+        @Param("jti") UUID jti,
+        @Param("accountId") Long accountId,
+        @Param("now") Instant now,
+        @Param("reason") IssuedJwt.RevokedReason reason
+    );
+
     @Modifying
     @Query(
         """

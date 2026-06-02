@@ -51,6 +51,10 @@ class AccountHardDeleteSweeperTest extends BaseIntegrationTest {
     @Autowired
     private AccountHardDeleteSweeper sweeper;
 
+    /** Spy so a single account's purge can be made to throw, exercising per-account isolation. */
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    private AccountPurger accountPurger;
+
     @Autowired
     private AccountRepository accountRepository;
 
@@ -175,7 +179,94 @@ class AccountHardDeleteSweeperTest extends BaseIntegrationTest {
         assertThat(accountRepository.findById(insideId).orElseThrow().getStatus()).isEqualTo(Account.Status.DELETING);
     }
 
+    // ── Case 5: GDPR erasure anonymizes the subject's retained audit rows ─────────────────────
+
+    @Test
+    void sweepNow_anonymizesSubjectAndImpersonatorAuditRows() {
+        Account account = newAccount("Erased User", "erased@example.com");
+        Long erasedId = account.getId();
+        // Row A: the erased user is the event SUBJECT. Row B: the erased user is the IMPERSONATOR
+        // (acting_account_id) of an event about a different account → both must be redacted.
+        seedAuthEvent(9001L, erasedId, null, "LOGIN", "203.0.113.7", "UA-A", "{\"x\":1}");
+        seedAuthEvent(
+            9002L,
+            88_888L,
+            erasedId,
+            "IMPERSONATION_BEGIN",
+            "198.51.100.9",
+            "UA-B",
+            "{\"reason\":\"abuse\"}"
+        );
+        markDeleting(erasedId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
+
+        sweeper.sweepNow();
+
+        var rows = jdbcTemplate.queryForList(
+            "SELECT event_type, result, ip_inet, user_agent, details FROM auth_event " +
+                "WHERE account_id = ? OR acting_account_id = ? ORDER BY id",
+            erasedId,
+            erasedId
+        );
+        assertThat(rows).hasSize(2);
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.get("ip_inet")).as("IP redacted").isNull();
+            assertThat(r.get("user_agent")).as("UA redacted").isNull();
+            assertThat(r.get("details")).as("details redacted").isNull();
+            assertThat(r.get("event_type")).as("skeleton kept").isNotNull();
+            assertThat(r.get("result")).as("skeleton kept").isNotNull();
+        });
+    }
+
+    // ── Case 6: one failing account does not block the rest of the backlog ────────────────────
+
+    @Test
+    void sweepNow_oneAccountFails_othersStillPurgedAndCounted() {
+        Account good = newAccount("Good", "good@example.com");
+        Long goodId = good.getId();
+        seedChildRows(goodId);
+        markDeleting(goodId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(1)));
+
+        Account bad = newAccount("Bad", "bad@example.com");
+        Long badId = bad.getId();
+        seedChildRows(badId);
+        markDeleting(badId, clock.instant().minus(COOLDOWN).minus(Duration.ofHours(2)));
+
+        // Make exactly the "bad" account's purge throw; the real bean handles the rest.
+        org.mockito.Mockito.doThrow(new RuntimeException("boom")).when(accountPurger).purge(badId);
+
+        int purged = sweeper.sweepNow();
+
+        assertThat(purged).as("only the healthy account is counted").isEqualTo(1);
+        assertThat(accountRepository.findById(goodId).orElseThrow().getStatus()).isEqualTo(Account.Status.DELETED);
+        assertThat(accountRepository.findById(badId).orElseThrow().getStatus())
+            .as("the failing account stays DELETING for the next sweep")
+            .isEqualTo(Account.Status.DELETING);
+    }
+
     // ── Fixtures ──────────────────────────────────────────────────────────────────────────────
+
+    private void seedAuthEvent(
+        long id,
+        Long accountId,
+        Long actingAccountId,
+        String eventType,
+        String ip,
+        String userAgent,
+        String details
+    ) {
+        jdbcTemplate.update(
+            "INSERT INTO auth_event " +
+                "(id, occurred_at, account_id, acting_account_id, event_type, result, ip_inet, user_agent, details) " +
+                "VALUES (?, now(), ?, ?, ?, 'SUCCESS', CAST(? AS inet), ?, CAST(? AS jsonb))",
+            id,
+            accountId,
+            actingAccountId,
+            eventType,
+            ip,
+            userAgent,
+            details
+        );
+    }
 
     /** Persists a real ACTIVE account via the production repository. */
     private Account newAccount(String displayName, String email) {

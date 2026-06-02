@@ -22,7 +22,6 @@ import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
-import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
@@ -31,13 +30,15 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * {@link JWKSource} and then short-circuits revoked {@code jti}s via a Caffeine-cached
  * negative lookup on {@link IssuedJwtRepository}.
  *
- * <h2>Cache strategy</h2>
- * Lookups are cached by {@code jti} in the {@code auth_jwt_revoked} Spring cache (TTL ~1
- * minute — see {@code CacheConfig}). The cache stores either a {@link Status#ACTIVE} sentinel
- * or {@link Status#REVOKED}; both short-circuit the DB. On revoke, {@code RevocationCacheEvictor}
- * evicts the {@code jti} on the acting pod (after commit) so logout/sign-out take effect
- * immediately there. Other pods converge within the TTL; a cross-pod NATS push
- * ({@code auth.jwt.revoked}) to make that immediate cluster-wide is a tracked follow-up.
+ * <h2>Cache strategy (negative cache)</h2>
+ * The {@code auth_jwt_revoked} Spring cache stores ONLY the REVOKED verdict, keyed by {@code jti}.
+ * An ACTIVE token is never cached: every request does the indexed primary-key lookup on
+ * {@code issued_jwt(jti)} (cheap), so a logout / admin-revoke takes effect on every pod within DB
+ * visibility lag rather than the cache TTL. Because a revocation is monotonic ({@code revoked_at}
+ * is never cleared), a cached REVOKED entry can never become a false positive — the cache can only
+ * ever be MORE restrictive than the DB, never less. No cross-pod eviction protocol is needed; the
+ * cache fills on the first DB-confirmed revocation and the TTL (see {@code CacheConfig}) merely
+ * bounds how long a revocation is remembered locally to shed token-replay load.
  *
  * <h2>Failure mode</h2>
  * If the DB is unreachable, this decoder fails closed — it surfaces an
@@ -80,8 +81,12 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     }
 
     private static OAuth2TokenValidator<Jwt> buildValidator(AuthProperties properties) {
+        // Wrap createDefault() WHOLE — it bundles JwtTimestampValidator (exp/nbf with a 60s clock-skew
+        // default, which absorbs multi-pod clock drift) AND X509CertificateThumbprintValidator. We do
+        // NOT recompose the list by hand: X509CertificateThumbprintValidator is package-private in
+        // spring-security-oauth2-jose, and hand-rolling the default set would silently drop it
+        // (spring-security#18230). issuer + audience are added on top.
         OAuth2TokenValidator<Jwt> defaults = JwtValidators.createDefault();
-        OAuth2TokenValidator<Jwt> timestamp = new JwtTimestampValidator();
         OAuth2TokenValidator<Jwt> issuer = new JwtClaimValidator<String>(
             JwtClaimNames.ISS,
             iss -> iss != null && iss.equals(properties.issuer().toString())
@@ -90,7 +95,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
             JwtClaimNames.AUD,
             aud -> aud != null && aud.contains(properties.audience())
         );
-        return new DelegatingOAuth2TokenValidator<>(defaults, timestamp, issuer, audience);
+        return new DelegatingOAuth2TokenValidator<>(defaults, issuer, audience);
     }
 
     @Override
@@ -106,19 +111,17 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         } catch (IllegalArgumentException ex) {
             throw new JwtException("malformed jti");
         }
-        Status cached = (cache != null) ? cache.get(jti, Status.class) : null;
-        if (cached == Status.REVOKED) {
+        // Negative cache: only the REVOKED verdict is stored; ACTIVE always re-reads. See class Javadoc.
+        Boolean revoked = (cache != null) ? cache.get(jti, Boolean.class) : null;
+        if (Boolean.TRUE.equals(revoked)) {
             throw revokedException();
-        }
-        if (cached == Status.ACTIVE) {
-            return jwt;
         }
         try {
             boolean active = repository.findActive(jti, clock.instant()).isPresent();
-            if (cache != null) {
-                cache.put(jti, active ? Status.ACTIVE : Status.REVOKED);
-            }
             if (!active) {
+                if (cache != null) {
+                    cache.put(jti, Boolean.TRUE);
+                }
                 throw revokedException();
             }
             return jwt;
@@ -134,21 +137,5 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     private static JwtException revokedException() {
         OAuth2Error error = new OAuth2Error("invalid_token", "token has been revoked or expired", null);
         return new JwtException(error.getDescription());
-    }
-
-    /** Evict a single jti from this pod's cache; called by {@code RevocationCacheEvictor} on revoke. */
-    public void invalidate(UUID jti) {
-        if (cache != null) {
-            cache.evict(jti);
-        }
-    }
-
-    /**
-     * Visibility marker — kept off {@link Status#name()} on the wire because the cache stores
-     * the enum reference directly (Caffeine-serialised in-process).
-     */
-    public enum Status {
-        ACTIVE,
-        REVOKED,
     }
 }

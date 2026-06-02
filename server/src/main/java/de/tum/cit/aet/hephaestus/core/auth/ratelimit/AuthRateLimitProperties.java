@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *   <li>{@code POST /auth/refresh} — 60/min, keyed by account (JWT sub; IP fallback)</li>
  *   <li>{@code POST /auth/impersonate} — 10/min, keyed by admin account</li>
  *   <li>{@code DELETE /user} — 3/hour, keyed by account</li>
+ *   <li>{@code POST /user/exports} — 10/hour, keyed by account</li>
  * </ul>
  *
  * <p>Set {@code enabled=false} to bypass the filter entirely (e.g. load tests). The limits are
@@ -33,7 +34,8 @@ public record AuthRateLimitProperties(
     @DefaultValue Limit oauthAuthorization,
     @DefaultValue Limit refresh,
     @DefaultValue Limit impersonate,
-    @DefaultValue Limit deleteUser
+    @DefaultValue Limit deleteUser,
+    @DefaultValue Limit export
 ) {
     public AuthRateLimitProperties {
         // Bind nulls (a partially-specified YAML block) to the spec defaults so a misconfigured
@@ -42,6 +44,9 @@ public record AuthRateLimitProperties(
         refresh = refresh != null ? refresh : Limit.of(60, Duration.ofMinutes(1));
         impersonate = impersonate != null ? impersonate : Limit.of(10, Duration.ofMinutes(1));
         deleteUser = deleteUser != null ? deleteUser : Limit.of(3, Duration.ofHours(1));
+        // 10/hour: generous for legit "download my data" (POST + a few download polls) but caps a
+        // session from spamming async bundle assemblies (each persisting a BYTEA blob).
+        export = export != null ? export : Limit.of(10, Duration.ofHours(1));
     }
 
     /**

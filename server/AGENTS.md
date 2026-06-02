@@ -4,7 +4,7 @@ Spring Boot 4 backend providing the REST API for Hephaestus.
 
 ## Local development loop
 
-From the repo root: `pnpm dev`. It launches `mprocs` with the server and webapp in separate panes; the Postgres/Keycloak containers come up automatically. For plain terminals, run `pnpm dev:server` and `pnpm dev:webapp` yourself.
+From the repo root: `pnpm dev`. It launches `mprocs` with the server and webapp in separate panes; the Postgres container comes up automatically. For plain terminals, run `pnpm dev:server` and `pnpm dev:webapp` yourself.
 
 ### Conventions
 

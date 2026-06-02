@@ -21,8 +21,9 @@ import org.jspecify.annotations.Nullable;
  * inserted here at issuance; the {@code RevocationAwareJwtDecoder} consults a Caffeine-cached
  * view of this table on every request to short-circuit revoked tokens.
  *
- * <p>Cache invalidation across pods is propagated over NATS on the {@code auth.jwt.revoked}
- * subject — Caffeine TTL is the safety net, not the primary correctness mechanism.
+ * <p>Cross-pod correctness comes from the indexed {@code jti} lookup on every request, not from
+ * cache invalidation: the decoder caches only the REVOKED verdict (a negative cache), so a revoke
+ * is visible to every pod within DB visibility lag. The Caffeine entry only sheds replay load.
  *
  * <p>Expired rows are swept by a scheduled job; the {@code expires_at} index makes that cheap.
  */
@@ -78,6 +79,8 @@ public class IssuedJwt {
         LOGOUT,
         ROTATE,
         SIGN_OUT_EVERYWHERE,
+        /** A user revoked one of their OWN sessions ("sign out this device"). */
+        SELF_REVOKE,
         ADMIN_REVOKE,
         IMPERSONATION_EXIT,
         ACCOUNT_DELETED,

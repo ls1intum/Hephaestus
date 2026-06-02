@@ -16,7 +16,7 @@ spring:
 
     # No resourceserver.jwt.issuer-uri in prod: tokens are issued + verified by Hephaestus
     # itself (core.auth). Required prod env: HEPHAESTUS_AUTH_ISSUER,
-    # HEPHAESTUS_AUTH_STATE_COOKIE_KEY, GITHUB_OAUTH_CLIENT_ID/SECRET,
+    # HEPHAESTUS_AUTH_STATE_COOKIE_KEY, HEPHAESTUS_TRUSTED_PROXIES, GITHUB_OAUTH_CLIENT_ID/SECRET,
     # GITLAB_LRZ_OAUTH_CLIENT_ID/SECRET. See ADR 0017 + docs/runbooks/auth-cutover.md.
 
     # Belt-and-suspenders: the spring-boot-docker-compose jar ships in the image (it powers the
@@ -30,6 +30,20 @@ spring:
 server:
     forward-headers-strategy: native
     tomcat:
+        # Proxy trust for RemoteIpValve (activated by forward-headers-strategy: native).
+        # Boot's DEFAULT internal-proxies trusts ALL of RFC-1918 (10/8, 172.16/12, 192.168/16,
+        # 169.254/16, 127/8). Behind in-cluster ingress the pod peer is itself in-range, so a client
+        # could spoof X-Forwarded-For and forge getRemoteAddr(), defeating the pre-auth IP rate-limit
+        # buckets (AuthRateLimitFilter.clientIp). Pin to the real ingress address(es) instead.
+        # HEPHAESTUS_TRUSTED_PROXIES is a Tomcat internal-proxies REGEX (NOT CIDR) — e.g. the single
+        # ingress address or a tight subnet pattern. ProxyTrustGuard fails the boot if this is left at
+        # the wildcard default in prod.
+        remoteip:
+            # Empty default so an unset env produces ProxyTrustGuard's clear fail-fast (not a raw
+            # placeholder-resolution error). The guard rejects a blank value in prod+native.
+            internal-proxies: ${HEPHAESTUS_TRUSTED_PROXIES:}
+            remote-ip-header: X-Forwarded-For
+            protocol-header: X-Forwarded-Proto
         redirect-context-root: false
         accesslog:
             enabled: true

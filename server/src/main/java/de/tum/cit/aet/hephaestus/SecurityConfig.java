@@ -34,6 +34,8 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -231,21 +233,16 @@ public class SecurityConfig {
             // gets overwritten by a 401 when the anonymous /error forward is denied. Permit it so the
             // ORIGINAL status is preserved. The error view carries no sensitive data.
             requests.requestMatchers("/error").permitAll();
-            // Webhook endpoints — authenticated by HMAC (GitHub) or shared-token (GitLab) at the
-            // pipeline layer. Spring Security must not block these or external providers can
-            // never reach the receiver. See integration.webhook.* and ADR 0008. The unified
-            // {@code /webhooks/{kind}} entry point serves GitHub, GitLab and Slack.
-            requests.requestMatchers(HttpMethod.POST, "/webhooks/**").permitAll();
-            // OAuth vendor callbacks — authenticated by HMAC-signed state parameter at the
-            // controller layer (see OAuthCallbackController). The vendor redirect arrives
-            // unauthenticated; Spring Security MUST NOT block it or no OAuth flow ever completes.
-            requests.requestMatchers("/oauth/callback/**").permitAll();
-            // NOTE: /api/workers/** and /actuator/** are handled by workerHubSecurityFilterChain
-            // (highest precedence) which skips the OAuth2 resource server entirely — the worker
-            // hub validates its own JWTs via WorkerJwtHandshakeInterceptor.
-            // Dev-only: permit the dev trigger endpoint when explicitly enabled (defaults to false)
+            // NOTE: /webhooks/**, /oauth/callback/**, /api/workers/** and /actuator/health|info are
+            // claimed by higher-precedence chains and NEVER reach this fallback chain:
+            //   - /webhooks/** + /oauth/callback/**  → workerHubSecurityFilterChain (HIGHEST_PRECEDENCE)
+            //   - /oauth2/authorization/** + /login/oauth2/code/** + /auth/login|error → AuthSecurityConfig
+            // Spring dispatches to the FIRST matching SecurityFilterChain only, so permitAll rules for
+            // those paths here would be dead code (they were — removed). Their controller/handshake-layer
+            // auth (HMAC, shared token, signed state, worker JWT) is unaffected.
+            // Dev-only: permit the dev trigger endpoint when explicitly enabled (defaults to false).
             if (devTriggerEnabled) {
-                requests.requestMatchers("/api/dev/**").permitAll();
+                requests.requestMatchers(DEV_TRIGGER_MATCHER).permitAll();
             }
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
@@ -283,6 +280,15 @@ public class SecurityConfig {
     private static final java.util.Set<String> SAFE_METHODS = java.util.Set.of("GET", "HEAD", "OPTIONS", "TRACE");
 
     /**
+     * Single canonical matcher for the optional dev-trigger surface, shared by the authorize rules and
+     * the CSRF predicate so they cannot diverge. Replaces the previous raw
+     * {@code getServletPath().startsWith("/api/dev/")} string gating. The webhook / OAuth-callback /
+     * {@code /login/oauth2/code/} skips that used to live in {@code requiresCsrf} are gone: those paths
+     * are owned by the higher-precedence worker-hub and oauth2Login chains and never reach this chain.
+     */
+    static final RequestMatcher DEV_TRIGGER_MATCHER = PathPatternRequestMatcher.withDefaults().matcher("/api/dev/**");
+
+    /**
      * CSRF applies only to cookie-authenticated, state-changing browser requests. Returns
      * {@code false} (skip CSRF) for safe methods, for any request bearing an
      * {@code Authorization: Bearer} header (bearer auth is not CSRF-vulnerable; covers API clients +
@@ -298,18 +304,11 @@ public class SecurityConfig {
         if (authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
             return false;
         }
-        String path = request.getServletPath();
-        if (path == null || path.isEmpty()) {
-            path = request.getRequestURI();
-        }
-        if (
-            path.startsWith("/webhooks/") ||
-            path.startsWith("/oauth/callback/") ||
-            path.startsWith("/login/oauth2/code/")
-        ) {
-            return false;
-        }
-        if (devTriggerEnabled && path.startsWith("/api/dev/")) {
+        // No path skips for /webhooks/, /oauth/callback/, or /login/oauth2/code/ here: those are owned
+        // by higher-precedence chains (worker-hub, oauth2Login) and never reach this chain, so any skip
+        // here was dead. The only live carve-out is the optional dev trigger, matched by the SAME
+        // PathPatternRequestMatcher the authorize rule uses (DEV_TRIGGER_MATCHER) so the two cannot drift.
+        if (devTriggerEnabled && DEV_TRIGGER_MATCHER.matches(request)) {
             return false;
         }
         return true;

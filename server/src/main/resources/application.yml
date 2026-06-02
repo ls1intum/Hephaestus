@@ -190,6 +190,10 @@ hephaestus:
             delete-user:
                 capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_DELETE_USER_CAPACITY:3}
                 period: ${HEPHAESTUS_AUTH_RATE_LIMIT_DELETE_USER_PERIOD:1h}
+            # POST /user/exports + GET /user/exports/{id}/download — keyed by account, IP fallback
+            export:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_CAPACITY:10}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_PERIOD:1h}
 
     host-url: https://hephaestus.ase.cit.tum.de/
 

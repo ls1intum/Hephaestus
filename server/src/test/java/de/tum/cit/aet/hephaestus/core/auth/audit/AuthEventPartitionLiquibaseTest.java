@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -108,6 +109,43 @@ class AuthEventPartitionLiquibaseTest {
             assertThat(rowCount(statement, "auth_event_default"))
                 .as("a current-dated row must NOT fall into the DEFAULT partition")
                 .isZero();
+        }
+    }
+
+    /**
+     * Proof for the {@code -13-} append-only immutability trigger (context="prod", so the ddl-auto test
+     * tier never exercises it). Against the real migrated schema: a plain UPDATE and a DELETE are
+     * rejected; ONLY the GDPR Art. 17 redaction (NULL the three PII columns, nothing else) is permitted.
+     * This pins the binding compliance control that {@code AccountPurger.anonymizeAuditRows} relies on.
+     */
+    @Test
+    void authEventIsAppendOnly_blocksMutationExceptGdprRedaction() throws Exception {
+        try (Connection connection = newConnection(); Statement statement = connection.createStatement()) {
+            long id = nextAuthEventId(statement);
+            statement.executeUpdate(
+                "INSERT INTO auth_event (id, occurred_at, event_type, result, ip_inet, user_agent, details) " +
+                    "VALUES (" +
+                    id +
+                    ", now(), 'LOGIN', 'SUCCESS', '203.0.113.7', 'UA', '{\"k\":1}'::jsonb)"
+            );
+
+            // GDPR redaction (NULL the three PII columns, nothing else) is permitted.
+            int redacted = statement.executeUpdate(
+                "UPDATE auth_event SET ip_inet = NULL, user_agent = NULL, details = NULL WHERE id = " + id
+            );
+            assertThat(redacted).as("GDPR Art.17 redaction must be permitted").isEqualTo(1);
+
+            // A non-redaction UPDATE is rejected.
+            assertThatThrownBy(() ->
+                statement.executeUpdate("UPDATE auth_event SET result = 'FAILURE' WHERE id = " + id)
+            )
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessageContaining("append-only");
+
+            // A DELETE is rejected (retention is enforced by dropping partitions, never row DELETE).
+            assertThatThrownBy(() -> statement.executeUpdate("DELETE FROM auth_event WHERE id = " + id))
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessageContaining("append-only");
         }
     }
 

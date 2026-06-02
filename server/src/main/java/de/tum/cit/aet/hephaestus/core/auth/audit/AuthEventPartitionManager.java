@@ -113,6 +113,14 @@ public class AuthEventPartitionManager {
         }
     }
 
+    /**
+     * Above this many DROPs in one run we log a WARN — steady state is exactly one partition/month, so a
+     * larger batch is worth noticing (clock skew, first deploy against a seeded DB, post-outage backlog).
+     * We do NOT cap the drops: an expired partition is out of the write window and dropping it is safe +
+     * idempotent, and retaining it would breach the GDPR retention window. Observe, don't truncate.
+     */
+    static final int DROP_COUNT_WARN_THRESHOLD = 3;
+
     /** Creates the current month plus {@link #CREATE_AHEAD_MONTHS} ahead if missing. */
     private int ensurePartitions(YearMonth current) {
         int created = 0;
@@ -198,9 +206,20 @@ public class AuthEventPartitionManager {
     }
 
     private int dropExpiredPartitions(YearMonth current) {
-        List<YearMonth> existing = existingMonthlyPartitions();
+        warnIfDefaultPartitionHasRows();
+        List<YearMonth> toDrop = partitionsToDrop(existingMonthlyPartitions(), current);
+        if (toDrop.size() > DROP_COUNT_WARN_THRESHOLD) {
+            // Anomalous batch — surface it, but still drop them all (retaining expired partitions would
+            // breach the GDPR retention window; the DROP is safe + idempotent out of the write window).
+            log.warn(
+                "auth.audit: dropping {} expired partitions in one run (steady state is 1) — investigate " +
+                    "clock skew / backfill / first-deploy backlog. Nominated: {}",
+                toDrop.size(),
+                toDrop
+            );
+        }
         int dropped = 0;
-        for (YearMonth ym : partitionsToDrop(existing, current)) {
+        for (YearMonth ym : toDrop) {
             String name = partitionName(ym);
             try {
                 // Plain DROP: dropping a partition takes a brief ACCESS EXCLUSIVE lock on the parent,
@@ -208,12 +227,36 @@ public class AuthEventPartitionManager {
                 // IF EXISTS is idempotent (a concurrent drop / lost lock race is harmless).
                 jdbcTemplate.execute("DROP TABLE IF EXISTS " + name);
                 dropped++;
-                log.info("auth.audit: dropped expired partition {} (retention {} months)", name, RETENTION_MONTHS);
+                // WARN, not INFO: dropping audit data is irreversible and operationally significant.
+                log.warn("auth.audit: dropped expired partition {} (retention {} months)", name, RETENTION_MONTHS);
             } catch (RuntimeException e) {
                 log.warn("auth.audit: failed to drop expired partition {}", name, e);
             }
         }
         return dropped;
+    }
+
+    /**
+     * The {@link #DEFAULT_PARTITION} catch-all should always be empty: rows land there only when
+     * create-ahead has failed to provision the current month's partition (e.g. a leftover DEFAULT row
+     * makes {@code CREATE TABLE ... PARTITION OF} fail with "partition constraint … would be violated by
+     * some row"). Surface that as a WARN so the otherwise-silent create-ahead failure is detectable.
+     */
+    private void warnIfDefaultPartitionHasRows() {
+        try {
+            Long rows = jdbcTemplate.queryForObject("SELECT count(*) FROM " + DEFAULT_PARTITION, Long.class);
+            if (rows != null && rows > 0) {
+                log.warn(
+                    "auth.audit: {} has {} row(s) — create-ahead is failing and new auth events are falling " +
+                        "into the catch-all. Provision the missing monthly partition(s) and move these rows " +
+                        "before they block partition creation.",
+                    DEFAULT_PARTITION,
+                    rows
+                );
+            }
+        } catch (RuntimeException e) {
+            log.debug("auth.audit: could not inspect {} row count", DEFAULT_PARTITION, e);
+        }
     }
 
     private List<YearMonth> existingMonthlyPartitions() {

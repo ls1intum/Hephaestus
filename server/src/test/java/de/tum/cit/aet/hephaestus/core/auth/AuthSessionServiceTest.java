@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipal;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationCacheEvictor;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -59,7 +58,6 @@ class AuthSessionServiceTest extends BaseUnitTest {
         issuedJwtRepository = mock(IssuedJwtRepository.class);
         accountRepository = mock(AccountRepository.class);
         jwtIssuer = mock(HephaestusJwtIssuer.class);
-        RevocationCacheEvictor evictor = mock(RevocationCacheEvictor.class);
         AuthProperties properties = mock(AuthProperties.class);
         AuthEventLogger eventLogger = new AuthEventLogger(mock(AuthEventWriter.class));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -76,7 +74,6 @@ class AuthSessionServiceTest extends BaseUnitTest {
             accountRepository,
             jwtIssuer,
             eventLogger,
-            evictor,
             properties,
             clock,
             new AuthMetrics(meterRegistry)

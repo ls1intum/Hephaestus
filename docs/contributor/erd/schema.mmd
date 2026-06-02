@@ -123,7 +123,7 @@ erDiagram
         BIGINT git_provider_id FK
         BIGINT workspace_id FK
         BIGINT identity_link_id FK
-        INET ip_inet "NOT NULL"
+        INET ip_inet
         VARCHAR(512) user_agent
         JSONB details
     }
@@ -139,7 +139,7 @@ erDiagram
         BIGINT git_provider_id FK
         BIGINT workspace_id FK
         BIGINT identity_link_id FK
-        INET ip_inet "NOT NULL"
+        INET ip_inet
         VARCHAR(512) user_agent
         JSONB details
     }
@@ -155,7 +155,7 @@ erDiagram
         BIGINT git_provider_id FK
         BIGINT workspace_id FK
         BIGINT identity_link_id FK
-        INET ip_inet "NOT NULL"
+        INET ip_inet
         VARCHAR(512) user_agent
         JSONB details
     }
@@ -171,7 +171,7 @@ erDiagram
         BIGINT git_provider_id FK
         BIGINT workspace_id FK
         BIGINT identity_link_id FK
-        INET ip_inet "NOT NULL"
+        INET ip_inet
         VARCHAR(512) user_agent
         JSONB details
     }
@@ -187,7 +187,7 @@ erDiagram
         BIGINT git_provider_id FK
         BIGINT workspace_id FK
         BIGINT identity_link_id FK
-        INET ip_inet "NOT NULL"
+        INET ip_inet
         VARCHAR(512) user_agent
         JSONB details
     }
@@ -517,7 +517,6 @@ erDiagram
         BYTEA private_key_pem "NOT NULL"
         BOOLEAN active "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ rotated_at
         VARCHAR(64) encryption_key_id "NOT NULL"
     }
 

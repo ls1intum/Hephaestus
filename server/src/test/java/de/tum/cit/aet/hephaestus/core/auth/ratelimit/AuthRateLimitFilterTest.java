@@ -65,7 +65,8 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
             overrides.length > 0 ? overrides[0] : new AuthRateLimitProperties.Limit(20, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(60, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(10, Duration.ofMinutes(1)),
-            new AuthRateLimitProperties.Limit(3, Duration.ofHours(1))
+            new AuthRateLimitProperties.Limit(3, Duration.ofHours(1)),
+            new AuthRateLimitProperties.Limit(10, Duration.ofHours(1))
         );
     }
 
@@ -104,6 +105,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1)),
+            new AuthRateLimitProperties.Limit(1, Duration.ofHours(1)),
             new AuthRateLimitProperties.Limit(1, Duration.ofHours(1))
         );
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/refresh");

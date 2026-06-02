@@ -119,7 +119,10 @@ public class Account {
     public enum Status {
         ACTIVE,
         SUSPENDED,
-        /** Soft-delete cooldown — account is invisible but recoverable for 48h. */
+        /**
+         * Soft-deleted: sessions revoked and login blocked immediately; the row is purged after the
+         * 48h cooldown ({@code AccountHardDeleteSweeper}). There is no self-service recovery path today.
+         */
         DELETING,
         DELETED,
     }

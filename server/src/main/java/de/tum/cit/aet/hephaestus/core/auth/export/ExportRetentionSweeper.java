@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.core.auth.export;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,17 +45,8 @@ public class ExportRetentionSweeper {
 
     @Transactional
     public int expireNow() {
-        Instant now = Instant.now(clock);
-        List<Long> ids = accountExportRepository.findReadyExpiredIds(now);
-        for (Long id : ids) {
-            accountExportRepository
-                .findById(id)
-                .ifPresent(e -> {
-                    e.setStatus(AccountExport.Status.EXPIRED);
-                    e.setPayload(null);
-                    accountExportRepository.save(e);
-                });
-        }
-        return ids.size();
+        // Single bulk UPDATE — flips status to EXPIRED and frees the payload without loading the
+        // (large) BYTEA blobs into the persistence context.
+        return accountExportRepository.expireReadyBefore(Instant.now(clock));
     }
 }

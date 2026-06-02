@@ -69,7 +69,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         OAUTH_AUTHORIZATION("oauth-authz", false),
         REFRESH("refresh", true),
         IMPERSONATE("impersonate", true),
-        DELETE_USER("delete-user", true);
+        DELETE_USER("delete-user", true),
+        // GDPR Art. 20 export: cap POST /user/exports (the async assembly). Account-scoped (JWT sub)
+        // with IP fallback — the route requires isAuthenticated(), so sub is normally present.
+        EXPORT("export", true);
 
         private final String namespace;
         /** Whether the limit keys by account (with IP fallback) vs. always by IP. */
@@ -97,8 +100,20 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
         AuthRateLimitProperties.Limit limit = limitFor(endpoint);
         String key = resolveBucketKey(endpoint, request);
-        Bucket bucket = bucketResolver.resolve(key, configFor(limit));
-        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+        ConsumptionProbe probe;
+        try {
+            Bucket bucket = bucketResolver.resolve(key, configFor(limit));
+            probe = bucket.tryConsumeAndReturnRemaining(1);
+        } catch (RuntimeException e) {
+            // Fail OPEN, deliberately. The bucket store (Postgres-backed in prod) can blip — a DB
+            // hiccup or lock-timeout must not turn the auth endpoints into a hard outage, and worse,
+            // failing closed here would let an attacker DoS auth by driving the limiter into contention.
+            // We surface the degradation as a metric + WARN so it is not silent.
+            metrics.recordRateLimitBackendError();
+            log.warn("Auth rate limit backend error (failing open): endpoint={} key={}", endpoint, key, e);
+            chain.doFilter(request, response);
+            return;
+        }
 
         if (probe.isConsumed()) {
             chain.doFilter(request, response);
@@ -141,6 +156,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         if ("DELETE".equals(method) && path.equals("/user")) {
             return Endpoint.DELETE_USER;
         }
+        // GDPR export: cap ONLY the POST that starts an async full-bundle assembly (the expensive,
+        // storage-amplifying op). The download is a cheap ownership+READY-gated blob read — rate-limiting
+        // it with the same budget would penalise legitimate polling.
+        if ("POST".equals(method) && path.equals("/user/exports")) {
+            return Endpoint.EXPORT;
+        }
         return null;
     }
 
@@ -150,6 +171,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             case REFRESH -> properties.refresh();
             case IMPERSONATE -> properties.impersonate();
             case DELETE_USER -> properties.deleteUser();
+            case EXPORT -> properties.export();
         };
     }
 
@@ -179,19 +201,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Resolves the client IP for IP-keyed buckets from {@code getRemoteAddr()} — and ONLY that.
-     *
-     * <p><strong>Why not parse X-Forwarded-For here.</strong> Production runs with
-     * {@code server.forward-headers-strategy: native} (see {@code application-prod.yml}), so Tomcat's
-     * {@code RemoteIpValve} runs BEFORE this filter: it consumes {@code X-Forwarded-For}, validates it
-     * against the configured trusted-proxy set, and rewrites {@code getRemoteAddr()} to the real client
-     * address. A second, bespoke XFF re-parse in this filter would then double-count the proxy hops and
-     * key the bucket off the wrong (or a spoofable) entry — defeating the very pre-auth limit it guards.
-     * Delegating to the container is the single source of truth for proxy trust; {@code getRemoteAddr()}
-     * is the only value a client cannot forge once the valve has run.
-     *
-     * <p>In dev (no forward-headers strategy) {@code getRemoteAddr()} is the direct socket peer, which
-     * is also correct: there is no trusted proxy to attribute the request through.
+     * Client IP for IP-keyed buckets, from {@code getRemoteAddr()} only — never a bespoke X-Forwarded-For
+     * parse. In prod Tomcat's {@code RemoteIpValve} ({@code forward-headers-strategy: native}, trust pinned
+     * by {@code ProxyTrustGuard}) has already validated XFF and rewritten {@code getRemoteAddr()} to the
+     * unforgeable client address; a second parse would double-count hops or key off a spoofable entry. In
+     * dev it is the direct socket peer. The container is the single source of truth for proxy trust.
      */
     String clientIp(HttpServletRequest request) {
         String remote = request.getRemoteAddr();

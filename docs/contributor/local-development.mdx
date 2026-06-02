@@ -49,12 +49,12 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    pnpm dev
    ```
 
-   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL and Keycloak containers are brought up automatically.
+   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL container is brought up automatically.
 
    Prefer plain terminals? Run the two sides yourself:
 
    ```bash
-   pnpm dev:server   # terminal 1 — brings up Postgres/Keycloak, then Spring Boot
+   pnpm dev:server   # terminal 1 — brings up Postgres, then Spring Boot
    pnpm dev:webapp   # terminal 2 — Vite dev server
    ```
 

@@ -79,6 +79,8 @@ public class AuthMetrics {
 
     private static final String LOGIN_METRIC = "auth.login";
     private static final String RATELIMIT_BLOCKED_METRIC = "auth.ratelimit.blocked";
+    private static final String RATELIMIT_BACKEND_ERROR_METRIC = "auth.ratelimit.backend_error";
+    private static final String AUDIT_WRITE_FAILED_METRIC = "auth.audit.write_failed";
     private static final String REFRESH_RESULT_METRIC = "auth.token.refresh.result";
     private static final String REVOCATION_CHECK_FAILED_METRIC = "auth.revocation.check_failed";
 
@@ -87,6 +89,8 @@ public class AuthMetrics {
     private final Counter loginFailure;
     private final Timer tokenRefresh;
     private final Counter revocationCheckFailed;
+    private final Counter rateLimitBackendError;
+    private final Counter auditWriteFailed;
 
     public AuthMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -100,6 +104,19 @@ public class AuthMetrics {
             .description(
                 "Fail-closed revocation lookups in RevocationAwareJwtDecoder (DB unreachable → 401). " +
                     "A spike means a DB outage is mass-rejecting otherwise-valid cookie-JWTs."
+            )
+            .register(registry);
+        this.rateLimitBackendError = Counter.builder(RATELIMIT_BACKEND_ERROR_METRIC)
+            .description(
+                "Rate-limit backend failures in AuthRateLimitFilter (bucket store unreachable → fail-open). " +
+                    "A spike means the limiter is degraded and auth endpoints are temporarily uncapped."
+            )
+            .register(registry);
+        this.auditWriteFailed = Counter.builder(AUDIT_WRITE_FAILED_METRIC)
+            .description(
+                "Auth-audit persist failures in AuthEventWriter (the sequence value was already consumed → " +
+                    "a permanent gap in auth_event.id). Swallowed so audit never breaks the request, but a " +
+                    "nonzero rate means the tamper-evident trail is silently losing events."
             )
             .register(registry);
     }
@@ -159,5 +176,23 @@ public class AuthMetrics {
      */
     public void recordRevocationCheckFailed() {
         revocationCheckFailed.increment();
+    }
+
+    /**
+     * Count one rate-limit backend failure ({@code AuthRateLimitFilter} could not reach the bucket
+     * store and failed open). Makes a degraded limiter observable so an operator can react before it
+     * is silently exploited.
+     */
+    public void recordRateLimitBackendError() {
+        rateLimitBackendError.increment();
+    }
+
+    /**
+     * Count one swallowed auth-audit persist failure ({@code AuthEventWriter} could not save an
+     * {@code AuthEvent} after the id sequence was already advanced). Makes the otherwise-silent gap in
+     * the append-only trail alertable.
+     */
+    public void recordAuditWriteFailed() {
+        auditWriteFailed.increment();
     }
 }

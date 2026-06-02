@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.auth.spi.OAuthLoginDefaultsProvider;
@@ -25,8 +26,16 @@ import org.springframework.core.env.Profiles;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
@@ -168,13 +177,51 @@ public class AuthSecurityConfig {
         );
     }
 
+    /**
+     * Resolver that adds PKCE (RFC 7636 / RFC 9700) to every login authorization request. Spring
+     * only auto-enables PKCE for <em>public</em> clients; our login registrations are confidential
+     * ({@code CLIENT_SECRET_BASIC}), so we opt in explicitly. RFC 9700 (Jan 2025) requires PKCE for
+     * all OAuth clients — for GitHub (plain OAuth2, no {@code id_token}/nonce) it is the primary
+     * defence against authorization-code injection alongside {@code state}. The {@code code_verifier}
+     * is stored on the {@code OAuth2AuthorizationRequest} and round-trips inside the sealed
+     * auth-request cookie ({@link CookieOAuth2AuthorizationRequestRepository}).
+     */
+    private static OAuth2AuthorizationRequestResolver pkceResolver(ClientRegistrationRepository repo) {
+        DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
+            repo,
+            "/oauth2/authorization"
+        );
+        resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
+        return resolver;
+    }
+
+    /**
+     * OAuth2 (non-OIDC) user service. Routes the default {@code github} registration through
+     * {@link GitHubEmailOAuth2UserService} (fetches the primary+verified email from
+     * {@code api.github.com/user/emails}); every other registration uses the framework default. Scoped
+     * to {@code github} ONLY — workspace {@code gh-ws-*} providers may be GitHub Enterprise with a
+     * different API host, which this enricher does not know. OIDC providers (gitlab-lrz, gl-ws-*) never
+     * reach this service; they go through the OidcUserService and expose {@code email_verified} natively.
+     */
+    @Bean
+    public OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService() {
+        var github = new GitHubEmailOAuth2UserService();
+        var fallback = new DefaultOAuth2UserService();
+        return request ->
+            (GITHUB_REGISTRATION_ID.equals(request.getClientRegistration().getRegistrationId())
+                ? github
+                : fallback
+            ).loadUser(request);
+    }
+
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE + 10)
     public SecurityFilterChain oauthLoginSecurityFilterChain(
         HttpSecurity http,
         CookieOAuth2AuthorizationRequestRepository cookieRepo,
         HephaestusAuthSuccessHandler successHandler,
-        AuthRateLimitFilter authRateLimitFilter
+        AuthRateLimitFilter authRateLimitFilter,
+        ClientRegistrationRepository clientRegistrationRepository
     ) throws Exception {
         http
             .securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
@@ -185,7 +232,14 @@ public class AuthSecurityConfig {
                 req.anyRequest().permitAll(); // oauth2Login handles the actual auth
             })
             .oauth2Login(oauth -> {
-                oauth.authorizationEndpoint(endpoint -> endpoint.authorizationRequestRepository(cookieRepo));
+                oauth.authorizationEndpoint(endpoint ->
+                    endpoint
+                        .authorizationRequestRepository(cookieRepo)
+                        .authorizationRequestResolver(pkceResolver(clientRegistrationRepository))
+                );
+                // GitHub: enrich attributes with the primary+verified email from /user/emails so
+                // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
+                oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
                 oauth.successHandler(successHandler);
                 oauth.failureUrl("/auth/error?code=oauth_failure");
             });

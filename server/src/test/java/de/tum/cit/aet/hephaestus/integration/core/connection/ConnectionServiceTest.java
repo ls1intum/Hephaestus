@@ -40,6 +40,7 @@ class ConnectionServiceTest extends BaseUnitTest {
     private CredentialBundleConverter credentialConverter;
     private ConnectionService service;
     private Workspace workspace;
+    private org.springframework.context.ApplicationEventPublisher events;
 
     @BeforeEach
     void setUp() {
@@ -47,13 +48,36 @@ class ConnectionServiceTest extends BaseUnitTest {
         // Real converter so the credential-purge case operates on a genuine AES-GCM blob,
         // not a mock stand-in.
         credentialConverter = new CredentialBundleConverter("a".repeat(32), "dev");
-        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter);
+        events = Mockito.mock(org.springframework.context.ApplicationEventPublisher.class);
+        service = new ConnectionService(connectionRepository, auditRepository, credentialConverter, events);
         workspace = new Workspace();
         workspace.setId(7L);
         // transition() returns the saved entity; echo it back so callers see the mutated row.
         Mockito.lenient()
             .when(connectionRepository.save(any(Connection.class)))
             .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void transition_publishesStateChangedEventForCacheEviction() {
+        Connection connection = pendingConnection();
+        // JPA assigns the id on persist; the mocked save echoes the arg, so set it explicitly to mimic
+        // a persisted row (publishStateChanged skips id-less rows). This proves the eviction event fires.
+        org.springframework.test.util.ReflectionTestUtils.setField(connection, "id", 99L);
+
+        service.transition(
+            connection,
+            new TransitionRequest(
+                IntegrationState.ACTIVE,
+                "INSTALL_BIND",
+                "GITHUB_WEBHOOK",
+                "actor-1",
+                "corr-evt",
+                "ok"
+            )
+        );
+
+        verify(events).publishEvent(new ConnectionStateChangedEvent(99L, IntegrationKind.GITHUB));
     }
 
     @Test

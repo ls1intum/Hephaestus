@@ -5,6 +5,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -41,20 +42,36 @@ public class AuthIntentCookie {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final SecretKeySpec key;
+    private final Clock clock;
 
     public AuthIntentCookie(byte[] aesKeyBytes) {
+        this(aesKeyBytes, Clock.systemUTC());
+    }
+
+    /** Test seam: inject a fixed clock to assert the server-side age check. */
+    AuthIntentCookie(byte[] aesKeyBytes, Clock clock) {
         if (aesKeyBytes.length != 32) {
             throw new IllegalArgumentException("AES-GCM intent key must be 32 bytes, got " + aesKeyBytes.length);
         }
         this.key = new SecretKeySpec(aesKeyBytes, "AES");
+        this.clock = clock;
     }
 
-    /** The pre-OAuth intent — populated from /auth/login query params, consumed in the success handler. */
+    /**
+     * The pre-OAuth intent — populated from /auth/login query params, consumed in the success handler.
+     *
+     * <p>{@code issuedAt} (epoch millis) is stamped at write time and lives inside the sealed,
+     * AES-GCM-authenticated plaintext, so it cannot be forged or replayed past the TTL. The cookie
+     * {@code Max-Age} is client-controlled and therefore only a hint; this field is the authoritative
+     * freshness check (see {@link AuthIntentCookie#read}). An old cookie minted before this field
+     * existed deserializes with {@code issuedAt == 0L} and is rejected as stale.
+     */
     public record Intent(
         @Nullable String workspaceSlug,
         @Nullable String returnTo,
         Mode mode,
-        @Nullable Long linkingAccountId
+        @Nullable Long linkingAccountId,
+        long issuedAt
     ) {
         public enum Mode {
             /** Fresh login — JIT-create Account on first IdP subject we've never seen. */
@@ -64,11 +81,11 @@ public class AuthIntentCookie {
         }
 
         public static Intent login(@Nullable String workspaceSlug, @Nullable String returnTo) {
-            return new Intent(workspaceSlug, returnTo, Mode.LOGIN, null);
+            return new Intent(workspaceSlug, returnTo, Mode.LOGIN, null, System.currentTimeMillis());
         }
 
         public static Intent link(Long currentAccountId, @Nullable String returnTo) {
-            return new Intent(null, returnTo, Mode.LINK, currentAccountId);
+            return new Intent(null, returnTo, Mode.LINK, currentAccountId, System.currentTimeMillis());
         }
     }
 
@@ -100,7 +117,16 @@ public class AuthIntentCookie {
                 try {
                     byte[] decoded = Base64.getUrlDecoder().decode(c.getValue());
                     byte[] plain = decrypt(decoded);
-                    return MAPPER.readValue(plain, Intent.class);
+                    Intent intent = MAPPER.readValue(plain, Intent.class);
+                    long ageSeconds = (clock.millis() - intent.issuedAt()) / 1000L;
+                    if (ageSeconds < 0 || ageSeconds > MAX_COOKIE_AGE_SECONDS) {
+                        // Authoritative server-side freshness gate — the cookie Max-Age is
+                        // client-controlled and cannot be trusted. Negative age = future-dated
+                        // (skew/forgery); over-TTL = replay of an expired intent. Either way: absent.
+                        log.warn("auth.oauth: rejecting stale/future auth-intent cookie (ageSeconds={})", ageSeconds);
+                        return null;
+                    }
+                    return intent;
                 } catch (RuntimeException ex) {
                     log.warn("auth.oauth: rejecting tampered/expired auth-intent cookie: {}", ex.getMessage());
                     return null;

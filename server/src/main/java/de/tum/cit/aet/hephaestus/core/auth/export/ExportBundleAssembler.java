@@ -11,7 +11,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.ZoneOffset;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -89,7 +89,7 @@ public class ExportBundleAssembler {
             account.getId(),
             account.getDisplayName(),
             account.getPrimaryEmail(),
-            account.getAppRole().name(),
+            // appRole deliberately not disclosed here — see ExportBundle.Profile (Art. 20(1) scope).
             account.getStatus().name(),
             account.getCreatedAt()
         );
@@ -113,10 +113,18 @@ public class ExportBundleAssembler {
             .map(p -> new ExportBundle.Preferences(p.participateInResearch(), p.aiReviewEnabled()))
             .orElse(null);
 
-        Instant since = Instant.now(clock).minus(AUTH_EVENT_WINDOW_MONTHS * 30L, ChronoUnit.DAYS);
+        // Real calendar months (not 30-day approximations) so this window matches the partition
+        // retention (AuthEventPartitionManager.RETENTION_MONTHS), which is also 12 calendar months.
+        Instant since = Instant.now(clock).atZone(ZoneOffset.UTC).minusMonths(AUTH_EVENT_WINDOW_MONTHS).toInstant();
         List<ExportBundle.AuthEvent> authEvents = authEventRepository
             .findByAccountSince(accountId, since)
             .stream()
+            // GDPR Art. 20(4): the export "shall not adversely affect the rights and freedoms of
+            // others." Impersonation rows are authored about this subject BY ANOTHER account (the
+            // operator) and carry that operator's id (acting_account_id) + operator-supplied reason
+            // (details) — operator-accountability audit records, not data this subject provided
+            // (Art. 20(1)). Excluded from the portable bundle; they remain in the immutable auth_event log.
+            .filter(e -> !isImpersonationEvent(e))
             .map(ExportBundleAssembler::toAuthEvent)
             .toList();
 
@@ -146,12 +154,23 @@ public class ExportBundleAssembler {
     }
 
     private static ExportBundle.AuthEvent toAuthEvent(de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent e) {
+        // NOTE (Art. 20(4) chokepoint): this mapper deliberately never reads e.getActingAccountId()
+        // or e.getDetails() — both can reference / be authored by another account. Do NOT add them.
         return new ExportBundle.AuthEvent(
             e.getId() != null ? e.getId().getOccurredAt() : null,
             e.getEventType() != null ? e.getEventType().name() : null,
             e.getResult() != null ? e.getResult().name() : null,
             e.getIpInet(),
             e.getUserAgent()
+        );
+    }
+
+    /** Impersonation events are operator-authored records about the subject; excluded under Art. 20(4). */
+    private static boolean isImpersonationEvent(de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent e) {
+        de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType t = e.getEventType();
+        return (
+            t == de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType.IMPERSONATION_BEGIN ||
+            t == de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent.EventType.IMPERSONATION_END
         );
     }
 }

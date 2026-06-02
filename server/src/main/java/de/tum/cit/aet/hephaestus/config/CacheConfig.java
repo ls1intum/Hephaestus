@@ -49,11 +49,13 @@ public class CacheConfig {
     private static final Duration MENTOR_ASPECT_TTL = Duration.ofMinutes(5);
 
     /**
-     * TTL for the JWT revocation lookup. Short by design — NATS will invalidate on revocation
-     * (later commit); Caffeine TTL is only the safety net. 1 minute keeps a stale-cached
-     * revoked-token window under 60s without thrashing the DB.
+     * TTL for the JWT revocation NEGATIVE cache. Only REVOKED verdicts are cached (see
+     * {@code RevocationAwareJwtDecoder}), so this is not a staleness window — a cached REVOKED entry
+     * can never be wrong (revocation is monotonic). It only bounds how long a revocation is remembered
+     * locally to shed token-replay load; sized to the access-token lifetime so a revoked token is
+     * remembered for as long as it could still be presented.
      */
-    private static final Duration AUTH_JWT_REVOKED_TTL = Duration.ofMinutes(1);
+    private static final Duration AUTH_JWT_REVOKED_TTL = Duration.ofMinutes(15);
 
     /** Max entries for the long-lived caches. */
     private static final long LONG_MAX = 1000L;

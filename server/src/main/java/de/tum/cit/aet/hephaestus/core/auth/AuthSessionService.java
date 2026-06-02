@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationCacheEvictor;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRepository;
 import io.micrometer.core.instrument.Timer;
@@ -37,7 +36,6 @@ public class AuthSessionService {
     private final AccountRepository accountRepository;
     private final HephaestusJwtIssuer jwtIssuer;
     private final AuthEventLogger authEventLogger;
-    private final RevocationCacheEvictor revocationCacheEvictor;
     private final AuthProperties properties;
     private final Clock clock;
     private final AuthMetrics metrics;
@@ -48,7 +46,6 @@ public class AuthSessionService {
         AccountRepository accountRepository,
         HephaestusJwtIssuer jwtIssuer,
         AuthEventLogger authEventLogger,
-        RevocationCacheEvictor revocationCacheEvictor,
         AuthProperties properties,
         Clock clock,
         AuthMetrics metrics
@@ -58,7 +55,6 @@ public class AuthSessionService {
         this.accountRepository = accountRepository;
         this.jwtIssuer = jwtIssuer;
         this.authEventLogger = authEventLogger;
-        this.revocationCacheEvictor = revocationCacheEvictor;
         this.properties = properties;
         this.clock = clock;
         this.metrics = metrics;
@@ -68,7 +64,6 @@ public class AuthSessionService {
     @Transactional
     public void logout(Long accountId, UUID jti, HttpServletResponse response) {
         issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.LOGOUT);
-        revocationCacheEvictor.evictAfterCommit(jti);
         authEventLogger.event(AuthEvent.EventType.LOGOUT, AuthEvent.Result.SUCCESS).account(accountId).record();
         clearCookie(response);
     }
@@ -96,7 +91,6 @@ public class AuthSessionService {
                 clearCookie(response);
                 return;
             }
-            revocationCacheEvictor.evictAfterCommit(jti);
             // Account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must not be able to
             // rotate its session into a fresh JWT — that would keep a suspended/deleting principal alive
             // indefinitely. The presenting token is already revoked above; we simply do NOT re-mint, clear
@@ -146,36 +140,27 @@ public class AuthSessionService {
         return issuedJwtRepository.findActiveByAccountId(accountId, clock.instant());
     }
 
-    /** Revoke a single session, only if it belongs to {@code accountId}. */
+    /**
+     * Revoke a single session, only if it belongs to {@code accountId}. Atomic ownership-scoped UPDATE
+     * (no findById-then-revoke TOCTOU): a row not owned by {@code accountId}, missing, or already
+     * revoked simply affects 0 rows. The {@code accountId} predicate is the access control.
+     */
     @Transactional
     public void revokeSession(Long accountId, UUID jti) {
-        issuedJwtRepository
-            .findById(jti)
-            .filter(j -> j.getAccountId().equals(accountId))
-            .ifPresent(j -> {
-                issuedJwtRepository.revoke(jti, clock.instant(), RevokedReason.ADMIN_REVOKE);
-                revocationCacheEvictor.evictAfterCommit(jti);
-            });
+        issuedJwtRepository.revokeOwned(jti, accountId, clock.instant(), RevokedReason.SELF_REVOKE);
     }
 
     /** Sign out everywhere except the presenting session. */
     @Transactional
     public void revokeAllExcept(Long accountId, UUID currentJti) {
-        // Snapshot the jtis being revoked BEFORE the bulk update so we can evict each from the
-        // local revocation cache; the bulk UPDATE returns only a count.
-        List<UUID> revoking = issuedJwtRepository
-            .findActiveByAccountId(accountId, clock.instant())
-            .stream()
-            .map(IssuedJwt::getJti)
-            .filter(j -> !j.equals(currentJti))
-            .toList();
+        // The negative-cache decoder re-checks every ACTIVE token against the DB, so the bulk revoke
+        // takes effect on all pods within DB visibility lag — no per-jti cache eviction needed.
         issuedJwtRepository.revokeAllForAccountExcept(
             accountId,
             currentJti,
             clock.instant(),
             RevokedReason.SIGN_OUT_EVERYWHERE
         );
-        revoking.forEach(revocationCacheEvictor::evictAfterCommit);
     }
 
     public void clearCookie(HttpServletResponse response) {

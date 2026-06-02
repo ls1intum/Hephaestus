@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountRoleQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,14 +18,9 @@ public class AccountRoleQueryService implements AccountRoleQuery {
 
     private static final Logger log = LoggerFactory.getLogger(AccountRoleQueryService.class);
 
-    private final IdentityLinkRepository identityLinkRepository;
     private final AccountFeatureRepository accountFeatureRepository;
 
-    public AccountRoleQueryService(
-        IdentityLinkRepository identityLinkRepository,
-        AccountFeatureRepository accountFeatureRepository
-    ) {
-        this.identityLinkRepository = identityLinkRepository;
+    public AccountRoleQueryService(AccountFeatureRepository accountFeatureRepository) {
         this.accountFeatureRepository = accountFeatureRepository;
     }
 
@@ -38,13 +31,7 @@ public class AccountRoleQueryService implements AccountRoleQuery {
             return false;
         }
         try {
-            return identityLinkRepository
-                .findAll()
-                .stream()
-                .filter(il -> il.getDisabledAt() == null)
-                .filter(il -> login.equalsIgnoreCase(il.getUsernameAtSignup()))
-                .map(IdentityLink::getAccount)
-                .anyMatch(a -> accountFeatureRepository.existsByIdAccountIdAndIdFlag(a.getId(), flag));
+            return accountFeatureRepository.existsActiveFeatureForLogin(login, flag);
         } catch (RuntimeException e) {
             log.error("auth.role: feature-flag check failed for login={}, flag={}", login, flag, e);
             return false; // fail-closed

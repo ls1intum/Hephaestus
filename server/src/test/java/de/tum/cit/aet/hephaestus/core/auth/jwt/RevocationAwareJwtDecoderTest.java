@@ -6,6 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.nimbusds.jose.JOSEObjectType;
@@ -240,15 +243,48 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     }
 
     @Test
-    void cachedRevokedStatusShortCircuitsWithoutHittingDb() {
+    void cachedRevokedVerdictShortCircuitsWithoutHittingDb() {
         UUID jti = UUID.randomUUID();
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         CacheManager cm = cacheManager();
         Cache cache = cm.getCache(RevocationAwareJwtDecoder.CACHE_NAME);
-        cache.put(jti, RevocationAwareJwtDecoder.Status.REVOKED);
+        cache.put(jti, Boolean.TRUE); // negative cache: only the REVOKED verdict is stored
 
         RevocationAwareJwtDecoder decoder = decoder(repo, cm);
         assertThatThrownBy(() -> decoder.decode(validToken(jti))).isInstanceOf(JwtException.class);
+        verify(repo, never()).findActive(any(), any());
+    }
+
+    @Test
+    void activeTokenIsNeverCached_alwaysHitsDb() {
+        UUID jti = UUID.randomUUID();
+        IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
+        IssuedJwt row = new IssuedJwt(jti, 42L, NOW.plus(Duration.ofMinutes(15)));
+        when(repo.findActive(eq(jti), any())).thenReturn(Optional.of(row));
+        CacheManager cm = cacheManager();
+
+        RevocationAwareJwtDecoder decoder = decoder(repo, cm);
+        decoder.decode(validToken(jti));
+        decoder.decode(validToken(jti));
+
+        // ACTIVE is never cached — both calls hit the DB, so a revoke is visible within DB lag, not TTL.
+        verify(repo, times(2)).findActive(eq(jti), any());
+        assertThat(cm.getCache(RevocationAwareJwtDecoder.CACHE_NAME).get(jti)).isNull();
+    }
+
+    @Test
+    void revokeAfterActiveDecodeTakesEffectImmediately() {
+        UUID jti = UUID.randomUUID();
+        IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
+        IssuedJwt row = new IssuedJwt(jti, 42L, NOW.plus(Duration.ofMinutes(15)));
+        // First request: active. Second request (after a revoke between requests): gone.
+        when(repo.findActive(eq(jti), any())).thenReturn(Optional.of(row)).thenReturn(Optional.empty());
+        RevocationAwareJwtDecoder decoder = decoder(repo, cacheManager());
+
+        assertThat(decoder.decode(validToken(jti)).getId()).isEqualTo(jti.toString());
+        assertThatThrownBy(() -> decoder.decode(validToken(jti)))
+            .isInstanceOf(JwtException.class)
+            .hasMessageContaining("revoked");
     }
 
     /**

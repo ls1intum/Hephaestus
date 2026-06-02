@@ -27,9 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * DB-backed JWK source for Hephaestus-issued JWTs. Acts both as a Spring Security
- * {@link JWKSource} (consumed by {@code NimbusJwtEncoder} and {@code NimbusJwtDecoder})
- * and as the rotation surface for the auth module.
+ * DB-backed JWK source for Hephaestus-issued JWTs. Acts as a Spring Security
+ * {@link JWKSource} (consumed by {@code NimbusJwtEncoder} and {@code NimbusJwtDecoder}).
  *
  * <h2>Bootstrapping</h2>
  * On first run (empty {@code jwt_signing_key} table), {@link #ensureActiveKey()} generates
@@ -47,16 +46,15 @@ import org.springframework.transaction.annotation.Transactional;
  * sign with an unsealed key). Prod auto-generation produces a <em>sealed</em> key (the sealer is
  * enabled there), so a fresh prod boots cleanly; only a pre-existing unsealed row trips the guard.
  *
- * <h2>Rotation</h2>
- * Two active keys at any time. {@link #rotate()} generates a new key, marks the oldest
- * still-active one rotated-but-acceptable for the JWT max TTL, then sweeps. Rotation
- * across pods will be NATS-driven in a later commit; today this service refreshes its
- * in-memory cache from DB at most once per minute.
+ * <h2>Key lifecycle</h2>
+ * A single active key signs all tokens; re-keying today means deploying with a fresh key
+ * (the old row is left {@code active=true} and still verifies until manually retired). Zero-downtime,
+ * NATS-coordinated rotation across pods is not yet implemented — see ADR 0017 for the planned design.
  *
  * <h2>Hot-path</h2>
  * {@link #get(JWKSelector, SecurityContext)} is called on every JWT
- * encode/decode. We resolve from an {@link AtomicReference}-cached {@link JWKSet}; cache is
- * invalidated on rotation and (defensively) refreshed on TTL expiry.
+ * encode/decode. We resolve from an {@link AtomicReference}-cached {@link JWKSet}, refreshed from DB
+ * on TTL expiry ({@value #CACHE_TTL_MILLIS} ms).
  */
 @Service
 @WorkspaceAgnostic("JWT signing keys are system-wide; get() returns the global JWK set, not tenant data")
@@ -90,13 +88,24 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
      * deploys can pre-seed via Liquibase customChange if they need deterministic kids.
      */
     @Transactional
-    public synchronized void ensureActiveKey() {
+    public void ensureActiveKey() {
+        // Fast path: a cheap unlocked read avoids taking the advisory lock on the overwhelmingly common
+        // warm-boot case (key already present). Pure optimisation — the post-lock re-check below is what
+        // actually guarantees a single insert.
+        if (repository.countByActiveTrue() > 0) {
+            return;
+        }
+        // Cold boot: serialize the bootstrap cluster-wide. pg_advisory_xact_lock blocks until this tx
+        // holds (17,1), then auto-releases on commit/rollback. A second pod that raced past the fast-path
+        // read above blocks here, then sees the now-committed key in the re-check and no-ops — so exactly
+        // one active signing identity is ever created. (Replaces the JVM-local `synchronized`, which could
+        // not coordinate across pods.)
+        repository.acquireBootstrapLock();
         if (repository.countByActiveTrue() > 0) {
             return;
         }
         if (isProd() && !sealer.isEnabled()) {
-            // Unreachable in practice (the sealer constructor fails fast in prod when the key is
-            // missing); belt-and-suspenders so we never bootstrap an unsealed key in prod.
+            // Belt-and-suspenders: the sealer ctor already fails fast in prod when the key is missing.
             throw new IllegalStateException(
                 "No JWT signing key present and sealing is disabled. Refusing to bootstrap an unsealed " +
                     "signing key in prod; set hephaestus.security.encryption-key (ADR 0017)."
@@ -137,20 +146,6 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
 
     private boolean isProd() {
         return environment.acceptsProfiles(Profiles.of("prod"));
-    }
-
-    /**
-     * Generate and persist a new signing key; mark the prior newest one
-     * rotated-but-still-accepted. Caller is responsible for publishing the
-     * {@code auth.signing-key.rotated} NATS message — that wiring lands in a later commit.
-     */
-    @Transactional
-    public synchronized String rotate() {
-        JwtSigningKey row = generateNewKeyRow();
-        repository.save(row);
-        cache.set(null);
-        log.info("auth.jwt: rotated to new signing key kid={}", row.getKid());
-        return row.getKid();
     }
 
     private JwtSigningKey generateNewKeyRow() {
@@ -219,11 +214,6 @@ public class JwtSigningKeyService implements JWKSource<SecurityContext> {
     private JWKSet reload() {
         List<JWK> jwks = repository.findActive().stream().map(this::toJwk).toList();
         return new JWKSet(jwks);
-    }
-
-    /** Force a reload — called by the NATS listener once rotation propagation lands. */
-    public void invalidateCache() {
-        cache.set(null);
     }
 
     private JWK toJwk(JwtSigningKey row) {

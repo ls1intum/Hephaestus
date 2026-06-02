@@ -21,12 +21,26 @@ public interface AccountExportRepository extends JpaRepository<AccountExport, Lo
     Optional<AccountExport> findByIdAndAccountId(Long id, Long accountId);
 
     /**
-     * READY exports whose retention window has elapsed. Backs the scheduled sweep that flips them
-     * to EXPIRED and frees the payload. Uses a JPQL projection of the id only to avoid loading
-     * the (potentially large) payload blob into the sweep.
+     * True if the account already has an in-flight export (PENDING or PROCESSING). Backs the
+     * one-in-flight-per-account cap that stops a session from queueing unbounded async full-bundle
+     * assemblies, each persisting a BYTEA blob (DoS / storage-amplification guard).
      */
+    boolean existsByAccountIdAndStatusIn(Long accountId, java.util.Collection<AccountExport.Status> statuses);
+
+    /**
+     * Bulk-expire READY exports past their retention window: flip to EXPIRED and free the payload in
+     * one UPDATE, without loading the (large) BYTEA blobs into the persistence context (the prior
+     * findById-per-id undid the id-only projection). Returns the number of rows affected.
+     */
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
-        "SELECT e.id FROM AccountExport e WHERE e.status = de.tum.cit.aet.hephaestus.core.auth.export.AccountExport.Status.READY AND e.expiresAt < :now"
+        """
+        UPDATE AccountExport e
+           SET e.status = de.tum.cit.aet.hephaestus.core.auth.export.AccountExport.Status.EXPIRED,
+               e.payload = NULL
+         WHERE e.status = de.tum.cit.aet.hephaestus.core.auth.export.AccountExport.Status.READY
+           AND e.expiresAt < :now
+        """
     )
-    List<Long> findReadyExpiredIds(@Param("now") Instant now);
+    int expireReadyBefore(@Param("now") Instant now);
 }

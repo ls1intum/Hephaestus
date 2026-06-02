@@ -36,13 +36,19 @@ public class AuthBeginController {
 
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final AuthIntentCookie authIntentCookie;
+    private final de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver bearerTokenResolver;
+    private final org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
     public AuthBeginController(
         ClientRegistrationRepository clientRegistrationRepository,
-        AuthIntentCookie authIntentCookie
+        AuthIntentCookie authIntentCookie,
+        de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver bearerTokenResolver,
+        de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder jwtDecoder
     ) {
         this.clientRegistrationRepository = clientRegistrationRepository;
         this.authIntentCookie = authIntentCookie;
+        this.bearerTokenResolver = bearerTokenResolver;
+        this.jwtDecoder = jwtDecoder;
     }
 
     @GetMapping("/login")
@@ -63,13 +69,47 @@ public class AuthBeginController {
             return new RedirectView("/auth/error?code=unknown_provider", false);
         }
         String safeReturnTo = ReturnToValidator.safeOrFallback(returnTo);
-        AuthIntentCookie.Intent intent = "link".equalsIgnoreCase(mode)
-            ? AuthIntentCookie.Intent.link(/* linkingAccountId resolved by handler */ null, safeReturnTo)
-            : AuthIntentCookie.Intent.login(workspaceSlug, safeReturnTo);
+        AuthIntentCookie.Intent intent;
+        if ("link".equalsIgnoreCase(mode)) {
+            // Link mode MUST be initiated by an already-authenticated user (secure account linking:
+            // never auto-link to an unauthenticated context — that is the pre-account-takeover bug).
+            // The login chain is stateless and permitAll, so no SecurityContext exists here; we validate
+            // the access cookie ourselves with the SAME primitives the resource-server chain uses
+            // (CookieBearerTokenResolver -> RevocationAwareJwtDecoder), then bind sub = accountId so
+            // AccountProvisioningService attaches the new identity to THIS account.
+            Long currentAccountId = resolveAuthenticatedAccountId(request);
+            if (currentAccountId == null) {
+                log.warn("auth.begin: link mode rejected — no valid session");
+                return new RedirectView("/auth/error?code=link_requires_auth", false);
+            }
+            intent = AuthIntentCookie.Intent.link(currentAccountId, safeReturnTo);
+        } else {
+            intent = AuthIntentCookie.Intent.login(workspaceSlug, safeReturnTo);
+        }
         authIntentCookie.write(response, intent);
         // 302 to Spring's standard initiation endpoint; the OAuth2AuthorizationRequestRedirectFilter
-        // takes over from here, building the upstream redirect with state + PKCE.
+        // takes over from here, building the upstream redirect with state + PKCE (see AuthSecurityConfig).
         String urlEncodedRegistration = URLEncoder.encode(registrationId, StandardCharsets.UTF_8);
         return new RedirectView(OAUTH_INIT_PATH + urlEncodedRegistration, false);
+    }
+
+    /**
+     * The current account id from the access cookie, validated through the same decoder the
+     * resource-server chain uses (signature + exp/iss/aud + revocation). Returns {@code null} when
+     * there is no cookie/header token or the token is invalid/revoked — link mode then fails closed.
+     */
+    @Nullable
+    private Long resolveAuthenticatedAccountId(HttpServletRequest request) {
+        String token = bearerTokenResolver.resolve(request);
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            org.springframework.security.oauth2.jwt.Jwt jwt = jwtDecoder.decode(token);
+            return Long.parseLong(jwt.getSubject());
+        } catch (org.springframework.security.oauth2.jwt.JwtException | NumberFormatException ex) {
+            log.warn("auth.begin: link-mode token rejected: {}", ex.getMessage());
+            return null;
+        }
     }
 }

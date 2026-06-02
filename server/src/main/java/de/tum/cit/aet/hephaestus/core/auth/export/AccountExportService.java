@@ -47,10 +47,40 @@ public class AccountExportService {
         this.clock = clock;
     }
 
-    /** Create a PENDING export for the account and kick off async generation. */
+    /** Statuses that count as "in flight" for the one-export-per-account cap. */
+    private static final java.util.List<AccountExport.Status> IN_FLIGHT = java.util.List.of(
+        AccountExport.Status.PENDING,
+        AccountExport.Status.PROCESSING
+    );
+
+    private static org.springframework.web.server.ResponseStatusException inFlightConflict() {
+        return new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.CONFLICT,
+            "An export is already in progress for this account."
+        );
+    }
+
+    /**
+     * Create a PENDING export for the account and kick off async generation.
+     *
+     * @throws org.springframework.web.server.ResponseStatusException 409 CONFLICT if the account
+     *     already has a PENDING/PROCESSING export — caps concurrent async bundle assemblies at one
+     *     per account (DoS / storage-amplification guard).
+     */
     @Transactional
     public AccountExport requestExport(Long accountId) {
-        AccountExport export = accountExportRepository.save(new AccountExport(accountId));
+        // Fast-path friendly check; the authoritative guard is the partial unique index
+        // uq_account_export_in_flight (changeset -14-), which closes the check-then-insert TOCTOU below.
+        if (accountExportRepository.existsByAccountIdAndStatusIn(accountId, IN_FLIGHT)) {
+            throw inFlightConflict();
+        }
+        AccountExport export;
+        try {
+            export = accountExportRepository.saveAndFlush(new AccountExport(accountId));
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Lost the race: a concurrent POST inserted the in-flight row first and won the unique index.
+            throw inFlightConflict();
+        }
         authEventLogger
             .event(AuthEvent.EventType.EXPORT_REQUESTED, AuthEvent.Result.SUCCESS)
             .account(accountId)

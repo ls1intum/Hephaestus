@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
+import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import org.jspecify.annotations.Nullable;
@@ -26,11 +27,18 @@ public class AuthEventWriter {
 
     private final AuthEventRepository repository;
     private final AuthEventSequence sequence;
+    private final AuthMetrics metrics;
     private final Clock clock;
 
-    public AuthEventWriter(AuthEventRepository repository, AuthEventSequence sequence, Clock clock) {
+    public AuthEventWriter(
+        AuthEventRepository repository,
+        AuthEventSequence sequence,
+        AuthMetrics metrics,
+        Clock clock
+    ) {
         this.repository = repository;
         this.sequence = sequence;
+        this.metrics = metrics;
         this.clock = clock;
     }
 
@@ -40,13 +48,21 @@ public class AuthEventWriter {
             AuthEvent event = AuthEvent.create(data, sequence.next(), clock.instant(), captureIp(), captureUserAgent());
             repository.save(event);
         } catch (RuntimeException e) {
-            log.error("auth.audit: failed to persist {} event", data.type(), e);
+            // Swallow — an audit write must never break the business flow — but make it observable:
+            // sequence.next() already consumed an id, so a failed save is a permanent gap in the
+            // append-only trail. The counter is the alertable signal; WARN (not ERROR) because the
+            // request itself succeeded.
+            metrics.recordAuditWriteFailed();
+            log.warn("auth.audit: failed to persist {} event (sequence value lost — gap in trail)", data.type(), e);
         }
     }
 
+    @Nullable
     private static String captureIp() {
         HttpServletRequest req = currentRequest();
-        return req == null ? "0.0.0.0" : req.getRemoteAddr();
+        // null (not a fake "0.0.0.0" sentinel) for context-less events: ip_inet is nullable since the
+        // GDPR redaction redesign, and a sentinel would pollute ix_auth_event_failure_ip.
+        return req == null ? null : req.getRemoteAddr();
     }
 
     @Nullable

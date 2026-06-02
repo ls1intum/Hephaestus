@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,17 +34,23 @@ public class AccountProvisioningService {
     private final AccountRepository accountRepository;
     private final IdentityLinkRepository identityLinkRepository;
     private final GitProviderRegistry gitProviderRegistry;
+    private final VerifiedEmailResolver verifiedEmailResolver;
+    private final AccountJitCreator accountJitCreator;
     private final Clock clock;
 
     public AccountProvisioningService(
         AccountRepository accountRepository,
         IdentityLinkRepository identityLinkRepository,
         GitProviderRegistry gitProviderRegistry,
+        VerifiedEmailResolver verifiedEmailResolver,
+        AccountJitCreator accountJitCreator,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
         this.gitProviderRegistry = gitProviderRegistry;
+        this.verifiedEmailResolver = verifiedEmailResolver;
+        this.accountJitCreator = accountJitCreator;
         this.clock = clock;
     }
 
@@ -66,6 +73,25 @@ public class AccountProvisioningService {
             .orElse(null);
 
         if (link != null) {
+            // Collision guard (secure account linking): if this identity is already an ACTIVE link, a
+            // LINK-mode flow may only re-affirm it for the SAME account. Returning a DIFFERENT account
+            // here would log the operator into someone else's account (or rebind a victim's identity) —
+            // an account-takeover vector. LOGIN mode is unaffected (the identity owns the account).
+            if (
+                mode == AuthIntentCookie.Intent.Mode.LINK &&
+                intent != null &&
+                intent.linkingAccountId() != null &&
+                !link.getAccount().getId().equals(intent.linkingAccountId())
+            ) {
+                throw new IllegalStateException(
+                    "auth.link: identity (provider=" +
+                        registrationId +
+                        ", subject=" +
+                        subject +
+                        ") is already linked to a different accountId=" +
+                        link.getAccount().getId()
+                );
+            }
             identityLinkRepository.touchLastLogin(link.getId(), clock.instant());
             log.info(
                 "auth.success: returning login provider={} accountId={}",
@@ -75,7 +101,13 @@ public class AccountProvisioningService {
             return link.getAccount();
         }
 
-        if (mode == AuthIntentCookie.Intent.Mode.LINK && intent != null && intent.linkingAccountId() != null) {
+        if (mode == AuthIntentCookie.Intent.Mode.LINK) {
+            // Defense in depth: AuthBeginController already rejects link mode without a valid session
+            // (it binds linkingAccountId from the validated access cookie), so a null binding here means
+            // a programming error, not user input — fail closed rather than JIT-create an orphan account.
+            if (intent == null || intent.linkingAccountId() == null) {
+                throw new IllegalStateException("auth.link: link mode requires an authenticated account binding");
+            }
             Account account = accountRepository
                 .findById(intent.linkingAccountId())
                 .orElseThrow(() ->
@@ -89,11 +121,53 @@ public class AccountProvisioningService {
         }
 
         Account account = new Account(displayName(principal, subject));
-        account.setPrimaryEmail(email(principal));
-        account = accountRepository.save(account);
-        identityLinkRepository.save(newIdentityLink(account, providerId, subject, principal));
-        log.info("auth.success: JIT created accountId={} via provider={}", account.getId(), registrationId);
-        return account;
+        VerifiedEmailResolver.ResolvedEmail resolvedEmail = verifiedEmailResolver.resolve(registrationId, principal);
+        account.setPrimaryEmail(resolvedEmail.email());
+        // nOAuth defence: email is contact-only and is NEVER a lookup key. Stamp the verified timestamp
+        // ONLY when the IdP attested verification (OIDC email_verified==true, or GitHub's primary+verified
+        // /user/emails entry); otherwise it stays null = unverified.
+        if (resolvedEmail.verified()) {
+            account.setPrimaryEmailVerifiedAt(clock.instant());
+        }
+        IdentityLink newLink = newIdentityLink(account, providerId, subject, principal);
+        try {
+            // The insert runs in AccountJitCreator's REQUIRES_NEW transaction so a unique-constraint
+            // loss rolls back ONLY that inner tx — this (the caller's) tx stays usable for the
+            // read-after-conflict below.
+            Account created = accountJitCreator.create(account, newLink);
+            log.info(
+                "auth.success: JIT created accountId={} via provider={} emailVerified={}",
+                created.getId(),
+                registrationId,
+                resolvedEmail.verified()
+            );
+            return created;
+        } catch (DataIntegrityViolationException e) {
+            // First-login race: a concurrent login already created this identity and won the
+            // uq_identity_link_provider_subject_team insert. Fail closed by reading the now-existing
+            // active link and returning the winner's account — never a second orphan account.
+            return identityLinkRepository
+                .findActiveByProviderSubject(providerId, subject, /* teamId */ null)
+                .map(IdentityLink::getAccount)
+                .map(winner -> {
+                    log.info(
+                        "auth.success: JIT race resolved — reused concurrently-created accountId={} via provider={}",
+                        winner.getId(),
+                        registrationId
+                    );
+                    return winner;
+                })
+                .orElseThrow(() ->
+                    new IllegalStateException(
+                        "auth.success: JIT create lost the race for provider=" +
+                            registrationId +
+                            " subject=" +
+                            subject +
+                            " but no active link is visible (constraint/transaction anomaly)",
+                        e
+                    )
+                );
+        }
     }
 
     private IdentityLink newIdentityLink(Account account, long providerId, String subject, OAuth2User principal) {
