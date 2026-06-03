@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class AuthEventLogger {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthEventLogger.class);
 
     private final AuthEventWriter writer;
 
@@ -80,19 +84,27 @@ public class AuthEventLogger {
         }
 
         public void record() {
-            writer.write(
-                new AuthEventData(
-                    type,
-                    result,
-                    accountId,
-                    actingAccountId,
-                    failureReason,
-                    gitProviderId,
-                    workspaceId,
-                    identityLinkId,
-                    details
-                )
-            );
+            try {
+                writer.write(
+                    new AuthEventData(
+                        type,
+                        result,
+                        accountId,
+                        actingAccountId,
+                        failureReason,
+                        gitProviderId,
+                        workspaceId,
+                        identityLinkId,
+                        details
+                    )
+                );
+            } catch (RuntimeException e) {
+                // An audit write must NEVER break the caller's business transaction. AuthEventWriter
+                // already swallows the insert failure, but its REQUIRES_NEW boundary can still surface an
+                // UnexpectedRollbackException at commit when the failed statement aborted that inner tx
+                // (the inner tx is independent, so the caller's tx stays intact once we absorb this).
+                log.warn("auth.audit: {} event could not be persisted; suppressed to protect the request", type, e);
+            }
         }
     }
 }
