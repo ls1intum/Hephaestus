@@ -13,6 +13,13 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -177,6 +184,51 @@ class AccountUnlinkIdentityIntegrationTest {
             .exchange()
             .expectStatus()
             .isNotFound();
+    }
+
+    @Test
+    void concurrentUnlinksCannotDrainTheAccountToZero() throws Exception {
+        Account account = accountRepository.save(new Account("Race User"));
+        IdentityLink a = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-race", "race");
+        IdentityLink b = seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-race", "race-gl");
+        String token = tokenFor(account);
+
+        // Fire both unlinks at once. The pessimistic write-lock over the account's active links
+        // serializes them, so exactly one wins (204) and the other re-reads count 1 and is rejected
+        // (409) — the account always keeps a sign-in method. Without the lock both would pass the
+        // guard and the account would be drained to zero.
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch go = new CountDownLatch(1);
+            Future<Integer> first = pool.submit(unlinkStatus(token, a.getId(), ready, go));
+            Future<Integer> second = pool.submit(unlinkStatus(token, b.getId(), ready, go));
+            ready.await(10, TimeUnit.SECONDS);
+            go.countDown();
+
+            int s1 = first.get(15, TimeUnit.SECONDS);
+            int s2 = second.get(15, TimeUnit.SECONDS);
+            assertThat(List.of(s1, s2)).containsExactlyInAnyOrder(204, 409);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(identityLinkRepository.findActiveByAccountId(account.getId())).hasSize(1);
+    }
+
+    private Callable<Integer> unlinkStatus(String token, Long identityId, CountDownLatch ready, CountDownLatch go) {
+        return () -> {
+            ready.countDown();
+            go.await(10, TimeUnit.SECONDS);
+            return webTestClient
+                .delete()
+                .uri("/user/identities/{id}", identityId)
+                .headers(h -> h.setBearerAuth(token))
+                .exchange()
+                .returnResult(Void.class)
+                .getStatus()
+                .value();
+        };
     }
 
     private IdentityLink seedLink(

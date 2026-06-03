@@ -2500,12 +2500,25 @@ export type UnlinkIdentityData = {
     url: '/user/identities/{id}';
 };
 
+export type UnlinkIdentityErrors = {
+    /**
+     * No such identity on the current account
+     */
+    404: unknown;
+    /**
+     * Cannot unlink the account's only remaining sign-in method
+     */
+    409: unknown;
+};
+
 export type UnlinkIdentityResponses = {
     /**
-     * OK
+     * Identity unlinked
      */
-    200: unknown;
+    204: void;
 };
+
+export type UnlinkIdentityResponse = UnlinkIdentityResponses[keyof UnlinkIdentityResponses];
 
 export type RevokeOtherSessionsData = {
     body?: never;

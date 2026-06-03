@@ -21,6 +21,7 @@ import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAcc
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
+import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,
@@ -117,10 +118,7 @@ function RouteComponent() {
 		},
 		onError: (error: DefaultError) => {
 			console.error("Failed to disconnect account:", error);
-			const detail = (error as { detail?: unknown })?.detail;
-			toast.error(
-				typeof detail === "string" ? detail : "Couldn't disconnect that account. Please try again.",
-			);
+			toast.error(problemDetailOf(error) ?? "Couldn't disconnect that account. Please try again.");
 		},
 	});
 

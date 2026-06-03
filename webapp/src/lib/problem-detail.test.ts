@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { problemDetailOf } from "./loginProviders";
+import { problemDetailOf } from "./problem-detail";
 
 // `problemDetailOf` turns whatever the generated client throws into a human-readable string
 // for toasts/inline errors. Precedence (detail -> title -> legacy error -> message) is the

@@ -1,10 +1,11 @@
 import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import {
 	AlertDialog,
-	AlertDialogAction,
 	AlertDialogCancel,
+	AlertDialogClose,
 	AlertDialogContent,
 	AlertDialogDescription,
 	AlertDialogFooter,
@@ -106,10 +107,27 @@ export function LinkedAccountsSection({
 	// Lockout guard: the account's only remaining sign-in method cannot be removed.
 	const isOnlyIdentity = identities.length <= 1;
 
+	// Focus restoration: when a disconnect succeeds, the row and its trigger unmount and focus
+	// would otherwise drop to <body>. Move focus to the section heading so keyboard/SR users
+	// land back at "Connected Accounts". We detect a removal by the identities list shrinking.
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	const prevIdentityCount = useRef(identities.length);
+	useEffect(() => {
+		if (identities.length < prevIdentityCount.current) {
+			headingRef.current?.focus();
+		}
+		prevIdentityCount.current = identities.length;
+	}, [identities.length]);
+
 	return (
 		<section className="space-y-4" aria-labelledby="linked-accounts-heading">
 			<div className="space-y-1">
-				<h2 id="linked-accounts-heading" className="text-xl font-semibold">
+				<h2
+					ref={headingRef}
+					tabIndex={-1}
+					id="linked-accounts-heading"
+					className="text-xl font-semibold outline-none"
+				>
 					Connected Accounts
 				</h2>
 				<p className="text-sm text-muted-foreground">
@@ -136,6 +154,7 @@ export function LinkedAccountsSection({
 
 					<div className="space-y-3">
 						{identities.map((identity) => {
+							const identityId = identity.id;
 							const Icon = getProviderIcon(identity.providerType);
 							const name =
 								identity.displayName || identity.username || identity.subject || "Account";
@@ -143,7 +162,7 @@ export function LinkedAccountsSection({
 
 							return (
 								<div
-									key={identity.id ?? `${identity.providerType}:${identity.subject}`}
+									key={identityId ?? `${identity.providerType}:${identity.subject}`}
 									className="flex items-center justify-between gap-4 rounded-lg border p-4"
 								>
 									<div className="flex items-center gap-3 min-w-0">
@@ -165,13 +184,14 @@ export function LinkedAccountsSection({
 										</div>
 									</div>
 
-									{identity.id != null && (
+									{identityId != null && (
 										<UnlinkControl
+											identityId={identityId}
 											name={name}
 											providerType={identity.providerType}
 											isOnlyIdentity={isOnlyIdentity}
-											isUnlinking={unlinkingId === identity.id}
-											onConfirm={() => onUnlink(identity.id as number)}
+											isUnlinking={unlinkingId === identityId}
+											onConfirm={() => onUnlink(identityId)}
 										/>
 									)}
 								</div>
@@ -214,6 +234,7 @@ export function LinkedAccountsSection({
 }
 
 interface UnlinkControlProps {
+	identityId: number;
 	name: string;
 	providerType?: string;
 	isOnlyIdentity: boolean;
@@ -222,11 +243,13 @@ interface UnlinkControlProps {
 }
 
 /**
- * The per-identity disconnect control. For the account's only remaining identity it renders a
- * disabled button with a tooltip explaining the lockout guard; otherwise a confirmation dialog
- * gates the (reversible) disconnect.
+ * The per-identity disconnect control. For the account's only remaining identity it renders an
+ * always-visible muted hint explaining the lockout guard (the action is intentionally absent —
+ * removing it is done by deleting the account); otherwise a confirmation dialog gates the
+ * (reversible) disconnect.
  */
 function UnlinkControl({
+	identityId,
 	name,
 	providerType,
 	isOnlyIdentity,
@@ -234,20 +257,16 @@ function UnlinkControl({
 	onConfirm,
 }: UnlinkControlProps) {
 	if (isOnlyIdentity) {
-		// The only sign-in method can't be removed (lockout guard). Disabled + a native hint;
-		// removing it is done by deleting the account in the Danger Zone.
+		// The only sign-in method can't be removed (lockout guard). An always-visible sentence
+		// states why — accessible to screen-reader/keyboard users, unlike a disabled button's
+		// native title. Removing it is done by deleting the account in the Danger Zone.
 		return (
-			<Button
-				variant="ghost"
-				size="sm"
-				disabled
-				aria-label={`Disconnect ${name}`}
-				title="This is your only sign-in method — to remove it, delete your account in the Danger Zone."
-				className="shrink-0 text-muted-foreground"
+			<p
+				id={`lockout-hint-${identityId}`}
+				className="shrink-0 max-w-3xs text-xs text-muted-foreground"
 			>
-				<Unlink className="size-3.5 mr-1.5" aria-hidden="true" />
-				Disconnect
-			</Button>
+				Your only sign-in method — delete your account in the Danger Zone to remove it.
+			</p>
 		);
 	}
 
@@ -258,8 +277,9 @@ function UnlinkControl({
 					<Button
 						variant="ghost"
 						size="sm"
-						disabled={isUnlinking}
-						aria-label={`Disconnect ${name}`}
+						aria-busy={isUnlinking}
+						aria-disabled={isUnlinking}
+						aria-label={isUnlinking ? `Disconnecting ${name}` : `Disconnect ${name}`}
 						className="shrink-0 text-muted-foreground hover:text-destructive"
 					>
 						{isUnlinking ? (
@@ -282,7 +302,10 @@ function UnlinkControl({
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel>Cancel</AlertDialogCancel>
-					<AlertDialogAction onClick={onConfirm}>Disconnect</AlertDialogAction>
+					<AlertDialogClose
+						render={<Button variant="destructive">Disconnect</Button>}
+						onClick={onConfirm}
+					/>
 				</AlertDialogFooter>
 			</AlertDialogContent>
 		</AlertDialog>
