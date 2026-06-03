@@ -29,7 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Unit coverage of {@link AccountService#unlinkIdentity} guard logic with all repository/audit
- * collaborators mocked — including the post-lock race branch ({@code disableByIdAndAccountId == 0}),
+ * collaborators mocked — including the post-lock race branch ({@code deleteByIdAndAccountId == 0}),
  * which the integration test cannot reach. Uses a real {@link AuthEventLogger} over a mock
  * {@link AuthEventWriter} so "did we audit?" is a single {@code write(...)} verification.
  */
@@ -62,7 +62,7 @@ class AccountServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void unlinkSecondaryIdentityDisablesItAndAudits() {
+    void unlinkSecondaryIdentityDeletesItAndAudits() {
         List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
         when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(1);

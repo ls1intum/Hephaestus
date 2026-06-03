@@ -79,7 +79,7 @@ class AccountUnlinkIdentityIntegrationTest {
     }
 
     @Test
-    void unlinkSecondaryIdentityDisablesItAndKeepsTheRest() {
+    void unlinkSecondaryIdentityDeletesItAndKeepsTheRest() {
         Account account = accountRepository.save(new Account("Two-provider User"));
         IdentityLink github = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-1", "octocat");
         IdentityLink gitlab = seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-1", "gluser");

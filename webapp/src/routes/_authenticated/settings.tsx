@@ -118,7 +118,7 @@ function RouteComponent() {
 		},
 		onError: (error: DefaultError) => {
 			console.error("Failed to disconnect account:", error);
-			toast.error(problemDetailOf(error) ?? "Couldn't disconnect that account. Please try again.");
+			toast.error(problemDetailOf(error, "Couldn't disconnect that account. Please try again."));
 		},
 	});
 
@@ -126,7 +126,14 @@ function RouteComponent() {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
 		onLink: linkAccount,
-		onUnlink: (id) => unlinkMutation.mutate({ path: { id } }),
+		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
+		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a
+		// second DELETE against the already-removed row.
+		onUnlink: (id) => {
+			if (!unlinkMutation.isPending) {
+				unlinkMutation.mutate({ path: { id } });
+			}
+		},
 		unlinkingId: unlinkMutation.isPending ? (unlinkMutation.variables?.path?.id ?? null) : null,
 		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,

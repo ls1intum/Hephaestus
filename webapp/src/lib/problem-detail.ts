@@ -4,9 +4,12 @@
  * The generated client (with `throwOnError`) throws the parsed response body on a
  * non-2xx. For RFC 9457 problem+json failures the server returns
  * `{ type, title, status, detail }`; we prefer `detail`, then `title`,
- * then the controller's legacy `{ error }` shape, then a generic fallback.
+ * then the controller's legacy `{ error }` shape, then the caller's `fallback`.
  */
-export function problemDetailOf(err: unknown): string {
+export function problemDetailOf(
+	err: unknown,
+	fallback = "An unexpected error occurred. Please try again.",
+): string {
 	if (typeof err === "string") {
 		return err;
 	}
@@ -22,5 +25,5 @@ export function problemDetailOf(err: unknown): string {
 	if (err instanceof Error && err.message) {
 		return err.message;
 	}
-	return "An unexpected error occurred. Please try again.";
+	return fallback;
 }
