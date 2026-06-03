@@ -70,6 +70,26 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
     List<IdentityLink> findActiveByAccountId(@Param("accountId") Long accountId);
 
     /**
+     * Soft-unlink: mark the link disabled, but only if it is currently active AND owned by the given
+     * account (so a caller can never unlink someone else's identity). Soft-delete — not a row delete —
+     * so the partial unique index {@code uq_identity_link_active_per_provider} frees the
+     * {@code (account, provider, team)} slot and the same provider can be re-linked later by signing in.
+     *
+     * @return number of rows updated (0 when the link is missing, already disabled, or not owned)
+     */
+    @Modifying
+    @Query(
+        """
+        UPDATE IdentityLink il
+           SET il.disabledAt = :now
+         WHERE il.id = :id
+           AND il.account.id = :accountId
+           AND il.disabledAt IS NULL
+        """
+    )
+    int disableByIdAndAccountId(@Param("id") Long id, @Param("accountId") Long accountId, @Param("now") Instant now);
+
+    /**
      * Wire an {@link IdentityLink} to its git-provider actor mirror, but only when it is not already
      * set — idempotent and never clobbers an existing association. Backs
      * {@code AccountIdentityQuery.linkExternalActor} so the SCM-side provisioner can close the

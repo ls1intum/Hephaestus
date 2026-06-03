@@ -448,6 +448,22 @@ paths:
       summary: List linked identity providers
       tags:
       - Account
+  /user/identities/{id}:
+    delete:
+      operationId: unlinkIdentity
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+      summary: Unlink one of the current user's linked identity providers
+      tags:
+      - Account
   /user/sessions:
     delete:
       operationId: revokeOtherSessions

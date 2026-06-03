@@ -79,6 +79,45 @@ public class AccountService {
             .record();
     }
 
+    /**
+     * Unlink a federated identity from the current account (soft-delete). Two safety rules, both
+     * standard for account-linking UIs:
+     * <ul>
+     *   <li><b>Ownership</b> — only a link the account actually owns can be removed (404 otherwise),
+     *       so one user can never detach another's identity.</li>
+     *   <li><b>Last-identity lockout</b> — the account's only remaining sign-in method cannot be
+     *       removed (409). "The more ways a user can verify their identity, the less likely they lose
+     *       access" (Auth0); to drop the last identity a user deletes the account instead.</li>
+     * </ul>
+     * Reversible: re-linking only requires signing in with that provider again. The current session
+     * is account-scoped (not identity-scoped), so unlinking never logs the user out.
+     */
+    @Transactional
+    public void unlinkIdentity(Long accountId, Long identityLinkId) {
+        List<IdentityLink> active = identityLinkRepository.findActiveByAccountId(accountId);
+        IdentityLink target = active
+            .stream()
+            .filter(il -> il.getId().equals(identityLinkId))
+            .findFirst()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "identity link not found"));
+        if (active.size() <= 1) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "You can't unlink your only sign-in method. Link another provider first, or delete your account."
+            );
+        }
+        if (identityLinkRepository.disableByIdAndAccountId(identityLinkId, accountId, clock.instant()) == 0) {
+            // Lost a race (concurrently disabled) — nothing to do; surface as not-found.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "identity link not found");
+        }
+        authEventLogger
+            .event(AuthEvent.EventType.IDENTITY_UNLINKED, AuthEvent.Result.SUCCESS)
+            .account(accountId)
+            .identityLink(identityLinkId)
+            .gitProvider(target.getGitProviderId())
+            .record();
+    }
+
     public List<Account> adminList(int page, int size) {
         int capped = Math.min(Math.max(size, 1), 200);
         return accountRepository.findAll(PageRequest.of(Math.max(page, 0), capped)).getContent();

@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -105,6 +106,13 @@ public class AccountWebController {
             .map(this::toView)
             .toList();
         return ResponseEntity.ok(views);
+    }
+
+    @DeleteMapping("/identities/{id}")
+    @Operation(summary = "Unlink one of the current user's linked identity providers", operationId = "unlinkIdentity")
+    public ResponseEntity<Void> unlinkIdentity(@PathVariable Long id) {
+        accountService.unlinkIdentity(CurrentAccount.requireId(), id);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping
