@@ -122,7 +122,6 @@ describe("DangerZoneSection — account deletion", () => {
 		});
 		fireEvent.click(within(dialog).getByRole("button", { name: "Delete account" }));
 
-		// Give any in-flight microtasks a chance; nothing should have fired.
 		await Promise.resolve();
 		expect(deleteHit).toBe(false);
 		expect(onAccountDeleted).not.toHaveBeenCalled();

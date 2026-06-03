@@ -137,13 +137,39 @@ public class AccountService {
             } catch (IllegalArgumentException e) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "unknown app role: " + appRole);
             }
+            // Last-admin lockout guard (mirrors unlink's last-identity guard): demoting the only
+            // remaining APP_ADMIN — or yourself — would lock everyone out of /admin with no recovery.
+            boolean isDemotion = account.getAppRole() == Account.AppRole.APP_ADMIN && role != Account.AppRole.APP_ADMIN;
+            if (isDemotion) {
+                if (accountId.equals(actingAccountId)) {
+                    throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "You can't revoke your own admin access. Have another admin do it."
+                    );
+                }
+                // Locked (FOR UPDATE) count so concurrent demotions serialize instead of both passing.
+                long activeAdmins = accountRepository
+                    .findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
+                    .size();
+                if (activeAdmins <= 1) {
+                    throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "You can't revoke the last admin. Grant admin to another account first."
+                    );
+                }
+            }
+            Account.AppRole previousRole = account.getAppRole();
             account.setAppRole(role);
             accountRepository.save(account);
+            // Dedicated APP_ROLE_CHANGED type so the most security-sensitive mutation (granting/revoking
+            // APP_ADMIN) is queryable and alertable on the indexed event_type column — the ADR's stated
+            // mitigation for omitting step-up re-auth. Enum names are [A-Z_] only, so the inline JSON is
+            // injection-safe. previousRole/role are both non-null (app_role is NOT NULL).
             authEventLogger
-                .event(AuthEvent.EventType.FEATURE_FLAG_CHANGED, AuthEvent.Result.SUCCESS)
+                .event(AuthEvent.EventType.APP_ROLE_CHANGED, AuthEvent.Result.SUCCESS)
                 .account(accountId)
                 .actingAccount(actingAccountId)
-                .details("{\"appRole\":\"" + role.name() + "\"}")
+                .details("{\"from\":\"" + previousRole.name() + "\",\"to\":\"" + role.name() + "\"}")
                 .record();
         }
         return account;

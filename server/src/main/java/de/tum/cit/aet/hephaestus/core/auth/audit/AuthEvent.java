@@ -113,6 +113,7 @@ public class AuthEvent {
         ACCOUNT_DELETED,
         EXPORT_REQUESTED,
         FEATURE_FLAG_CHANGED,
+        APP_ROLE_CHANGED,
     }
 
     public enum Result {

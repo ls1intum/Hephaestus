@@ -94,6 +94,36 @@ export function setStoredConsent(consent: Pick<CookieConsent, "analytics" | "err
 	emitChange();
 }
 
+// Set when the banner is re-opened by an explicit user action (the footer/settings "Cookie
+// preferences" control), so the banner can move focus to itself — but NOT steal focus on a passive
+// first-visit appearance. Read-and-reset via consumeConsentReopen().
+let reopenRequested = false;
+
+/**
+ * Forget the stored decision so the consent banner shows again — the withdrawal path required by
+ * GDPR Art. 7(3) (withdrawing consent must be as easy as giving it). PostHog/Sentry stay disabled
+ * until a fresh decision is recorded.
+ */
+export function clearStoredConsent() {
+	if (typeof window === "undefined") {
+		return;
+	}
+	try {
+		window.localStorage.removeItem(CONSENT_STORAGE_KEY);
+	} catch {
+		// localStorage may be unavailable (private mode / disabled); fall back to in-memory only.
+	}
+	reopenRequested = true;
+	emitChange();
+}
+
+/** Read-and-reset the reopen flag set by {@link clearStoredConsent}. */
+export function consumeConsentReopen(): boolean {
+	const requested = reopenRequested;
+	reopenRequested = false;
+	return requested;
+}
+
 /** Subscribe to consent changes (this tab and other tabs). Returns an unsubscribe fn. */
 export function subscribeConsent(listener: ConsentListener): () => void {
 	listeners.add(listener);

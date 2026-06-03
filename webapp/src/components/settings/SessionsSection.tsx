@@ -136,9 +136,10 @@ export function SessionsSection() {
 				<div className="space-y-3" role="list">
 					{sessions.map((session) => {
 						const signedInAt = formatTimestamp(session.issuedAt);
+						const expiresAt = formatTimestamp(session.expiresAt);
 						const deviceLabel = session.userAgent || "Unknown device";
 						// Scope the pending state to the row actually being revoked so a single revoke
-						// doesn't disable/spin every other session's button (mirrors LoginProvidersSettings).
+						// doesn't disable/spin every other session's button.
 						const isRevokingThis =
 							revokeOne.isPending && revokeOne.variables?.path.jti === session.jti;
 						return (
@@ -160,7 +161,11 @@ export function SessionsSection() {
 											)}
 										</div>
 										<p className="text-xs text-muted-foreground truncate">
-											{[session.ip, signedInAt && `signed in ${signedInAt}`]
+											{[
+												session.ip,
+												signedInAt && `signed in ${signedInAt}`,
+												expiresAt && `expires ${expiresAt}`,
+											]
 												.filter(Boolean)
 												.join(" · ") || "No session details available"}
 										</p>

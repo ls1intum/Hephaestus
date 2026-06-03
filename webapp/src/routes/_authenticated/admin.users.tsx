@@ -16,6 +16,7 @@ import { ImpersonateDialog } from "@/components/admin/users/ImpersonateDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { problemDetailOf } from "@/lib/problem-detail";
 
 const PAGE_SIZE = 25;
 
@@ -51,7 +52,6 @@ function AdminUsersPage() {
 			lastPage.length === PAGE_SIZE ? allPages.length : undefined,
 	});
 
-	// React Compiler memoizes these derivations; no manual useMemo (see webapp/AGENTS.md).
 	const allUsers: AdminAccountView[] = listQuery.data?.pages.flat() ?? [];
 
 	const term = deferredSearch.trim().toLowerCase();
@@ -76,16 +76,15 @@ function AdminUsersPage() {
 			setRoleTarget(null);
 		},
 		onError: (error) => {
-			console.error("Failed to update account role:", error);
-			toast.error("Failed to update role. Please try again.");
+			// Surface the server's ProblemDetail (e.g. the last-admin 409), not a generic "try again".
+			toast.error(problemDetailOf(error, "Failed to update role. Please try again."));
 		},
 	});
 
 	const impersonate = useMutation({
 		...impersonateMutation(),
 		onError: (error) => {
-			console.error("Failed to begin impersonation:", error);
-			toast.error("Failed to start impersonation. Please try again.");
+			toast.error(problemDetailOf(error, "Failed to start impersonation. Please try again."));
 		},
 	});
 
@@ -101,8 +100,8 @@ function AdminUsersPage() {
 			{
 				onSuccess: () => {
 					setImpersonateTarget(null);
-					// The impersonation banner is owned by a sibling task and renders from the
-					// refreshed current-user state, so a full navigation home is the cleanest reset.
+					// Full navigation home re-resolves the session cookie + current-user, from which the
+					// impersonation banner renders — the cleanest reset for an app-wide identity switch.
 					window.location.assign("/");
 				},
 			},

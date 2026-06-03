@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
@@ -43,11 +44,14 @@ function roleBadgeVariant(appRole: string | undefined) {
 	return appRole === "APP_ADMIN" ? "default" : "secondary";
 }
 
+// Active is neutral; suspended / being-deleted are non-normal states and read as destructive.
 function statusBadgeVariant(status: string | undefined) {
 	if (!status) return "outline" as const;
 	const normalized = status.toUpperCase();
 	if (normalized === "ACTIVE") return "secondary" as const;
-	if (normalized === "DISABLED" || normalized === "SUSPENDED") return "destructive" as const;
+	if (normalized === "SUSPENDED" || normalized === "DELETING" || normalized === "DELETED") {
+		return "destructive" as const;
+	}
 	return "outline" as const;
 }
 
@@ -113,6 +117,9 @@ export function AdminUsersTable({
 						) : (
 							users.map((user) => {
 								const isSelf = user.id != null && user.id === currentUserId;
+								// You can't revoke your own admin — it would lock you out of /admin with no
+								// in-app recovery (the server rejects it too; this just hides the footgun).
+								const isSelfAdmin = isSelf && user.appRole === "APP_ADMIN";
 								const name = user.displayName ?? "—";
 								return (
 									<TableRow key={user.id ?? user.primaryEmail}>
@@ -149,19 +156,28 @@ export function AdminUsersTable({
 													<MoreHorizontal className="size-4" />
 												</DropdownMenuTrigger>
 												<DropdownMenuContent align="end">
-													<DropdownMenuLabel>Account actions</DropdownMenuLabel>
-													<DropdownMenuItem onClick={() => onChangeRole(user)}>
-														<UserCog className="size-4" />
-														{user.appRole === "APP_ADMIN" ? "Revoke admin" : "Change role"}
-													</DropdownMenuItem>
-													<DropdownMenuSeparator />
-													<DropdownMenuItem
-														disabled={isSelf}
-														onClick={() => !isSelf && onImpersonate(user)}
-													>
-														<Users className="size-4" />
-														{isSelf ? "Cannot impersonate self" : "Impersonate"}
-													</DropdownMenuItem>
+													<DropdownMenuGroup>
+														<DropdownMenuLabel>Account actions</DropdownMenuLabel>
+														<DropdownMenuItem
+															disabled={isSelfAdmin}
+															onClick={() => !isSelfAdmin && onChangeRole(user)}
+														>
+															<UserCog className="size-4" />
+															{isSelfAdmin
+																? "Can't revoke your own admin"
+																: user.appRole === "APP_ADMIN"
+																	? "Revoke admin"
+																	: "Change role"}
+														</DropdownMenuItem>
+														<DropdownMenuSeparator />
+														<DropdownMenuItem
+															disabled={isSelf}
+															onClick={() => !isSelf && onImpersonate(user)}
+														>
+															<Users className="size-4" />
+															{isSelf ? "Cannot impersonate self" : "Impersonate"}
+														</DropdownMenuItem>
+													</DropdownMenuGroup>
 												</DropdownMenuContent>
 											</DropdownMenu>
 										</TableCell>

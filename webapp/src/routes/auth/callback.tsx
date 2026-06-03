@@ -1,5 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { safeReturnTo } from "@/integrations/auth/guard";
@@ -25,6 +26,15 @@ function AuthCallbackPage() {
 	const { isLoading, isError } = useAuth();
 	const navigate = useNavigate();
 
+	// Escape hatch: if the /user probe never settles (hung request), don't strand the user on an
+	// infinite spinner — after a few seconds offer a manual way back to sign in.
+	const [timedOut, setTimedOut] = useState(false);
+	useEffect(() => {
+		if (!isLoading) return;
+		const timer = setTimeout(() => setTimedOut(true), 8000);
+		return () => clearTimeout(timer);
+	}, [isLoading]);
+
 	useEffect(() => {
 		// Wait for the cookie-session probe (GET /user) to settle so the target route
 		// paints with the correct auth state.
@@ -42,8 +52,16 @@ function AuthCallbackPage() {
 	}, [isLoading, isError, returnTo, navigate]);
 
 	return (
-		<div className="flex min-h-[100dvh] items-center justify-center">
+		<div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4">
 			<Spinner className="size-8" aria-label="Signing you in" />
+			{timedOut && (
+				<div className="flex flex-col items-center gap-2 text-center" role="status">
+					<p className="text-sm text-muted-foreground">This is taking longer than expected.</p>
+					<Button variant="outline" size="sm" render={<Link to="/login" />}>
+						Back to sign in
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }

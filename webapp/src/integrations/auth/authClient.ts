@@ -57,7 +57,9 @@ function readCookie(name: string): string | undefined {
 
 /** The CSRF header/cookie pair Spring Security's CookieCsrfTokenRepository expects. */
 export function csrfHeaders(): Record<string, string> {
-	const token = readCookie("XSRF-TOKEN");
+	// The double-submit cookie carries the __Host- prefix (host-only + Secure) so a sibling subdomain
+	// cannot toss a forged token onto this host; the echoed header name stays X-XSRF-TOKEN.
+	const token = readCookie("__Host-XSRF-TOKEN");
 	return token ? { "X-XSRF-TOKEN": token } : {};
 }
 

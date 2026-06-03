@@ -192,8 +192,8 @@ public class SecurityConfig {
         // Stateless double-submit CSRF (ADR 0017). The access-token cookie is sent automatically by
         // the browser on same-site requests, so SameSite=Lax alone is the only forgery barrier — and
         // Lax still permits top-level cross-site POST navigations. We close that gap with a
-        // double-submit token: CookieCsrfTokenRepository.withHttpOnlyFalse() writes the raw token to a
-        // JS-readable `XSRF-TOKEN` cookie; the SPA echoes it in the `X-XSRF-TOKEN` header (see
+        // double-submit token: the repository writes the raw token to a JS-readable
+        // `__Host-XSRF-TOKEN` cookie; the SPA echoes it in the `X-XSRF-TOKEN` header (see
         // webapp/src/main.tsx). A cross-site attacker cannot read the cookie, so cannot supply the
         // header. SpaCsrfTokenRequestHandler resolves the header value as the raw (unmasked) token to
         // match what the SPA sends.
@@ -206,12 +206,12 @@ public class SecurityConfig {
         // dev-trigger are additionally excluded — they are not browser cookie POSTs.
         http.csrf(csrf ->
             csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(csrfTokenRepository())
                 .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                 .requireCsrfProtectionMatcher(this::requiresCsrf)
         );
-        // Force the deferred token to render the XSRF-TOKEN cookie on every response so the SPA always
-        // has a token to echo, even on a bare GET /user.
+        // Force the deferred token to render the __Host-XSRF-TOKEN cookie on every response so the SPA
+        // always has a token to echo, even on a bare GET /user.
         http.addFilterAfter(new CsrfCookieFilter(), AuthorizationFilter.class);
 
         // Security headers (HSTS, CSP-report-only, COOP, COEP, Referrer-Policy,
@@ -282,6 +282,20 @@ public class SecurityConfig {
         });
 
         return http.build();
+    }
+
+    /**
+     * Double-submit CSRF cookie repository. The token cookie is JS-readable (httpOnly=false) so the SPA
+     * can echo it in the {@code X-XSRF-TOKEN} header. The {@code __Host-} name prefix forces the browser
+     * to keep the cookie host-only + Secure + Path=/ (no Domain), so a sibling subdomain cannot "toss" a
+     * forged {@code XSRF-TOKEN} cookie onto this host and defeat the double-submit check — matching the
+     * un-tossable {@code __Host-} access cookie ({@link AuthProperties#DEFAULT_COOKIE_NAME}).
+     */
+    private static CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieName("__Host-XSRF-TOKEN");
+        repository.setCookieCustomizer(cookie -> cookie.secure(true).path("/").sameSite("Lax"));
+        return repository;
     }
 
     private static final java.util.Set<String> SAFE_METHODS = java.util.Set.of("GET", "HEAD", "OPTIONS", "TRACE");

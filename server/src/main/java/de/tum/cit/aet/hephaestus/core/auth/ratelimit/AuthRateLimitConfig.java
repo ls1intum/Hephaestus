@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
+import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
 import io.github.bucket4j.distributed.jdbc.PrimaryKeyMapper;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.postgresql.Bucket4jPostgreSQL;
+import java.time.Duration;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,15 +20,17 @@ import tools.jackson.databind.ObjectMapper;
  * <h2>Backend choice — shared vs. per-replica</h2>
  *
  * <p>The primary path is a Postgres {@code ProxyManager} (SELECT … FOR UPDATE on the
- * {@code auth_rate_limit_bucket} table created by Liquibase migration
- * {@code 1779850000000_auth_rate_limit_bucket.xml}). Buckets are persisted, so the limits are
+ * {@code auth_rate_limit_bucket} table created by the consolidated auth Liquibase changelog).
+ * Buckets are persisted, so the limits are
  * <strong>shared across all replicas</strong> with no extra infrastructure — we reuse the existing
- * DataSource (no Redis; ADR 0017 constraint). This bean is only created when a {@link DataSource}
- * is present (i.e. a real Postgres-backed boot), guarded by
- * {@code hephaestus.auth.rate-limit.postgres-backed=true} (default).
+ * DataSource (no Redis; ADR 0017 constraint). These beans are created whenever
+ * {@code hephaestus.auth.rate-limit.postgres-backed=true} (the default) and <em>require</em> a
+ * {@link DataSource} — there is no {@code @ConditionalOnBean(DataSource)} back-off, so a boot with no
+ * DataSource must explicitly set {@code postgres-backed=false} to select the in-JVM fallback below
+ * (otherwise context startup fails on the unsatisfied {@code DataSource} dependency).
  *
- * <p><strong>Trade-off / fallback:</strong> when no Postgres DataSource is available (the
- * {@code specs} profile, worker-only pods, the H2 test context, or {@code postgres-backed=false}),
+ * <p><strong>Trade-off / fallback:</strong> when {@code postgres-backed=false} (the {@code specs}
+ * profile, worker-only pods, the H2 test context, and any DataSource-less boot set it),
  * an in-JVM {@code ConcurrentHashMap}-backed resolver is used instead. In that mode the limits are
  * <strong>per-replica</strong>: N replicas allow up to N× the configured rate cluster-wide. This is
  * acceptable for those non-production contexts but would be a regression in a multi-replica
@@ -40,26 +44,58 @@ public class AuthRateLimitConfig {
     /** Table backing the distributed buckets (see the matching Liquibase changelog). */
     static final String BUCKET_TABLE = "auth_rate_limit_bucket";
 
+    /** Soft cap on the in-JVM fallback map so a long-lived non-prod pod cannot grow it without bound. */
+    static final int IN_MEMORY_MAX_BUCKETS = 50_000;
+
     /**
      * Postgres-backed, cluster-shared bucket store. Created only on a Postgres-backed boot. The
      * builder defaults to {@code BIGINT} keys; we remap to {@code STRING} because our keys are
      * heterogeneous (IP strings + decimal account ids).
+     *
+     * <p>{@code expirationAfterWrite} populates the {@code expires_at} column so
+     * {@link AuthRateLimitBucketSweeper} can prune stale rows — without it the table grows without
+     * bound on the pre-auth, IP-keyed hot path (one permanent row per distinct/rotating client IP).
+     * {@code basedOnTimeForRefillingBucketUpToMax} keeps a bucket until it would have fully refilled
+     * to max — i.e. until the limit no longer constrains anyone — so eviction never resets a still
+     * meaningful limit; the one-minute argument is slack on top of that refill time.
      */
     @Bean
     @ConditionalOnProperty(prefix = "hephaestus.auth.rate-limit", name = "postgres-backed", matchIfMissing = true)
-    @ConditionalOnMissingBean(BucketResolver.class)
-    BucketResolver postgresBucketResolver(DataSource dataSource) {
+    ProxyManager<String> authRateLimitProxyManager(DataSource dataSource) {
         ProxyManager<String> proxyManager = Bucket4jPostgreSQL.selectForUpdateBasedBuilder(dataSource)
             .primaryKeyMapper(PrimaryKeyMapper.STRING)
             .table(BUCKET_TABLE)
+            .expirationAfterWrite(
+                ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(1))
+            )
             .build();
         log.info("Auth rate limiting: Postgres-backed (table={}) — limits SHARED across replicas.", BUCKET_TABLE);
+        return proxyManager;
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "hephaestus.auth.rate-limit", name = "postgres-backed", matchIfMissing = true)
+    @ConditionalOnMissingBean(BucketResolver.class)
+    BucketResolver postgresBucketResolver(ProxyManager<String> proxyManager) {
         return (key, config) -> proxyManager.getProxy(key, () -> config);
     }
 
     /**
-     * In-JVM fallback. PER-REPLICA limits — see the class Javadoc trade-off. Activated only when the
-     * Postgres bean backed off (no DataSource / {@code postgres-backed=false}).
+     * Prunes expired buckets so {@code auth_rate_limit_bucket} stays bounded. Only present on the
+     * Postgres-backed path (the in-JVM fallback bounds itself).
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "hephaestus.auth.rate-limit", name = "postgres-backed", matchIfMissing = true)
+    AuthRateLimitBucketSweeper authRateLimitBucketSweeper(ProxyManager<String> proxyManager) {
+        return new AuthRateLimitBucketSweeper(proxyManager);
+    }
+
+    /**
+     * In-JVM fallback. PER-REPLICA limits — see the class Javadoc trade-off. Activated only when
+     * {@code postgres-backed=false} (the Postgres beans above require a DataSource and do not back off
+     * on their own). Bounded by
+     * {@link #IN_MEMORY_MAX_BUCKETS}: this mode is dev / specs / worker-only and short-lived, so a
+     * coarse clear-on-overflow is sufficient to keep memory bounded without per-entry eviction.
      */
     @Bean
     @ConditionalOnMissingBean(BucketResolver.class)
@@ -70,10 +106,14 @@ public class AuthRateLimitConfig {
                 "Postgres-backed (hephaestus.auth.rate-limit.postgres-backed=true with a DataSource)."
         );
         var store = new java.util.concurrent.ConcurrentHashMap<String, io.github.bucket4j.Bucket>();
-        return (key, config) ->
-            store.computeIfAbsent(key, k ->
+        return (key, config) -> {
+            if (store.size() >= IN_MEMORY_MAX_BUCKETS && !store.containsKey(key)) {
+                store.clear();
+            }
+            return store.computeIfAbsent(key, k ->
                 io.github.bucket4j.Bucket.builder().addLimit(config.getBandwidths()[0]).build()
             );
+        };
     }
 
     @Bean

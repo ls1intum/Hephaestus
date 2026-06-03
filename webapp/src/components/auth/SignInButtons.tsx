@@ -40,7 +40,8 @@ function GitHubMark({ className }: { className?: string }) {
 }
 
 /** Shared hover style for branded header buttons */
-const headerButtonBase = "gap-2 border-0 transition-all hover:scale-[1.02] active:scale-[0.98]";
+const headerButtonBase =
+	"gap-2 border-0 transition-all motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]";
 
 function HeaderProviderButton({
 	provider,
@@ -60,7 +61,7 @@ function HeaderProviderButton({
 	const brandClass = isGitHub
 		? "bg-github-black text-github-white dark:bg-github-white dark:text-github-black hover:shadow-lg hover:shadow-github-black/20 dark:hover:shadow-github-white/20"
 		: isGitLab
-			? "bg-[#FC6D26] text-white hover:shadow-lg hover:shadow-[#FC6D26]/30"
+			? "bg-gitlab-orange text-white hover:shadow-lg hover:shadow-gitlab-orange/30"
 			: "";
 
 	const icon = isGitHub ? (

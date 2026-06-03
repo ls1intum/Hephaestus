@@ -9,6 +9,13 @@ import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 
 /**
  * Pins the fail-closed contract of {@link AuthSecurityConfig#resolveStateCookieKey}: in production a
@@ -54,5 +61,37 @@ class AuthSecurityConfigTest extends BaseUnitTest {
         assertThatThrownBy(() -> AuthSecurityConfig.resolveStateCookieKey(propsWithKey(base64Key(16)), false))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("32 bytes");
+    }
+
+    @Test
+    void pkceResolverEmitsCodeChallengeForConfidentialGithubClient() {
+        // GitHub is plain OAuth2 (no id_token/nonce), so PKCE + state are THE authorization-code-injection
+        // defenses (RFC 9700). Spring auto-enables PKCE only for PUBLIC clients; our github registration is
+        // confidential (CLIENT_SECRET_BASIC), so PKCE is supplied solely by withPkce() in pkceResolver().
+        // This asserts it is actually emitted — deleting that one line must fail this test.
+        ClientRegistration github = ClientRegistration.withRegistrationId("github")
+            .clientId("client-id")
+            .clientSecret("client-secret")
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+            .scope("read:user", "user:email")
+            .authorizationUri("https://github.com/login/oauth/authorize")
+            .tokenUri("https://github.com/login/oauth/access_token")
+            .userInfoUri("https://api.github.com/user")
+            .userNameAttributeName("id")
+            .build();
+        OAuth2AuthorizationRequestResolver resolver = AuthSecurityConfig.pkceResolver(
+            new InMemoryClientRegistrationRepository(github)
+        );
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        request.setServletPath("/oauth2/authorization/github");
+        OAuth2AuthorizationRequest authorizationRequest = resolver.resolve(request);
+
+        assertThat(authorizationRequest).isNotNull();
+        assertThat(authorizationRequest.getAdditionalParameters())
+            .containsKey("code_challenge")
+            .containsEntry("code_challenge_method", "S256");
     }
 }

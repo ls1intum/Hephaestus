@@ -1,8 +1,8 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { setStoredConsent, useCookieConsent } from "@/integrations/consent";
+import { consumeConsentReopen, setStoredConsent, useCookieConsent } from "@/integrations/consent";
 
 /**
  * Cookie consent banner (English only, no external dependency). Shown at the bottom of the
@@ -24,6 +24,15 @@ export function CookieConsentBanner() {
 	const descriptionId = useId();
 	const analyticsId = useId();
 	const errorMonitoringId = useId();
+	const cardRef = useRef<HTMLDivElement>(null);
+
+	// Move focus to the dialog only on an explicit reopen, never on a passive first-visit appearance
+	// (see consumeConsentReopen).
+	useEffect(() => {
+		if (consent === null && consumeConsentReopen()) {
+			cardRef.current?.focus();
+		}
+	}, [consent]);
 
 	// Saving a decision unmounts the banner; without intervention focus falls back to <body>,
 	// stranding keyboard/AT users. Move focus to the main landmark (or its first focusable child)
@@ -39,7 +48,6 @@ export function CookieConsentBanner() {
 		}
 	};
 
-	// A decision has been made — banner stays hidden until consent is cleared.
 	if (consent !== null) {
 		return null;
 	}
@@ -47,11 +55,13 @@ export function CookieConsentBanner() {
 	return (
 		<div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-4">
 			<Card
+				ref={cardRef}
+				tabIndex={-1}
 				role="dialog"
 				aria-modal="false"
 				aria-labelledby={titleId}
 				aria-describedby={descriptionId}
-				className="w-full max-w-2xl shadow-lg"
+				className="w-full max-w-2xl shadow-lg outline-none"
 			>
 				<CardHeader>
 					<CardTitle id={titleId}>Cookies &amp; privacy</CardTitle>

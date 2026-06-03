@@ -32,7 +32,7 @@ client.setConfig({
 	credentials: "include",
 });
 
-// Attach the CSRF double-submit header (X-XSRF-TOKEN from the XSRF-TOKEN cookie) on every
+// Attach the CSRF double-submit header (X-XSRF-TOKEN from the __Host-XSRF-TOKEN cookie) on every
 // state-changing request. Safe (GET/HEAD/OPTIONS) requests don't need it; sending it anyway
 // is harmless.
 client.interceptors.request.use((request) => {

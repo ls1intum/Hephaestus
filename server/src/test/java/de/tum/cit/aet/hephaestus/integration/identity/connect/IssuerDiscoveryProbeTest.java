@@ -52,6 +52,17 @@ class IssuerDiscoveryProbeTest extends BaseUnitTest {
             "fc00::1", // IPv6 unique-local
             "fd00::1", // IPv6 unique-local
             "224.0.0.1", // multicast
+            "100.64.0.1", // CGNAT (RFC 6598) — standard EKS/GKE pod networking
+            "100.127.255.255", // CGNAT upper bound
+            "192.0.0.1", // IETF protocol assignments (RFC 6890)
+            "192.0.2.1", // TEST-NET-1
+            "198.18.0.1", // benchmarking (RFC 2544)
+            "198.51.100.1", // TEST-NET-2
+            "203.0.113.1", // TEST-NET-3
+            "240.0.0.1", // Class E reserved
+            "255.255.255.255", // limited broadcast
+            "64:ff9b::7f00:1", // NAT64 (RFC 6052) of 127.0.0.1 — loopback bypass
+            "2001:db8::1", // documentation prefix
         }
     )
     void rejectsNonPublicResolvedAddress(String privateIp) {

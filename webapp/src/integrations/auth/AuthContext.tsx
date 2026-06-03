@@ -75,8 +75,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 	// branch on this instead of relying on a downstream guard to bounce them back.
 	const isError = userQuery.isError;
 
-	// No manual memoization: the project runs React Compiler, which memoizes these derived
-	// values and stable callbacks automatically (see webapp/AGENTS.md).
 	const userProfile = user ? toUserProfile(user) : undefined;
 
 	const isAppAdmin = computeIsAppAdmin(user);

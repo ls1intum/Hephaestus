@@ -1,0 +1,193 @@
+package de.tum.cit.aet.hephaestus.core.auth.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
+import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
+import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
+import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+/**
+ * {@code PATCH /admin/users/{id}} — the super-admin role change against the <b>real</b> security
+ * chain (genuine cookie-JWT, no mock decoder), mirroring {@code AccountUnlinkIdentityIntegrationTest}.
+ *
+ * <p>Covers the last-admin lockout guard in {@code AccountService.adminSetRole}.
+ * {@link #concurrentDemotionsCannotDrainTheRoleToZero} would fail if the {@code @Lock} were dropped:
+ * without it, two admins demoting each other both read count==2 from their own snapshot and both
+ * commit, draining the role to zero. (The two updates touch distinct rows, so {@code @Version} alone
+ * does not catch it — the {@code FOR UPDATE} over the {@code (APP_ADMIN, ACTIVE)} set is what
+ * serializes them.) Requires Docker, like every {@code @Tag("integration")} test.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+@AutoConfigureWebTestClient
+@Import(GitHubIntegrationPostgresShutdown.class)
+@Testcontainers
+@Tag("integration")
+class AccountAdminRoleIntegrationTest {
+
+    @Autowired
+    private WebTestClient webTestClient;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private HephaestusJwtIssuer jwtIssuer;
+
+    @Autowired
+    private JwtPrincipalFactory principalFactory;
+
+    @Autowired
+    private DatabaseTestUtils databaseTestUtils;
+
+    @Autowired
+    private JwtSigningKeyService signingKeyService;
+
+    // Global isolation: the last-admin guard counts ALL active admins, so each test must start from a
+    // clean slate or leftover admins from a prior test would inflate the count and mask the guard.
+    // cleanDatabase() also truncates the JWT signing key, so re-seed it before we issue test tokens.
+    @BeforeEach
+    void cleanSlate() {
+        databaseTestUtils.cleanDatabase();
+        signingKeyService.ensureActiveKey();
+    }
+
+    @DynamicPropertySource
+    static void datasource(DynamicPropertyRegistry registry) {
+        RealAuthDatasource.register(registry);
+    }
+
+    @Test
+    void demotingOneAdminWhileAnotherRemainsPersistsToTheDatabase() {
+        Account keeper = persistAdmin("Keeper Admin");
+        Account victim = persistAdmin("Demote Me");
+
+        webTestClient
+            .patch()
+            .uri("/admin/users/{id}", victim.getId())
+            .headers(h -> h.setBearerAuth(tokenFor(keeper)))
+            .bodyValue(Map.of("appRole", "USER"))
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        assertThat(accountRepository.findById(victim.getId()))
+            .get()
+            .extracting(Account::getAppRole)
+            .isEqualTo(Account.AppRole.USER);
+        assertThat(activeAdminCount()).isEqualTo(1L);
+    }
+
+    @Test
+    void cannotRevokeYourOwnAdminEvenWhenAnotherAdminExists() {
+        Account self = persistAdmin("Self Admin");
+        persistAdmin("Backup Admin"); // another admin exists, yet self-demotion is still refused
+
+        webTestClient
+            .patch()
+            .uri("/admin/users/{id}", self.getId())
+            .headers(h -> h.setBearerAuth(tokenFor(self)))
+            .bodyValue(Map.of("appRole", "USER"))
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409)
+            .expectBody()
+            .jsonPath("$.detail")
+            .isEqualTo("You can't revoke your own admin access. Have another admin do it.");
+
+        assertThat(accountRepository.findById(self.getId()))
+            .get()
+            .extracting(Account::getAppRole)
+            .isEqualTo(Account.AppRole.APP_ADMIN);
+    }
+
+    @Test
+    void concurrentDemotionsCannotDrainTheRoleToZero() throws Exception {
+        Account adminA = persistAdmin("Admin A");
+        Account adminB = persistAdmin("Admin B");
+        assertThat(activeAdminCount()).isEqualTo(2L);
+
+        // A demotes B and B demotes A at the same instant. The pessimistic write-lock over the
+        // (APP_ADMIN, ACTIVE) set serializes them: exactly one wins (200), the loser re-reads count 1
+        // and is rejected (409). Without the lock both would pass the guard and drain the role to zero.
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch go = new CountDownLatch(1);
+            Future<Integer> first = pool.submit(demote(tokenFor(adminA), adminB.getId(), ready, go));
+            Future<Integer> second = pool.submit(demote(tokenFor(adminB), adminA.getId(), ready, go));
+            ready.await(10, TimeUnit.SECONDS);
+            go.countDown();
+
+            int s1 = first.get(15, TimeUnit.SECONDS);
+            int s2 = second.get(15, TimeUnit.SECONDS);
+            assertThat(List.of(s1, s2)).containsExactlyInAnyOrder(200, 409);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(activeAdminCount()).isEqualTo(1L);
+    }
+
+    private Callable<Integer> demote(String token, Long targetId, CountDownLatch ready, CountDownLatch go) {
+        return () -> {
+            ready.countDown();
+            go.await(10, TimeUnit.SECONDS);
+            return webTestClient
+                .patch()
+                .uri("/admin/users/{id}", targetId)
+                .headers(h -> h.setBearerAuth(token))
+                .bodyValue(Map.of("appRole", "USER"))
+                .exchange()
+                .returnResult(Void.class)
+                .getStatus()
+                .value();
+        };
+    }
+
+    private Account persistAdmin(String displayName) {
+        Account account = new Account(displayName);
+        account.setAppRole(Account.AppRole.APP_ADMIN);
+        account.setStatus(Account.Status.ACTIVE);
+        return accountRepository.save(account);
+    }
+
+    // Plain (non-locking) count for assertions. The production guard's query is @Lock(PESSIMISTIC_WRITE)
+    // and so requires an active transaction; counting here via findAll avoids needing one in the test.
+    private long activeAdminCount() {
+        return accountRepository
+            .findAll()
+            .stream()
+            .filter(a -> a.getAppRole() == Account.AppRole.APP_ADMIN && a.getStatus() == Account.Status.ACTIVE)
+            .count();
+    }
+
+    private String tokenFor(Account account) {
+        return jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+    }
+}

@@ -185,8 +185,12 @@ public class AuthSecurityConfig {
      * defence against authorization-code injection alongside {@code state}. The {@code code_verifier}
      * is stored on the {@code OAuth2AuthorizationRequest} and round-trips inside the sealed
      * auth-request cookie ({@link CookieOAuth2AuthorizationRequestRepository}).
+     *
+     * <p>Package-private so {@code AuthSecurityConfigTest} can assert {@code code_challenge} is
+     * actually emitted — removing the {@code withPkce()} line would otherwise silently drop the only
+     * code-injection defense for the confidential GitHub client with no test failure.
      */
-    private static OAuth2AuthorizationRequestResolver pkceResolver(ClientRegistrationRepository repo) {
+    static OAuth2AuthorizationRequestResolver pkceResolver(ClientRegistrationRepository repo) {
         DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
             repo,
             "/oauth2/authorization"

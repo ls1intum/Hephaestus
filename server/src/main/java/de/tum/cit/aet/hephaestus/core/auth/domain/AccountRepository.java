@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.core.auth.domain;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -34,4 +36,18 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
         """
     )
     List<Long> findDeletingPastCooldown(@Param("cutoff") Instant cutoff, Pageable pageable);
+
+    /**
+     * Usable (ACTIVE) accounts in the given role, write-locked for the surrounding transaction. Backs
+     * the last-admin guard. Selects the entity (not a scalar) so Hibernate emits {@code FOR UPDATE} —
+     * as {@code findActiveByAccountIdForUpdate} does — letting concurrent demotions serialize rather
+     * than both passing a stale count. ACTIVE-only: a suspended/deleting admin can't sign in, so it
+     * must not count as the last admin.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a WHERE a.appRole = :role AND a.status = :status")
+    List<Account> findByAppRoleAndStatusForUpdate(
+        @Param("role") Account.AppRole role,
+        @Param("status") Account.Status status
+    );
 }

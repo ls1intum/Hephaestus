@@ -122,11 +122,14 @@ export function LinkedAccountsSection({
 	return (
 		<section className="space-y-4" aria-labelledby="linked-accounts-heading">
 			<div className="space-y-1">
+				{/* Programmatic focus target (see above). It's removed from the tab order (tabIndex={-1}),
+				    so :focus-visible would not fire on the post-deletion .focus(); use :focus so focus
+				    landing here after a row unmounts is actually visible, instead of disappearing. */}
 				<h2
 					ref={headingRef}
 					tabIndex={-1}
 					id="linked-accounts-heading"
-					className="text-xl font-semibold outline-none"
+					className="text-xl font-semibold rounded-sm outline-none focus:ring-2 focus:ring-ring"
 				>
 					Connected Accounts
 				</h2>

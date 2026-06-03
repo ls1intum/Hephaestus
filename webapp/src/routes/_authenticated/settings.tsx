@@ -35,23 +35,19 @@ function RouteComponent() {
 	// Feature flag: AI review section visible only for users with the practice review role
 	const showAiReviewSection = hasRole("run_practice_review");
 
-	// Query for user settings
 	const { data: settings, isLoading } = useQuery({
 		...getUserSettingsOptions({}),
 		retry: 1,
 	});
 
-	// Query for the account's federated identities (read-only in this view).
 	const linkedIdentitiesQuery = useQuery({
 		...listLinkedIdentitiesOptions({}),
 	});
 
-	// Query for the sign-in providers available to link.
 	const identityProvidersQuery = useQuery({
 		...listIdentityProvidersOptions({}),
 	});
 
-	// Mutation for updating user settings
 	const updateSettingsMutation = useMutation<
 		UpdateUserSettingsResponse,
 		DefaultError,

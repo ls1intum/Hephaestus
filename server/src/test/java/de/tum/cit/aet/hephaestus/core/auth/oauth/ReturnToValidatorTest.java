@@ -57,4 +57,38 @@ class ReturnToValidatorTest extends BaseUnitTest {
         assertThat(ReturnToValidator.safeOrFallback("")).isEqualTo("/");
         assertThat(ReturnToValidator.safeOrFallback("   ")).isEqualTo("/");
     }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+            "/%2f%2fevil.com", // encoded // → protocol-relative after decode
+            "/%2F%2Fevil.com", // upper-case hex
+            "/%252f%252fevil.com", // double-encoded // (resolved within the bounded decode passes)
+            "/%5cevil.com", // encoded backslash
+            "/%5Cevil.com",
+            "/%09/evil", // encoded TAB → control char
+            "/foo%0abar", // encoded LF → control char (header/log injection)
+            "/foo%00bar", // encoded NUL → control char
+        }
+    )
+    void rejectsPercentEncodedSmuggling(String encoded) {
+        // The authoritative server-side defense: checks run against the FULLY percent-decoded form, so
+        // encoded slashes / control chars cannot slip past the literal checks. Deleting the decode loop
+        // in ReturnToValidator must fail these.
+        assertThat(ReturnToValidator.safeOrFallback(encoded)).isEqualTo("/");
+    }
+
+    @Test
+    void preservesLegitimatelyEncodedQueryVerbatimWhenSafe() {
+        // The decoded form is only used for validation; a safe value is returned UNCHANGED so an
+        // encoded query string survives intact.
+        assertThat(ReturnToValidator.safeOrFallback("/search?q=a%26b")).isEqualTo("/search?q=a%26b");
+    }
+
+    @Test
+    void malformedPercentEncodingFallsBackToRoot() {
+        // A malformed escape makes fullyDecode return a guaranteed-rejected sentinel → fallback.
+        assertThat(ReturnToValidator.safeOrFallback("/%ZZ")).isEqualTo("/");
+        assertThat(ReturnToValidator.safeOrFallback("/%")).isEqualTo("/");
+    }
 }

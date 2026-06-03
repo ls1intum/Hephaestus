@@ -28,9 +28,8 @@ describe("SessionsSection", () => {
 		renderWithClient(<SessionsSection />);
 
 		await screen.findByText("Chrome 124 on macOS");
-		for (const s of sessions) {
-			expect(screen.getByText(s.userAgent as string)).toBeTruthy();
-		}
+		// One row per session (the visual per-device rendering is covered by the Storybook story).
+		expect(screen.getAllByRole("listitem")).toHaveLength(sessions.length);
 
 		// The current session is badged and offers a disabled "Current" control, not a Revoke one.
 		const currentRow = rowByDevice("Chrome 124 on macOS");

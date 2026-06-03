@@ -24,7 +24,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  */
 class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
 
-    private static final String XSRF_COOKIE = "XSRF-TOKEN";
+    private static final String XSRF_COOKIE = "__Host-XSRF-TOKEN";
     private static final String XSRF_HEADER = "X-XSRF-TOKEN";
 
     @Autowired

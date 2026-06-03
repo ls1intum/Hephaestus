@@ -94,7 +94,7 @@ public class TestAuthUtils {
     }
 
     /** The double-submit CSRF cookie/header pair the SPA echoes (see SpaCsrfTokenRequestHandler). */
-    private static final String XSRF_COOKIE = "XSRF-TOKEN";
+    private static final String XSRF_COOKIE = "__Host-XSRF-TOKEN";
     private static final String XSRF_HEADER = "X-XSRF-TOKEN";
 
     /**

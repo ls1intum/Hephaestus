@@ -29,6 +29,9 @@ const DELETE_CONFIRM_PHRASE = "delete my account";
 // Export states that mean the server is still working — keep polling while in these.
 const EXPORT_IN_PROGRESS = new Set(["PENDING", "PROCESSING"]);
 
+// Give up polling after this long so a wedged export doesn't poll indefinitely.
+const MAX_EXPORT_WAIT_MS = 3 * 60 * 1000;
+
 interface DangerZoneSectionProps {
 	/** Called after the account is deleted (e.g. logout + redirect to /login). */
 	onAccountDeleted: () => void | Promise<void>;
@@ -61,6 +64,7 @@ export function DangerZoneSection({ onAccountDeleted }: DangerZoneSectionProps) 
  */
 function DataExportRow() {
 	const [exportId, setExportId] = useState<number | null>(null);
+	const [requestedAt, setRequestedAt] = useState<number | null>(null);
 	const [isDownloading, setIsDownloading] = useState(false);
 
 	const requestExport = useMutation({
@@ -68,6 +72,7 @@ function DataExportRow() {
 		onSuccess: (data) => {
 			if (typeof data.id === "number") {
 				setExportId(data.id);
+				setRequestedAt(Date.now());
 			} else {
 				toast.error("Export request did not return an identifier.");
 			}
@@ -83,15 +88,22 @@ function DataExportRow() {
 		enabled: exportId !== null,
 		refetchInterval: (query) => {
 			const status = query.state.data?.status?.toUpperCase();
-			return status && EXPORT_IN_PROGRESS.has(status) ? 2000 : false;
+			const stillWorking = status && EXPORT_IN_PROGRESS.has(status);
+			if (!stillWorking || requestedAt === null) return stillWorking ? 2000 : false;
+			return query.state.dataUpdatedAt - requestedAt < MAX_EXPORT_WAIT_MS ? 2000 : false;
 		},
 	});
 
 	const status = statusQuery.data?.status?.toUpperCase();
-	const isPreparing =
-		requestExport.isPending || (exportId !== null && status && EXPORT_IN_PROGRESS.has(status));
+	const inProgress = exportId !== null && status && EXPORT_IN_PROGRESS.has(status);
+	// Polling gave up while the export was still working — let the user retry rather than spin forever.
+	const isStalled =
+		Boolean(inProgress) &&
+		requestedAt !== null &&
+		statusQuery.dataUpdatedAt - requestedAt >= MAX_EXPORT_WAIT_MS;
+	const isPreparing = !isStalled && (requestExport.isPending || Boolean(inProgress));
 	const isReady = status === "READY";
-	const isFailed = status === "FAILED" || status === "EXPIRED";
+	const isFailed = status === "FAILED" || status === "EXPIRED" || isStalled;
 
 	const handleDownload = async () => {
 		if (exportId === null) return;
@@ -132,6 +144,7 @@ function DataExportRow() {
 	if (requestExport.isPending) statusText = "Requesting export…";
 	else if (isPreparing) statusText = "Preparing your export… this can take a moment.";
 	else if (isReady) statusText = "Your export is ready to download.";
+	else if (isStalled) statusText = "This is taking longer than expected. Please try again.";
 	else if (isFailed) statusText = "The export could not be prepared. Please try again.";
 
 	return (

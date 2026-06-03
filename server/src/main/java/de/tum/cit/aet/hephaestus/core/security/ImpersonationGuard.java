@@ -16,6 +16,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
@@ -30,7 +33,9 @@ import tools.jackson.databind.ObjectMapper;
  * controller layer.
  *
  * <p>Safe methods (GET / HEAD / OPTIONS) always pass — impersonation is primarily a
- * "see what they see" tool.
+ * "see what they see" tool. The session-lifecycle escape endpoints ({@link #LIFECYCLE_ESCAPE} —
+ * exit / logout / refresh) also always pass, so the operator can never be trapped in a read-only
+ * session by the very guard meant to contain it.
  *
  * <p><strong>Threat-model honesty.</strong> This is an <em>accidental-write guardrail</em>, not a
  * hardened authorization control. An operator who holds an impersonation token already wields the
@@ -54,6 +59,23 @@ import tools.jackson.databind.ObjectMapper;
 public class ImpersonationGuard extends OncePerRequestFilter {
 
     public static final String ALLOW_WRITES_HEADER = "X-Impersonation-Allow-Writes";
+
+    /**
+     * Session-lifecycle "escape" endpoints that MUST stay reachable during an impersonation session.
+     * All three are POSTs (non-safe methods), so without this carve-out the read-only write-block
+     * below would 403 them — trapping the operator in the impersonated session until the token TTL
+     * expires, and (for exit) silently dropping the {@code IMPERSONATION_END} audit row. These verbs
+     * only reduce or preserve privilege — exit drops the {@code act} claim, logout revokes the token,
+     * refresh re-issues the same claims — so allowing them unconditionally cannot escalate. CSRF still
+     * applies (they are cookie POSTs on the resource-server chain), and the privilege-granting
+     * {@code POST /auth/impersonate} (begin) is deliberately NOT listed, so it stays guarded.
+     */
+    public static final RequestMatcher LIFECYCLE_ESCAPE = new OrRequestMatcher(
+        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/impersonate:exit"),
+        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/logout"),
+        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/auth/refresh")
+    );
+
     private static final Logger log = LoggerFactory.getLogger(ImpersonationGuard.class);
 
     private final ObjectMapper objectMapper;
@@ -65,7 +87,7 @@ public class ImpersonationGuard extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
         throws ServletException, IOException {
-        if (isImpersonating() && !isSafe(request) && !writesAllowed(request)) {
+        if (isImpersonating() && !isSafe(request) && !writesAllowed(request) && !LIFECYCLE_ESCAPE.matches(request)) {
             log.warn(
                 "auth.impersonation: blocked {} {} — impersonation session is read-only (no allow-writes header)",
                 request.getMethod(),

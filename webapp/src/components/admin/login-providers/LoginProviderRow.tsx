@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, CopyIcon, HistoryIcon, PauseIcon, PlayIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { auditOptions } from "@/api/@tanstack/react-query.gen";
 import type { ConnectionSummary } from "@/api/types.gen";
 import {
@@ -71,7 +72,12 @@ export function LoginProviderRow({
 				setCopied(true);
 				setTimeout(() => setCopied(false), 2000);
 			})
-			.catch(() => setCopied(false));
+			.catch(() => {
+				// Clipboard write can be blocked (insecure context, denied permission) — tell the user
+				// to copy manually instead of silently doing nothing.
+				setCopied(false);
+				toast.error("Couldn't copy — select the URL and copy it manually.");
+			});
 	};
 
 	return (

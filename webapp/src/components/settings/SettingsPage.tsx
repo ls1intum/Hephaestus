@@ -1,5 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
+import { CookiePreferencesSection } from "./CookiePreferencesSection";
 import { DangerZoneSection } from "./DangerZoneSection";
 import { LinkedAccountsSection, type LinkedAccountsSectionProps } from "./LinkedAccountsSection";
 import {
@@ -87,6 +88,9 @@ export function SettingsPage({
 
 			<Separator />
 			<SessionsSection />
+
+			<Separator />
+			<CookiePreferencesSection />
 
 			<Separator />
 			<DangerZoneSection onAccountDeleted={onAccountDeleted} />

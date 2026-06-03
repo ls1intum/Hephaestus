@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 /**
  * CSRF request handler for a stateless cookie double-submit SPA (ADR 0017).
  *
- * <p>The webapp reads the <em>raw</em> {@code XSRF-TOKEN} cookie value and echoes it back in the
+ * <p>The webapp reads the <em>raw</em> {@code __Host-XSRF-TOKEN} cookie value and echoes it back in the
  * {@code X-XSRF-TOKEN} header on every state-changing request (see {@code webapp/src/main.tsx} and
  * {@code webapp/src/integrations/auth/authClient.ts}). It does NOT understand Spring's
  * BREACH-mitigation XOR masking. This handler therefore:
@@ -28,7 +28,7 @@ import org.springframework.util.StringUtils;
  * </ul>
  *
  * <p>Pairing this with {@code CookieCsrfTokenRepository.withHttpOnlyFalse()} stores the raw token in
- * the JS-readable {@code XSRF-TOKEN} cookie, closing the SameSite=Lax-only gap: a cross-site forged
+ * the JS-readable {@code __Host-XSRF-TOKEN} cookie, closing the SameSite=Lax-only gap: a cross-site forged
  * POST cannot read the cookie and so cannot supply the matching header.
  */
 public final class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {

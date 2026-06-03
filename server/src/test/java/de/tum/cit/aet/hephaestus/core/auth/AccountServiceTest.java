@@ -11,8 +11,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
@@ -22,13 +25,16 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Unit coverage of {@link AccountService#unlinkIdentity} guard logic with all repository/audit
+ * Unit coverage of {@link AccountService} guard logic ({@code unlinkIdentity} last-identity/ownership
+ * rules and {@code adminSetRole} last-admin/self-demotion rules) with all repository/audit
  * collaborators mocked — including the post-lock race branch ({@code deleteByIdAndAccountId == 0}),
  * which the integration test cannot reach. Uses a real {@link AuthEventLogger} over a mock
  * {@link AuthEventWriter} so "did we audit?" is a single {@code write(...)} verification.
@@ -112,6 +118,88 @@ class AccountServiceTest extends BaseUnitTest {
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
         );
 
+        verifyNoInteractions(auditWriter);
+    }
+
+    private Account accountWithRole(long id, Account.AppRole role) {
+        Account account = new Account();
+        account.setId(id);
+        account.setAppRole(role);
+        when(accountRepository.findById(id)).thenReturn(Optional.of(account));
+        return account;
+    }
+
+    @Test
+    void grantingAdminToAUserPersistsAndAuditsWithoutAnyLockoutCheck() {
+        Account account = accountWithRole(2L, Account.AppRole.USER);
+
+        service.adminSetRole(2L, "APP_ADMIN", 1L);
+
+        assertThat(account.getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
+        verify(accountRepository).save(account);
+        // The role change must be audited under the dedicated APP_ROLE_CHANGED type (not the generic
+        // FEATURE_FLAG_CHANGED) with the old→new transition, so it is queryable on event_type.
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(auditWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.APP_ROLE_CHANGED);
+        assertThat(event.getValue().details()).contains("\"from\":\"USER\"", "\"to\":\"APP_ADMIN\"");
+        // Promotion never needs the admin-count query.
+        verify(accountRepository, never()).findByAppRoleAndStatusForUpdate(any(), any());
+    }
+
+    @Test
+    void demotingAnotherAdminSucceedsWhileMoreAdminsRemain() {
+        Account account = accountWithRole(2L, Account.AppRole.APP_ADMIN);
+        when(
+            accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
+        ).thenReturn(List.of(new Account(), new Account()));
+
+        service.adminSetRole(2L, "USER", 1L);
+
+        assertThat(account.getAppRole()).isEqualTo(Account.AppRole.USER);
+        verify(accountRepository).save(account);
+        verify(auditWriter).write(any());
+    }
+
+    @Test
+    void unknownRoleIsRejectedWithoutSavingOrAuditing() {
+        accountWithRole(2L, Account.AppRole.USER);
+
+        assertThatThrownBy(() -> service.adminSetRole(2L, "BOGUS", 1L)).isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        );
+
+        verify(accountRepository, never()).save(any());
+        verifyNoInteractions(auditWriter);
+    }
+
+    @Test
+    void cannotRevokeYourOwnAdmin() {
+        accountWithRole(1L, Account.AppRole.APP_ADMIN);
+
+        assertThatThrownBy(() -> service.adminSetRole(1L, "USER", 1L)).isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
+        );
+
+        verify(accountRepository, never()).save(any());
+        verifyNoInteractions(auditWriter);
+    }
+
+    @Test
+    void cannotRevokeTheLastRemainingActiveAdmin() {
+        accountWithRole(2L, Account.AppRole.APP_ADMIN);
+        when(
+            accountRepository.findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
+        ).thenReturn(List.of(new Account()));
+
+        assertThatThrownBy(() -> service.adminSetRole(2L, "USER", 1L)).isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
+        );
+
+        verify(accountRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
     }
 }
