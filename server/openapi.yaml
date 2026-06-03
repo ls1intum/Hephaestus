@@ -459,8 +459,12 @@ paths:
           type: integer
           format: int64
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Identity unlinked
+        "404":
+          description: No such identity on the current account
+        "409":
+          description: Cannot unlink the account's only remaining sign-in method
       summary: Unlink one of the current user's linked identity providers
       tags:
       - Account

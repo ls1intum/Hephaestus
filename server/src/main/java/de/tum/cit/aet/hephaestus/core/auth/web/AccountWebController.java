@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.List;
@@ -110,6 +112,16 @@ public class AccountWebController {
 
     @DeleteMapping("/identities/{id}")
     @Operation(summary = "Unlink one of the current user's linked identity providers", operationId = "unlinkIdentity")
+    @ApiResponses(
+        {
+            @ApiResponse(responseCode = "204", description = "Identity unlinked"),
+            @ApiResponse(responseCode = "404", description = "No such identity on the current account"),
+            @ApiResponse(
+                responseCode = "409",
+                description = "Cannot unlink the account's only remaining sign-in method"
+            ),
+        }
+    )
     public ResponseEntity<Void> unlinkIdentity(@PathVariable Long id) {
         accountService.unlinkIdentity(CurrentAccount.requireId(), id);
         return ResponseEntity.noContent().build();

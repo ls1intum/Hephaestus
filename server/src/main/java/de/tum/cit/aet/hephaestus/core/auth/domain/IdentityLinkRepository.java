@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.core.auth.domain;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -70,24 +72,39 @@ public interface IdentityLinkRepository extends JpaRepository<IdentityLink, Long
     List<IdentityLink> findActiveByAccountId(@Param("accountId") Long accountId);
 
     /**
-     * Soft-unlink: mark the link disabled, but only if it is currently active AND owned by the given
-     * account (so a caller can never unlink someone else's identity). Soft-delete — not a row delete —
-     * so the partial unique index {@code uq_identity_link_active_per_provider} frees the
-     * {@code (account, provider, team)} slot and the same provider can be re-linked later by signing in.
-     *
-     * @return number of rows updated (0 when the link is missing, already disabled, or not owned)
+     * Like {@link #findActiveByAccountId} but takes a {@code PESSIMISTIC_WRITE} (SELECT … FOR UPDATE)
+     * lock on the account's active links. Unlink uses this to serialize the last-identity guard:
+     * without the lock, two concurrent unlinks of DIFFERENT identities each read count 2, both pass
+     * {@code size() <= 1}, and both disjoint-row UPDATEs commit under READ COMMITTED (neither blocks on
+     * the other) → 0 active identities, a full sign-in lockout. With the lock the second unlink waits,
+     * re-reads count 1, and is rejected.
      */
-    @Modifying
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
-        UPDATE IdentityLink il
-           SET il.disabledAt = :now
-         WHERE il.id = :id
-           AND il.account.id = :accountId
+        SELECT il
+          FROM IdentityLink il
+         WHERE il.account.id = :accountId
            AND il.disabledAt IS NULL
         """
     )
-    int disableByIdAndAccountId(@Param("id") Long id, @Param("accountId") Long accountId, @Param("now") Instant now);
+    List<IdentityLink> findActiveByAccountIdForUpdate(@Param("accountId") Long accountId);
+
+    /**
+     * Unlink: remove the link, but only if owned by the given account (so a caller can never unlink
+     * someone else's identity). A row delete — not a soft delete — chosen deliberately: the
+     * {@code uq_identity_link_provider_subject_team} index is global (spans disabled rows), so a
+     * soft-deleted row would keep its {@code (provider, subject)} key and re-linking the SAME IdP
+     * identity later would hit a unique violation. Deleting also avoids retaining the disconnected
+     * identity's PII and keeps {@code disabled_at} reserved for admin/system disabling. The append-only
+     * {@code auth_event} keeps the audit trail; its {@code identity_link_id} FK is {@code ON DELETE SET
+     * NULL}.
+     *
+     * @return number of rows deleted (0 when the link is missing or not owned — e.g. a lost race)
+     */
+    @Modifying
+    @Query("DELETE FROM IdentityLink il WHERE il.id = :id AND il.account.id = :accountId")
+    int deleteByIdAndAccountId(@Param("id") Long id, @Param("accountId") Long accountId);
 
     /**
      * Wire an {@link IdentityLink} to its git-provider actor mirror, but only when it is not already

@@ -86,8 +86,36 @@ class AccountUnlinkIdentityIntegrationTest {
             .expectStatus()
             .isNoContent();
 
-        var remaining = identityLinkRepository.findActiveByAccountId(account.getId());
-        assertThat(remaining).extracting(IdentityLink::getId).containsExactly(gitlab.getId());
+        // Hard delete: the unlinked row is gone (not soft-disabled), the other identity stays active.
+        assertThat(identityLinkRepository.findById(github.getId())).isEmpty();
+        assertThat(identityLinkRepository.findActiveByAccountId(account.getId()))
+            .extracting(IdentityLink::getId)
+            .containsExactly(gitlab.getId());
+    }
+
+    @Test
+    void unlinkIsReversibleTheSameProviderCanBeRelinked() {
+        Account account = accountRepository.save(new Account("Reversible User"));
+        IdentityLink github = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
+        seedLink(account, GitProviderType.GITLAB, "https://gitlab.lrz.de", "gl-rev", "rev-gl");
+        String token = tokenFor(account);
+
+        webTestClient
+            .delete()
+            .uri("/user/identities/{id}", github.getId())
+            .headers(h -> h.setBearerAuth(token))
+            .exchange()
+            .expectStatus()
+            .isNoContent();
+
+        // The row is gone, so the global (provider, subject) uniqueness is freed and the SAME GitHub
+        // identity can be linked again — the promise the disconnect dialog makes. A soft-delete
+        // regression would leave the key occupied and this re-link would throw a unique violation.
+        assertThat(identityLinkRepository.findById(github.getId())).isEmpty();
+        IdentityLink relinked = seedLink(account, GitProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
+        assertThat(identityLinkRepository.findActiveByAccountId(account.getId()))
+            .extracting(IdentityLink::getId)
+            .contains(relinked.getId());
     }
 
     @Test
@@ -102,7 +130,12 @@ class AccountUnlinkIdentityIntegrationTest {
             .headers(h -> h.setBearerAuth(token))
             .exchange()
             .expectStatus()
-            .isEqualTo(409);
+            .isEqualTo(409)
+            .expectBody()
+            .jsonPath("$.detail")
+            .isEqualTo(
+                "You can't unlink your only sign-in method. Link another provider first, or delete your account."
+            );
 
         assertThat(identityLinkRepository.findActiveByAccountId(account.getId())).hasSize(1);
     }

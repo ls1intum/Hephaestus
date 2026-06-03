@@ -80,7 +80,7 @@ public class AccountService {
     }
 
     /**
-     * Unlink a federated identity from the current account (soft-delete). Two safety rules, both
+     * Unlink (remove) a federated identity from the current account. Two safety rules, both
      * standard for account-linking UIs:
      * <ul>
      *   <li><b>Ownership</b> — only a link the account actually owns can be removed (404 otherwise),
@@ -94,7 +94,9 @@ public class AccountService {
      */
     @Transactional
     public void unlinkIdentity(Long accountId, Long identityLinkId) {
-        List<IdentityLink> active = identityLinkRepository.findActiveByAccountId(accountId);
+        // Write-lock the account's active links so two concurrent unlinks of different identities
+        // serialize — otherwise both pass the last-identity guard below and drain the account to zero.
+        List<IdentityLink> active = identityLinkRepository.findActiveByAccountIdForUpdate(accountId);
         IdentityLink target = active
             .stream()
             .filter(il -> il.getId().equals(identityLinkId))
@@ -106,15 +108,17 @@ public class AccountService {
                 "You can't unlink your only sign-in method. Link another provider first, or delete your account."
             );
         }
-        if (identityLinkRepository.disableByIdAndAccountId(identityLinkId, accountId, clock.instant()) == 0) {
-            // Lost a race (concurrently disabled) — nothing to do; surface as not-found.
+        Long gitProviderId = target.getGitProviderId();
+        if (identityLinkRepository.deleteByIdAndAccountId(identityLinkId, accountId) == 0) {
+            // Lost a race (concurrently removed) — nothing to do; surface as not-found.
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "identity link not found");
         }
+        // The link row is now gone, so don't reference its id in the audit (its auth_event FK is
+        // ON DELETE SET NULL anyway); account + provider record who unlinked which provider.
         authEventLogger
             .event(AuthEvent.EventType.IDENTITY_UNLINKED, AuthEvent.Result.SUCCESS)
             .account(accountId)
-            .identityLink(identityLinkId)
-            .gitProvider(target.getGitProviderId())
+            .gitProvider(gitProviderId)
             .record();
     }
 
