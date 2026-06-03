@@ -55,6 +55,7 @@ const defaultLinkedAccountsProps = {
 		{ registrationId: "gitlab-lrz", displayName: "GitLab LRZ", providerType: "GITLAB" },
 	],
 	onLink: fn(),
+	onUnlink: fn(),
 };
 
 /**

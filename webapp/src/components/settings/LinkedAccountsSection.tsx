@@ -1,6 +1,17 @@
-import { LinkIcon, type LucideIcon } from "lucide-react";
+import { LinkIcon, type LucideIcon, Unlink } from "lucide-react";
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,6 +21,11 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITLAB: GitlabIcon,
 };
 
+const PROVIDER_LABELS: Record<string, string> = {
+	GITHUB: "GitHub",
+	GITLAB: "GitLab",
+};
+
 /**
  * Resolve a brand icon from a provider type (e.g. "GITHUB", "GITLAB"). Falls back
  * to a generic link icon for unknown providers so new IdPs render gracefully.
@@ -17,6 +33,12 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 function getProviderIcon(providerType?: string): LucideIcon {
 	if (!providerType) return LinkIcon;
 	return PROVIDER_ICONS[providerType.toUpperCase()] ?? LinkIcon;
+}
+
+/** Human-friendly provider name for prose ("GITHUB" → "GitHub"). */
+function friendlyProvider(providerType?: string): string {
+	if (!providerType) return "that provider";
+	return PROVIDER_LABELS[providerType.toUpperCase()] ?? providerType;
 }
 
 function formatLastLogin(lastLoginAt?: Date): string | undefined {
@@ -31,7 +53,7 @@ function formatLastLogin(lastLoginAt?: Date): string | undefined {
 }
 
 export interface LinkedAccountsSectionProps {
-	/** Identities already federated to this account (read-only in this view). */
+	/** Identities already federated to this account. */
 	identities: IdentityView[];
 	/** Sign-in providers available to link (offered when not already linked). */
 	providers: IdentityProviderView[];
@@ -40,6 +62,14 @@ export interface LinkedAccountsSectionProps {
 	 * attaches the resulting identity to the current account (top-level redirect).
 	 */
 	onLink: (registrationId: string) => void;
+	/**
+	 * Disconnect a linked identity. Disabled for the account's only remaining sign-in
+	 * method — removing the last identity would lock the user out, so they delete the
+	 * account instead.
+	 */
+	onUnlink: (identityId: number) => void;
+	/** Id of the identity currently being disconnected — shows a spinner and blocks repeat clicks. */
+	unlinkingId?: number | null;
 	isLoading?: boolean;
 	isError?: boolean;
 }
@@ -47,14 +77,16 @@ export interface LinkedAccountsSectionProps {
 /**
  * Settings section for federated identities (ADR 0017 native auth).
  *
- * Linked identities are read-only — there is no unlink endpoint. To add another
- * identity the user re-runs sign-in with that provider via `onLink`, which
- * links the resulting identity to the current account.
+ * Users can connect additional providers (re-running sign-in, which links the resulting
+ * identity to this account) and disconnect ones they no longer want — except the last
+ * remaining identity, which is kept so the account can never be locked out of sign-in.
  */
 export function LinkedAccountsSection({
 	identities,
 	providers,
 	onLink,
+	onUnlink,
+	unlinkingId = null,
 	isLoading = false,
 	isError = false,
 }: LinkedAccountsSectionProps) {
@@ -71,6 +103,9 @@ export function LinkedAccountsSection({
 		return !type || !linkedProviderTypes.has(type);
 	});
 
+	// Lockout guard: the account's only remaining sign-in method cannot be removed.
+	const isOnlyIdentity = identities.length <= 1;
+
 	return (
 		<section className="space-y-4" aria-labelledby="linked-accounts-heading">
 			<div className="space-y-1">
@@ -78,8 +113,8 @@ export function LinkedAccountsSection({
 					Connected Accounts
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					The identity providers linked to your account. Linking another provider re-runs sign-in
-					with it and attaches that login to this account.
+					The identity providers you can sign in to Hephaestus with. Connect another provider, or
+					disconnect ones you no longer use.
 				</p>
 			</div>
 
@@ -102,7 +137,8 @@ export function LinkedAccountsSection({
 					<div className="space-y-3">
 						{identities.map((identity) => {
 							const Icon = getProviderIcon(identity.providerType);
-							const name = identity.displayName || identity.username || identity.subject;
+							const name =
+								identity.displayName || identity.username || identity.subject || "Account";
 							const lastLogin = formatLastLogin(identity.lastLoginAt);
 
 							return (
@@ -128,6 +164,16 @@ export function LinkedAccountsSection({
 											)}
 										</div>
 									</div>
+
+									{identity.id != null && (
+										<UnlinkControl
+											name={name}
+											providerType={identity.providerType}
+											isOnlyIdentity={isOnlyIdentity}
+											isUnlinking={unlinkingId === identity.id}
+											onConfirm={() => onUnlink(identity.id as number)}
+										/>
+									)}
 								</div>
 							);
 						})}
@@ -135,7 +181,7 @@ export function LinkedAccountsSection({
 
 					{linkableProviders.length > 0 && (
 						<div className="space-y-2 pt-2">
-							<h3 className="text-sm font-medium">Link another account</h3>
+							<h3 className="text-sm font-medium">Connect another account</h3>
 							<p className="text-xs text-muted-foreground">
 								Connecting a provider sends you to its sign-in page; the identity you sign in with
 								is then linked to this account.
@@ -164,5 +210,81 @@ export function LinkedAccountsSection({
 				</>
 			)}
 		</section>
+	);
+}
+
+interface UnlinkControlProps {
+	name: string;
+	providerType?: string;
+	isOnlyIdentity: boolean;
+	isUnlinking: boolean;
+	onConfirm: () => void;
+}
+
+/**
+ * The per-identity disconnect control. For the account's only remaining identity it renders a
+ * disabled button with a tooltip explaining the lockout guard; otherwise a confirmation dialog
+ * gates the (reversible) disconnect.
+ */
+function UnlinkControl({
+	name,
+	providerType,
+	isOnlyIdentity,
+	isUnlinking,
+	onConfirm,
+}: UnlinkControlProps) {
+	if (isOnlyIdentity) {
+		// The only sign-in method can't be removed (lockout guard). Disabled + a native hint;
+		// removing it is done by deleting the account in the Danger Zone.
+		return (
+			<Button
+				variant="ghost"
+				size="sm"
+				disabled
+				aria-label={`Disconnect ${name}`}
+				title="This is your only sign-in method — to remove it, delete your account in the Danger Zone."
+				className="shrink-0 text-muted-foreground"
+			>
+				<Unlink className="size-3.5 mr-1.5" aria-hidden="true" />
+				Disconnect
+			</Button>
+		);
+	}
+
+	return (
+		<AlertDialog>
+			<AlertDialogTrigger
+				render={
+					<Button
+						variant="ghost"
+						size="sm"
+						disabled={isUnlinking}
+						aria-label={`Disconnect ${name}`}
+						className="shrink-0 text-muted-foreground hover:text-destructive"
+					>
+						{isUnlinking ? (
+							<Spinner className="size-3.5 mr-1.5" aria-hidden="true" />
+						) : (
+							<Unlink className="size-3.5 mr-1.5" aria-hidden="true" />
+						)}
+						Disconnect
+					</Button>
+				}
+			/>
+			<AlertDialogContent>
+				<AlertDialogHeader>
+					<AlertDialogTitle>Disconnect {name}?</AlertDialogTitle>
+					<AlertDialogDescription>
+						You'll no longer be able to sign in to Hephaestus with this{" "}
+						{friendlyProvider(providerType)} account. You can reconnect it anytime by signing in
+						with {friendlyProvider(providerType)} again.
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<AlertDialogFooter>
+					<AlertDialogCancel>Cancel</AlertDialogCancel>
+					<AlertDialogAction onClick={onConfirm}>Disconnect</AlertDialogAction>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
 	);
 }

@@ -2491,6 +2491,22 @@ export type ListLinkedIdentitiesResponses = {
 
 export type ListLinkedIdentitiesResponse = ListLinkedIdentitiesResponses[keyof ListLinkedIdentitiesResponses];
 
+export type UnlinkIdentityData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/user/identities/{id}';
+};
+
+export type UnlinkIdentityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type RevokeOtherSessionsData = {
     body?: never;
     path?: never;

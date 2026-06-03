@@ -2,10 +2,13 @@ import { type DefaultError, useMutation, useQuery, useQueryClient } from "@tanst
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+	getCurrentUserQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
 	listIdentityProvidersOptions,
 	listLinkedIdentitiesOptions,
+	listLinkedIdentitiesQueryKey,
+	unlinkIdentityMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Options } from "@/api/sdk.gen";
@@ -102,10 +105,31 @@ function RouteComponent() {
 		await logout();
 	};
 
+	// Disconnect a federated identity. The server enforces the lockout guard (409 on the last
+	// identity) and ownership; the UI also disables that case, so this path is the happy one.
+	const unlinkMutation = useMutation({
+		...unlinkIdentityMutation(),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: listLinkedIdentitiesQueryKey({}) });
+			// The primary identity (avatar, username) the app shows may have been the one removed.
+			queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
+			toast.success("Account disconnected.");
+		},
+		onError: (error: DefaultError) => {
+			console.error("Failed to disconnect account:", error);
+			const detail = (error as { detail?: unknown })?.detail;
+			toast.error(
+				typeof detail === "string" ? detail : "Couldn't disconnect that account. Please try again.",
+			);
+		},
+	});
+
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
 		onLink: linkAccount,
+		onUnlink: (id) => unlinkMutation.mutate({ path: { id } }),
+		unlinkingId: unlinkMutation.isPending ? (unlinkMutation.variables?.path?.id ?? null) : null,
 		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 	};
