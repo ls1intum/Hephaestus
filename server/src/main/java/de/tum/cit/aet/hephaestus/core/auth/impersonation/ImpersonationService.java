@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -44,6 +45,7 @@ public class ImpersonationService {
     private final IssuedJwtRepository issuedJwtRepository;
     private final AuthEventLogger authEventLogger;
     private final ObjectMapper objectMapper;
+    private final de.tum.cit.aet.hephaestus.core.auth.AuthProperties properties;
     private final Clock clock;
 
     public ImpersonationService(
@@ -53,6 +55,7 @@ public class ImpersonationService {
         IssuedJwtRepository issuedJwtRepository,
         AuthEventLogger authEventLogger,
         ObjectMapper objectMapper,
+        de.tum.cit.aet.hephaestus.core.auth.AuthProperties properties,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
@@ -61,6 +64,7 @@ public class ImpersonationService {
         this.issuedJwtRepository = issuedJwtRepository;
         this.authEventLogger = authEventLogger;
         this.objectMapper = objectMapper;
+        this.properties = properties;
         this.clock = clock;
     }
 
@@ -101,9 +105,12 @@ public class ImpersonationService {
         // Impersonate with the target's own roles so the operator sees the target's view;
         // ImpersonationGuard makes the session read-only regardless. The act claim records
         // the operator. Issued via the principal factory so preferred_username = target login.
+        // imp_exp stamps the absolute time-box so silent refresh can't renew it indefinitely.
+        Instant impersonationExpiresAt = clock.instant().plus(properties.impersonationMaxLifetime());
         HephaestusJwtIssuer.Token token = jwtIssuer.issue(
             principalFactory.forAccount(target),
             operator.getId(),
+            impersonationExpiresAt,
             request
         );
 

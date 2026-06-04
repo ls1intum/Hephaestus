@@ -68,7 +68,8 @@ class OAuthLoginRegistrationSubjectTest extends BaseUnitTest {
             new AuthProperties.GithubLogin("gh-client-id", "gh-client-secret"),
             new AuthProperties.GitlabLrzLogin("gl-client-id", "gl-client-secret", URI.create("https://gitlab.lrz.de")),
             java.util.List.of(),
-            ""
+            "",
+            Duration.ofHours(1)
         );
     }
 }

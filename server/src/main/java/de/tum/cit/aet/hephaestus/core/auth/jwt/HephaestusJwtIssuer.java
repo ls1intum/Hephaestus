@@ -79,8 +79,28 @@ public class HephaestusJwtIssuer {
      */
     @Transactional
     public Token issue(JwtPrincipal principal, @Nullable Long impersonatorId, @Nullable HttpServletRequest request) {
+        return issue(principal, impersonatorId, null, request);
+    }
+
+    /**
+     * As {@link #issue(JwtPrincipal, Long, HttpServletRequest)} but with an impersonation time-box.
+     * When {@code impersonationExpiresAt} is set, the token's {@code exp} is capped at
+     * {@code min(now + accessTtl, impersonationExpiresAt)} and an {@code imp_exp} claim carries the
+     * absolute ceiling so {@code AuthSessionService.refresh} can auto-exit once it passes. Only the
+     * impersonation paths supply it; ordinary issuance keeps the full {@code accessTtl}.
+     */
+    @Transactional
+    public Token issue(
+        JwtPrincipal principal,
+        @Nullable Long impersonatorId,
+        @Nullable Instant impersonationExpiresAt,
+        @Nullable HttpServletRequest request
+    ) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(properties.accessTtl());
+        if (impersonationExpiresAt != null && impersonationExpiresAt.isBefore(expiresAt)) {
+            expiresAt = impersonationExpiresAt;
+        }
         UUID jti = UUID.randomUUID();
         JWK signingKey = keyService.currentSigningKey();
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
@@ -97,6 +117,11 @@ public class HephaestusJwtIssuer {
         }
         if (impersonatorId != null) {
             claims.claim("act", java.util.Map.of("sub", String.valueOf(impersonatorId)));
+        }
+        if (impersonationExpiresAt != null) {
+            // Absolute impersonation ceiling (epoch seconds), constant across refreshes. refresh reads
+            // it to auto-exit; it is NOT the per-token exp (which is min(now+accessTtl, this)).
+            claims.claim("imp_exp", impersonationExpiresAt.getEpochSecond());
         }
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
         Jwt jwt = encoder.encode(JwtEncoderParameters.from(header, claims.build()));

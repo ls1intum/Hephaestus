@@ -25,8 +25,12 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code usernameAtSignup} — the same value the provider returns as the login.
  *
  * <h2>Role resolution</h2>
- * {@code admin} when the account is {@link Account.AppRole#APP_ADMIN}, plus every enabled
- * {@code account_feature} flag (e.g. {@code mentor_access}, {@code run_practice_review}).
+ * {@code app_admin} when the account is {@link Account.AppRole#APP_ADMIN}, plus every enabled
+ * {@code account_feature} flag (e.g. {@code mentor_access}, {@code run_practice_review}). The
+ * instance-admin authority is namespaced {@code app_admin} (matching the {@code /.well-known}
+ * discovery doc) — distinct from the per-workspace "admin" role, which is membership-derived and
+ * never appears in this token. Resource-server rules accept {@code admin} too for one transitional
+ * release while old tokens drain (see {@code AccountAdminController}); remove that after.
  */
 @Service
 @WorkspaceAgnostic("JWT principal assembly is account-scoped")
@@ -66,7 +70,7 @@ public class JwtPrincipalFactory {
         String login = resolveLogin(account);
         Set<String> roles = new HashSet<>(accountFeatureRepository.findFlagsByAccountId(account.getId()));
         if (account.getAppRole() == Account.AppRole.APP_ADMIN) {
-            roles.add("admin");
+            roles.add("app_admin");
         }
         return new JwtPrincipal(account.getId(), login, account.getDisplayName(), roles);
     }

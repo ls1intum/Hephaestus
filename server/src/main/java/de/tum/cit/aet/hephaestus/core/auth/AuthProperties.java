@@ -50,6 +50,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        afterwards). Proof-of-control is deployment access; deliver out-of-band,
  *                        never log it. Blank = endpoint disabled (404). Prefer {@code bootstrapAdmins};
  *                        keep this as the lockout safety net.
+ * @param impersonationMaxLifetime Absolute cap on an impersonation session, independent of the
+ *                        per-token {@code accessTtl}. {@code begin} stamps {@code imp_exp = now +
+ *                        this}; each refresh caps the new token's {@code exp} at {@code imp_exp} and,
+ *                        once it passes, drops the {@code act} claim (auto-exit to the operator). Stops
+ *                        an impersonation session from being renewed indefinitely by silent refresh.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
@@ -62,7 +67,8 @@ public record AuthProperties(
     @DefaultValue GithubLogin github,
     @DefaultValue GitlabLrzLogin gitlabLrz,
     @DefaultValue List<String> bootstrapAdmins,
-    @DefaultValue("") String bootstrapToken
+    @DefaultValue("") String bootstrapToken,
+    @DefaultValue("1h") Duration impersonationMaxLifetime
 ) {
     /**
      * Access-token cookie name. The {@code __Host-} prefix forces Secure + host-only (no Domain),

@@ -66,6 +66,12 @@ class ImpersonationServiceTest extends BaseUnitTest {
     void setUp() {
         AuthEventLogger logger = new AuthEventLogger(authEventWriter);
         Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
+        de.tum.cit.aet.hephaestus.core.auth.AuthProperties properties = mock(
+            de.tum.cit.aet.hephaestus.core.auth.AuthProperties.class
+        );
+        org.mockito.Mockito.lenient()
+            .when(properties.impersonationMaxLifetime())
+            .thenReturn(java.time.Duration.ofHours(1));
         service = new ImpersonationService(
             accountRepository,
             jwtIssuer,
@@ -73,6 +79,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
             issuedJwtRepository,
             logger,
             objectMapper,
+            properties,
             clock
         );
     }
@@ -94,7 +101,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
         when(principalFactory.forAccount(target)).thenReturn(
             new JwtPrincipal(2L, "target", "Target", java.util.Set.of())
         );
-        when(jwtIssuer.issue(any(), eq(1L), any())).thenReturn(
+        when(jwtIssuer.issue(any(), eq(1L), any(), any())).thenReturn(
             new HephaestusJwtIssuer.Token("tok", UUID.randomUUID(), Instant.parse("2026-01-01T00:15:00Z"))
         );
 
@@ -174,7 +181,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
             new JwtPrincipal(2L, "target", "Target", java.util.Set.of())
         );
         // act-claim contract: the issuer is invoked with the OPERATOR id as the impersonatorId arg.
-        when(jwtIssuer.issue(any(), eq(1L), any())).thenReturn(
+        when(jwtIssuer.issue(any(), eq(1L), any(), any())).thenReturn(
             new HephaestusJwtIssuer.Token("tok", UUID.randomUUID(), Instant.parse("2026-01-01T00:15:00Z"))
         );
 
@@ -182,7 +189,9 @@ class ImpersonationServiceTest extends BaseUnitTest {
 
         assertThat(result.targetAccountId()).isEqualTo(2L);
         assertThat(result.actingAccountId()).isEqualTo(1L);
-        verify(jwtIssuer).issue(any(), eq(1L), any());
+        // Impersonation is time-boxed: begin stamps imp_exp = now + impersonationMaxLifetime (1h from
+        // the fixed clock at 2026-01-01T00:00:00Z), which begin passes as the 3rd (cap) arg to issue.
+        verify(jwtIssuer).issue(any(), eq(1L), eq(Instant.parse("2026-01-01T01:00:00Z")), any());
 
         ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
         verify(authEventWriter).write(captor.capture());

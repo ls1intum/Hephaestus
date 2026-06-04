@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -73,6 +74,24 @@ public final class CurrentAccount {
             } catch (NumberFormatException ignored) {
                 return null;
             }
+        }
+        return null;
+    }
+
+    /**
+     * Absolute impersonation expiry ({@code imp_exp} claim, epoch seconds) if present, else null.
+     * Carries the time-box ceiling so {@code refresh} can auto-exit once it passes — the per-token
+     * {@code exp} only bounds a single token, not the whole impersonation session.
+     */
+    @Nullable
+    public static Instant impersonationExpiresAt() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            return null;
+        }
+        Object impExp = jwt.getClaim("imp_exp");
+        if (impExp instanceof Number n) {
+            return Instant.ofEpochSecond(n.longValue());
         }
         return null;
     }

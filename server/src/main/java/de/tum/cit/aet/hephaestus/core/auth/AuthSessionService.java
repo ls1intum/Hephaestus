@@ -16,6 +16,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -74,6 +75,7 @@ public class AuthSessionService {
         Long accountId,
         UUID jti,
         @Nullable Long impersonatorId,
+        @Nullable Instant impersonationExpiresAt,
         HttpServletRequest request,
         HttpServletResponse response
     ) {
@@ -101,15 +103,37 @@ public class AuthSessionService {
                 clearCookie(response);
                 return;
             }
-            HephaestusJwtIssuer.Token token = jwtIssuer.issue(
-                principalFactory.forAccountId(accountId),
-                impersonatorId,
-                request
-            );
-            authEventLogger
-                .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
-                .account(accountId)
-                .record();
+            HephaestusJwtIssuer.Token token;
+            if (impersonatorId == null) {
+                // Ordinary (non-impersonation) rotation.
+                token = jwtIssuer.issue(principalFactory.forAccountId(accountId), null, request);
+                authEventLogger
+                    .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
+                    .account(accountId)
+                    .record();
+            } else if (impersonationExpired(impersonationExpiresAt)) {
+                // Impersonation time-box reached: auto-exit to the operator (mint an operator token
+                // with NO act claim) rather than renewing the impersonation forever via silent refresh.
+                token = jwtIssuer.issue(principalFactory.forAccountId(impersonatorId), null, request);
+                authEventLogger
+                    .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
+                    .account(accountId)
+                    .actingAccount(impersonatorId)
+                    .details("{\"reason\":\"EXPIRED\"}")
+                    .record();
+            } else {
+                // Impersonation rotation: re-cap the new token at the same imp_exp ceiling.
+                token = jwtIssuer.issue(
+                    principalFactory.forAccountId(accountId),
+                    impersonatorId,
+                    impersonationExpiresAt,
+                    request
+                );
+                authEventLogger
+                    .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
+                    .account(accountId)
+                    .record();
+            }
             setCookie(response, token);
             metrics.recordRefreshResult(AuthMetrics.RefreshResult.SUCCESS);
         } catch (RuntimeException e) {
@@ -133,6 +157,15 @@ public class AuthSessionService {
         cookie.setMaxAge((int) Math.max(0, maxAge));
         cookie.setAttribute("SameSite", "Lax");
         response.addCookie(cookie);
+    }
+
+    /**
+     * Whether an impersonation session has hit its absolute time-box. A missing ceiling is treated as
+     * expired (fail-safe: a legacy impersonation token without {@code imp_exp} auto-exits on its next
+     * refresh rather than living forever).
+     */
+    private boolean impersonationExpired(@Nullable Instant impersonationExpiresAt) {
+        return impersonationExpiresAt == null || !clock.instant().isBefore(impersonationExpiresAt);
     }
 
     /** Active (non-revoked, non-expired) sessions for an account. */

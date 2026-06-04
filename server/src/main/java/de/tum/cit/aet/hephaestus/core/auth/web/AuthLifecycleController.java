@@ -54,6 +54,7 @@ public class AuthLifecycleController {
             CurrentAccount.requireId(),
             CurrentAccount.requireJti(),
             CurrentAccount.impersonatorId(),
+            CurrentAccount.impersonationExpiresAt(),
             request,
             response
         );
@@ -61,7 +62,7 @@ public class AuthLifecycleController {
     }
 
     @PostMapping("/impersonate")
-    @PreAuthorize("hasAuthority('admin')")
+    @PreAuthorize("hasAnyAuthority('app_admin', 'admin')")
     @Operation(summary = "Begin impersonating another account", operationId = "impersonate")
     public ResponseEntity<Void> impersonate(
         @Valid @RequestBody ImpersonateRequestDTO body,
