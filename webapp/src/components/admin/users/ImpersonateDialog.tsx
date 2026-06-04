@@ -18,6 +18,8 @@ export interface ImpersonateDialogProps {
 	/** The user to impersonate; `null` keeps the dialog closed. */
 	user: AdminAccountView | null;
 	isPending: boolean;
+	/** Server refusal (e.g. admin→admin 409) shown inline; the dialog stays open so it can be read. */
+	errorMessage?: string;
 	onOpenChange: (open: boolean) => void;
 	onConfirm: (user: AdminAccountView, reason: string) => void;
 }
@@ -30,6 +32,7 @@ export interface ImpersonateDialogProps {
 export function ImpersonateDialog({
 	user,
 	isPending,
+	errorMessage,
 	onOpenChange,
 	onConfirm,
 }: ImpersonateDialogProps) {
@@ -77,6 +80,14 @@ export function ImpersonateDialog({
 							autoFocus
 						/>
 					</div>
+					{errorMessage && (
+						<p
+							role="alert"
+							className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+						>
+							{errorMessage}
+						</p>
+					)}
 					<DialogFooter>
 						<DialogClose render={<Button type="button" variant="outline" disabled={isPending} />}>
 							Cancel

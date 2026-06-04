@@ -9,12 +9,23 @@
  * The decision is persisted in `localStorage` under `CONSENT_STORAGE_KEY`. Until a
  * decision is made (`getStoredConsent` returns `null`) the banner is shown and both
  * optional integrations stay disabled. Consumers subscribe via `subscribeConsent` (used by
- * the `useSyncExternalStore`-based hook in this module).
+ * the `useSyncExternalStore`-based hooks in this module).
+ *
+ * "Cookie preferences" (footer + settings) re-open the banner in edit mode via
+ * {@link requestConsentReopen} — pre-seeded from the current decision and cancelable, so revisiting
+ * preferences never silently drops a prior choice.
  */
 
 import { useSyncExternalStore } from "react";
 
 export const CONSENT_STORAGE_KEY = "hephaestus-cookie-consent";
+
+/**
+ * Bump when the cookie categories or privacy policy change. A stored decision with a missing or
+ * lower version is treated as "no decision" so existing users are re-prompted (GDPR Art. 7 — consent
+ * must be informed and specific; a changed policy invalidates the prior, narrower consent).
+ */
+export const CONSENT_VERSION = 1;
 
 export interface CookieConsent {
 	/** PostHog analytics. */
@@ -23,7 +34,12 @@ export interface CookieConsent {
 	errorMonitoring: boolean;
 	/** ISO timestamp of when the decision was recorded. */
 	decidedAt: string;
+	/** Policy/category version this decision was made against (see {@link CONSENT_VERSION}). */
+	version: number;
 }
+
+/** The opt-in choices a user can toggle (essential cookies are always on, not represented here). */
+export type ConsentChoice = Pick<CookieConsent, "analytics" | "errorMonitoring">;
 
 type ConsentListener = () => void;
 
@@ -47,10 +63,15 @@ function parseConsent(raw: string): CookieConsent | null {
 		if (typeof parsed?.analytics !== "boolean" || typeof parsed?.errorMonitoring !== "boolean") {
 			return null;
 		}
+		// A decision from an older policy version is re-prompted (treated as no decision).
+		if (parsed.version !== CONSENT_VERSION) {
+			return null;
+		}
 		return {
 			analytics: parsed.analytics,
 			errorMonitoring: parsed.errorMonitoring,
 			decidedAt: typeof parsed.decidedAt === "string" ? parsed.decidedAt : new Date().toISOString(),
+			version: CONSENT_VERSION,
 		};
 	} catch {
 		return null;
@@ -77,7 +98,7 @@ export function getStoredConsent(): CookieConsent | null {
 }
 
 /** Persist a consent decision and notify subscribers (and other tabs via the storage event). */
-export function setStoredConsent(consent: Pick<CookieConsent, "analytics" | "errorMonitoring">) {
+export function setStoredConsent(consent: ConsentChoice) {
 	if (typeof window === "undefined") {
 		return;
 	}
@@ -85,46 +106,59 @@ export function setStoredConsent(consent: Pick<CookieConsent, "analytics" | "err
 		analytics: consent.analytics,
 		errorMonitoring: consent.errorMonitoring,
 		decidedAt: new Date().toISOString(),
+		version: CONSENT_VERSION,
 	};
 	try {
 		window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(value));
 	} catch {
 		// localStorage may be unavailable (private mode / disabled); fall back to in-memory only.
 	}
+	closeConsentReopen();
 	emitChange();
 }
 
-// Set when the banner is re-opened by an explicit user action (the footer/settings "Cookie
-// preferences" control), so the banner can move focus to itself — but NOT steal focus on a passive
-// first-visit appearance. Read-and-reset via consumeConsentReopen().
+// Edit-mode reopen: set when the user clicks "Cookie preferences". The banner then shows even though
+// a decision exists, pre-seeded from `reopenSeed` and cancelable (so backing out keeps the prior
+// choice). This is NOT a passive first-visit appearance.
 let reopenRequested = false;
+let reopenSeed: ConsentChoice | null = null;
 
 /**
- * Forget the stored decision so the consent banner shows again — the withdrawal path required by
- * GDPR Art. 7(3) (withdrawing consent must be as easy as giving it). PostHog/Sentry stay disabled
- * until a fresh decision is recorded.
+ * Re-open the consent banner in edit mode, pre-seeded with the current decision. Cancelling leaves
+ * the existing choice untouched; saving records a new one. Satisfies GDPR Art. 7(3) (withdrawing is
+ * as easy as giving — open and pick "Reject all") without destroying the prior decision on a passive
+ * revisit.
  */
-export function clearStoredConsent() {
-	if (typeof window === "undefined") {
-		return;
-	}
-	try {
-		window.localStorage.removeItem(CONSENT_STORAGE_KEY);
-	} catch {
-		// localStorage may be unavailable (private mode / disabled); fall back to in-memory only.
-	}
+export function requestConsentReopen() {
+	const current = getStoredConsent();
+	reopenSeed = current
+		? { analytics: current.analytics, errorMonitoring: current.errorMonitoring }
+		: null;
 	reopenRequested = true;
 	emitChange();
 }
 
-/** Read-and-reset the reopen flag set by {@link clearStoredConsent}. */
-export function consumeConsentReopen(): boolean {
-	const requested = reopenRequested;
-	reopenRequested = false;
-	return requested;
+/** Close the edit-mode reopen (on save or cancel). */
+export function closeConsentReopen() {
+	if (reopenRequested) {
+		reopenRequested = false;
+		emitChange();
+	}
 }
 
-/** Subscribe to consent changes (this tab and other tabs). Returns an unsubscribe fn. */
+/** The pre-seed for a reopen, read-and-cleared so it applies once. */
+export function consumeReopenSeed(): ConsentChoice | null {
+	const seed = reopenSeed;
+	reopenSeed = null;
+	return seed;
+}
+
+/** Whether the banner is currently in explicit edit-mode reopen (non-hook accessor). */
+export function isConsentReopenRequested(): boolean {
+	return reopenRequested;
+}
+
+/** Subscribe to consent / reopen changes (this tab and other tabs). Returns an unsubscribe fn. */
 export function subscribeConsent(listener: ConsentListener): () => void {
 	listeners.add(listener);
 	const onStorage = (event: StorageEvent) => {
@@ -142,6 +176,11 @@ export function subscribeConsent(listener: ConsentListener): () => void {
 /** React hook returning the current consent (or `null` until a decision is made). */
 export function useCookieConsent(): CookieConsent | null {
 	return useSyncExternalStore(subscribeConsent, getStoredConsent, () => null);
+}
+
+/** React hook: whether the banner was explicitly re-opened in edit mode. */
+export function useConsentReopenRequested(): boolean {
+	return useSyncExternalStore(subscribeConsent, isConsentReopenRequested, () => false);
 }
 
 /** Whether error-monitoring (Sentry) consent has been granted. */

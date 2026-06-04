@@ -1,6 +1,9 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { LoginCard } from "@/components/auth/LoginCard";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { ACCOUNT_DELETED_NOTICE_KEY } from "@/integrations/auth/accountDeletedNotice";
 import { resolveCurrentUser, safeReturnTo } from "@/integrations/auth/guard";
 
 interface LoginSearch {
@@ -32,6 +35,22 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
 	const { error, returnTo } = Route.useSearch();
 	const { login } = useAuth();
+
+	// One-shot confirmation after self-deletion: the delete flow signs out + reloads here, so a toast
+	// fired before the reload would be lost. We stash a flag through the reload instead and announce
+	// the real outcome (scheduled deletion, signed out everywhere) once on arrival.
+	useEffect(() => {
+		try {
+			if (sessionStorage.getItem(ACCOUNT_DELETED_NOTICE_KEY) === "1") {
+				sessionStorage.removeItem(ACCOUNT_DELETED_NOTICE_KEY);
+				toast.success(
+					"Your account is scheduled for deletion and you've been signed out everywhere. Permanent removal completes after about 48 hours.",
+				);
+			}
+		} catch {
+			// sessionStorage unavailable (private mode) — the notice is best-effort.
+		}
+	}, []);
 
 	// Pass the validated ?returnTo destination through to the kickoff so the server echoes it
 	// back into the SPA callback — without this the user would be returned to /login itself.

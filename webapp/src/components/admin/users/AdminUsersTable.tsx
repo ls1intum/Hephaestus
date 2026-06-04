@@ -105,13 +105,22 @@ export function AdminUsersTable({
 						) : users.length === 0 ? (
 							<TableRow>
 								<TableCell colSpan={COLUMN_COUNT} className="h-32 text-center">
-									<div className="flex flex-col items-center justify-center gap-2">
-										<Users className="size-8 text-muted-foreground" aria-hidden />
-										<p className="text-sm font-medium">No users found</p>
-										<p className="text-xs text-muted-foreground">
-											{hasSearch ? "Try adjusting your search." : "No accounts exist yet."}
-										</p>
-									</div>
+									{hasSearch && (hasNextPage || isFetchingNextPage) ? (
+										// Search filters loaded rows client-side, and the page is still loading more —
+										// don't claim "no users" before every page is in (avoids a false negative).
+										<div className="flex flex-col items-center justify-center gap-2">
+											<Spinner aria-hidden />
+											<p className="text-sm text-muted-foreground">Searching all users…</p>
+										</div>
+									) : (
+										<div className="flex flex-col items-center justify-center gap-2">
+											<Users className="size-8 text-muted-foreground" aria-hidden />
+											<p className="text-sm font-medium">No users found</p>
+											<p className="text-xs text-muted-foreground">
+												{hasSearch ? "Try adjusting your search." : "No accounts exist yet."}
+											</p>
+										</div>
+									)}
 								</TableCell>
 							</TableRow>
 						) : (

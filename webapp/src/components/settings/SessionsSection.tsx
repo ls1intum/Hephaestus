@@ -34,6 +34,44 @@ function formatTimestamp(value?: Date): string | undefined {
 }
 
 /**
+ * Best-effort "Browser on OS" label from a raw User-Agent string. A raw UA is unreadable to humans,
+ * so a user can't tell their sessions apart — the recognition the revoke feature depends on. The raw
+ * string is kept as a tooltip for the rare case the heuristic misses. Order matters (Edge/Opera
+ * before Chrome; Chrome before Safari) because UAs nest these tokens.
+ */
+function describeUserAgent(ua?: string): string {
+	if (!ua) return "Unknown device";
+	const os = /Windows/.test(ua)
+		? "Windows"
+		: /iPhone|iPad|iPod/.test(ua)
+			? "iOS"
+			: /Mac OS X|Macintosh/.test(ua)
+				? "macOS"
+				: /Android/.test(ua)
+					? "Android"
+					: /CrOS/.test(ua)
+						? "ChromeOS"
+						: /Linux/.test(ua)
+							? "Linux"
+							: undefined;
+	const browser = /Edg\//.test(ua)
+		? "Edge"
+		: /OPR\/|Opera/.test(ua)
+			? "Opera"
+			: /Firefox\//.test(ua)
+				? "Firefox"
+				: /Chrome\//.test(ua)
+					? "Chrome"
+					: /Safari\//.test(ua)
+						? "Safari"
+						: undefined;
+	if (browser && os) return `${browser} on ${os}`;
+	if (browser) return browser;
+	if (os) return os;
+	return ua;
+}
+
+/**
  * Settings section listing the account's active sessions (ADR 0017 native auth).
  *
  * The current session is badged and cannot be revoked from here; other sessions
@@ -96,16 +134,21 @@ export function SessionsSection() {
 									className="mt-1 shrink-0"
 								>
 									{revokeOthers.isPending ? <Spinner className="mr-1.5" /> : null}
-									Sign out everywhere else
+									Sign out {otherSessionCount} other{" "}
+									{otherSessionCount === 1 ? "session" : "sessions"}
 								</Button>
 							}
 						/>
 						<AlertDialogContent>
 							<AlertDialogHeader>
-								<AlertDialogTitle>Sign out of all other sessions?</AlertDialogTitle>
+								<AlertDialogTitle>
+									Sign out of {otherSessionCount} other{" "}
+									{otherSessionCount === 1 ? "session" : "sessions"}?
+								</AlertDialogTitle>
 								<AlertDialogDescription>
-									This revokes every session except the one you are using now. Other devices will
-									need to sign in again.
+									This revokes every session except the one you are using now. The other{" "}
+									{otherSessionCount === 1 ? "device" : `${otherSessionCount} devices`} will need to
+									sign in again.
 								</AlertDialogDescription>
 							</AlertDialogHeader>
 							<AlertDialogFooter>
@@ -137,7 +180,7 @@ export function SessionsSection() {
 					{sessions.map((session) => {
 						const signedInAt = formatTimestamp(session.issuedAt);
 						const expiresAt = formatTimestamp(session.expiresAt);
-						const deviceLabel = session.userAgent || "Unknown device";
+						const deviceLabel = describeUserAgent(session.userAgent);
 						// Scope the pending state to the row actually being revoked so a single revoke
 						// doesn't disable/spin every other session's button.
 						const isRevokingThis =
@@ -153,7 +196,12 @@ export function SessionsSection() {
 									<MonitorIcon className="size-5 shrink-0" aria-hidden="true" />
 									<div className="min-w-0">
 										<div className="flex items-center gap-2">
-											<span className="text-sm font-medium truncate">{deviceLabel}</span>
+											<span
+												className="text-sm font-medium truncate"
+												title={session.userAgent ?? undefined}
+											>
+												{deviceLabel}
+											</span>
 											{session.current && (
 												<Badge variant="secondary" className="text-xs">
 													This device

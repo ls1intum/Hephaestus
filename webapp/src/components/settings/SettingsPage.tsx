@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
 import { CookiePreferencesSection } from "./CookiePreferencesSection";
@@ -38,6 +39,14 @@ export interface SettingsPageProps {
 	 * Whether the settings are still loading
 	 */
 	isLoading?: boolean;
+	/**
+	 * Whether the user-settings query failed. When true the settings-backed sections (AI review,
+	 * research participation) show an error + retry instead of a fabricated default, so a privacy
+	 * toggle is never shown as "on" just because the load failed.
+	 */
+	settingsError?: boolean;
+	/** Retry loading the user settings. */
+	onRetrySettings?: () => void;
 }
 
 /**
@@ -52,6 +61,8 @@ export function SettingsPage({
 	linkedAccountsProps,
 	onAccountDeleted,
 	isLoading = false,
+	settingsError = false,
+	onRetrySettings,
 }: SettingsPageProps) {
 	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
@@ -69,17 +80,41 @@ export function SettingsPage({
 				</p>
 			</div>
 
-			{showAiReviewSection && (
+			{settingsError ? (
+				(showAiReviewSection || showResearchSection) && (
+					<>
+						<Separator />
+						<section className="space-y-2" aria-labelledby="settings-error-heading">
+							<h2 id="settings-error-heading" className="text-xl font-semibold">
+								Preferences
+							</h2>
+							<p className="text-sm text-destructive" role="alert">
+								We couldn't load your preferences, so your AI-review and research-participation
+								settings aren't shown — we won't display a guessed value for a privacy choice.
+							</p>
+							{onRetrySettings && (
+								<Button variant="outline" size="sm" onClick={onRetrySettings}>
+									Retry
+								</Button>
+							)}
+						</section>
+					</>
+				)
+			) : (
 				<>
-					<Separator />
-					<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
-				</>
-			)}
+					{showAiReviewSection && (
+						<>
+							<Separator />
+							<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+						</>
+					)}
 
-			{showResearchSection && (
-				<>
-					<Separator />
-					<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
+					{showResearchSection && (
+						<>
+							<Separator />
+							<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
+						</>
+					)}
 				</>
 			)}
 

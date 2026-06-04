@@ -69,6 +69,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		return (
 			<>
+				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
+				<CookieConsentBanner />
 				<ImpersonationBanner />
 				<ProviderColorScope>
 					<SidebarProvider>
@@ -92,7 +94,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
 				<FeatureFlagDevTools />
-				<CookieConsentBanner />
 			</>
 		);
 	},

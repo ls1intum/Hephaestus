@@ -22,6 +22,7 @@ import {
 } from "@/integrations/posthog/config";
 import { disableSentry, initSentry } from "@/integrations/sentry";
 import { ThemeProvider } from "@/integrations/theme";
+import { useImpersonationStore } from "@/stores/impersonation-store";
 import reportWebVitals from "./reportWebVitals";
 
 client.setConfig({
@@ -40,6 +41,12 @@ client.interceptors.request.use((request) => {
 	if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
 		for (const [key, value] of Object.entries(csrfHeaders())) {
 			request.headers.set(key, value);
+		}
+		// While impersonating, writes are blocked by the server's ImpersonationGuard unless the
+		// operator has explicitly enabled write-mode (a second confirmation in ImpersonationBanner).
+		// The flag is in-memory and resets on reload, so this is always a deliberate, fresh opt-in.
+		if (useImpersonationStore.getState().writesEnabled) {
+			request.headers.set("X-Impersonation-Allow-Writes", "true");
 		}
 	}
 	return request;

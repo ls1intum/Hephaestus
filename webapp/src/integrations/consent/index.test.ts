@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	CONSENT_STORAGE_KEY,
-	clearStoredConsent,
-	consumeConsentReopen,
+	CONSENT_VERSION,
+	closeConsentReopen,
+	consumeReopenSeed,
 	getStoredConsent,
+	isConsentReopenRequested,
+	requestConsentReopen,
 	setStoredConsent,
 	subscribeConsent,
 } from "./index";
@@ -14,7 +17,8 @@ describe("consent store", () => {
 		// reset the module-level snapshot cache between tests.
 		localStorage.clear();
 		getStoredConsent();
-		consumeConsentReopen(); // drain the module-level reopen flag so it can't leak between tests
+		closeConsentReopen(); // drain any reopen flag so it can't leak between tests
+		consumeReopenSeed();
 	});
 	afterEach(() => localStorage.clear());
 
@@ -22,19 +26,13 @@ describe("consent store", () => {
 		expect(getStoredConsent()).toBeNull();
 	});
 
-	it("persists a decision and reads it back", () => {
+	it("persists a decision (stamped with the current version) and reads it back", () => {
 		setStoredConsent({ analytics: true, errorMonitoring: false });
 		const stored = getStoredConsent();
 		expect(stored?.analytics).toBe(true);
 		expect(stored?.errorMonitoring).toBe(false);
+		expect(stored?.version).toBe(CONSENT_VERSION);
 		expect(typeof stored?.decidedAt).toBe("string");
-	});
-
-	it("clearStoredConsent forgets the decision (the GDPR withdrawal path)", () => {
-		setStoredConsent({ analytics: true, errorMonitoring: true });
-		expect(getStoredConsent()).not.toBeNull();
-		clearStoredConsent();
-		expect(getStoredConsent()).toBeNull();
 	});
 
 	it("treats malformed or incomplete stored values as no decision", () => {
@@ -44,31 +42,56 @@ describe("consent store", () => {
 		expect(getStoredConsent()).toBeNull();
 	});
 
+	it("re-prompts (treats as no decision) when the stored consent version is older/missing", () => {
+		localStorage.setItem(
+			CONSENT_STORAGE_KEY,
+			JSON.stringify({ analytics: true, errorMonitoring: true, decidedAt: "x" }), // no version
+		);
+		expect(getStoredConsent()).toBeNull();
+		localStorage.setItem(
+			CONSENT_STORAGE_KEY,
+			JSON.stringify({
+				analytics: true,
+				errorMonitoring: true,
+				decidedAt: "x",
+				version: CONSENT_VERSION - 1,
+			}),
+		);
+		expect(getStoredConsent()).toBeNull();
+	});
+
 	it("returns a referentially stable snapshot while the raw value is unchanged", () => {
 		// Guards the useSyncExternalStore getSnapshot contract: an unstable snapshot would crash the
-		// consumer hook with an infinite render loop. White-box on the cache by necessity — there is no
-		// cheaper way to assert the stability React requires.
+		// consumer hook with an infinite render loop.
 		setStoredConsent({ analytics: false, errorMonitoring: true });
 		expect(getStoredConsent()).toBe(getStoredConsent());
 	});
 
-	it("flags a user-initiated reopen exactly once (drives banner focus, not first-load)", () => {
-		// A passive first visit must not request focus.
-		expect(consumeConsentReopen()).toBe(false);
-		// Withdrawing consent (the footer/settings control) requests it, once.
-		clearStoredConsent();
-		expect(consumeConsentReopen()).toBe(true);
-		expect(consumeConsentReopen()).toBe(false);
-		// Recording a decision does not request focus.
+	it("requestConsentReopen opens edit mode and pre-seeds from the prior decision", () => {
 		setStoredConsent({ analytics: true, errorMonitoring: false });
-		expect(consumeConsentReopen()).toBe(false);
+		expect(isConsentReopenRequested()).toBe(false);
+
+		requestConsentReopen();
+		expect(isConsentReopenRequested()).toBe(true);
+		// Seed mirrors the stored choice and is consumed once.
+		expect(consumeReopenSeed()).toEqual({ analytics: true, errorMonitoring: false });
+		expect(consumeReopenSeed()).toBeNull();
+
+		// Saving (or cancelling) closes edit mode.
+		setStoredConsent({ analytics: false, errorMonitoring: false });
+		expect(isConsentReopenRequested()).toBe(false);
 	});
 
-	it("notifies subscribers on set and clear", () => {
+	it("a passive first visit does not request reopen or a seed", () => {
+		expect(isConsentReopenRequested()).toBe(false);
+		expect(consumeReopenSeed()).toBeNull();
+	});
+
+	it("notifies subscribers on set and on reopen", () => {
 		const listener = vi.fn();
 		const unsubscribe = subscribeConsent(listener);
 		setStoredConsent({ analytics: true, errorMonitoring: false });
-		clearStoredConsent();
+		requestConsentReopen();
 		expect(listener).toHaveBeenCalledTimes(2);
 		unsubscribe();
 		setStoredConsent({ analytics: false, errorMonitoring: false });

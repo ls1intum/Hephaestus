@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { ACCOUNT_DELETED_NOTICE_KEY } from "@/integrations/auth/accountDeletedNotice";
 
 const DELETE_CONFIRM_PHRASE = "delete my account";
 
@@ -193,6 +194,13 @@ function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
 	const deleteAccount = useMutation({
 		...deleteCurrentUserMutation(),
 		onSuccess: async () => {
+			// Stash a one-shot flag so the login page (after logout's reload) can confirm the outcome —
+			// a toast here would be destroyed by the reload onAccountDeleted triggers.
+			try {
+				sessionStorage.setItem(ACCOUNT_DELETED_NOTICE_KEY, "1");
+			} catch {
+				// best-effort; private mode may block sessionStorage
+			}
 			await onAccountDeleted();
 		},
 		onError: (error) => {
@@ -214,8 +222,9 @@ function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
 			<div className="space-y-1 flex-1">
 				<h3 className="text-base font-medium">Delete account</h3>
 				<p className="text-sm text-muted-foreground leading-relaxed">
-					Permanently delete your account and remove your data from our servers (GDPR Art. 17). This
-					action cannot be undone.
+					Permanently delete your account and erase your personal data (GDPR Art. 17). You'll be
+					signed out on all devices immediately, and the account is scheduled for permanent deletion
+					after a ~48-hour cooldown. It can't be recovered from here.
 				</p>
 			</div>
 			<AlertDialog onOpenChange={(open) => !open && setConfirmText("")}>
@@ -234,8 +243,9 @@ function DeleteAccountRow({ onAccountDeleted }: DangerZoneSectionProps) {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete your account?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently deletes your account and removes your data from our servers. This
-							cannot be undone. To confirm, type{" "}
+							This signs you out on all devices immediately and disables your account, then
+							permanently deletes it and your data after a ~48-hour cooldown. It can't be undone
+							from here. To confirm, type{" "}
 							<span className="font-medium text-foreground">{DELETE_CONFIRM_PHRASE}</span> below.
 						</AlertDialogDescription>
 					</AlertDialogHeader>

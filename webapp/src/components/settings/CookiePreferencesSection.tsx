@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { clearStoredConsent, useCookieConsent } from "@/integrations/consent";
+import { requestConsentReopen, useCookieConsent } from "@/integrations/consent";
 
 /**
  * Lets a signed-in user revisit the cookie decision they made in the consent banner. Clearing the
@@ -34,11 +34,11 @@ export function CookiePreferencesSection() {
 					variant="outline"
 					className="shrink-0"
 					onClick={() => {
-						clearStoredConsent();
-						toast.success("Update your cookie choices in the banner that just appeared.");
+						requestConsentReopen();
+						toast.success("Adjust your cookie choices in the banner that just appeared.");
 					}}
 				>
-					Manage cookie preferences
+					Change cookie choices
 				</Button>
 			</div>
 		</section>

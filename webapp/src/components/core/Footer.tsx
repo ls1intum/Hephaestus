@@ -2,7 +2,7 @@ import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react"
 import { Link } from "@tanstack/react-router";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { clearStoredConsent } from "@/integrations/consent";
+import { requestConsentReopen } from "@/integrations/consent";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
@@ -85,12 +85,13 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 						>
 							Imprint
 						</Link>
-						{/* Always-available consent withdrawal (GDPR Art. 7(3)): the footer renders on every
-						    non-fullscreen route for signed-in and signed-out visitors alike, so clearing the
-						    stored decision re-opens the consent banner from anywhere. */}
+						{/* Always-available consent control (GDPR Art. 7(3)): the footer renders on every
+						    non-fullscreen route for signed-in and signed-out visitors alike, so this re-opens
+						    the consent banner (pre-seeded, cancelable) from anywhere — withdraw by choosing
+						    "Reject all". */}
 						<button
 							type="button"
-							onClick={() => clearStoredConsent()}
+							onClick={() => requestConsentReopen()}
 							className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
 						>
 							Cookie preferences

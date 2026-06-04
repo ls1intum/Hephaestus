@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ShieldCheck, ShieldOff, UserCog, Users } from "lucide-react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	adminListUsersInfiniteOptions,
@@ -54,6 +54,20 @@ function AdminUsersPage() {
 
 	const allUsers: AdminAccountView[] = listQuery.data?.pages.flat() ?? [];
 
+	// Search filters loaded rows client-side (the API has no `q` param). While a term is active,
+	// eagerly pull the remaining pages so the filter sees EVERY user — otherwise a match on an
+	// un-fetched page shows a false "No users found".
+	useEffect(() => {
+		if (deferredSearch.trim() && listQuery.hasNextPage && !listQuery.isFetchingNextPage) {
+			listQuery.fetchNextPage();
+		}
+	}, [
+		deferredSearch,
+		listQuery.hasNextPage,
+		listQuery.isFetchingNextPage,
+		listQuery.fetchNextPage,
+	]);
+
 	const term = deferredSearch.trim().toLowerCase();
 	const filteredUsers = term
 		? allUsers.filter((u) =>
@@ -75,17 +89,13 @@ function AdminUsersPage() {
 			toast.success(`Role updated to ${variables.body.appRole}.`);
 			setRoleTarget(null);
 		},
-		onError: (error) => {
-			// Surface the server's ProblemDetail (e.g. the last-admin 409), not a generic "try again".
-			toast.error(problemDetailOf(error, "Failed to update role. Please try again."));
-		},
+		// Errors (e.g. the last-admin 409) are surfaced inline in the dialog, which stays open so the
+		// blocked action and its reason sit together — not a detached toast that auto-dismisses.
 	});
 
 	const impersonate = useMutation({
 		...impersonateMutation(),
-		onError: (error) => {
-			toast.error(problemDetailOf(error, "Failed to start impersonation. Please try again."));
-		},
+		// Errors surfaced inline in the dialog (see updateRole).
 	});
 
 	const handleConfirmRole = (user: AdminAccountView, nextRole: string) => {
@@ -145,16 +155,30 @@ function AdminUsersPage() {
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}
-				onChangeRole={(user) => setRoleTarget({ user })}
-				onImpersonate={(user) => setImpersonateTarget({ user })}
+				onChangeRole={(user) => {
+					updateRole.reset(); // clear any prior error so a fresh dialog starts clean
+					setRoleTarget({ user });
+				}}
+				onImpersonate={(user) => {
+					impersonate.reset();
+					setImpersonateTarget({ user });
+				}}
 			/>
 
 			<ChangeRoleDialog
 				icon={roleTarget?.user.appRole === "APP_ADMIN" ? ShieldOff : ShieldCheck}
 				user={roleTarget?.user ?? null}
 				isPending={updateRole.isPending}
+				errorMessage={
+					updateRole.isError
+						? problemDetailOf(updateRole.error, "Couldn't update the role.")
+						: undefined
+				}
 				onOpenChange={(open) => {
-					if (!open) setRoleTarget(null);
+					if (!open) {
+						setRoleTarget(null);
+						updateRole.reset();
+					}
 				}}
 				onConfirm={handleConfirmRole}
 			/>
@@ -162,8 +186,16 @@ function AdminUsersPage() {
 			<ImpersonateDialog
 				user={impersonateTarget?.user ?? null}
 				isPending={impersonate.isPending}
+				errorMessage={
+					impersonate.isError
+						? problemDetailOf(impersonate.error, "Couldn't start impersonation.")
+						: undefined
+				}
 				onOpenChange={(open) => {
-					if (!open) setImpersonateTarget(null);
+					if (!open) {
+						setImpersonateTarget(null);
+						impersonate.reset();
+					}
 				}}
 				onConfirm={handleConfirmImpersonate}
 			/>

@@ -18,6 +18,8 @@ export interface ChangeRoleDialogProps {
 	user: AdminAccountView | null;
 	icon: LucideIcon;
 	isPending: boolean;
+	/** Server refusal (e.g. last-admin 409) shown inline; the dialog stays open so it can be read. */
+	errorMessage?: string;
 	onOpenChange: (open: boolean) => void;
 	onConfirm: (user: AdminAccountView, nextRole: string) => void;
 }
@@ -34,6 +36,7 @@ export function ChangeRoleDialog({
 	user,
 	icon: Icon,
 	isPending,
+	errorMessage,
 	onOpenChange,
 	onConfirm,
 }: ChangeRoleDialogProps) {
@@ -66,6 +69,14 @@ export function ChangeRoleDialog({
 						)}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
+				{errorMessage && (
+					<p
+						role="alert"
+						className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+					>
+						{errorMessage}
+					</p>
+				)}
 				<AlertDialogFooter>
 					<AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
 					<AlertDialogAction

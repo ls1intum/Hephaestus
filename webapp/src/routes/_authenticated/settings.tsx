@@ -35,7 +35,12 @@ function RouteComponent() {
 	// Feature flag: AI review section visible only for users with the practice review role
 	const showAiReviewSection = hasRole("run_practice_review");
 
-	const { data: settings, isLoading } = useQuery({
+	const {
+		data: settings,
+		isLoading,
+		isError: settingsError,
+		refetch: refetchSettings,
+	} = useQuery({
 		...getUserSettingsOptions({}),
 		retry: 1,
 	});
@@ -138,6 +143,8 @@ function RouteComponent() {
 	return (
 		<SettingsPage
 			isLoading={isLoading}
+			settingsError={settingsError}
+			onRetrySettings={() => refetchSettings()}
 			aiReviewProps={{
 				aiReviewEnabled: settings?.aiReviewEnabled ?? true,
 				onToggleAiReview: handleAiReviewToggle,

@@ -2,22 +2,34 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { consumeConsentReopen, setStoredConsent, useCookieConsent } from "@/integrations/consent";
+import {
+	closeConsentReopen,
+	consumeReopenSeed,
+	setStoredConsent,
+	useConsentReopenRequested,
+	useCookieConsent,
+} from "@/integrations/consent";
 
 /**
  * Cookie consent banner (English only, no external dependency). Shown at the bottom of the
- * viewport until a decision is stored in localStorage.
+ * viewport until a decision is stored, and re-opened in edit mode via "Cookie preferences".
  *
  * Categories:
  *  - Essential (always on, informational): session, CSRF, OAuth-state cookies.
  *  - Analytics (opt-in): PostHog.
  *  - Error monitoring (opt-in): Sentry.
  *
- * Storing a decision gates initialization of PostHog and Sentry (see `main.tsx`). Offers
- * "Accept all", "Reject non-essential", and per-category toggles before saving.
+ * Storing a decision gates initialization of PostHog and Sentry (see `main.tsx`). "Accept all" and
+ * "Reject all" carry equal visual weight (EDPB/CNIL equal-prominence); granular toggles + "Save
+ * choices" sit alongside. It is a non-modal `role="region"` (not a focus-trapping dialog) so it never
+ * blocks the page, but it is announced and reachable by keyboard/AT.
  */
 export function CookieConsentBanner() {
 	const consent = useCookieConsent();
+	const reopen = useConsentReopenRequested();
+	const editing = consent !== null; // reopened to change an existing decision (vs first visit)
+	const open = consent === null || reopen;
+
 	const [analytics, setAnalytics] = useState(false);
 	const [errorMonitoring, setErrorMonitoring] = useState(false);
 	const titleId = useId();
@@ -26,20 +38,37 @@ export function CookieConsentBanner() {
 	const errorMonitoringId = useId();
 	const cardRef = useRef<HTMLDivElement>(null);
 
-	// Move focus to the dialog only on an explicit reopen, never on a passive first-visit appearance
-	// (see consumeConsentReopen).
+	// On an explicit reopen, pre-seed the toggles from the prior decision (so revisiting never
+	// silently drops a choice) and move focus to the banner. A passive first visit does neither.
 	useEffect(() => {
-		if (consent === null && consumeConsentReopen()) {
+		if (reopen) {
+			const seed = consumeReopenSeed();
+			setAnalytics(seed?.analytics ?? false);
+			setErrorMonitoring(seed?.errorMonitoring ?? false);
 			cardRef.current?.focus();
 		}
-	}, [consent]);
+	}, [reopen]);
 
-	// Saving a decision unmounts the banner; without intervention focus falls back to <body>,
-	// stranding keyboard/AT users. Move focus to the main landmark (or its first focusable child)
-	// before the unmount so the next Tab lands somewhere sensible.
-	const decideAndRestoreFocus = (choice: { analytics: boolean; errorMonitoring: boolean }) => {
+	// Reserve space at the bottom of the page while the fixed banner is shown so it never occludes
+	// the footer Privacy/Imprint links a first-visit user must read before consenting.
+	useEffect(() => {
+		if (!open) return;
+		const apply = () => {
+			const height = cardRef.current?.offsetHeight ?? 0;
+			document.body.style.paddingBottom = height > 0 ? `${height + 32}px` : "";
+		};
+		apply();
+		window.addEventListener("resize", apply);
+		return () => {
+			window.removeEventListener("resize", apply);
+			document.body.style.paddingBottom = "";
+		};
+	}, [open]);
+
+	// Saving/closing unmounts the banner; move focus to the main landmark first so the next Tab
+	// lands somewhere sensible instead of falling back to <body>.
+	const restoreFocusToMain = () => {
 		const main = document.querySelector<HTMLElement>("main");
-		setStoredConsent(choice);
 		if (main) {
 			if (main.tabIndex < 0 && !main.hasAttribute("tabindex")) {
 				main.tabIndex = -1;
@@ -48,7 +77,17 @@ export function CookieConsentBanner() {
 		}
 	};
 
-	if (consent !== null) {
+	const decide = (choice: { analytics: boolean; errorMonitoring: boolean }) => {
+		setStoredConsent(choice); // also closes the reopen
+		restoreFocusToMain();
+	};
+
+	const cancelEdit = () => {
+		closeConsentReopen();
+		restoreFocusToMain();
+	};
+
+	if (!open) {
 		return null;
 	}
 
@@ -57,8 +96,8 @@ export function CookieConsentBanner() {
 			<Card
 				ref={cardRef}
 				tabIndex={-1}
-				role="dialog"
-				aria-modal="false"
+				role="region"
+				aria-live="polite"
 				aria-labelledby={titleId}
 				aria-describedby={descriptionId}
 				className="w-full max-w-2xl shadow-lg outline-none"
@@ -115,21 +154,19 @@ export function CookieConsentBanner() {
 					</div>
 
 					<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-						<Button
-							variant="outline"
-							onClick={() => decideAndRestoreFocus({ analytics: false, errorMonitoring: false })}
-						>
-							Reject non-essential
+						{editing && (
+							<Button variant="ghost" className="sm:mr-auto" onClick={cancelEdit}>
+								Cancel
+							</Button>
+						)}
+						{/* Equal prominence (EDPB/CNIL): Reject all and Accept all share the same weight. */}
+						<Button onClick={() => decide({ analytics: false, errorMonitoring: false })}>
+							Reject all
 						</Button>
-						<Button
-							variant="outline"
-							onClick={() => decideAndRestoreFocus({ analytics, errorMonitoring })}
-						>
+						<Button variant="outline" onClick={() => decide({ analytics, errorMonitoring })}>
 							Save choices
 						</Button>
-						<Button
-							onClick={() => decideAndRestoreFocus({ analytics: true, errorMonitoring: true })}
-						>
+						<Button onClick={() => decide({ analytics: true, errorMonitoring: true })}>
 							Accept all
 						</Button>
 					</div>

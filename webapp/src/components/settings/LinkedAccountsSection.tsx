@@ -230,6 +230,12 @@ export function LinkedAccountsSection({
 							</div>
 						</div>
 					)}
+
+					{linkableProviders.length === 0 && identities.length > 0 && (
+						<p className="pt-2 text-xs text-muted-foreground">
+							You've connected all available sign-in providers.
+						</p>
+					)}
 				</>
 			)}
 		</section>
