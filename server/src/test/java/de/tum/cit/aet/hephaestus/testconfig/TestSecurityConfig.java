@@ -55,7 +55,7 @@ public class TestSecurityConfig {
                     .claim("iss", "https://test-issuer")
                     .claim("aud", "test-audience")
                     .claim("jti", IMPERSONATION_JTI)
-                    .claim("roles", Arrays.asList("admin"))
+                    .claim("roles", Arrays.asList("app_admin"))
                     .claim("act", Map.of("sub", "2"))
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(3600))
@@ -89,7 +89,7 @@ public class TestSecurityConfig {
                     .claim("preferred_username", "account-" + sub)
                     .claim("iss", "https://test-issuer")
                     .claim("aud", "test-audience")
-                    .claim("roles", Arrays.asList("mentor_access", "admin"))
+                    .claim("roles", Arrays.asList("mentor_access", "app_admin"))
                     .issuedAt(Instant.now())
                     .expiresAt(Instant.now().plusSeconds(3600))
                     .build();
@@ -107,7 +107,7 @@ public class TestSecurityConfig {
             } else if ("mock-jwt-token-for-admin-user".equals(token)) {
                 username = "admin";
                 userId = "admin-user-id";
-                roles = new String[] { "admin" };
+                roles = new String[] { "app_admin" };
             } else if ("mock-jwt-token-for-test-user".equals(token)) {
                 username = "testuser";
                 userId = "test-user-id";

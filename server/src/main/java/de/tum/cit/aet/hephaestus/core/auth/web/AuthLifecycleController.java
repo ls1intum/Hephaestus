@@ -62,7 +62,7 @@ public class AuthLifecycleController {
     }
 
     @PostMapping("/impersonate")
-    @PreAuthorize("hasAnyAuthority('app_admin', 'admin')")
+    @PreAuthorize("hasAuthority('app_admin')")
     @Operation(summary = "Begin impersonating another account", operationId = "impersonate")
     public ResponseEntity<Void> impersonate(
         @Valid @RequestBody ImpersonateRequestDTO body,

@@ -33,6 +33,8 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Instance-admin account management
+  name: Admin
 - description: Team management within workspace
   name: Teams
 - description: |-
@@ -48,8 +50,6 @@ tags:
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Super-admin account management
-  name: Admin
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
 - description: User profile and activity data

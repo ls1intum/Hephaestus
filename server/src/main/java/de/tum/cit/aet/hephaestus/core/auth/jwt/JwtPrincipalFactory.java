@@ -28,13 +28,19 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code app_admin} when the account is {@link Account.AppRole#APP_ADMIN}, plus every enabled
  * {@code account_feature} flag (e.g. {@code mentor_access}, {@code run_practice_review}). The
  * instance-admin authority is namespaced {@code app_admin} (matching the {@code /.well-known}
- * discovery doc) — distinct from the per-workspace "admin" role, which is membership-derived and
- * never appears in this token. Resource-server rules accept {@code admin} too for one transitional
- * release while old tokens drain (see {@code AccountAdminController}); remove that after.
+ * discovery doc and {@code SecurityUtils.isSuperAdmin}) — deliberately distinct from the
+ * per-workspace "admin" role, which is membership-derived and never appears in this token.
  */
 @Service
 @WorkspaceAgnostic("JWT principal assembly is account-scoped")
 public class JwtPrincipalFactory {
+
+    /**
+     * Authority strings that must never originate from a grantable {@code account_feature} flag — the
+     * instance-admin authority comes only from {@link Account.AppRole#APP_ADMIN}. {@code admin} is
+     * also reserved (it is the legacy pre-rename string and the per-workspace role name).
+     */
+    private static final Set<String> RESERVED_INSTANCE_AUTHORITIES = Set.of("app_admin", "admin");
 
     private final AccountRepository accountRepository;
     private final IdentityLinkRepository identityLinkRepository;
@@ -69,6 +75,11 @@ public class JwtPrincipalFactory {
         }
         String login = resolveLogin(account);
         Set<String> roles = new HashSet<>(accountFeatureRepository.findFlagsByAccountId(account.getId()));
+        // Privilege separation: the instance-admin authority derives ONLY from Account.appRole, never
+        // from a grantable account_feature row. Strip any feature flag that collides with a reserved
+        // instance authority so a `/admin/users`-granted flag can't inject super-admin (account_feature
+        // .flag is free-text, so this is the enforcement point).
+        roles.removeAll(RESERVED_INSTANCE_AUTHORITIES);
         if (account.getAppRole() == Account.AppRole.APP_ADMIN) {
             roles.add("app_admin");
         }

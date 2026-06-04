@@ -50,11 +50,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        afterwards). Proof-of-control is deployment access; deliver out-of-band,
  *                        never log it. Blank = endpoint disabled (404). Prefer {@code bootstrapAdmins};
  *                        keep this as the lockout safety net.
- * @param impersonationMaxLifetime Absolute cap on an impersonation session, independent of the
- *                        per-token {@code accessTtl}. {@code begin} stamps {@code imp_exp = now +
- *                        this}; each refresh caps the new token's {@code exp} at {@code imp_exp} and,
- *                        once it passes, drops the {@code act} claim (auto-exit to the operator). Stops
- *                        an impersonation session from being renewed indefinitely by silent refresh.
+ * @param impersonationMaxLifetime Absolute ceiling on an impersonation session, used when a session
+ *                        is renewed via {@code POST /auth/refresh}: {@code begin} stamps
+ *                        {@code imp_exp = now + this}, the issuer caps each token's {@code exp} at
+ *                        {@code min(now + accessTtl, imp_exp)}, and once {@code imp_exp} passes
+ *                        {@code refresh} drops the {@code act} claim (auto-exit to the operator).
+ *                        NOTE: there is currently no proactive/silent refresh caller, so a session
+ *                        already ends when the access token expires ({@code accessTtl}, ~15m) — which
+ *                        is shorter than this ceiling. This value therefore only becomes the binding
+ *                        limit once silent refresh is wired; until then it is a future-proof upper
+ *                        bound, and the de-facto impersonation time-box is {@code accessTtl}.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(

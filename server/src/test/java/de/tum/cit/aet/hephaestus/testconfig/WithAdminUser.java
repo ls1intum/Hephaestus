@@ -16,9 +16,12 @@ public @interface WithAdminUser {
     String username() default "admin";
 
     /**
-     * The authorities/roles for the mock admin user.
+     * The authorities/roles for the mock admin user. Defaults to the namespaced instance-admin
+     * authority {@code app_admin} (the string the real issuer mints for APP_ADMIN; see
+     * {@code JwtPrincipalFactory}), which is what {@code SecurityUtils.isSuperAdmin} reads to grant
+     * cross-workspace elevation.
      */
-    String[] authorities() default { "admin" };
+    String[] authorities() default { "app_admin" };
 
     /**
      * The user ID for the mock admin user.

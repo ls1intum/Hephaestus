@@ -23,16 +23,16 @@ export async function resolveCurrentUser(
 }
 
 /**
- * Whether an account is an instance admin: `appRole === "APP_ADMIN"` OR the `app_admin` authority is
- * present (the legacy `admin` string is also accepted while pre-rename tokens drain — ADR 0017).
- * `appRole` is the authoritative source; we tolerate role-string differences. Accepts the raw
- * generated `CurrentUserView` (or null) so route guards and `useAuth()` share one definition.
+ * Whether an account is an instance admin. The authoritative source is the `appRole` field returned
+ * by `GET /user` (ADR 0017); the client is not a security boundary (every admin endpoint is enforced
+ * server-side by `hasAuthority('app_admin')`), so a single appRole check is both correct and simplest.
+ * Accepts the raw generated `CurrentUserView` (or null) so route guards and `useAuth()` share one
+ * definition.
  */
 export function isAppAdmin(
-	user: Partial<Pick<CurrentUserView, "appRole" | "roles">> | null | undefined,
+	user: Partial<Pick<CurrentUserView, "appRole">> | null | undefined,
 ): boolean {
-	const roles = user?.roles ?? [];
-	return user?.appRole === "APP_ADMIN" || roles.includes("app_admin") || roles.includes("admin");
+	return user?.appRole === "APP_ADMIN";
 }
 
 /**

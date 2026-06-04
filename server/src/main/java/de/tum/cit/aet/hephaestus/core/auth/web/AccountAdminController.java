@@ -17,15 +17,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Instance-admin account management, guarded by the {@code app_admin} authority (the granted
- * authority the issuer now mints for {@code APP_ADMIN}; see {@code JwtPrincipalFactory}). Thin
- * adapter over {@link AccountService}. The legacy {@code admin} authority is accepted for one
- * transitional release while pre-rename tokens drain — drop it afterwards.
+ * Instance-admin account management, guarded by the namespaced {@code app_admin} authority (the
+ * granted authority the issuer mints for {@code APP_ADMIN}; see {@code JwtPrincipalFactory}). Thin
+ * adapter over {@link AccountService}. Access JWTs are short-lived (~15m) and refresh re-derives
+ * roles from the DB, so no legacy-authority grace is carried in code.
  */
 @RestController
 @RequestMapping("/admin/users")
 @Tag(name = "Admin", description = "Instance-admin account management")
-@PreAuthorize("hasAnyAuthority('app_admin', 'admin')")
+@PreAuthorize("hasAuthority('app_admin')")
 public class AccountAdminController {
 
     private final AccountService accountService;

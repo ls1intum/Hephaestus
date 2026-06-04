@@ -79,7 +79,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         Jwt jwt = Jwt.withTokenValue("token")
             .header("alg", "ES256")
             .subject(subject)
-            .claim("roles", java.util.List.of("admin"))
+            .claim("roles", java.util.List.of("app_admin"))
             .build();
         AbstractAuthenticationToken auth = new JwtAuthenticationToken(jwt);
         auth.setAuthenticated(true);
