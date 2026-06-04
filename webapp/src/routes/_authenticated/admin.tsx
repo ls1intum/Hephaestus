@@ -2,16 +2,10 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { isAppAdmin, resolveCurrentUser } from "@/integrations/auth/guard";
 
 /**
- * Super-admin (APP_ADMIN) layout route (ADR 0017 native auth).
- *
- * Guards the whole `/admin` subtree in `beforeLoad` so the redirect happens
- * before any child route renders (no flash of admin UI). The check resolves the current
- * user through the same query the rest of the app reads (`resolveCurrentUser`), so it
- * is cached and consistent with `useAuth()`.
- *
- * App-admin is indicated by either `appRole === "APP_ADMIN"` or the `admin`
- * role on the current user — we accept either so the guard tolerates server-side role
- * representation differences. Non-admins are redirected to the dashboard.
+ * Instance-admin (APP_ADMIN) layout route (ADR 0017 native auth). Guards the whole `/admin`
+ * subtree in `beforeLoad` via `isAppAdmin` (`appRole === "APP_ADMIN"`), redirecting non-admins
+ * before any admin UI renders. The client is not a security boundary — every `/admin` endpoint is
+ * enforced server-side by `hasAuthority('app_admin')`; this guard only avoids a pointless flash.
  */
 export const Route = createFileRoute("/_authenticated/admin")({
 	beforeLoad: async ({ context }) => {

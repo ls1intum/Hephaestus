@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
@@ -66,9 +67,7 @@ class ImpersonationServiceTest extends BaseUnitTest {
     void setUp() {
         AuthEventLogger logger = new AuthEventLogger(authEventWriter);
         Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
-        de.tum.cit.aet.hephaestus.core.auth.AuthProperties properties = mock(
-            de.tum.cit.aet.hephaestus.core.auth.AuthProperties.class
-        );
+        AuthProperties properties = mock(AuthProperties.class);
         org.mockito.Mockito.lenient()
             .when(properties.impersonationMaxLifetime())
             .thenReturn(java.time.Duration.ofHours(1));

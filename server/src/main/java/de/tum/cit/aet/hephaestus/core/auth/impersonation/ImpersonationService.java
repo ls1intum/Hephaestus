@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.impersonation;
 
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
@@ -45,7 +46,7 @@ public class ImpersonationService {
     private final IssuedJwtRepository issuedJwtRepository;
     private final AuthEventLogger authEventLogger;
     private final ObjectMapper objectMapper;
-    private final de.tum.cit.aet.hephaestus.core.auth.AuthProperties properties;
+    private final AuthProperties properties;
     private final Clock clock;
 
     public ImpersonationService(
@@ -55,7 +56,7 @@ public class ImpersonationService {
         IssuedJwtRepository issuedJwtRepository,
         AuthEventLogger authEventLogger,
         ObjectMapper objectMapper,
-        de.tum.cit.aet.hephaestus.core.auth.AuthProperties properties,
+        AuthProperties properties,
         Clock clock
     ) {
         this.accountRepository = accountRepository;

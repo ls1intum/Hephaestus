@@ -24,11 +24,6 @@ function statusVariant(status: string): "secondary" | "destructive" | "outline" 
 	return "outline";
 }
 
-function formatDate(value: AdminWorkspaceView["createdAt"]): string {
-	const date = value instanceof Date ? value : new Date(value as unknown as string);
-	return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString();
-}
-
 /**
  * Read-only, metadata-only table of every workspace (instance-admin overview). Pure/presentational.
  * No tenant content — reaching a workspace's content is done via audited impersonation of a member.
@@ -67,13 +62,15 @@ export function AdminWorkspacesTable({
 			<Table>
 				<TableHeader>
 					<TableRow>
-						<TableHead>Name</TableHead>
-						<TableHead>Slug</TableHead>
-						<TableHead>Status</TableHead>
-						<TableHead>Provider</TableHead>
-						<TableHead>Owner</TableHead>
-						<TableHead className="text-right">Members</TableHead>
-						<TableHead>Created</TableHead>
+						<TableHead scope="col">Name</TableHead>
+						<TableHead scope="col">Slug</TableHead>
+						<TableHead scope="col">Status</TableHead>
+						<TableHead scope="col">Provider</TableHead>
+						<TableHead scope="col">Owner</TableHead>
+						<TableHead scope="col" className="text-right">
+							Members
+						</TableHead>
+						<TableHead scope="col">Created</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -98,7 +95,7 @@ export function AdminWorkspacesTable({
 							<TableCell className="text-muted-foreground">{ws.ownerLogin ?? "—"}</TableCell>
 							<TableCell className="text-right tabular-nums">{ws.memberCount}</TableCell>
 							<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-								{formatDate(ws.createdAt)}
+								{ws.createdAt.toLocaleDateString()}
 							</TableCell>
 						</TableRow>
 					))}

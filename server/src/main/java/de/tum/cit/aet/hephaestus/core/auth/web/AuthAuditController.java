@@ -18,13 +18,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Read-only instance-admin audit viewer over the append-only {@code auth_event} log (logins,
- * impersonation, role changes, deletions, …). Guarded by the namespaced {@code app_admin} authority.
- *
- * <p>Read-only by construction: this controller exposes no write paths, and {@code auth_event} is
- * append-only at the SQL-grant level (see {@link AuthEvent}). It surfaces the same forensic fields
- * the GDPR export records — including the {@code (account_id, acting_account_id)} pair so every
- * impersonated action is attributable to its operator.
+ * Read-only instance-admin viewer over the append-only {@code auth_event} log (see {@link AuthEvent}).
+ * Guarded by the namespaced {@code app_admin} authority. Surfaces the {@code (account_id,
+ * acting_account_id)} pair so impersonated actions stay attributable to their operator.
  */
 @RestController
 @RequestMapping("/admin/audit")
@@ -62,7 +58,7 @@ public class AuthAuditController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size,
         @RequestParam(required = false) @Nullable Long accountId,
-        @RequestParam(required = false) AuthEvent.EventType eventType
+        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType
     ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);

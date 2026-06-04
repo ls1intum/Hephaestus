@@ -176,12 +176,10 @@ public class AccountService {
     }
 
     /**
-     * Instance-admin force sign-out: revoke ALL of {@code accountId}'s active sessions. Because an
-     * impersonation token is minted with the target's account id as its subject, this also terminates
-     * any in-flight impersonation OF this account (the operator's own session is a separate jti and is
-     * untouched). {@code RevocationAwareJwtDecoder} enforces the revocation on the next request, so the
-     * effect is near-immediate without any new schema. Audited as {@code JWT_REVOKED} attributed to the
-     * acting admin. Returns the number of sessions revoked.
+     * Instance-admin force sign-out: revoke all of {@code accountId}'s active sessions. Also ends any
+     * in-flight impersonation OF this account — an impersonation token's subject is the target's id, so
+     * its row is revoked here too; the operator's own session is a separate jti and is untouched.
+     * Audited as {@code JWT_REVOKED}.
      */
     @Transactional
     public int adminRevokeAllSessions(Long accountId, Long actingAccountId) {

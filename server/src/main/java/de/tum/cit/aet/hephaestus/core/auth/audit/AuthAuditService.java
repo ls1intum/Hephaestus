@@ -24,7 +24,7 @@ public class AuthAuditService {
 
     /** Auth events newest-first, optionally narrowed by subject account and/or event type. */
     @Transactional(readOnly = true)
-    public Page<AuthEvent> list(@Nullable Long accountId, AuthEvent.EventType eventType, Pageable pageable) {
+    public Page<AuthEvent> list(@Nullable Long accountId, AuthEvent.@Nullable EventType eventType, Pageable pageable) {
         return authEventRepository.findForAdmin(accountId, eventType, pageable);
     }
 }

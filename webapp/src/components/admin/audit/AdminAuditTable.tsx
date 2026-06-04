@@ -22,12 +22,6 @@ export interface AdminAuditTableProps {
 	onLoadMore: () => void;
 }
 
-/** Render an epoch/ISO instant in the viewer's locale; defensive against string-vs-Date at runtime. */
-function formatInstant(value: AuthEventView["occurredAt"]): string {
-	const date = value instanceof Date ? value : new Date(value as unknown as string);
-	return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
 /**
  * Read-only table of auth audit events (newest first). Pure/presentational: all data + paging come
  * from the route. The actor column is the impersonator (RFC 8693 `act`) when the event happened under
@@ -75,20 +69,20 @@ export function AdminAuditTable({
 				<Table>
 					<TableHeader>
 						<TableRow>
-							<TableHead>Time</TableHead>
-							<TableHead>Event</TableHead>
-							<TableHead>Result</TableHead>
-							<TableHead>Account</TableHead>
-							<TableHead>Actor</TableHead>
-							<TableHead>IP</TableHead>
-							<TableHead>Details</TableHead>
+							<TableHead scope="col">Time</TableHead>
+							<TableHead scope="col">Event</TableHead>
+							<TableHead scope="col">Result</TableHead>
+							<TableHead scope="col">Account</TableHead>
+							<TableHead scope="col">Actor</TableHead>
+							<TableHead scope="col">IP</TableHead>
+							<TableHead scope="col">Details</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
 						{events.map((e) => (
 							<TableRow key={e.id}>
 								<TableCell className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-									{formatInstant(e.occurredAt)}
+									{e.occurredAt.toLocaleString()}
 								</TableCell>
 								<TableCell>
 									<Badge variant="outline" className="font-mono text-xs">

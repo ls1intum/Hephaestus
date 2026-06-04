@@ -13,7 +13,7 @@ import {
  * Content of the dedicated instance-admin (APP_ADMIN) shell — the `context === "admin"` sidebar.
  * It is workspace-independent (no workspace switcher; a "Back to app" link returns to the dashboard)
  * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, which is the
- * per-workspace admin nav. Sections grow in later phases (Overview, Workspaces, Audit); P0 ships Users.
+ * per-workspace admin nav.
  */
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },

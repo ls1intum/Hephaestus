@@ -55,7 +55,7 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
     )
     Page<AuthEvent> findForAdmin(
         @Param("accountId") @Nullable Long accountId,
-        @Param("eventType") AuthEvent.EventType eventType,
+        @Param("eventType") AuthEvent.@Nullable EventType eventType,
         Pageable pageable
     );
 }
