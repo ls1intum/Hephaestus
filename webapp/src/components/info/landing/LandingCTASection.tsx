@@ -1,5 +1,4 @@
-import { ArrowRight } from "lucide-react";
-import { SignInButtons } from "@/components/auth/SignInButtons";
+import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/integrations/theme";
 import { cn } from "@/lib/utils";
@@ -30,18 +29,13 @@ export function LandingCTASection({
 						practices.
 					</p>
 					<div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
-						{isSignedIn ? (
-							<Button size="lg" onClick={onGoToDashboard}>
-								Go to Dashboard
-								<ArrowRight className="h-4 w-4" />
-							</Button>
-						) : (
-							<SignInButtons
-								onSignIn={onSignIn}
-								size="lg"
-								className="w-full justify-center sm:w-auto"
-							/>
-						)}
+						<LandingSignInCTA
+							isSignedIn={isSignedIn}
+							onSignIn={onSignIn}
+							onGoToDashboard={onGoToDashboard}
+							size="lg"
+							className="w-full sm:w-auto"
+						/>
 						<Button
 							size="lg"
 							variant="outline"

@@ -77,15 +77,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 						<AppSidebarContainer />
 						<SidebarInset style={{ marginRight: "var(--right-sidebar-width, 0)" }}>
 							<HeaderContainer />
-							<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
-								<main className={`${isFullscreenRoute ? "" : "p-4"}`}>
+							<div className="flex min-h-[calc(100dvh-4rem)] flex-col">
+								<main className={isFullscreenRoute ? "" : "flex-1 p-4"}>
 									<Outlet />
 								</main>
-								{!isFullscreenRoute && (
-									<div className="flex justify-end flex-col h-full">
-										<Footer buildInfo={environment.buildInfo} />
-									</div>
-								)}
+								{!isFullscreenRoute && <Footer buildInfo={environment.buildInfo} />}
 							</div>
 						</SidebarInset>
 					</SidebarProvider>
@@ -195,7 +191,6 @@ function GlobalCopilot() {
 }
 
 function HeaderContainer() {
-	const { pathname } = useLocation();
 	const {
 		isAuthenticated,
 		isLoading,
@@ -209,9 +204,7 @@ function HeaderContainer() {
 
 	return (
 		<Header
-			sidebarTrigger={
-				!(pathname === "/landing" || !isAuthenticated) && <SidebarTrigger className="-ml-1" />
-			}
+			sidebarTrigger={isAuthenticated && <SidebarTrigger className="-ml-1" />}
 			version={environment.version}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
@@ -264,7 +257,7 @@ function AppSidebarContainer() {
 		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
 	});
 
-	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
+	if (!isAuthenticated || username === undefined) {
 		return null;
 	}
 

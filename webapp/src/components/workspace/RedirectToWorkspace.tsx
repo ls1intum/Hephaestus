@@ -1,13 +1,15 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
-export const Route = createFileRoute("/_authenticated/")({
-	component: RedirectToWorkspace,
-});
-
+/**
+ * Lands a signed-in visitor on their workspace: navigates (replacing history) to the last selected
+ * workspace, or the first available one. Renders nothing while the selection hydrates, and shows
+ * {@link NoWorkspace} when the account has no workspace yet. Used by the public index route for
+ * authenticated visitors, so they never see the marketing landing page.
+ */
 export function RedirectToWorkspace() {
 	const navigate = useNavigate();
 	const { isAuthenticated } = useAuth();

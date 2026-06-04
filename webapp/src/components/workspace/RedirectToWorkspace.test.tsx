@@ -22,7 +22,7 @@ vi.mock("@/components/workspace/NoWorkspace", () => ({
 	NoWorkspace: () => <div>No Workspace</div>,
 }));
 
-import { RedirectToWorkspace } from "./index";
+import { RedirectToWorkspace } from "./RedirectToWorkspace";
 
 describe("RedirectToWorkspace", () => {
 	afterEach(() => {
