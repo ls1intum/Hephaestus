@@ -341,7 +341,7 @@ class WorkspaceAccessServiceTest {
             de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
-                new String[] { "admin" },
+                new String[] { "app_admin" },
                 "super-admin-token"
             )
         );
@@ -374,7 +374,7 @@ class WorkspaceAccessServiceTest {
             de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
-                new String[] { "admin" },
+                new String[] { "app_admin" },
                 "super-admin-token"
             )
         );
@@ -404,7 +404,7 @@ class WorkspaceAccessServiceTest {
             de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
-                new String[] { "admin" },
+                new String[] { "app_admin" },
                 "super-admin-token"
             )
         );
@@ -434,7 +434,7 @@ class WorkspaceAccessServiceTest {
             de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
-                new String[] { "admin" },
+                new String[] { "app_admin" },
                 "super-admin-token"
             )
         );
