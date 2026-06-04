@@ -42,9 +42,43 @@ commit. For 30 days post-launch:
 3. Existing `account` / `identity_link` rows are harmless to leave in place — the reverted
    code simply ignores them.
 
-Data note: no destructive migration runs at cutover. The `user → external_actor` Java rename
-keeps the SQL table name `"user"`, and `workspace_membership.user_id → account_id` is the only
-column rename — it carries a Liquibase rollback.
+Data note: the migration is purely **additive** — it creates the new auth tables (`account`,
+`identity_link`, `account_feature`, `jwt_signing_key`, `issued_jwt`, `auth_event` (+ partitions),
+`auth_rate_limit_bucket`, `account_export`) and drops the now-unused `user.keycloak_subject`
+column. The `"user"` table is otherwise left in place (still mapped as `User`); its rename to
+`ExternalActor` and the activity-FK rewrite are deferred to a planned Liquibase squash. No existing
+activity/membership columns are renamed or dropped, so leaving `account` / `identity_link` rows in
+place on a revert is harmless.
+
+## Existing users at cutover (no backfill required)
+
+Existing users are **not** pre-migrated into `account` / `identity_link` — those tables start
+empty, and there is no backfill changeset. On a user's first post-cutover login an `Account` +
+`IdentityLink` are JIT-created. This is safe because **workspace authorization never keys on
+`account_id`**: the issued JWT carries `preferred_username` = the git login, and
+`WorkspaceContextFilter` resolves the current `User` by login (case-insensitive) → the existing
+`workspace_membership` rows (still keyed on `user_id`). Memberships, roles, leaderboard points and
+activity history therefore carry over automatically.
+
+- ⚠️ **Risk — username drift.** The bridge is git-login string equality. GitHub / gitlab.lrz.de
+  usernames are mutable; if a user renamed since the last sync, the stale `User.login` won't match
+  their fresh `preferred_username` and they will appear as a non-member (403) until a sync updates
+  the row. **Mitigation: run a fresh user sync immediately before the cutover** so `User.login`
+  reflects current provider usernames. **Verify on staging** with at least one user whose provider
+  username differs from the value currently in the `"user"` table. (The FK-stable fallback keyed on
+  the numeric provider id lives in `AuthenticatedGitProviderUserService` but is not on the
+  `WorkspaceContextFilter` hot path, so the sync is the operational safeguard.)
+
+### Migration smoke-tested
+
+The Liquibase migration was validated against Postgres 16 in both directions: a **fresh** apply
+(`db/master.xml`, `prod` context → 684 changesets, all auth tables + the `auth_event` RANGE
+partitions seeded) and an **upgrade** from the current `main` schema (apply `main` → then this
+branch). The upgrade applies cleanly (no failed changesets); because this branch re-timestamped the
+PR #1306 changelog (`1780313973588` → `1779790459343`), Liquibase re-encounters those ~25 changesets
+under the new identity and records them `MARK_RAN` via their `onFail="MARK_RAN"` preconditions — the
+DDL is not re-executed, so the only effect is a few duplicate `DATABASECHANGELOG` rows (cosmetic; a
+`logicalFilePath` follow-up would remove it).
 
 ## JWK rotation
 
