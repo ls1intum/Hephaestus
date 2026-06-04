@@ -101,7 +101,7 @@ public class AccountProvisioningService {
                 registrationId,
                 link.getAccount().getId()
             );
-            return promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject);
+            return promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal));
         }
 
         if (mode == AuthIntentCookie.Intent.Mode.LINK) {
@@ -144,7 +144,22 @@ public class AccountProvisioningService {
                 registrationId,
                 resolvedEmail.verified()
             );
-            return promoteIfBootstrapAdmin(created, registrationId, subject);
+            String login = loginOf(principal);
+            Account result = promoteIfBootstrapAdmin(created, registrationId, subject, login);
+            if (result.getAppRole() != Account.AppRole.APP_ADMIN && adminBootstrapPolicy.isConfigured()) {
+                // Cold-start aid: a new account on an allowlist-configured instance that did NOT match.
+                // Logs the exact identity so a mis-listed first admin can self-diagnose in one line
+                // instead of silently landing as a plain USER with no Admin nav.
+                log.info(
+                    "auth.bootstrap: new accountId={} did NOT match bootstrap-admins (provider={} subject={} username=@{}). " +
+                        "Add 'provider:@username' or 'provider:subject' to grant APP_ADMIN.",
+                    result.getId(),
+                    registrationId,
+                    subject,
+                    login
+                );
+            }
+            return result;
         } catch (DataIntegrityViolationException e) {
             // First-login race: a concurrent login already created this identity and won the
             // uq_identity_link_provider_subject_team insert. Fail closed by reading the now-existing
@@ -158,7 +173,7 @@ public class AccountProvisioningService {
                         winner.getId(),
                         registrationId
                     );
-                    return promoteIfBootstrapAdmin(winner, registrationId, subject);
+                    return promoteIfBootstrapAdmin(winner, registrationId, subject, loginOf(principal));
                 })
                 .orElseThrow(() ->
                     new IllegalStateException(
@@ -180,10 +195,10 @@ public class AccountProvisioningService {
      * (so {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
      * deliberate {@code /admin/users} action.
      */
-    private Account promoteIfBootstrapAdmin(Account account, String registrationId, String subject) {
+    private Account promoteIfBootstrapAdmin(Account account, String registrationId, String subject, String login) {
         if (
             account.getAppRole() != Account.AppRole.APP_ADMIN &&
-            adminBootstrapPolicy.shouldPromote(registrationId, subject)
+            adminBootstrapPolicy.shouldPromote(registrationId, subject, login)
         ) {
             account.setAppRole(Account.AppRole.APP_ADMIN);
             accountRepository.save(account);
@@ -194,6 +209,11 @@ public class AccountProvisioningService {
             );
         }
         return account;
+    }
+
+    /** Git login the user authenticated with — the value matched by {@code provider:@username} entries. */
+    private static String loginOf(OAuth2User principal) {
+        return stringAttr(principal, "login", "preferred_username", "username");
     }
 
     private IdentityLink newIdentityLink(Account account, long providerId, String subject, OAuth2User principal) {

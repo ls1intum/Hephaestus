@@ -38,13 +38,18 @@ Instance super-admin (`APP_ADMIN`) is **separate** from per-workspace roles (tho
 membership). It is an operator concern — "who runs this instance" — so the source of truth is
 operator config, not any workspace's SCM team. Two mechanisms, no data backfill:
 
-1. **Allowlist (preferred):** `hephaestus.auth.bootstrap-admins` — a list of
-   `<registrationId>:<provider-subject>` (e.g. `github:1234567`, `gitlab-lrz:42`). A listed identity
-   is promoted to `APP_ADMIN` on login (idempotent, promote-only — it never demotes; demotion stays a
-   `/admin/users` action). Keyed on the stable numeric provider subject (NOT email, NOT username), so
-   it is nOAuth- and username-reclaim-safe and works on a cold instance. Find a GitHub id at
-   `https://api.github.com/users/<login>`; a gitlab.lrz.de id at `/api/v4/user`. As env (comma-separated):
-   `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=github:1234567,gitlab-lrz:42`.
+1. **Allowlist (preferred):** `hephaestus.auth.bootstrap-admins` — a list of `<registrationId>:<who>`.
+   `who` is either **`@username`** (recommended, readable) or the stable numeric **`subject`**. A listed
+   identity is promoted to `APP_ADMIN` on login (idempotent, promote-only — it never demotes; demotion
+   stays a `/admin/users` action), and it works on a cold instance. As env (comma-separated):
+   `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=gitlab-lrz:@m.mustermann,github:@octocat`.
+   - On **institutional gitlab.lrz.de** use `@username` — handles are bound to TUM identity, so the
+     reclaim risk is negligible. On **public github.com**, prefer the numeric `subject`
+     (`github:1234567`, from `https://api.github.com/users/<login>`) because a renamed/relinquished
+     GitHub handle can be reclaimed by someone else. Matching is on the authenticated identity, never
+     on email, so it is not nOAuth-vulnerable either way.
+   - If a designated admin logs in and lands as a plain user, the server logs (INFO) the exact
+     `provider subject username` it saw on that first login — copy it into the allowlist.
 2. **Break-glass token (fallback / lockout insurance):** set `hephaestus.auth.bootstrap-token`
    (`HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN`) to a high-entropy secret, then have the operator log in and
    `POST /auth/bootstrap-admin` with `{"token":"…"}`. It promotes the authenticated caller **only

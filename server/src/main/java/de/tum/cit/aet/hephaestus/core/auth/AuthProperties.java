@@ -32,17 +32,18 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        crash) — unlike {@code spring.security.oauth2.client.*}, which fails
  *                        Boot's non-empty-client-id validation on a no-credentials boot.
  * @param gitlabLrz       Default gitlab.lrz.de OAuth login app (same blank-tolerant rule).
- * @param bootstrapAdmins Instance super-admin (APP_ADMIN) allowlist, keyed on the stable
- *                        {@code <registrationId>:<provider-subject>} tuple (e.g.
- *                        {@code github:1234567}, {@code gitlab-lrz:42}) — the same identifier
- *                        {@code IdentityLink} stores. A listed identity is promoted to APP_ADMIN
- *                        on login (idempotent, promote-only — never demotes). Keyed on the numeric
- *                        provider subject, NOT email (nOAuth-safe) and NOT username (reclaim-safe).
- *                        This is the operator-scoped source of truth for "who runs this instance";
- *                        it is deliberately separate from per-workspace roles (those derive from
- *                        SCM team / WorkspaceMembership). Empty by default. Find a GitHub id via
- *                        {@code https://api.github.com/users/<login>}; a gitlab.lrz.de id via
- *                        {@code /api/v4/user}.
+ * @param bootstrapAdmins Instance super-admin (APP_ADMIN) allowlist of {@code <registrationId>:<who>}.
+ *                        {@code who} is either {@code @username} (recommended, readable — e.g.
+ *                        {@code gitlab-lrz:@m.mustermann}, matched against the git login) or the
+ *                        stable numeric {@code subject} (e.g. {@code github:1234567}, reclaim-proof,
+ *                        best on public github.com). A listed identity is promoted to APP_ADMIN on
+ *                        login (idempotent, promote-only — never demotes). Matched on the authenticated
+ *                        identity, NEVER email (so it is not nOAuth-vulnerable); the {@code @username}
+ *                        form's only residual risk is username reclaim (negligible on institutional
+ *                        gitlab.lrz.de, hence the default there; prefer {@code subject} on github.com).
+ *                        This is the operator-scoped source of truth for "who runs this instance",
+ *                        deliberately separate from per-workspace roles (those derive from SCM team /
+ *                        WorkspaceMembership). Empty by default.
  * @param bootstrapToken  Optional one-time break-glass token. When non-blank it enables
  *                        {@code POST /auth/bootstrap-admin}, which promotes the authenticated
  *                        caller to APP_ADMIN exactly while NO active admin exists (self-disables

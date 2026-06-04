@@ -7,12 +7,12 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
-import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the {@code hephaestus.auth.bootstrap-admins} allowlist matching: exact {@code provider:subject},
- * fail-closed on empty/null, and malformed entries dropped (not booted on, not matched).
+ * Pins {@code hephaestus.auth.bootstrap-admins} matching: by stable subject ({@code provider:1234567})
+ * and by git login ({@code provider:@username}, case-insensitive), fail-closed on empty/null, and
+ * malformed entries dropped (not booted on, not matched).
  */
 class AdminBootstrapPolicyTest extends BaseUnitTest {
 
@@ -23,55 +23,63 @@ class AdminBootstrapPolicyTest extends BaseUnitTest {
     }
 
     @Test
-    void matchesExactProviderSubject() {
+    void matchesByStableSubject() {
         AdminBootstrapPolicy p = policy("github:1234567", "gitlab-lrz:42");
-        assertThat(p.shouldPromote("github", "1234567")).isTrue();
-        assertThat(p.shouldPromote("gitlab-lrz", "42")).isTrue();
+        assertThat(p.shouldPromote("github", "1234567", "octocat")).isTrue();
+        assertThat(p.shouldPromote("gitlab-lrz", "42", null)).isTrue();
+    }
+
+    @Test
+    void matchesByUsernameCaseInsensitive() {
+        AdminBootstrapPolicy p = policy("gitlab-lrz:@m.mustermann", "github:@Octocat");
+        assertThat(p.shouldPromote("gitlab-lrz", "999", "m.mustermann")).isTrue();
+        assertThat(p.shouldPromote("github", "888", "octocat")).isTrue(); // listed @Octocat, login octocat
+        assertThat(p.shouldPromote("github", "888", "OCTOCAT")).isTrue();
+    }
+
+    @Test
+    void usernameEntryDoesNotMatchASubjectAndViceVersa() {
+        AdminBootstrapPolicy p = policy("github:@octocat");
+        // The literal "octocat" must not be matched as a subject, and the @ form must not match a
+        // different login.
+        assertThat(p.shouldPromote("github", "octocat", "someone-else")).isFalse();
+        assertThat(p.shouldPromote("github", "123", "mona")).isFalse();
     }
 
     @Test
     void rejectsNonListedOrCrossProvider() {
-        AdminBootstrapPolicy p = policy("github:1234567");
-        assertThat(p.shouldPromote("github", "9999999")).isFalse(); // different subject
-        assertThat(p.shouldPromote("gitlab-lrz", "1234567")).isFalse(); // same subject, wrong provider
-        assertThat(p.shouldPromote("github", "12345")).isFalse(); // not a prefix match
+        AdminBootstrapPolicy p = policy("github:1234567", "gitlab-lrz:@jdoe");
+        assertThat(p.shouldPromote("github", "9999999", "x")).isFalse(); // different subject
+        assertThat(p.shouldPromote("gitlab-lrz", "1234567", "x")).isFalse(); // right subject, wrong provider
+        assertThat(p.shouldPromote("github", "1", "jdoe")).isFalse(); // username listed only for gitlab-lrz
     }
 
     @Test
-    void emptyOrNullAllowlistNeverPromotes() {
-        assertThat(policy().shouldPromote("github", "1")).isFalse();
-        assertThat(policy((String[]) null).shouldPromote("github", "1")).isFalse();
+    void emptyOrNullAllowlistNeverPromotes_andNotConfigured() {
+        assertThat(policy().isConfigured()).isFalse();
+        assertThat(policy().shouldPromote("github", "1", "x")).isFalse();
+        assertThat(policy((String[]) null).shouldPromote("github", "1", "x")).isFalse();
     }
 
     @Test
-    void nullInputsAreFalse() {
-        AdminBootstrapPolicy p = policy("github:1");
-        assertThat(p.shouldPromote(null, "1")).isFalse();
-        assertThat(p.shouldPromote("github", null)).isFalse();
+    void nullRegistrationIsFalse() {
+        AdminBootstrapPolicy p = policy("github:@octocat");
+        assertThat(p.shouldPromote(null, "1", "octocat")).isFalse();
+        assertThat(p.isConfigured()).isTrue();
     }
 
     @Test
     void trimsWhitespaceAndIgnoresMalformedEntries() {
-        // Malformed: blank, no colon, missing subject, missing provider — all dropped, none crash.
-        AdminBootstrapPolicy p = policy("  github:1234567  ", "", "noColon", "github:", ":42", "   ");
-        assertThat(p.shouldPromote("github", "1234567")).isTrue(); // trimmed entry still matches
-        assertThat(p.shouldPromote("github", "")).isFalse(); // "github:" dropped
-        assertThat(p.shouldPromote("", "42")).isFalse(); // ":42" dropped
+        AdminBootstrapPolicy p = policy("  github:@octocat  ", "", "noColon", "github:", ":42", "gitlab-lrz:@");
+        assertThat(p.shouldPromote("github", "1", "octocat")).isTrue(); // trimmed entry still matches
+        assertThat(p.shouldPromote("github", "", null)).isFalse(); // "github:" dropped
+        assertThat(p.shouldPromote("", "42", null)).isFalse(); // ":42" dropped
+        assertThat(p.shouldPromote("gitlab-lrz", "9", "")).isFalse(); // "gitlab-lrz:@" (blank handle) dropped
     }
 
     @Test
     void subjectWithColonsKeepsEverythingAfterFirstColon() {
-        // First-colon split: a subject containing ':' is preserved verbatim.
         AdminBootstrapPolicy p = policy("custom:urn:weird:99");
-        assertThat(p.shouldPromote("custom", "urn:weird:99")).isTrue();
-    }
-
-    @Test
-    void parsesAList() {
-        List<String> raw = List.of("github:1", "github:2", "gitlab-lrz:3");
-        AdminBootstrapPolicy p = policy(raw.toArray(new String[0]));
-        assertThat(p.shouldPromote("github", "1")).isTrue();
-        assertThat(p.shouldPromote("github", "2")).isTrue();
-        assertThat(p.shouldPromote("gitlab-lrz", "3")).isTrue();
+        assertThat(p.shouldPromote("custom", "urn:weird:99", null)).isTrue();
     }
 }

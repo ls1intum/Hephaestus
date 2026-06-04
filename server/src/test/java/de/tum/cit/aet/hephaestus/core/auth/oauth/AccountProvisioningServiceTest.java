@@ -81,7 +81,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
             new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
         );
-        when(adminBootstrapPolicy.shouldPromote("github", "sub-1")).thenReturn(true);
+        when(adminBootstrapPolicy.shouldPromote(eq("github"), eq("sub-1"), any())).thenReturn(true);
 
         Account result = service.resolveOrProvision(
             "github",
