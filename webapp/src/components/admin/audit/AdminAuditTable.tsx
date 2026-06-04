@@ -22,6 +22,14 @@ export interface AdminAuditTableProps {
 	onLoadMore: () => void;
 }
 
+// Date fields are typed `Date` by the generated client but arrive as ISO strings at runtime (the
+// response transformers aren't wired into the SDK calls) — coerce defensively, matching the
+// established pattern in SessionsSection / LinkedAccountsSection.
+function formatInstant(value: AuthEventView["occurredAt"]): string {
+	const date = value instanceof Date ? value : new Date(value);
+	return date.toLocaleString();
+}
+
 /**
  * Read-only table of auth audit events (newest first). Pure/presentational: all data + paging come
  * from the route. The actor column is the impersonator (RFC 8693 `act`) when the event happened under
@@ -82,7 +90,7 @@ export function AdminAuditTable({
 						{events.map((e) => (
 							<TableRow key={e.id}>
 								<TableCell className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-									{e.occurredAt.toLocaleString()}
+									{formatInstant(e.occurredAt)}
 								</TableCell>
 								<TableCell>
 									<Badge variant="outline" className="font-mono text-xs">

@@ -24,6 +24,14 @@ function statusVariant(status: string): "secondary" | "destructive" | "outline" 
 	return "outline";
 }
 
+// The generated client types date fields as `Date`, but the response transformers aren't wired into
+// the SDK calls, so at runtime they arrive as ISO strings — coerce defensively (the established
+// pattern in SessionsSection / LinkedAccountsSection).
+function formatDate(value: AdminWorkspaceView["createdAt"]): string {
+	const date = value instanceof Date ? value : new Date(value);
+	return date.toLocaleDateString();
+}
+
 /**
  * Read-only, metadata-only table of every workspace (instance-admin overview). Pure/presentational.
  * No tenant content — reaching a workspace's content is done via audited impersonation of a member.
@@ -95,7 +103,7 @@ export function AdminWorkspacesTable({
 							<TableCell className="text-muted-foreground">{ws.ownerLogin ?? "—"}</TableCell>
 							<TableCell className="text-right tabular-nums">{ws.memberCount}</TableCell>
 							<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-								{ws.createdAt.toLocaleDateString()}
+								{formatDate(ws.createdAt)}
 							</TableCell>
 						</TableRow>
 					))}
