@@ -224,7 +224,7 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
 
 #### Configure GitHub login
 
-1. [Create a GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:38080/login/oauth2/code/github` (use your `SERVER_PORT` if you overrode it).
+1. [Create a GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8080/login/oauth2/code/github` (use your `SERVER_PORT` if you overrode it).
 2. Copy `server/.env.example` to `server/.env` and set the credentials:
 
    ```bash
@@ -235,7 +235,7 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    ```
 
 3. (Optional) To enable gitlab.lrz.de login locally, register an OAuth application there
-   (callback `http://localhost:38080/login/oauth2/code/gitlab-lrz`, scopes `openid profile email read_user`)
+   (callback `http://localhost:8080/login/oauth2/code/gitlab-lrz`, scopes `openid profile email read_user`)
    and set `GITLAB_LRZ_OAUTH_CLIENT_ID` / `GITLAB_LRZ_OAUTH_CLIENT_SECRET`. Leave blank to hide the GitLab button.
 4. Run the application server with `./mvnw spring-boot:run`; Postgres + NATS start automatically via Spring Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
 

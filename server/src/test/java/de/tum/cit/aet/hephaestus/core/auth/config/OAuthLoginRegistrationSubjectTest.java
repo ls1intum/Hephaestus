@@ -59,7 +59,7 @@ class OAuthLoginRegistrationSubjectTest extends BaseUnitTest {
 
     private static AuthProperties fullyConfiguredAuthProperties() {
         return new AuthProperties(
-            URI.create("http://localhost:38080"),
+            URI.create("http://localhost:8080"),
             "hephaestus-spa",
             Duration.ofMinutes(15),
             "__Host-HEPHAESTUS_AT",

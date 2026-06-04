@@ -150,7 +150,7 @@ springdoc:
 
 hephaestus:
     auth:
-        issuer: ${HEPHAESTUS_AUTH_ISSUER:http://localhost:38080}
+        issuer: ${HEPHAESTUS_AUTH_ISSUER:http://localhost:8080}
         audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
         access-ttl: ${HEPHAESTUS_AUTH_ACCESS_TTL:15m}
         cookie-name: ${HEPHAESTUS_AUTH_COOKIE_NAME:__Host-HEPHAESTUS_AT}

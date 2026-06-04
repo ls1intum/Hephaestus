@@ -57,7 +57,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
-    @DefaultValue("http://localhost:38080") URI issuer,
+    @DefaultValue("http://localhost:8080") URI issuer,
     @DefaultValue("hephaestus-spa") String audience,
     @DefaultValue("15m") Duration accessTtl,
     @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,

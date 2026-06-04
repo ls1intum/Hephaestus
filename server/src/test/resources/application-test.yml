@@ -80,7 +80,7 @@ hephaestus:
             secret: test-oauth-state-hmac-secret-not-real
     webhook:
         secret: test-webhook-shared-secret-not-real
-        external-url: http://localhost:38080
+        external-url: http://localhost:8080
     cors:
         allowed-origins:
             - http://localhost:4200

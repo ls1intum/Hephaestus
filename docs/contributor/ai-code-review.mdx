@@ -184,7 +184,7 @@ hephaestus:
       enabled: true # Enable agent job processing
       server: nats://localhost:4222
   sandbox:
-    llm-proxy-port: 38080 # Must match server port
+    llm-proxy-port: 8080 # Must match server port
     docker-host: unix:///var/run/docker.sock
   git:
     enabled: true
@@ -209,7 +209,7 @@ Then trigger with:
 curl -X POST "http://localhost:${SERVER_PORT}/api/dev/trigger-review?prId=123&workspaceId=1"
 ```
 
-The port must match your `SERVER_PORT` environment variable (default: `38080` in `.env`).
+The port must match your `SERVER_PORT` environment variable (default: `8080` in `.env`).
 
 ## Adding a new practice
 

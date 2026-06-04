@@ -29,7 +29,7 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         AuthProperties properties = new AuthProperties(
-            URI.create("http://localhost:38080"),
+            URI.create("http://localhost:8080"),
             "hephaestus-spa",
             Duration.ofMinutes(15),
             COOKIE_NAME,

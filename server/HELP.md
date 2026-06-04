@@ -17,7 +17,7 @@ Setting environment variables works through profile-based `application.yml` file
 
 Authentication is Hephaestus-native (Spring Security `oauth2Login`; ADR 0017) — there is no separate
 identity server to bootstrap. For local development, configure a GitHub OAuth app and set
-`GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (callback `http://localhost:38080/api/login/oauth2/code/github`),
+`GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (callback `http://localhost:8080/api/login/oauth2/code/github`),
 then sign in via GitHub. Grant yourself the `admin` app role by setting `app_role = 'APP_ADMIN'` on your
 `account` row. See `docs/contributor/local-development.mdx` for the full walkthrough.
 
