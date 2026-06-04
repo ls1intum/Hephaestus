@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
 import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthDatasource;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -67,6 +69,9 @@ class AccountAdminRoleIntegrationTest {
 
     @Autowired
     private JwtSigningKeyService signingKeyService;
+
+    @Autowired
+    private IssuedJwtRepository issuedJwtRepository;
 
     // Global isolation: the last-admin guard counts ALL active admins, so each test must start from a
     // clean slate or leftover admins from a prior test would inflate the count and mask the guard.
@@ -154,6 +159,43 @@ class AccountAdminRoleIntegrationTest {
         assertThat(activeAdminCount()).isEqualTo(1L);
     }
 
+    @Test
+    void adminForceSignOutRevokesTargetSessions() {
+        Account admin = persistAdmin("Admin");
+        Account user = persistUser("Plain User");
+        tokenFor(user); // mints + records an active issued_jwt for the user
+        assertThat(issuedJwtRepository.findActiveByAccountId(user.getId(), Instant.now())).hasSize(1);
+
+        // Admin force sign-out revokes the user's active session(s).
+        webTestClient
+            .delete()
+            .uri("/admin/users/{id}/sessions", user.getId())
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.revoked")
+            .isEqualTo(1);
+
+        // The account now has no active sessions — RevocationAwareJwtDecoder rejects the token on its
+        // next request (enforced per-request via the issued_jwt revocation row).
+        assertThat(issuedJwtRepository.findActiveByAccountId(user.getId(), Instant.now())).isEmpty();
+    }
+
+    @Test
+    void forceSignOutRequiresAdmin() {
+        Account user = persistUser("Plain User");
+
+        webTestClient
+            .delete()
+            .uri("/admin/users/{id}/sessions", user.getId())
+            .headers(h -> h.setBearerAuth(tokenFor(user)))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
     private Callable<Integer> demote(String token, Long targetId, CountDownLatch ready, CountDownLatch go) {
         return () -> {
             ready.countDown();
@@ -173,6 +215,13 @@ class AccountAdminRoleIntegrationTest {
     private Account persistAdmin(String displayName) {
         Account account = new Account(displayName);
         account.setAppRole(Account.AppRole.APP_ADMIN);
+        account.setStatus(Account.Status.ACTIVE);
+        return accountRepository.save(account);
+    }
+
+    private Account persistUser(String displayName) {
+        Account account = new Account(displayName);
+        account.setAppRole(Account.AppRole.USER);
         account.setStatus(Account.Status.ACTIVE);
         return accountRepository.save(account);
     }

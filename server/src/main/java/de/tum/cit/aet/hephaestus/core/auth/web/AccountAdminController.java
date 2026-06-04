@@ -8,6 +8,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,6 +45,8 @@ public class AccountAdminController {
 
     public record UpdateAccountRequestDTO(@Nullable String appRole) {}
 
+    public record RevokeSessionsResultDTO(int revoked) {}
+
     @GetMapping
     @Operation(summary = "List accounts (paged)", operationId = "adminListUsers")
     public ResponseEntity<List<AdminAccountViewDTO>> list(
@@ -66,6 +69,16 @@ public class AccountAdminController {
     ) {
         Account account = accountService.adminSetRole(id, body.appRole(), CurrentAccount.requireId());
         return ResponseEntity.ok(toView(account));
+    }
+
+    @DeleteMapping("/{id}/sessions")
+    @Operation(
+        summary = "Force sign-out: revoke all of an account's active sessions",
+        operationId = "adminRevokeUserSessions"
+    )
+    public ResponseEntity<RevokeSessionsResultDTO> revokeSessions(@PathVariable Long id) {
+        int revoked = accountService.adminRevokeAllSessions(id, CurrentAccount.requireId());
+        return ResponseEntity.ok(new RevokeSessionsResultDTO(revoked));
     }
 
     private static AdminAccountViewDTO toView(Account a) {

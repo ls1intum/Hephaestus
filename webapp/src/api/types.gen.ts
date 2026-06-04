@@ -781,6 +781,10 @@ export type SessionView = {
     userAgent?: string;
 };
 
+export type RevokeSessionsResult = {
+    revoked?: number;
+};
+
 /**
  * Request to rename a workspace's URL slug
  */
@@ -2283,6 +2287,24 @@ export type AdminUpdateUserResponses = {
 };
 
 export type AdminUpdateUserResponse = AdminUpdateUserResponses[keyof AdminUpdateUserResponses];
+
+export type AdminRevokeUserSessionsData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}/sessions';
+};
+
+export type AdminRevokeUserSessionsResponses = {
+    /**
+     * OK
+     */
+    200: RevokeSessionsResult;
+};
+
+export type AdminRevokeUserSessionsResponse = AdminRevokeUserSessionsResponses[keyof AdminRevokeUserSessionsResponses];
 
 export type ImpersonateData = {
     body: ImpersonateRequest;

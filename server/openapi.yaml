@@ -237,6 +237,26 @@ paths:
       summary: Update an account's app role
       tags:
       - Admin
+  /admin/users/{id}/sessions:
+    delete:
+      operationId: adminRevokeUserSessions
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeSessionsResult"
+          description: OK
+      summary: "Force sign-out: revoke all of an account's active sessions"
+      tags:
+      - Admin
   /auth/impersonate:
     post:
       operationId: impersonate
@@ -5088,6 +5108,12 @@ components:
       - id
       - name
       - nameWithOwner
+    RevokeSessionsResult:
+      type: object
+      properties:
+        revoked:
+          type: integer
+          format: int32
     SessionView:
       type: object
       properties:

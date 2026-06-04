@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
 	adminListUsersInfiniteOptions,
 	adminListUsersQueryKey,
+	adminRevokeUserSessionsMutation,
 	adminUpdateUserMutation,
 	impersonateMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -13,6 +14,16 @@ import type { AdminAccountView } from "@/api/types.gen";
 import { AdminUsersTable } from "@/components/admin/users/AdminUsersTable";
 import { ChangeRoleDialog } from "@/components/admin/users/ChangeRoleDialog";
 import { ImpersonateDialog } from "@/components/admin/users/ImpersonateDialog";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -42,6 +53,7 @@ function AdminUsersPage() {
 
 	const [roleTarget, setRoleTarget] = useState<DialogTarget>(null);
 	const [impersonateTarget, setImpersonateTarget] = useState<DialogTarget>(null);
+	const [signOutTarget, setSignOutTarget] = useState<DialogTarget>(null);
 
 	// Offset pagination: the endpoint returns a bare array with no total/cursor, so we treat
 	// a full page as "there may be more" and stop when a short page comes back.
@@ -97,6 +109,29 @@ function AdminUsersPage() {
 		...impersonateMutation(),
 		// Errors surfaced inline in the dialog (see updateRole).
 	});
+
+	const forceSignOut = useMutation({
+		...adminRevokeUserSessionsMutation(),
+		onSuccess: (data) => {
+			const count = data?.revoked ?? 0;
+			toast.success(
+				count === 0
+					? "No active sessions to sign out."
+					: `Signed out — revoked ${count} session${count === 1 ? "" : "s"}.`,
+			);
+			setSignOutTarget(null);
+		},
+		onError: (error) => {
+			toast.error(problemDetailOf(error, "Couldn't sign the user out."));
+			setSignOutTarget(null);
+		},
+	});
+
+	const handleConfirmSignOut = () => {
+		const id = signOutTarget?.user.id;
+		if (id == null) return;
+		forceSignOut.mutate({ path: { id } });
+	};
 
 	const handleConfirmRole = (user: AdminAccountView, nextRole: string) => {
 		if (user.id == null) return;
@@ -163,6 +198,7 @@ function AdminUsersPage() {
 					impersonate.reset();
 					setImpersonateTarget({ user });
 				}}
+				onForceSignOut={(user) => setSignOutTarget({ user })}
 			/>
 
 			<ChangeRoleDialog
@@ -199,6 +235,39 @@ function AdminUsersPage() {
 				}}
 				onConfirm={handleConfirmImpersonate}
 			/>
+
+			<AlertDialog
+				open={signOutTarget !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						setSignOutTarget(null);
+						forceSignOut.reset();
+					}
+				}}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							Force sign-out {signOutTarget?.user.displayName ?? "this user"}?
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							This revokes all of the account's active sessions immediately — they'll have to sign
+							in again, and any in-progress impersonation of this account ends. This can't be
+							undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={forceSignOut.isPending}
+							onClick={handleConfirmSignOut}
+						>
+							{forceSignOut.isPending ? "Signing out…" : "Force sign-out"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

@@ -1,4 +1,4 @@
-import { MoreHorizontal, UserCog, Users } from "lucide-react";
+import { LogOut, MoreHorizontal, UserCog, Users } from "lucide-react";
 import type { AdminAccountView } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ export interface AdminUsersTableProps {
 	onLoadMore: () => void;
 	onChangeRole: (user: AdminAccountView) => void;
 	onImpersonate: (user: AdminAccountView) => void;
+	/** Force sign-out: revoke all of the account's active sessions (also kills impersonation of it). */
+	onForceSignOut: (user: AdminAccountView) => void;
 }
 
 const COLUMN_COUNT = 6;
@@ -67,6 +69,7 @@ export function AdminUsersTable({
 	onLoadMore,
 	onChangeRole,
 	onImpersonate,
+	onForceSignOut,
 }: AdminUsersTableProps) {
 	return (
 		<div className="space-y-4">
@@ -185,6 +188,14 @@ export function AdminUsersTable({
 														>
 															<Users className="size-4" />
 															{isSelf ? "Cannot impersonate self" : "Impersonate"}
+														</DropdownMenuItem>
+														<DropdownMenuSeparator />
+														<DropdownMenuItem
+															variant="destructive"
+															onClick={() => onForceSignOut(user)}
+														>
+															<LogOut className="size-4" />
+															Force sign-out
 														</DropdownMenuItem>
 													</DropdownMenuGroup>
 												</DropdownMenuContent>

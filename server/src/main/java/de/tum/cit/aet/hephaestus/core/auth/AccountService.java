@@ -174,4 +174,29 @@ public class AccountService {
         }
         return account;
     }
+
+    /**
+     * Instance-admin force sign-out: revoke ALL of {@code accountId}'s active sessions. Because an
+     * impersonation token is minted with the target's account id as its subject, this also terminates
+     * any in-flight impersonation OF this account (the operator's own session is a separate jti and is
+     * untouched). {@code RevocationAwareJwtDecoder} enforces the revocation on the next request, so the
+     * effect is near-immediate without any new schema. Audited as {@code JWT_REVOKED} attributed to the
+     * acting admin. Returns the number of sessions revoked.
+     */
+    @Transactional
+    public int adminRevokeAllSessions(Long accountId, Long actingAccountId) {
+        requireById(accountId); // 404 if the account does not exist
+        int revoked = issuedJwtRepository.revokeAllForAccount(
+            accountId,
+            clock.instant(),
+            IssuedJwt.RevokedReason.ADMIN_REVOKE
+        );
+        authEventLogger
+            .event(AuthEvent.EventType.JWT_REVOKED, AuthEvent.Result.SUCCESS)
+            .account(accountId)
+            .actingAccount(actingAccountId)
+            .details("{\"reason\":\"ADMIN_REVOKE\",\"count\":" + revoked + "}")
+            .record();
+        return revoked;
+    }
 }

@@ -45,6 +45,7 @@ const meta = {
 		onLoadMore: fn(),
 		onChangeRole: fn(),
 		onImpersonate: fn(),
+		onForceSignOut: fn(),
 	},
 } satisfies Meta<typeof AdminUsersTable>;
 
