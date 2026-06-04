@@ -263,11 +263,6 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
                 java.util.Set.of()
             );
             case SLACK -> new ConnectionConfig.SlackConfig(null, null, null, null, java.util.Set.of());
-            case OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> new ConnectionConfig.OidcLoginConfig(
-                "https://gitlab.example.com",
-                java.util.Set.of("openid", "profile", "email"),
-                "Example IdP"
-            );
         };
         Connection c = new Connection(ws, kind, instanceKey, cfg);
         c.setState(state);

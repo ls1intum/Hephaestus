@@ -157,7 +157,7 @@ public final class ConsumerSubjectMath {
         }
         return switch (kind) {
             case GITHUB -> buildSubjectPrefix("github", "?/?") + ".>";
-            case GITLAB, SLACK, OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> throw new UnsupportedOperationException(
+            case GITLAB, SLACK -> throw new UnsupportedOperationException(
                 "Installation-aware subject filter not yet supported for kind=" +
                     kind +
                     " (only GITHUB publishes installation events today)"
@@ -181,7 +181,7 @@ public final class ConsumerSubjectMath {
         return switch (kind) {
             case GITHUB -> Optional.of("github");
             case GITLAB -> Optional.of("gitlab");
-            case SLACK, OIDC_LOGIN_GITHUB, OIDC_LOGIN_GITLAB -> Optional.empty();
+            case SLACK -> Optional.empty();
         };
     }
 

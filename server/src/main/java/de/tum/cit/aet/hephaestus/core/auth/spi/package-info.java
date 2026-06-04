@@ -7,8 +7,7 @@
  *       {@code AccountPreferencesQuery}, {@code AccountWorkspaceMembershipQuery}.</li>
  *   <li><b>Required (outbound) ports</b> — contracts {@code core.auth} <em>consumes</em> but expects
  *       another module (typically {@code integration}) to implement, keeping vendor knowledge out of
- *       auth: e.g. {@code GitProviderRegistry}, {@code IdentityProviderCatalog},
- *       {@code OAuthLoginDefaultsProvider}.</li>
+ *       auth: e.g. {@code GitProviderRegistry}, {@code IdentityProviderCatalog}.</li>
  * </ul>
  *
  * <p>This is the only {@code core.auth} package other modules may depend on; implementations and

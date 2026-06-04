@@ -2,10 +2,10 @@
  * Auth — Hephaestus-native authentication and identity.
  *
  * <p>Replaces the prior Keycloak federating-IdP setup with Spring Security 7 native auth:
- * {@code oauth2Login} federates to upstream IdPs (GitHub, gitlab.lrz.de, workspace-owned
- * GitLab/GHE via {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection}
- * rows of {@code kind=OIDC_LOGIN_*}); on success we mint our own short-lived ES256
- * cookie-JWT via Spring's {@code NimbusJwtEncoder} + a DB-backed {@code JWKSource}.
+ * {@code oauth2Login} federates to upstream IdPs (the instance-scoped {@code login_provider}
+ * rows — GitHub, GitLab.com, self-hosted GitLab — see
+ * {@link de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider}); on success we mint our own
+ * short-lived ES256 cookie-JWT via Spring's {@code NimbusJwtEncoder} + a DB-backed {@code JWKSource}.
  *
  * <h2>Ubiquitous language</h2>
  * <ul>
@@ -42,9 +42,9 @@
  *       ({@code AccountRoleQuery}, {@code AccountIdentityQuery}, {@code AccountPreferencesQuery},
  *       {@code AccountWorkspaceMembershipQuery}).</li>
  *   <li>{@code core.auth} does <em>not</em> depend on {@code workspace} or {@code integration.*}
- *       directly. It reads workspace-scoped {@code OIDC_LOGIN_*} {@code Connection} rows via the
- *       {@code IdentityProviderCatalog}/{@code GitProviderRegistry} SPI ports implemented in
- *       {@code integration.identity.connect}.</li>
+ *       directly. Login {@code ClientRegistration}s are built from the {@code core.auth.provider}
+ *       store and exposed via the {@code IdentityProviderCatalog}/{@code GitProviderRegistry} SPI
+ *       ports implemented in {@code integration.identity.connect}.</li>
  *   <li>ArchUnit forbids any {@code org.keycloak.*} or {@code com.auth0.jwt.*} import.</li>
  * </ul>
  *

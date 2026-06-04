@@ -273,19 +273,14 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
-        // Each config subtype yields the set of kinds it may legally bind to — most are a singleton,
-        // OidcLoginConfig spans both OIDC_LOGIN_* (the issuer URL alone can't disambiguate provider
-        // type). One membership check covers every subtype, so adding a new ConnectionConfig is a
-        // compile error here (exhaustive switch) rather than a silent runtime mismatch.
+        // Each config subtype yields the set of kinds it may legally bind to. One membership check
+        // covers every subtype, so adding a new ConnectionConfig is a compile error here (exhaustive
+        // switch) rather than a silent runtime mismatch.
         Set<IntegrationKind> allowed = switch (config) {
             case ConnectionConfig.GitHubAppConfig __ -> EnumSet.of(IntegrationKind.GITHUB);
             case ConnectionConfig.GitHubPatConfig __ -> EnumSet.of(IntegrationKind.GITHUB);
             case ConnectionConfig.GitLabConfig __ -> EnumSet.of(IntegrationKind.GITLAB);
             case ConnectionConfig.SlackConfig __ -> EnumSet.of(IntegrationKind.SLACK);
-            case ConnectionConfig.OidcLoginConfig __ -> EnumSet.of(
-                IntegrationKind.OIDC_LOGIN_GITHUB,
-                IntegrationKind.OIDC_LOGIN_GITLAB
-            );
         };
         if (!allowed.contains(kind)) {
             throw new IllegalStateException(

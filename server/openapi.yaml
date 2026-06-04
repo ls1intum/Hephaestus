@@ -3632,7 +3632,6 @@ components:
           enum:
           - SCM
           - MESSAGING
-          - IDENTITY
         id:
           type: integer
           format: int64
@@ -3644,8 +3643,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-          - OIDC_LOGIN_GITHUB
-          - OIDC_LOGIN_GITLAB
         state:
           type: string
           enum:
@@ -3688,7 +3685,6 @@ components:
           enum:
           - SCM
           - MESSAGING
-          - IDENTITY
         id:
           type: integer
           format: int64
@@ -3700,8 +3696,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-          - OIDC_LOGIN_GITHUB
-          - OIDC_LOGIN_GITLAB
         state:
           type: string
           enum:
@@ -4254,8 +4248,6 @@ components:
           - GITHUB
           - GITLAB
           - SLACK
-          - OIDC_LOGIN_GITHUB
-          - OIDC_LOGIN_GITLAB
         redirectAfter:
           type: string
           format: uri

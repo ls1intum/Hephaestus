@@ -15,7 +15,6 @@ import {
 	currentUser,
 	exportPending,
 	exportReady,
-	identityConnections,
 	identityProviders,
 	linkedIdentities,
 	sessions,
@@ -78,23 +77,6 @@ export const handlers = [
 	http.post("*/auth/impersonate", () => new HttpResponse(null, { status: 204 })),
 	// `:exit` is a literal colon-suffix on the path, not an MSW path param.
 	http.post("*/auth/impersonate\\:exit", () => new HttpResponse(null, { status: 204 })),
-
-	// --- workspace connection registry (IDENTITY login providers) -----------
-	http.get("*/workspaces/:workspaceSlug/connections", () => HttpResponse.json(identityConnections)),
-	http.post("*/workspaces/:workspaceSlug/connections", async ({ request }) => {
-		const body = (await request.json().catch(() => ({}))) as { displayName?: string };
-		// Flat InitiateConnectionResponse: OIDC login is an inline-credential ("LINKED") flow.
-		return HttpResponse.json({
-			type: "LINKED",
-			connectionId: 599,
-			displayName: body.displayName ?? "New login provider",
-		});
-	}),
-	// Single lifecycle endpoint replacing the old suspend/reactivate/disconnect verbs;
-	// the target `state` in the body distinguishes the transition.
-	http.patch("*/workspaces/:workspaceSlug/connections/:id/status", () =>
-		HttpResponse.json({ ok: true }),
-	),
 ];
 
 // ---------------------------------------------------------------------------

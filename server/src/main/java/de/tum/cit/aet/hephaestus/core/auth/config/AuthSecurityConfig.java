@@ -8,13 +8,10 @@ import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationReques
 import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
-import de.tum.cit.aet.hephaestus.core.auth.spi.OAuthLoginDefaultsProvider;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import java.security.SecureRandom;
 import java.time.Clock;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +22,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -33,8 +29,6 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
@@ -68,78 +62,9 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 public class AuthSecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthSecurityConfig.class);
+
+    /** The seeded GitHub login provider's registration id — selects the email-enriching user service. */
     private static final String GITHUB_REGISTRATION_ID = "github";
-    private static final String GITLAB_LRZ_REGISTRATION_ID = "gitlab-lrz";
-    private static final String REDIRECT_URI_TEMPLATE = "{baseUrl}/login/oauth2/code/{registrationId}";
-
-    /**
-     * Env-configured default OAuth login providers (github, gitlab-lrz), exposed as the
-     * {@link OAuthLoginDefaultsProvider} port. The {@code integration} module's composite
-     * {@code ClientRegistrationRepository} consumes this and overlays the workspace-scoped
-     * OIDC-login Connections (family IDENTITY) — keeping the secret-bearing Connection access
-     * out of {@code core.auth} and the bounded-context dependency direction correct
-     * ({@code integration → core}, never the reverse).
-     *
-     * <p>Default providers are built from {@link AuthProperties} rather than
-     * {@code spring.security.oauth2.client.*} so that a provider with no configured client id
-     * is simply omitted — Boot's {@code OAuth2ClientProperties} validation would otherwise
-     * reject the empty client id and abort the context (breaking CI, specs and worker pods).
-     */
-    @Bean
-    public OAuthLoginDefaultsProvider oauthLoginDefaultsProvider(AuthProperties authProperties) {
-        List<ClientRegistration> registrations = new ArrayList<>();
-        if (authProperties.github().configured()) {
-            registrations.add(buildGithubRegistration(authProperties.github()));
-        }
-        if (authProperties.gitlabLrz().configured()) {
-            registrations.add(buildGitlabLrzRegistration(authProperties.gitlabLrz()));
-        }
-        if (registrations.isEmpty()) {
-            log.warn(
-                "auth: no default OAuth login providers configured — set hephaestus.auth.github.client-id " +
-                    "and/or hephaestus.auth.gitlab-lrz.client-id. Workspace-scoped OIDC Connections may still apply."
-            );
-        }
-        return () -> List.copyOf(registrations);
-    }
-
-    private static ClientRegistration buildGithubRegistration(AuthProperties.GithubLogin github) {
-        return ClientRegistration.withRegistrationId(GITHUB_REGISTRATION_ID)
-            .clientId(github.clientId())
-            .clientSecret(github.clientSecret())
-            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri(REDIRECT_URI_TEMPLATE)
-            .scope("read:user", "user:email")
-            .authorizationUri("https://github.com/login/oauth/authorize")
-            .tokenUri("https://github.com/login/oauth/access_token")
-            .userInfoUri("https://api.github.com/user")
-            .userNameAttributeName("id")
-            .clientName("GitHub")
-            .build();
-    }
-
-    private static ClientRegistration buildGitlabLrzRegistration(AuthProperties.GitlabLrzLogin gitlab) {
-        String base = gitlab.baseUrl().toString().replaceAll("/+$", "");
-        return ClientRegistration.withRegistrationId(GITLAB_LRZ_REGISTRATION_ID)
-            .clientId(gitlab.clientId())
-            .clientSecret(gitlab.clientSecret())
-            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri(REDIRECT_URI_TEMPLATE)
-            .scope("openid", "profile", "email", "read_user")
-            .authorizationUri(base + "/oauth/authorize")
-            .tokenUri(base + "/oauth/token")
-            .userInfoUri(base + "/api/v4/user")
-            // Subject must be the IdP-stable NUMERIC GitLab user id (GitLab's /api/v4/user returns
-            // both "id" and "username"; "username" is mutable). Keying IdentityLink.subject on the
-            // numeric id matches GitHub + the workspace-scoped gl-ws-* registrations, satisfies the
-            // "IdP-stable user id" contract on IdentityLink.subject (nOAuth defence), and lets the
-            // SCM actor-mirror provisioner derive the provider native_id from the subject.
-            .userNameAttributeName("id")
-            .clientName("gitlab.lrz.de")
-            .build();
-    }
 
     @Bean
     public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(

@@ -6,7 +6,6 @@ import {
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 import { AdminSlackNotificationSettings } from "./AdminSlackNotificationSettings";
-import { LoginProvidersSettings } from "./login-providers/LoginProvidersSettings";
 
 type RepositoryItem = {
 	nameWithOwner: string;
@@ -39,8 +38,6 @@ export interface AdminSettingsPageProps {
 	slackScheduleDay?: number;
 	slackScheduleTime?: string;
 	onSlackSaved: () => void;
-	/** API origin used to build OAuth callback URLs for self-hosted login providers. */
-	apiOrigin: string;
 }
 
 export function AdminSettingsPage({
@@ -67,7 +64,6 @@ export function AdminSettingsPage({
 	slackScheduleDay,
 	slackScheduleTime,
 	onSlackSaved,
-	apiOrigin,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
@@ -91,10 +87,6 @@ export function AdminSettingsPage({
 					onAddRepository={onAddRepository}
 					onRemoveRepository={onRemoveRepository}
 				/>
-
-				{workspaceSlug != null && (
-					<LoginProvidersSettings workspaceSlug={workspaceSlug} apiOrigin={apiOrigin} />
-				)}
 
 				{features.leaguesEnabled && (
 					<AdminLeagueSettings isResetting={isResettingLeagues} onResetLeagues={onResetLeagues} />

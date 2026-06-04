@@ -105,6 +105,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "IssuedJwt", // JWT revocation list; account-scoped
         "JwtSigningKey", // System-wide signing keys
         "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
+        "LoginProvider", // Instance-scoped OAuth login provider (sign-in option); not workspace-scoped
         "WorkerRegistry" // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
     );
 

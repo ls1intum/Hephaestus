@@ -17,18 +17,7 @@ public enum IntegrationKind {
     /** GitLab.com or self-hosted GitLab (host disambiguates). */
     GITLAB(IntegrationFamily.SCM),
     /** Slack workspace. */
-    SLACK(IntegrationFamily.MESSAGING),
-    /**
-     * Workspace-scoped GitHub OAuth login app — surfaces a "Sign in with this workspace's
-     * GitHub" provider in addition to the env-default {@code github} registration. Distinct
-     * from {@link #GITHUB} which represents SCM sync.
-     */
-    OIDC_LOGIN_GITHUB(IntegrationFamily.IDENTITY),
-    /**
-     * Workspace-scoped GitLab OAuth login app (self-hosted instances; e.g. gitlab.lrz.de
-     * is the env default but other workspaces can register their own).
-     */
-    OIDC_LOGIN_GITLAB(IntegrationFamily.IDENTITY);
+    SLACK(IntegrationFamily.MESSAGING);
 
     private final IntegrationFamily family;
 

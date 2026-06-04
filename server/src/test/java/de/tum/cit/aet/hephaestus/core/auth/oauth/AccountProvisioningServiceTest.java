@@ -54,7 +54,15 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         accountJitCreator = mock(AccountJitCreator.class);
         // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
         adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
-        lenient().when(gitProviderRegistry.resolveProviderId(any())).thenReturn(PROVIDER_ID);
+        de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository loginProviderRepository = mock(
+            de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository.class
+        );
+        var githubProvider = new de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider();
+        githubProvider.setRegistrationId("github");
+        githubProvider.setType(de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType.GITHUB);
+        githubProvider.setBaseUrl("https://github.com");
+        lenient().when(loginProviderRepository.findByRegistrationId(any())).thenReturn(Optional.of(githubProvider));
+        lenient().when(gitProviderRegistry.resolveProviderId(any(), any())).thenReturn(PROVIDER_ID);
         lenient()
             .when(accountRepository.save(any()))
             .thenAnswer(inv -> inv.getArgument(0));
@@ -66,6 +74,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             accountRepository,
             identityLinkRepository,
             gitProviderRegistry,
+            loginProviderRepository,
             verifiedEmailResolver,
             accountJitCreator,
             adminBootstrapPolicy,

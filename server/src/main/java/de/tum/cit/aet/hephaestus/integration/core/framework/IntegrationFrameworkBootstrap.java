@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationFamily;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
@@ -80,16 +79,6 @@ public class IntegrationFrameworkBootstrap {
     public void validate() {
         List<String> violations = new ArrayList<>();
         for (IntegrationKind kind : manifests.registeredKinds()) {
-            // IDENTITY-family kinds (OIDC_LOGIN_*) are intentionally manifest-exempt: they ship a
-            // ConnectionStrategy that seeds an OAuth ClientRegistration at login time but never sync,
-            // deliver feedback, or hold a long-lived API credential / lifecycle listener. Requiring a
-            // manifest here would force empty-capability + no-op ApiCredentialProvider/lifecycle stubs
-            // (the very theatre the framework avoids), so they are deliberately not registered and are
-            // skipped defensively if one ever is. The login-provider wiring is validated by
-            // LoginClientRegistrationRepository, not this bootstrap.
-            if (kind.family() == IntegrationFamily.IDENTITY) {
-                continue;
-            }
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
             Set<Capability> declared = manifest.declaredCapabilities();
             checkRequired(kind, declared, violations);

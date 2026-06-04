@@ -1,133 +1,95 @@
 package de.tum.cit.aet.hephaestus.integration.identity.connect;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link RegistrationToGitProviderResolver}, the {@code GitProviderRegistry} SPI
- * implementation. Focus on the workspace-scoped path ({@code gh-ws-*}/{@code gl-ws-*}), which a
- * real OAuth round-trip reaches via {@code AccountProvisioningService} — previously a 500
- * ({@code IllegalStateException("...not yet wired")}).
+ * Unit tests for {@link RegistrationToGitProviderResolver}, the {@code GitProviderRegistry} SPI impl:
+ * given a login provider's {@code (type, baseUrl)}, it upserts the {@code git_provider} row keyed on
+ * the canonical server-url origin (scheme + host + explicit non-default port).
  */
-class RegistrationToGitProviderResolverTest extends BaseUnitTest {
+class RegistrationToGitProviderResolverTest {
 
     private GitProviderRepository gitProviderRepository;
-    private ConnectionRepository connectionRepository;
     private RegistrationToGitProviderResolver resolver;
 
     @BeforeEach
     void setup() {
         gitProviderRepository = mock(GitProviderRepository.class);
-        connectionRepository = mock(ConnectionRepository.class);
-        resolver = new RegistrationToGitProviderResolver(gitProviderRepository, connectionRepository);
+        resolver = new RegistrationToGitProviderResolver(gitProviderRepository);
     }
 
-    /** Upsert-miss path: stub save() to return the row with a stamped (DB-generated) id. */
-    private void stubSaveStampsId() {
+    private void stubSaveStampsId(long id) {
         when(gitProviderRepository.save(any(GitProvider.class))).thenAnswer(inv -> {
             GitProvider p = inv.getArgument(0);
-            setId(p, 7L);
+            setId(p, id);
             return p;
         });
     }
 
     @Test
-    void defaultGithubRegistrationUpsertsGithubComOrigin() {
-        stubSaveStampsId();
+    void upsertsGithubComOrigin() {
+        stubSaveStampsId(7L);
         when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")).thenReturn(
             Optional.empty()
         );
 
-        GitProvider provider = resolver.resolve("github");
-
-        assertThat(provider.getType()).isEqualTo(GitProviderType.GITHUB);
-        assertThat(provider.getServerUrl()).isEqualTo("https://github.com");
+        assertThat(resolver.resolveProviderId("GITHUB", "https://github.com")).isEqualTo(7L);
     }
 
     @Test
-    void workspaceScopedGitlabRegistrationResolvesFromConnectionIssuerOrigin() {
-        stubSaveStampsId();
-        Connection connection = oidcConnection(
-            IntegrationKind.OIDC_LOGIN_GITLAB,
-            "https://gitlab.example.test/sub/path"
-        );
-        when(connectionRepository.findById(42L)).thenReturn(Optional.of(connection));
+    void selfHostedGitlabOriginStripsPath() {
+        stubSaveStampsId(8L);
         when(
             gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.example.test")
         ).thenReturn(Optional.empty());
 
-        // The previously thrown path — now a clean upsert keyed on the issuer origin.
-        GitProvider provider = resolver.resolve("gl-ws-42");
+        resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path");
 
-        assertThat(provider.getType()).isEqualTo(GitProviderType.GITLAB);
-        assertThat(provider.getServerUrl()).isEqualTo("https://gitlab.example.test");
+        // Save is keyed on the bare origin, not the full base URL.
+        when(
+            gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.example.test")
+        ).thenReturn(Optional.of(stamped(GitProviderType.GITLAB, "https://gitlab.example.test", 8L)));
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path")).isEqualTo(8L);
     }
 
     @Test
-    void workspaceScopedRegistrationPreservesExplicitPortInOrigin() {
-        stubSaveStampsId();
-        Connection connection = oidcConnection(IntegrationKind.OIDC_LOGIN_GITHUB, "https://ghe.example.test:8443");
-        when(connectionRepository.findById(9L)).thenReturn(Optional.of(connection));
+    void preservesExplicitPort() {
+        stubSaveStampsId(9L);
         when(
-            gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITHUB, "https://ghe.example.test:8443")
+            gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.example.test:8443")
         ).thenReturn(Optional.empty());
 
-        GitProvider provider = resolver.resolve("gh-ws-9");
-
-        assertThat(provider.getServerUrl()).isEqualTo("https://ghe.example.test:8443");
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test:8443")).isEqualTo(9L);
     }
 
     @Test
-    void workspaceScopedRegistrationReusesExistingProviderRow() {
-        Connection connection = oidcConnection(IntegrationKind.OIDC_LOGIN_GITLAB, "https://gitlab.lrz.de");
-        GitProvider existing = new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de");
-        setId(existing, 3L);
-        when(connectionRepository.findById(5L)).thenReturn(Optional.of(connection));
+    void reusesExistingProviderRow() {
         when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")).thenReturn(
-            Optional.of(existing)
+            Optional.of(stamped(GitProviderType.GITLAB, "https://gitlab.lrz.de", 3L))
         );
 
-        assertThat(resolver.resolveProviderId("gl-ws-5")).isEqualTo(3L);
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.lrz.de")).isEqualTo(3L);
     }
 
     @Test
-    void missingConnectionForWorkspaceRegistrationFailsWithIllegalArgument() {
-        when(connectionRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> resolver.resolve("gl-ws-99")).isInstanceOf(IllegalArgumentException.class);
+    void providerTypeNameIsUnknownForNull() {
+        assertThat(resolver.providerTypeName(null)).isEqualTo("UNKNOWN");
     }
 
-    @Test
-    void unknownRegistrationIdFailsWithIllegalArgument() {
-        assertThatThrownBy(() -> resolver.resolve("totally-bogus")).isInstanceOf(IllegalArgumentException.class);
-    }
-
-    private static Connection oidcConnection(IntegrationKind kind, String issuerUrl) {
-        Workspace workspace = new Workspace();
-        setId(workspace, 1L);
-        return new Connection(
-            workspace,
-            kind,
-            "instance",
-            new ConnectionConfig.OidcLoginConfig(issuerUrl, Set.of("read_user"), "Workspace IdP")
-        );
+    private static GitProvider stamped(GitProviderType type, String serverUrl, long id) {
+        GitProvider p = new GitProvider(type, serverUrl);
+        setId(p, id);
+        return p;
     }
 
     private static void setId(Object entity, Long id) {

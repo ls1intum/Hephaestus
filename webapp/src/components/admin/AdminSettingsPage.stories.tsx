@@ -41,7 +41,6 @@ const meta = {
 		hasSlackConnection: false,
 		slackNotificationsEnabled: false,
 		onSlackSaved: fn(),
-		apiOrigin: "https://hephaestus.example.com",
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 

@@ -1543,7 +1543,7 @@ export type InitiateConnectionResponse = {
  * <code>IllegalArgumentException</code>.
  */
 export type InitiateConnectionRequest = {
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
     redirectAfter?: string;
     userInput?: {
         [key: string]: string;
@@ -1958,10 +1958,10 @@ export type ConnectionSummary = {
     capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     createdAt?: Date;
     displayName?: string;
-    family?: 'SCM' | 'MESSAGING' | 'IDENTITY';
+    family?: 'SCM' | 'MESSAGING';
     id?: number;
     instanceKey?: string;
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
     updatedAt?: Date;
@@ -1985,10 +1985,10 @@ export type ConnectionDetail = {
     };
     createdAt?: Date;
     displayName?: string;
-    family?: 'SCM' | 'MESSAGING' | 'IDENTITY';
+    family?: 'SCM' | 'MESSAGING';
     id?: number;
     instanceKey?: string;
-    kind?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OIDC_LOGIN_GITHUB' | 'OIDC_LOGIN_GITLAB';
+    kind?: 'GITHUB' | 'GITLAB' | 'SLACK';
     state?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
     stateReason?: string;
     updatedAt?: Date;

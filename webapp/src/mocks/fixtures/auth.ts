@@ -6,7 +6,6 @@
 
 import type {
 	AdminAccountView,
-	ConnectionSummary,
 	CurrentUserView,
 	ExportStatus,
 	IdentityProviderView,
@@ -119,35 +118,6 @@ export const adminUsers: AdminAccountView[] = [
 		primaryEmail: "sam@example.com",
 		appRole: "APP_USER",
 		status: "SUSPENDED",
-	},
-];
-
-// IDENTITY-family connections backing the workspace login-providers screen. These
-// share the generic `/connections` endpoint with SCM/messaging connections; the UI
-// filters client-side to the OIDC_LOGIN_* kinds.
-export const identityConnections: Wire<ConnectionSummary>[] = [
-	{
-		id: 501,
-		kind: "OIDC_LOGIN_GITHUB",
-		family: "IDENTITY",
-		displayName: "GitHub Enterprise (login)",
-		instanceKey: "ghe-corp",
-		state: "ACTIVE",
-		capabilities: [],
-		createdAt: "2026-03-01T12:00:00Z",
-		updatedAt: "2026-05-01T12:00:00Z",
-	},
-	{
-		id: 502,
-		kind: "OIDC_LOGIN_GITLAB",
-		family: "IDENTITY",
-		displayName: "Self-hosted GitLab (login)",
-		instanceKey: "gitlab-lrz",
-		state: "SUSPENDED",
-		stateReason: "Credentials rotated by admin",
-		capabilities: [],
-		createdAt: "2026-02-14T09:00:00Z",
-		updatedAt: "2026-05-10T09:00:00Z",
 	},
 ];
 

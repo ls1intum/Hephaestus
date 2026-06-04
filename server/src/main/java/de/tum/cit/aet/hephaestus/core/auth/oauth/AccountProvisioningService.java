@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import java.time.Clock;
 import java.util.Map;
@@ -34,6 +36,7 @@ public class AccountProvisioningService {
     private final AccountRepository accountRepository;
     private final IdentityLinkRepository identityLinkRepository;
     private final GitProviderRegistry gitProviderRegistry;
+    private final LoginProviderRepository loginProviderRepository;
     private final VerifiedEmailResolver verifiedEmailResolver;
     private final AccountJitCreator accountJitCreator;
     private final AdminBootstrapPolicy adminBootstrapPolicy;
@@ -43,6 +46,7 @@ public class AccountProvisioningService {
         AccountRepository accountRepository,
         IdentityLinkRepository identityLinkRepository,
         GitProviderRegistry gitProviderRegistry,
+        LoginProviderRepository loginProviderRepository,
         VerifiedEmailResolver verifiedEmailResolver,
         AccountJitCreator accountJitCreator,
         AdminBootstrapPolicy adminBootstrapPolicy,
@@ -51,6 +55,7 @@ public class AccountProvisioningService {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
         this.gitProviderRegistry = gitProviderRegistry;
+        this.loginProviderRepository = loginProviderRepository;
         this.verifiedEmailResolver = verifiedEmailResolver;
         this.accountJitCreator = accountJitCreator;
         this.adminBootstrapPolicy = adminBootstrapPolicy;
@@ -68,7 +73,7 @@ public class AccountProvisioningService {
         OAuth2User principal,
         AuthIntentCookie.Intent intent
     ) {
-        long providerId = gitProviderRegistry.resolveProviderId(registrationId);
+        long providerId = resolveProviderId(registrationId);
         AuthIntentCookie.Intent.Mode mode = (intent != null) ? intent.mode() : AuthIntentCookie.Intent.Mode.LOGIN;
 
         IdentityLink link = identityLinkRepository
@@ -195,6 +200,18 @@ public class AccountProvisioningService {
      * (so {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
      * deliberate {@code /admin/users} action.
      */
+    /**
+     * Resolve the {@code git_provider} row id for a login registration: look up the instance-scoped
+     * {@code login_provider} row (this module owns it), then let the integration-side registry upsert
+     * the provider row from its {@code (type, baseUrl)} — keeping the GitProvider entity out of auth.
+     */
+    private long resolveProviderId(String registrationId) {
+        LoginProvider provider = loginProviderRepository
+            .findByRegistrationId(registrationId)
+            .orElseThrow(() -> new IllegalArgumentException("unknown login registrationId: " + registrationId));
+        return gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
+    }
+
     private Account promoteIfBootstrapAdmin(Account account, String registrationId, String subject, String login) {
         if (
             account.getAppRole() != Account.AppRole.APP_ADMIN &&
