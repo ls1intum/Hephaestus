@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.core.auth.audit;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -55,7 +55,7 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
     )
     Page<AuthEvent> findForAdmin(
         @Param("accountId") @Nullable Long accountId,
-        @Param("eventType") @Nullable AuthEvent.EventType eventType,
+        @Param("eventType") AuthEvent.EventType eventType,
         Pageable pageable
     );
 }

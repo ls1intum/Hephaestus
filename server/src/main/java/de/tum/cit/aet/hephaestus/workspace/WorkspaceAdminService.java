@@ -1,0 +1,63 @@
+package de.tum.cit.aet.hephaestus.workspace;
+
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.dto.AdminWorkspaceViewDTO;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Instance-admin cross-tenant workspace listing (metadata only). The whole service is
+ * {@link WorkspaceAgnostic} so the listing — including the per-workspace connection / membership
+ * lookups — runs under a tenancy bypass and sees every workspace, not just the caller's. Access is
+ * gated upstream by {@code hasAuthority('app_admin')} on {@link WorkspaceAdminController}.
+ */
+@Service
+@WorkspaceAgnostic("Instance-admin overview lists every workspace across tenants (metadata only)")
+public class WorkspaceAdminService {
+
+    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceMembershipRepository membershipRepository;
+    private final ConnectionService connectionService;
+
+    public WorkspaceAdminService(
+        WorkspaceRepository workspaceRepository,
+        WorkspaceMembershipRepository membershipRepository,
+        ConnectionService connectionService
+    ) {
+        this.workspaceRepository = workspaceRepository;
+        this.membershipRepository = membershipRepository;
+        this.connectionService = connectionService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminWorkspaceViewDTO> listAll() {
+        return workspaceRepository.findAll().stream().map(this::toView).toList();
+    }
+
+    private AdminWorkspaceViewDTO toView(Workspace ws) {
+        GitProviderType providerType = connectionService
+            .findActiveProviderKind(ws.getId())
+            .map(GitProviderType::from)
+            .orElse(null);
+        String ownerLogin = membershipRepository
+            .findUserLoginsByWorkspaceIdAndRole(ws.getId(), WorkspaceRole.OWNER)
+            .stream()
+            .findFirst()
+            .orElse(null);
+        return new AdminWorkspaceViewDTO(
+            ws.getId(),
+            ws.getWorkspaceSlug(),
+            ws.getDisplayName(),
+            ws.getStatus() != null ? ws.getStatus().name() : null,
+            ws.getAccountLogin(),
+            providerType,
+            ownerLogin,
+            membershipRepository.countByWorkspace_Id(ws.getId()),
+            ws.getCreatedAt()
+        );
+    }
+}

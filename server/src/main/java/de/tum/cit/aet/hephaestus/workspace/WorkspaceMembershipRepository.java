@@ -89,6 +89,16 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
 
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
 
+    /** Total member count for a workspace (all roles). Backs the instance-admin workspaces overview. */
+    long countByWorkspace_Id(Long workspaceId);
+
+    /** Git logins of a workspace's members in the given role (e.g. OWNER) — for the admin overview. */
+    @Query("SELECT wm.user.login FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.role = :role")
+    List<String> findUserLoginsByWorkspaceIdAndRole(
+        @Param("workspaceId") Long workspaceId,
+        @Param("role") WorkspaceRole role
+    );
+
     @Query("SELECT wm.user.id FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.hidden = true")
     Set<Long> findHiddenUserIdsByWorkspaceId(@Param("workspaceId") Long workspaceId);
 

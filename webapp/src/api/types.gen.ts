@@ -2146,6 +2146,21 @@ export type AgentConfig = {
     updatedAt?: Date;
 };
 
+/**
+ * Metadata-only workspace summary for the instance-admin overview
+ */
+export type AdminWorkspaceView = {
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    id: number;
+    memberCount: number;
+    ownerLogin?: string;
+    providerType?: 'GITHUB' | 'GITLAB';
+    status: string;
+    workspaceSlug: string;
+};
+
 export type AdminAccountView = {
     appRole?: string;
     displayName?: string;
@@ -2305,6 +2320,22 @@ export type AdminRevokeUserSessionsResponses = {
 };
 
 export type AdminRevokeUserSessionsResponse = AdminRevokeUserSessionsResponses[keyof AdminRevokeUserSessionsResponses];
+
+export type AdminListWorkspacesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/workspaces';
+};
+
+export type AdminListWorkspacesResponses = {
+    /**
+     * OK
+     */
+    200: Array<AdminWorkspaceView>;
+};
+
+export type AdminListWorkspacesResponse = AdminListWorkspacesResponses[keyof AdminListWorkspacesResponses];
 
 export type ImpersonateData = {
     body: ImpersonateRequest;

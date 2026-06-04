@@ -257,6 +257,21 @@ paths:
       summary: "Force sign-out: revoke all of an account's active sessions"
       tags:
       - Admin
+  /admin/workspaces:
+    get:
+      operationId: adminListWorkspaces
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminWorkspaceView"
+          description: OK
+      summary: List all workspaces (metadata only)
+      tags:
+      - Admin
   /auth/impersonate:
     post:
       operationId: impersonate
@@ -3198,6 +3213,42 @@ components:
           type: string
         status:
           type: string
+    AdminWorkspaceView:
+      type: object
+      description: Metadata-only workspace summary for the instance-admin overview
+      properties:
+        accountLogin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        memberCount:
+          type: integer
+          format: int64
+        ownerLogin:
+          type: string
+        providerType:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+        status:
+          type: string
+        workspaceSlug:
+          type: string
+      required:
+      - accountLogin
+      - createdAt
+      - displayName
+      - id
+      - memberCount
+      - status
+      - workspaceSlug
     AgentConfig:
       type: object
       description: Agent configuration for a workspace (API key redacted)

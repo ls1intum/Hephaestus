@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthAuditService;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
-import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -35,10 +35,10 @@ public class AuthAuditController {
     /** Hard cap on page size so a malicious/typo'd {@code size} can't scan a whole partition. */
     private static final int MAX_PAGE_SIZE = 200;
 
-    private final AuthEventRepository authEventRepository;
+    private final AuthAuditService authAuditService;
 
-    public AuthAuditController(AuthEventRepository authEventRepository) {
-        this.authEventRepository = authEventRepository;
+    public AuthAuditController(AuthAuditService authAuditService) {
+        this.authAuditService = authAuditService;
     }
 
     /** One audit row, flattened for the admin viewer. */
@@ -68,8 +68,8 @@ public class AuthAuditController {
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         // The query carries its own ORDER BY occurred_at DESC; keep the Pageable sort empty.
         Pageable pageable = PageRequest.of(safePage, safeSize);
-        Page<AuthEventViewDTO> events = authEventRepository
-            .findForAdmin(accountId, eventType, pageable)
+        Page<AuthEventViewDTO> events = authAuditService
+            .list(accountId, eventType, pageable)
             .map(AuthAuditController::toView);
         return ResponseEntity.ok(events);
     }
