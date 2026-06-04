@@ -3,9 +3,12 @@ package de.tum.cit.aet.hephaestus.core.auth.audit;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -31,4 +34,28 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
         """
     )
     List<AuthEvent> findByAccountSince(@Param("accountId") Long accountId, @Param("since") Instant since);
+
+    /**
+     * Admin audit viewer: auth events newest-first, optionally narrowed by subject account and/or
+     * event type (both null = unfiltered). Backs the read-only {@code GET /admin/audit} viewer.
+     *
+     * <p>Ordered by {@code occurred_at DESC}. The table is monthly RANGE-partitioned on
+     * {@code occurred_at}, so the newest pages touch only the most recent partition(s); there is no
+     * {@code occurred_at}-leading global index because this is an admin-only, low-traffic surface and
+     * partition pruning bounds the scan. Add one (or switch to keyset pagination) if deep paging over
+     * the full 12-month window ever becomes hot.
+     */
+    @Query(
+        """
+            SELECT e FROM AuthEvent e
+            WHERE (:accountId IS NULL OR e.accountId = :accountId)
+              AND (:eventType IS NULL OR e.eventType = :eventType)
+            ORDER BY e.id.occurredAt DESC
+        """
+    )
+    Page<AuthEvent> findForAdmin(
+        @Param("accountId") @Nullable Long accountId,
+        @Param("eventType") @Nullable AuthEvent.EventType eventType,
+        Pageable pageable
+    );
 }

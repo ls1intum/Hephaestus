@@ -128,6 +128,59 @@ paths:
       summary: OIDC issuer metadata
       tags:
       - Auth discovery
+  /admin/audit:
+    get:
+      operationId: adminListAuthEvents
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      - in: query
+        name: accountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: eventType
+        required: false
+        schema:
+          type: string
+          enum:
+          - LOGIN
+          - LOGIN_FAILED
+          - LOGOUT
+          - TOKEN_REFRESH
+          - JWT_REVOKED
+          - IDENTITY_LINKED
+          - IDENTITY_UNLINKED
+          - IMPERSONATION_BEGIN
+          - IMPERSONATION_END
+          - ACCOUNT_DELETED
+          - EXPORT_REQUESTED
+          - FEATURE_FLAG_CHANGED
+          - APP_ROLE_CHANGED
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageAuthEventView"
+          description: OK
+      summary: "List auth audit events (paged, newest first)"
+      tags:
+      - Admin
   /admin/users:
     get:
       operationId: adminListUsers
@@ -3318,6 +3371,42 @@ components:
       required:
       - role
       - userId
+    AuthEventView:
+      type: object
+      description: "One audit row, flattened for the admin viewer."
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        actingAccountId:
+          type: integer
+          format: int64
+        details:
+          type: string
+        eventType:
+          type: string
+        failureReason:
+          type: string
+        id:
+          type: integer
+          format: int64
+        ipAddress:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        result:
+          type: string
+        userAgent:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - eventType
+      - id
+      - occurredAt
+      - result
     BinaryAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -4293,6 +4382,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AgentJob"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageAuthEventView:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthEventView"
         empty:
           type: boolean
         first:

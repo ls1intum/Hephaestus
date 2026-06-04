@@ -1264,6 +1264,37 @@ export type PagePracticeFindingList = {
     totalPages?: number;
 };
 
+export type PageAuthEventView = {
+    content?: Array<AuthEventView>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+/**
+ * One audit row, flattened for the admin viewer.
+ */
+export type AuthEventView = {
+    accountId?: number;
+    actingAccountId?: number;
+    details?: string;
+    eventType: string;
+    failureReason?: string;
+    id: number;
+    ipAddress?: string;
+    occurredAt: Date;
+    result: string;
+    userAgent?: string;
+    workspaceId?: number;
+};
+
 export type PageAgentJob = {
     content?: Array<AgentJob>;
     empty?: boolean;
@@ -2194,6 +2225,27 @@ export type GetOpenidConfigurationResponses = {
 };
 
 export type GetOpenidConfigurationResponse = GetOpenidConfigurationResponses[keyof GetOpenidConfigurationResponses];
+
+export type AdminListAuthEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        size?: number;
+        accountId?: number;
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'FEATURE_FLAG_CHANGED' | 'APP_ROLE_CHANGED';
+    };
+    url: '/admin/audit';
+};
+
+export type AdminListAuthEventsResponses = {
+    /**
+     * OK
+     */
+    200: PageAuthEventView;
+};
+
+export type AdminListAuthEventsResponse = AdminListAuthEventsResponses[keyof AdminListAuthEventsResponses];
 
 export type AdminListUsersData = {
     body?: never;

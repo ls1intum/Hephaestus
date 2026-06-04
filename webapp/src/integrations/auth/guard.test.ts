@@ -86,19 +86,15 @@ describe("safeReturnTo", () => {
 });
 
 describe("isAppAdmin", () => {
+	// The authoritative (and only) source is the `appRole` field from GET /user; the client is not a
+	// security boundary (every admin endpoint is enforced server-side by hasAuthority('app_admin')).
 	it("is true when appRole is APP_ADMIN", () => {
-		expect(isAppAdmin({ appRole: "APP_ADMIN", roles: [] })).toBe(true);
+		expect(isAppAdmin({ appRole: "APP_ADMIN" })).toBe(true);
 	});
-	it("is true when the admin role is present even if appRole is not APP_ADMIN", () => {
-		expect(isAppAdmin({ appRole: "APP_USER", roles: ["user", "admin"] })).toBe(true);
-	});
-	it("is false for a plain user", () => {
-		expect(isAppAdmin({ appRole: "APP_USER", roles: ["user"] })).toBe(false);
+	it("is false for a plain user regardless of any roles claim", () => {
+		expect(isAppAdmin({ appRole: "APP_USER" })).toBe(false);
 	});
 	it.each([null, undefined])("is false for %s", (u) => {
 		expect(isAppAdmin(u)).toBe(false);
-	});
-	it("tolerates a missing roles array", () => {
-		expect(isAppAdmin({ appRole: "APP_USER" })).toBe(false);
 	});
 });

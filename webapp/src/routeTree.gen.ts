@@ -24,6 +24,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as WWorkspaceSlugLoginRouteImport } from './routes/w/$workspaceSlug/login'
 import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
+import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_authenticated/workspaces/new/index'
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
 import { Route as AuthenticatedWorkspacesNewGitlabRouteImport } from './routes/_authenticated/workspaces/new/gitlab'
@@ -120,6 +121,11 @@ const AuthenticatedMentorMentor_accessRoute =
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
 const AuthenticatedWorkspacesNewIndexRoute =
@@ -261,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
+  '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
@@ -298,6 +305,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/': typeof AuthenticatedIndexRoute
+  '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
@@ -335,6 +343,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/login': typeof WWorkspaceSlugLoginRoute
@@ -374,6 +383,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/auth/callback'
     | '/auth/error'
+    | '/admin/audit'
     | '/admin/users'
     | '/mentor'
     | '/w/$workspaceSlug/login'
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/'
+    | '/admin/audit'
     | '/admin/users'
     | '/mentor'
     | '/w/$workspaceSlug/login'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/_authenticated/'
+    | '/_authenticated/admin/audit'
     | '/_authenticated/admin/users'
     | '/_authenticated/mentor/_mentor_access'
     | '/w/$workspaceSlug/login'
@@ -590,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/audit': {
+      id: '/_authenticated/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AuthenticatedAdminAuditRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/workspaces/new/': {
@@ -743,10 +762,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
 }
 

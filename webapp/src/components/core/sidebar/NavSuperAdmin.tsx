@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { ChevronLeft, Users } from "lucide-react";
+import { ChevronLeft, ScrollText, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -17,6 +17,7 @@ import {
  */
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
+	{ to: "/admin/audit", label: "Audit log", icon: ScrollText, tooltip: "Auth audit events" },
 ] as const;
 
 export function NavSuperAdmin() {
