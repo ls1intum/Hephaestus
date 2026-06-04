@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { optionalIntegrationsAvailable } from "@/integrations/consent";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
 import { CookiePreferencesSection } from "./CookiePreferencesSection";
 import { DangerZoneSection } from "./DangerZoneSection";
@@ -124,8 +125,12 @@ export function SettingsPage({
 			<Separator />
 			<SessionsSection />
 
-			<Separator />
-			<CookiePreferencesSection />
+			{optionalIntegrationsAvailable && (
+				<>
+					<Separator />
+					<CookiePreferencesSection />
+				</>
+			)}
 
 			<Separator />
 			<DangerZoneSection onAccountDeleted={onAccountDeleted} />

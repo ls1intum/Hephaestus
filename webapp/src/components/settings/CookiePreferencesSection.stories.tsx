@@ -10,7 +10,7 @@ import {
 import { CookiePreferencesSection } from "./CookiePreferencesSection";
 
 /**
- * Privacy & cookies settings row. Rendered alongside the consent banner so the edit path
+ * Privacy settings row. Rendered alongside the consent banner so the edit path
  * (GDPR Art. 7(3)) is reviewable end-to-end: clicking "Change cookie choices" re-opens the banner
  * (pre-seeded, cancelable) so a prior choice can be adjusted or withdrawn.
  */
@@ -43,13 +43,13 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/analytics on · error monitoring off/i)).toBeInTheDocument();
+		await expect(canvas.getByRole("heading", { name: /^privacy$/i })).toBeInTheDocument();
 		// The banner is hidden while a decision is stored.
-		await expect(screen.queryByText("Cookies & privacy")).not.toBeInTheDocument();
+		await expect(screen.queryByRole("region", { name: /your privacy/i })).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /change cookie choices/i }));
-		await expect(await screen.findByText("Cookies & privacy")).toBeInTheDocument();
-		// A user-initiated reopen moves focus to the banner region (keyboard/AT parity).
-		await expect(screen.getByRole("region", { name: /cookies & privacy/i })).toHaveFocus();
+		// A user-initiated reopen surfaces the banner and moves focus to it (keyboard/AT parity).
+		await expect(await screen.findByRole("region", { name: /your privacy/i })).toBeInTheDocument();
+		await expect(screen.getByRole("region", { name: /your privacy/i })).toHaveFocus();
 	},
 };

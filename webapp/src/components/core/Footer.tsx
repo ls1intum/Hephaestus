@@ -2,7 +2,7 @@ import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react"
 import { Link } from "@tanstack/react-router";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { requestConsentReopen } from "@/integrations/consent";
+import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
@@ -85,17 +85,19 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 						>
 							Imprint
 						</Link>
-						{/* Always-available consent control (GDPR Art. 7(3)): the footer renders on every
-						    non-fullscreen route for signed-in and signed-out visitors alike, so this re-opens
-						    the consent banner (pre-seeded, cancelable) from anywhere — withdraw by choosing
-						    "Reject all". */}
-						<button
-							type="button"
-							onClick={() => requestConsentReopen()}
-							className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
-						>
-							Cookie preferences
-						</button>
+						{/* Consent control (GDPR Art. 7(3)): re-opens the banner (pre-seeded, cancelable) so a
+						    choice can be changed or withdrawn from anywhere. Shown only when an optional,
+						    consent-gated integration is configured — with essential cookies alone there is no
+						    choice to make, so the link would be a dead end. */}
+						{optionalIntegrationsAvailable && (
+							<button
+								type="button"
+								onClick={() => requestConsentReopen()}
+								className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4"
+							>
+								Cookie preferences
+							</button>
+						)}
 					</nav>
 
 					{/* Build info only for preview/dev - minimal style */}

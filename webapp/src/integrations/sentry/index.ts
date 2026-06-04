@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/react";
-import environment from "@/environment";
 import { hasErrorMonitoringConsent } from "@/integrations/consent";
+import { sentryDsn, sentryEnvironment } from "@/integrations/sentry/config";
 
 let initialized = false;
 
@@ -13,12 +13,12 @@ export function initSentry() {
 	if (initialized) {
 		return;
 	}
-	if (!environment.sentry?.dsn || !hasErrorMonitoringConsent()) {
+	if (!sentryDsn || !hasErrorMonitoringConsent()) {
 		return;
 	}
 	Sentry.init({
-		dsn: environment.sentry.dsn,
-		environment: environment.sentry.environment,
+		dsn: sentryDsn,
+		environment: sentryEnvironment,
 		// Don't let Sentry infer IP/PII by default — data minimisation. We already
 		// attach the context an error report needs explicitly, so the safer default
 		// avoids shipping inferred IP addresses for TUM-student data subjects.

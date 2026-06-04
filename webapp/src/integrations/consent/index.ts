@@ -17,8 +17,27 @@
  */
 
 import { useSyncExternalStore } from "react";
+import { isPosthogEnabled } from "@/integrations/posthog/config";
+import { isSentryConfigured } from "@/integrations/sentry/config";
 
 export const CONSENT_STORAGE_KEY = "hephaestus-cookie-consent";
+
+/**
+ * Which optional, consent-gated integrations are configured in THIS deployment. PostHog and Sentry
+ * are the only non-essential cookie consumers; an unconfigured one can never set a cookie (its
+ * provider never mounts / it never initialises).
+ */
+export const analyticsConfigured = isPosthogEnabled;
+export const errorMonitoringConfigured = isSentryConfigured;
+
+/**
+ * Whether any optional integration is configured. When false the app uses essential cookies only —
+ * which need no consent under ePrivacy Art. 5(3) / German TDDDG §25 — so the whole consent surface
+ * (banner, footer link, settings section) is suppressed. A stale stored decision from when an
+ * integration WAS configured is inert (nothing initialises) and is deliberately NOT cleared, so the
+ * choice is honoured again if the integration ever returns.
+ */
+export const optionalIntegrationsAvailable = analyticsConfigured || errorMonitoringConfigured;
 
 /**
  * Bump when the cookie categories or privacy policy change. A stored decision with a missing or

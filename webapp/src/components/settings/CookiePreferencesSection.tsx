@@ -1,43 +1,43 @@
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { requestConsentReopen, useCookieConsent } from "@/integrations/consent";
+import {
+	analyticsConfigured,
+	errorMonitoringConfigured,
+	requestConsentReopen,
+	useCookieConsent,
+} from "@/integrations/consent";
 
 /**
- * Lets a signed-in user revisit the cookie decision they made in the consent banner. Clearing the
- * stored decision re-opens the banner (and disables PostHog/Sentry until a fresh choice is made),
- * which is the withdrawal path GDPR Art. 7(3) requires to be as easy as granting consent.
+ * Lets a signed-in user revisit the cookie choice they made in the consent banner. "Change cookie
+ * choices" re-opens the banner (pre-seeded, cancelable), which is the withdrawal path GDPR Art. 7(3)
+ * requires to be as easy as granting consent. Only the optional categories configured in this
+ * deployment are summarised; {@code SettingsPage} hides this section entirely when none are.
  */
 export function CookiePreferencesSection() {
 	const consent = useCookieConsent();
 
-	const summary = consent
-		? [
-				`Analytics ${consent.analytics ? "on" : "off"}`,
-				`Error monitoring ${consent.errorMonitoring ? "on" : "off"}`,
-			].join(" · ")
-		: "No optional cookies — using essential cookies only.";
+	const parts: string[] = [];
+	if (analyticsConfigured) {
+		parts.push(`Usage analytics ${consent?.analytics ? "on" : "off"}`);
+	}
+	if (errorMonitoringConfigured) {
+		parts.push(`Error reports ${consent?.errorMonitoring ? "on" : "off"}`);
+	}
+	const summary = consent && parts.length ? parts.join(" · ") : "Using essential cookies only.";
 
 	return (
 		<section className="space-y-4" aria-labelledby="cookie-preferences-heading">
 			<div className="space-y-1">
 				<h2 id="cookie-preferences-heading" className="text-xl font-semibold">
-					Privacy &amp; cookies
+					Privacy
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					Essential cookies keep you signed in and secure. You can change your choice about optional
-					analytics and error-monitoring cookies at any time.
+					cookies anytime.
 				</p>
 			</div>
 			<div className="flex items-center justify-between gap-4">
 				<p className="text-sm text-muted-foreground">{summary}</p>
-				<Button
-					variant="outline"
-					className="shrink-0"
-					onClick={() => {
-						requestConsentReopen();
-						toast.success("Adjust your cookie choices in the banner that just appeared.");
-					}}
-				>
+				<Button variant="outline" className="shrink-0" onClick={() => requestConsentReopen()}>
 					Change cookie choices
 				</Button>
 			</div>
