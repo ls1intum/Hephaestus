@@ -35,13 +35,21 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     private final AuthProperties authProperties;
     private final Clock clock;
 
+    /**
+     * SPA origin (no trailing slash) prepended to every post-OAuth redirect, so the browser lands on
+     * the app and not on the API origin. Blank in production (SPA + API share an origin → a relative
+     * path is correct); set to e.g. {@code http://localhost:4200} in local dev where they differ.
+     */
+    private final String appBaseUrl;
+
     public HephaestusAuthSuccessHandler(
         AccountProvisioningService provisioningService,
         HephaestusJwtIssuer jwtIssuer,
         JwtPrincipalFactory principalFactory,
         AuthIntentCookie authIntentCookie,
         AuthProperties authProperties,
-        Clock clock
+        Clock clock,
+        String webappBaseUrl
     ) {
         this.provisioningService = provisioningService;
         this.jwtIssuer = jwtIssuer;
@@ -49,8 +57,17 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         this.authIntentCookie = authIntentCookie;
         this.authProperties = authProperties;
         this.clock = clock;
+        this.appBaseUrl = stripTrailingSlash(webappBaseUrl);
         setAlwaysUseDefaultTargetUrl(false);
         setDefaultTargetUrl("/");
+    }
+
+    private static String stripTrailingSlash(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String trimmed = value.trim();
+        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
     }
 
     @Override
@@ -62,7 +79,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     ) throws IOException {
         if (!(authentication instanceof OAuth2AuthenticationToken token)) {
             log.error("auth.success: unexpected authentication type {}", authentication.getClass());
-            getRedirectStrategy().sendRedirect(request, response, "/auth/error?code=unexpected_auth_type");
+            redirectToApp(request, response, "/auth/error?code=unexpected_auth_type");
             return;
         }
         OAuth2User principal = token.getPrincipal();
@@ -70,7 +87,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         String subject = principal.getName();
         if (subject == null || subject.isBlank()) {
             log.error("auth.success: principal has no subject (registrationId={})", registrationId);
-            getRedirectStrategy().sendRedirect(request, response, "/auth/error?code=no_subject");
+            redirectToApp(request, response, "/auth/error?code=no_subject");
             return;
         }
 
@@ -90,7 +107,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
                 account.getId(),
                 account.getStatus()
             );
-            getRedirectStrategy().sendRedirect(request, response, "/auth/error?code=account_inactive");
+            redirectToApp(request, response, "/auth/error?code=account_inactive");
             return;
         }
 
@@ -106,7 +123,17 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         );
 
         String redirectTo = (intent != null) ? ReturnToValidator.safeOrFallback(intent.returnTo()) : "/";
-        getRedirectStrategy().sendRedirect(request, response, redirectTo);
+        redirectToApp(request, response, redirectTo);
+    }
+
+    /**
+     * Redirect to a SPA path, prefixing the app origin when it differs from the API origin (local
+     * dev). {@code path} is always a server-validated, same-origin relative path (leading {@code /}),
+     * so prefixing a trusted, configured origin cannot widen it into an open redirect.
+     */
+    private void redirectToApp(HttpServletRequest request, HttpServletResponse response, String path)
+        throws IOException {
+        getRedirectStrategy().sendRedirect(request, response, appBaseUrl + path);
     }
 
     private void setAccessCookie(HttpServletResponse response, String jwt, long maxAgeSeconds) {

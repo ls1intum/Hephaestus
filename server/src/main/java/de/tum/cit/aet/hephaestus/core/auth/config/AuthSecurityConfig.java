@@ -165,7 +165,11 @@ public class AuthSecurityConfig {
         de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory principalFactory,
         AuthIntentCookie authIntentCookie,
         AuthProperties properties,
-        Clock authClock
+        Clock authClock,
+        // Origin of the SPA. Same origin as the API in production (so a relative redirect is enough),
+        // but in local dev the SPA (:4200) and API (:8080) differ, so the post-login 302 must target
+        // the app origin or it lands on the API origin (which serves no SPA → 404). Blank = relative.
+        @org.springframework.beans.factory.annotation.Value("${hephaestus.webapp.url:}") String webappBaseUrl
     ) {
         return new HephaestusAuthSuccessHandler(
             provisioningService,
@@ -173,7 +177,8 @@ public class AuthSecurityConfig {
             principalFactory,
             authIntentCookie,
             properties,
-            authClock
+            authClock,
+            webappBaseUrl
         );
     }
 
@@ -226,8 +231,14 @@ public class AuthSecurityConfig {
         HephaestusAuthSuccessHandler successHandler,
         AuthRateLimitFilter authRateLimitFilter,
         ClientRegistrationRepository clientRegistrationRepository,
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService,
+        // SPA origin (blank in prod = same origin). In local dev the SPA (:4200) and API (:8080)
+        // differ, so the OAuth failure redirect must target the app origin, not the API origin.
+        @org.springframework.beans.factory.annotation.Value("${hephaestus.webapp.url:}") String webappBaseUrl
     ) throws Exception {
+        String appBase = webappBaseUrl.endsWith("/")
+            ? webappBaseUrl.substring(0, webappBaseUrl.length() - 1)
+            : webappBaseUrl;
         http
             .securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -253,7 +264,7 @@ public class AuthSecurityConfig {
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
                 oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService));
                 oauth.successHandler(successHandler);
-                oauth.failureUrl("/auth/error?code=oauth_failure");
+                oauth.failureUrl(appBase + "/auth/error?code=oauth_failure");
             });
 
         // Same header set as the resource-server chain — this chain serves /auth/error to the SPA.
