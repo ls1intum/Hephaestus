@@ -588,4 +588,63 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Instance-scoped OAuth2 login providers (ADR 0017). Replaces the env-only login defaults and the
+        per-workspace OIDC Connections with a single runtime-manageable table: env seeds the defaults on
+        first boot, then an instance admin can add more (e.g. a self-hosted GitLab) without a redeploy.
+        registration_id is the OAuth callback id (stable, unique). client_secret is sealed at rest by
+        EncryptedStringConverter (AES-256-GCM), stored as the base64 TEXT it emits.
+    -->
+    <changeSet author="FelixTJDietrich" id="1780291041748-15-login-provider">
+        <preConditions onFail="MARK_RAN" onFailMessage="login_provider table already present">
+            <not>
+                <tableExists tableName="login_provider"/>
+            </not>
+        </preConditions>
+        <createTable tableName="login_provider">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="registration_id" type="VARCHAR(64)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_login_provider_registration_id"/>
+            </column>
+            <column name="type" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="base_url" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_id" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="client_secret" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="scopes" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="seeded_from_env" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE login_provider ADD CONSTRAINT ck_login_provider_type CHECK (type IN ('GITHUB', 'GITLAB'));
+        ]]></sql>
+        <rollback>
+            <dropTable tableName="login_provider"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
