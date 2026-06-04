@@ -14,8 +14,8 @@ deployment — distinct from a **workspace admin**, whose powers are scoped to a
 - The authority comes **only** from `appRole` — `JwtPrincipalFactory` strips any reserved authority
   (`app_admin`/`admin`) that might arrive via a grantable `account_feature` row, so an
   `/admin/users`-granted flag can never escalate to instance admin.
-- First-admin bootstrap (no DB seed required) is covered separately in
-  [`runbooks/auth-cutover.md`](../runbooks/auth-cutover.md).
+- First-admin bootstrap (no DB seed required) is covered separately in the
+  `docs/runbooks/auth-cutover.md` runbook.
 
 ## The shell
 
