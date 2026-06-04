@@ -36,6 +36,7 @@ public class AccountProvisioningService {
     private final GitProviderRegistry gitProviderRegistry;
     private final VerifiedEmailResolver verifiedEmailResolver;
     private final AccountJitCreator accountJitCreator;
+    private final AdminBootstrapPolicy adminBootstrapPolicy;
     private final Clock clock;
 
     public AccountProvisioningService(
@@ -44,6 +45,7 @@ public class AccountProvisioningService {
         GitProviderRegistry gitProviderRegistry,
         VerifiedEmailResolver verifiedEmailResolver,
         AccountJitCreator accountJitCreator,
+        AdminBootstrapPolicy adminBootstrapPolicy,
         Clock clock
     ) {
         this.accountRepository = accountRepository;
@@ -51,6 +53,7 @@ public class AccountProvisioningService {
         this.gitProviderRegistry = gitProviderRegistry;
         this.verifiedEmailResolver = verifiedEmailResolver;
         this.accountJitCreator = accountJitCreator;
+        this.adminBootstrapPolicy = adminBootstrapPolicy;
         this.clock = clock;
     }
 
@@ -98,7 +101,7 @@ public class AccountProvisioningService {
                 registrationId,
                 link.getAccount().getId()
             );
-            return link.getAccount();
+            return promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject);
         }
 
         if (mode == AuthIntentCookie.Intent.Mode.LINK) {
@@ -141,7 +144,7 @@ public class AccountProvisioningService {
                 registrationId,
                 resolvedEmail.verified()
             );
-            return created;
+            return promoteIfBootstrapAdmin(created, registrationId, subject);
         } catch (DataIntegrityViolationException e) {
             // First-login race: a concurrent login already created this identity and won the
             // uq_identity_link_provider_subject_team insert. Fail closed by reading the now-existing
@@ -155,7 +158,7 @@ public class AccountProvisioningService {
                         winner.getId(),
                         registrationId
                     );
-                    return winner;
+                    return promoteIfBootstrapAdmin(winner, registrationId, subject);
                 })
                 .orElseThrow(() ->
                     new IllegalStateException(
@@ -168,6 +171,29 @@ public class AccountProvisioningService {
                     )
                 );
         }
+    }
+
+    /**
+     * Idempotent, promote-only instance-admin bootstrap: if the resolved login is on the
+     * {@code hephaestus.auth.bootstrap-admins} allowlist and the account is not already APP_ADMIN,
+     * promote it. Runs inside the login transaction so the role is committed before the JWT is minted
+     * (so {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
+     * deliberate {@code /admin/users} action.
+     */
+    private Account promoteIfBootstrapAdmin(Account account, String registrationId, String subject) {
+        if (
+            account.getAppRole() != Account.AppRole.APP_ADMIN &&
+            adminBootstrapPolicy.shouldPromote(registrationId, subject)
+        ) {
+            account.setAppRole(Account.AppRole.APP_ADMIN);
+            accountRepository.save(account);
+            log.info(
+                "auth.bootstrap: promoted accountId={} to APP_ADMIN via bootstrap-admins allowlist (provider={})",
+                account.getId(),
+                registrationId
+            );
+        }
+        return account;
     }
 
     private IdentityLink newIdentityLink(Account account, long providerId, String subject, OAuth2User principal) {

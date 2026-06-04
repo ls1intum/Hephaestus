@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -50,4 +51,27 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
         @Param("role") Account.AppRole role,
         @Param("status") Account.Status status
     );
+
+    /**
+     * Break-glass first-admin promotion (backs {@code POST /auth/bootstrap-admin}). Promotes the
+     * given account to {@code APP_ADMIN} in a single atomic statement, but ONLY while no ACTIVE
+     * {@code APP_ADMIN} exists — so it self-disables the instant a real admin appears (the
+     * {@code NOT EXISTS} is the gate). Returns the number of rows updated: {@code 1} on success,
+     * {@code 0} if an admin already exists or the account is already {@code APP_ADMIN}.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        UPDATE Account a
+           SET a.appRole = de.tum.cit.aet.hephaestus.core.auth.domain.Account.AppRole.APP_ADMIN
+         WHERE a.id = :id
+           AND a.appRole <> de.tum.cit.aet.hephaestus.core.auth.domain.Account.AppRole.APP_ADMIN
+           AND NOT EXISTS (
+               SELECT 1 FROM Account b
+                WHERE b.appRole = de.tum.cit.aet.hephaestus.core.auth.domain.Account.AppRole.APP_ADMIN
+                  AND b.status = de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.ACTIVE
+           )
+        """
+    )
+    int promoteToFirstAdminIfNoneExists(@Param("id") Long id);
 }

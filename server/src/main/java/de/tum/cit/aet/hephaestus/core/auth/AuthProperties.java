@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -31,6 +32,23 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        crash) — unlike {@code spring.security.oauth2.client.*}, which fails
  *                        Boot's non-empty-client-id validation on a no-credentials boot.
  * @param gitlabLrz       Default gitlab.lrz.de OAuth login app (same blank-tolerant rule).
+ * @param bootstrapAdmins Instance super-admin (APP_ADMIN) allowlist, keyed on the stable
+ *                        {@code <registrationId>:<provider-subject>} tuple (e.g.
+ *                        {@code github:1234567}, {@code gitlab-lrz:42}) — the same identifier
+ *                        {@code IdentityLink} stores. A listed identity is promoted to APP_ADMIN
+ *                        on login (idempotent, promote-only — never demotes). Keyed on the numeric
+ *                        provider subject, NOT email (nOAuth-safe) and NOT username (reclaim-safe).
+ *                        This is the operator-scoped source of truth for "who runs this instance";
+ *                        it is deliberately separate from per-workspace roles (those derive from
+ *                        SCM team / WorkspaceMembership). Empty by default. Find a GitHub id via
+ *                        {@code https://api.github.com/users/<login>}; a gitlab.lrz.de id via
+ *                        {@code /api/v4/user}.
+ * @param bootstrapToken  Optional one-time break-glass token. When non-blank it enables
+ *                        {@code POST /auth/bootstrap-admin}, which promotes the authenticated
+ *                        caller to APP_ADMIN exactly while NO active admin exists (self-disables
+ *                        afterwards). Proof-of-control is deployment access; deliver out-of-band,
+ *                        never log it. Blank = endpoint disabled (404). Prefer {@code bootstrapAdmins};
+ *                        keep this as the lockout safety net.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
@@ -41,7 +59,9 @@ public record AuthProperties(
     @DefaultValue("") String stateCookieKey,
     @DefaultValue("48h") Duration deleteCooldown,
     @DefaultValue GithubLogin github,
-    @DefaultValue GitlabLrzLogin gitlabLrz
+    @DefaultValue GitlabLrzLogin gitlabLrz,
+    @DefaultValue List<String> bootstrapAdmins,
+    @DefaultValue("") String bootstrapToken
 ) {
     /**
      * Access-token cookie name. The {@code __Host-} prefix forces Secure + host-only (no Domain),

@@ -29,6 +29,30 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
 - [ ] `jwt_signing_key` seeded (auto-seeds a sealed key on first boot via
       `AuthJwtConfig.seedKeysOnStartup`; requires `hephaestus.security.encryption-key`, see above).
 - [ ] TLS 1.3 + HSTS preload confirmed at the edge.
+- [ ] First instance admin designated — see below (the super-admin UI is admin-gated, so the first
+      `APP_ADMIN` cannot be minted from the UI).
+
+## First instance admin (bootstrap)
+
+Instance super-admin (`APP_ADMIN`) is **separate** from per-workspace roles (those derive from
+membership). It is an operator concern — "who runs this instance" — so the source of truth is
+operator config, not any workspace's SCM team. Two mechanisms, no data backfill:
+
+1. **Allowlist (preferred):** `hephaestus.auth.bootstrap-admins` — a list of
+   `<registrationId>:<provider-subject>` (e.g. `github:1234567`, `gitlab-lrz:42`). A listed identity
+   is promoted to `APP_ADMIN` on login (idempotent, promote-only — it never demotes; demotion stays a
+   `/admin/users` action). Keyed on the stable numeric provider subject (NOT email, NOT username), so
+   it is nOAuth- and username-reclaim-safe and works on a cold instance. Find a GitHub id at
+   `https://api.github.com/users/<login>`; a gitlab.lrz.de id at `/api/v4/user`. As env (comma-separated):
+   `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=github:1234567,gitlab-lrz:42`.
+2. **Break-glass token (fallback / lockout insurance):** set `hephaestus.auth.bootstrap-token`
+   (`HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN`) to a high-entropy secret, then have the operator log in and
+   `POST /auth/bootstrap-admin` with `{"token":"…"}`. It promotes the authenticated caller **only
+   while no admin exists** (atomic, self-disabling) and 404s when the token is unset. Deliver the
+   token out-of-band; it is never logged. Unset it after bootstrapping.
+
+Prefer the allowlist; keep the token as the safety net for "I can't predict the identity" or a
+zero-admin lockout. Once one admin exists, everyone else is managed in `/admin/users`.
 
 ## Rollback
 

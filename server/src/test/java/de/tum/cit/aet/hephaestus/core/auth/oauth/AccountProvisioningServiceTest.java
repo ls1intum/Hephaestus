@@ -42,6 +42,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private IdentityLinkRepository identityLinkRepository;
     private VerifiedEmailResolver verifiedEmailResolver;
     private AccountJitCreator accountJitCreator;
+    private AdminBootstrapPolicy adminBootstrapPolicy;
     private AccountProvisioningService service;
 
     @BeforeEach
@@ -51,6 +52,8 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         GitProviderRegistry gitProviderRegistry = mock(GitProviderRegistry.class);
         verifiedEmailResolver = mock(VerifiedEmailResolver.class);
         accountJitCreator = mock(AccountJitCreator.class);
+        // Default: empty allowlist → no promotion (mock returns false for shouldPromote).
+        adminBootstrapPolicy = mock(AdminBootstrapPolicy.class);
         lenient().when(gitProviderRegistry.resolveProviderId(any())).thenReturn(PROVIDER_ID);
         lenient()
             .when(accountRepository.save(any()))
@@ -65,8 +68,49 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             gitProviderRegistry,
             verifiedEmailResolver,
             accountJitCreator,
+            adminBootstrapPolicy,
             Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    void jitCreate_whenOnBootstrapAllowlist_promotesToAppAdmin() {
+        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any())).thenReturn(
+            Optional.empty()
+        );
+        when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
+            new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
+        );
+        when(adminBootstrapPolicy.shouldPromote("github", "sub-1")).thenReturn(true);
+
+        Account result = service.resolveOrProvision(
+            "github",
+            "sub-1",
+            principal(),
+            AuthIntentCookie.Intent.login(null, null)
+        );
+
+        assertThat(result.getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
+    }
+
+    @Test
+    void jitCreate_whenNotOnBootstrapAllowlist_staysUser() {
+        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any())).thenReturn(
+            Optional.empty()
+        );
+        when(verifiedEmailResolver.resolve(eq("github"), any())).thenReturn(
+            new VerifiedEmailResolver.ResolvedEmail("u@v.de", true)
+        );
+        // adminBootstrapPolicy.shouldPromote defaults to false.
+
+        Account result = service.resolveOrProvision(
+            "github",
+            "sub-1",
+            principal(),
+            AuthIntentCookie.Intent.login(null, null)
+        );
+
+        assertThat(result.getAppRole()).isEqualTo(Account.AppRole.USER);
     }
 
     private static OAuth2User principal() {
