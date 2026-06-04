@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Bug, Settings, Sparkles } from "lucide-react";
+import { Bug, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import {
 	SidebarMenu,
 	SidebarMenuButton,
@@ -7,9 +7,25 @@ import {
 	SidebarSeparator,
 } from "@/components/ui/sidebar";
 
-export function NavFooter() {
+interface NavFooterProps {
+	/** Show the workspace-independent entry into the instance-admin shell (APP_ADMIN only). */
+	isAppAdmin?: boolean;
+}
+
+export function NavFooter({ isAppAdmin = false }: NavFooterProps) {
 	return (
 		<SidebarMenu>
+			{isAppAdmin && (
+				<>
+					<SidebarMenuItem>
+						<SidebarMenuButton tooltip="Instance admin" render={<Link to="/admin/users" />}>
+							<ShieldCheck />
+							<span>Instance&nbsp;admin</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+					<SidebarSeparator />
+				</>
+			)}
 			<SidebarMenuItem>
 				<SidebarMenuButton tooltip="Settings" render={<Link to="/settings" />}>
 					<Settings />

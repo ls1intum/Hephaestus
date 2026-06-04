@@ -246,8 +246,11 @@ function AppSidebarContainer() {
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
 
-	const sidebarContext: SidebarContext =
-		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname) ? "mentor" : "main";
+	const sidebarContext: SidebarContext = pathname.startsWith("/admin")
+		? "admin"
+		: pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname)
+			? "mentor"
+			: "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {

@@ -24,7 +24,7 @@ import { NavMentorThreads } from "./NavMentorThreads";
 import { NavSuperAdmin } from "./NavSuperAdmin";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
-export type SidebarContext = "main" | "mentor";
+export type SidebarContext = "main" | "mentor" | "admin";
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	username: string;
@@ -63,7 +63,12 @@ export function AppSidebar({
 	let contextHeader: ReactNode = null;
 	let sidebarContent: ReactNode = null;
 
-	if (workspacesLoading) {
+	if (context === "admin") {
+		// Dedicated instance-admin shell: its own back-to-app header + section nav, rendered
+		// independent of any workspace. This is what lets a freshly-bootstrapped APP_ADMIN with
+		// zero workspaces reach /admin (the entry point is the always-present footer, below).
+		sidebarContent = <NavSuperAdmin />;
+	} else if (workspacesLoading) {
 		sidebarContent = (
 			<SidebarGroup>
 				<SidebarMenu>
@@ -125,7 +130,8 @@ export function AppSidebar({
 						practicesEnabled={activeWorkspace.practicesEnabled}
 					/>
 				)}
-				{isAppAdmin && <NavSuperAdmin />}
+				{/* Instance-admin is intentionally NOT mixed into the per-workspace nav anymore — it lives
+				    in its own /admin shell, reached via the footer entry (workspace-independent). */}
 			</>
 		);
 	}
@@ -133,19 +139,23 @@ export function AppSidebar({
 	return (
 		<Sidebar collapsible={context === "main" ? "icon" : "offcanvas"} {...props}>
 			<SidebarHeader>
-				<WorkspaceSwitcher
-					isLoading={workspacesLoading}
-					workspaces={workspaces}
-					activeWorkspace={activeWorkspace}
-					onWorkspaceChange={onWorkspaceChange}
-					onAddWorkspace={onAddWorkspace}
-					isAdmin={isAdmin}
-				/>
+				{/* The workspace switcher is workspace-scoped chrome; the instance-admin shell is not, so
+				    it gets its own back-to-app header (in NavSuperAdmin) instead. */}
+				{context !== "admin" && (
+					<WorkspaceSwitcher
+						isLoading={workspacesLoading}
+						workspaces={workspaces}
+						activeWorkspace={activeWorkspace}
+						onWorkspaceChange={onWorkspaceChange}
+						onAddWorkspace={onAddWorkspace}
+						isAdmin={isAdmin}
+					/>
+				)}
 				{contextHeader}
 			</SidebarHeader>
 			<SidebarContent>{sidebarContent}</SidebarContent>
 			<SidebarFooter>
-				<NavFooter />
+				<NavFooter isAppAdmin={isAppAdmin} />
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>

@@ -1,30 +1,50 @@
-import { Link } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Link, useLocation } from "@tanstack/react-router";
+import { ChevronLeft, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	SidebarSeparator,
 } from "@/components/ui/sidebar";
 
 /**
- * Application-wide (super-admin / APP_ADMIN) navigation. Distinct from `NavAdmin`,
- * which is scoped to the active workspace. Rendered only when the signed-in user is an
- * application admin (see `AppSidebar.isAppAdmin`).
+ * Content of the dedicated instance-admin (APP_ADMIN) shell — the `context === "admin"` sidebar.
+ * It is workspace-independent (no workspace switcher; a "Back to app" link returns to the dashboard)
+ * so an admin can reach it even with zero workspaces. Distinct from `NavAdmin`, which is the
+ * per-workspace admin nav. Sections grow in later phases (Overview, Workspaces, Audit); P0 ships Users.
  */
+const ADMIN_SECTIONS = [
+	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
+] as const;
+
 export function NavSuperAdmin() {
+	const { pathname } = useLocation();
 	return (
-		<SidebarGroup>
-			<SidebarGroupLabel>Admin</SidebarGroupLabel>
-			<SidebarMenu>
-				<SidebarMenuItem>
-					<SidebarMenuButton tooltip="Manage users" render={<Link to="/admin/users" />}>
-						<Users />
-						<span>Users</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-			</SidebarMenu>
-		</SidebarGroup>
+		<>
+			<SidebarMenuButton render={<Link to="/" className="font-semibold" />}>
+				<ChevronLeft className="h-4 w-4" />
+				Back to app
+			</SidebarMenuButton>
+			<SidebarSeparator />
+			<SidebarGroup>
+				<SidebarGroupLabel>Instance administration</SidebarGroupLabel>
+				<SidebarMenu>
+					{ADMIN_SECTIONS.map((section) => (
+						<SidebarMenuItem key={section.to}>
+							<SidebarMenuButton
+								tooltip={section.tooltip}
+								isActive={pathname.startsWith(section.to)}
+								render={<Link to={section.to} />}
+							>
+								<section.icon />
+								<span>{section.label}</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					))}
+				</SidebarMenu>
+			</SidebarGroup>
+		</>
 	);
 }
