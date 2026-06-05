@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -46,6 +47,24 @@ public class AuthAuditController {
     /** A human-readable account identity. {@code displayName}/{@code email} are null for deleted accounts. */
     public record AccountRefDTO(@NonNull Long id, @Nullable String displayName, @Nullable String email) {}
 
+    /**
+     * Optional query-param filters for the list/export endpoints, bound as a flattened
+     * {@link ParameterObject} so the handler stays under the parameter-count budget. All fields are
+     * optional; an absent field means "no constraint on that dimension".
+     */
+    public record AuditFilterParams(
+        @RequestParam(required = false) @Nullable Long accountId,
+        @RequestParam(required = false) @Nullable Long actingAccountId,
+        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType,
+        @RequestParam(required = false) AuthEvent.@Nullable Result result,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
+    ) {
+        AuthAuditService.Filter toFilter() {
+            return new AuthAuditService.Filter(accountId, actingAccountId, eventType, result, from, to);
+        }
+    }
+
     /** One audit row, flattened for the admin viewer. */
     public record AuthEventViewDTO(
         @NonNull Long id,
@@ -70,21 +89,13 @@ public class AuthAuditController {
     public ResponseEntity<Page<AuthEventViewDTO>> list(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size,
-        @RequestParam(required = false) @Nullable Long accountId,
-        @RequestParam(required = false) @Nullable Long actingAccountId,
-        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType,
-        @RequestParam(required = false) AuthEvent.@Nullable Result result,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
+        @ParameterObject AuditFilterParams filter
     ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         // The query carries its own ORDER BY occurred_at DESC; keep the Pageable sort empty.
         Pageable pageable = PageRequest.of(safePage, safeSize);
-        AuthAuditService.AuditPage result0 = authAuditService.list(
-            new AuthAuditService.Filter(accountId, actingAccountId, eventType, result, from, to),
-            pageable
-        );
+        AuthAuditService.AuditPage result0 = authAuditService.list(filter.toFilter(), pageable);
         Page<AuthEventViewDTO> events = result0.events().map(e -> toView(e, result0.identities()));
         return ResponseEntity.ok(events);
     }
@@ -94,18 +105,8 @@ public class AuthAuditController {
         summary = "Export the filtered audit log as CSV (newest first, capped)",
         operationId = "adminExportAuthEvents"
     )
-    public ResponseEntity<String> export(
-        @RequestParam(required = false) @Nullable Long accountId,
-        @RequestParam(required = false) @Nullable Long actingAccountId,
-        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType,
-        @RequestParam(required = false) AuthEvent.@Nullable Result result,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
-    ) {
-        AuthAuditService.AuditPage data = authAuditService.list(
-            new AuthAuditService.Filter(accountId, actingAccountId, eventType, result, from, to),
-            PageRequest.of(0, EXPORT_MAX_ROWS)
-        );
+    public ResponseEntity<String> export(@ParameterObject AuditFilterParams filter) {
+        AuthAuditService.AuditPage data = authAuditService.list(filter.toFilter(), PageRequest.of(0, EXPORT_MAX_ROWS));
         var identities = data.identities();
         StringBuilder csv = new StringBuilder();
         csv.append(
