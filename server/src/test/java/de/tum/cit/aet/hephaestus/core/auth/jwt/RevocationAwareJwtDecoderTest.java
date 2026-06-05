@@ -129,6 +129,38 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         return mint(jti, ISSUER.toString(), AUDIENCE, NOW.plus(Duration.ofMinutes(15)));
     }
 
+    /** A signature/issuer/audience-valid token whose jti claim is set verbatim (or omitted when null). */
+    private String mintWithRawJti(String rawJtiOrNull) {
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
+            .issuer(ISSUER.toString())
+            .subject("42")
+            .audience(List.of(AUDIENCE))
+            .issuedAt(NOW.minus(Duration.ofMinutes(1)))
+            .expiresAt(NOW.plus(Duration.ofMinutes(15)));
+        if (rawJtiOrNull != null) {
+            claims.id(rawJtiOrNull);
+        }
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
+        return encoder.encode(JwtEncoderParameters.from(header, claims.build())).getTokenValue();
+    }
+
+    @Test
+    void rejectsTokenWithMissingJti() {
+        // A signature-valid token with no jti is a client error → 401 (BadJwtException), not a 500.
+        IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
+        assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(mintWithRawJti(null)))
+            .isInstanceOf(BadJwtException.class)
+            .hasMessageContaining("missing jti");
+    }
+
+    @Test
+    void rejectsTokenWithMalformedJti() {
+        IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
+        assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(mintWithRawJti("not-a-uuid")))
+            .isInstanceOf(BadJwtException.class)
+            .hasMessageContaining("malformed jti");
+    }
+
     @Test
     void acceptsValidNonRevokedToken() {
         UUID jti = UUID.randomUUID();

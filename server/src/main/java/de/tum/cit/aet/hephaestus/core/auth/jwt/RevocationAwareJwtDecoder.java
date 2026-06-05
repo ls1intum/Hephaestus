@@ -107,13 +107,15 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         Jwt jwt = delegate.decode(token);
         String jtiClaim = jwt.getId();
         if (jtiClaim == null) {
-            throw new JwtException("missing jti");
+            // BadJwtException (not bare JwtException): a signature-valid token with a bad jti is a
+            // client error → 401, not a 500. See revokedException() and the class Javadoc.
+            throw new BadJwtException("missing jti");
         }
         UUID jti;
         try {
             jti = UUID.fromString(jtiClaim);
         } catch (IllegalArgumentException ex) {
-            throw new JwtException("malformed jti");
+            throw new BadJwtException("malformed jti");
         }
         // Negative cache: only the REVOKED verdict is stored; ACTIVE always re-reads. See class Javadoc.
         Boolean revoked = (cache != null) ? cache.get(jti, Boolean.class) : null;
