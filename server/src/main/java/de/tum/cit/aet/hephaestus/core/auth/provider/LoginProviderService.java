@@ -129,7 +129,7 @@ public class LoginProviderService {
             provider.setClientSecret(patch.clientSecret());
         }
         if (patch.scopes() != null && !patch.scopes().isBlank()) {
-            provider.setScopes(patch.scopes().trim());
+            provider.setScopes(sanitizeScopesOrThrow(provider.getType(), patch.scopes()));
         }
         if (patch.enabled() != null && !patch.enabled() && provider.isEnabled()) {
             requireNotLastEnabled(registrationId, "disable");
@@ -232,9 +232,29 @@ public class LoginProviderService {
 
     private static String resolveScopes(LoginProvider.ProviderType type, @Nullable String scopes) {
         if (scopes != null && !scopes.isBlank()) {
-            return scopes.trim();
+            return sanitizeScopesOrThrow(type, scopes);
         }
         return type == LoginProvider.ProviderType.GITHUB ? GITHUB_SCOPES : GITLAB_SCOPES;
+    }
+
+    /**
+     * GitLab login uses the OAuth2 flow (userInfo = /api/v4/user); an {@code openid} scope flips Spring
+     * to the OIDC path and 500s the callback (no jwkSetUri is configured). Reject it with an actionable
+     * 422 so an admin editing the provider can't silently brick sign-in. See GITLAB_SCOPES + ADR 0017.
+     */
+    private static String sanitizeScopesOrThrow(LoginProvider.ProviderType type, String scopes) {
+        String trimmed = scopes.trim();
+        if (type == LoginProvider.ProviderType.GITLAB) {
+            for (String scope : trimmed.split("\\s+")) {
+                if (scope.equalsIgnoreCase("openid")) {
+                    throw new ResponseStatusException(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        "GitLab login uses the OAuth2 flow — the scope must not contain 'openid' (use 'read_user')"
+                    );
+                }
+            }
+        }
+        return trimmed;
     }
 
     private void requireNotLastEnabled(String registrationId, String verb) {

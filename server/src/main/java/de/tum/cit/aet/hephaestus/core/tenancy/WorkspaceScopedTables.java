@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.tenancy;
 
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.metamodel.EntityType;
+import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import org.hibernate.SessionFactory;
@@ -132,7 +133,7 @@ public class WorkspaceScopedTables {
 
     private static void addIfScoped(Set<String> tables, String rawName) {
         if (rawName == null || rawName.isBlank()) return;
-        String name = rawName.toLowerCase();
+        String name = rawName.toLowerCase(Locale.ROOT);
         if (!GLOBAL_TABLES.contains(name)) {
             tables.add(name);
         }
@@ -145,6 +146,6 @@ public class WorkspaceScopedTables {
 
     /** True iff the table requires a {@code workspace_id} predicate on every query. */
     public boolean isScoped(String tableName) {
-        return tableName != null && scopedTables.contains(tableName.toLowerCase());
+        return tableName != null && scopedTables.contains(tableName.toLowerCase(Locale.ROOT));
     }
 }

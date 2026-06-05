@@ -150,6 +150,29 @@ class LoginProviderServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void createRejectsGitlabOpenidScope() {
+        // openid flips Spring to the OIDC path and 500s the callback (no jwkSetUri) — must be rejected.
+        assertThatThrownBy(() ->
+            adminService().create(gitlabDraft("gitlab-x", "https://gitlab.acme.test", "openid profile read_user"))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void updateRejectsGitlabOpenidScope() {
+        LoginProvider existing = gitlabProvider("gitlab", "sealed");
+        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(existing));
+
+        assertThatThrownBy(() ->
+            adminService().update(
+                "gitlab",
+                new LoginProviderService.Patch(null, null, null, null, "openid read_user", null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void createRejectsMalformedRegistrationId() {
         assertThatThrownBy(() ->
             adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null))

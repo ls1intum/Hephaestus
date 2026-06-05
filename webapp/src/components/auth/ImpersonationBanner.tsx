@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { exitImpersonationMutation } from "@/api/@tanstack/react-query.gen";
 import {
 	AlertDialog,
@@ -39,6 +40,13 @@ export function ImpersonationBanner() {
 		onSuccess: () => {
 			// Full reload so the restored operator session cookie + current-user re-resolve cleanly.
 			window.location.assign("/");
+		},
+		onError: (error) => {
+			// A failed exit must be loud: the operator is still impersonating. Disarm write-mode so a
+			// stuck session can't keep mutating, and tell them to retry (rather than silently re-enabling).
+			console.error("Failed to exit impersonation:", error);
+			setWritesEnabled(false);
+			toast.error("Could not stop impersonating. Please try again.");
 		},
 	});
 

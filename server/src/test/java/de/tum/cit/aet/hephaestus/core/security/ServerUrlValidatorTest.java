@@ -102,6 +102,61 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     }
 
     @Nested
+    class NonCanonicalNumericHostBypass {
+
+        // InetAddress.getByName resolves these to real private/loopback/metadata addresses, but their
+        // textual form != the canonical getHostAddress() — the classic SSRF deny-list bypass.
+
+        @Test
+        void rejectsDecimalIntegerLoopback() {
+            // 2130706433 == 127.0.0.1
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://2130706433"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-canonical numeric host");
+        }
+
+        @Test
+        void rejectsDecimalIntegerCloudMetadata() {
+            // 2852039166 == 169.254.169.254 (cloud metadata)
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://2852039166"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-canonical numeric host");
+        }
+
+        @Test
+        void rejectsDecimalIntegerPrivate() {
+            // 3232235521 == 192.168.0.1
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://3232235521"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-canonical numeric host");
+        }
+
+        @Test
+        void rejectsHexEncodedIp() {
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://0x7f000001"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-canonical numeric host");
+        }
+
+        @Test
+        void rejectsOctalEncodedIp() {
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://0177.0.0.1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-canonical numeric host");
+        }
+
+        @Test
+        void stillAcceptsCanonicalPublicIpv4() {
+            assertThatCode(() -> ServerUrlValidator.validate("https://8.8.8.8")).doesNotThrowAnyException();
+        }
+
+        @Test
+        void stillAcceptsPublicIpv6() {
+            assertThatCode(() -> ServerUrlValidator.validate("https://[2001:db8::1]")).doesNotThrowAnyException();
+        }
+    }
+
+    @Nested
     class TldValidation {
 
         @Test

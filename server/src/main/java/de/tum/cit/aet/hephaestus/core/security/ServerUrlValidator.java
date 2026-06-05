@@ -116,6 +116,15 @@ public final class ServerUrlValidator {
         // Strip IPv6 brackets if present
         String ipCandidate = host.startsWith("[") && host.endsWith("]") ? host.substring(1, host.length() - 1) : host;
 
+        // Reject non-canonical numeric IPv4 encodings (decimal-integer "2130706433", hex "0x7f000001",
+        // octal/dotted-shorthand "0177.0.0.1"/"127.1") outright. InetAddress.getByName resolves these to
+        // real private/loopback/metadata addresses (2130706433 == 127.0.0.1, 2852039166 == 169.254.169.254)
+        // but their textual form never equals the canonical getHostAddress() string — the classic SSRF
+        // deny-list bypass. A legitimate server base URL only ever uses a canonical dotted-quad or IPv6.
+        if (isNumericIpv4Form(ipCandidate) && !isCanonicalDottedQuad(ipCandidate)) {
+            throw new IllegalArgumentException("Server URL must not use a non-canonical numeric host: " + host);
+        }
+
         InetAddress addr;
         try {
             // InetAddress.getByName() parses numeric IPs without DNS lookup
@@ -125,8 +134,9 @@ public final class ServerUrlValidator {
             return;
         }
 
-        // Only check if the parsed address matches the input (i.e., it was a numeric IP, not a hostname)
-        // InetAddress.getByName("example.com") triggers DNS lookup, so we skip non-numeric inputs
+        // Only range-check IP literals (canonical dotted-quad or bracketed IPv6); a DNS hostname's resolved
+        // address varies over time and is the HTTP client's concern. Non-canonical numeric forms are already
+        // rejected above, so this equality check is now exact for the literals that reach it.
         if (!addr.getHostAddress().equalsIgnoreCase(ipCandidate) && !host.startsWith("[")) {
             return;
         }
@@ -143,5 +153,30 @@ public final class ServerUrlValidator {
         if (addr.isAnyLocalAddress()) {
             throw new IllegalArgumentException("Server URL must not point to a wildcard address");
         }
+    }
+
+    /** True if the host is an all-numeric IPv4-style literal in any encoding (decimal, hex, dotted). */
+    private static boolean isNumericIpv4Form(String host) {
+        return host.matches("[0-9.]+") || host.matches("0[xX][0-9a-fA-F]+");
+    }
+
+    /** True only for a canonical dotted-quad IPv4 — exactly four 0-255 octets with no leading zeros. */
+    private static boolean isCanonicalDottedQuad(String host) {
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4) {
+            return false;
+        }
+        for (String part : parts) {
+            if (part.isEmpty() || part.length() > 3 || !part.chars().allMatch(Character::isDigit)) {
+                return false;
+            }
+            if (part.length() > 1 && part.charAt(0) == '0') {
+                return false; // leading zero ⇒ octal ambiguity
+            }
+            if (Integer.parseInt(part) > 255) {
+                return false;
+            }
+        }
+        return true;
     }
 }
