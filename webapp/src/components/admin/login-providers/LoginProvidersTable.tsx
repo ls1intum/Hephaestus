@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
 	Table,
 	TableBody,
@@ -22,7 +23,6 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 
 interface LoginProvidersTableProps {
 	providers: LoginProviderView[];
