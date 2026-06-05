@@ -309,4 +309,49 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         assertThat(secondRes.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
         assertThat(store).containsOnlyKeys("oauth-authz:ip:10.0.0.1");
     }
+
+    @Test
+    void failsOpenAndRecordsMetricWhenBucketBackendThrows() throws Exception {
+        // A bucket-store blip (e.g. Postgres lock-timeout) must degrade to pass-through, not a hard
+        // outage — and the degradation must be observable via the backend-error metric.
+        BucketResolver throwing = (key, config) -> {
+            throw new RuntimeException("bucket store down");
+        };
+        AuthMetrics mockMetrics = mock(AuthMetrics.class);
+        AuthRateLimitFilter f = new AuthRateLimitFilter(props(), throwing, objectMapper, mockMetrics);
+
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
+        req.setRemoteAddr("203.0.113.7");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+        f.doFilter(req, res, chain);
+
+        verify(chain, times(1)).doFilter(req, res); // request passed through (failed open)
+        assertThat(res.getStatus()).isEqualTo(HttpStatus.OK.value()); // NOT 429
+        verify(mockMetrics, times(1)).recordRateLimitBackendError();
+    }
+
+    @Test
+    void exportPostIsAccountKeyedAndDownloadIsNotLimited() throws Exception {
+        authenticateAs("acct-42");
+        AuthRateLimitFilter f = filter(props());
+
+        // POST /user/exports → matched + account-keyed (the expensive async assembly).
+        f.doFilter(
+            new MockHttpServletRequest("POST", "/user/exports"),
+            new MockHttpServletResponse(),
+            mock(FilterChain.class)
+        );
+        assertThat(store).hasSize(1);
+        assertThat(store.keySet().iterator().next()).contains("acct-42");
+
+        // GET /user/exports/{id}/download → intentionally NOT rate-limited (no bucket, passes through).
+        store.clear();
+        MockHttpServletRequest dl = new MockHttpServletRequest("GET", "/user/exports/abc/download");
+        MockHttpServletResponse dlRes = new MockHttpServletResponse();
+        FilterChain dlChain = mock(FilterChain.class);
+        f.doFilter(dl, dlRes, dlChain);
+        verify(dlChain, times(1)).doFilter(dl, dlRes);
+        assertThat(store).isEmpty();
+    }
 }

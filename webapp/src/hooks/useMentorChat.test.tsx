@@ -526,5 +526,22 @@ describe("useMentorChat", () => {
 				}),
 			);
 		});
+
+		it("rides the session cookie + CSRF double-submit header (ADR 0017 auth migration)", () => {
+			renderHook(() => useMentorChat({}), {
+				wrapper: createWrapper(queryClient),
+			});
+
+			// biome-ignore lint/suspicious/noExplicitAny: transport comes from the mocked useChat call args
+			const transport = (mockUseChat.mock.calls.at(-1)?.[0] as any).transport;
+			const prepared = transport.prepareSendMessagesRequest({
+				id: "thread-1",
+				messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+			});
+
+			// The Keycloak Bearer header is gone; the request now carries the session cookie + CSRF token.
+			expect(prepared.credentials).toBe("include");
+			expect(prepared.headers["X-XSRF-TOKEN"]).toBe("mock-csrf");
+		});
 	});
 });
