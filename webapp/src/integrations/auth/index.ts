@@ -1,9 +1,16 @@
 import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext";
-import { authClient, type CurrentUser, csrfHeaders, type UserProfile } from "./authClient";
+import {
+	applyStateChangingHeaders,
+	authClient,
+	type CurrentUser,
+	csrfHeaders,
+	type UserProfile,
+} from "./authClient";
 
 export {
 	type AuthContextType,
 	AuthProvider,
+	applyStateChangingHeaders,
 	authClient,
 	type CurrentUser,
 	csrfHeaders,

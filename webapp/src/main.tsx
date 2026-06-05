@@ -10,7 +10,7 @@ import "./styles.css";
 import { StrictMode, useEffect } from "react";
 
 import environment from "@/environment";
-import { AuthProvider, csrfHeaders, useAuth } from "@/integrations/auth";
+import { AuthProvider, applyStateChangingHeaders, useAuth } from "@/integrations/auth";
 import { handlePossibleSessionExpiry } from "@/integrations/auth/sessionExpiry";
 import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
@@ -34,23 +34,14 @@ client.setConfig({
 });
 
 // Attach the CSRF double-submit header (X-XSRF-TOKEN from the __Host-XSRF-TOKEN cookie) on every
-// state-changing request. Safe (GET/HEAD/OPTIONS) requests don't need it; sending it anyway
-// is harmless.
-client.interceptors.request.use((request) => {
-	const method = (request.method ?? "GET").toUpperCase();
-	if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-		for (const [key, value] of Object.entries(csrfHeaders())) {
-			request.headers.set(key, value);
-		}
-		// While impersonating, writes are blocked by the server's ImpersonationGuard unless the
-		// operator has explicitly enabled write-mode (a second confirmation in ImpersonationBanner).
-		// The flag is in-memory and resets on reload, so this is always a deliberate, fresh opt-in.
-		if (useImpersonationStore.getState().writesEnabled) {
-			request.headers.set("X-Impersonation-Allow-Writes", "true");
-		}
-	}
-	return request;
-});
+// state-changing request, plus the impersonation write-allow header when write-mode is on. The pure
+// logic lives in applyStateChangingHeaders (unit-tested); the store read stays here at the wiring edge.
+// While impersonating, writes are blocked by the server's ImpersonationGuard unless the operator has
+// explicitly enabled write-mode (a second confirmation in ImpersonationBanner); the flag is in-memory
+// and resets on reload, so it is always a deliberate, fresh opt-in.
+client.interceptors.request.use((request) =>
+	applyStateChangingHeaders(request, useImpersonationStore.getState().writesEnabled),
+);
 
 // Mid-session cookie-expiry handler: when an authenticated in-app request 401s, drop the cached
 // identity and redirect to /login with the current path preserved as returnTo. The `GET /user`

@@ -35,4 +35,20 @@ describe("SignInButtons", () => {
 		// Button does not. Asserting on it proves we took the branded path, not the fallback.
 		expect(button.className).toContain("bg-github-black");
 	});
+
+	it("shows a neutral error state — and NO provider button — when discovery fails", async () => {
+		// Security-relevant: on a GitLab-only instance a fallback GitHub button would lead users to a
+		// dead OAuth path, so a discovery failure must render a neutral message, not a provider button.
+		server.use(
+			http.get("*/identity-providers", () =>
+				HttpResponse.json({ message: "boom" }, { status: 500 }),
+			),
+		);
+
+		renderWithClient(<SignInButtons onSignIn={vi.fn()} />);
+
+		// findByText throws if the neutral message never appears (jest-dom matchers aren't set up here).
+		expect(await screen.findByText(/Couldn't load sign-in options/i)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /continue with/i })).toBeNull();
+	});
 });

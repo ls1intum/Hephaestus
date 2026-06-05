@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { authClient, type CurrentUser, toUserProfile } from "./authClient";
+import {
+	applyStateChangingHeaders,
+	authClient,
+	type CurrentUser,
+	toUserProfile,
+} from "./authClient";
 
 // Object-mother for a CurrentUser (server CurrentUserView). Tests override only what they assert.
 function makeCurrentUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
@@ -126,5 +131,49 @@ describe("authClient.login — returnTo forwarding (safeReturnTo guard)", () => 
 		const url = new URL(assigned[0]);
 		expect(url.searchParams.get("provider")).toBe("github");
 		expect(url.searchParams.get("returnTo")).toBe("/dashboard");
+	});
+});
+
+describe("applyStateChangingHeaders (app-wide CSRF + impersonation guard)", () => {
+	// jsdom over http refuses to store a __Host- (Secure) cookie, so stub document.cookie's getter —
+	// the helper only reads it via csrfHeaders().
+	function setCookie(raw: string) {
+		Object.defineProperty(document, "cookie", { configurable: true, get: () => raw });
+	}
+	function req(method: string): Request {
+		return { method, headers: new Headers() } as unknown as Request;
+	}
+
+	afterEach(() => setCookie(""));
+
+	it("adds the CSRF double-submit header on state-changing methods", () => {
+		setCookie("__Host-XSRF-TOKEN=tok-123");
+		const r = applyStateChangingHeaders(req("POST"), false);
+		expect(r.headers.get("X-XSRF-TOKEN")).toBe("tok-123");
+		expect(r.headers.get("X-Impersonation-Allow-Writes")).toBeNull();
+	});
+
+	it("sends NO CSRF header on safe methods", () => {
+		setCookie("__Host-XSRF-TOKEN=tok-123");
+		expect(applyStateChangingHeaders(req("GET"), true).headers.get("X-XSRF-TOKEN")).toBeNull();
+		expect(applyStateChangingHeaders(req("HEAD"), true).headers.get("X-XSRF-TOKEN")).toBeNull();
+	});
+
+	it("adds X-Impersonation-Allow-Writes only when write-mode is on, and only on writes", () => {
+		setCookie("__Host-XSRF-TOKEN=tok-123");
+		expect(
+			applyStateChangingHeaders(req("DELETE"), true).headers.get("X-Impersonation-Allow-Writes"),
+		).toBe("true");
+		expect(
+			applyStateChangingHeaders(req("DELETE"), false).headers.get("X-Impersonation-Allow-Writes"),
+		).toBeNull();
+		expect(
+			applyStateChangingHeaders(req("GET"), true).headers.get("X-Impersonation-Allow-Writes"),
+		).toBeNull();
+	});
+
+	it("omits the CSRF header (fail-safe) when the token cookie is absent", () => {
+		setCookie("");
+		expect(applyStateChangingHeaders(req("POST"), false).headers.get("X-XSRF-TOKEN")).toBeNull();
 	});
 });

@@ -65,6 +65,26 @@ export function csrfHeaders(): Record<string, string> {
 	return token ? { "X-XSRF-TOKEN": token } : {};
 }
 
+/**
+ * Mutate a state-changing request so it carries the CSRF double-submit header — and, when an operator
+ * has explicitly enabled impersonation write-mode, the `X-Impersonation-Allow-Writes` header. Safe
+ * methods (GET/HEAD/OPTIONS) get neither. This is the single CSRF guard applied to EVERY generated
+ * mutation; `writesEnabled` is injected (not read from the store) so the guard is a pure, unit-testable
+ * seam — see `main.tsx` for the wiring.
+ */
+export function applyStateChangingHeaders(request: Request, writesEnabled: boolean): Request {
+	const method = (request.method ?? "GET").toUpperCase();
+	if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+		for (const [key, value] of Object.entries(csrfHeaders())) {
+			request.headers.set(key, value);
+		}
+		if (writesEnabled) {
+			request.headers.set("X-Impersonation-Allow-Writes", "true");
+		}
+	}
+	return request;
+}
+
 export const authClient = {
 	/**
 	 * Begin the OAuth login flow against the given provider (default: github).
