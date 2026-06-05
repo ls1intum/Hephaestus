@@ -69,9 +69,9 @@ spring:
     # Hephaestus issues + verifies its own ES256 cookie-JWTs (core.auth
     # RevocationAwareJwtDecoder is the sole JwtDecoder bean) and federates login via
     # oauth2Login. There is no spring.security.oauth2.client.registration here: the default
-    # login providers are configured under hephaestus.auth.{github,gitlab} and built into
-    # a composite ClientRegistrationRepository, so a no-credentials boot does not fail
-    # Boot's non-empty-client-id validation. See ADR 0017.
+    # login providers are configured under hephaestus.auth.{github,gitlab} and seeded into the
+    # instance-scoped login_provider store, which the DB-backed LoginProviderClientRegistrationRepository
+    # reads — so a no-credentials boot does not fail Boot's non-empty-client-id validation. See ADR 0017.
 
     # RFC 9457 Problem Details for all framework-raised errors (ResponseStatusException,
     # validation, etc.). Set explicitly so the contract survives a Boot upgrade. The
@@ -155,10 +155,9 @@ hephaestus:
         access-ttl: ${HEPHAESTUS_AUTH_ACCESS_TTL:15m}
         cookie-name: ${HEPHAESTUS_AUTH_COOKIE_NAME:__Host-HEPHAESTUS_AT}
         state-cookie-key: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:}
-        # Default OAuth login providers visible to every workspace. A provider with a blank
-        # client-id is omitted at startup (no crash) — workspace-scoped self-hosted GitLab / GHE
-        # registrations layer on top via the composite ClientRegistrationRepository reading
-        # Connection rows with kind=OIDC_LOGIN_*. Callback: /api/login/oauth2/code/{registrationId}.
+        # Default instance login providers seeded on first boot. A provider with a blank client-id is
+        # skipped (no crash). Admins manage the rest at runtime in the login_provider store via
+        # Instance admin → Login providers. Callback: /api/login/oauth2/code/{registrationId}.
         github:
             client-id: ${GITHUB_OAUTH_CLIENT_ID:}
             client-secret: ${GITHUB_OAUTH_CLIENT_SECRET:}

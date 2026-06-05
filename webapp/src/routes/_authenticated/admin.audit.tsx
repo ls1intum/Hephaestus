@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { format } from "date-fns";
+import { endOfDay, format, formatISO, startOfDay } from "date-fns";
 import { CalendarIcon, Download, ScrollText, X } from "lucide-react";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -56,13 +56,15 @@ export const Route = createFileRoute("/_authenticated/admin/audit")({
 
 // The generated client types `from`/`to` as `Date`, but its query serializer mangles a real Date into
 // a deepObject on the wire; the server expects an ISO-8601 instant (@DateTimeFormat). So we build the
-// ISO string the server wants and cast to satisfy the generated type. We use the picked calendar day's
-// UTC bounds; `to` is end-of-day so the picked day is inclusive (server predicate is `occurred_at < :to`).
+// instant string the server wants and cast to satisfy the generated type. The bounds are the picked
+// day in the USER's LOCAL timezone (matching the "shown in your local timezone" copy and the
+// leaderboard's TimeframeFilter) — `formatISO` carries the local offset, so "Jun 2" means the user's
+// local Jun 2, not UTC. `to` is end-of-day so the picked day is inclusive (predicate is `occurred_at < :to`).
 function dayStartIso(date: Date): Date {
-	return `${format(date, "yyyy-MM-dd")}T00:00:00.000Z` as unknown as Date;
+	return formatISO(startOfDay(date)) as unknown as Date;
 }
 function dayEndIso(date: Date): Date {
-	return `${format(date, "yyyy-MM-dd")}T23:59:59.999Z` as unknown as Date;
+	return formatISO(endOfDay(date)) as unknown as Date;
 }
 
 // Compact label for the date-range trigger, mirroring the leaderboard's TimeframeFilter.

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "./AdminAuditTable";
 
@@ -54,6 +54,8 @@ const meta = {
 		hasNextPage: false,
 		isFetchingNextPage: false,
 		onLoadMore: () => {},
+		onFilterAccount: fn(),
+		onFilterActor: fn(),
 	},
 } satisfies Meta<typeof AdminAuditTable>;
 
@@ -64,8 +66,8 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Accounts render as human names, not numeric ids.
-		await expect(canvas.getByText("Ada Lovelace")).toBeInTheDocument();
+		// Accounts render as human names, not numeric ids (Ada is the subject of two rows).
+		await expect(canvas.getAllByText("Ada Lovelace").length).toBeGreaterThan(0);
 		// Impersonated actions attribute the operator ("via Grace Hopper").
 		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
 		// A failure shows its reason (not just a red badge), plus the destructive result badge.

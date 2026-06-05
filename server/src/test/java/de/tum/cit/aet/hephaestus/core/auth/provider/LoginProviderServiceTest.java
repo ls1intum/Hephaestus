@@ -134,7 +134,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
 
         assertThat(created.getType()).isEqualTo(LoginProvider.ProviderType.GITLAB);
         assertThat(created.getBaseUrl()).isEqualTo("https://gitlab.acme.test"); // trailing slash stripped
-        assertThat(created.getScopes()).isEqualTo("openid profile email read_user"); // defaulted by type
+        assertThat(created.getScopes()).isEqualTo("read_user"); // defaulted by type (OAuth2, no openid)
         assertThat(created.isSeededFromEnv()).isFalse();
         verify(registrationCache).evict("gitlab-acme");
     }
@@ -169,5 +169,61 @@ class LoginProviderServiceTest extends BaseUnitTest {
             adminService().update("github", new LoginProviderService.Patch(null, null, null, null, null, false))
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void deleteRefusesWhenItIsTheLastEnabledProvider() {
+        LoginProvider only = gitlabProvider("gitlab", "sealed");
+        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(only));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
+
+        assertThatThrownBy(() -> adminService().delete("gitlab")).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).delete(any());
+        verify(registrationCache, never()).evict(any());
+    }
+
+    @Test
+    void createRejectsNonHttpsGitlabBaseUrl() {
+        // SSRF / HTTPS guard: ServerUrlValidator rejects http:// (and loopback/internal) base URLs.
+        assertThatThrownBy(() ->
+            adminService().create(gitlabDraft("gitlab-x", "http://gitlab.acme.test", null))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void updateLeavesSealedSecretUnchangedWhenPatchSecretIsNullOrBlank() {
+        LoginProvider existing = gitlabProvider("gitlab", "sealed-secret");
+        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService().update("gitlab", new LoginProviderService.Patch("Renamed", null, null, null, null, null));
+        assertThat(existing.getClientSecret()).isEqualTo("sealed-secret"); // null secret → unchanged
+
+        adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "   ", null, null));
+        assertThat(existing.getClientSecret()).isEqualTo("sealed-secret"); // blank secret → unchanged
+    }
+
+    @Test
+    void updateReplacesSecretWhenPatchSecretIsPresent() {
+        LoginProvider existing = gitlabProvider("gitlab", "old-secret");
+        when(repository.findByRegistrationId("gitlab")).thenReturn(java.util.Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        adminService().update("gitlab", new LoginProviderService.Patch(null, null, null, "new-secret", null, null));
+        assertThat(existing.getClientSecret()).isEqualTo("new-secret");
+    }
+
+    private static LoginProvider gitlabProvider(String registrationId, String clientSecret) {
+        LoginProvider provider = new LoginProvider();
+        provider.setRegistrationId(registrationId);
+        provider.setType(LoginProvider.ProviderType.GITLAB);
+        provider.setDisplayName("GitLab");
+        provider.setBaseUrl("https://gitlab.example.com");
+        provider.setClientId("client-id");
+        provider.setClientSecret(clientSecret);
+        provider.setScopes("read_user");
+        provider.setEnabled(true);
+        return provider;
     }
 }

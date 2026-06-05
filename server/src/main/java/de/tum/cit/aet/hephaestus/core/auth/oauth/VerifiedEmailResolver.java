@@ -13,11 +13,13 @@ import org.springframework.stereotype.Component;
  * {@code primaryEmailVerifiedAt} for contact.
  *
  * <ul>
- *   <li><b>OIDC providers (gitlab-lrz, gl-ws-*)</b>: trust the {@code email_verified == true} claim
- *       from the ID token (OIDC Core §5.1; GitLab puts it in the ID token).</li>
- *   <li><b>GitHub (github, gh-ws-*)</b>: the {@code /user} email is unreliable; the trusted signal is
- *       the {@code primary && verified} entry surfaced by {@link GitHubEmailOAuth2UserService} into the
+ *   <li><b>GitHub</b>: the {@code /user} email is unreliable, so the trusted signal is the
+ *       {@code primary && verified} entry surfaced by {@link GitHubEmailOAuth2UserService} into the
  *       {@code email} + {@code email_verified} attributes.</li>
+ *   <li><b>GitLab</b>: signs in via the OAuth2 flow ({@code /api/v4/user}), which carries no
+ *       verification attestation — so {@code email} is stored but left unverified. A future OIDC
+ *       login provider would surface {@code email_verified} on the {@link OidcUser} and be trusted
+ *       by the generic check below.</li>
  * </ul>
  *
  * @see <a href="https://openid.net/specs/openid-connect-core-1_0.html">OIDC Core §5.1</a>

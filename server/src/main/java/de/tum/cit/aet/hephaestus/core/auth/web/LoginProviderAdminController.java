@@ -128,8 +128,8 @@ public class LoginProviderAdminController {
         @NonNull String displayName,
         @NonNull String baseUrl,
         @NonNull String scopes,
-        @NonNull boolean enabled,
-        @NonNull boolean seededFromEnv,
+        boolean enabled,
+        boolean seededFromEnv,
         @NonNull @Schema(
             description = "Redirect/callback URI to register on the upstream OAuth app"
         ) String redirectUri,

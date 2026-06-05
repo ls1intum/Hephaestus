@@ -147,8 +147,8 @@ public class AuthSecurityConfig {
             .oauth2Login(oauth -> {
                 // Explicit loginPage: the SPA owns the login UI, and without this Spring Security's
                 // OAuth2LoginConfigurer ENUMERATES the ClientRegistrationRepository at config time to build
-                // default login links. That repo is DB-backed (LoginClientRegistrationRepository overlays
-                // workspace OIDC Connections), so the enumeration opens a JDBC connection during context
+                // default login links. That repo is DB-backed (LoginProviderClientRegistrationRepository
+                // reads the login_provider store), so the enumeration opens a JDBC connection during context
                 // refresh — which has no DB during the Paketo CDS-training build run and fails the image
                 // build. Setting a loginPage skips the default-page generation and that startup DB hit.
                 oauth.loginPage("/login");

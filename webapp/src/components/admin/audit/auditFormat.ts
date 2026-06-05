@@ -74,7 +74,9 @@ const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
  */
 export function relativeTime(value: AuthEventView["occurredAt"]): string {
 	const date = value instanceof Date ? value : new Date(value);
-	const diffMs = date.getTime() - Date.now();
+	// Audit events are always in the past; clamp so minor clock skew (or a sub-minute-old event) reads
+	// "just now" instead of a nonsensical "in N seconds".
+	const diffMs = Math.min(date.getTime() - Date.now(), 0);
 	const abs = Math.abs(diffMs);
 	if (abs < 60_000) return "just now";
 	const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });

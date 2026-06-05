@@ -15,7 +15,7 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
 - [ ] `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` registered (GitHub OAuth App,
       callback `https://<host>/api/login/oauth2/code/github`) (the `/api` prefix is stripped by Traefik before Spring sees it).
 - [ ] `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET` registered (GitLab OAuth application,
-      callback `https://<host>/api/login/oauth2/code/gitlab`, scopes `openid profile email read_user`).
+      callback `https://<host>/api/login/oauth2/code/gitlab`, scope `read_user`).
       Set `GITLAB_OAUTH_BASE_URL` to the instance (defaults to `https://gitlab.com`; e.g.
       `https://gitlab.lrz.de` for a self-hosted instance) and optionally `GITLAB_OAUTH_DISPLAY_NAME`.
 - [ ] Reverse proxy (Coolify / TUM) verified to NOT inject a `Domain=` on Set-Cookie — a

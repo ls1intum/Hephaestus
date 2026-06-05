@@ -143,13 +143,23 @@ public class AuthAuditController {
         return value == null ? "" : value.toString();
     }
 
-    /** Append one RFC-4180 CSV row: quote every field, escape embedded quotes, normalize newlines. */
+    /**
+     * Append one RFC-4180 CSV row: quote every field, escape embedded quotes, normalize newlines, and
+     * neutralize spreadsheet formula injection. Audit cells carry user-controlled text (display names,
+     * emails, user-agents, raw details) and the consumer is a privileged admin double-clicking the
+     * export — so a value starting with {@code = + - @ TAB CR} would execute as a formula in
+     * Excel/Sheets/LibreOffice. Prefix those with a single quote so they render as inert text.
+     * See <a href="https://owasp.org/www-community/attacks/CSV_Injection">OWASP CSV Injection</a>.
+     */
     private static void appendCsvRow(StringBuilder out, String... fields) {
         for (int i = 0; i < fields.length; i++) {
             if (i > 0) {
                 out.append(',');
             }
             String value = fields[i] == null ? "" : fields[i];
+            if (!value.isEmpty() && "=+-@\t\r".indexOf(value.charAt(0)) >= 0) {
+                value = "'" + value;
+            }
             out.append('"').append(value.replace("\"", "\"\"").replace("\r\n", " ").replace('\n', ' ')).append('"');
         }
         out.append('\n');

@@ -70,7 +70,7 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 
 The login provider is instance-agnostic: gitlab.com works out of the box, and any self-hosted GitLab works by pointing `GITLAB_OAUTH_BASE_URL` at it. Create the GitLab OAuth application on that instance with these settings:
 
-- Redirect URI: `https://<hostname>/api/login/oauth2/code/gitlab` · Scopes: `openid profile email read_user`
+- Redirect URI: `https://<hostname>/api/login/oauth2/code/gitlab` · Scope: `read_user`
 - Confidential client: enabled
 
 This env-seeds **one** default GitLab login provider (registration id `gitlab`). Additional GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** — no redeploy.

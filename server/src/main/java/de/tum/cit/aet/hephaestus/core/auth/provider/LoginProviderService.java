@@ -36,7 +36,11 @@ public class LoginProviderService {
     static final String GITHUB_REGISTRATION_ID = "github";
     static final String GITLAB_REGISTRATION_ID = "gitlab";
     static final String GITHUB_SCOPES = "read:user user:email";
-    static final String GITLAB_SCOPES = "openid profile email read_user";
+    // GitLab login uses the OAuth2 flow (userInfo = /api/v4/user, keyed on "id"), NOT OIDC — so the
+    // scope must NOT contain "openid". A request carrying "openid" makes Spring Security take the OIDC
+    // path and validate the id_token JWS via a jwkSetUri the registration never sets, which 500s the
+    // callback. "read_user" alone returns id + username + email from /api/v4/user. See ADR 0017.
+    static final String GITLAB_SCOPES = "read_user";
     private static final String GITHUB_COM = "https://github.com";
 
     private static final Logger log = LoggerFactory.getLogger(LoginProviderService.class);

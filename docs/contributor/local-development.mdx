@@ -235,7 +235,7 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    ```
 
 3. (Optional) To enable GitLab login locally, register an OAuth application on your GitLab instance
-   (callback `http://localhost:8080/login/oauth2/code/gitlab`, scopes `openid profile email read_user`),
+   (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
    set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
    instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
 4. Run the application server with `./mvnw spring-boot:run`; Postgres + NATS start automatically via Spring Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
@@ -248,7 +248,7 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `admin
 
 - **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
 - **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
-- **Reset everything:** `cd server && docker compose down -v && docker compose up` clears Postgres; on next login the account + identity link are recreated.
+- **Reset everything:** run `pnpm dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
 
 
 ### Webhook receiver

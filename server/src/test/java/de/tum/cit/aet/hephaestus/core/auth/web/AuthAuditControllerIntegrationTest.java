@@ -273,6 +273,35 @@ class AuthAuditControllerIntegrationTest {
     }
 
     @Test
+    void csvExportNeutralizesFormulaInjectionAndEscapesEmbeddedQuotes() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        // A failure reason that is BOTH a spreadsheet formula (leading '=') and carries an embedded quote.
+        seedFailure(
+            1L,
+            AuthEvent.EventType.LOGIN_FAILED,
+            Instant.parse("2026-06-01T10:00:00Z"),
+            "=cmd|' /C calc'!A1 \"x\""
+        );
+
+        String csv = webTestClient
+            .get()
+            .uri(builder -> builder.path("/admin/audit/export").build())
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(String.class)
+            .returnResult()
+            .getResponseBody();
+
+        org.assertj.core.api.Assertions.assertThat(csv).isNotNull();
+        // Formula trigger neutralized: the cell is quoted and the leading '=' is prefixed with an apostrophe.
+        org.assertj.core.api.Assertions.assertThat(csv).contains("\"'=cmd");
+        // RFC-4180: the embedded double-quote is doubled.
+        org.assertj.core.api.Assertions.assertThat(csv).contains("\"\"x\"\"");
+    }
+
+    @Test
     void plainUserCannotExport() {
         Account user = persist("Plain User", Account.AppRole.USER);
 
