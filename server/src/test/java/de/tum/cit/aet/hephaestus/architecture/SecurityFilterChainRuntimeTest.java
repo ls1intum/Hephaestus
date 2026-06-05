@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.architecture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.proxy.JobTokenAuthenticationFilter;
+import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.security.CsrfCookieFilter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import jakarta.servlet.Filter;
@@ -38,6 +39,16 @@ class SecurityFilterChainRuntimeTest extends BaseIntegrationTest {
         assertThat(filterChains)
             .as("the cookie app chain must enforce CSRF")
             .anyMatch(chain -> chain.getFilters().stream().anyMatch(CsrfFilter.class::isInstance));
+    }
+
+    @Test
+    void authRateLimitFilterIsInstalledOnASecurityChain() {
+        // All rate-limit coverage is the isolated filter unit test driving doFilter() directly, so a
+        // regression removing addFilterBefore(authRateLimitFilter, AuthorizationFilter.class) — disabling
+        // auth rate limiting entirely in prod — would otherwise be invisible. Assert it is actually wired.
+        assertThat(filterChains)
+            .as("at least one security chain must install AuthRateLimitFilter")
+            .anyMatch(chain -> chain.getFilters().stream().anyMatch(AuthRateLimitFilter.class::isInstance));
     }
 
     @Test

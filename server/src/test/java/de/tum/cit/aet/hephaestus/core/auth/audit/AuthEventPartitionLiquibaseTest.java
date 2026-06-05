@@ -149,6 +149,40 @@ class AuthEventPartitionLiquibaseTest {
         }
     }
 
+    /**
+     * The real attack on the append-only trigger: laundering a forensic edit through a redaction.
+     * NULLing a PII column must NOT license mutating a non-redactable column in the same UPDATE — the
+     * column-aware guard exists precisely to fail this closed. The earlier test only covers a pure
+     * all-PII redaction and a pure non-PII edit; this is the dangerous mixed case a "simplification"
+     * to {@code NEW.ip_inet IS NULL} would silently re-open.
+     */
+    @Test
+    void authEventAppendOnly_rejectsRedactionLaunderingANonRedactableEdit() throws Exception {
+        try (Connection connection = newConnection(); Statement statement = connection.createStatement()) {
+            long id = nextAuthEventId(statement);
+            statement.executeUpdate(
+                "INSERT INTO auth_event (id, occurred_at, event_type, result, ip_inet, user_agent, details) " +
+                    "VALUES (" +
+                    id +
+                    ", now(), 'LOGIN', 'SUCCESS', '203.0.113.7', 'UA', '{\"k\":1}'::jsonb)"
+            );
+
+            // NULL a PII column (ip_inet) AND flip a non-redactable column (result) in one UPDATE.
+            assertThatThrownBy(() ->
+                statement.executeUpdate("UPDATE auth_event SET ip_inet = NULL, result = 'FAILURE' WHERE id = " + id)
+            )
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessageContaining("append-only");
+
+            // Stricter than "any change confined to PII columns": the trigger permits ONLY the exact
+            // all-three-NULL Art.17 erasure, so even a partial redaction (ip_inet alone) is rejected.
+            // This forecloses selectively NULLing one PII field while preserving the rest.
+            assertThatThrownBy(() -> statement.executeUpdate("UPDATE auth_event SET ip_inet = NULL WHERE id = " + id))
+                .isInstanceOf(java.sql.SQLException.class)
+                .hasMessageContaining("append-only");
+        }
+    }
+
     private static Connection newConnection() throws Exception {
         return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
     }
