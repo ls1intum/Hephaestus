@@ -29,7 +29,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 /**
  * {@link JwtDecoder} that validates signatures against {@link JwtSigningKeyService}'s
- * {@link JWKSource} and then short-circuits revoked {@code jti}s via a Caffeine-cached
+ * {@code JWKSource} and then short-circuits revoked {@code jti}s via a Caffeine-cached
  * negative lookup on {@link IssuedJwtRepository}.
  *
  * <h2>Cache strategy (negative cache)</h2>
