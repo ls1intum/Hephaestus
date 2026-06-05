@@ -18,7 +18,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Durable guard against mocking owned JPA {@code @Entity} POJOs in unit tests: stubbing an entity's
  * getters tests the stub, not the SUT (full rationale is in the failure message below). Build the real
- * object instead — every guarded entity has {@code @NoArgsConstructor + @Setter} (see {@code TestEntities}).
+ * object instead — via {@code TestEntities} where a factory exists, otherwise {@code new Entity()} +
+ * setters (every guarded entity is {@code @NoArgsConstructor + @Setter}).
  *
  * <p>NOT covered (legitimate boundary mocks): {@code *Repository} interfaces, {@code Clock},
  * {@code ApplicationEventPublisher}, SPI interfaces, WebClient/NATS/Docker SDKs. Only the concrete owned

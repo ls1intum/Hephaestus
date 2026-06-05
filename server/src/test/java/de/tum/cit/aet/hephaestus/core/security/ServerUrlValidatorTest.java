@@ -77,6 +77,14 @@ class ServerUrlValidatorTest extends BaseUnitTest {
         }
 
         @Test
+        void rejectsGoogMetadataHostname() {
+            // Pins the remaining blocked hostname (metadata.goog) so every deny-list member is covered.
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://metadata.goog"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not allowed");
+        }
+
+        @Test
         void rejectsPrivateIpRange() {
             assertThatThrownBy(() -> ServerUrlValidator.validate("https://10.0.0.1"))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -181,6 +189,15 @@ class ServerUrlValidatorTest extends BaseUnitTest {
 
         // IPv4-mapped addresses (::ffff:…) have no explicit check — they pass only because getByName
         // canonicalizes them to IPv4, so isLoopback/isSiteLocalAddress fire. (ULA rationale is in the source.)
+
+        @Test
+        void rejectsIpv6Wildcard() {
+            // "[::]" is the only input that reaches the isAnyLocalAddress() guard — IPv4 0.0.0.0
+            // short-circuits earlier in the blocked-IP set.
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://[::]"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("wildcard");
+        }
 
         @Test
         void rejectsIpv6UniqueLocalFc00() {

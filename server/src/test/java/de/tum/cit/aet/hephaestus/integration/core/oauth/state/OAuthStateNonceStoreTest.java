@@ -15,12 +15,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 /**
- * Unit tests for {@link OAuthStateNonceStore} — the atomic single-use claim contract.
- *
- * <p>The store delegates the load-bearing atomicity to
- * {@code OAuthStateNonceRepository.markConsumed(nonce, now)} — these tests verify
- * the SERVICE-LAYER plumbing: input validation, mapping of {@code rows-affected}
- * to {@code true/false}, and collision avoidance on issue.
+ * Unit tests for {@link OAuthStateNonceStore}'s service-layer plumbing: input validation (blank
+ * rejection on {@code issue}/{@code tryConsume}) and skip-on-collision at issue time. The load-bearing
+ * atomicity it delegates to {@code OAuthStateNonceRepository.markConsumed} — and the consume-once /
+ * concurrency contract — is proven against real SQL by {@code OAuthStateNonceStoreIntegrationTest}.
  */
 class OAuthStateNonceStoreTest extends BaseUnitTest {
 
