@@ -16,27 +16,16 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Durable guard against re-introducing "bullshit mocking" of owned JPA {@code @Entity} POJOs
- * in unit tests.
+ * Durable guard against mocking owned JPA {@code @Entity} POJOs in unit tests: stubbing an entity's
+ * getters tests the stub, not the SUT (full rationale is in the failure message below). Build the real
+ * object instead — every guarded entity has {@code @NoArgsConstructor + @Setter} (see {@code TestEntities}).
  *
- * <p><b>Why this rule exists.</b> Mocking an owned entity and stubbing its getters is
- * tautological: {@code when(ws.getId()).thenReturn(1L)} followed by an assertion on
- * {@code 1L} tests the stub, not the system under test. It also couples the test to getter
- * names instead of the real entity wiring (relationships, equals/hashCode). Every entity
- * guarded here carries Lombok {@code @NoArgsConstructor + @Setter}, so the real object is
- * both cheaper and strictly more faithful. Construct the real object via
- * {@code de.tum.cit.aet.hephaestus.testconfig.TestEntities} (or {@code new Entity()} + setters)
- * instead of mocking it.
+ * <p>NOT covered (legitimate boundary mocks): {@code *Repository} interfaces, {@code Clock},
+ * {@code ApplicationEventPublisher}, SPI interfaces, WebClient/NATS/Docker SDKs. Only the concrete owned
+ * {@code @Entity} classes in {@link #GUARDED_ENTITIES} are targeted.
  *
- * <p><b>What is NOT covered.</b> Spring Data {@code *Repository} interfaces, GraphQL /
- * WebClient / NATS / Docker SDKs, {@code Clock}, {@code ApplicationEventPublisher}, SPI
- * interfaces, etc. are legitimate boundary mocks. This rule deliberately targets only the
- * concrete owned {@code @Entity} classes listed in {@link #GUARDED_ENTITIES}.
- *
- * <p><b>Implementation.</b> A source scan (rather than ArchUnit bytecode inspection) because
- * {@code mock(X.class)} compiles to a {@code Class<T>} literal whose entity identity is hard
- * to resolve reliably from bytecode, whereas the source form is unambiguous and the failure
- * message can point straight at the offending file/line.
+ * <p>Source scan (not ArchUnit bytecode) because {@code mock(X.class)} is a {@code Class<T>} literal that
+ * is hard to resolve from bytecode, whereas the source form points straight at the offending line.
  */
 @Tag("architecture")
 class NoMockingOwnedEntitiesTest {

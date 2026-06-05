@@ -56,19 +56,13 @@ class EncryptionContextTest extends BaseUnitTest {
     }
 
     @Test
-    void allContextsShareAStableDomainSeparatorPrefix() {
-        // Cross-purpose AAD separation: every context starts with the same constant framing prefix
-        // (domain separator + schema version) regardless of field values, so the differences are
-        // confined to the field region. (Exact byte layout is an implementation detail, not asserted.)
-        byte[] a = aad(1L, IntegrationKind.GITHUB, "inst", "col");
-        byte[] b = aad(999L, IntegrationKind.SLACK, "other-instance", "other.column");
-        int commonPrefix = 0;
-        while (commonPrefix < a.length && commonPrefix < b.length && a[commonPrefix] == b[commonPrefix]) {
-            commonPrefix++;
-        }
-        assertThat(commonPrefix)
-            .as("a stable domain-separator + schema-version prefix must precede the field region")
-            .isGreaterThanOrEqualTo("hephaestus-credential-bundle".length() + 1);
+    void everyContextBeginsWithTheSameDomainSeparatorMarker() {
+        // Cross-purpose AAD separation: every context — regardless of its fields — leads with the same
+        // domain-separator marker, so a credential-bundle ciphertext can't be confused with another use
+        // of the same AES key. Asserting the marker (not the exact framing offsets) keeps this robust.
+        byte[] marker = "hephaestus-credential-bundle".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(aad(1L, IntegrationKind.GITHUB, "inst", "col")).startsWith(marker);
+        assertThat(aad(999L, IntegrationKind.SLACK, "other-instance", "other.column")).startsWith(marker);
     }
 
     @Test

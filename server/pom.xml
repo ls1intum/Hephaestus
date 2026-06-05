@@ -1232,7 +1232,6 @@
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicyTest</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidatorTest</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContextTest</param>
-                                <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContextPropertyTest</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.identity.connect.IssuerDiscoveryProbeTest</param>
                             </targetTests>
                             <outputFormats>

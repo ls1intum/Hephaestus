@@ -20,8 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
- * Proof test for the {@code auth_event} partitioning fix (the production-breaking bug this change
- * closes). The normal test profile DISABLES Liquibase and uses Hibernate {@code ddl-auto: create},
+ * Proof test for the {@code auth_event} partitioning fix. The normal test profile DISABLES Liquibase
+ * and uses Hibernate {@code ddl-auto: create},
  * which emits a plain non-partitioned {@code auth_event} table — so it would never catch the bug.
  *
  * <p>This test instead spins up a FRESH stock {@code postgres:16} container with NO {@code
@@ -150,11 +150,10 @@ class AuthEventPartitionLiquibaseTest {
     }
 
     /**
-     * The real attack on the append-only trigger: laundering a forensic edit through a redaction.
-     * NULLing a PII column must NOT license mutating a non-redactable column in the same UPDATE — the
-     * column-aware guard exists precisely to fail this closed. The earlier test only covers a pure
-     * all-PII redaction and a pure non-PII edit; this is the dangerous mixed case a "simplification"
-     * to {@code NEW.ip_inet IS NULL} would silently re-open.
+     * Mixed UPDATE: NULLing a PII column must NOT license mutating a non-redactable column in the same
+     * statement — the column-aware guard fails this closed. The earlier test covers only a pure all-PII
+     * redaction and a pure non-PII edit; this mixed case is what a "simplification" to {@code
+     * NEW.ip_inet IS NULL} would silently re-open.
      */
     @Test
     void authEventAppendOnly_rejectsRedactionLaunderingANonRedactableEdit() throws Exception {

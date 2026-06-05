@@ -34,12 +34,10 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
 /**
- * The login-time decision point of {@code oauth2Login}: {@link HephaestusAuthSuccessHandler} resolves
- * the account, then mints a cookie-JWT — but ONLY for an ACTIVE account. A SUSPENDED / DELETING /
- * DELETED account that re-authenticates must be turned away with NO cookie, or a re-login silently
- * resurrects a deleting account / re-enables a suspended one. The decoder + JwtPrincipalFactory
- * enforce the same gate as defence-in-depth, but this handler is where the login decision is made,
- * so the bailout must hold here independently.
+ * The ADR-0017 account-status gate in {@link HephaestusAuthSuccessHandler}: a SUSPENDED / DELETING /
+ * DELETED account that re-authenticates gets NO cookie (see that class's onAuthenticationSuccess for
+ * the full threat model). The decoder + JwtPrincipalFactory enforce the same invariant as defence-in-
+ * depth, but this handler is where the login decision is made, so it must hold here independently.
  */
 class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
 
@@ -82,7 +80,6 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("sub-1"));
 
-        // No session is minted and no cookie is written — the inactive account cannot re-enter.
         verify(jwtIssuer, never()).issue(any(), any(), any());
         assertThat(response.getCookie(COOKIE_NAME)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/error?code=account_inactive");

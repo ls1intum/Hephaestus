@@ -6,36 +6,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ServerUrlValidatorTest extends BaseUnitTest {
 
     @Nested
     class SchemeValidation {
 
-        @Test
-        void rejectsHttpUrl() {
-            assertThatThrownBy(() -> ServerUrlValidator.validate("http://gitlab.example.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HTTPS");
-        }
-
-        @Test
-        void rejectsFileUrl() {
-            assertThatThrownBy(() -> ServerUrlValidator.validate("file:///etc/passwd"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HTTPS");
-        }
-
-        @Test
-        void rejectsFtpUrl() {
-            assertThatThrownBy(() -> ServerUrlValidator.validate("ftp://gitlab.example.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HTTPS");
-        }
-
-        @Test
-        void rejectsGopherUrl() {
-            assertThatThrownBy(() -> ServerUrlValidator.validate("gopher://gitlab.example.com"))
+        // All non-HTTPS schemes reject at the single scheme guard, before any host/path check.
+        @ParameterizedTest
+        @ValueSource(
+            strings = {
+                "http://gitlab.example.com",
+                "ftp://gitlab.example.com",
+                "gopher://gitlab.example.com",
+                "file:///etc/passwd",
+            }
+        )
+        void rejectsNonHttpsScheme(String url) {
+            assertThatThrownBy(() -> ServerUrlValidator.validate(url))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("HTTPS");
         }
@@ -104,29 +94,12 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     @Nested
     class NonCanonicalNumericHostBypass {
 
-        // InetAddress.getByName resolves these to real private/loopback/metadata addresses, but their
-        // textual form != the canonical getHostAddress() — the classic SSRF deny-list bypass.
-
-        @Test
-        void rejectsDecimalIntegerLoopback() {
-            // 2130706433 == 127.0.0.1
-            assertThatThrownBy(() -> ServerUrlValidator.validate("https://2130706433"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-canonical numeric host");
-        }
-
-        @Test
-        void rejectsDecimalIntegerCloudMetadata() {
-            // 2852039166 == 169.254.169.254 (cloud metadata)
-            assertThatThrownBy(() -> ServerUrlValidator.validate("https://2852039166"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-canonical numeric host");
-        }
-
-        @Test
-        void rejectsDecimalIntegerPrivate() {
-            // 3232235521 == 192.168.0.1
-            assertThatThrownBy(() -> ServerUrlValidator.validate("https://3232235521"))
+        // 2130706433==127.0.0.1, 2852039166==169.254.169.254, 3232235521==192.168.0.1 — all resolve to
+        // loopback/metadata/private targets but share the single non-canonical-numeric branch.
+        @ParameterizedTest
+        @ValueSource(strings = { "https://2130706433", "https://2852039166", "https://3232235521" })
+        void rejectsDecimalIntegerHost(String url) {
+            assertThatThrownBy(() -> ServerUrlValidator.validate(url))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-canonical numeric host");
         }
@@ -192,8 +165,8 @@ class ServerUrlValidatorTest extends BaseUnitTest {
 
         @Test
         void stillAcceptsCanonicalPublicIpv4WithAZeroOctet() {
-            // A single "0" octet is canonical (only MULTI-digit leading zeros are octal-ambiguous). The
-            // leading-zero guard must use length > 1, not >= 1, or it would reject legitimate public IPs.
+            // Boundary guard must use length > 1, not >= 1: a single "0" octet is canonical, so >= 1
+            // would wrongly reject legitimate public IPs. (8.8.8.8 above has no zero octet to exercise it.)
             assertThatCode(() -> ServerUrlValidator.validate("https://8.0.8.8")).doesNotThrowAnyException();
         }
 
@@ -206,9 +179,8 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     @Nested
     class PrivateIpv6Bypass {
 
-        // Java has no isUniqueLocalAddress() and isSiteLocalAddress() is false for ULA, so these must be
-        // caught by the explicit fc00::/7 check; IPv4-mapped private/loopback are caught by getByName's
-        // isLoopback/isSiteLocal canonicalization (asserted here as a regression guard).
+        // IPv4-mapped addresses (::ffff:…) have no explicit check — they pass only because getByName
+        // canonicalizes them to IPv4, so isLoopback/isSiteLocalAddress fire. (ULA rationale is in the source.)
 
         @Test
         void rejectsIpv6UniqueLocalFc00() {

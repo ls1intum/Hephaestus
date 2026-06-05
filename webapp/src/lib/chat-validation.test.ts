@@ -4,7 +4,7 @@ import { extractVotesFromThreadDetail, parseThreadMessages } from "./chat-valida
 // chat-validation is the Zod boundary on untrusted server-provided chat content that mentor hydration
 // depends on. Its rejection branches are security-relevant (a malformed payload must fail closed, not
 // corrupt the chat) and were only exercised indirectly through a heavily-mocked hook — where a non-UUID
-// id once silently skipped hydration and masked a bug. These are direct, millisecond assertions.
+// id once silently skipped hydration and masked a bug.
 
 const UUID = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
 const UUID2 = "c9bf9e57-1685-4c89-bafb-ff5af830be8a";

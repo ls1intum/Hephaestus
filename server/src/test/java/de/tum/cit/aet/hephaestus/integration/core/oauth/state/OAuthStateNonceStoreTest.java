@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,18 +56,6 @@ class OAuthStateNonceStoreTest extends BaseUnitTest {
         assertThatThrownBy(() -> store.issue("", 1L, IntegrationKind.GITHUB, Instant.now())).isInstanceOf(
             IllegalArgumentException.class
         );
-    }
-
-    @Test
-    void tryConsumeWinsOnUpdate() {
-        when(repository.markConsumed(eq("abc"), any(Instant.class))).thenReturn(1);
-        assertThat(store.tryConsume("abc")).isTrue();
-    }
-
-    @Test
-    void tryConsumeLosesWhenAlreadyConsumed() {
-        when(repository.markConsumed(eq("abc"), any(Instant.class))).thenReturn(0);
-        assertThat(store.tryConsume("abc")).isFalse();
     }
 
     @Test

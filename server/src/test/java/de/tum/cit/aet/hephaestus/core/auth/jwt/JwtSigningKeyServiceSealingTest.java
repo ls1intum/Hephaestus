@@ -18,13 +18,10 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.env.MockEnvironment;
 
 /**
- * Proves a freshly generated signing key survives the full DB round-trip <em>through the
- * service</em> when sealing is enabled: {@code generateNewKeyRow()} seals on write, and the
- * private-key read path unseals on load, yielding a usable ES256 signing JWK. Also pins that
- * the public JWK set never leaks the private key.
- *
- * <p>The repository is mocked as an in-memory holder so we exercise the real seal/unseal seam
- * without a database — the sealer is a real {@link JwtSigningKeySealer} built from a 32-char key.
+ * Proves a freshly generated signing key survives the full seal-on-write / unseal-on-load round-trip
+ * through the service (yielding a usable ES256 signing JWK), and that the public JWK set never leaks
+ * the private key. The repository is mocked as an in-memory holder so the test exercises the real
+ * seal/unseal seam without a database — the sealer is a real {@link JwtSigningKeySealer} (32-char key).
  */
 class JwtSigningKeyServiceSealingTest extends BaseUnitTest {
 
@@ -96,11 +93,9 @@ class JwtSigningKeyServiceSealingTest extends BaseUnitTest {
 
     @Test
     void prod_existingUnsealedRow_failsClosed() {
-        // A legacy v0-unsealed row must fail closed in prod at BOTH enforcement points: the
-        // non-swallowed startup assertion (so boot aborts) and key materialization / signing
-        // (so a deferred first-issuance can't sign with the forgeable key either). ensureActiveKey()
-        // itself is best-effort and intentionally does NOT throw here — the swallowing @PostConstruct
-        // would hide it, which is exactly the inert-guard bug this guards against.
+        // A legacy v0-unsealed row must fail closed at both the startup assertion and the signing path.
+        // ensureActiveKey() is intentionally NOT the guard here: it runs inside AuthJwtConfig's
+        // swallowing @PostConstruct, so making it the guard would be inert — the exact bug this pins.
         JwtSigningKeySealer sealer = new JwtSigningKeySealer(KEY, "prod");
         JwtSigningKeyRepository repo = mock(JwtSigningKeyRepository.class);
 

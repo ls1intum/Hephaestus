@@ -26,25 +26,15 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * End-to-end proof of the account-provisioning invariants against a REAL Postgres — the parts the
- * mock-based {@link AccountProvisioningServiceTest} structurally cannot prove because it stubs
- * {@code findActiveByProviderSubject} (so it asserts the code <i>asked</i> by (provider, subject),
- * not that the persisted data actually keys on it).
+ * nOAuth defence against a REAL Postgres: the mock-based {@link AccountProvisioningServiceTest} stubs
+ * {@code findActiveByProviderSubject}, so it cannot prove the persisted data keys on (provider,
+ * subject) rather than email. Two identities sharing one verified email must resolve to DISTINCT
+ * accounts — email is contact metadata, never a join key.
  *
- * <h2>nOAuth defence (the marquee invariant)</h2>
- * Two federated identities that share the same verified email must resolve to two DISTINCT accounts:
- * email is contact metadata, never a join key. The classic nOAuth account-takeover is exactly the
- * regression where an attacker controlling identity B with the victim's email folds into the
- * victim's account. This test seeds a real {@code login_provider} pair, drives the real
- * {@link AccountProvisioningService} through the real {@code GitProviderRegistry} +
- * {@code AccountJitCreator}, and asserts on rows in {@code account} / {@code identity_link}.
- *
- * <p>The concurrent-first-login convergence (uq_identity_link_provider_subject_team) is NOT exercised
- * here: the test profile uses Hibernate {@code ddl-auto: create}, which cannot reproduce the
- * production index's {@code COALESCE(team_id, '')} NULL handling, so a NULL-team race would falsely
- * appear to duplicate. That production constraint is pinned faithfully against the real Liquibase
- * schema by {@code IdentityLinkUniquenessLiquibaseTest}; the read-after-conflict recovery logic is
- * unit-covered by {@link AccountProvisioningServiceTest}.
+ * <p>The concurrent-first-login convergence is pinned separately by {@code
+ * IdentityLinkUniquenessLiquibaseTest} (its {@code COALESCE(team_id,'')} index is unreproducible
+ * under this profile's ddl-auto schema); the read-after-conflict recovery is unit-covered by {@link
+ * AccountProvisioningServiceTest}.
  *
  * @see <a href="https://www.descope.com/blog/post/noauth">nOAuth: account takeover via email merging</a>
  */
