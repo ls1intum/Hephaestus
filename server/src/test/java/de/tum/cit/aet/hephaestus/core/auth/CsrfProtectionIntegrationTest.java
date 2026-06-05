@@ -3,11 +3,10 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import java.util.List;
+import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
@@ -20,10 +19,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * <p>Distinguishing the two failure modes: a missing/invalid CSRF token is rejected by the CSRF
  * filter with <b>403</b> before authentication; once CSRF passes, the (still unauthenticated)
  * request is rejected by the entry point with <b>401</b>. The 403→401 transition proves CSRF — not
- * auth — was the gate.
+ * auth — was the gate. Token fetch + matching-token replay reuse {@link TestAuthUtils}.
  */
 class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
 
+    // Used only for the deliberate-mismatch case below; the happy path uses TestAuthUtils.withCsrf.
     private static final String XSRF_COOKIE = "__Host-XSRF-TOKEN";
     private static final String XSRF_HEADER = "X-XSRF-TOKEN";
 
@@ -32,8 +32,7 @@ class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void csrfCookieIsIssuedOnSafeRequest() {
-        String token = fetchCsrfToken();
-        assertThat(token).isNotBlank();
+        assertThat(TestAuthUtils.fetchCsrfToken(webTestClient)).isNotBlank();
     }
 
     @Test
@@ -46,17 +45,14 @@ class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void cookieStylePostWithMatchingCsrfTokenPassesCsrf() {
-        // Obtain a token + the cookie it was minted into, then replay both on the POST. CSRF now
-        // passes; the request is unauthenticated so the entry point returns 401 (NOT the CSRF 403).
-        FluxExchangeResultHolder safe = exchangeForCsrf();
-        String token = safe.token();
-        String cookieHeader = XSRF_COOKIE + "=" + token;
+        // Replay a matching token (cookie + header). CSRF passes; the request is unauthenticated so the
+        // entry point returns 401 (NOT the CSRF 403).
+        String token = TestAuthUtils.fetchCsrfToken(webTestClient);
 
         webTestClient
             .post()
             .uri("/auth/logout")
-            .header(HttpHeaders.COOKIE, cookieHeader)
-            .header(XSRF_HEADER, token)
+            .headers(TestAuthUtils.withCsrf(token))
             .exchange()
             .expectStatus()
             .isUnauthorized();
@@ -64,8 +60,7 @@ class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void cookieStylePostWithMismatchedCsrfTokenIsRejected() {
-        FluxExchangeResultHolder safe = exchangeForCsrf();
-        String token = safe.token();
+        String token = TestAuthUtils.fetchCsrfToken(webTestClient);
 
         webTestClient
             .post()
@@ -75,30 +70,5 @@ class CsrfProtectionIntegrationTest extends BaseIntegrationTest {
             .exchange()
             .expectStatus()
             .isForbidden();
-    }
-
-    private record FluxExchangeResultHolder(String token) {}
-
-    private FluxExchangeResultHolder exchangeForCsrf() {
-        return new FluxExchangeResultHolder(fetchCsrfToken());
-    }
-
-    /**
-     * Performs a safe GET on a public resource-server-chain endpoint and extracts the XSRF-TOKEN
-     * cookie value the CsrfCookieFilter wrote. {@code /identity-providers} is permitAll and lives on
-     * the resource-server chain (where CSRF + the cookie filter are configured), unlike {@code
-     * /auth/error} which is owned by the oauth2Login chain.
-     */
-    private String fetchCsrfToken() {
-        var result = webTestClient
-            .get()
-            .uri("/identity-providers")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .returnResult(Void.class);
-        List<ResponseCookie> cookies = result.getResponseCookies().get(XSRF_COOKIE);
-        assertThat(cookies).as("XSRF-TOKEN cookie must be issued").isNotEmpty();
-        return cookies.get(0).getValue();
     }
 }
