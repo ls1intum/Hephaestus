@@ -1,4 +1,5 @@
 import { ScrollText } from "lucide-react";
+import { useState } from "react";
 import type { AuthEventView } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,15 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { AuditEventDetailDialog } from "./AuditEventDetailDialog";
+import {
+	type AuditSeverity,
+	accountLabel,
+	eventLabel,
+	eventSeverity,
+	formatTimestamp,
+	humanizeDetails,
+} from "./auditFormat";
 
 export interface AdminAuditTableProps {
 	events: AuthEventView[];
@@ -20,20 +30,21 @@ export interface AdminAuditTableProps {
 	hasNextPage: boolean;
 	isFetchingNextPage: boolean;
 	onLoadMore: () => void;
+	/** Drill-downs: filter the log to a subject account / to an actor's impersonation session. */
+	onFilterAccount?: (id: number) => void;
+	onFilterActor?: (id: number) => void;
 }
 
-// Date fields are typed `Date` by the generated client but arrive as ISO strings at runtime (the
-// response transformers aren't wired into the SDK calls) — coerce defensively, matching the
-// established pattern in SessionsSection / LinkedAccountsSection.
-function formatInstant(value: AuthEventView["occurredAt"]): string {
-	const date = value instanceof Date ? value : new Date(value);
-	return date.toLocaleString();
-}
+const SEVERITY_DOT: Record<AuditSeverity, string> = {
+	error: "bg-destructive",
+	warning: "bg-amber-500",
+	info: "bg-muted-foreground/40",
+};
 
 /**
- * Read-only table of auth audit events (newest first). Pure/presentational: all data + paging come
- * from the route. The actor column is the impersonator (RFC 8693 `act`) when the event happened under
- * impersonation, so every impersonated action stays attributable.
+ * Read-only table of auth audit events (newest first). The actor column attributes impersonated
+ * actions to the operator (RFC 8693 `act`); accounts resolve to names (email on hover) and fall back to
+ * `#id` for deleted accounts. Click an account/actor to filter; open a row for the full forensic record.
  */
 export function AdminAuditTable({
 	events,
@@ -43,7 +54,11 @@ export function AdminAuditTable({
 	hasNextPage,
 	isFetchingNextPage,
 	onLoadMore,
+	onFilterAccount,
+	onFilterActor,
 }: AdminAuditTableProps) {
+	const [detail, setDetail] = useState<AuthEventView | null>(null);
+
 	if (isError) {
 		return (
 			<p className="py-8 text-center text-sm text-destructive">
@@ -83,52 +98,114 @@ export function AdminAuditTable({
 							<TableHead scope="col">Account</TableHead>
 							<TableHead scope="col">Actor</TableHead>
 							<TableHead scope="col">IP</TableHead>
-							<TableHead scope="col">Details</TableHead>
+							<TableHead scope="col">Summary</TableHead>
+							<TableHead scope="col">
+								<span className="sr-only">Details</span>
+							</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{events.map((e) => (
-							<TableRow key={e.id}>
-								<TableCell className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-									{formatInstant(e.occurredAt)}
-								</TableCell>
-								<TableCell>
-									<Badge variant="outline" className="font-mono text-xs">
-										{e.eventType}
-									</Badge>
-								</TableCell>
-								<TableCell>
-									<Badge variant={e.result === "FAILURE" ? "destructive" : "secondary"}>
-										{e.result}
-									</Badge>
-								</TableCell>
-								<TableCell className="tabular-nums">{e.accountId ?? "—"}</TableCell>
-								<TableCell className="tabular-nums">
-									{e.actingAccountId != null ? (
-										<Badge variant="outline" className="text-xs">
-											via #{e.actingAccountId}
+						{events.map((e) => {
+							const ts = formatTimestamp(e.occurredAt);
+							const severity = eventSeverity(e.eventType, e.result);
+							const account = accountLabel(e.account, e.accountId);
+							const actor = accountLabel(e.actor, e.actingAccountId);
+							const summary =
+								e.result === "FAILURE" && e.failureReason
+									? e.failureReason
+									: humanizeDetails(e.details);
+							return (
+								<TableRow key={e.id}>
+									<TableCell
+										className="whitespace-nowrap text-sm tabular-nums text-muted-foreground"
+										title={ts.isoUtc}
+									>
+										{ts.local}
+									</TableCell>
+									<TableCell>
+										<span className="flex items-center gap-2" title={e.eventType}>
+											<span
+												className={`size-1.5 shrink-0 rounded-full ${SEVERITY_DOT[severity]}`}
+												aria-hidden
+											/>
+											<span className="text-sm">{eventLabel(e.eventType)}</span>
+										</span>
+									</TableCell>
+									<TableCell>
+										<Badge variant={e.result === "FAILURE" ? "destructive" : "secondary"}>
+											{e.result}
 										</Badge>
-									) : (
-										"—"
-									)}
-								</TableCell>
-								<TableCell className="font-mono text-xs text-muted-foreground">
-									{e.ipAddress ?? "—"}
-								</TableCell>
-								<TableCell className="max-w-xs">
-									{e.details ? (
-										<code
-											className="block truncate text-xs text-muted-foreground"
-											title={e.details}
+									</TableCell>
+									<TableCell className="max-w-[12rem] truncate">
+										{account ? (
+											onFilterAccount && e.accountId != null ? (
+												<button
+													type="button"
+													className="truncate text-left hover:underline"
+													title={e.account?.email ?? `Filter by ${account}`}
+													onClick={() => onFilterAccount(e.accountId as number)}
+												>
+													{account}
+												</button>
+											) : (
+												<span title={e.account?.email ?? undefined}>{account}</span>
+											)
+										) : (
+											"—"
+										)}
+									</TableCell>
+									<TableCell className="max-w-[12rem] truncate">
+										{actor ? (
+											<span className="text-muted-foreground">
+												via{" "}
+												{onFilterActor && e.actingAccountId != null ? (
+													<button
+														type="button"
+														className="hover:underline"
+														title={e.actor?.email ?? `Filter by ${actor}`}
+														onClick={() => onFilterActor(e.actingAccountId as number)}
+													>
+														{actor}
+													</button>
+												) : (
+													actor
+												)}
+											</span>
+										) : (
+											"—"
+										)}
+									</TableCell>
+									<TableCell className="font-mono text-xs text-muted-foreground">
+										{e.ipAddress ?? "—"}
+									</TableCell>
+									<TableCell className="max-w-xs">
+										{summary ? (
+											<span
+												className={`block truncate text-xs ${
+													e.result === "FAILURE" ? "text-destructive" : "text-muted-foreground"
+												}`}
+												title={summary}
+											>
+												{summary}
+											</span>
+										) : (
+											"—"
+										)}
+									</TableCell>
+									<TableCell className="text-right">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											aria-label={`View details of ${eventLabel(e.eventType)} event`}
+											onClick={() => setDetail(e)}
 										>
-											{e.details}
-										</code>
-									) : (
-										"—"
-									)}
-								</TableCell>
-							</TableRow>
-						))}
+											Details
+										</Button>
+									</TableCell>
+								</TableRow>
+							);
+						})}
 					</TableBody>
 				</Table>
 			</div>
@@ -141,6 +218,12 @@ export function AdminAuditTable({
 					</Button>
 				</div>
 			)}
+
+			<AuditEventDetailDialog
+				event={detail}
+				open={detail !== null}
+				onOpenChange={(open) => !open && setDetail(null)}
+			/>
 		</div>
 	);
 }

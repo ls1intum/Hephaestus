@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect, screen, userEvent, within } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "./AdminAuditTable";
 
@@ -11,8 +11,12 @@ const events: AuthEventView[] = [
 		result: "SUCCESS",
 		accountId: 42,
 		actingAccountId: 7,
+		account: { id: 42, displayName: "Ada Lovelace", email: "ada@example.com" },
+		actor: { id: 7, displayName: "Grace Hopper", email: "grace@example.com" },
 		details: '{"from":"USER","to":"APP_ADMIN"}',
+		workspaceId: 12,
 		ipAddress: "203.0.113.7",
+		userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/124.0",
 	},
 	{
 		id: 2,
@@ -21,6 +25,9 @@ const events: AuthEventView[] = [
 		result: "SUCCESS",
 		accountId: 42,
 		actingAccountId: 7,
+		account: { id: 42, displayName: "Ada Lovelace", email: "ada@example.com" },
+		actor: { id: 7, displayName: "Grace Hopper", email: "grace@example.com" },
+		details: '{"reason":"Investigating a failed sync reported by the student"}',
 		ipAddress: "203.0.113.7",
 	},
 	{
@@ -29,7 +36,9 @@ const events: AuthEventView[] = [
 		eventType: "LOGIN_FAILED",
 		result: "FAILURE",
 		accountId: 99,
+		failureReason: "Email not verified on the GitLab account",
 		ipAddress: "198.51.100.4",
+		userAgent: "curl/8.4.0",
 	},
 ];
 
@@ -51,15 +60,49 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Newest-first rows; impersonated actions show the operator in the Actor column. */
+/** Newest-first rows: accounts resolve to names, impersonation is attributed, failures show why. */
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(canvas.getByText("APP_ROLE_CHANGED")).toBeInTheDocument();
-		// The impersonation event attributes the operator (act claim).
-		await expect(canvas.getAllByText(/via #7/).length).toBeGreaterThan(0);
-		// A failure renders with the destructive result badge.
+		// Accounts render as human names, not numeric ids.
+		await expect(canvas.getByText("Ada Lovelace")).toBeInTheDocument();
+		// Impersonated actions attribute the operator ("via Grace Hopper").
+		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
+		// A failure shows its reason (not just a red badge), plus the destructive result badge.
+		await expect(canvas.getByText("Email not verified on the GitLab account")).toBeInTheDocument();
 		await expect(canvas.getByText("FAILURE")).toBeInTheDocument();
+	},
+};
+
+/** Deleted accounts (no resolved identity) fall back to `#id` so the row stays attributable. */
+export const DeletedAccountFallback: Story = {
+	args: {
+		events: [
+			{
+				id: 5,
+				occurredAt: new Date("2026-06-02T11:00:00Z"),
+				eventType: "ACCOUNT_DELETED",
+				result: "SUCCESS",
+				accountId: 1234,
+				ipAddress: "203.0.113.9",
+			},
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("#1234")).toBeInTheDocument();
+	},
+};
+
+/** Opening a row reveals the full forensic record (user agent, workspace, pretty-printed details). */
+export const RowDetail: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const buttons = canvas.getAllByRole("button", { name: /View details/i });
+		await userEvent.click(buttons[0]);
+		// The dialog renders in a portal → query the document, not just the canvas.
+		await expect(await screen.findByText("User agent")).toBeInTheDocument();
+		await expect(screen.getByText("Workspace")).toBeInTheDocument();
 	},
 };
 
@@ -69,6 +112,15 @@ export const EmptyWithFilter: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(canvas.getByText("No matching audit events.")).toBeInTheDocument();
+	},
+};
+
+/** Error state when the page fails to load. */
+export const ErrorState: Story = {
+	args: { events: [], isError: true },
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText(/Failed to load audit events/i)).toBeInTheDocument();
 	},
 };
 

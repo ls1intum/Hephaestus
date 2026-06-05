@@ -155,6 +155,12 @@ paths:
           type: integer
           format: int64
       - in: query
+        name: actingAccountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
         name: eventType
         required: false
         schema:
@@ -173,6 +179,26 @@ paths:
           - EXPORT_REQUESTED
           - FEATURE_FLAG_CHANGED
           - APP_ROLE_CHANGED
+      - in: query
+        name: result
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCESS
+          - FAILURE
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           content:
@@ -3149,6 +3175,20 @@ paths:
       - Achievements
 components:
   schemas:
+    AccountRef:
+      type: object
+      description: A human-readable account identity. <code>displayName</code>/<code>email</code>
+        are null for deleted accounts.
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        id:
+          type: integer
+          format: int64
+      required:
+      - id
     Achievement:
       type: object
       description: Achievement with user-specific progress information
@@ -3520,12 +3560,16 @@ components:
       type: object
       description: "One audit row, flattened for the admin viewer."
       properties:
+        account:
+          $ref: "#/components/schemas/AccountRef"
         accountId:
           type: integer
           format: int64
         actingAccountId:
           type: integer
           format: int64
+        actor:
+          $ref: "#/components/schemas/AccountRef"
         details:
           type: string
         eventType:

@@ -10,6 +10,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,9 @@ public class AuthAuditController {
         this.authAuditService = authAuditService;
     }
 
+    /** A human-readable account identity. {@code displayName}/{@code email} are null for deleted accounts. */
+    public record AccountRefDTO(@NonNull Long id, @Nullable String displayName, @Nullable String email) {}
+
     /** One audit row, flattened for the admin viewer. */
     public record AuthEventViewDTO(
         @NonNull Long id,
@@ -45,6 +49,10 @@ public class AuthAuditController {
         @NonNull String result,
         @Nullable Long accountId,
         @Nullable Long actingAccountId,
+        // Resolved identities for accountId / actingAccountId (null when the account no longer exists);
+        // the raw ids stay for back-compat and so deleted-account rows are still attributable by id.
+        @Nullable AccountRefDTO account,
+        @Nullable AccountRefDTO actor,
         @Nullable String failureReason,
         @Nullable Long workspaceId,
         @Nullable String ipAddress,
@@ -58,19 +66,25 @@ public class AuthAuditController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "50") int size,
         @RequestParam(required = false) @Nullable Long accountId,
-        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType
+        @RequestParam(required = false) @Nullable Long actingAccountId,
+        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType,
+        @RequestParam(required = false) AuthEvent.@Nullable Result result,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
     ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         // The query carries its own ORDER BY occurred_at DESC; keep the Pageable sort empty.
         Pageable pageable = PageRequest.of(safePage, safeSize);
-        Page<AuthEventViewDTO> events = authAuditService
-            .list(accountId, eventType, pageable)
-            .map(AuthAuditController::toView);
+        AuthAuditService.AuditPage result0 = authAuditService.list(
+            new AuthAuditService.Filter(accountId, actingAccountId, eventType, result, from, to),
+            pageable
+        );
+        Page<AuthEventViewDTO> events = result0.events().map(e -> toView(e, result0.identities()));
         return ResponseEntity.ok(events);
     }
 
-    private static AuthEventViewDTO toView(AuthEvent e) {
+    private static AuthEventViewDTO toView(AuthEvent e, java.util.Map<Long, AuthAuditService.AccountRef> identities) {
         return new AuthEventViewDTO(
             e.getId().getId(),
             e.getId().getOccurredAt(),
@@ -78,11 +92,17 @@ public class AuthAuditController {
             e.getResult().name(),
             e.getAccountId(),
             e.getActingAccountId(),
+            toRef(AuthAuditService.refOf(e.getAccountId(), identities)),
+            toRef(AuthAuditService.refOf(e.getActingAccountId(), identities)),
             e.getFailureReason(),
             e.getWorkspaceId(),
             e.getIpInet(),
             e.getUserAgent(),
             e.getDetails()
         );
+    }
+
+    private static @Nullable AccountRefDTO toRef(AuthAuditService.@Nullable AccountRef ref) {
+        return ref == null ? null : new AccountRefDTO(ref.id(), ref.displayName(), ref.email());
     }
 }

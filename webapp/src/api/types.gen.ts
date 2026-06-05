@@ -1299,11 +1299,22 @@ export type PageAuthEventView = {
 };
 
 /**
+ * A human-readable account identity. <code>displayName</code>/<code>email</code> are null for deleted accounts.
+ */
+export type AccountRef = {
+    displayName?: string;
+    email?: string;
+    id: number;
+};
+
+/**
  * One audit row, flattened for the admin viewer.
  */
 export type AuthEventView = {
+    account?: AccountRef;
     accountId?: number;
     actingAccountId?: number;
+    actor?: AccountRef;
     details?: string;
     eventType: string;
     failureReason?: string;
@@ -2323,7 +2334,11 @@ export type AdminListAuthEventsData = {
         page?: number;
         size?: number;
         accountId?: number;
+        actingAccountId?: number;
         eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'FEATURE_FLAG_CHANGED' | 'APP_ROLE_CHANGED';
+        result?: 'SUCCESS' | 'FAILURE';
+        from?: Date;
+        to?: Date;
     };
     url: '/admin/audit';
 };

@@ -1,10 +1,13 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ScrollText } from "lucide-react";
+import { ScrollText, X } from "lucide-react";
 import { useState } from "react";
 import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
 import type { AuthEventView, PageAuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
 	Select,
@@ -35,16 +38,43 @@ const EVENT_TYPES = [
 ] as const;
 
 type EventTypeFilter = (typeof EVENT_TYPES)[number];
+type ResultFilter = "SUCCESS" | "FAILURE";
 
 export const Route = createFileRoute("/_authenticated/admin/audit")({
 	component: AdminAuditPage,
 });
 
+// The generated client types `from`/`to` as `Date`, but its query serializer treats a Date as a
+// deepObject (mangled on the wire); the server expects an ISO-8601 instant (@DateTimeFormat). So we
+// build the ISO string the server wants and cast to satisfy the generated type. `to` is end-of-day so
+// the picked day is inclusive (the server predicate is `occurred_at < :to`).
+function dayStartIso(date: string): Date {
+	return `${date}T00:00:00.000Z` as unknown as Date;
+}
+function dayEndIso(date: string): Date {
+	return `${date}T23:59:59.999Z` as unknown as Date;
+}
+
 function AdminAuditPage() {
 	const [eventType, setEventType] = useState<EventTypeFilter | undefined>(undefined);
+	const [result, setResult] = useState<ResultFilter | undefined>(undefined);
+	const [from, setFrom] = useState("");
+	const [to, setTo] = useState("");
+	const [accountId, setAccountId] = useState<number | undefined>(undefined);
+	const [actingAccountId, setActingAccountId] = useState<number | undefined>(undefined);
 
 	const listQuery = useInfiniteQuery({
-		...adminListAuthEventsInfiniteOptions({ query: { size: PAGE_SIZE, eventType } }),
+		...adminListAuthEventsInfiniteOptions({
+			query: {
+				size: PAGE_SIZE,
+				eventType,
+				result,
+				from: from ? dayStartIso(from) : undefined,
+				to: to ? dayEndIso(to) : undefined,
+				accountId,
+				actingAccountId,
+			},
+		}),
 		initialPageParam: 0,
 		// The endpoint returns a Spring Page; advance by page number until the last page.
 		getNextPageParam: (lastPage: PageAuthEventView) =>
@@ -52,6 +82,23 @@ function AdminAuditPage() {
 	});
 
 	const events: AuthEventView[] = listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [];
+	const total = listQuery.data?.pages[0]?.totalElements;
+	const hasFilter =
+		eventType !== undefined ||
+		result !== undefined ||
+		from !== "" ||
+		to !== "" ||
+		accountId !== undefined ||
+		actingAccountId !== undefined;
+
+	const clearAll = () => {
+		setEventType(undefined);
+		setResult(undefined);
+		setFrom("");
+		setTo("");
+		setAccountId(undefined);
+		setActingAccountId(undefined);
+	};
 
 	return (
 		<div className="mx-auto w-full max-w-6xl space-y-6 py-6">
@@ -62,42 +109,138 @@ function AdminAuditPage() {
 				</div>
 				<p className="text-sm text-muted-foreground">
 					Read-only record of authentication and admin events (logins, impersonation, role changes,
-					deletions). Append-only — entries can't be edited or removed.
+					deletions). Append-only — entries can't be edited or removed. Times are shown in your
+					local timezone (hover for the exact UTC instant).
 				</p>
 			</header>
 
-			<div className="flex w-full flex-col gap-2 sm:max-w-xs">
-				<Label htmlFor="audit-event-type" className="text-sm">
-					Event type
-				</Label>
-				<Select
-					value={eventType ?? ALL}
-					onValueChange={(value) =>
-						setEventType(value === ALL ? undefined : (value as EventTypeFilter))
-					}
-				>
-					<SelectTrigger id="audit-event-type">
-						<SelectValue placeholder="All events" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value={ALL}>All events</SelectItem>
-						{EVENT_TYPES.map((type) => (
-							<SelectItem key={type} value={type}>
-								{type}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+			<div className="flex flex-wrap items-end gap-3">
+				<div className="flex w-full flex-col gap-1.5 sm:w-48">
+					<Label htmlFor="audit-event-type" className="text-sm">
+						Event type
+					</Label>
+					<Select
+						value={eventType ?? ALL}
+						onValueChange={(value) =>
+							setEventType(value === ALL ? undefined : (value as EventTypeFilter))
+						}
+					>
+						<SelectTrigger id="audit-event-type">
+							<SelectValue placeholder="All events" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value={ALL}>All events</SelectItem>
+							{EVENT_TYPES.map((type) => (
+								<SelectItem key={type} value={type}>
+									{type}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</div>
+
+				<div className="flex w-full flex-col gap-1.5 sm:w-40">
+					<Label htmlFor="audit-result" className="text-sm">
+						Outcome
+					</Label>
+					<Select
+						value={result ?? ALL}
+						onValueChange={(value) =>
+							setResult(value === ALL ? undefined : (value as ResultFilter))
+						}
+					>
+						<SelectTrigger id="audit-result">
+							<SelectValue placeholder="All outcomes" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value={ALL}>All outcomes</SelectItem>
+							<SelectItem value="SUCCESS">Success</SelectItem>
+							<SelectItem value="FAILURE">Failure</SelectItem>
+						</SelectContent>
+					</Select>
+				</div>
+
+				<div className="flex flex-col gap-1.5">
+					<Label htmlFor="audit-from" className="text-sm">
+						From
+					</Label>
+					<Input
+						id="audit-from"
+						type="date"
+						value={from}
+						max={to || undefined}
+						onChange={(e) => setFrom(e.target.value)}
+						className="w-40"
+					/>
+				</div>
+
+				<div className="flex flex-col gap-1.5">
+					<Label htmlFor="audit-to" className="text-sm">
+						To
+					</Label>
+					<Input
+						id="audit-to"
+						type="date"
+						value={to}
+						min={from || undefined}
+						onChange={(e) => setTo(e.target.value)}
+						className="w-40"
+					/>
+				</div>
+
+				{hasFilter && (
+					<Button variant="ghost" onClick={clearAll} className="mb-0.5">
+						Clear filters
+					</Button>
+				)}
 			</div>
+
+			{(accountId !== undefined || actingAccountId !== undefined) && (
+				<div className="flex flex-wrap items-center gap-2">
+					{accountId !== undefined && (
+						<Badge variant="secondary" className="gap-1">
+							Account #{accountId}
+							<button
+								type="button"
+								aria-label="Clear account filter"
+								onClick={() => setAccountId(undefined)}
+							>
+								<X className="size-3" aria-hidden />
+							</button>
+						</Badge>
+					)}
+					{actingAccountId !== undefined && (
+						<Badge variant="secondary" className="gap-1">
+							Actor #{actingAccountId}
+							<button
+								type="button"
+								aria-label="Clear actor filter"
+								onClick={() => setActingAccountId(undefined)}
+							>
+								<X className="size-3" aria-hidden />
+							</button>
+						</Badge>
+					)}
+				</div>
+			)}
+
+			{total !== undefined && total > 0 && (
+				<p className="text-xs text-muted-foreground">
+					{total.toLocaleString()} event{total === 1 ? "" : "s"}
+					{hasFilter ? " match the current filters" : ""}.
+				</p>
+			)}
 
 			<AdminAuditTable
 				events={events}
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
-				hasFilter={eventType !== undefined}
+				hasFilter={hasFilter}
 				hasNextPage={Boolean(listQuery.hasNextPage)}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}
+				onFilterAccount={setAccountId}
+				onFilterActor={setActingAccountId}
 			/>
 		</div>
 	);

@@ -143,6 +143,123 @@ class AuthAuditControllerIntegrationTest {
             .isEqualTo("APP_ROLE_CHANGED");
     }
 
+    @Test
+    void resolvesAccountAndActorToHumanIdentities() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        Account target = persist("Target User", Account.AppRole.USER);
+        seed(
+            1L,
+            AuthEvent.EventType.APP_ROLE_CHANGED,
+            Instant.parse("2026-06-02T10:00:00Z"),
+            target.getId(),
+            admin.getId()
+        );
+
+        webTestClient
+            .get()
+            .uri("/admin/audit")
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.content[0].account.displayName")
+            .isEqualTo("Target User")
+            .jsonPath("$.content[0].actor.displayName")
+            .isEqualTo("Keeper Admin");
+    }
+
+    @Test
+    void resultFilterNarrowsToFailuresWithReason() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+        seedFailure(2L, AuthEvent.EventType.LOGIN_FAILED, Instant.parse("2026-06-02T10:00:00Z"), "Email not verified");
+
+        webTestClient
+            .get()
+            .uri(builder -> builder.path("/admin/audit").queryParam("result", "FAILURE").build())
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.totalElements")
+            .isEqualTo(1)
+            .jsonPath("$.content[0].result")
+            .isEqualTo("FAILURE")
+            .jsonPath("$.content[0].failureReason")
+            .isEqualTo("Email not verified");
+    }
+
+    @Test
+    void timeRangeFilterNarrowsToWindow() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+        seed(2L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-05T10:00:00Z"), admin.getId(), null);
+
+        webTestClient
+            .get()
+            .uri(builder ->
+                builder
+                    .path("/admin/audit")
+                    .queryParam("from", "2026-06-04T00:00:00Z")
+                    .queryParam("to", "2026-06-06T00:00:00Z")
+                    .build()
+            )
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.totalElements")
+            .isEqualTo(1)
+            .jsonPath("$.content[0].occurredAt")
+            .value(v -> org.assertj.core.api.Assertions.assertThat((String) v).startsWith("2026-06-05"));
+    }
+
+    @Test
+    void actorFilterReconstructsImpersonationSession() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        Account target = persist("Target", Account.AppRole.USER);
+        // One self-login (no actor) + one acted-by-admin event.
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), target.getId(), null);
+        seed(
+            2L,
+            AuthEvent.EventType.IMPERSONATION_BEGIN,
+            Instant.parse("2026-06-02T10:00:00Z"),
+            target.getId(),
+            admin.getId()
+        );
+
+        webTestClient
+            .get()
+            .uri(builder -> builder.path("/admin/audit").queryParam("actingAccountId", admin.getId()).build())
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.totalElements")
+            .isEqualTo(1)
+            .jsonPath("$.content[0].eventType")
+            .isEqualTo("IMPERSONATION_BEGIN");
+    }
+
+    private void seedFailure(long id, AuthEvent.EventType type, Instant occurredAt, String failureReason) {
+        AuthEventData data = new AuthEventData(
+            type,
+            AuthEvent.Result.FAILURE,
+            null,
+            null,
+            failureReason,
+            null,
+            null,
+            null,
+            null
+        );
+        authEventRepository.save(AuthEvent.create(data, id, occurredAt, "127.0.0.1", "test-agent"));
+    }
+
     private void seed(long id, AuthEvent.EventType type, Instant occurredAt, Long accountId, Long actingAccountId) {
         AuthEventData data = new AuthEventData(
             type,
