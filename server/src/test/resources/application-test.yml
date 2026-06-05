@@ -73,6 +73,9 @@ hephaestus:
         encryption-key: test-encryption-key-32-bytes-aes
     workspace:
         init-default: false # Disable PAT workspace bootstrap
+        # Tests exercise creation mechanics as a regular user; the ADMIN_ONLY gate is covered
+        # explicitly by WorkspaceCreationPolicyIntegrationTest via a property override.
+        creation-policy: SELF_SERVICE
     # OAuth state HMAC secret + webhook secret — required by HmacOAuthStateService
     # at boot. Without these the integration framework can't construct.
     integration:

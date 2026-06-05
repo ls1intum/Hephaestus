@@ -18,6 +18,9 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,10 +41,13 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @PreAuthorize("isAuthenticated()")
 public class WorkspaceRegistryController {
 
+    private static final String APP_ADMIN_AUTHORITY = "app_admin";
+
     private final WorkspaceService workspaceService;
     private final WorkspaceQueryService workspaceQueryService;
     private final WorkspaceProvisioningService workspaceProvisioningService;
     private final FeatureFlagService featureFlagService;
+    private final WorkspaceProperties workspaceProperties;
 
     @GetMapping("/providers")
     @Operation(
@@ -64,11 +70,22 @@ public class WorkspaceRegistryController {
     public ResponseEntity<WorkspaceDTO> createWorkspace(
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
+        // Actor gate (configurable). ADMIN_ONLY (default) restricts creation to instance admins; flip to
+        // SELF_SERVICE to let any authenticated user create a workspace. Orthogonal to per-provider
+        // availability (the GitLab feature flag below).
+        if (workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY && !isAppAdmin()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                "Workspace creation is restricted to instance admins on this deployment"
+            );
+        }
+
         if (
             createWorkspaceRequest.kind() == IntegrationKind.GITLAB &&
             !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
         ) {
-            throw new org.springframework.security.access.AccessDeniedException(
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
                 "GitLab workspace creation is not enabled"
             );
         }
@@ -87,6 +104,19 @@ public class WorkspaceRegistryController {
             .toUri();
 
         return ResponseEntity.created(location).body(workspaceQueryService.toWorkspaceDTO(workspace));
+    }
+
+    private static boolean isAppAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            if (APP_ADMIN_AUTHORITY.equals(authority.getAuthority())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @GetMapping
