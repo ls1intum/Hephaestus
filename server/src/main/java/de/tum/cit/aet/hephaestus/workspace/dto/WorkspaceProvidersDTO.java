@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.workspace.dto;
 
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "Available workspace creation providers and their configuration")
 public record WorkspaceProvidersDTO(
     @Schema(description = "GitHub workspace provider config, null if not available") GitHubProviderDTO github,
-    @Schema(description = "GitLab workspace provider config, null if not available") GitLabProviderDTO gitlab
+    @Schema(description = "GitLab workspace provider config, null if not available") GitLabProviderDTO gitlab,
+    @Schema(description = "Who may create workspaces — ADMIN_ONLY restricts creation to instance admins")
+    WorkspaceProperties.CreationPolicy creationPolicy
 ) {
     @Schema(description = "GitHub provider configuration")
     public record GitHubProviderDTO(

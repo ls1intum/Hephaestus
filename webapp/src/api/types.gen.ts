@@ -49,6 +49,10 @@ export type WorkspaceTeamRepositorySettings = {
  */
 export type WorkspaceProviders = {
     /**
+     * Who may create workspaces — ADMIN_ONLY restricts creation to instance admins
+     */
+    creationPolicy?: 'ADMIN_ONLY' | 'SELF_SERVICE';
+    /**
      * GitHub workspace provider config, null if not available
      */
     github?: GitHubProvider;

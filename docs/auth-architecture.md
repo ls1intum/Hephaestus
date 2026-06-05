@@ -27,9 +27,9 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
         │                                                                           
         ▼  302 to IdP                                                               
    ╔════════════════════════╗                                                       
-   ║ GitHub / gitlab.lrz.de ║  ← also: workspace-owned GitLab/GHE via Connection    
-   ╚════════════════════════╝     rows (kind=OIDC_LOGIN_*) resolved by              
-        │                          LoginClientRegistrationRepository (composite)    
+   ║ GitHub / gitlab.lrz.de ║  ← instance login_provider rows (one per SCM          
+   ╚════════════════════════╝     instance) resolved by                             
+        │                          LoginProviderClientRegistrationRepository         
         ▼  302 /login/oauth2/code/gitlab-lrz?code=…                                 
    ┌──────────────────────────────────────────┐                                    
    │ HephaestusAuthSuccessHandler              │                                    
@@ -71,11 +71,13 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 - **Account lookup is `(provider, subject)`, never email.** This is the structural defence
   against the nOAuth (Descope 2023) account-takeover class. `IdentityLinkRepository` has no
   `findByEmail`; ArchUnit forbids any email-based auth lookup.
-- **Workspace-scoped IdPs ride PR #1306's `Connection`.** A workspace's self-hosted GitLab /
-  GHE OAuth app is a `Connection` row of `kind=OIDC_LOGIN_*` (family `IDENTITY`). The client
-  secret is sealed with the same per-row AAD-bound AES-GCM (`CredentialBundleConverter`,
-  ADR 0014) as every other tenant secret. An `IssuerDiscoveryProbe` (SSRF-protected) validates
-  the issuer URL before the secret is persisted.
+- **Login providers are instance-scoped (Stage B-2; supersedes the per-workspace OIDC model).**
+  A sign-in option — GitHub, GitLab.com, or a self-hosted GitLab — is a row in the instance
+  `login_provider` table (`core.auth.provider`), **one per SCM instance** (`UNIQUE(type, base_url)`),
+  env-seeded on first boot and managed at runtime by an instance admin. The client secret is sealed
+  by `EncryptedStringConverter` (AES-256-GCM). This is **authentication** only; a workspace's SCM
+  data source is a separate per-workspace `Connection` + group token/PAT. (The earlier design rode
+  `Connection` rows of `kind=OIDC_LOGIN_*`; that was removed — see ADR 0017's Stage B-2 update.)
 - **Impersonation = `act`-claim reissuance.** No `SwitchUserFilter` (session-bound; we have
   no session). An app admin mints a target-scoped JWT carrying `act={operatorId}` (RFC 8693).
   `ImpersonationGuard` makes such sessions read-only unless the operator sends an explicit
@@ -104,10 +106,12 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 | `config/` | `AuthJwtConfig`, `AuthSecurityConfig` |
 | `spi/` | `AccountRepository` (cross-module handle) |
 
-The OIDC-login adapters (`LoginClientRegistrationRepository`, `IssuerDiscoveryProbe`,
-OIDC-login strategies) live in `integration.identity.connect`, reached via the integration SPI;
-`ImpersonationGuard` lives in `core.security`.
+Login `ClientRegistration`s are built from the `login_provider` store by
+`LoginProviderClientRegistrationRepository` in `core.auth.provider` (it depends only on the store +
+Spring Security — integration may not reach into `core.auth.provider`). The integration side keeps
+`RegistrationToGitProviderResolver` (maps a registration to its `GitProvider` row via the
+`GitProviderRegistry` SPI) and the reusable `IssuerDiscoveryProbe`; `ImpersonationGuard` lives in
+`core.security`.
 
 Boundaries: `workspace` / `gitprovider` / `notification` depend on `core.auth` (read model
-+ events), never the reverse. `core.auth` reads workspace OIDC `Connection` rows through the
-integration SPI only. ArchUnit forbids any `org.keycloak.*` or `com.auth0.jwt.*` import.
++ events), never the reverse. ArchUnit forbids any `org.keycloak.*` or `com.auth0.jwt.*` import.

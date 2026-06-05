@@ -349,7 +349,7 @@ function GitLabWizardPage() {
 
 			<div className="mt-6" role="region" aria-labelledby="wizard-heading">
 				<WizardContext.Provider value={wizardContextValue}>
-					{state.step === 1 && <ConnectGitLabStep />}
+					{state.step === 1 && <ConnectGitLabStep instances={gitlabProviders} />}
 					{state.step === 2 && <SelectGroupStep />}
 					{state.step === 3 && <ConfigureWorkspaceStep />}
 				</WizardContext.Provider>

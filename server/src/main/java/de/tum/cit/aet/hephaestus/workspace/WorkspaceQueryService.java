@@ -53,6 +53,7 @@ public class WorkspaceQueryService {
      * delegates the "is this provider exposable to the wizard?" decision back to the adapter.
      */
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
+    private final WorkspaceProperties workspaceProperties;
 
     public WorkspaceQueryService(
         WorkspaceRepository workspaceRepository,
@@ -60,6 +61,7 @@ public class WorkspaceQueryService {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         UserRepository userRepository,
         ConnectionService connectionService,
+        WorkspaceProperties workspaceProperties,
         List<WorkspaceProviderAvailability> providerAvailabilityList
     ) {
         this.workspaceRepository = workspaceRepository;
@@ -67,6 +69,7 @@ public class WorkspaceQueryService {
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.userRepository = userRepository;
         this.connectionService = connectionService;
+        this.workspaceProperties = workspaceProperties;
         Map<IntegrationKind, WorkspaceProviderAvailability> map = new EnumMap<>(IntegrationKind.class);
         for (WorkspaceProviderAvailability a : providerAvailabilityList) {
             map.put(a.kind(), a);
@@ -116,7 +119,7 @@ public class WorkspaceQueryService {
                 ? glAvail.hintUrl().map(WorkspaceProvidersDTO.GitLabProviderDTO::new).orElse(null)
                 : null;
 
-        return new WorkspaceProvidersDTO(github, gitlab);
+        return new WorkspaceProvidersDTO(github, gitlab, workspaceProperties.creationPolicy());
     }
 
     /**

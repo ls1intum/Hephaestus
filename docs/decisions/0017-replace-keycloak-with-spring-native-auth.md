@@ -6,6 +6,17 @@
 **Supersedes (Stage A):** [ADR 0016](0016-unified-identity-keycloak-as-truth.md)
 **Builds on:** [ADR 0010](0010-outbound-oauth-state-handrolled.md), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md), [ADR 0015](0015-unified-integration-framework.md)
 
+> **Update (Stage B-2, post-merge).** The login model below was revised during PR review. Login no
+> longer rides per-workspace `Connection` rows of `kind=OIDC_LOGIN_*`; those kinds, the `IDENTITY`
+> family, and `OidcLoginConfig` were **removed**. Sign-in is now driven by an **instance-scoped
+> `login_provider` table** (`core.auth.provider`) — one OAuth app **per SCM instance** (a
+> `UNIQUE(type, base_url)` constraint enforces it), env-seeded on first boot and managed at runtime by
+> an instance admin (`/admin/login-providers`). This cleanly separates **authentication** (instance
+> login providers) from a **workspace's SCM data source** (a per-workspace `Connection` + group
+> token/PAT) — mirroring how tools like CodeRabbit wire self-hosted GitLab. Workspace creation is
+> additionally gated by `hephaestus.workspace.creation-policy` (`ADMIN_ONLY` default | `SELF_SERVICE`).
+> Read the `kind=OIDC_LOGIN_*` / `OidcLoginConfig` references below as historical.
+
 ## Context
 
 Keycloak 26 currently sits in the `server/compose.yaml` as a federating IdP between Hephaestus and the upstream identity providers we actually use (GitHub.com, gitlab.lrz.de). Of the ~30 Keycloak features available, the codebase uses five: federated login via `oauth2Login`-equivalent flows, two protocol mappers (`github_id`, `gitlab_id`), two realm roles (`admin`, `mentor_access`), one identity-link / unlink flow (`kc_action=idp_link`), and the admin client for ~5 SDK calls. We pay for it with one extra container in compose, a parallel concept of "user" between Keycloak and our DB, dev-loop cost, realm-JSON drift, and the `keycloak-admin-client` dependency in the server pom + `keycloak-js` in the webapp.

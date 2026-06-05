@@ -47,6 +47,7 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             repositoryToMonitorRepository,
             userRepository,
             connectionService,
+            new WorkspaceProperties(false, null, false, null, WorkspaceProperties.CreationPolicy.ADMIN_ONLY),
             List.of()
         );
 
@@ -74,6 +75,7 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
             repositoryToMonitorRepository,
             userRepository,
             connectionService,
+            new WorkspaceProperties(false, null, false, null, WorkspaceProperties.CreationPolicy.ADMIN_ONLY),
             List.of()
         );
 

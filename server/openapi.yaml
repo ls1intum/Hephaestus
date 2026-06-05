@@ -6066,6 +6066,13 @@ components:
       type: object
       description: Available workspace creation providers and their configuration
       properties:
+        creationPolicy:
+          type: string
+          description: Who may create workspaces — ADMIN_ONLY restricts creation to
+            instance admins
+          enum:
+          - ADMIN_ONLY
+          - SELF_SERVICE
         github:
           $ref: "#/components/schemas/GitHubProvider"
           description: "GitHub workspace provider config, null if not available"
