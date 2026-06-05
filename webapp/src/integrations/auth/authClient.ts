@@ -142,7 +142,7 @@ export function toUserProfile(user: CurrentUserView): UserProfile {
 	return {
 		id: String(user.id),
 		username: user.username ?? "",
-		firstName: firstName ?? name,
+		firstName,
 		lastName: rest.join(" "),
 		email: user.primaryEmail ?? "",
 		name,

@@ -9,6 +9,7 @@ import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +95,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
             JwtClaimNames.ISS,
             iss -> iss != null && iss.equals(properties.issuer().toString())
         );
-        OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<java.util.List<String>>(
+        OAuth2TokenValidator<Jwt> audience = new JwtClaimValidator<List<String>>(
             JwtClaimNames.AUD,
             aud -> aud != null && aud.contains(properties.audience())
         );
@@ -129,6 +130,8 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
             }
             return jwt;
         } catch (JwtException rethrow) {
+            // Let our own revokedException() (a JwtException) pass through unchanged; it must NOT fall
+            // into the RuntimeException handler below, which exists only to remap real DB failures.
             throw rethrow;
         } catch (RuntimeException dbError) {
             metrics.recordRevocationCheckFailed();

@@ -77,7 +77,9 @@ class AccountServiceTest extends BaseUnitTest {
         service.unlinkIdentity(1L, 10L);
 
         verify(identityLinkRepository).deleteByIdAndAccountId(10L, 1L);
-        verify(auditWriter).write(any());
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(auditWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.IDENTITY_UNLINKED);
     }
 
     @Test
@@ -138,8 +140,8 @@ class AccountServiceTest extends BaseUnitTest {
 
         assertThat(account.getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
         verify(accountRepository).save(account);
-        // The role change must be audited under the dedicated APP_ROLE_CHANGED type (not the generic
-        // FEATURE_FLAG_CHANGED) with the old→new transition, so it is queryable on event_type.
+        // Dedicated APP_ROLE_CHANGED type (not the generic FEATURE_FLAG_CHANGED) so role changes stay
+        // queryable on event_type.
         ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
         verify(auditWriter).write(event.capture());
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.APP_ROLE_CHANGED);
