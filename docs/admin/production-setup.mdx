@@ -15,7 +15,7 @@ The production stack consists of:
 - **Webhook server** (same Spring Boot artifact, `webhook` profile → NATS JetStream)
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
-- **Hephaestus-native auth** (Spring Security `oauth2Login` federating to GitHub + optional gitlab.lrz.de, issuing cookie-session JWTs — ADR 0017)
+- **Hephaestus-native auth** (Spring Security `oauth2Login` federating to GitHub + optional GitLab — gitlab.com or self-hosted — issuing cookie-session JWTs — ADR 0017)
 
 ## Environment variables
 
@@ -58,19 +58,22 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 
 | Variable | Purpose |
 | --- | --- |
-| `GITLAB_LRZ_OAUTH_CLIENT_ID` | gitlab.lrz.de OAuth application client ID (callback `https://<host>/api/login/oauth2/code/gitlab-lrz`) |
-| `GITLAB_LRZ_OAUTH_CLIENT_SECRET` | gitlab.lrz.de OAuth application client secret |
-| `GITLAB_DEFAULT_SERVER_URL` | Default GitLab instance for workspace creation / SCM sync (not auth) |
+| `GITLAB_OAUTH_CLIENT_ID` | GitLab OAuth application client ID (callback `https://<host>/api/login/oauth2/code/gitlab`) |
+| `GITLAB_OAUTH_CLIENT_SECRET` | GitLab OAuth application client secret |
+| `GITLAB_OAUTH_BASE_URL` | GitLab instance the login button federates to. Defaults to `https://gitlab.com`; set to your self-hosted instance (e.g. `https://gitlab.lrz.de`) |
+| `GITLAB_OAUTH_DISPLAY_NAME` | Login-button label (defaults to `GitLab`; e.g. `gitlab.lrz.de`) |
+| `GITLAB_DEFAULT_SERVER_URL` | Default GitLab instance for workspace creation / SCM sync (not auth). Falls back to `GITLAB_OAUTH_BASE_URL` |
 | `GITLAB_ENABLED` | Enables server-side GitLab beans in the application server |
 | `GITLAB_WORKSPACE_CREATION` | Enables GitLab workspace creation in the UI and API |
 | `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration |
 | `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab |
 
-Create the GitLab OAuth application with these settings:
+The login provider is instance-agnostic: gitlab.com works out of the box, and any self-hosted GitLab works by pointing `GITLAB_OAUTH_BASE_URL` at it. Create the GitLab OAuth application on that instance with these settings:
 
-- Redirect URI: `https://<hostname>/api/login/oauth2/code/gitlab-lrz` · Scopes: `openid profile email read_user`
-- Scopes: `openid`, `profile`, `email`
+- Redirect URI: `https://<hostname>/api/login/oauth2/code/gitlab` · Scopes: `openid profile email read_user`
 - Confidential client: enabled
+
+This env-seeds **one** default GitLab login provider (registration id `gitlab`). Additional GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** — no redeploy.
 
 ### Practice review rollout bundle
 
@@ -142,7 +145,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 2. **Configure authentication:**
    - Copy `server/.env.example` to `server/.env`, then populate `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `HEPHAESTUS_AUTH_ISSUER`, and `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`. The GitHub OAuth app's callback must be `https://<host>/api/login/oauth2/code/github`.
    - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
-   - If rolling out GitLab login, set `GITLAB_LRZ_OAUTH_CLIENT_ID/SECRET` (callback `.../api/login/oauth2/code/gitlab-lrz`); this env-seeds the default GitLab login provider on first boot. Additional self-hosted GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** (one OAuth app per instance) — no redeploy. The screen shows the exact redirect URI to register on the upstream GitLab OAuth app.
+   - If rolling out GitLab login, set `GITLAB_OAUTH_CLIENT_ID/SECRET` (callback `.../api/login/oauth2/code/gitlab`), plus `GITLAB_OAUTH_BASE_URL` (defaults to `https://gitlab.com`; point it at a self-hosted instance such as `https://gitlab.lrz.de`) and optionally `GITLAB_OAUTH_DISPLAY_NAME`. This env-seeds the default GitLab login provider on first boot. Additional GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** (one OAuth app per instance) — no redeploy. The screen shows the exact redirect URI to register on the upstream GitLab OAuth app.
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
 4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
 5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.

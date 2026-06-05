@@ -220,7 +220,7 @@ Filters don't delete data – they just skip sync operations. Workspace and orga
 
 ### Authentication (local)
 
-Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md)). The server federates to GitHub (and optionally self-hosted gitlab.lrz.de) via Spring Security `oauth2Login`, then issues its own short-lived ES256 cookie-session JWT. The webapp reads `GET /user` and redirects to `/auth/login` — there is no token in the browser.
+Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md)). The server federates to GitHub (and optionally GitLab — gitlab.com or a self-hosted instance) via Spring Security `oauth2Login`, then issues its own short-lived ES256 cookie-session JWT. The webapp reads `GET /user` and redirects to `/auth/login` — there is no token in the browser.
 
 #### Configure GitHub login
 
@@ -234,9 +234,10 @@ Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://gith
    # GITHUB_OAUTH_CLIENT_SECRET=<github-client-secret>
    ```
 
-3. (Optional) To enable gitlab.lrz.de login locally, register an OAuth application there
-   (callback `http://localhost:8080/login/oauth2/code/gitlab-lrz`, scopes `openid profile email read_user`)
-   and set `GITLAB_LRZ_OAUTH_CLIENT_ID` / `GITLAB_LRZ_OAUTH_CLIENT_SECRET`. Leave blank to hide the GitLab button.
+3. (Optional) To enable GitLab login locally, register an OAuth application on your GitLab instance
+   (callback `http://localhost:8080/login/oauth2/code/gitlab`, scopes `openid profile email read_user`),
+   set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
+   instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
 4. Run the application server with `./mvnw spring-boot:run`; Postgres + NATS start automatically via Spring Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
 
 #### Super admin

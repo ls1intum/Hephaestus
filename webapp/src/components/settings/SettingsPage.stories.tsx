@@ -52,7 +52,7 @@ const defaultLinkedAccountsProps = {
 	],
 	providers: [
 		{ registrationId: "github", displayName: "GitHub", providerType: "GITHUB" },
-		{ registrationId: "gitlab-lrz", displayName: "GitLab LRZ", providerType: "GITLAB" },
+		{ registrationId: "gitlab", displayName: "GitLab", providerType: "GITLAB" },
 	],
 	onLink: fn(),
 	onUnlink: fn(),

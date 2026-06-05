@@ -23,8 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>Seeding is idempotent and promote-once: a provider is created from {@code hephaestus.auth.*} only
  * when it does not already exist, so env becomes the <em>seed</em>, never the live source — an admin
  * can edit or disable a seeded provider afterwards and the env value won't clobber it on the next boot.
- * Registration ids {@code github} / {@code gitlab-lrz} are preserved so existing {@code IdentityLink}s
- * and the admin allowlist keep resolving.
+ * Registration ids {@code github} / {@code gitlab} are stable so {@code IdentityLink}s and the admin
+ * allowlist keep resolving across reboots.
  *
  * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
  * edit/enable/disable takes effect immediately rather than after the 60s TTL.
@@ -34,7 +34,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class LoginProviderService {
 
     static final String GITHUB_REGISTRATION_ID = "github";
-    static final String GITLAB_LRZ_REGISTRATION_ID = "gitlab-lrz";
+    static final String GITLAB_REGISTRATION_ID = "gitlab";
     static final String GITHUB_SCOPES = "read:user user:email";
     static final String GITLAB_SCOPES = "openid profile email read_user";
     private static final String GITHUB_COM = "https://github.com";
@@ -166,19 +166,18 @@ public class LoginProviderService {
             );
             log.info("auth.login-provider: seeded default '{}' from env", GITHUB_REGISTRATION_ID);
         }
-        AuthProperties.GitlabLrzLogin gitlab = authProperties.gitlabLrz();
-        if (gitlab.configured() && !repository.existsByRegistrationId(GITLAB_LRZ_REGISTRATION_ID)) {
-            String baseUrl = gitlab.baseUrl().toString();
+        AuthProperties.GitlabLogin gitlab = authProperties.gitlab();
+        if (gitlab.configured() && !repository.existsByRegistrationId(GITLAB_REGISTRATION_ID)) {
             seed(
-                GITLAB_LRZ_REGISTRATION_ID,
+                GITLAB_REGISTRATION_ID,
                 LoginProvider.ProviderType.GITLAB,
-                "gitlab.lrz.de",
-                baseUrl,
+                gitlab.displayName(),
+                gitlab.baseUrl().toString(),
                 gitlab.clientId(),
                 gitlab.clientSecret(),
                 GITLAB_SCOPES
             );
-            log.info("auth.login-provider: seeded default '{}' from env", GITLAB_LRZ_REGISTRATION_ID);
+            log.info("auth.login-provider: seeded default '{}' from env", GITLAB_REGISTRATION_ID);
         }
     }
 

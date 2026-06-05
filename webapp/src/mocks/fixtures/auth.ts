@@ -57,8 +57,8 @@ export const identityProviders: IdentityProviderView[] = [
 		baseUrl: "https://github.com",
 	},
 	{
-		registrationId: "gitlab-lrz",
-		displayName: "GitLab LRZ",
+		registrationId: "gitlab",
+		displayName: "GitLab",
 		providerType: "GITLAB",
 		baseUrl: "https://gitlab.lrz.de",
 	},

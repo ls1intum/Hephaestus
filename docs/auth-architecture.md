@@ -12,11 +12,11 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
                                                                                     
   click "Sign in with GitLab"                                                       
         │                                                                           
-        ▼  GET /auth/login?provider=gitlab-lrz&workspace=acme&returnTo=/w/acme      
+        ▼  GET /auth/login?provider=gitlab&workspace=acme&returnTo=/w/acme          
    ┌──────────────────────────────────────────┐                                    
    │ AuthBeginController                       │                                    
    │  • write __Host-AUTH_INTENT cookie (AEAD) │  (workspace + returnTo + mode)     
-   │  • 302 /oauth2/authorization/gitlab-lrz   │                                    
+   │  • 302 /oauth2/authorization/gitlab       │                                    
    └──────────────────────────────────────────┘                                    
         │                                                                           
         ▼  Spring OAuth2AuthorizationRequestRedirectFilter                          
@@ -27,10 +27,10 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
         │                                                                           
         ▼  302 to IdP                                                               
    ╔════════════════════════╗                                                       
-   ║ GitHub / gitlab.lrz.de ║  ← instance login_provider rows (one per SCM          
+   ║ GitHub / GitLab        ║  ← instance login_provider rows (one per SCM          
    ╚════════════════════════╝     instance) resolved by                             
         │                          LoginProviderClientRegistrationRepository         
-        ▼  302 /login/oauth2/code/gitlab-lrz?code=…                                 
+        ▼  302 /login/oauth2/code/gitlab?code=…                                     
    ┌──────────────────────────────────────────┐                                    
    │ HephaestusAuthSuccessHandler              │                                    
    │  • lookup IdentityLink (provider,subject) │ ───────────────► identity_link     

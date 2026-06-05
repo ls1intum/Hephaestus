@@ -105,11 +105,11 @@ describe("authClient.login — returnTo forwarding (safeReturnTo guard)", () => 
 
 	it("redirects to the server kickoff carrying a safe same-origin returnTo", () => {
 		const { assigned } = stubLocation();
-		authClient.login("gitlab-lrz", "/settings/account");
+		authClient.login("gitlab", "/settings/account");
 		expect(assigned).toHaveLength(1);
 		const url = new URL(assigned[0]);
 		expect(`${url.origin}${url.pathname}`).toBe("http://localhost:8080/auth/login");
-		expect(url.searchParams.get("provider")).toBe("gitlab-lrz");
+		expect(url.searchParams.get("provider")).toBe("gitlab");
 		expect(url.searchParams.get("returnTo")).toBe("/settings/account");
 	});
 

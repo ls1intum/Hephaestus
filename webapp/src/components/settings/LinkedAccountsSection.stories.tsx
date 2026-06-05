@@ -27,7 +27,7 @@ const githubProvider: IdentityProviderView = {
 	providerType: "GITHUB",
 };
 const gitlabProvider: IdentityProviderView = {
-	registrationId: "gitlab-lrz",
+	registrationId: "gitlab",
 	displayName: "GitLab",
 	providerType: "GITLAB",
 };

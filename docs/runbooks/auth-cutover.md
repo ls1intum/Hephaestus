@@ -14,9 +14,10 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
       must be set before first boot and kept stable, or all sessions invalidate when it changes.
 - [ ] `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` registered (GitHub OAuth App,
       callback `https://<host>/api/login/oauth2/code/github`) (the `/api` prefix is stripped by Traefik before Spring sees it).
-- [ ] `GITLAB_LRZ_OAUTH_CLIENT_ID` / `GITLAB_LRZ_OAUTH_CLIENT_SECRET` registered (gitlab.lrz.de
-      application, callback `https://<host>/api/login/oauth2/code/gitlab-lrz`,
-      scopes `openid profile email read_user`).
+- [ ] `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET` registered (GitLab OAuth application,
+      callback `https://<host>/api/login/oauth2/code/gitlab`, scopes `openid profile email read_user`).
+      Set `GITLAB_OAUTH_BASE_URL` to the instance (defaults to `https://gitlab.com`; e.g.
+      `https://gitlab.lrz.de` for a self-hosted instance) and optionally `GITLAB_OAUTH_DISPLAY_NAME`.
 - [ ] Reverse proxy (Coolify / TUM) verified to NOT inject a `Domain=` on Set-Cookie — a
       `__Host-` cookie with a Domain attribute is silently dropped by browsers → infinite
       redirect loop. Smoke-test the full login on staging behind the real proxy.
@@ -42,9 +43,10 @@ operator config, not any workspace's SCM team. Two mechanisms, no data backfill:
    `who` is either **`@username`** (recommended, readable) or the stable numeric **`subject`**. A listed
    identity is promoted to `APP_ADMIN` on login (idempotent, promote-only — it never demotes; demotion
    stays a `/admin/users` action), and it works on a cold instance. As env (comma-separated):
-   `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=gitlab-lrz:@m.mustermann,github:@octocat`.
-   - On **institutional gitlab.lrz.de** use `@username` — handles are bound to TUM identity, so the
-     reclaim risk is negligible. On **public github.com**, prefer the numeric `subject`
+   `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=gitlab:@m.mustermann,github:@octocat` (the GitLab registration
+   id is `gitlab` regardless of which instance it federates to).
+   - On an **institutional GitLab** (e.g. gitlab.lrz.de) where usernames are bound to a managed
+     identity and not recycled, `@username` is safe. On **public github.com**, prefer the numeric `subject`
      (`github:1234567`, from `https://api.github.com/users/<login>`) because a renamed/relinquished
      GitHub handle can be reclaimed by someone else. Matching is on the authenticated identity, never
      on email, so it is not nOAuth-vulnerable either way.
@@ -89,7 +91,7 @@ empty, and there is no backfill changeset. On a user's first post-cutover login 
 `workspace_membership` rows (still keyed on `user_id`). Memberships, roles, leaderboard points and
 activity history therefore carry over automatically.
 
-- ⚠️ **Risk — username drift.** The bridge is git-login string equality. GitHub / gitlab.lrz.de
+- ⚠️ **Risk — username drift.** The bridge is git-login string equality. GitHub / GitLab
   usernames are mutable; if a user renamed since the last sync, the stale `User.login` won't match
   their fresh `preferred_username` and they will appear as a non-member (403) until a sync updates
   the row. **Mitigation: run a fresh user sync immediately before the cutover** so `User.login`

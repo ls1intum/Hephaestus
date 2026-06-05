@@ -69,7 +69,7 @@ spring:
     # Hephaestus issues + verifies its own ES256 cookie-JWTs (core.auth
     # RevocationAwareJwtDecoder is the sole JwtDecoder bean) and federates login via
     # oauth2Login. There is no spring.security.oauth2.client.registration here: the default
-    # login providers are configured under hephaestus.auth.{github,gitlab-lrz} and built into
+    # login providers are configured under hephaestus.auth.{github,gitlab} and built into
     # a composite ClientRegistrationRepository, so a no-credentials boot does not fail
     # Boot's non-empty-client-id validation. See ADR 0017.
 
@@ -162,10 +162,13 @@ hephaestus:
         github:
             client-id: ${GITHUB_OAUTH_CLIENT_ID:}
             client-secret: ${GITHUB_OAUTH_CLIENT_SECRET:}
-        gitlab-lrz:
-            client-id: ${GITLAB_LRZ_OAUTH_CLIENT_ID:}
-            client-secret: ${GITLAB_LRZ_OAUTH_CLIENT_SECRET:}
-            base-url: ${GITLAB_LRZ_BASE_URL:https://gitlab.lrz.de}
+        # GitLab login works against any instance: leave base-url at gitlab.com or point it at a
+        # self-hosted GitLab (e.g. https://gitlab.lrz.de). display-name is the login-button label.
+        gitlab:
+            client-id: ${GITLAB_OAUTH_CLIENT_ID:}
+            client-secret: ${GITLAB_OAUTH_CLIENT_SECRET:}
+            base-url: ${GITLAB_OAUTH_BASE_URL:https://gitlab.com}
+            display-name: ${GITLAB_OAUTH_DISPLAY_NAME:GitLab}
         # Token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
         # Buckets are SHARED across replicas via a Postgres ProxyManager (no Redis) when
         # postgres-backed=true (default) and a DataSource is present; otherwise an in-JVM
@@ -518,9 +521,9 @@ hephaestus:
         gitlab:
             enabled: ${GITLAB_ENABLED:false}
             # Default GitLab server URL (used when workspace has no custom serverUrl).
-            # Falls back to the native-auth gitlab.lrz login base URL so deployments with
-            # GitLab login automatically use the same instance for workspace creation.
-            default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${GITLAB_LRZ_BASE_URL:https://gitlab.com}}
+            # Falls back to the native-auth GitLab login base URL so deployments with GitLab login
+            # automatically use the same instance for workspace creation.
+            default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${GITLAB_OAUTH_BASE_URL:https://gitlab.com}}
             # Timeout for standard GraphQL operations (default: 30s)
             graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
             # Extended timeout for complex operations (default: 60s)

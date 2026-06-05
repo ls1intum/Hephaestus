@@ -31,16 +31,19 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        only when a client id is configured (blank = provider omitted, no
  *                        crash) — unlike {@code spring.security.oauth2.client.*}, which fails
  *                        Boot's non-empty-client-id validation on a no-credentials boot.
- * @param gitlabLrz       Default gitlab.lrz.de OAuth login app (same blank-tolerant rule).
+ * @param gitlab          Default GitLab OAuth login app (same blank-tolerant rule). Works against
+ *                        any GitLab instance — set {@code base-url} (defaults to gitlab.com) and an
+ *                        optional {@code display-name} for the login button. Self-hosted deployers
+ *                        (e.g. gitlab.lrz.de) only override those two plus the client credentials.
  * @param bootstrapAdmins Instance super-admin (APP_ADMIN) allowlist of {@code <registrationId>:<who>}.
  *                        {@code who} is either {@code @username} (recommended, readable — e.g.
- *                        {@code gitlab-lrz:@m.mustermann}, matched against the git login) or the
+ *                        {@code gitlab:@m.mustermann}, matched against the git login) or the
  *                        stable numeric {@code subject} (e.g. {@code github:1234567}, reclaim-proof,
  *                        best on public github.com). A listed identity is promoted to APP_ADMIN on
  *                        login (idempotent, promote-only — never demotes). Matched on the authenticated
  *                        identity, NEVER email (so it is not nOAuth-vulnerable); the {@code @username}
- *                        form's only residual risk is username reclaim (negligible on institutional
- *                        gitlab.lrz.de, hence the default there; prefer {@code subject} on github.com).
+ *                        form's only residual risk is username reclaim (negligible on an institutional
+ *                        GitLab where usernames aren't recycled; prefer {@code subject} on github.com).
  *                        This is the operator-scoped source of truth for "who runs this instance",
  *                        deliberately separate from per-workspace roles (those derive from SCM team /
  *                        WorkspaceMembership). Empty by default.
@@ -64,7 +67,7 @@ public record AuthProperties(
     @DefaultValue("") String stateCookieKey,
     @DefaultValue("48h") Duration deleteCooldown,
     @DefaultValue GithubLogin github,
-    @DefaultValue GitlabLrzLogin gitlabLrz,
+    @DefaultValue GitlabLogin gitlab,
     @DefaultValue List<String> bootstrapAdmins,
     @DefaultValue("") String bootstrapToken,
     @DefaultValue("1h") Duration impersonationMaxLifetime
@@ -87,12 +90,16 @@ public record AuthProperties(
     }
 
     /**
-     * Default gitlab.lrz.de OAuth login provider credentials plus the instance base URL.
+     * Default GitLab OAuth login provider credentials plus the instance base URL and login-button
+     * label. Works against any GitLab (gitlab.com by default, or a self-hosted instance via
+     * {@code base-url}); {@code display-name} is what the login page shows. Same blank-tolerant rule
+     * as {@link GithubLogin} — a blank client id omits the provider so credential-less pods still boot.
      */
-    public record GitlabLrzLogin(
+    public record GitlabLogin(
         @DefaultValue("") String clientId,
         @DefaultValue("") String clientSecret,
-        @DefaultValue("https://gitlab.lrz.de") URI baseUrl
+        @DefaultValue("https://gitlab.com") URI baseUrl,
+        @DefaultValue("GitLab") String displayName
     ) {
         public boolean configured() {
             return !clientId.isBlank();
