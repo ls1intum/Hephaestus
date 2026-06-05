@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.security;
 
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -152,6 +153,12 @@ public final class ServerUrlValidator {
         }
         if (addr.isAnyLocalAddress()) {
             throw new IllegalArgumentException("Server URL must not point to a wildcard address");
+        }
+        // IPv6 Unique-Local Addresses (fc00::/7) are private — the dominant self-hosted IPv6 range — but
+        // Java has no isUniqueLocalAddress() and isSiteLocalAddress() returns false for them, so check the
+        // high 7 bits directly. Without this, https://[fc00::1] / https://[fd12::1] would pass the gate.
+        if (addr instanceof Inet6Address && (addr.getAddress()[0] & 0xFE) == 0xFC) {
+            throw new IllegalArgumentException("Server URL must not point to a unique-local (ULA) address");
         }
     }
 

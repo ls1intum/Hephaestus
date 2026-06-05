@@ -157,6 +157,42 @@ class ServerUrlValidatorTest extends BaseUnitTest {
     }
 
     @Nested
+    class PrivateIpv6Bypass {
+
+        // Java has no isUniqueLocalAddress() and isSiteLocalAddress() is false for ULA, so these must be
+        // caught by the explicit fc00::/7 check; IPv4-mapped private/loopback are caught by getByName's
+        // isLoopback/isSiteLocal canonicalization (asserted here as a regression guard).
+
+        @Test
+        void rejectsIpv6UniqueLocalFc00() {
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://[fc00::1]"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unique-local");
+        }
+
+        @Test
+        void rejectsIpv6UniqueLocalFd00() {
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://[fd12:3456::1]"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unique-local");
+        }
+
+        @Test
+        void rejectsIpv4MappedLoopback() {
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://[::ffff:127.0.0.1]")).isInstanceOf(
+                IllegalArgumentException.class
+            );
+        }
+
+        @Test
+        void rejectsIpv4MappedPrivate() {
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://[::ffff:10.0.0.1]")).isInstanceOf(
+                IllegalArgumentException.class
+            );
+        }
+    }
+
+    @Nested
     class TldValidation {
 
         @Test
