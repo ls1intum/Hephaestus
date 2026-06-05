@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Building2, ChevronLeft, ScrollText, Users } from "lucide-react";
+import { Building2, ChevronLeft, KeyRound, ScrollText, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -18,6 +18,12 @@ import {
 const ADMIN_SECTIONS = [
 	{ to: "/admin/users", label: "Users", icon: Users, tooltip: "Manage accounts" },
 	{ to: "/admin/workspaces", label: "Workspaces", icon: Building2, tooltip: "All workspaces" },
+	{
+		to: "/admin/login-providers",
+		label: "Login providers",
+		icon: KeyRound,
+		tooltip: "Sign-in options",
+	},
 	{ to: "/admin/audit", label: "Audit log", icon: ScrollText, tooltip: "Auth audit events" },
 ] as const;
 

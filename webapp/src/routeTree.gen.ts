@@ -25,6 +25,7 @@ import { Route as WWorkspaceSlugLoginRouteImport } from './routes/w/$workspaceSl
 import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
 import { Route as AuthenticatedAdminWorkspacesRouteImport } from './routes/_authenticated/admin.workspaces'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
+import { Route as AuthenticatedAdminLoginProvidersRouteImport } from './routes/_authenticated/admin.login-providers'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
 import { Route as AuthenticatedWorkspacesNewIndexRouteImport } from './routes/_authenticated/workspaces/new/index'
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
@@ -130,6 +131,12 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminLoginProvidersRoute =
+  AuthenticatedAdminLoginProvidersRouteImport.update({
+    id: '/login-providers',
+    path: '/login-providers',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminAuditRoute = AuthenticatedAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
@@ -314,6 +322,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
@@ -353,6 +362,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/error': typeof AuthErrorRoute
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
+  '/_authenticated/admin/login-providers': typeof AuthenticatedAdminLoginProvidersRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/admin/workspaces': typeof AuthenticatedAdminWorkspacesRoute
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
@@ -394,6 +404,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
+    | '/admin/login-providers'
     | '/admin/users'
     | '/admin/workspaces'
     | '/mentor'
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/admin/audit'
+    | '/admin/login-providers'
     | '/admin/users'
     | '/admin/workspaces'
     | '/mentor'
@@ -471,6 +483,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/error'
     | '/_authenticated/admin/audit'
+    | '/_authenticated/admin/login-providers'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/workspaces'
     | '/_authenticated/mentor/_mentor_access'
@@ -623,6 +636,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/login-providers': {
+      id: '/_authenticated/admin/login-providers'
+      path: '/login-providers'
+      fullPath: '/admin/login-providers'
+      preLoaderRoute: typeof AuthenticatedAdminLoginProvidersRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/audit': {
@@ -784,12 +804,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
+  AuthenticatedAdminLoginProvidersRoute: typeof AuthenticatedAdminLoginProvidersRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminWorkspacesRoute: typeof AuthenticatedAdminWorkspacesRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
+  AuthenticatedAdminLoginProvidersRoute: AuthenticatedAdminLoginProvidersRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminWorkspacesRoute: AuthenticatedAdminWorkspacesRoute,
 }
