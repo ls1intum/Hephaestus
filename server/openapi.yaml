@@ -209,6 +209,71 @@ paths:
       summary: "List auth audit events (paged, newest first)"
       tags:
       - Admin
+  /admin/audit/export:
+    get:
+      operationId: adminExportAuthEvents
+      parameters:
+      - in: query
+        name: accountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: actingAccountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: eventType
+        required: false
+        schema:
+          type: string
+          enum:
+          - LOGIN
+          - LOGIN_FAILED
+          - LOGOUT
+          - TOKEN_REFRESH
+          - JWT_REVOKED
+          - IDENTITY_LINKED
+          - IDENTITY_UNLINKED
+          - IMPERSONATION_BEGIN
+          - IMPERSONATION_END
+          - ACCOUNT_DELETED
+          - EXPORT_REQUESTED
+          - FEATURE_FLAG_CHANGED
+          - APP_ROLE_CHANGED
+      - in: query
+        name: result
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCESS
+          - FAILURE
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: OK
+      summary: "Export the filtered audit log as CSV (newest first, capped)"
+      tags:
+      - Admin
   /admin/login-providers:
     get:
       operationId: adminListLoginProviders

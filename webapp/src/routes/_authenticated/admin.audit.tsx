@@ -1,8 +1,13 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ScrollText, X } from "lucide-react";
+import { Download, ScrollText, X } from "lucide-react";
 import { useState } from "react";
-import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
+import { toast } from "sonner";
+import {
+	adminListAuthEventsInfiniteOptions,
+	adminListWorkspacesOptions,
+} from "@/api/@tanstack/react-query.gen";
+import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView, PageAuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +21,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 50;
 const ALL = "ALL";
@@ -62,19 +68,27 @@ function AdminAuditPage() {
 	const [to, setTo] = useState("");
 	const [accountId, setAccountId] = useState<number | undefined>(undefined);
 	const [actingAccountId, setActingAccountId] = useState<number | undefined>(undefined);
+	const [exporting, setExporting] = useState(false);
+
+	// Shared filter shape for the list query + the CSV export, so both honour the same selection.
+	const filters = {
+		eventType,
+		result,
+		from: from ? dayStartIso(from) : undefined,
+		to: to ? dayEndIso(to) : undefined,
+		accountId,
+		actingAccountId,
+	};
+
+	// Workspace names are resolved client-side from the admin workspace list (dozens at most) — keeps
+	// the audit service from reaching into the workspace module just to label a row.
+	const workspacesQuery = useQuery(adminListWorkspacesOptions());
+	const workspaceNames = new Map(
+		(workspacesQuery.data ?? []).map((w) => [w.id, w.displayName || w.workspaceSlug] as const),
+	);
 
 	const listQuery = useInfiniteQuery({
-		...adminListAuthEventsInfiniteOptions({
-			query: {
-				size: PAGE_SIZE,
-				eventType,
-				result,
-				from: from ? dayStartIso(from) : undefined,
-				to: to ? dayEndIso(to) : undefined,
-				accountId,
-				actingAccountId,
-			},
-		}),
+		...adminListAuthEventsInfiniteOptions({ query: { size: PAGE_SIZE, ...filters } }),
 		initialPageParam: 0,
 		// The endpoint returns a Spring Page; advance by page number until the last page.
 		getNextPageParam: (lastPage: PageAuthEventView) =>
@@ -98,6 +112,29 @@ function AdminAuditPage() {
 		setTo("");
 		setAccountId(undefined);
 		setActingAccountId(undefined);
+	};
+
+	const handleExport = async () => {
+		setExporting(true);
+		try {
+			const { data, error } = await adminExportAuthEvents({ query: filters });
+			if (error || typeof data !== "string") {
+				throw new Error("export failed");
+			}
+			const blob = new Blob([data], { type: "text/csv;charset=utf-8;" });
+			const url = URL.createObjectURL(blob);
+			const anchor = document.createElement("a");
+			anchor.href = url;
+			anchor.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			anchor.remove();
+			URL.revokeObjectURL(url);
+		} catch {
+			toast.error("Could not export the audit log. Please try again.");
+		} finally {
+			setExporting(false);
+		}
 	};
 
 	return (
@@ -193,6 +230,20 @@ function AdminAuditPage() {
 						Clear filters
 					</Button>
 				)}
+
+				<Button
+					variant="outline"
+					onClick={handleExport}
+					disabled={exporting || events.length === 0}
+					className="mb-0.5 ml-auto"
+				>
+					{exporting ? (
+						<Spinner className="mr-2 size-3.5" />
+					) : (
+						<Download className="size-4" aria-hidden />
+					)}
+					Export CSV
+				</Button>
 			</div>
 
 			{(accountId !== undefined || actingAccountId !== undefined) && (
@@ -241,6 +292,7 @@ function AdminAuditPage() {
 				onLoadMore={() => listQuery.fetchNextPage()}
 				onFilterAccount={setAccountId}
 				onFilterActor={setActingAccountId}
+				resolveWorkspaceName={(id) => workspaceNames.get(id)}
 			/>
 		</div>
 	);

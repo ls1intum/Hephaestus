@@ -13,6 +13,8 @@ interface AuditEventDetailDialogProps {
 	event: AuthEventView | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	/** Resolve a workspace id to its name (client-side, from the admin workspace list). */
+	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -29,11 +31,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  * pretty-printed details) plus both identities. A row-level "detail drawer" is the pattern Datadog and
  * Tailscale use so wide records aren't crammed into columns or hidden in tooltips.
  */
-export function AuditEventDetailDialog({ event, open, onOpenChange }: AuditEventDetailDialogProps) {
+export function AuditEventDetailDialog({
+	event,
+	open,
+	onOpenChange,
+	resolveWorkspaceName,
+}: AuditEventDetailDialogProps) {
 	const ts = event ? formatTimestamp(event.occurredAt) : null;
 	const account = event ? accountLabel(event.account, event.accountId) : null;
 	const actor = event ? accountLabel(event.actor, event.actingAccountId) : null;
 	const pretty = event ? prettyDetails(event.details) : null;
+	const workspaceName =
+		event?.workspaceId != null ? resolveWorkspaceName?.(event.workspaceId) : undefined;
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -87,7 +96,13 @@ export function AuditEventDetailDialog({ event, open, onOpenChange }: AuditEvent
 								"—"
 							)}
 						</Row>
-						<Row label="Workspace">{event.workspaceId != null ? `#${event.workspaceId}` : "—"}</Row>
+						<Row label="Workspace">
+							{event.workspaceId != null
+								? workspaceName
+									? `${workspaceName} (#${event.workspaceId})`
+									: `#${event.workspaceId}`
+								: "—"}
+						</Row>
 						<Row label="IP address">
 							<span className="font-mono text-xs">{event.ipAddress ?? "—"}</span>
 						</Row>

@@ -20,6 +20,7 @@ import {
 	eventSeverity,
 	formatTimestamp,
 	humanizeDetails,
+	relativeTime,
 } from "./auditFormat";
 
 export interface AdminAuditTableProps {
@@ -33,6 +34,8 @@ export interface AdminAuditTableProps {
 	/** Drill-downs: filter the log to a subject account / to an actor's impersonation session. */
 	onFilterAccount?: (id: number) => void;
 	onFilterActor?: (id: number) => void;
+	/** Resolve a workspace id to its name for the detail drawer (client-side, from the admin list). */
+	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
 const SEVERITY_DOT: Record<AuditSeverity, string> = {
@@ -56,6 +59,7 @@ export function AdminAuditTable({
 	onLoadMore,
 	onFilterAccount,
 	onFilterActor,
+	resolveWorkspaceName,
 }: AdminAuditTableProps) {
 	const [detail, setDetail] = useState<AuthEventView | null>(null);
 
@@ -117,10 +121,10 @@ export function AdminAuditTable({
 							return (
 								<TableRow key={e.id}>
 									<TableCell
-										className="whitespace-nowrap text-sm tabular-nums text-muted-foreground"
-										title={ts.isoUtc}
+										className="whitespace-nowrap text-sm text-muted-foreground"
+										title={`${ts.local} (${ts.isoUtc})`}
 									>
-										{ts.local}
+										{relativeTime(e.occurredAt)}
 									</TableCell>
 									<TableCell>
 										<span className="flex items-center gap-2" title={e.eventType}>
@@ -223,6 +227,7 @@ export function AdminAuditTable({
 				event={detail}
 				open={detail !== null}
 				onOpenChange={(open) => !open && setDetail(null)}
+				resolveWorkspaceName={resolveWorkspaceName}
 			/>
 		</div>
 	);

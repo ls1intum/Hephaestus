@@ -11,6 +11,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +33,9 @@ public class AuthAuditController {
 
     /** Hard cap on page size so a malicious/typo'd {@code size} can't scan a whole partition. */
     private static final int MAX_PAGE_SIZE = 200;
+
+    /** Upper bound on a single CSV export so the admin can't pull an unbounded slice of the log. */
+    private static final int EXPORT_MAX_ROWS = 10_000;
 
     private final AuthAuditService authAuditService;
 
@@ -82,6 +87,72 @@ public class AuthAuditController {
         );
         Page<AuthEventViewDTO> events = result0.events().map(e -> toView(e, result0.identities()));
         return ResponseEntity.ok(events);
+    }
+
+    @GetMapping(value = "/export", produces = "text/csv")
+    @Operation(
+        summary = "Export the filtered audit log as CSV (newest first, capped)",
+        operationId = "adminExportAuthEvents"
+    )
+    public ResponseEntity<String> export(
+        @RequestParam(required = false) @Nullable Long accountId,
+        @RequestParam(required = false) @Nullable Long actingAccountId,
+        @RequestParam(required = false) AuthEvent.@Nullable EventType eventType,
+        @RequestParam(required = false) AuthEvent.@Nullable Result result,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
+    ) {
+        AuthAuditService.AuditPage data = authAuditService.list(
+            new AuthAuditService.Filter(accountId, actingAccountId, eventType, result, from, to),
+            PageRequest.of(0, EXPORT_MAX_ROWS)
+        );
+        var identities = data.identities();
+        StringBuilder csv = new StringBuilder();
+        csv.append(
+            "occurred_at_utc,event_type,result,account_id,account_name,account_email," +
+                "acting_account_id,actor_name,actor_email,failure_reason,workspace_id,ip_address,user_agent,details\n"
+        );
+        for (AuthEvent e : data.events().getContent()) {
+            AuthAuditService.AccountRef account = AuthAuditService.refOf(e.getAccountId(), identities);
+            AuthAuditService.AccountRef actor = AuthAuditService.refOf(e.getActingAccountId(), identities);
+            appendCsvRow(
+                csv,
+                e.getId().getOccurredAt().toString(),
+                e.getEventType().name(),
+                e.getResult().name(),
+                str(e.getAccountId()),
+                account == null ? "" : account.displayName(),
+                account == null ? "" : account.email(),
+                str(e.getActingAccountId()),
+                actor == null ? "" : actor.displayName(),
+                actor == null ? "" : actor.email(),
+                e.getFailureReason(),
+                str(e.getWorkspaceId()),
+                e.getIpInet(),
+                e.getUserAgent(),
+                e.getDetails()
+            );
+        }
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"audit-log.csv\"")
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .body(csv.toString());
+    }
+
+    private static String str(@Nullable Long value) {
+        return value == null ? "" : value.toString();
+    }
+
+    /** Append one RFC-4180 CSV row: quote every field, escape embedded quotes, normalize newlines. */
+    private static void appendCsvRow(StringBuilder out, String... fields) {
+        for (int i = 0; i < fields.length; i++) {
+            if (i > 0) {
+                out.append(',');
+            }
+            String value = fields[i] == null ? "" : fields[i];
+            out.append('"').append(value.replace("\"", "\"\"").replace("\r\n", " ").replace('\n', ' ')).append('"');
+        }
+        out.append('\n');
     }
 
     private static AuthEventViewDTO toView(AuthEvent e, java.util.Map<Long, AuthAuditService.AccountRef> identities) {

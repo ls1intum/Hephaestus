@@ -245,6 +245,46 @@ class AuthAuditControllerIntegrationTest {
             .isEqualTo("IMPERSONATION_BEGIN");
     }
 
+    @Test
+    void adminExportsCsvWithHeaderAndRows() {
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+
+        String csv = webTestClient
+            .get()
+            .uri(builder -> builder.path("/admin/audit/export").build())
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectHeader()
+            .value("Content-Type", ct -> org.assertj.core.api.Assertions.assertThat(ct).contains("text/csv"))
+            .expectHeader()
+            .value("Content-Disposition", cd ->
+                org.assertj.core.api.Assertions.assertThat(cd).contains("audit-log.csv")
+            )
+            .expectBody(String.class)
+            .returnResult()
+            .getResponseBody();
+
+        org.assertj.core.api.Assertions.assertThat(csv).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(csv).startsWith("occurred_at_utc,event_type,result");
+        org.assertj.core.api.Assertions.assertThat(csv).contains("LOGIN").contains("Keeper Admin");
+    }
+
+    @Test
+    void plainUserCannotExport() {
+        Account user = persist("Plain User", Account.AppRole.USER);
+
+        webTestClient
+            .get()
+            .uri("/admin/audit/export")
+            .headers(h -> h.setBearerAuth(tokenFor(user)))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
     private void seedFailure(long id, AuthEvent.EventType type, Instant occurredAt, String failureReason) {
         AuthEventData data = new AuthEventData(
             type,

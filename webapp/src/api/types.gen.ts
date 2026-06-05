@@ -2352,6 +2352,29 @@ export type AdminListAuthEventsResponses = {
 
 export type AdminListAuthEventsResponse = AdminListAuthEventsResponses[keyof AdminListAuthEventsResponses];
 
+export type AdminExportAuthEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        accountId?: number;
+        actingAccountId?: number;
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'FEATURE_FLAG_CHANGED' | 'APP_ROLE_CHANGED';
+        result?: 'SUCCESS' | 'FAILURE';
+        from?: Date;
+        to?: Date;
+    };
+    url: '/admin/audit/export';
+};
+
+export type AdminExportAuthEventsResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type AdminExportAuthEventsResponse = AdminExportAuthEventsResponses[keyof AdminExportAuthEventsResponses];
+
 export type AdminListLoginProvidersData = {
     body?: never;
     path?: never;

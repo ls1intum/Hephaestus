@@ -57,6 +57,30 @@ export function formatTimestamp(value: AuthEventView["occurredAt"]): FormattedTi
 	return { local: date.toLocaleString(), isoUtc: date.toISOString() };
 }
 
+const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+	["year", 31_536_000_000],
+	["month", 2_592_000_000],
+	["day", 86_400_000],
+	["hour", 3_600_000],
+	["minute", 60_000],
+];
+
+/**
+ * A compact relative time ("2 hours ago") for the row, paired with the absolute value on hover — the
+ * convention GitHub/Datadog/Tailscale use for log rows (scannable recency + precision on demand).
+ */
+export function relativeTime(value: AuthEventView["occurredAt"]): string {
+	const date = value instanceof Date ? value : new Date(value);
+	const diffMs = date.getTime() - Date.now();
+	const abs = Math.abs(diffMs);
+	if (abs < 60_000) return "just now";
+	const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+	for (const [unit, ms] of RELATIVE_UNITS) {
+		if (abs >= ms) return rtf.format(Math.round(diffMs / ms), unit);
+	}
+	return "just now";
+}
+
 /**
  * Turn the JSONB `details` blob into a human sentence where we can — `{"from":"USER","to":"APP_ADMIN"}`
  * → `USER → APP_ADMIN`, other objects → `key: value` pairs — and fall back to the raw string when it is
