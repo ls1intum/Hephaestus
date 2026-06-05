@@ -54,7 +54,10 @@ export function formatTimestamp(value: AuthEventView["occurredAt"]): FormattedTi
 	// The generated client types this `Date`, but the response transformers aren't wired into the SDK
 	// calls, so it arrives as an ISO string at runtime — coerce defensively (same pattern as elsewhere).
 	const date = value instanceof Date ? value : new Date(value);
-	return { local: date.toLocaleString(), isoUtc: date.toISOString() };
+	// Medium date + medium time (incl. seconds) — audit rows need second precision, and the explicit
+	// styles render consistently across locales rather than the browser default's variable shape.
+	const local = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+	return { local, isoUtc: date.toISOString() };
 }
 
 const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [

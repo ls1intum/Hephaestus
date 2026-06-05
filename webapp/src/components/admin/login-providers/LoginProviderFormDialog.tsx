@@ -13,8 +13,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -55,6 +55,7 @@ export function LoginProviderFormDialog({
 	const [clientId, setClientId] = useState("");
 	const [clientSecret, setClientSecret] = useState("");
 	const [scopes, setScopes] = useState("");
+	const [errors, setErrors] = useState<{ registrationId?: string; baseUrl?: string }>({});
 
 	// Re-seed the form whenever the dialog opens for a different target.
 	useEffect(() => {
@@ -66,12 +67,36 @@ export function LoginProviderFormDialog({
 		setClientId("");
 		setClientSecret("");
 		setScopes(editing?.scopes ?? "");
+		setErrors({});
 	}, [open, editing]);
 
 	const isGitlab = type === "GITLAB";
 
+	// Mirror the server-side constraints so the operator sees the problem inline before a round-trip:
+	// the registration id is the immutable callback-path segment, and a GitLab base URL must be HTTPS.
+	const REGISTRATION_ID_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
+	const validate = (): boolean => {
+		const next: { registrationId?: string; baseUrl?: string } = {};
+		if (!isEdit && !REGISTRATION_ID_PATTERN.test(registrationId.trim())) {
+			next.registrationId = "Lowercase letters, digits and hyphens; must start with a letter.";
+		}
+		if (isGitlab && (!isEdit || baseUrl.trim())) {
+			const value = baseUrl.trim();
+			if (!isEdit && !value) {
+				next.baseUrl = "A GitLab instance URL is required.";
+			} else if (value && !value.startsWith("https://")) {
+				next.baseUrl = "Must be an HTTPS URL.";
+			}
+		}
+		setErrors(next);
+		return Object.keys(next).length === 0;
+	};
+
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
+		if (!validate()) {
+			return;
+		}
 		if (isEdit && editing) {
 			const body: UpdateLoginProviderRequest = {
 				displayName: displayName.trim() || undefined,
@@ -107,8 +132,8 @@ export function LoginProviderFormDialog({
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="space-y-2">
-						<Label htmlFor="lp-registration-id">Registration ID</Label>
+					<Field data-invalid={errors.registrationId ? "true" : undefined}>
+						<FieldLabel htmlFor="lp-registration-id">Registration ID</FieldLabel>
 						<Input
 							id="lp-registration-id"
 							value={registrationId}
@@ -116,17 +141,19 @@ export function LoginProviderFormDialog({
 							placeholder="gitlab-acme"
 							disabled={isEdit}
 							required={!isEdit}
-							pattern="[a-z][a-z0-9-]{1,62}"
+							aria-invalid={errors.registrationId ? "true" : undefined}
+							aria-describedby="lp-registration-id-description"
 							autoComplete="off"
 						/>
-						<p className="text-xs text-muted-foreground">
+						<FieldDescription id="lp-registration-id-description">
 							Stable id used in the OAuth callback path. Lowercase letters, digits, hyphens.
 							Immutable once created.
-						</p>
-					</div>
+						</FieldDescription>
+						{errors.registrationId && <FieldError>{errors.registrationId}</FieldError>}
+					</Field>
 
-					<div className="space-y-2">
-						<Label htmlFor="lp-type">Provider type</Label>
+					<Field>
+						<FieldLabel htmlFor="lp-type">Provider type</FieldLabel>
 						<Select
 							value={type}
 							onValueChange={(v) => setType(v as ProviderType)}
@@ -140,21 +167,21 @@ export function LoginProviderFormDialog({
 								<SelectItem value="GITLAB">GitLab / self-hosted GitLab</SelectItem>
 							</SelectContent>
 						</Select>
-					</div>
+					</Field>
 
-					<div className="space-y-2">
-						<Label htmlFor="lp-display-name">Display name</Label>
+					<Field>
+						<FieldLabel htmlFor="lp-display-name">Display name</FieldLabel>
 						<Input
 							id="lp-display-name"
 							value={displayName}
 							onChange={(e) => setDisplayName(e.target.value)}
 							placeholder="Defaults to the registration ID"
 						/>
-					</div>
+					</Field>
 
 					{isGitlab && (
-						<div className="space-y-2">
-							<Label htmlFor="lp-base-url">Instance base URL</Label>
+						<Field data-invalid={errors.baseUrl ? "true" : undefined}>
+							<FieldLabel htmlFor="lp-base-url">Instance base URL</FieldLabel>
 							<Input
 								id="lp-base-url"
 								type="url"
@@ -162,15 +189,18 @@ export function LoginProviderFormDialog({
 								onChange={(e) => setBaseUrl(e.target.value)}
 								placeholder="https://gitlab.example.com"
 								required={isGitlab && !isEdit}
+								aria-invalid={errors.baseUrl ? "true" : undefined}
+								aria-describedby="lp-base-url-description"
 							/>
-							<p className="text-xs text-muted-foreground">
+							<FieldDescription id="lp-base-url-description">
 								HTTPS only. GitHub is always github.com, so this field is GitLab-only.
-							</p>
-						</div>
+							</FieldDescription>
+							{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
+						</Field>
 					)}
 
-					<div className="space-y-2">
-						<Label htmlFor="lp-client-id">Client ID</Label>
+					<Field>
+						<FieldLabel htmlFor="lp-client-id">Client ID</FieldLabel>
 						<Input
 							id="lp-client-id"
 							value={clientId}
@@ -179,10 +209,10 @@ export function LoginProviderFormDialog({
 							required={!isEdit}
 							autoComplete="off"
 						/>
-					</div>
+					</Field>
 
-					<div className="space-y-2">
-						<Label htmlFor="lp-client-secret">Client secret</Label>
+					<Field>
+						<FieldLabel htmlFor="lp-client-secret">Client secret</FieldLabel>
 						<Input
 							id="lp-client-secret"
 							type="password"
@@ -191,21 +221,22 @@ export function LoginProviderFormDialog({
 							placeholder={isEdit ? "Leave blank to keep current" : ""}
 							required={!isEdit}
 							autoComplete="off"
+							aria-describedby="lp-client-secret-description"
 						/>
-						<p className="text-xs text-muted-foreground">
+						<FieldDescription id="lp-client-secret-description">
 							Sealed at rest; never displayed after saving.
-						</p>
-					</div>
+						</FieldDescription>
+					</Field>
 
-					<div className="space-y-2">
-						<Label htmlFor="lp-scopes">Scopes</Label>
+					<Field>
+						<FieldLabel htmlFor="lp-scopes">Scopes</FieldLabel>
 						<Input
 							id="lp-scopes"
 							value={scopes}
 							onChange={(e) => setScopes(e.target.value)}
 							placeholder="Defaulted by provider type if blank"
 						/>
-					</div>
+					</Field>
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

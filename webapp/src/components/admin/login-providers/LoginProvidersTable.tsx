@@ -1,4 +1,4 @@
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, KeyRound, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { LoginProviderView } from "@/api/types.gen";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import {
 	Table,
@@ -45,19 +46,24 @@ export function LoginProvidersTable({
 }: LoginProvidersTableProps) {
 	if (isError) {
 		return (
-			<p className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-				Could not load login providers. Please retry.
+			<p className="py-8 text-center text-sm text-destructive">
+				Could not load login providers. Please try again.
 			</p>
 		);
 	}
 	if (isLoading) {
-		return <p className="text-sm text-muted-foreground">Loading login providers…</p>;
+		return (
+			<div className="flex items-center justify-center py-12">
+				<Spinner />
+			</div>
+		);
 	}
 	if (providers.length === 0) {
 		return (
-			<p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-				No login providers yet. Add one so users can sign in.
-			</p>
+			<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+				<KeyRound className="size-8" aria-hidden />
+				<p className="text-sm">No login providers yet. Add one so users can sign in.</p>
+			</div>
 		);
 	}
 

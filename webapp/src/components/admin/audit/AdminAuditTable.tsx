@@ -12,7 +12,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { AuditEventDetailDialog } from "./AuditEventDetailDialog";
+import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
 import {
 	type AuditSeverity,
 	accountLabel,
@@ -136,7 +136,7 @@ export function AdminAuditTable({
 										</span>
 									</TableCell>
 									<TableCell>
-										<Badge variant={e.result === "FAILURE" ? "destructive" : "secondary"}>
+										<Badge variant={e.result === "FAILURE" ? "destructive" : "outline"}>
 											{e.result}
 										</Badge>
 									</TableCell>
@@ -145,7 +145,7 @@ export function AdminAuditTable({
 											onFilterAccount && e.accountId != null ? (
 												<button
 													type="button"
-													className="truncate text-left hover:underline"
+													className="truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
 													title={e.account?.email ?? `Filter by ${account}`}
 													onClick={() => onFilterAccount(e.accountId as number)}
 												>
@@ -165,7 +165,7 @@ export function AdminAuditTable({
 												{onFilterActor && e.actingAccountId != null ? (
 													<button
 														type="button"
-														className="hover:underline"
+														className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
 														title={e.actor?.email ?? `Filter by ${actor}`}
 														onClick={() => onFilterActor(e.actingAccountId as number)}
 													>
@@ -223,7 +223,7 @@ export function AdminAuditTable({
 				</div>
 			)}
 
-			<AuditEventDetailDialog
+			<AuditEventDetailSheet
 				event={detail}
 				open={detail !== null}
 				onOpenChange={(open) => !open && setDetail(null)}

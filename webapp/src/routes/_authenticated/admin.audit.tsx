@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Download, ScrollText, X } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarIcon, Download, ScrollText, X } from "lucide-react";
 import { useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import {
 	adminListAuthEventsInfiniteOptions,
@@ -12,8 +14,9 @@ import type { AuthEventView, PageAuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -22,6 +25,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 const ALL = "ALL";
@@ -50,22 +54,32 @@ export const Route = createFileRoute("/_authenticated/admin/audit")({
 	component: AdminAuditPage,
 });
 
-// The generated client types `from`/`to` as `Date`, but its query serializer treats a Date as a
-// deepObject (mangled on the wire); the server expects an ISO-8601 instant (@DateTimeFormat). So we
-// build the ISO string the server wants and cast to satisfy the generated type. `to` is end-of-day so
-// the picked day is inclusive (the server predicate is `occurred_at < :to`).
-function dayStartIso(date: string): Date {
-	return `${date}T00:00:00.000Z` as unknown as Date;
+// The generated client types `from`/`to` as `Date`, but its query serializer mangles a real Date into
+// a deepObject on the wire; the server expects an ISO-8601 instant (@DateTimeFormat). So we build the
+// ISO string the server wants and cast to satisfy the generated type. We use the picked calendar day's
+// UTC bounds; `to` is end-of-day so the picked day is inclusive (server predicate is `occurred_at < :to`).
+function dayStartIso(date: Date): Date {
+	return `${format(date, "yyyy-MM-dd")}T00:00:00.000Z` as unknown as Date;
 }
-function dayEndIso(date: string): Date {
-	return `${date}T23:59:59.999Z` as unknown as Date;
+function dayEndIso(date: Date): Date {
+	return `${format(date, "yyyy-MM-dd")}T23:59:59.999Z` as unknown as Date;
+}
+
+// Compact label for the date-range trigger, mirroring the leaderboard's TimeframeFilter.
+function formatRangeLabel(range: DateRange | undefined): string {
+	if (!range?.from) {
+		return "Any date";
+	}
+	if (!range.to) {
+		return `From ${format(range.from, "MMM d, yyyy")}`;
+	}
+	return `${format(range.from, "MMM d, yyyy")} – ${format(range.to, "MMM d, yyyy")}`;
 }
 
 function AdminAuditPage() {
 	const [eventType, setEventType] = useState<EventTypeFilter | undefined>(undefined);
 	const [result, setResult] = useState<ResultFilter | undefined>(undefined);
-	const [from, setFrom] = useState("");
-	const [to, setTo] = useState("");
+	const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 	const [accountId, setAccountId] = useState<number | undefined>(undefined);
 	const [actingAccountId, setActingAccountId] = useState<number | undefined>(undefined);
 	const [exporting, setExporting] = useState(false);
@@ -74,8 +88,8 @@ function AdminAuditPage() {
 	const filters = {
 		eventType,
 		result,
-		from: from ? dayStartIso(from) : undefined,
-		to: to ? dayEndIso(to) : undefined,
+		from: dateRange?.from ? dayStartIso(dateRange.from) : undefined,
+		to: dateRange?.to ? dayEndIso(dateRange.to) : undefined,
 		accountId,
 		actingAccountId,
 	};
@@ -100,16 +114,14 @@ function AdminAuditPage() {
 	const hasFilter =
 		eventType !== undefined ||
 		result !== undefined ||
-		from !== "" ||
-		to !== "" ||
+		dateRange?.from !== undefined ||
 		accountId !== undefined ||
 		actingAccountId !== undefined;
 
 	const clearAll = () => {
 		setEventType(undefined);
 		setResult(undefined);
-		setFrom("");
-		setTo("");
+		setDateRange(undefined);
 		setAccountId(undefined);
 		setActingAccountId(undefined);
 	};
@@ -198,31 +210,36 @@ function AdminAuditPage() {
 				</div>
 
 				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="audit-from" className="text-sm">
-						From
+					<Label htmlFor="audit-date-range" className="text-sm">
+						Date range
 					</Label>
-					<Input
-						id="audit-from"
-						type="date"
-						value={from}
-						max={to || undefined}
-						onChange={(e) => setFrom(e.target.value)}
-						className="w-40"
-					/>
-				</div>
-
-				<div className="flex flex-col gap-1.5">
-					<Label htmlFor="audit-to" className="text-sm">
-						To
-					</Label>
-					<Input
-						id="audit-to"
-						type="date"
-						value={to}
-						min={from || undefined}
-						onChange={(e) => setTo(e.target.value)}
-						className="w-40"
-					/>
+					<Popover>
+						<PopoverTrigger
+							render={
+								<Button
+									id="audit-date-range"
+									variant="outline"
+									className={cn(
+										"w-64 justify-start text-left font-normal",
+										!dateRange?.from && "text-muted-foreground",
+									)}
+								>
+									<CalendarIcon className="mr-2 size-4" aria-hidden />
+									{formatRangeLabel(dateRange)}
+								</Button>
+							}
+						/>
+						<PopoverContent className="w-auto p-0" align="start">
+							<Calendar
+								autoFocus
+								mode="range"
+								defaultMonth={dateRange?.from}
+								selected={dateRange}
+								onSelect={setDateRange}
+								numberOfMonths={2}
+							/>
+						</PopoverContent>
+					</Popover>
 				</div>
 
 				{hasFilter && (
@@ -255,6 +272,7 @@ function AdminAuditPage() {
 								type="button"
 								aria-label="Clear account filter"
 								onClick={() => setAccountId(undefined)}
+								className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								<X className="size-3" aria-hidden />
 							</button>
@@ -267,6 +285,7 @@ function AdminAuditPage() {
 								type="button"
 								aria-label="Clear actor filter"
 								onClick={() => setActingAccountId(undefined)}
+								className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								<X className="size-3" aria-hidden />
 							</button>

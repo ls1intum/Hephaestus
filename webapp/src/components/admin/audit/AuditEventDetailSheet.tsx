@@ -1,15 +1,15 @@
 import type { AuthEventView } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+	Sheet,
+	SheetContent,
+	SheetDescription,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
 import { accountLabel, eventLabel, formatTimestamp, prettyDetails } from "./auditFormat";
 
-interface AuditEventDetailDialogProps {
+interface AuditEventDetailSheetProps {
 	event: AuthEventView | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -28,15 +28,16 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 /**
  * Full forensic view of a single audit event — every field the row can't fit (workspace, user agent,
- * pretty-printed details) plus both identities. A row-level "detail drawer" is the pattern Datadog and
- * Tailscale use so wide records aren't crammed into columns or hidden in tooltips.
+ * pretty-printed details) plus both identities. A right-hand detail drawer is the pattern Datadog and
+ * Tailscale use so wide records aren't crammed into columns or hidden in tooltips; a Sheet (vs. a modal
+ * Dialog) keeps the audit table visible behind it, matching the "inspect a row" mental model.
  */
-export function AuditEventDetailDialog({
+export function AuditEventDetailSheet({
 	event,
 	open,
 	onOpenChange,
 	resolveWorkspaceName,
-}: AuditEventDetailDialogProps) {
+}: AuditEventDetailSheetProps) {
 	const ts = event ? formatTimestamp(event.occurredAt) : null;
 	const account = event ? accountLabel(event.account, event.accountId) : null;
 	const actor = event ? accountLabel(event.actor, event.actingAccountId) : null;
@@ -45,23 +46,23 @@ export function AuditEventDetailDialog({
 		event?.workspaceId != null ? resolveWorkspaceName?.(event.workspaceId) : undefined;
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<DialogHeader>
-					<DialogTitle>{event ? eventLabel(event.eventType) : "Audit event"}</DialogTitle>
-					<DialogDescription>
+		<Sheet open={open} onOpenChange={onOpenChange}>
+			<SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+				<SheetHeader>
+					<SheetTitle>{event ? eventLabel(event.eventType) : "Audit event"}</SheetTitle>
+					<SheetDescription>
 						{event ? `Event #${event.id} — ${event.eventType}` : ""}
-					</DialogDescription>
-				</DialogHeader>
+					</SheetDescription>
+				</SheetHeader>
 
 				{event && ts && (
-					<dl className="divide-y">
+					<dl className="divide-y px-4 pb-4">
 						<Row label="Time">
 							<span>{ts.local}</span>
 							<span className="ml-2 text-xs text-muted-foreground">({ts.isoUtc})</span>
 						</Row>
 						<Row label="Result">
-							<Badge variant={event.result === "FAILURE" ? "destructive" : "secondary"}>
+							<Badge variant={event.result === "FAILURE" ? "destructive" : "outline"}>
 								{event.result}
 							</Badge>
 						</Row>
@@ -118,7 +119,7 @@ export function AuditEventDetailDialog({
 						</Row>
 					</dl>
 				)}
-			</DialogContent>
-		</Dialog>
+			</SheetContent>
+		</Sheet>
 	);
 }
