@@ -103,12 +103,12 @@ public class AuthSecurityConfig {
     }
 
     /**
-     * OAuth2 (non-OIDC) user service. Routes the default {@code github} registration through
+     * OAuth2 user service. Routes the {@code github} registration through
      * {@link GitHubEmailOAuth2UserService} (fetches the primary+verified email from
      * {@code api.github.com/user/emails}); every other registration uses the framework default. Scoped
-     * to {@code github} ONLY — workspace {@code gh-ws-*} providers may be GitHub Enterprise with a
-     * different API host, which this enricher does not know. OIDC providers (gitlab-lrz, gl-ws-*) never
-     * reach this service; they go through the OidcUserService and expose {@code email_verified} natively.
+     * to {@code github} ONLY because the enricher hardcodes github.com's email API. The GitLab login is
+     * OAuth2 (scope {@code read_user}, no {@code openid}), so it takes the default service and reads its
+     * email from {@code /api/v4/user} — see {@code LoginProviderClientRegistrationRepository}.
      */
     @Bean
     public OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService() {

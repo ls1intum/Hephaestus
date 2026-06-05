@@ -19,9 +19,11 @@ import org.springframework.stereotype.Component;
  * Each entry is {@code <registrationId>:<who>}, where {@code who} is either:
  *
  * <ul>
- *   <li><b>{@code @username}</b> (recommended, e.g. {@code gitlab-lrz:@m.mustermann}) — matched
- *       against the git login the user authenticates with. Readable and the right default on
- *       institutional providers (gitlab.lrz.de handles are bound to TUM identity and not recycled).
+ *   <li><b>{@code @username}</b> (recommended, e.g. {@code gitlab:@m.mustermann}) — matched
+ *       against the git login the user authenticates with. The {@code registrationId} prefix must
+ *       equal a real provider's id (the env-seeded GitLab provider is {@code gitlab}, GitHub is
+ *       {@code github}). Readable and the right default on institutional providers (managed GitLab
+ *       handles are bound to a directory identity and not recycled).
  *       This is NOT email-matching / nOAuth: the operator must complete OAuth and authenticate as the
  *       account that currently holds that handle. The only residual risk is <em>username reclaim</em>
  *       (a relinquished public-provider handle later re-registered by someone else), which is why —</li>

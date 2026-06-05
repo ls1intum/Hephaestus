@@ -54,7 +54,7 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
               AND (:result IS NULL OR e.result = :result)
               AND (CAST(:from AS Instant) IS NULL OR e.id.occurredAt >= :from)
               AND (CAST(:to AS Instant) IS NULL OR e.id.occurredAt < :to)
-            ORDER BY e.id.occurredAt DESC
+            ORDER BY e.id.occurredAt DESC, e.id.id DESC
         """
     )
     Page<AuthEvent> findForAdmin(

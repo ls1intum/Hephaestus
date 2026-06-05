@@ -18,16 +18,11 @@ import type {
 import { LoginProviderFormDialog } from "@/components/admin/login-providers/LoginProviderFormDialog";
 import { LoginProvidersTable } from "@/components/admin/login-providers/LoginProvidersTable";
 import { Button } from "@/components/ui/button";
+import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/login-providers")({
 	component: AdminLoginProvidersPage,
 });
-
-/** Extract the RFC-7807 `detail` from a hey-api error, falling back to a generic message. */
-function problemDetail(error: unknown, fallback: string): string {
-	const detail = (error as { detail?: unknown })?.detail;
-	return typeof detail === "string" && detail.length > 0 ? detail : fallback;
-}
 
 function AdminLoginProvidersPage() {
 	const queryClient = useQueryClient();
@@ -48,7 +43,7 @@ function AdminLoginProvidersPage() {
 			setDialogOpen(false);
 			toast.success("Login provider added");
 		},
-		onError: (error) => toast.error(problemDetail(error, "Could not add the login provider")),
+		onError: (error) => toast.error(problemDetailOf(error, "Could not add the login provider")),
 	});
 
 	const updateMutation = useMutation({
@@ -58,7 +53,7 @@ function AdminLoginProvidersPage() {
 			setDialogOpen(false);
 			toast.success("Login provider updated");
 		},
-		onError: (error) => toast.error(problemDetail(error, "Could not update the login provider")),
+		onError: (error) => toast.error(problemDetailOf(error, "Could not update the login provider")),
 		onSettled: () => setMutatingId(null),
 	});
 
@@ -68,7 +63,7 @@ function AdminLoginProvidersPage() {
 			invalidate();
 			toast.success("Login provider deleted");
 		},
-		onError: (error) => toast.error(problemDetail(error, "Could not delete the login provider")),
+		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the login provider")),
 		onSettled: () => setMutatingId(null),
 	});
 

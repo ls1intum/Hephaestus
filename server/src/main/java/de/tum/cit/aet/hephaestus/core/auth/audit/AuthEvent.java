@@ -83,9 +83,9 @@ public class AuthEvent {
     private Long identityLinkId;
 
     // Bind the String through the INET JDBC type (see IssuedJwt.ipInet) — otherwise Hibernate emits a
-    // varchar and the insert fails against the `inet` column. Nullable since the GDPR Art. 17 sweep
-    // redacts the IP to NULL on erasure (AccountPurger#anonymizeAuditRows); live writes always supply a
-    // value (AuthEventWriter#captureIp falls back to '0.0.0.0' off-request).
+    // varchar and the insert fails against the `inet` column. Nullable for two reasons: the GDPR Art. 17
+    // sweep redacts the IP to NULL on erasure (AccountPurger#anonymizeAuditRows), and off-request writes
+    // store NULL (AuthEventWriter#captureIp returns null when there is no HttpServletRequest — no sentinel).
     @Column(name = "ip_inet", columnDefinition = "inet")
     @JdbcTypeCode(SqlTypes.INET)
     @Nullable

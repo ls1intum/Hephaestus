@@ -4703,11 +4703,9 @@ components:
       - baseUrl
       - createdAt
       - displayName
-      - enabled
       - redirectUri
       - registrationId
       - scopes
-      - seededFromEnv
       - type
       - updatedAt
     PageAgentJob:

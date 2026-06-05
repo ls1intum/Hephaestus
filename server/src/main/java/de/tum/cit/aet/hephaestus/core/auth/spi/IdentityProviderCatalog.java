@@ -4,20 +4,17 @@ import java.util.List;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 
 /**
- * Enumerates every sign-in option a user may pick — the env-configured defaults plus the
- * active workspace-scoped OIDC-login {@code Connection} rows. Backs the public
- * identity-provider discovery endpoint.
+ * Enumerates every enabled sign-in option a user may pick, drawn from the instance-scoped
+ * {@code login_provider} store. Backs the public identity-provider discovery endpoint.
  *
- * <p>Owned by {@code integration} (the composite {@code ClientRegistrationRepository} lives
- * there with the secret-bearing {@code Connection} access); consumed by {@code core.auth}'s
- * discovery controller through this port so the controller never imports the integration
- * repository class. Returns Spring Security {@link ClientRegistration}s — a framework-neutral
- * type both sides already speak.
+ * <p>Implemented by {@code core.auth.provider.LoginProviderClientRegistrationRepository} (the
+ * DB-backed {@code ClientRegistrationRepository} that displaces Boot's in-memory bean); consumed by
+ * {@code core.auth}'s discovery controller through this port. Returns Spring Security
+ * {@link ClientRegistration}s — a framework-neutral type both sides already speak.
  */
 public interface IdentityProviderCatalog {
     /**
-     * @return all currently resolvable client registrations (env defaults + active workspace
-     *         OIDC-login Connections). Never {@code null}.
+     * @return the client registrations for all enabled login providers. Never {@code null}.
      */
     List<ClientRegistration> listRegistrations();
 }

@@ -35,6 +35,30 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
     }
 
     @Test
+    @WithUser
+    void nonAdminCannotMutateLoginProviders() {
+        // The app_admin gate must guard the destructive endpoints too, not just the list — it fires
+        // before any provider lookup, so the result is 403 regardless of whether "github" exists.
+        webTestClient
+            .patch()
+            .uri("/admin/login-providers/github")
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("enabled", false))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        webTestClient
+            .delete()
+            .uri("/admin/login-providers/github")
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
     @WithAdminUser
     void adminCanCreateAndListWithoutLeakingTheSecret() {
         Map<String, Object> body = Map.of(

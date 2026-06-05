@@ -302,6 +302,24 @@ class AuthAuditControllerIntegrationTest {
     }
 
     @Test
+    void pageSizeIsClampedToTheMaximum() {
+        // MAX_PAGE_SIZE caps a malicious/typo'd size so it can't scan a whole monthly partition.
+        Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
+        seed(1L, AuthEvent.EventType.LOGIN, Instant.parse("2026-06-01T10:00:00Z"), admin.getId(), null);
+
+        webTestClient
+            .get()
+            .uri(builder -> builder.path("/admin/audit").queryParam("size", "100000").build())
+            .headers(h -> h.setBearerAuth(tokenFor(admin)))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.size")
+            .isEqualTo(200);
+    }
+
+    @Test
     void plainUserCannotExport() {
         Account user = persist("Plain User", Account.AppRole.USER);
 
