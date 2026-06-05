@@ -17,11 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
  * page renders one button per entry; each button targets
  * {@code /auth/login?provider={registrationId}}.
  *
- * <p>v1 lists every configured registration (env defaults + active workspace OIDC
- * Connections). Workspace-scoped filtering ({@code ?workspace={slug}} → only that
- * workspace's providers + defaults) is a thin follow-up once the workspace-slug → id
- * resolution is exposed publicly; the registration ids already encode the workspace
- * ({@code gl-ws-{id}}).
+ * <p>Lists every enabled instance-scoped {@code login_provider} (GitHub, GitLab.com, self-hosted
+ * GitLab) — one shared registration per provider, reused across all workspaces.
  */
 @RestController
 @Tag(name = "Auth discovery", description = "Identity provider discovery (public)")
@@ -46,20 +43,20 @@ public class IdentityProviderDiscoveryController {
                 new IdentityProviderViewDTO(
                     reg.getRegistrationId(),
                     reg.getClientName() != null ? reg.getClientName() : reg.getRegistrationId(),
-                    providerTypeOf(reg.getRegistrationId())
+                    providerTypeOf(reg)
                 )
             );
         }
         return ResponseEntity.ok(views);
     }
 
-    private static String providerTypeOf(String registrationId) {
-        if (registrationId.equals("github") || registrationId.startsWith("gh-ws-")) {
-            return "GITHUB";
-        }
-        if (registrationId.equals("gitlab-lrz") || registrationId.startsWith("gl-ws-")) {
-            return "GITLAB";
-        }
-        return "OIDC";
+    /**
+     * The provider type drives the SPA's icon choice. Derived from the authorization endpoint host
+     * (the only GitHub login target is github.com; everything else is a GitLab instance), so it works
+     * for any admin-registered self-hosted GitLab without relying on the registration-id naming.
+     */
+    private static String providerTypeOf(ClientRegistration reg) {
+        String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
+        return (authorizationUri != null && authorizationUri.contains("github.com")) ? "GITHUB" : "GITLAB";
     }
 }

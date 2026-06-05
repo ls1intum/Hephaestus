@@ -647,4 +647,18 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="FelixTJDietrich" id="1780291041748-16-login-provider-instance-unique">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM pg_constraint WHERE conname = 'uq_login_provider_type_base_url'</sqlCheck>
+        </preConditions>
+        <comment>One login OAuth app per SCM instance: (type, base_url) must be unique.</comment>
+        <addUniqueConstraint
+            tableName="login_provider"
+            columnNames="type, base_url"
+            constraintName="uq_login_provider_type_base_url"/>
+        <rollback>
+            <dropUniqueConstraint tableName="login_provider" constraintName="uq_login_provider_type_base_url"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

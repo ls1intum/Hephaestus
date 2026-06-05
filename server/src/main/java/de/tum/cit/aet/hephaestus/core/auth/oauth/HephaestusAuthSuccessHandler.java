@@ -11,10 +11,13 @@ import java.io.IOException;
 import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Account lookup is always {@code (provider, subject)} — never email (nOAuth defence).
  */
+@Component
 public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private static final Logger log = LoggerFactory.getLogger(HephaestusAuthSuccessHandler.class);
@@ -48,8 +52,8 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         JwtPrincipalFactory principalFactory,
         AuthIntentCookie authIntentCookie,
         AuthProperties authProperties,
-        Clock clock,
-        String webappBaseUrl
+        @Qualifier("authClock") Clock clock,
+        @Value("${hephaestus.webapp.url:}") String webappBaseUrl
     ) {
         this.provisioningService = provisioningService;
         this.jwtIssuer = jwtIssuer;

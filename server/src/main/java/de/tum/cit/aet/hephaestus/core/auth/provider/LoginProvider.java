@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,7 +30,15 @@ import org.hibernate.annotations.UpdateTimestamp;
  * never leaves the server.
  */
 @Entity
-@Table(name = "login_provider")
+@Table(
+    name = "login_provider",
+    // One login OAuth app per instance: a (type, baseUrl) pair identifies a single SCM instance, so two
+    // rows for e.g. https://gitlab.lrz.de would mean two login buttons → split identities for one user.
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_login_provider_type_base_url",
+        columnNames = { "type", "base_url" }
+    )
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -84,4 +93,12 @@ public class LoginProvider {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Normalize on write (trim + strip trailing slashes) so the {@code (type, base_url)} uniqueness is
+     * meaningful — {@code https://gitlab.lrz.de} and {@code https://gitlab.lrz.de/} are the same instance.
+     */
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl == null ? null : baseUrl.trim().replaceAll("/+$", "");
+    }
 }

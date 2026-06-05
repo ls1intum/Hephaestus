@@ -66,6 +66,8 @@ public class WorkspaceScopedTables {
         "account_export",
         // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
         "worker_registry",
+        // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
+        "login_provider",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"

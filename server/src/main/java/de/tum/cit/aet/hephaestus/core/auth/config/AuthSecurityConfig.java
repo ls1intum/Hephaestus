@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
-import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
-import de.tum.cit.aet.hephaestus.core.auth.oauth.AccountProvisioningService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
@@ -10,7 +8,6 @@ import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import java.security.SecureRandom;
-import java.time.Clock;
 import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,30 +80,6 @@ public class AuthSecurityConfig {
         return environment.acceptsProfiles(Profiles.of("prod"));
     }
 
-    @Bean
-    public HephaestusAuthSuccessHandler hephaestusAuthSuccessHandler(
-        AccountProvisioningService provisioningService,
-        HephaestusJwtIssuer jwtIssuer,
-        de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory principalFactory,
-        AuthIntentCookie authIntentCookie,
-        AuthProperties properties,
-        Clock authClock,
-        // Origin of the SPA. Same origin as the API in production (so a relative redirect is enough),
-        // but in local dev the SPA (:4200) and API (:8080) differ, so the post-login 302 must target
-        // the app origin or it lands on the API origin (which serves no SPA → 404). Blank = relative.
-        @org.springframework.beans.factory.annotation.Value("${hephaestus.webapp.url:}") String webappBaseUrl
-    ) {
-        return new HephaestusAuthSuccessHandler(
-            provisioningService,
-            jwtIssuer,
-            principalFactory,
-            authIntentCookie,
-            properties,
-            authClock,
-            webappBaseUrl
-        );
-    }
-
     /**
      * Resolver that adds PKCE (RFC 7636 / RFC 9700) to every login authorization request. Spring
      * only auto-enables PKCE for <em>public</em> clients; our login registrations are confidential
@@ -156,7 +129,6 @@ public class AuthSecurityConfig {
         HephaestusAuthSuccessHandler successHandler,
         AuthRateLimitFilter authRateLimitFilter,
         ClientRegistrationRepository clientRegistrationRepository,
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService,
         // SPA origin (blank in prod = same origin). In local dev the SPA (:4200) and API (:8080)
         // differ, so the OAuth failure redirect must target the app origin, not the API origin.
         @org.springframework.beans.factory.annotation.Value("${hephaestus.webapp.url:}") String webappBaseUrl
@@ -187,7 +159,7 @@ public class AuthSecurityConfig {
                 );
                 // GitHub: enrich attributes with the primary+verified email from /user/emails so
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
-                oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService));
+                oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
                 oauth.successHandler(successHandler);
                 oauth.failureUrl(appBase + "/auth/error?code=oauth_failure");
             });
