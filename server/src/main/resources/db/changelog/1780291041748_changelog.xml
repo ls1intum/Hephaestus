@@ -626,10 +626,10 @@
             <column name="scopes" type="VARCHAR(512)">
                 <constraints nullable="false"/>
             </column>
-            <column name="enabled" type="BOOLEAN" defaultValueBoolean="true">
+            <column name="enabled" type="BOOLEAN">
                 <constraints nullable="false"/>
             </column>
-            <column name="seeded_from_env" type="BOOLEAN" defaultValueBoolean="false">
+            <column name="seeded_from_env" type="BOOLEAN">
                 <constraints nullable="false"/>
             </column>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">

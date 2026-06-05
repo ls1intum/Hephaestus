@@ -533,6 +533,21 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
+    LoginProvider {
+        BIGINT id PK
+        VARCHAR(64) registration_id UK "NOT NULL"
+        VARCHAR(10) type UK "NOT NULL"
+        VARCHAR(255) display_name "NOT NULL"
+        VARCHAR(512) base_url UK "NOT NULL"
+        VARCHAR(512) client_id "NOT NULL"
+        TEXT client_secret "NOT NULL"
+        VARCHAR(512) scopes "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        BOOLEAN seeded_from_env "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
     Milestone {
         BIGINT id PK
         TIMESTAMPTZ created_at
