@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,9 +60,11 @@ class AccountServiceTest extends BaseUnitTest {
     }
 
     private static IdentityLink link(long id, long gitProviderId) {
-        IdentityLink il = mock(IdentityLink.class);
-        lenient().when(il.getId()).thenReturn(id);
-        lenient().when(il.getGitProviderId()).thenReturn(gitProviderId);
+        // Real owned entity, not a mock: stubbing getId()/getGitProviderId() would test the stub, not
+        // the service, and couple to getter names. IdentityLink is @NoArgsConstructor + @Setter.
+        IdentityLink il = new IdentityLink();
+        il.setId(id);
+        il.setGitProviderId(gitProviderId);
         return il;
     }
 

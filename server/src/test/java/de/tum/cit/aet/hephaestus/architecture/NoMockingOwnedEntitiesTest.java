@@ -53,7 +53,8 @@ class NoMockingOwnedEntitiesTest {
         "Commit",
         "Organization",
         "GitProvider",
-        "User"
+        "User",
+        "IdentityLink"
     );
 
     /** {@code mock(Entity.class)} or {@code Mockito.mock(Entity.class)}, with optional settings arg. */
