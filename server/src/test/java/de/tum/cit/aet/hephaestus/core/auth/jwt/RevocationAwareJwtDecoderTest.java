@@ -47,6 +47,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -149,8 +150,11 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
 
         RevocationAwareJwtDecoder decoder = decoder(repo, cacheManager());
 
+        // BadJwtException (not a bare JwtException): this subtype is what makes Spring's
+        // JwtAuthenticationProvider answer a revoked token with 401, not 500. Asserting the exact
+        // type pins that production contract (covered end-to-end by CookieAuthenticationIntegrationTest).
         assertThatThrownBy(() -> decoder.decode(validToken(jti)))
-            .isInstanceOf(JwtException.class)
+            .isInstanceOf(BadJwtException.class)
             .hasMessageContaining("revoked");
     }
 
@@ -233,9 +237,11 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         when(repo.findActive(eq(jti), any())).thenThrow(new RuntimeException("db down"));
 
-        // Fail CLOSED: a DB outage must reject the token, never accept a signature-valid one.
+        // Fail CLOSED: a DB outage must reject the token, never accept a signature-valid one — and as a
+        // BadJwtException so the unverifiable token is answered 401 (fail-closed), not 500. A bare
+        // JwtException here would turn every request during a DB blip into a 500 instead of a clean 401.
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(validToken(jti)))
-            .isInstanceOf(JwtException.class)
+            .isInstanceOf(BadJwtException.class)
             .hasMessageContaining("revocation check failed");
 
         // …and the fail-closed rejection is observable (a DB-outage mass-401 must not be silent).
@@ -282,8 +288,9 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         RevocationAwareJwtDecoder decoder = decoder(repo, cacheManager());
 
         assertThat(decoder.decode(validToken(jti)).getId()).isEqualTo(jti.toString());
+        // The revoke-between-requests verdict must also be a BadJwtException → 401 (see rejectsRevokedJti).
         assertThatThrownBy(() -> decoder.decode(validToken(jti)))
-            .isInstanceOf(JwtException.class)
+            .isInstanceOf(BadJwtException.class)
             .hasMessageContaining("revoked");
     }
 

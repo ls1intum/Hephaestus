@@ -17,6 +17,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimNames;
 import org.springframework.security.oauth2.jwt.JwtClaimValidator;
@@ -41,8 +42,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * bounds how long a revocation is remembered locally to shed token-replay load.
  *
  * <h2>Failure mode</h2>
- * If the DB is unreachable, this decoder fails closed — it surfaces an
- * {@code invalid_token} {@link JwtException}, which downstream Spring maps to a 401. The
+ * If the DB is unreachable, this decoder fails closed — it surfaces an {@code invalid_token}
+ * {@link BadJwtException}. The {@link BadJwtException} subtype matters: Spring's
+ * {@code JwtAuthenticationProvider} maps it to {@code InvalidBearerTokenException} → 401, whereas a
+ * bare {@link JwtException} would map to {@code AuthenticationServiceException} → 500. The
  * alternative (fail open, accept any signature-valid JWT) would defeat "sign out everywhere."
  */
 public class RevocationAwareJwtDecoder implements JwtDecoder {
@@ -130,12 +133,15 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         } catch (RuntimeException dbError) {
             metrics.recordRevocationCheckFailed();
             log.error("auth.jwt: revocation lookup failed for jti={}", jti, dbError);
-            throw new JwtException("revocation check failed", dbError);
+            // BadJwtException (not bare JwtException) so the provider maps this to a 401, not a 500.
+            throw new BadJwtException("revocation check failed", dbError);
         }
     }
 
     private static JwtException revokedException() {
         OAuth2Error error = new OAuth2Error("invalid_token", "token has been revoked or expired", null);
-        return new JwtException(error.getDescription());
+        // BadJwtException (a JwtException subtype): Spring's JwtAuthenticationProvider maps it to
+        // InvalidBearerTokenException → 401. A bare JwtException would surface as a 500 instead.
+        return new BadJwtException(error.getDescription());
     }
 }

@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
+import java.time.Instant;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +22,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
@@ -53,6 +58,12 @@ class CookieAuthenticationIntegrationTest {
 
     @Autowired
     private JwtPrincipalFactory principalFactory;
+
+    @Autowired
+    private IssuedJwtRepository issuedJwtRepository;
+
+    @Autowired
+    private PlatformTransactionManager txManager;
 
     @Value("${hephaestus.auth.cookie-name:__Host-HEPHAESTUS_AT}")
     private String cookieName;
@@ -104,6 +115,42 @@ class CookieAuthenticationIntegrationTest {
     @Test
     void noCredentialsIsUnauthorized() {
         webTestClient.get().uri("/user").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void revokedTokenIsRejectedWith401ThroughTheLiveChain() {
+        // The headline guarantee of the revocation design (sign-out-everywhere), proven end-to-end:
+        // the RevocationAwareJwtDecoder NEVER caches an ACTIVE token — it re-reads the issued_jwt row
+        // on every request — so a revocation takes effect immediately on the next request.
+        IssuedAccount issued = issueRealTokenForNewAccount("Revoked Rita");
+
+        // Freshly minted: the cookie authenticates.
+        webTestClient
+            .get()
+            .uri("/user")
+            .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        // Revoke every session for the account (the issuer persisted the issued_jwt row). The
+        // @Modifying query needs an active, COMMITTED tx so the server thread's next read sees it.
+        new TransactionTemplate(txManager).executeWithoutResult(status ->
+            issuedJwtRepository.revokeAllForAccount(
+                issued.accountId(),
+                Instant.now(),
+                IssuedJwt.RevokedReason.SIGN_OUT_EVERYWHERE
+            )
+        );
+
+        // The SAME cookie now fails closed: 401 via the resource-server chain.
+        webTestClient
+            .get()
+            .uri("/user")
+            .header(HttpHeaders.COOKIE, cookieName + "=" + issued.token())
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
     }
 
     // NOTE on CSRF: the cookie-style POST-without-token → 403 contract is covered by
