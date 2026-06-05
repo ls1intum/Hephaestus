@@ -29,6 +29,8 @@ class ReturnToValidatorTest extends BaseUnitTest {
             "file:///etc/passwd",
             "evil.com", // no leading slash
             "\\\\evil.com", // UNC-style
+            "//", // EXACTLY two chars: the protocol-relative guard must fire at length == 2, not only > 2
+            "/\\", // two chars, backslash second char (browser may treat as protocol-relative)
         }
     )
     void rejectsUnsafeReturnTo(String unsafe) {
@@ -36,7 +38,11 @@ class ReturnToValidatorTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "/", "/dashboard", "/workspaces/acme/settings", "/path?q=1&b=2", "/path#frag" })
+    @ValueSource(
+        strings = {
+            "/", "/dashboard", "/workspaces/acme/settings", "/path?q=1&b=2", "/path#frag", "/search?q=hello world", // a bare space (0x20) is allowed — only chars BELOW 0x20 are control
+        }
+    )
     void acceptsSafeRelativePaths(String safe) {
         assertThat(ReturnToValidator.safeOrFallback(safe)).isEqualTo(safe);
     }

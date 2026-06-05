@@ -145,9 +145,56 @@ class ServerUrlValidatorTest extends BaseUnitTest {
                 .hasMessageContaining("non-canonical numeric host");
         }
 
+        // The 0177-style octal form above reaches the dotted-quad canonicality check because URI parses
+        // it as a reg-name. The shorthand / out-of-range forms below are rejected EARLIER: java.net.URI
+        // returns a null host for an IPv4-shaped authority that isn't four in-range octets, so validate()
+        // fails them at the "valid hostname" guard. Either way they must never slip through — this pins
+        // that the dangerous shorthands are rejected, regardless of which guard fires.
+
+        @Test
+        void rejectsLoopbackShorthand() {
+            // "127.1" expands to 127.0.0.1 (loopback) in many resolvers — the canonical SSRF shorthand.
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://127.1")).isInstanceOf(
+                IllegalArgumentException.class
+            );
+        }
+
+        @Test
+        void rejectsThreeOctetShorthand() {
+            // "1.2.3" expands to 1.2.0.3 — fewer than four octets must not be accepted as a literal host.
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://1.2.3")).isInstanceOf(
+                IllegalArgumentException.class
+            );
+        }
+
+        @Test
+        void rejectsOctetAbove255() {
+            // 256 is out of range; must not be accepted as a host literal.
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://256.1.1.1")).isInstanceOf(
+                IllegalArgumentException.class
+            );
+        }
+
+        @Test
+        void rejectsLeadingZeroOctet() {
+            // "010.0.0.1" keeps a non-null host (a 3-digit reg-name octet), so it reaches the dotted-quad
+            // check — and a leading-zero octet is octal-ambiguous (010 == 8 in some resolvers), so it must
+            // be rejected as non-canonical, not silently accepted as 10.0.0.1.
+            assertThatThrownBy(() -> ServerUrlValidator.validate("https://010.0.0.1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("non-canonical numeric host");
+        }
+
         @Test
         void stillAcceptsCanonicalPublicIpv4() {
             assertThatCode(() -> ServerUrlValidator.validate("https://8.8.8.8")).doesNotThrowAnyException();
+        }
+
+        @Test
+        void stillAcceptsCanonicalPublicIpv4WithAZeroOctet() {
+            // A single "0" octet is canonical (only MULTI-digit leading zeros are octal-ambiguous). The
+            // leading-zero guard must use length > 1, not >= 1, or it would reject legitimate public IPs.
+            assertThatCode(() -> ServerUrlValidator.validate("https://8.0.8.8")).doesNotThrowAnyException();
         }
 
         @Test
