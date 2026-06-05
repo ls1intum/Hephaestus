@@ -48,6 +48,15 @@ class EncryptedStringConverterTest extends BaseUnitTest {
     }
 
     @Test
+    void throwsOnTruncatedCiphertextShorterThanIv() {
+        // An ENC: blob whose decoded body is shorter than the 12-byte GCM IV must fail closed
+        // (EncryptionException), not leak a NegativeArraySizeException from `new byte[len - 12]`.
+        EncryptedStringConverter c = converter();
+        String truncated = "ENC:" + java.util.Base64.getEncoder().encodeToString(new byte[5]);
+        assertThatThrownBy(() -> c.convertToEntityAttribute(truncated)).isInstanceOf(EncryptionException.class);
+    }
+
+    @Test
     void failsFastInProdWhenKeyMissing() {
         assertThatThrownBy(() -> new EncryptedStringConverter("", "prod")).isInstanceOf(IllegalStateException.class);
     }
