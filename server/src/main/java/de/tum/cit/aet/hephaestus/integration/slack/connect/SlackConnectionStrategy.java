@@ -70,7 +70,7 @@ public class SlackConnectionStrategy implements ConnectionStrategy {
 
     @Override
     public ConnectInitiation initiate(InitiateRequest request) {
-        String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.SLACK);
+        String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.SLACK, request.actorRef());
         StringBuilder url = new StringBuilder(AUTHORIZE_URL)
             .append('?')
             .append("client_id=")

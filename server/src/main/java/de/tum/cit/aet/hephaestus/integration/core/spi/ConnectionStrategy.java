@@ -35,7 +35,8 @@ public interface ConnectionStrategy {
         long workspaceId,
         IntegrationKind kind,
         Map<String, String> userInput, // pasted PAT, configured server URL, etc.
-        @Nullable URI redirectAfter // where to bounce the user post-OAuth
+        @Nullable URI redirectAfter, // where to bounce the user post-OAuth
+        @Nullable String actorRef // initiating admin, woven into the OAuth state so the audit row attributes it
     ) {}
 
     sealed interface ConnectInitiation permits ConnectInitiation.RedirectToVendor, ConnectInitiation.AcceptInline {

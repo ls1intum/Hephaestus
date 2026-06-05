@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.connect;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -112,16 +113,21 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void initiate_buildsAuthorizeUrlWithLockedScopes() {
-        when(oauthStateService.issue(42L, IntegrationKind.SLACK)).thenReturn("state-abc");
+        // The initiating admin's actorRef must be woven into the OAuth state so the post-callback
+        // connection audit row attributes the connect to them.
+        when(oauthStateService.issue(42L, IntegrationKind.SLACK, "admin@example.com")).thenReturn("state-abc");
 
         var initiation = strategy.initiate(
             new de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.InitiateRequest(
                 42L,
                 IntegrationKind.SLACK,
                 Map.of(),
-                null
+                null,
+                "admin@example.com"
             )
         );
+
+        verify(oauthStateService).issue(42L, IntegrationKind.SLACK, "admin@example.com");
 
         assertThat(initiation).isInstanceOf(
             de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.ConnectInitiation.RedirectToVendor.class
