@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,16 +77,6 @@ class OAuthStateNonceStoreTest extends BaseUnitTest {
         assertThat(store.tryConsume("")).isFalse();
         verify(repository, never()).markConsumed(any(), any());
     }
-
-    @Test
-    void tryConsumeMapsRowCountFaithfully() {
-        // Simulate the repository returning row-count for a sequence of attempts.
-        // The store must NOT add extra state — it's a thin mapper.
-        when(repository.markConsumed(eq("abc"), any(Instant.class))).thenReturn(1).thenReturn(0).thenReturn(0);
-
-        assertThat(store.tryConsume("abc")).isTrue();
-        assertThat(store.tryConsume("abc")).isFalse();
-        assertThat(store.tryConsume("abc")).isFalse();
-        verify(repository, times(3)).markConsumed(eq("abc"), any(Instant.class));
-    }
+    // The full consume-once-then-reject sequence (and its concurrency) is proven against real SQL by
+    // OAuthStateNonceStoreIntegrationTest; a mock "thin mapper" replay of it here added no signal.
 }
