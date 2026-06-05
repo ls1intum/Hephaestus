@@ -4100,6 +4100,10 @@ components:
         impersonatorId:
           type: integer
           format: int64
+        linkedProviders:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkedProvider"
         primaryEmail:
           type: string
         profileUrl:
@@ -4300,9 +4304,12 @@ components:
           example: https://gitlab.lrz.de
     IdentityProviderView:
       type: object
-      description: One row per sign-in option. <code>providerType</code> drives the
-        SPA's icon choice.
+      description: |-
+        One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
+         the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
       properties:
+        baseUrl:
+          type: string
         displayName:
           type: string
         providerType:
@@ -4547,6 +4554,15 @@ components:
       required:
       - current
       - target
+    LinkedProvider:
+      type: object
+      description: "A provider instance the current user is linked to: its type +\
+        \ server-url origin."
+      properties:
+        serverUrl:
+          type: string
+        type:
+          type: string
     LoginProviderView:
       type: object
       description: Admin view of a login provider. The client secret is never included.

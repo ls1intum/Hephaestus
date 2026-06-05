@@ -55,8 +55,14 @@ public class AccountWebController {
         @Nullable String identityProvider,
         @Nullable String gitProviderId,
         boolean hasGitLabIdentity,
+        // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
+        // gate on the *target instance* rather than merely "has any GitLab identity".
+        java.util.List<LinkedProviderDTO> linkedProviders,
         java.util.List<String> roles
     ) {}
+
+    /** A provider instance the current user is linked to: its type + server-url origin. */
+    public record LinkedProviderDTO(String type, @Nullable String serverUrl) {}
 
     public record IdentityViewDTO(
         Long id,
@@ -76,9 +82,17 @@ public class AccountWebController {
         var identities = accountService.activeIdentities(account.getId());
         // Primary identity = most recently used active link (login source for the SPA).
         IdentityLink primary = identities.stream().findFirst().orElse(null);
-        boolean hasGitLab = identities
+        java.util.List<LinkedProviderDTO> linkedProviders = identities
             .stream()
-            .anyMatch(il -> "GITLAB".equals(gitProviderRegistry.providerTypeName(il.getGitProviderId())));
+            .map(il ->
+                new LinkedProviderDTO(
+                    gitProviderRegistry.providerTypeName(il.getGitProviderId()),
+                    gitProviderRegistry.providerServerUrl(il.getGitProviderId())
+                )
+            )
+            .distinct()
+            .toList();
+        boolean hasGitLab = linkedProviders.stream().anyMatch(p -> "GITLAB".equals(p.type()));
         return ResponseEntity.ok(
             new CurrentUserViewDTO(
                 account.getId(),
@@ -94,6 +108,7 @@ public class AccountWebController {
                 primary != null ? gitProviderRegistry.providerTypeName(primary.getGitProviderId()) : null,
                 primary != null ? primary.getSubject() : null,
                 hasGitLab,
+                linkedProviders,
                 CurrentAccount.roles()
             )
         );

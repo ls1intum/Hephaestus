@@ -27,6 +27,8 @@ export interface AuthContextType {
 	getUserProfilePictureUrl: () => string;
 	/** Whether the user has a linked GitLab identity (logged in via GitLab or account linked) */
 	hasGitLabIdentity: boolean;
+	/** SCM instances the account has an active identity on — for instance-scoped gating. */
+	linkedProviders: Array<{ type: string; serverUrl?: string }>;
 	/** True when the current session is impersonating another account. */
 	isImpersonating: boolean;
 	/** Display name of the impersonated account (the current user) while impersonating. */
@@ -134,6 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		getGitProviderId,
 		getUserProfilePictureUrl,
 		hasGitLabIdentity: user?.hasGitLabIdentity ?? false,
+		linkedProviders: userProfile?.linkedProviders ?? [],
 		isImpersonating: user?.impersonating ?? false,
 		impersonatedDisplayName: user?.displayName ?? undefined,
 	};

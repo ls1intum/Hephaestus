@@ -30,8 +30,16 @@ public class IdentityProviderDiscoveryController {
         this.identityProviderCatalog = identityProviderCatalog;
     }
 
-    /** One row per sign-in option. {@code providerType} drives the SPA's icon choice. */
-    public record IdentityProviderViewDTO(String registrationId, String displayName, String providerType) {}
+    /**
+     * One row per sign-in option. {@code providerType} drives the SPA's icon choice; {@code baseUrl} is
+     * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
+     */
+    public record IdentityProviderViewDTO(
+        String registrationId,
+        String displayName,
+        String providerType,
+        String baseUrl
+    ) {}
 
     @GetMapping("/identity-providers")
     @PreAuthorize("permitAll()")
@@ -43,7 +51,8 @@ public class IdentityProviderDiscoveryController {
                 new IdentityProviderViewDTO(
                     reg.getRegistrationId(),
                     reg.getClientName() != null ? reg.getClientName() : reg.getRegistrationId(),
-                    providerTypeOf(reg)
+                    providerTypeOf(reg),
+                    baseUrlOf(reg)
                 )
             );
         }
@@ -58,5 +67,23 @@ public class IdentityProviderDiscoveryController {
     private static String providerTypeOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
         return (authorizationUri != null && authorizationUri.contains("github.com")) ? "GITHUB" : "GITLAB";
+    }
+
+    /** The SCM instance origin (scheme + host[:port]) derived from the authorization endpoint. */
+    private static String baseUrlOf(ClientRegistration reg) {
+        String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
+        if (authorizationUri == null) {
+            return "";
+        }
+        try {
+            java.net.URI uri = new java.net.URI(authorizationUri);
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return "";
+            }
+            String origin = uri.getScheme() + "://" + uri.getHost();
+            return uri.getPort() == -1 ? origin : origin + ":" + uri.getPort();
+        } catch (java.net.URISyntaxException e) {
+            return "";
+        }
     }
 }

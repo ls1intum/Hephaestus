@@ -42,12 +42,26 @@ export const currentUser: CurrentUserView = {
 	identityProvider: "GITHUB",
 	gitProviderId: "583231",
 	hasGitLabIdentity: true,
+	linkedProviders: [
+		{ type: "GITHUB", serverUrl: "https://github.com" },
+		{ type: "GITLAB", serverUrl: "https://gitlab.lrz.de" },
+	],
 	impersonating: false,
 };
 
 export const identityProviders: IdentityProviderView[] = [
-	{ registrationId: "github", displayName: "GitHub", providerType: "GITHUB" },
-	{ registrationId: "gitlab-lrz", displayName: "GitLab LRZ", providerType: "GITLAB" },
+	{
+		registrationId: "github",
+		displayName: "GitHub",
+		providerType: "GITHUB",
+		baseUrl: "https://github.com",
+	},
+	{
+		registrationId: "gitlab-lrz",
+		displayName: "GitLab LRZ",
+		providerType: "GITLAB",
+		baseUrl: "https://gitlab.lrz.de",
+	},
 ];
 
 export const linkedIdentities: Wire<IdentityView>[] = [

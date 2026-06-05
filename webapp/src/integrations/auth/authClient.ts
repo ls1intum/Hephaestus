@@ -45,6 +45,8 @@ export interface UserProfile {
 	githubId?: string;
 	gitlabId?: string;
 	identityProvider?: string;
+	/** SCM instances this account has an active identity on (for instance-scoped gating). */
+	linkedProviders: Array<{ type: string; serverUrl?: string }>;
 }
 
 const serverUrl = () => environment.serverUrl.replace(/\/$/, "");
@@ -128,5 +130,9 @@ export function toUserProfile(user: CurrentUserView): UserProfile {
 		githubId: user.identityProvider === "GITHUB" ? (user.gitProviderId ?? undefined) : undefined,
 		gitlabId: user.identityProvider === "GITLAB" ? (user.gitProviderId ?? undefined) : undefined,
 		identityProvider: user.identityProvider ?? undefined,
+		linkedProviders: (user.linkedProviders ?? []).map((p) => ({
+			type: p.type ?? "",
+			serverUrl: p.serverUrl ?? undefined,
+		})),
 	};
 }

@@ -1447,6 +1447,14 @@ export type LoginProviderView = {
 };
 
 /**
+ * A provider instance the current user is linked to: its type + server-url origin.
+ */
+export type LinkedProvider = {
+    serverUrl?: string;
+    type?: string;
+};
+
+/**
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -1597,9 +1605,11 @@ export type IdentityView = {
 };
 
 /**
- * One row per sign-in option. <code>providerType</code> drives the SPA's icon choice.
+ * One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
+ * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
  */
 export type IdentityProviderView = {
+    baseUrl?: string;
     displayName?: string;
     providerType?: string;
     registrationId?: string;
@@ -1778,6 +1788,7 @@ export type CurrentUserView = {
     identityProvider?: string;
     impersonating?: boolean;
     impersonatorId?: number;
+    linkedProviders?: Array<LinkedProvider>;
     primaryEmail?: string;
     profileUrl?: string;
     roles?: Array<string>;

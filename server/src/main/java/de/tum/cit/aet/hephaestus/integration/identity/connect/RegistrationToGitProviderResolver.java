@@ -50,6 +50,15 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
             .orElse(UNKNOWN);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public String providerServerUrl(Long gitProviderId) {
+        if (gitProviderId == null) {
+            return null;
+        }
+        return gitProviderRepository.findById(gitProviderId).map(GitProvider::getServerUrl).orElse(null);
+    }
+
     /**
      * The scheme + host (+ explicit non-default port) of the base URL — the canonical server URL used
      * to key the {@code git_provider} row (e.g. {@code https://github.com}, {@code https://gitlab.lrz.de}).

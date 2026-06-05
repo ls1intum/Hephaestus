@@ -34,4 +34,15 @@ public interface GitProviderRegistry {
      * @return the provider type name, or {@code "UNKNOWN"} when the id is {@code null} or no row exists
      */
     String providerTypeName(Long gitProviderId);
+
+    /**
+     * Resolve the server-url origin (e.g. {@code https://github.com}, {@code https://gitlab.lrz.de}) for
+     * a {@code git_provider} row id. Lets read-side auth surfaces tell <em>which instance</em> an
+     * {@link de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink} belongs to — so a workspace-creation
+     * gate can be instance-scoped, not merely type-scoped.
+     *
+     * @param gitProviderId the {@code git_provider} row id, or {@code null}
+     * @return the server-url origin, or {@code null} when the id is {@code null} or no row exists
+     */
+    String providerServerUrl(Long gitProviderId);
 }

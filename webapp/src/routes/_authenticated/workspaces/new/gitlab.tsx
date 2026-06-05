@@ -39,40 +39,43 @@ const STEP_META = [
 	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
 ] as const;
 
+interface GitLabProvider {
+	registrationId: string;
+	displayName: string;
+	baseUrl: string;
+}
+
+function BackToProviders() {
+	return (
+		<Link
+			to="/workspaces/new"
+			className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+		>
+			<ArrowLeftIcon className="size-3.5" />
+			Back
+		</Link>
+	);
+}
+
 /**
- * Prompts the user to link their GitLab account via re-login linking: a top-level redirect to
- * the GitLab identity provider that attaches the GitLab identity to the currently authenticated
- * account. There is no longer an account-claiming path — linking is always done by re-login.
+ * Shown when no GitLab sign-in is configured for this instance, so there is nothing to link. An admin
+ * must add a GitLab login provider first (Instance admin → Login providers).
  */
-function GitLabLinkPrompt({
-	gitlabIdpAlias,
-	linkAccount,
-}: {
-	gitlabIdpAlias?: string;
-	linkAccount: (alias: string) => Promise<void>;
-}) {
+function NoGitLabProviderNotice({ isAppAdmin }: { isAppAdmin: boolean }) {
 	return (
 		<div className="mx-auto max-w-2xl py-8">
-			<Link
-				to="/workspaces/new"
-				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
-			>
-				<ArrowLeftIcon className="size-3.5" />
-				Back
-			</Link>
-
+			<BackToProviders />
 			<div className="space-y-4">
-				<div className="space-y-1.5">
-					<h1 className="text-2xl font-semibold tracking-tight">Link Your GitLab Account</h1>
-					<p className="text-muted-foreground">
-						To create a GitLab workspace, you need to link your GitLab account first. You'll be
-						redirected to GitLab to sign in; the identity is then attached to your current account.
-					</p>
-				</div>
-
-				{gitlabIdpAlias && (
-					<Button className="w-fit" onClick={() => linkAccount(gitlabIdpAlias)}>
-						Link GitLab Account
+				<h1 className="text-2xl font-semibold tracking-tight">GitLab sign-in isn't configured</h1>
+				<p className="text-muted-foreground">
+					This instance has no GitLab login provider, so a GitLab account can't be linked yet.
+					{isAppAdmin
+						? " Add one to enable GitLab sign-in."
+						: " Ask an instance admin to add one (Instance admin → Login providers)."}
+				</p>
+				{isAppAdmin && (
+					<Button className="w-fit" render={<Link to="/admin/login-providers" />}>
+						Manage login providers
 					</Button>
 				)}
 			</div>
@@ -80,8 +83,59 @@ function GitLabLinkPrompt({
 	);
 }
 
+/**
+ * Prompts the user to link a GitLab account via re-login linking: a top-level redirect to the GitLab
+ * identity provider that attaches the identity to the current account. When more than one GitLab
+ * instance is configured, the user picks which instance to link (no arbitrary default).
+ */
+function GitLabLinkPrompt({
+	providers,
+	linkedServerUrls,
+	linkAccount,
+}: {
+	providers: GitLabProvider[];
+	linkedServerUrls: Set<string>;
+	linkAccount: (alias: string) => Promise<void>;
+}) {
+	const multiple = providers.length > 1;
+	return (
+		<div className="mx-auto max-w-2xl py-8">
+			<BackToProviders />
+			<div className="space-y-4">
+				<div className="space-y-1.5">
+					<h1 className="text-2xl font-semibold tracking-tight">Link your GitLab account</h1>
+					<p className="text-muted-foreground">
+						{multiple
+							? "To create a GitLab workspace, link the GitLab instance you'll monitor. You'll be redirected to sign in; the identity is then attached to your current account."
+							: "To create a GitLab workspace, link your GitLab account first. You'll be redirected to GitLab to sign in; the identity is then attached to your current account."}
+					</p>
+				</div>
+				<div className="flex flex-col items-start gap-2">
+					{providers.map((provider) => {
+						const linked = linkedServerUrls.has(provider.baseUrl);
+						return (
+							<Button
+								key={provider.registrationId}
+								variant={linked ? "outline" : "default"}
+								disabled={linked}
+								onClick={() => linkAccount(provider.registrationId)}
+							>
+								{linked
+									? `${provider.displayName} — already linked`
+									: multiple
+										? `Link ${provider.displayName}`
+										: "Link GitLab account"}
+							</Button>
+						);
+					})}
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function GitLabWizardPage() {
-	const { hasGitLabIdentity, linkAccount } = useAuth();
+	const { hasGitLabIdentity, linkAccount, linkedProviders, isAppAdmin } = useAuth();
 
 	const {
 		data: providers,
@@ -92,14 +146,24 @@ function GitLabWizardPage() {
 		staleTime: 5 * 60 * 1000,
 	});
 
-	// Find the GitLab IdP registration id for account linking
+	// The configured GitLab sign-in options (one per instance). Used to gate + drive instance-scoped
+	// account linking — never an arbitrary "first gitlab-ish" provider.
 	const { data: identityProviders } = useQuery({
 		...listIdentityProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
-	const gitlabIdpAlias = identityProviders?.find(
-		(p) => p.registrationId?.startsWith("gitlab") || p.providerType === "gitlab",
-	)?.registrationId;
+	const gitlabProviders: GitLabProvider[] = (identityProviders ?? [])
+		.filter((p) => p.providerType === "GITLAB" && !!p.registrationId)
+		.map((p) => ({
+			registrationId: p.registrationId as string,
+			displayName: p.displayName || (p.registrationId as string),
+			baseUrl: p.baseUrl ?? "",
+		}));
+	const linkedGitlabServerUrls = new Set(
+		linkedProviders
+			.filter((p) => p.type === "GITLAB" && p.serverUrl)
+			.map((p) => p.serverUrl as string),
+	);
 
 	const gitlabEnabled = !!providers?.gitlab;
 	const defaultServerUrl = providers?.gitlab?.defaultServerUrl;
@@ -239,8 +303,18 @@ function GitLabWizardPage() {
 		return <Navigate to="/workspaces/new" />;
 	}
 
+	if (gitlabProviders.length === 0) {
+		return <NoGitLabProviderNotice isAppAdmin={isAppAdmin} />;
+	}
+
 	if (!hasGitLabIdentity) {
-		return <GitLabLinkPrompt gitlabIdpAlias={gitlabIdpAlias} linkAccount={linkAccount} />;
+		return (
+			<GitLabLinkPrompt
+				providers={gitlabProviders}
+				linkedServerUrls={linkedGitlabServerUrls}
+				linkAccount={linkAccount}
+			/>
+		);
 	}
 
 	return (
