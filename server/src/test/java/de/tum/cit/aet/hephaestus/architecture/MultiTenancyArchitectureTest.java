@@ -591,10 +591,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "LeaderboardDigestReadyEvent", // Carries workspaceId for the vendor-publish fan-out
                                 "WorkspaceCreatedEvent", // Carries workspaceId + kind
                                 "WorkspaceScheduleChangedEvent", // Carries workspaceId for leaderboard reschedule
-                                // Connection lifecycle event; its sole consumer is the global OIDC-login
-                                // ClientRegistration cache (LoginClientRegistrationRepository), which evicts
-                                // by connectionId and is workspace-agnostic by design — no workspace context
-                                // needed (same rationale as the auth events exempted below).
+                                // Connection lifecycle event, published as groundwork for a future
+                                // (instance-global, workspace-agnostic) cache-eviction listener; no consumer
+                                // is wired today, so no workspace context is needed — same rationale as the
+                                // auth events exempted below.
                                 "ConnectionStateChangedEvent",
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed

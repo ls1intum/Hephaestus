@@ -14,7 +14,7 @@ export interface AuthContextType {
 	isError: boolean;
 	username: string | undefined;
 	userRoles: string[];
-	/** True when the current account is an application super-admin (APP_ADMIN or `admin` role). */
+	/** True when the current account is an application super-admin (appRole === "APP_ADMIN"). */
 	isAppAdmin: boolean;
 	userProfile: UserProfile | undefined;
 	login: (idpHint?: string, returnTo?: string) => Promise<void>;

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -18,9 +19,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,8 +38,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Validated
 @PreAuthorize("isAuthenticated()")
 public class WorkspaceRegistryController {
-
-    private static final String APP_ADMIN_AUTHORITY = "app_admin";
 
     private final WorkspaceService workspaceService;
     private final WorkspaceQueryService workspaceQueryService;
@@ -73,7 +69,10 @@ public class WorkspaceRegistryController {
         // Actor gate (configurable). ADMIN_ONLY (default) restricts creation to instance admins; flip to
         // SELF_SERVICE to let any authenticated user create a workspace. Orthogonal to per-provider
         // availability (the GitLab feature flag below).
-        if (workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY && !isAppAdmin()) {
+        if (
+            workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY &&
+            !SecurityUtils.isSuperAdmin()
+        ) {
             throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.FORBIDDEN,
                 "Workspace creation is restricted to instance admins on this deployment"
@@ -104,19 +103,6 @@ public class WorkspaceRegistryController {
             .toUri();
 
         return ResponseEntity.created(location).body(workspaceQueryService.toWorkspaceDTO(workspace));
-    }
-
-    private static boolean isAppAdmin() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            return false;
-        }
-        for (GrantedAuthority authority : authentication.getAuthorities()) {
-            if (APP_ADMIN_AUTHORITY.equals(authority.getAuthority())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @GetMapping

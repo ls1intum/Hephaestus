@@ -30,7 +30,7 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
         """
             SELECT e FROM AuthEvent e
             WHERE e.accountId = :accountId AND e.id.occurredAt >= :since
-            ORDER BY e.id.occurredAt DESC
+            ORDER BY e.id.occurredAt DESC, e.id.id DESC
         """
     )
     List<AuthEvent> findByAccountSince(@Param("accountId") Long accountId, @Param("since") Instant since);

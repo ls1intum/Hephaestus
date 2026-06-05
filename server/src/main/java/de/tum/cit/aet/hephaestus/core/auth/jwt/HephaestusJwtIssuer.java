@@ -145,10 +145,12 @@ public class HephaestusJwtIssuer {
     }
 
     /**
-     * Return {@code raw} only if it parses as a literal IP address; otherwise null. The hostname
-     * pre-check (reject anything that isn't hex-digits/{@code . : %}) guarantees {@code getByName}
-     * can never trigger a DNS lookup. Keeps a malformed audit IP from failing the {@code ip_inet}
-     * (Postgres {@code inet}) INSERT and thus blocking issuance.
+     * Return {@code raw} only if it parses as a literal IP address; otherwise null. The char pre-check
+     * (only {@code 0-9 a-f . : %}) keeps {@code getByName} off DNS for the inputs we actually see — this
+     * is always {@code request.getRemoteAddr()}, a numeric peer IP, never a hostname. (A contrived
+     * all-hex label like {@code "cafe"} would still be a resolvable name, so this is a fast-path filter,
+     * not a hard guarantee.) Keeps a malformed audit IP from failing the {@code ip_inet} (Postgres
+     * {@code inet}) INSERT and thus blocking issuance.
      */
     @Nullable
     static String sanitizeIp(@Nullable String raw) {

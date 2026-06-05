@@ -43,7 +43,7 @@ public class ConnectionService {
         this.events = events;
     }
 
-    /** Publish a {@link ConnectionStateChangedEvent} so caches (e.g. the OIDC-login registration cache) evict. */
+    /** Publish a {@link ConnectionStateChangedEvent} (groundwork for a future cache-eviction listener; no consumer yet). */
     private void publishStateChanged(Connection connection) {
         if (connection.getId() == null) {
             return; // unsaved row → nothing is cached under its id yet
@@ -350,7 +350,7 @@ public class ConnectionService {
             log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
         }
         Connection saved = connectionRepository.save(connection);
-        publishStateChanged(saved); // evicts cached materializations (e.g. OIDC-login registrations)
+        publishStateChanged(saved); // emit state-change event (future cache-eviction listener; none today)
         return saved;
     }
 

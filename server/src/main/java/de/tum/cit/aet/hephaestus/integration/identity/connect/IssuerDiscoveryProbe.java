@@ -25,11 +25,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Validates a workspace-supplied OIDC issuer URL before its {@code client_secret} is
- * persisted. Defends against an SSRF vector: a malicious workspace admin could otherwise
- * register an "issuer" pointing at an internal address (cloud metadata endpoint, a sibling
- * service, localhost) and use the registration / test-login dance to make the server issue
- * requests there.
+ * Rebind/TOCTOU-hardened SSRF guard for a supplied OIDC issuer URL: a malicious admin could otherwise
+ * register an "issuer" pointing at an internal address (cloud metadata endpoint, a sibling service,
+ * localhost) and use the registration / test-login dance to make the server issue requests there.
+ *
+ * <p><b>NOT yet wired into a registration path.</b> The current login-provider registration validates
+ * its base URL with the (synchronous, no-DNS) {@code core.security.ServerUrlValidator}; this stronger
+ * probe is staged for the issuer-discovery flow but has no production caller today (only its unit test).
  *
  * <h2>Checks, in order</h2>
  * <ol>

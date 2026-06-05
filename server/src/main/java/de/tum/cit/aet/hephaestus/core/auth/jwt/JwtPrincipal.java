@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * @param accountId Hephaestus account id → {@code sub}
  * @param login     git-provider login → {@code preferred_username}
  * @param givenName optional first name → {@code given_name}
- * @param roles     app roles ({@code "admin"} when app-admin, plus enabled feature-flag
+ * @param roles     app roles ({@code "app_admin"} when app-admin, plus enabled feature-flag
  *                  keys) → {@code roles}
  */
 public record JwtPrincipal(Long accountId, String login, @Nullable String givenName, Set<String> roles) {}

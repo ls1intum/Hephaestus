@@ -102,7 +102,7 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 | `export/` | GDPR export (`AccountExportService`, `ExportBundleAssembler`, workers/sweepers) |
 | `metrics/` | `AuthMetrics`, `AuthLoginEventMetrics` |
 | `ratelimit/` | `AuthRateLimitFilter`, `BucketResolver`, config |
-| `web/` | `/user`, `/auth/*`, `/user/sessions`, `/admin/users`, `/.well-known/*`, `/identity-providers` controllers |
+| `web/` | `/user`, `/auth/*`, `/user/sessions`, `/user/exports`, `/admin/users`, `/admin/login-providers`, `/admin/audit`, `/.well-known/*`, `/identity-providers` controllers |
 | `config/` | `AuthJwtConfig`, `AuthSecurityConfig` |
 | `spi/` | `AccountRepository` (cross-module handle) |
 

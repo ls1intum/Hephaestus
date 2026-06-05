@@ -150,12 +150,29 @@ function ProviderButton({
  *   Uses consistent `brightness` hover across all providers.
  */
 export function SignInButtons({ onSignIn, disabled, size, className, header }: SignInButtonsProps) {
-	const { data: providers, isLoading } = useQuery({
+	const {
+		data: providers,
+		isLoading,
+		isError,
+	} = useQuery({
 		...listIdentityProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
 
-	// While loading or on error, show a GitHub button as fallback
+	// On a genuine discovery failure we must NOT imply a specific provider works (this instance may be
+	// GitLab-only, where a GitHub button leads to a dead OAuth path). Show a neutral, non-misleading state.
+	if (isError || (!isLoading && !providers)) {
+		if (header) {
+			return <span className="text-sm text-muted-foreground">Sign-in unavailable</span>;
+		}
+		return (
+			<p className={`text-center text-sm text-muted-foreground ${className ?? ""}`}>
+				Couldn't load sign-in options. Please refresh and try again.
+			</p>
+		);
+	}
+
+	// While loading, show an optimistic GitHub button (the common case) so the header doesn't flicker.
 	if (isLoading || !providers) {
 		if (header) {
 			return (

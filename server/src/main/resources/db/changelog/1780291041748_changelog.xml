@@ -395,7 +395,7 @@
         <rollback>
             <!-- Re-add the dropped column + its partial unique index (matching 1779790459343). -->
             <sql splitStatements="false"><![CDATA[
-                ALTER TABLE "user" ADD COLUMN IF NOT EXISTS keycloak_subject VARCHAR(255);
+                ALTER TABLE "user" ADD COLUMN IF NOT EXISTS keycloak_subject VARCHAR(128);
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_keycloak_subject
                     ON "user" (keycloak_subject)
                     WHERE keycloak_subject IS NOT NULL;

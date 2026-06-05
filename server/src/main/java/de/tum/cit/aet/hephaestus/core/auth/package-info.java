@@ -45,7 +45,9 @@
  *       directly. Login {@code ClientRegistration}s are built from the {@code core.auth.provider}
  *       store and exposed via the {@code IdentityProviderCatalog}/{@code GitProviderRegistry} SPI
  *       ports implemented in {@code integration.identity.connect}.</li>
- *   <li>ArchUnit forbids any {@code org.keycloak.*} or {@code com.auth0.jwt.*} import.</li>
+ *   <li>ArchUnit ({@code NoKeycloakImportTest}) forbids any {@code org.keycloak.*} import.
+ *       {@code com.auth0:java-jwt} is intentionally retained (worker-control-channel + GitHub App
+ *       token JWTs) and is NOT banned.</li>
  * </ul>
  *
  * <p>See ADR 0017 for the full rationale.
