@@ -37,6 +37,7 @@ vi.mock("uuid", () => ({
 
 // Import after mocks are set up
 import { useChat } from "@ai-sdk/react";
+import { getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
 import { useMentorChat } from "./useMentorChat";
@@ -260,7 +261,7 @@ describe("useMentorChat", () => {
 			expect(result.current.error).toBe(testError);
 		});
 
-		it("should call onError callback when provided and error occurs", () => {
+		it("should call onError callback when provided and error occurs", async () => {
 			const onError = vi.fn();
 
 			// Capture the onError callback passed to useChat
@@ -291,12 +292,9 @@ describe("useMentorChat", () => {
 				wrapper: createWrapper(queryClient),
 			});
 
-			// The callback was passed to useChat - verify the structure
-			expect(mockUseChat).toHaveBeenCalledWith(
-				expect.objectContaining({
-					onError: expect.any(Function),
-				}),
-			);
+			// The hook forwards useChat's error to the caller's onError — assert that pass-through actually
+			// fires end-to-end (the setTimeout above simulates useChat raising a streaming error).
+			await waitFor(() => expect(onError).toHaveBeenCalledWith(expect.any(Error)));
 		});
 	});
 
@@ -370,9 +368,11 @@ describe("useMentorChat", () => {
 
 	describe("thread hydration", () => {
 		it("should hydrate messages from thread detail when data is available", async () => {
+			// IDs must be UUIDs — parseThreadMessages (chat-validation) rejects non-UUID ids, which would
+			// silently skip hydration. (The previous "msg-1"/"msg-2" ids never validated, masking the bug.)
 			const threadMessages = [
-				createMockMessage("user", "Previous message", "msg-1"),
-				createMockMessage("assistant", "Previous response", "msg-2"),
+				createMockMessage("user", "Previous message", "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
+				createMockMessage("assistant", "Previous response", "c9bf9e57-1685-4c89-bafb-ff5af830be8a"),
 			];
 
 			// Mock useChat to simulate the hook with thread detail available
@@ -407,16 +407,16 @@ describe("useMentorChat", () => {
 			});
 			global.fetch = mockFetch;
 
-			// Pre-populate query cache with thread data using the correct query key structure
-			const queryKey = [
-				"getThread",
-				{ path: { workspaceSlug: "test-workspace", threadId: "thread-123" } },
-			];
-			queryClient.setQueryData(queryKey, {
-				id: "thread-123",
-				title: "Test Thread",
-				messages: threadMessages,
-			});
+			// Pre-populate the query cache under the hook's REAL query key (hey-api createQueryKey),
+			// so threadQuery resolves and the hydration effect runs.
+			queryClient.setQueryData(
+				getThreadQueryKey({ path: { workspaceSlug: "test-workspace", threadId: "thread-123" } }),
+				{
+					id: "thread-123",
+					title: "Test Thread",
+					messages: threadMessages,
+				},
+			);
 
 			const { result } = renderHook(() => useMentorChat({ threadId: "thread-123" }), {
 				wrapper: createWrapper(queryClient),
@@ -425,16 +425,11 @@ describe("useMentorChat", () => {
 			// The hook should set the threadId as currentThreadId
 			expect(result.current.currentThreadId).toBe("thread-123");
 
-			// Hydration relies on threadDetail being loaded which triggers setMessages
-			// In the real implementation, this happens via the useQuery + useEffect combination
-			// For testing, we verify the mechanism is in place
-			await waitFor(
-				() => {
-					// The setMessages should be exposed and callable
-					expect(result.current.setMessages).toBe(mockSetMessages);
-				},
-				{ timeout: 100 },
-			);
+			// Once the thread detail resolves (and we're not streaming), the hydration effect pushes the
+			// parsed thread messages into the chat exactly once — assert the effect actually ran, not just
+			// that setMessages is re-exposed.
+			await waitFor(() => expect(mockSetMessages).toHaveBeenCalledTimes(1));
+			expect(mockSetMessages.mock.calls[0][0]).toHaveLength(threadMessages.length);
 		});
 
 		it("should not hydrate when streaming is in progress", async () => {
