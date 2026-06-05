@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -14,6 +15,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Pins the env → seed contract: a configured login provider is seeded once when absent, never
@@ -23,6 +25,9 @@ import org.mockito.ArgumentCaptor;
 class LoginProviderServiceTest extends BaseUnitTest {
 
     private final LoginProviderRepository repository = mock(LoginProviderRepository.class);
+    private final LoginProviderClientRegistrationRepository registrationCache = mock(
+        LoginProviderClientRegistrationRepository.class
+    );
 
     private LoginProviderService service(AuthProperties.GithubLogin github, AuthProperties.GitlabLrzLogin gitlab) {
         AuthProperties props = new AuthProperties(
@@ -38,11 +43,27 @@ class LoginProviderServiceTest extends BaseUnitTest {
             "",
             Duration.ofHours(1)
         );
-        return new LoginProviderService(repository, props);
+        return new LoginProviderService(repository, registrationCache, props);
+    }
+
+    private LoginProviderService adminService() {
+        return service(new AuthProperties.GithubLogin("", ""), unconfiguredGitlab());
     }
 
     private static AuthProperties.GitlabLrzLogin unconfiguredGitlab() {
         return new AuthProperties.GitlabLrzLogin("", "", URI.create("https://gitlab.lrz.de"));
+    }
+
+    private static LoginProviderService.Draft gitlabDraft(String registrationId, String baseUrl, String scopes) {
+        return new LoginProviderService.Draft(
+            registrationId,
+            LoginProvider.ProviderType.GITLAB,
+            "Self-hosted GitLab",
+            baseUrl,
+            "client-id",
+            "client-secret",
+            scopes
+        );
     }
 
     @Test
@@ -76,6 +97,52 @@ class LoginProviderServiceTest extends BaseUnitTest {
 
         service(new AuthProperties.GithubLogin("", ""), unconfiguredGitlab()).seedFromEnvOnStartup();
 
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void createSelfHostedGitlabDefaultsScopesAndEvictsCache() {
+        when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(false);
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        LoginProvider created = adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test/", null));
+
+        assertThat(created.getType()).isEqualTo(LoginProvider.ProviderType.GITLAB);
+        assertThat(created.getBaseUrl()).isEqualTo("https://gitlab.acme.test"); // trailing slash stripped
+        assertThat(created.getScopes()).isEqualTo("openid profile email read_user"); // defaulted by type
+        assertThat(created.isSeededFromEnv()).isFalse();
+        verify(registrationCache).evict("gitlab-acme");
+    }
+
+    @Test
+    void createRejectsDuplicateRegistrationId() {
+        when(repository.existsByRegistrationId("gitlab-acme")).thenReturn(true);
+
+        assertThatThrownBy(() ->
+            adminService().create(gitlabDraft("gitlab-acme", "https://gitlab.acme.test", null))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsMalformedRegistrationId() {
+        assertThatThrownBy(() ->
+            adminService().create(gitlabDraft("Bad Id!", "https://gitlab.acme.test", null))
+        ).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void disableRefusesWhenItIsTheLastEnabledProvider() {
+        LoginProvider only = new LoginProvider();
+        only.setRegistrationId("github");
+        only.setType(LoginProvider.ProviderType.GITHUB);
+        only.setEnabled(true);
+        when(repository.findByRegistrationId("github")).thenReturn(java.util.Optional.of(only));
+        when(repository.findByEnabledTrueOrderByDisplayNameAsc()).thenReturn(List.of(only));
+
+        assertThatThrownBy(() ->
+            adminService().update("github", new LoginProviderService.Patch(null, null, null, null, null, false))
+        ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }
 }

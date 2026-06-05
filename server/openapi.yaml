@@ -21,6 +21,8 @@ tags:
   name: Contributors
 - description: User preferences
   name: Account
+- description: Instance-admin login provider management
+  name: Admin
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -179,6 +181,78 @@ paths:
                 $ref: "#/components/schemas/PageAuthEventView"
           description: OK
       summary: "List auth audit events (paged, newest first)"
+      tags:
+      - Admin
+  /admin/login-providers:
+    get:
+      operationId: adminListLoginProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LoginProviderView"
+          description: OK
+      summary: List login providers
+      tags:
+      - Admin
+    post:
+      operationId: adminCreateLoginProvider
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoginProviderRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginProviderView"
+          description: OK
+      summary: Create a login provider
+      tags:
+      - Admin
+  /admin/login-providers/{registrationId}:
+    delete:
+      operationId: adminDeleteLoginProvider
+      parameters:
+      - in: path
+        name: registrationId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Delete a login provider
+      tags:
+      - Admin
+    patch:
+      operationId: adminUpdateLoginProvider
+      parameters:
+      - in: path
+        name: registrationId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLoginProviderRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginProviderView"
+          description: OK
+      summary: Update a login provider
       tags:
       - Admin
   /admin/users:
@@ -3858,6 +3932,41 @@ components:
           minLength: 0
       required:
       - action
+    CreateLoginProviderRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+          description: Instance base URL (GitLab only; GitHub is always github.com)
+          example: https://gitlab.example.com
+        clientId:
+          type: string
+          minLength: 1
+        clientSecret:
+          type: string
+          description: "OAuth client secret; sealed at rest, never returned"
+          minLength: 1
+        displayName:
+          type: string
+          description: Label shown on the login button; defaults to the registrationId
+        registrationId:
+          type: string
+          description: Stable id used in the OAuth callback path and identity resolution
+          example: gitlab-acme
+          minLength: 1
+        scopes:
+          type: string
+          description: Space-separated scopes; defaulted by provider type if omitted
+        type:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+      required:
+      - clientId
+      - clientSecret
+      - registrationId
+      - type
     CreatePracticeRequest:
       type: object
       description: Request to create a new practice definition
@@ -4438,6 +4547,44 @@ components:
       required:
       - current
       - target
+    LoginProviderView:
+      type: object
+      description: Admin view of a login provider. The client secret is never included.
+      properties:
+        baseUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        redirectUri:
+          type: string
+          description: Redirect/callback URI to register on the upstream OAuth app
+        registrationId:
+          type: string
+        scopes:
+          type: string
+        seededFromEnv:
+          type: boolean
+        type:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - baseUrl
+      - createdAt
+      - displayName
+      - enabled
+      - redirectUri
+      - registrationId
+      - scopes
+      - seededFromEnv
+      - type
+      - updatedAt
     PageAgentJob:
       type: object
       properties:
@@ -5416,6 +5563,22 @@ components:
       required:
       - day
       - time
+    UpdateLoginProviderRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+          description: Omit to leave the existing secret unchanged
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        scopes:
+          type: string
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state

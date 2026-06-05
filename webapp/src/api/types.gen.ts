@@ -548,6 +548,18 @@ export type UpdatePracticeActiveRequest = {
     active: boolean;
 };
 
+export type UpdateLoginProviderRequest = {
+    baseUrl?: string;
+    clientId?: string;
+    /**
+     * Omit to leave the existing secret unchanged
+     */
+    clientSecret?: string;
+    displayName?: string;
+    enabled?: boolean;
+    scopes?: string;
+};
+
 /**
  * Request to update the entire weekly leaderboard digest configuration atomically
  */
@@ -1416,6 +1428,25 @@ export type AgentJob = {
 };
 
 /**
+ * Admin view of a login provider. The client secret is never included.
+ */
+export type LoginProviderView = {
+    baseUrl: string;
+    createdAt: Date;
+    displayName: string;
+    enabled: boolean;
+    /**
+     * Redirect/callback URI to register on the upstream OAuth app
+     */
+    redirectUri: string;
+    registrationId: string;
+    scopes: string;
+    seededFromEnv: boolean;
+    type: string;
+    updatedAt: Date;
+};
+
+/**
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -1822,6 +1853,31 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+};
+
+export type CreateLoginProviderRequest = {
+    /**
+     * Instance base URL (GitLab only; GitHub is always github.com)
+     */
+    baseUrl?: string;
+    clientId: string;
+    /**
+     * OAuth client secret; sealed at rest, never returned
+     */
+    clientSecret: string;
+    /**
+     * Label shown on the login button; defaults to the registrationId
+     */
+    displayName?: string;
+    /**
+     * Stable id used in the OAuth callback path and identity resolution
+     */
+    registrationId: string;
+    /**
+     * Space-separated scopes; defaulted by provider type if omitted
+     */
+    scopes?: string;
+    type: 'GITHUB' | 'GITLAB';
 };
 
 /**
@@ -2265,6 +2321,72 @@ export type AdminListAuthEventsResponses = {
 };
 
 export type AdminListAuthEventsResponse = AdminListAuthEventsResponses[keyof AdminListAuthEventsResponses];
+
+export type AdminListLoginProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/login-providers';
+};
+
+export type AdminListLoginProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<LoginProviderView>;
+};
+
+export type AdminListLoginProvidersResponse = AdminListLoginProvidersResponses[keyof AdminListLoginProvidersResponses];
+
+export type AdminCreateLoginProviderData = {
+    body: CreateLoginProviderRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/login-providers';
+};
+
+export type AdminCreateLoginProviderResponses = {
+    /**
+     * OK
+     */
+    200: LoginProviderView;
+};
+
+export type AdminCreateLoginProviderResponse = AdminCreateLoginProviderResponses[keyof AdminCreateLoginProviderResponses];
+
+export type AdminDeleteLoginProviderData = {
+    body?: never;
+    path: {
+        registrationId: string;
+    };
+    query?: never;
+    url: '/admin/login-providers/{registrationId}';
+};
+
+export type AdminDeleteLoginProviderResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type AdminUpdateLoginProviderData = {
+    body: UpdateLoginProviderRequest;
+    path: {
+        registrationId: string;
+    };
+    query?: never;
+    url: '/admin/login-providers/{registrationId}';
+};
+
+export type AdminUpdateLoginProviderResponses = {
+    /**
+     * OK
+     */
+    200: LoginProviderView;
+};
+
+export type AdminUpdateLoginProviderResponse = AdminUpdateLoginProviderResponses[keyof AdminUpdateLoginProviderResponses];
 
 export type AdminListUsersData = {
     body?: never;
