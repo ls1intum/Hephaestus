@@ -38,7 +38,6 @@ erDiagram
         BIGINT account_id PK,FK
         VARCHAR(64) flag PK
         TIMESTAMPTZ enabled_at "NOT NULL"
-        BIGINT enabled_by_account_id FK
     }
 
     ActivityEvent {
@@ -987,6 +986,7 @@ erDiagram
 
     %% Relationships
     %% One-to-One relationships
+    Account ||--|| AccountFeature : has
     Workspace ||--|| ActivityEvent : has
     Workspace ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessageVote : has
@@ -1109,8 +1109,6 @@ erDiagram
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
-    Account }o--o{ AccountFeature : has
-    Account }o--o{ AccountFeature : has
     GitCommit }o--o{ CommitPullRequest : has
     Issue }o--o{ CommitPullRequest : references
     Discussion }o--o{ DiscussionLabel : labeled

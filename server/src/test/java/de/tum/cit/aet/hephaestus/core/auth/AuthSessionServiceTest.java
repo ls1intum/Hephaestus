@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
@@ -33,14 +35,18 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
- * Pins the terminal-{@code result} telemetry of {@link AuthSessionService#refresh}. The timer alone
- * cannot distinguish a real re-mint from a rotation race or a suspended-account early-return; this
- * suite asserts that each branch records the right {@code auth.token.refresh.result} tag so an
- * operator can alert on an abnormal {@code noop}/{@code suspended}/{@code error} rate. Each test
- * fails if its branch stops recording (or records the wrong result).
+ * Pins the terminal-{@code result} telemetry of {@link AuthSessionService#refresh} AND the
+ * security-relevant audit emissions on the session lifecycle (LOGOUT, TOKEN_REFRESH, and the
+ * refresh-time IMPERSONATION_END auto-exit). The timer alone cannot distinguish a real re-mint from
+ * a rotation race or a suspended-account early-return; this suite asserts that each branch records
+ * the right {@code auth.token.refresh.result} tag so an operator can alert on an abnormal
+ * {@code noop}/{@code suspended}/{@code error} rate, and that the right {@link AuthEvent} is written
+ * with correct attribution. Each test fails if its branch stops recording, mis-tags the result, or
+ * drops/mis-attributes the audit event.
  */
 class AuthSessionServiceTest extends BaseUnitTest {
 
@@ -51,6 +57,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
     private AccountRepository accountRepository;
     private HephaestusJwtIssuer jwtIssuer;
     private JwtPrincipalFactory principalFactory;
+    private AuthEventWriter authEventWriter;
     private SimpleMeterRegistry meterRegistry;
     private AuthSessionService service;
 
@@ -61,7 +68,8 @@ class AuthSessionServiceTest extends BaseUnitTest {
         accountRepository = mock(AccountRepository.class);
         jwtIssuer = mock(HephaestusJwtIssuer.class);
         AuthProperties properties = mock(AuthProperties.class);
-        AuthEventLogger eventLogger = new AuthEventLogger(mock(AuthEventWriter.class));
+        authEventWriter = mock(AuthEventWriter.class);
+        AuthEventLogger eventLogger = new AuthEventLogger(authEventWriter);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         meterRegistry = new SimpleMeterRegistry();
 
@@ -94,6 +102,26 @@ class AuthSessionServiceTest extends BaseUnitTest {
         return account;
     }
 
+    /** The single audit event written during the call (fails if zero or more than one was written). */
+    private AuthEventData capturedEvent() {
+        ArgumentCaptor<AuthEventData> captor = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter).write(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void logout_revokesPresentingTokenAndAuditsLogout() {
+        UUID jti = UUID.randomUUID();
+
+        service.logout(ACCOUNT_ID, jti, new MockHttpServletResponse());
+
+        verify(issuedJwtRepository).revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.LOGOUT));
+        AuthEventData event = capturedEvent();
+        assertThat(event.type()).isEqualTo(AuthEvent.EventType.LOGOUT);
+        assertThat(event.result()).isEqualTo(AuthEvent.Result.SUCCESS);
+        assertThat(event.accountId()).isEqualTo(ACCOUNT_ID);
+    }
+
     @Test
     void refresh_whenImpersonationTimeBoxExpired_autoExitsToOperator() {
         UUID jti = UUID.randomUUID();
@@ -121,6 +149,12 @@ class AuthSessionServiceTest extends BaseUnitTest {
         // Operator token minted via the 3-arg overload (no impersonator), for the OPERATOR principal —
         // i.e. the act claim is dropped, ending the impersonation.
         verify(jwtIssuer).issue(eq(operatorPrincipal), isNull(), any(HttpServletRequest.class));
+        // The auto-exit is audited as IMPERSONATION_END attributed to BOTH parties, reason EXPIRED.
+        AuthEventData event = capturedEvent();
+        assertThat(event.type()).isEqualTo(AuthEvent.EventType.IMPERSONATION_END);
+        assertThat(event.accountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(event.actingAccountId()).isEqualTo(operatorId);
+        assertThat(event.details()).contains("EXPIRED");
     }
 
     @Test
@@ -147,6 +181,10 @@ class AuthSessionServiceTest extends BaseUnitTest {
         assertThat(refreshResult("success")).isEqualTo(1.0);
         // Re-minted via the 4-arg (time-boxed) overload, act preserved, capped at the unchanged ceiling.
         verify(jwtIssuer).issue(any(), eq(operatorId), eq(ceiling), any(HttpServletRequest.class));
+        // An in-box impersonation rotation is audited as an ordinary TOKEN_REFRESH (not a re-BEGIN).
+        AuthEventData event = capturedEvent();
+        assertThat(event.type()).isEqualTo(AuthEvent.EventType.TOKEN_REFRESH);
+        assertThat(event.accountId()).isEqualTo(ACCOUNT_ID);
     }
 
     @Test
@@ -205,6 +243,10 @@ class AuthSessionServiceTest extends BaseUnitTest {
         assertThat(refreshResult("success")).isEqualTo(1.0);
         assertThat(response.getCookie("__Host-HEPHAESTUS_AT")).isNotNull();
         assertThat(response.getCookie("__Host-HEPHAESTUS_AT").getValue()).isEqualTo("fresh-token");
+        // An ordinary rotation is audited as TOKEN_REFRESH for the account.
+        AuthEventData event = capturedEvent();
+        assertThat(event.type()).isEqualTo(AuthEvent.EventType.TOKEN_REFRESH);
+        assertThat(event.accountId()).isEqualTo(ACCOUNT_ID);
     }
 
     @Test

@@ -14,7 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
 
-class SecurityFilterChainRuntimeTest extends BaseIntegrationTest {
+class SecurityFilterChainRuntimeIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private List<SecurityFilterChain> filterChains;

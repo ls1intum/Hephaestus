@@ -2336,7 +2336,7 @@ export type AdminListAuthEventsData = {
         size?: number;
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'FEATURE_FLAG_CHANGED' | 'APP_ROLE_CHANGED';
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED';
         result?: 'SUCCESS' | 'FAILURE';
         from?: Date;
         to?: Date;
@@ -2359,7 +2359,7 @@ export type AdminExportAuthEventsData = {
     query?: {
         accountId?: number;
         actingAccountId?: number;
-        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'FEATURE_FLAG_CHANGED' | 'APP_ROLE_CHANGED';
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED';
         result?: 'SUCCESS' | 'FAILURE';
         from?: Date;
         to?: Date;

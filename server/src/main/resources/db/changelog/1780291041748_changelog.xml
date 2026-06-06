@@ -179,16 +179,9 @@
             <column name="enabled_at" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="now()">
                 <constraints nullable="false"/>
             </column>
-            <column name="enabled_by_account_id" type="BIGINT"/>
         </createTable>
         <addPrimaryKey tableName="account_feature" columnNames="account_id, flag"
                        constraintName="pk_account_feature"/>
-        <!-- ON DELETE SET NULL has no inline <constraints> form in Liquibase (only deleteCascade);
-             it must be an explicit addForeignKeyConstraint. -->
-        <addForeignKeyConstraint baseTableName="account_feature" baseColumnNames="enabled_by_account_id"
-                                 constraintName="sfk_account_feature_enabled_by"
-                                 referencedTableName="account" referencedColumnNames="id"
-                                 onDelete="SET NULL"/>
         <rollback>
             <dropTable tableName="account_feature"/>
         </rollback>
@@ -305,7 +298,7 @@
                     'IDENTITY_LINKED', 'IDENTITY_UNLINKED',
                     'IMPERSONATION_BEGIN', 'IMPERSONATION_END',
                     'ACCOUNT_DELETED',
-                    'EXPORT_REQUESTED', 'FEATURE_FLAG_CHANGED', 'APP_ROLE_CHANGED'
+                    'EXPORT_REQUESTED', 'APP_ROLE_CHANGED'
                 ))
             ) PARTITION BY RANGE (occurred_at);
 

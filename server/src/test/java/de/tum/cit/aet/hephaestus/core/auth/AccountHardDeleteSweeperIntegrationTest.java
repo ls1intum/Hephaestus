@@ -40,7 +40,7 @@ import org.springframework.test.context.TestPropertySource;
  * That makes the cutoff math deterministic without touching the bean graph the JWT decoder shares.
  */
 @TestPropertySource(properties = { "hephaestus.auth.delete-cooldown=24h" })
-class AccountHardDeleteSweeperTest extends BaseIntegrationTest {
+class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
     /** Matches {@code @TestPropertySource} above; the sweeper's cutoff is {@code now - COOLDOWN}. */
     private static final Duration COOLDOWN = Duration.ofHours(24);
@@ -279,7 +279,7 @@ class AccountHardDeleteSweeperTest extends BaseIntegrationTest {
 
     /** Persists one row in each child table that the sweeper purges, using real owned entities. */
     private void seedChildRows(Long accountId) {
-        accountFeatureRepository.save(new AccountFeature(accountId, "mentor_access", null));
+        accountFeatureRepository.save(new AccountFeature(accountId, "mentor_access"));
 
         IdentityLink link = new IdentityLink();
         link.setAccount(accountRepository.findById(accountId).orElseThrow());

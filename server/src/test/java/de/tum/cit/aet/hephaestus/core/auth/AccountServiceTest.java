@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -140,8 +142,8 @@ class AccountServiceTest extends BaseUnitTest {
 
         assertThat(account.getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
         verify(accountRepository).save(account);
-        // Dedicated APP_ROLE_CHANGED type (not the generic FEATURE_FLAG_CHANGED) so role changes stay
-        // queryable on event_type.
+        // Dedicated APP_ROLE_CHANGED type so the most security-sensitive mutation stays queryable on
+        // the indexed event_type column.
         ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
         verify(auditWriter).write(event.capture());
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.APP_ROLE_CHANGED);
@@ -204,5 +206,39 @@ class AccountServiceTest extends BaseUnitTest {
 
         verify(accountRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
+    }
+
+    @Test
+    void softDeleteMarksDeletingRevokesAllSessionsAndAuditsAccountDeleted() {
+        Account account = accountWithRole(2L, Account.AppRole.USER);
+
+        service.softDelete(2L);
+
+        assertThat(account.getStatus()).isEqualTo(Account.Status.DELETING);
+        assertThat(account.getDeletedAt()).isEqualTo(clock.instant());
+        verify(accountRepository).save(account);
+        verify(issuedJwtRepository).revokeAllForAccount(eq(2L), any(), eq(IssuedJwt.RevokedReason.ACCOUNT_DELETED));
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(auditWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.ACCOUNT_DELETED);
+        assertThat(event.getValue().accountId()).isEqualTo(2L);
+    }
+
+    @Test
+    void adminRevokeAllSessionsRevokesAndAuditsJwtRevokedWithAttribution() {
+        accountWithRole(2L, Account.AppRole.USER); // requireById target exists
+        when(
+            issuedJwtRepository.revokeAllForAccount(eq(2L), any(), eq(IssuedJwt.RevokedReason.ADMIN_REVOKE))
+        ).thenReturn(3);
+
+        int revoked = service.adminRevokeAllSessions(2L, 1L);
+
+        assertThat(revoked).isEqualTo(3);
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(auditWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.JWT_REVOKED);
+        assertThat(event.getValue().accountId()).isEqualTo(2L);
+        assertThat(event.getValue().actingAccountId()).isEqualTo(1L);
+        assertThat(event.getValue().details()).contains("ADMIN_REVOKE", "\"count\":3");
     }
 }

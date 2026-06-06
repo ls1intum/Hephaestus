@@ -51,7 +51,7 @@ import org.springframework.web.server.ResponseStatusException;
  *       real DB-state assertion against the {@code WHERE external_actor_id IS NULL} guard.</li>
  * </ul>
  */
-class AuthenticatedGitProviderUserServiceSecurityTest extends BaseIntegrationTest {
+class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseIntegrationTest {
 
     private static final long ACCOUNT_ID = 42L;
     private static final long GITLAB_PROVIDER_ID = 7L;
