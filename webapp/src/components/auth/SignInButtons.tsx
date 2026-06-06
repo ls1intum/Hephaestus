@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ComponentPropsWithoutRef } from "react";
+import { Loader2 } from "lucide-react";
+import type { ComponentPropsWithoutRef, SVGAttributes } from "react";
 import { listIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProviderView } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GitHubSignInButton } from "./GitHubSignInButton";
-import { GitLabMarkIcon, GitLabSignInButton } from "./GitLabSignInButton";
+import { cn } from "@/lib/utils";
 
 type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
 
@@ -14,22 +14,14 @@ interface SignInButtonsProps {
 	disabled?: boolean;
 	size?: ButtonSize;
 	className?: string;
-	/**
-	 * Header mode: branded icon + short name on desktop, icon-only on mobile.
-	 */
+	/** Header mode: compact buttons (icon + short name on desktop, icon-only on mobile). */
 	header?: boolean;
 }
 
-/** GitHub mark SVG — shared between full and header buttons */
-function GitHubMark({ className }: { className?: string }) {
+/** GitHub mark SVG. Sized by the Button's `[&_svg]` rule; kept monochrome (currentColor). */
+function GitHubMark(props: SVGAttributes<SVGSVGElement>) {
 	return (
-		<svg
-			viewBox="0 0 98 96"
-			fill="currentColor"
-			className={className ?? "h-5 w-5 shrink-0"}
-			focusable="false"
-			aria-hidden="true"
-		>
+		<svg viewBox="0 0 98 96" fill="currentColor" focusable="false" aria-hidden="true" {...props}>
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -39,56 +31,24 @@ function GitHubMark({ className }: { className?: string }) {
 	);
 }
 
-/** Shared hover style for branded header buttons */
-const headerButtonBase =
-	"gap-2 border-0 transition-all motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.98]";
-
-function HeaderProviderButton({
-	provider,
-	onSignIn,
-	disabled,
-}: {
-	provider: IdentityProviderView;
-	onSignIn: (idpHint: string) => void;
-	disabled?: boolean;
-}) {
-	const registrationId = provider.registrationId ?? "";
-	const label = provider.displayName ?? registrationId;
-	const handleClick = () => onSignIn(registrationId);
-	const isGitHub = provider.providerType?.toUpperCase() === "GITHUB";
-	const isGitLab = registrationId.startsWith("gitlab");
-
-	const brandClass = isGitHub
-		? "bg-github-black text-github-white dark:bg-github-white dark:text-github-black hover:shadow-lg hover:shadow-github-black/20 dark:hover:shadow-github-white/20"
-		: isGitLab
-			? "bg-gitlab-orange text-white hover:shadow-lg hover:shadow-gitlab-orange/30"
-			: "";
-
-	const icon = isGitHub ? (
-		<GitHubMark
-			className={`h-5 w-5 shrink-0 ${isGitHub ? "!text-github-white dark:!text-github-black" : ""}`}
-		/>
-	) : isGitLab ? (
-		<GitLabMarkIcon />
-	) : null;
-
+/** GitLab tanuki mark SVG (monochrome, currentColor — recognisable on a neutral button). */
+function GitLabMark(props: SVGAttributes<SVGSVGElement>) {
 	return (
-		<Tooltip>
-			<TooltipTrigger
-				render={
-					<Button
-						onClick={handleClick}
-						disabled={disabled}
-						className={`${headerButtonBase} ${brandClass}`}
-					/>
-				}
-			>
-				{icon}
-				<span className="hidden sm:inline text-sm font-semibold tracking-tight">{label}</span>
-			</TooltipTrigger>
-			<TooltipContent className="sm:hidden">Continue with {label}</TooltipContent>
-		</Tooltip>
+		<svg viewBox="0 0 24 24" fill="currentColor" focusable="false" aria-hidden="true" {...props}>
+			<path d="m23.6004 9.5927-.0337-.0862L20.3.9814a.851.851 0 0 0-.3362-.405.8748.8748 0 0 0-.9997.0539.8748.8748 0 0 0-.29.4399l-2.2055 6.748H7.5375l-2.2057-6.748a.8573.8573 0 0 0-.29-.4412.8748.8748 0 0 0-.9997-.0537.8585.8585 0 0 0-.3362.4049L.4332 9.5015l-.0325.0862a6.0657 6.0657 0 0 0 2.0119 7.0105l.0113.0087.03.0213 4.976 3.7264 2.462 1.8633 1.4995 1.1321a1.0085 1.0085 0 0 0 1.2197 0l1.4995-1.1321 2.4619-1.8633 5.006-3.7489.0125-.01a6.0682 6.0682 0 0 0 2.0094-7.003z" />
+		</svg>
 	);
+}
+
+/** Recognisable provider mark (icon only — the button itself stays the stock shadcn style). */
+function ProviderIcon({ provider }: { provider: IdentityProviderView }) {
+	if (provider.providerType?.toUpperCase() === "GITHUB") {
+		return <GitHubMark className="shrink-0" />;
+	}
+	if ((provider.registrationId ?? "").startsWith("gitlab")) {
+		return <GitLabMark className="shrink-0" />;
+	}
+	return null;
 }
 
 function ProviderButton({
@@ -106,48 +66,52 @@ function ProviderButton({
 }) {
 	const registrationId = provider.registrationId ?? "";
 	const label = provider.displayName ?? registrationId;
-	const handleClick = () => onSignIn(registrationId);
-
-	if (provider.providerType?.toUpperCase() === "GITHUB") {
-		return (
-			<GitHubSignInButton
-				onClick={handleClick}
-				disabled={disabled}
-				size={size}
-				className={className}
-			>
-				Continue with {label}
-			</GitHubSignInButton>
-		);
-	}
-
-	if (registrationId.startsWith("gitlab")) {
-		return (
-			<GitLabSignInButton
-				onClick={handleClick}
-				disabled={disabled}
-				size={size}
-				className={className}
-			>
-				Continue with {label}
-			</GitLabSignInButton>
-		);
-	}
-
 	return (
-		<Button onClick={handleClick} disabled={disabled} size={size} className={className}>
+		<Button
+			variant="outline"
+			size={size}
+			disabled={disabled}
+			onClick={() => onSignIn(registrationId)}
+			className={cn("w-full", className)}
+		>
+			<ProviderIcon provider={provider} />
 			Continue with {label}
 		</Button>
 	);
 }
 
+function HeaderProviderButton({
+	provider,
+	onSignIn,
+	disabled,
+}: {
+	provider: IdentityProviderView;
+	onSignIn: (idpHint: string) => void;
+	disabled?: boolean;
+}) {
+	const registrationId = provider.registrationId ?? "";
+	const label = provider.displayName ?? registrationId;
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<Button variant="outline" disabled={disabled} onClick={() => onSignIn(registrationId)} />
+				}
+			>
+				<ProviderIcon provider={provider} />
+				<span className="hidden sm:inline">{label}</span>
+			</TooltipTrigger>
+			<TooltipContent className="sm:hidden">Continue with {label}</TooltipContent>
+		</Tooltip>
+	);
+}
+
 /**
- * Renders sign-in buttons for all enabled identity providers.
- * Fetches the list from the backend at /auth/identity-providers.
+ * Renders a stock shadcn `outline` sign-in button per enabled identity provider (brand icon for
+ * recognition + "Continue with …" label). The provider list is fetched from `/identity-providers`.
  *
- * - Default: full branded buttons with "Sign in with …" labels (landing pages).
- * - `header`: branded icon + short name on desktop, icon-only on mobile.
- *   Uses consistent `brightness` hover across all providers.
+ * - Default: full-width buttons stacked vertically (the login card).
+ * - `header`: compact buttons (icon + short name on desktop, icon-only on mobile).
  */
 export function SignInButtons({ onSignIn, disabled, size, className, header }: SignInButtonsProps) {
 	const {
@@ -166,33 +130,32 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 			return <span className="text-sm text-muted-foreground">Sign-in unavailable</span>;
 		}
 		return (
-			<p className={`text-center text-sm text-muted-foreground ${className ?? ""}`}>
+			<p className={cn("text-center text-sm text-muted-foreground", className)}>
 				Couldn't load sign-in options. Please refresh and try again.
 			</p>
 		);
 	}
 
-	// While loading, show an optimistic GitHub button (the common case) so the header doesn't flicker.
+	// While the list loads, show a NON-clickable placeholder — never an optimistic provider button.
 	if (isLoading || !providers) {
 		if (header) {
 			return (
-				<Button
-					disabled={disabled}
-					onClick={() => onSignIn("github")}
-					className={`${headerButtonBase} bg-github-black text-github-white dark:bg-github-white dark:text-github-black hover:shadow-lg hover:shadow-github-black/20 dark:hover:shadow-github-white/20`}
-				>
-					<GitHubMark className="h-5 w-5 shrink-0 !text-github-white dark:!text-github-black" />
-					<span className="hidden sm:inline text-sm font-semibold tracking-tight">GitHub</span>
+				<Button variant="outline" disabled aria-label="Loading sign-in options">
+					<Loader2 className="animate-spin" />
 				</Button>
 			);
 		}
 		return (
-			<GitHubSignInButton
-				onClick={() => onSignIn("github")}
-				disabled={disabled}
+			<Button
+				variant="outline"
 				size={size}
-				className={className}
-			/>
+				disabled
+				aria-label="Loading sign-in options"
+				className={cn("w-full", className)}
+			>
+				<Loader2 className="animate-spin" />
+				Loading sign-in options…
+			</Button>
 		);
 	}
 
@@ -212,7 +175,7 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 	}
 
 	return (
-		<div className="flex flex-wrap items-center gap-2">
+		<div className="flex flex-col gap-2">
 			{providers.map((provider) => (
 				<ProviderButton
 					key={provider.registrationId ?? provider.displayName}

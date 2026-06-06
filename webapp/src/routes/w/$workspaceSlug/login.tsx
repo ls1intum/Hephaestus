@@ -48,7 +48,7 @@ function WorkspaceLoginPage() {
 	return (
 		<LoginCard
 			title={heading}
-			description="Continue with your Git provider to access this workspace."
+			description="Sign in to continue to this workspace."
 			error={error}
 			onSignIn={(registrationId) => login(registrationId, `/w/${workspaceSlug}`)}
 		/>

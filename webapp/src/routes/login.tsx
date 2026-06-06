@@ -56,8 +56,8 @@ function LoginPage() {
 	// back into the SPA callback — without this the user would be returned to /login itself.
 	return (
 		<LoginCard
-			title="Sign in to Hephaestus"
-			description="Continue with your Git provider to access your workspaces."
+			title="Welcome to Hephaestus"
+			description="Your AI mentor for growing as a software engineer."
 			error={error}
 			onSignIn={(registrationId) => login(registrationId, returnTo)}
 		/>

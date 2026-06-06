@@ -67,6 +67,27 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		const showCopilot = !isLoading && isAuthenticated && hasMentorAccess && !isExcludedRoute;
 
+		// Auth screens (/login, /w/<slug>/login, /auth/*) render on a focused, full-viewport canvas with
+		// NO app chrome — no header (which otherwise duplicates the sign-in buttons), no footer, no
+		// sidebar. The page owns the whole viewport, so it can center cleanly without subtracting header/
+		// footer height.
+		const isAuthRoute =
+			pathname === "/login" ||
+			pathname.startsWith("/auth/") ||
+			/^\/w\/[^/]+\/login\/?$/.test(pathname);
+
+		if (isAuthRoute) {
+			return (
+				<>
+					<CookieConsentBanner />
+					<ProviderColorScope>
+						<Outlet />
+					</ProviderColorScope>
+					<Toaster theme={theme} />
+				</>
+			);
+		}
+
 		return (
 			<>
 				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
@@ -200,7 +221,19 @@ function HeaderContainer() {
 		logout,
 		getUserProfilePictureUrl,
 	} = useAuth();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const {
+		workspaceSlug,
+		userLogin: workspaceUserLogin,
+		userName: workspaceUserName,
+	} = useWorkspaceAccess();
+
+	// Inside a workspace, "you" are the account's identity for that workspace's provider (ADR 0017):
+	// e.g. a GitLab-logged-in account is its GitHub user in a GitHub workspace. Prefer that identity for
+	// the displayed name and the "My Profile" link so it points at the right per-provider profile;
+	// fall back to the global account identity outside a workspace (or before membership resolves).
+	const effectiveUsername = workspaceUserLogin ?? username;
+	const effectiveName =
+		workspaceUserName ?? (userProfile && `${userProfile.firstName} ${userProfile.lastName}`);
 
 	return (
 		<Header
@@ -208,8 +241,8 @@ function HeaderContainer() {
 			version={environment.version}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
-			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
-			username={username}
+			name={effectiveName}
+			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
 			workspaceSlug={workspaceSlug}
 			onLogin={login}

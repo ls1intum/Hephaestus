@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+import { Hammer } from "lucide-react";
 import type { ReactNode } from "react";
 import { SignInButtons } from "@/components/auth/SignInButtons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -7,19 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const ERROR_COPY: Record<string, { title: string; description: string }> = {
 	access_denied: {
 		title: "Sign-in was cancelled",
-		description: "You declined the authorization request. Try again when you're ready.",
+		description: "No problem — you can try again whenever you're ready.",
 	},
 	idp_unavailable: {
-		title: "Provider unavailable",
-		description: "The identity provider couldn't be reached. Please try again in a moment.",
+		title: "That provider isn't responding",
+		description: "We couldn't reach it just now. Give it a moment and try again.",
 	},
 };
 
 function describeError(code: string): { title: string; description: string } {
 	return (
 		ERROR_COPY[code] ?? {
-			title: "Sign-in failed",
-			description: "Something went wrong while signing you in. Please try again.",
+			title: "Something went wrong",
+			description: "We couldn't sign you in. Please try again.",
 		}
 	);
 }
@@ -36,17 +38,28 @@ interface LoginCardProps {
 }
 
 /**
- * Centered sign-in card shared by the global and workspace-scoped login routes.
- * Renders full, branded provider buttons and an accessible `aria-live` error alert.
+ * Focused, full-viewport sign-in screen shared by the global and workspace-scoped login routes. Rendered
+ * on its own canvas (no app header/footer — see the auth-route branch in the root layout), so it centers
+ * cleanly and never duplicates the header's sign-in buttons. Shows branded provider buttons and an
+ * accessible `aria-live` error alert.
  */
 export function LoginCard({ title, description, error, onSignIn }: LoginCardProps) {
 	const errorCopy = error ? describeError(error) : undefined;
 
 	return (
-		<div className="flex min-h-[100dvh] items-center justify-center p-4">
-			<Card className="w-full max-w-md">
+		<div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
+			<Link
+				to="/"
+				aria-label="Hephaestus home"
+				className="flex items-center gap-2 font-medium hover:opacity-80"
+			>
+				<Hammer className="size-5" />
+				<span className="text-lg font-semibold tracking-tight">Hephaestus</span>
+			</Link>
+
+			<Card className="w-full max-w-sm">
 				<CardHeader className="text-center">
-					<CardTitle className="text-2xl">{title}</CardTitle>
+					<CardTitle className="text-xl">{title}</CardTitle>
 					{description ? <CardDescription>{description}</CardDescription> : null}
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
@@ -59,11 +72,13 @@ export function LoginCard({ title, description, error, onSignIn }: LoginCardProp
 							</Alert>
 						) : null}
 					</div>
-					<div className="flex flex-col gap-3 [&>*]:w-full [&_button]:w-full [&_button]:justify-center">
-						<SignInButtons onSignIn={onSignIn} />
-					</div>
+					<SignInButtons onSignIn={onSignIn} />
 				</CardContent>
 			</Card>
+
+			<Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
+				← Back to home
+			</Link>
 		</div>
 	);
 }
