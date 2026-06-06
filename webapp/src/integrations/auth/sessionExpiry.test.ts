@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { handlePossibleSessionExpiry } from "./sessionExpiry";
+import { __resetSessionRecoveryForTests, handlePossibleSessionExpiry } from "./sessionExpiry";
 import { refreshAccessToken } from "./sessionRefresh";
 
 // The recovery path calls the shared single-flight refresh; mock it to drive both outcomes.
@@ -22,7 +22,10 @@ function stubLocation(pathname: string, search = ""): { assigned: string[] } {
 }
 
 const realLocation = window.location;
-beforeEach(() => refreshMock.mockReset());
+beforeEach(() => {
+	refreshMock.mockReset();
+	__resetSessionRecoveryForTests();
+});
 afterEach(() => {
 	Object.defineProperty(window, "location", { configurable: true, value: realLocation });
 	vi.restoreAllMocks();
@@ -78,6 +81,42 @@ describe("handlePossibleSessionExpiry", () => {
 		const url = new URL(assigned[0]);
 		expect(url.pathname).toBe("/login");
 		expect(url.searchParams.get("returnTo")).toBe("/w/acme/overview?tab=prs");
+	});
+
+	it("logs out instead of refresh-looping when a 401 persists after a successful refresh", async () => {
+		// Refresh always "succeeds" (cookie is valid), but the endpoint keeps 401ing — so the refresh is
+		// not the cure. The loop-breaker must give up and log out rather than refresh+invalidate forever.
+		refreshMock.mockResolvedValue(true);
+		const { assigned } = stubLocation("/w/acme/overview");
+		const qc = makeQueryClient();
+		const url = "http://localhost:8080/workspaces/acme/practices";
+
+		handlePossibleSessionExpiry(res(401, url), qc);
+		await flush();
+		expect(refreshMock).toHaveBeenCalledOnce();
+		expect(assigned).toHaveLength(0); // first 401: refreshed, recovered in place
+
+		// The same endpoint 401s again right after the "successful" refresh.
+		handlePossibleSessionExpiry(res(401, url), qc);
+		await flush();
+		expect(refreshMock).toHaveBeenCalledOnce(); // NO second refresh — no storm
+		expect(assigned).toHaveLength(1);
+		expect(new URL(assigned[0]).pathname).toBe("/login");
+	});
+
+	it("collapses concurrent 401s into a single refresh", async () => {
+		refreshMock.mockResolvedValue(true);
+		stubLocation("/w/acme/overview");
+		const qc = makeQueryClient();
+		const url = "http://localhost:8080/workspaces/acme/practices";
+
+		// Three requests 401 at once during a cookie rotation.
+		handlePossibleSessionExpiry(res(401, url), qc);
+		handlePossibleSessionExpiry(res(401, url), qc);
+		handlePossibleSessionExpiry(res(401, url), qc);
+		await flush();
+
+		expect(refreshMock).toHaveBeenCalledOnce();
 	});
 
 	it("does NOT handle (or refresh) a 401 from the GET /user probe", () => {
