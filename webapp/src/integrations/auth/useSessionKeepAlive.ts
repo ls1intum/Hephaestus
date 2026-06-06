@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { getCurrentUserOptions, getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
-import { refresh } from "@/api/sdk.gen";
+import { refreshAccessToken } from "./sessionRefresh";
 
 /**
  * Proactive, activity-gated session keep-alive (ADR 0017).
@@ -25,23 +25,6 @@ const REFRESH_SKEW_MS = 60_000;
 /** Coalesce activity bookkeeping so the listeners are effectively free on a busy page. */
 const ACTIVITY_THROTTLE_MS = 10_000;
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "scroll", "pointermove", "wheel"] as const;
-
-// Module-level single-flight: a focus event and the scheduled timer must never fire two refreshes, and
-// concurrent tabs/components share one in-flight call.
-let inFlightRefresh: Promise<boolean> | null = null;
-
-/** Rotate the access cookie once. Returns whether it succeeded. Never throws. */
-function refreshOnce(): Promise<boolean> {
-	if (!inFlightRefresh) {
-		inFlightRefresh = refresh()
-			.then(({ error }) => !error)
-			.catch(() => false)
-			.finally(() => {
-				inFlightRefresh = null;
-			});
-	}
-	return inFlightRefresh;
-}
 
 /**
  * Schedules the renewal while authenticated. Mount once inside the authenticated app (see
@@ -87,7 +70,7 @@ export function useSessionKeepAlive() {
 		const renew = async () => {
 			// Either way we refetch /user: on success to pick up the new expiry (reschedules this effect);
 			// on failure the identity query 401s → useAuth() flips to logged-out and guards redirect.
-			await refreshOnce();
+			await refreshAccessToken();
 			await queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
 		};
 

@@ -1,6 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handlePossibleSessionExpiry } from "./sessionExpiry";
+import { refreshAccessToken } from "./sessionRefresh";
+
+// The recovery path calls the shared single-flight refresh; mock it to drive both outcomes.
+vi.mock("./sessionRefresh", () => ({ refreshAccessToken: vi.fn() }));
+const refreshMock = vi.mocked(refreshAccessToken);
 
 // jsdom's window.location is not directly assignable; replace it with a stub exposing `assign` plus
 // the pathname/search/origin the handler reads.
@@ -17,6 +22,7 @@ function stubLocation(pathname: string, search = ""): { assigned: string[] } {
 }
 
 const realLocation = window.location;
+beforeEach(() => refreshMock.mockReset());
 afterEach(() => {
 	Object.defineProperty(window, "location", { configurable: true, value: realLocation });
 	vi.restoreAllMocks();
@@ -32,8 +38,12 @@ function res(status: number, url: string): Response {
 	return r;
 }
 
+// The 401 recovery is async (a silent refresh attempt); let its microtasks/timer settle.
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe("handlePossibleSessionExpiry", () => {
-	it("redirects to /login with sanitised returnTo on a 401 from an in-app endpoint", () => {
+	it("recovers a mid-session 401 via a silent refresh — no redirect", async () => {
+		refreshMock.mockResolvedValue(true);
 		const { assigned } = stubLocation("/w/acme/overview", "?tab=prs");
 		const qc = makeQueryClient();
 		const invalidate = vi.spyOn(qc, "invalidateQueries");
@@ -44,34 +54,55 @@ describe("handlePossibleSessionExpiry", () => {
 		);
 
 		expect(handled).toBe(true);
-		expect(invalidate).toHaveBeenCalledOnce();
+		await flush();
+		expect(refreshMock).toHaveBeenCalledOnce();
+		// Refresh succeeded → session restored, queries refetched, and the user is NOT bounced to /login.
+		expect(assigned).toHaveLength(0);
+		expect(invalidate).toHaveBeenCalled();
+	});
+
+	it("logs out to /login with sanitised returnTo when the 401 cannot be refreshed", async () => {
+		refreshMock.mockResolvedValue(false);
+		const { assigned } = stubLocation("/w/acme/overview", "?tab=prs");
+		const qc = makeQueryClient();
+
+		const handled = handlePossibleSessionExpiry(
+			res(401, "http://localhost:8080/workspaces/acme/practices"),
+			qc,
+		);
+
+		expect(handled).toBe(true);
+		await flush();
+		expect(refreshMock).toHaveBeenCalledOnce();
 		expect(assigned).toHaveLength(1);
 		const url = new URL(assigned[0]);
 		expect(url.pathname).toBe("/login");
 		expect(url.searchParams.get("returnTo")).toBe("/w/acme/overview?tab=prs");
 	});
 
-	it("does NOT redirect (no loop) on a 401 from the GET /user probe", () => {
+	it("does NOT handle (or refresh) a 401 from the GET /user probe", () => {
 		const { assigned } = stubLocation("/");
 		const handled = handlePossibleSessionExpiry(
 			res(401, "http://localhost:8080/user"),
 			makeQueryClient(),
 		);
 		expect(handled).toBe(false);
+		expect(refreshMock).not.toHaveBeenCalled();
 		expect(assigned).toHaveLength(0);
 	});
 
-	it("does NOT redirect on a 401 from /auth/* endpoints", () => {
+	it("does NOT handle a 401 from /auth/* endpoints (refresh must not recurse)", () => {
 		const { assigned } = stubLocation("/");
 		const handled = handlePossibleSessionExpiry(
 			res(401, "http://localhost:8080/auth/refresh"),
 			makeQueryClient(),
 		);
 		expect(handled).toBe(false);
+		expect(refreshMock).not.toHaveBeenCalled();
 		expect(assigned).toHaveLength(0);
 	});
 
-	it("does NOT redirect when already on /login (defence-in-depth against loops)", () => {
+	it("does NOT handle when already on /login (defence-in-depth against loops)", () => {
 		const { assigned } = stubLocation("/login");
 		const handled = handlePossibleSessionExpiry(
 			res(401, "http://localhost:8080/workspaces/acme/practices"),
@@ -81,12 +112,14 @@ describe("handlePossibleSessionExpiry", () => {
 		expect(assigned).toHaveLength(0);
 	});
 
-	it("drops an open-redirect returnTo down to '/' via safeReturnTo", () => {
+	it("drops an open-redirect returnTo down to '/' when logging out", async () => {
+		refreshMock.mockResolvedValue(false);
 		const { assigned } = stubLocation("//evil.example.com");
 		handlePossibleSessionExpiry(
 			res(401, "http://localhost:8080/workspaces/acme"),
 			makeQueryClient(),
 		);
+		await flush();
 		const url = new URL(assigned[0]);
 		expect(url.searchParams.get("returnTo")).toBe("/");
 	});

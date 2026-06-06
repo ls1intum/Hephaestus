@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
 import { safeReturnTo } from "@/integrations/auth/guard";
+import { refreshAccessToken } from "@/integrations/auth/sessionRefresh";
 
 /**
  * Paths whose own 401 must NOT trigger a redirect-to-login. The `GET /user` identity probe
@@ -39,13 +40,25 @@ export function handlePossibleSessionExpiry(response: Response, queryClient: Que
 	const pathname = window.location.pathname;
 	if (isExemptFromSessionExpiry(pathname, response.url)) return false;
 
-	// Invalidate the shared identity query so useAuth()/guards observe "logged out" even if the
-	// reload is intercepted/slow.
-	void queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
-
-	const returnTo = safeReturnTo(window.location.pathname + window.location.search);
-	const target = new URL("/login", window.location.origin);
-	target.searchParams.set("returnTo", returnTo);
-	window.location.assign(target.toString());
+	// A mid-session 401 is usually a just-lapsed or just-ROTATED cookie (an in-flight request can race
+	// the proactive renewal). Try ONE silent refresh before logging the user out, so the common case
+	// heals transparently instead of bouncing them to /login. Capture the path now (the recovery is
+	// async). /auth/* is exempt above, so refresh's own response can't recurse here.
+	void recoverOrLogout(queryClient, window.location.pathname + window.location.search);
 	return true;
+}
+
+async function recoverOrLogout(queryClient: QueryClient, currentPath: string): Promise<void> {
+	if (await refreshAccessToken()) {
+		// Session restored under a fresh cookie — refetch active queries so the UI recovers in place
+		// (including the failed request's data) without a navigation.
+		void queryClient.invalidateQueries();
+		return;
+	}
+	// Genuinely signed out: drop the cached identity so useAuth()/guards observe "logged out", then
+	// redirect to /login carrying a sanitised returnTo.
+	void queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
+	const target = new URL("/login", window.location.origin);
+	target.searchParams.set("returnTo", safeReturnTo(currentPath));
+	window.location.assign(target.toString());
 }
