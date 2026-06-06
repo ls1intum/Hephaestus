@@ -4189,6 +4189,9 @@ components:
     CurrentUserView:
       type: object
       properties:
+        accessTokenExpiresAt:
+          type: integer
+          format: int64
         appRole:
           type: string
         avatarUrl:

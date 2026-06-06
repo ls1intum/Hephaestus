@@ -12,6 +12,7 @@ import { StrictMode, useEffect } from "react";
 import environment from "@/environment";
 import { AuthProvider, applyStateChangingHeaders, useAuth } from "@/integrations/auth";
 import { handlePossibleSessionExpiry } from "@/integrations/auth/sessionExpiry";
+import { SessionKeepAlive } from "@/integrations/auth/useSessionKeepAlive";
 import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
 import { PostHogIdentity } from "@/integrations/posthog";
@@ -108,6 +109,9 @@ function Root() {
 		<TanstackQuery.Provider>
 			<AuthProvider>
 				{analyticsEnabled ? <PostHogIdentity /> : null}
+				{/* Proactively rotates the access cookie before it expires (only while active), so an
+				    active user is never auto-logged-out and an idle session still times out. */}
+				<SessionKeepAlive />
 				<ThemeProvider defaultTheme="dark" storageKey="theme">
 					<WrappedRouterProvider />
 					<TanstackDevtools router={router} />

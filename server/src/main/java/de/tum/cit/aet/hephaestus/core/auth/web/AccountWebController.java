@@ -58,7 +58,10 @@ public class AccountWebController {
         // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
         // gate on the *target instance* rather than merely "has any GitLab identity".
         java.util.List<LinkedProviderDTO> linkedProviders,
-        java.util.List<String> roles
+        java.util.List<String> roles,
+        // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh before it
+        // lapses, rather than waiting for a 401 (BFF pattern; see CurrentAccount.accessTokenExpiresAt).
+        @Nullable Long accessTokenExpiresAt
     ) {}
 
     /** A provider instance the current user is linked to: its type + server-url origin. */
@@ -109,7 +112,8 @@ public class AccountWebController {
                 primary != null ? primary.getSubject() : null,
                 hasGitLab,
                 linkedProviders,
-                CurrentAccount.roles()
+                CurrentAccount.roles(),
+                CurrentAccount.accessTokenExpiresAt()
             )
         );
     }

@@ -96,6 +96,20 @@ public final class CurrentAccount {
         return null;
     }
 
+    /**
+     * The current access token's expiry as epoch seconds ({@code exp}), or null if absent. Exposed on
+     * {@code /user} so the SPA can schedule a proactive, before-expiry refresh (the BFF pattern) instead
+     * of discovering the expiry only when a request 401s.
+     */
+    @Nullable
+    public static Long accessTokenExpiresAt() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null || jwt.getExpiresAt() == null) {
+            return null;
+        }
+        return jwt.getExpiresAt().getEpochSecond();
+    }
+
     private static Jwt requireJwt() {
         Jwt jwt = jwtOrNull();
         if (jwt == null) {

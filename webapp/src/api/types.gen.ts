@@ -1449,14 +1449,14 @@ export type LoginProviderView = {
     baseUrl: string;
     createdAt: Date;
     displayName: string;
-    enabled: boolean;
+    enabled?: boolean;
     /**
      * Redirect/callback URI to register on the upstream OAuth app
      */
     redirectUri: string;
     registrationId: string;
     scopes: string;
-    seededFromEnv: boolean;
+    seededFromEnv?: boolean;
     type: string;
     updatedAt: Date;
 };
@@ -1794,6 +1794,7 @@ export type ExportCreated = {
 };
 
 export type CurrentUserView = {
+    accessTokenExpiresAt?: number;
     appRole?: string;
     avatarUrl?: string;
     displayName?: string;
