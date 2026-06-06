@@ -14,8 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * <p>All knobs that vary by environment live here. Defaults are tuned for production;
  * integration tests override via {@code @TestPropertySource}.
  *
- * @param issuer          Canonical issuer URI; populates the {@code iss} claim and
- *                        {@code /.well-known/openid-configuration}.
+ * @param issuer          Canonical issuer URI; populates the {@code iss} claim.
  * @param audience        Default {@code aud} claim for SPA cookies.
  * @param accessTtl       Cookie-JWT lifetime.
  * @param cookieName      Access-token cookie name (the {@code __Host-} prefix is
@@ -57,9 +56,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        never log it. Blank = endpoint disabled (404). Prefer {@code bootstrapAdmins};
  *                        keep this as the lockout safety net.
  * @param impersonationMaxLifetime Absolute ceiling on an impersonation session ({@code imp_exp}),
- *                        enforced on {@code POST /auth/refresh}. With no silent-refresh caller today
- *                        the de-facto bound is already {@code accessTtl}; this only binds once refresh
- *                        is wired. See {@code docs/contributor/instance-admin.md}.
+ *                        enforced on every {@code POST /auth/refresh} rotation (the silent-refresh
+ *                        keep-alive cannot extend an impersonation past it). See
+ *                        {@code docs/contributor/instance-admin.md}.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(

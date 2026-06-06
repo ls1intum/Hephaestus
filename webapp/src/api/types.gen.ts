@@ -2310,24 +2310,6 @@ export type GetJwksResponses = {
 
 export type GetJwksResponse = GetJwksResponses[keyof GetJwksResponses];
 
-export type GetOpenidConfigurationData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/.well-known/openid-configuration';
-};
-
-export type GetOpenidConfigurationResponses = {
-    /**
-     * OK
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type GetOpenidConfigurationResponse = GetOpenidConfigurationResponses[keyof GetOpenidConfigurationResponses];
-
 export type AdminListAuthEventsData = {
     body?: never;
     path?: never;

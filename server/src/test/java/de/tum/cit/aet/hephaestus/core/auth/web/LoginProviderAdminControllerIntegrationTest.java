@@ -75,7 +75,7 @@ class LoginProviderAdminControllerIntegrationTest extends AbstractWorkspaceInteg
             "clientSecret",
             "super-secret-value",
             "scopes",
-            "openid profile"
+            "read_user"
         );
 
         webTestClient

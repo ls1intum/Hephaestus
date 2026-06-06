@@ -134,7 +134,5 @@ public class IdentityLink {
         OAUTH_LOGIN,
         /** User added this provider in settings while already authenticated (re-login flow). */
         MANUAL_LINK,
-        /** Auto-linked via a workspace-scoped webhook mirror (rare; admin-driven). */
-        WEBHOOK_MIRROR,
     }
 }

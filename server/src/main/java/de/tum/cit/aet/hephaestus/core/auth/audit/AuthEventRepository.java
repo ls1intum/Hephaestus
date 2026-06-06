@@ -39,11 +39,10 @@ public interface AuthEventRepository extends JpaRepository<AuthEvent, AuthEvent.
      * Admin audit viewer: auth events newest-first, optionally narrowed by subject account and/or
      * event type (both null = unfiltered). Backs the read-only {@code GET /admin/audit} viewer.
      *
-     * <p>Ordered by {@code occurred_at DESC}. The table is monthly RANGE-partitioned on
-     * {@code occurred_at}, so the newest pages touch only the most recent partition(s); there is no
-     * {@code occurred_at}-leading global index because this is an admin-only, low-traffic surface and
-     * partition pruning bounds the scan. Add one (or switch to keyset pagination) if deep paging over
-     * the full 12-month window ever becomes hot.
+     * <p>Ordered by {@code occurred_at DESC}, backed by the {@code ix_auth_event_occurred} index;
+     * the monthly RANGE partitioning on {@code occurred_at} additionally lets the newest pages prune
+     * to the most recent partition(s). Switch to keyset pagination if deep paging over the full
+     * 12-month window ever becomes hot.
      */
     @Query(
         """

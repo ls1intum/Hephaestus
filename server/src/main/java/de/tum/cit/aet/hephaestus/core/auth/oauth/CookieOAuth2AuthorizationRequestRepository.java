@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -171,7 +172,7 @@ public class CookieOAuth2AuthorizationRequestRepository
             RNG.nextBytes(nonce);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, nonce));
-            cipher.updateAAD(AAD.getBytes());
+            cipher.updateAAD(AAD.getBytes(StandardCharsets.UTF_8));
             byte[] ct = cipher.doFinal(plain);
             byte[] out = new byte[nonce.length + ct.length];
             System.arraycopy(nonce, 0, out, 0, nonce.length);
@@ -193,7 +194,7 @@ public class CookieOAuth2AuthorizationRequestRepository
             System.arraycopy(sealed, NONCE_BYTES, ct, 0, ct.length);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, nonce));
-            cipher.updateAAD(AAD.getBytes());
+            cipher.updateAAD(AAD.getBytes(StandardCharsets.UTF_8));
             return cipher.doFinal(ct);
         } catch (Exception ex) {
             throw new IllegalStateException("oauth-state decrypt failed", ex);

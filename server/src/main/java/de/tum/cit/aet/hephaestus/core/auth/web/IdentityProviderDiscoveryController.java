@@ -65,8 +65,22 @@ public class IdentityProviderDiscoveryController {
      * for any admin-registered self-hosted GitLab without relying on the registration-id naming.
      */
     private static String providerTypeOf(ClientRegistration reg) {
+        // Match on the parsed HOST, not a substring of the whole URI — "github.com" appearing in a
+        // path/query of a GitLab instance (or a look-alike host) must not be misclassified as GitHub.
+        return "github.com".equals(hostOf(reg)) ? "GITHUB" : "GITLAB";
+    }
+
+    /** Host of the authorization endpoint, or {@code null} if absent/malformed. */
+    private static String hostOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
-        return (authorizationUri != null && authorizationUri.contains("github.com")) ? "GITHUB" : "GITLAB";
+        if (authorizationUri == null) {
+            return null;
+        }
+        try {
+            return new java.net.URI(authorizationUri).getHost();
+        } catch (java.net.URISyntaxException e) {
+            return null;
+        }
     }
 
     /** The SCM instance origin (scheme + host[:port]) derived from the authorization endpoint. */

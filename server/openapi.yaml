@@ -73,10 +73,10 @@ tags:
   name: Connections
 - description: Up/down votes on mentor assistant messages
   name: Mentor Votes
+- description: Public JWK set for verifying Hephaestus session JWTs
+  name: Auth discovery
 - description: GDPR Art. 20 self-service data export
   name: Account
-- description: OIDC issuer metadata (public)
-  name: Auth discovery
 - description: |-
     Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
      identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
@@ -114,20 +114,6 @@ paths:
                 additionalProperties: {}
           description: OK
       summary: JWK set (public keys only)
-      tags:
-      - Auth discovery
-  /.well-known/openid-configuration:
-    get:
-      operationId: getOpenidConfiguration
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: {}
-          description: OK
-      summary: OIDC issuer metadata
       tags:
       - Auth discovery
   /admin/audit:

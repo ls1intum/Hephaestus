@@ -19,9 +19,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.Optional;
-import java.util.Set;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -273,23 +271,22 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
-        // Each config subtype yields the set of kinds it may legally bind to. One membership check
-        // covers every subtype, so adding a new ConnectionConfig is a compile error here (exhaustive
-        // switch) rather than a silent runtime mismatch.
-        Set<IntegrationKind> allowed = switch (config) {
-            case ConnectionConfig.GitHubAppConfig __ -> EnumSet.of(IntegrationKind.GITHUB);
-            case ConnectionConfig.GitHubPatConfig __ -> EnumSet.of(IntegrationKind.GITHUB);
-            case ConnectionConfig.GitLabConfig __ -> EnumSet.of(IntegrationKind.GITLAB);
-            case ConnectionConfig.SlackConfig __ -> EnumSet.of(IntegrationKind.SLACK);
+        // Each config subtype maps to the one kind it may legally bind to; the exhaustive switch
+        // makes adding a new ConnectionConfig a compile error here rather than a silent mismatch.
+        IntegrationKind expected = switch (config) {
+            case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
+            case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
+            case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
+            case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
         };
-        if (!allowed.contains(kind)) {
+        if (kind != expected) {
             throw new IllegalStateException(
                 "Connection kind=" +
                     kind +
                     " incompatible with config=" +
                     config.getClass().getSimpleName() +
-                    " (expected kind in " +
-                    allowed +
+                    " (expected " +
+                    expected +
                     ")"
             );
         }

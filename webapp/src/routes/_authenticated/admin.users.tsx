@@ -46,8 +46,8 @@ function AdminUsersPage() {
 	const currentUserId = userId != null ? Number(userId) : undefined;
 
 	// Server has no search param (AdminListUsersData.query is { page, size } only), so we
-	// filter the already-loaded rows client-side. useDeferredValue debounces the heavy
-	// re-filter without lagging the input itself.
+	// filter the already-loaded rows client-side. useDeferredValue keeps the input responsive
+	// by deprioritizing the heavy re-filter render (it does not debounce/throttle).
 	const [search, setSearch] = useState("");
 	const deferredSearch = useDeferredValue(search);
 

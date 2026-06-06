@@ -25,7 +25,8 @@ import org.jspecify.annotations.Nullable;
  * cache invalidation: the decoder caches only the REVOKED verdict (a negative cache), so a revoke
  * is visible to every pod within DB visibility lag. The Caffeine entry only sheds replay load.
  *
- * <p>Expired rows are swept by a scheduled job; the {@code expires_at} index makes that cheap.
+ * <p>Expired rows are pruned daily by {@code IssuedJwtCleanupJob}; the {@code expires_at} index
+ * makes that range delete cheap.
  */
 @Entity
 @Table(name = "issued_jwt")

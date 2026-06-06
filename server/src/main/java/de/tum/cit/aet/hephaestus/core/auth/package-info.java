@@ -31,8 +31,8 @@
  * {@code preferred_username} (standard OIDC), {@code roles} (flat string array,
  * Hephaestus-specific — read by the authority converter), {@code given_name} (when known),
  * and {@code act} (RFC 8693; only when impersonating). Signed ES256 with a DB-backed
- * {@code JWKSource}; {@code /.well-known/openid-configuration} + {@code /.well-known/jwks.json}
- * are published from day one. See {@code HephaestusJwtIssuer} for the authoritative shape.
+ * {@code JWKSource}; the public keys are published at {@code /.well-known/jwks.json}. See
+ * {@code HephaestusJwtIssuer} for the authoritative shape.
  *
  * <h2>Module boundaries</h2>
  * <ul>

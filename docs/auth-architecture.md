@@ -62,7 +62,8 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 - **We are our own issuer.** After federating to the upstream IdP, we mint *our* JWT. Claim
   shape is a strict OIDC subset (`iss/sub/aud/jti/iat/exp/scope/act`) so a future Spring
   Authorization Server can take over issuance without touching resource-server code.
-  Discovery is published at `/.well-known/openid-configuration` + `/.well-known/jwks.json`.
+  The public signing keys are published at `/.well-known/jwks.json` (a full OIDC discovery
+  document is deferred until a relying party actually needs it).
 - **Revocation is real.** Every issued JWT has a `jti` row in `issued_jwt`. Logout /
   refresh / sign-out-everywhere / account-delete set `revoked_at`; `RevocationAwareJwtDecoder`
   re-checks `issued_jwt(jti)` on every request, so revocation takes effect on every pod within

@@ -25,8 +25,7 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
  * lands. Production deploys can pre-seed via Liquibase if deterministic kids are needed.
  *
  * <h2>{@link Clock} bean</h2>
- * Provided here (not in a global config) because the auth module is the first consumer; if
- * another module later needs a clock, this bean naturally generalises.
+ * A local {@code @Bean} so the issuer/decoder can be tested against a fixed {@link Clock}.
  */
 @Configuration
 @EnableConfigurationProperties(AuthProperties.class)

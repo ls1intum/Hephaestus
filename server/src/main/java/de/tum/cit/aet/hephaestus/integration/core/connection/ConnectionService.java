@@ -11,7 +11,6 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,26 +28,15 @@ public class ConnectionService {
     private final ConnectionRepository connectionRepository;
     private final ConnectionAuditRepository auditRepository;
     private final CredentialBundleConverter credentialConverter;
-    private final ApplicationEventPublisher events;
 
     public ConnectionService(
         ConnectionRepository connectionRepository,
         ConnectionAuditRepository auditRepository,
-        CredentialBundleConverter credentialConverter,
-        ApplicationEventPublisher events
+        CredentialBundleConverter credentialConverter
     ) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
-        this.events = events;
-    }
-
-    /** Publish a {@link ConnectionStateChangedEvent} (groundwork for a future cache-eviction listener; no consumer yet). */
-    private void publishStateChanged(Connection connection) {
-        if (connection.getId() == null) {
-            return; // unsaved row → nothing is cached under its id yet
-        }
-        events.publishEvent(new ConnectionStateChangedEvent(connection.getId(), connection.getKind()));
     }
 
     @Transactional(readOnly = true)
@@ -153,9 +141,7 @@ public class ConnectionService {
                 );
             }
             c.setConfig(next);
-            Connection saved = connectionRepository.save(c);
-            publishStateChanged(saved);
-            return saved;
+            return connectionRepository.save(c);
         });
     }
 
@@ -167,9 +153,7 @@ public class ConnectionService {
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
         return findActive(workspaceId, kind).map(c -> {
             c.setCredentials(bundle, credentialConverter);
-            Connection saved = connectionRepository.save(c);
-            publishStateChanged(saved);
-            return saved;
+            return connectionRepository.save(c);
         });
     }
 
@@ -349,9 +333,7 @@ public class ConnectionService {
             connection.setCredentialsAlg(null);
             log.info("Purged credentials on UNINSTALLED transition for connection={}", connection.getId());
         }
-        Connection saved = connectionRepository.save(connection);
-        publishStateChanged(saved); // emit state-change event (future cache-eviction listener; none today)
-        return saved;
+        return connectionRepository.save(connection);
     }
 
     /** Parameter object for {@link #transition} — collapses 6 params to one record. */

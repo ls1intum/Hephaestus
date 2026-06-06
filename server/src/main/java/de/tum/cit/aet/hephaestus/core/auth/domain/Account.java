@@ -51,7 +51,7 @@ public class Account {
      * Contact email (CITEXT). NEVER used for authentication lookup — see class doc.
      * Unique among non-deleted active accounts.
      */
-    @Column(name = "primary_email", length = 320, columnDefinition = "citext")
+    @Column(name = "primary_email", columnDefinition = "citext")
     @Nullable
     private String primaryEmail;
 
@@ -63,16 +63,6 @@ public class Account {
     @Column(name = "app_role", nullable = false, length = 16)
     @ColumnDefault("'USER'")
     private AppRole appRole = AppRole.USER;
-
-    /**
-     * Distinguishes humans from service principals (agent runtime, CI). For v1 only
-     * {@link Type#HUMAN} is created via the OAuth login flow; {@link Type#SERVICE}
-     * is reserved for a follow-up that ships scoped service-account tokens.
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false, length = 16)
-    @ColumnDefault("'HUMAN'")
-    private Type type = Type.HUMAN;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
@@ -109,11 +99,6 @@ public class Account {
     public enum AppRole {
         USER,
         APP_ADMIN,
-    }
-
-    public enum Type {
-        HUMAN,
-        SERVICE,
     }
 
     public enum Status {
