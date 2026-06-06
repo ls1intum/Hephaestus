@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -27,14 +29,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        recoverable for this window; once {@code deleted_at} is older than this,
  *                        {@code AccountHardDeleteSweeper} hard-deletes the account (cascading its
  *                        auth rows) and flips status to DELETED. Default 48h.
- * @param github          Default GitHub OAuth login app. The login registration is built
- *                        only when a client id is configured (blank = provider omitted, no
- *                        crash) — unlike {@code spring.security.oauth2.client.*}, which fails
- *                        Boot's non-empty-client-id validation on a no-credentials boot.
- * @param gitlab          Default GitLab OAuth login app (same blank-tolerant rule). Works against
- *                        any GitLab instance — set {@code base-url} (defaults to gitlab.com) and an
- *                        optional {@code display-name} for the login button. Self-hosted deployers
- *                        (e.g. gitlab.lrz.de) only override those two plus the client credentials.
+ * @param loginProviders  Instance login providers to seed on first boot, keyed by a stable
+ *                        {@code registrationId} (the OAuth callback segment {@code /login/oauth2/code/
+ *                        {id}} and the identity key — e.g. {@code github}, {@code gitlab},
+ *                        {@code gitlab-lrz}). Each entry is blank-tolerant: a blank client id omits
+ *                        that provider (no crash), so credential-less CI/specs/worker pods still boot.
+ *                        Multiple providers per instance are supported (one per {@code (type, base-url)}
+ *                        SCM instance); seeding is seed-if-absent, so an admin's later edits are never
+ *                        clobbered on reboot. Additional providers can also be added at runtime in
+ *                        Instance admin → Login providers.
  * @param bootstrapAdmins Instance super-admin (APP_ADMIN) allowlist of {@code <registrationId>:<who>}.
  *                        {@code who} is either {@code @username} (recommended, readable — e.g.
  *                        {@code gitlab:@m.mustermann}, matched against the git login) or the
@@ -66,12 +69,19 @@ public record AuthProperties(
     @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,
     @DefaultValue("") String stateCookieKey,
     @DefaultValue("48h") Duration deleteCooldown,
-    @DefaultValue GithubLogin github,
-    @DefaultValue GitlabLogin gitlab,
+    Map<String, LoginProviderSeed> loginProviders,
     @DefaultValue List<String> bootstrapAdmins,
     @DefaultValue("") String bootstrapToken,
     @DefaultValue("1h") Duration impersonationMaxLifetime
 ) {
+    /**
+     * Null-coalesce the optional provider map so a deployment with no {@code login-providers} block (and
+     * direct test construction passing {@code null}) binds to an empty map rather than NPEing at seed time.
+     */
+    public AuthProperties {
+        loginProviders = loginProviders == null ? Map.of() : loginProviders;
+    }
+
     /**
      * Access-token cookie name. The {@code __Host-} prefix forces Secure + host-only (no Domain),
      * so the browser drops it if a proxy injects a Domain attribute. Single source of truth — also
@@ -80,29 +90,26 @@ public record AuthProperties(
     public static final String DEFAULT_COOKIE_NAME = "__Host-HEPHAESTUS_AT";
 
     /**
-     * Default GitHub OAuth login provider credentials. The registration is wired only when
-     * {@link #configured()} so CI / specs / worker-only pods boot without OAuth credentials.
+     * One instance login provider to seed. {@code type} selects the OAuth wiring (GitHub → github.com
+     * endpoints; GitLab → endpoints derived from {@code baseUrl}); {@code baseUrl} is the instance root
+     * for a self-hosted GitLab (ignored for GitHub, which is github.com only). {@code displayName} is the
+     * login-button label (defaults to the registration id when blank). A blank {@code clientId} omits the
+     * provider so credential-less pods still boot.
+     *
+     * <p>Scopes are intentionally NOT settable here — they are derived from {@code type} in
+     * {@code LoginProviderService} so the GitLab "must not request {@code openid}" invariant cannot be
+     * misconfigured from env.
      */
-    public record GithubLogin(@DefaultValue("") String clientId, @DefaultValue("") String clientSecret) {
-        public boolean configured() {
-            return !clientId.isBlank();
-        }
-    }
-
-    /**
-     * Default GitLab OAuth login provider credentials plus the instance base URL and login-button
-     * label. Works against any GitLab (gitlab.com by default, or a self-hosted instance via
-     * {@code base-url}); {@code display-name} is what the login page shows. Same blank-tolerant rule
-     * as {@link GithubLogin} — a blank client id omits the provider so credential-less pods still boot.
-     */
-    public record GitlabLogin(
+    public record LoginProviderSeed(
+        LoginProvider.ProviderType type,
+        @DefaultValue("") String baseUrl,
         @DefaultValue("") String clientId,
         @DefaultValue("") String clientSecret,
-        @DefaultValue("https://gitlab.com") URI baseUrl,
-        @DefaultValue("GitLab") String displayName
+        @DefaultValue("") String displayName
     ) {
+        /** A provider with a blank client id is skipped at seed time (no crash). */
         public boolean configured() {
-            return !clientId.isBlank();
+            return clientId != null && !clientId.isBlank();
         }
     }
 }

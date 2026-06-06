@@ -17,6 +17,9 @@ public interface LoginProviderRepository extends JpaRepository<LoginProvider, Lo
 
     boolean existsByRegistrationId(String registrationId);
 
+    /** One login app per SCM instance (uq on {@code type + base_url}) — guards seeding against duplicates. */
+    boolean existsByTypeAndBaseUrl(LoginProvider.ProviderType type, String baseUrl);
+
     /** Enabled providers, ordered for a stable login-page display. */
     List<LoginProvider> findByEnabledTrueOrderByDisplayNameAsc();
 }

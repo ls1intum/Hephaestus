@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -28,13 +29,25 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
         this.gitProviderRepository = gitProviderRepository;
     }
 
+    /**
+     * Get-or-create the {@code git_provider} row, committing in its OWN transaction
+     * ({@link Propagation#REQUIRES_NEW}). This is required for correctness, not just isolation: account
+     * provisioning inserts the {@code identity_link} (FK {@code sfk_identity_link_git_provider}) inside
+     * {@code AccountJitCreator}'s {@code REQUIRES_NEW} transaction, which under READ_COMMITTED cannot see
+     * an uncommitted {@code git_provider} row. The first login on a not-yet-seen instance (e.g. a
+     * self-hosted gitlab.lrz.de) would otherwise create the row in the outer login transaction and then
+     * fail the FK from the inner JIT transaction. The provider row is idempotent reference data (an SCM
+     * instance registration, reused across logins — exactly like the env-seeded github.com / gitlab.com
+     * rows), so committing it independently of the login outcome is correct.
+     */
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long resolveProviderId(String providerTypeName, String baseUrl) {
         GitProviderType type = GitProviderType.valueOf(providerTypeName);
+        String origin = originOf(baseUrl);
         return gitProviderRepository
-            .findByTypeAndServerUrl(type, originOf(baseUrl))
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(type, originOf(baseUrl))))
+            .findByTypeAndServerUrl(type, origin)
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(type, origin)))
             .getId();
     }
 

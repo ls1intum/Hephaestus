@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,7 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Pins the env → seed contract: a configured login provider is seeded once when absent, never
  * re-seeded when present (so an admin's later edits aren't clobbered), and unconfigured providers
- * are skipped. registration ids {@code github} / {@code gitlab} are stable across reboots.
+ * are skipped. Providers are keyed by a stable, operator-chosen {@code registrationId} (e.g.
+ * {@code gitlab-lrz}) and several seed in one boot.
  */
 class LoginProviderServiceTest extends BaseUnitTest {
 
@@ -29,7 +31,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
         LoginProviderClientRegistrationRepository.class
     );
 
-    private LoginProviderService service(AuthProperties.GithubLogin github, AuthProperties.GitlabLogin gitlab) {
+    private LoginProviderService service(Map<String, AuthProperties.LoginProviderSeed> providers) {
         AuthProperties props = new AuthProperties(
             URI.create("http://localhost:8080"),
             "hephaestus-spa",
@@ -37,8 +39,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
             "__Host-HEPHAESTUS_AT",
             "",
             Duration.ofHours(48),
-            github,
-            gitlab,
+            providers,
             List.of(),
             "",
             Duration.ofHours(1)
@@ -47,11 +48,26 @@ class LoginProviderServiceTest extends BaseUnitTest {
     }
 
     private LoginProviderService adminService() {
-        return service(new AuthProperties.GithubLogin("", ""), unconfiguredGitlab());
+        return service(Map.of());
     }
 
-    private static AuthProperties.GitlabLogin unconfiguredGitlab() {
-        return new AuthProperties.GitlabLogin("", "", URI.create("https://gitlab.com"), "GitLab");
+    private static AuthProperties.LoginProviderSeed githubSeed(String clientId, String secret) {
+        return new AuthProperties.LoginProviderSeed(LoginProvider.ProviderType.GITHUB, "", clientId, secret, "");
+    }
+
+    private static AuthProperties.LoginProviderSeed gitlabSeed(
+        String clientId,
+        String secret,
+        String baseUrl,
+        String displayName
+    ) {
+        return new AuthProperties.LoginProviderSeed(
+            LoginProvider.ProviderType.GITLAB,
+            baseUrl,
+            clientId,
+            secret,
+            displayName
+        );
     }
 
     private static LoginProviderService.Draft gitlabDraft(String registrationId, String baseUrl, String scopes) {
@@ -70,7 +86,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void seedsConfiguredGithubWhenAbsent() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
 
-        service(new AuthProperties.GithubLogin("client-id", "secret"), unconfiguredGitlab()).seedFromEnvOnStartup();
+        service(Map.of("github", githubSeed("client-id", "secret"))).seedFromEnvOnStartup();
 
         ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
         verify(repository).save(captor.capture());
@@ -78,40 +94,83 @@ class LoginProviderServiceTest extends BaseUnitTest {
         assertThat(seeded.getRegistrationId()).isEqualTo("github");
         assertThat(seeded.getType()).isEqualTo(LoginProvider.ProviderType.GITHUB);
         assertThat(seeded.getBaseUrl()).isEqualTo("https://github.com");
+        assertThat(seeded.getScopes()).isEqualTo("read:user user:email"); // defaulted by type
         assertThat(seeded.isSeededFromEnv()).isTrue();
         assertThat(seeded.isEnabled()).isTrue();
     }
 
     @Test
-    void seedsConfiguredGitlabWithGenericIdAndConfiguredLabel() {
+    void seedsSelfHostedGitlabUnderItsDescriptiveRegistrationId() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
-        // A self-hosted deployer only sets base-url + display-name + credentials; the registration id
-        // stays the stable, instance-agnostic "gitlab" so IdentityLinks and the admin allowlist resolve.
-        AuthProperties.GitlabLogin gitlab = new AuthProperties.GitlabLogin(
-            "client-id",
-            "secret",
-            URI.create("https://gitlab.lrz.de"),
-            "gitlab.lrz.de"
-        );
+        // The whole point of the map: a self-hosted GitLab keeps a descriptive, stable id (gitlab-lrz),
+        // not a forced generic "gitlab" — so several GitLab instances can coexist on one Hephaestus.
 
-        service(new AuthProperties.GithubLogin("", ""), gitlab).seedFromEnvOnStartup();
+        service(
+            Map.of("gitlab-lrz", gitlabSeed("client-id", "secret", "https://gitlab.lrz.de", "GitLab LRZ"))
+        ).seedFromEnvOnStartup();
 
         ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
         verify(repository).save(captor.capture());
         LoginProvider seeded = captor.getValue();
-        assertThat(seeded.getRegistrationId()).isEqualTo("gitlab");
+        assertThat(seeded.getRegistrationId()).isEqualTo("gitlab-lrz");
         assertThat(seeded.getType()).isEqualTo(LoginProvider.ProviderType.GITLAB);
         assertThat(seeded.getBaseUrl()).isEqualTo("https://gitlab.lrz.de");
-        assertThat(seeded.getDisplayName()).isEqualTo("gitlab.lrz.de");
+        assertThat(seeded.getDisplayName()).isEqualTo("GitLab LRZ");
+        assertThat(seeded.getScopes()).isEqualTo("read_user"); // OAuth2 (no openid), defaulted by type
         assertThat(seeded.isSeededFromEnv()).isTrue();
         assertThat(seeded.isEnabled()).isTrue();
+    }
+
+    @Test
+    void seedsMultipleProvidersInOneBoot() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+
+        service(
+            Map.of(
+                "github",
+                githubSeed("gh-id", "gh-secret"),
+                "gitlab-lrz",
+                gitlabSeed("gl-id", "gl-secret", "https://gitlab.lrz.de", "GitLab LRZ")
+            )
+        ).seedFromEnvOnStartup();
+
+        ArgumentCaptor<LoginProvider> captor = ArgumentCaptor.forClass(LoginProvider.class);
+        verify(repository, org.mockito.Mockito.times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .extracting(LoginProvider::getRegistrationId)
+            .containsExactlyInAnyOrder("github", "gitlab-lrz");
+    }
+
+    @Test
+    void skipsSeedWhenAnInstanceWithSameTypeAndBaseUrlAlreadyExists() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+        // A row for this (type, base_url) already exists (e.g. an admin added it, or a prior id) — the
+        // uniqueness guard must skip rather than crash startup on a constraint violation.
+        when(repository.existsByTypeAndBaseUrl(LoginProvider.ProviderType.GITLAB, "https://gitlab.lrz.de")).thenReturn(
+            true
+        );
+
+        service(
+            Map.of("gitlab-lrz", gitlabSeed("client-id", "secret", "https://gitlab.lrz.de", "GitLab LRZ"))
+        ).seedFromEnvOnStartup();
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void skipsSeedOfInvalidRegistrationId() {
+        when(repository.existsByRegistrationId(any())).thenReturn(false);
+
+        service(Map.of("Bad Id!", githubSeed("client-id", "secret"))).seedFromEnvOnStartup();
+
+        verify(repository, never()).save(any());
     }
 
     @Test
     void doesNotReseedWhenAlreadyPresent() {
         when(repository.existsByRegistrationId(any())).thenReturn(true);
 
-        service(new AuthProperties.GithubLogin("client-id", "secret"), unconfiguredGitlab()).seedFromEnvOnStartup();
+        service(Map.of("github", githubSeed("client-id", "secret"))).seedFromEnvOnStartup();
 
         verify(repository, never()).save(any());
     }
@@ -120,7 +179,9 @@ class LoginProviderServiceTest extends BaseUnitTest {
     void skipsUnconfiguredProviders() {
         when(repository.existsByRegistrationId(any())).thenReturn(false);
 
-        service(new AuthProperties.GithubLogin("", ""), unconfiguredGitlab()).seedFromEnvOnStartup();
+        service(
+            Map.of("github", githubSeed("", ""), "gitlab", gitlabSeed("", "", "https://gitlab.com", "GitLab"))
+        ).seedFromEnvOnStartup();
 
         verify(repository, never()).save(any());
     }

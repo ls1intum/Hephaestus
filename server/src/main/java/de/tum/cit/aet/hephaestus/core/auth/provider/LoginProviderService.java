@@ -3,7 +3,10 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +23,13 @@ import org.springframework.web.server.ResponseStatusException;
  * boot, is the single read path for building login {@code ClientRegistration}s (Slice 1b), and backs
  * the instance-admin CRUD (Slice 2).
  *
- * <p>Seeding is idempotent and promote-once: a provider is created from {@code hephaestus.auth.*} only
- * when it does not already exist, so env becomes the <em>seed</em>, never the live source — an admin
- * can edit or disable a seeded provider afterwards and the env value won't clobber it on the next boot.
- * Registration ids {@code github} / {@code gitlab} are stable so {@code IdentityLink}s and the admin
- * allowlist keep resolving across reboots.
+ * <p>Seeding is idempotent and promote-once: a provider is created from {@code hephaestus.auth.login-
+ * providers.*} only when it does not already exist, so env becomes the <em>seed</em>, never the live
+ * source — an admin can edit or disable a seeded provider afterwards and the env value won't clobber it
+ * on the next boot. Each entry is keyed by a stable, operator-chosen {@code registrationId} (e.g.
+ * {@code github}, {@code gitlab}, {@code gitlab-lrz}) so {@code IdentityLink}s and the admin allowlist
+ * keep resolving across reboots; multiple providers per instance seed in one boot (one per
+ * {@code (type, baseUrl)} SCM instance).
  *
  * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
  * edit/enable/disable takes effect immediately rather than after the 60s TTL.
@@ -33,8 +38,6 @@ import org.springframework.web.server.ResponseStatusException;
 @WorkspaceAgnostic("Login providers are instance-global, not workspace-scoped")
 public class LoginProviderService {
 
-    static final String GITHUB_REGISTRATION_ID = "github";
-    static final String GITLAB_REGISTRATION_ID = "gitlab";
     static final String GITHUB_SCOPES = "read:user user:email";
     // GitLab login uses the OAuth2 flow (userInfo = /api/v4/user, keyed on "id"), NOT OIDC — so the
     // scope must NOT contain "openid". A request carrying "openid" makes Spring Security take the OIDC
@@ -157,32 +160,53 @@ public class LoginProviderService {
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seedFromEnvOnStartup() {
-        AuthProperties.GithubLogin github = authProperties.github();
-        if (github.configured() && !repository.existsByRegistrationId(GITHUB_REGISTRATION_ID)) {
+        // Sorted by registration id for deterministic seeding when two entries collide on (type, baseUrl).
+        Set<String> seededInstances = new HashSet<>();
+        new TreeMap<>(authProperties.loginProviders()).forEach((registrationId, seed) -> {
+            if (seed == null || !seed.configured()) {
+                return; // blank client id → provider omitted (credential-less pods still boot)
+            }
+            String id = registrationId == null ? "" : registrationId.trim();
+            if (!id.matches("^[a-z][a-z0-9-]{1,62}$")) {
+                log.warn("auth.login-provider: skipping seed of invalid registration id '{}'", registrationId);
+                return;
+            }
+            if (repository.existsByRegistrationId(id)) {
+                return; // seed-once: env is the seed, never the live source — admin edits survive reboots
+            }
+            String baseUrl;
+            try {
+                baseUrl = resolveBaseUrl(seed.type(), seed.baseUrl());
+            } catch (ResponseStatusException e) {
+                log.warn("auth.login-provider: skipping seed '{}' — invalid base URL: {}", id, e.getReason());
+                return;
+            }
+            // One login app per SCM instance (uq on type+base_url): skip a duplicate so a misconfiguration
+            // can't crash startup on a constraint violation.
+            if (
+                !seededInstances.add(seed.type() + "|" + baseUrl) ||
+                repository.existsByTypeAndBaseUrl(seed.type(), baseUrl)
+            ) {
+                log.warn(
+                    "auth.login-provider: skipping seed '{}' — a {} provider for {} already exists",
+                    id,
+                    seed.type(),
+                    baseUrl
+                );
+                return;
+            }
+            String displayName = seed.displayName().isBlank() ? id : seed.displayName().trim();
             seed(
-                GITHUB_REGISTRATION_ID,
-                LoginProvider.ProviderType.GITHUB,
-                "GitHub",
-                GITHUB_COM,
-                github.clientId(),
-                github.clientSecret(),
-                GITHUB_SCOPES
+                id,
+                seed.type(),
+                displayName,
+                baseUrl,
+                seed.clientId().trim(),
+                seed.clientSecret(),
+                resolveScopes(seed.type(), null)
             );
-            log.info("auth.login-provider: seeded default '{}' from env", GITHUB_REGISTRATION_ID);
-        }
-        AuthProperties.GitlabLogin gitlab = authProperties.gitlab();
-        if (gitlab.configured() && !repository.existsByRegistrationId(GITLAB_REGISTRATION_ID)) {
-            seed(
-                GITLAB_REGISTRATION_ID,
-                LoginProvider.ProviderType.GITLAB,
-                gitlab.displayName(),
-                gitlab.baseUrl().toString(),
-                gitlab.clientId(),
-                gitlab.clientSecret(),
-                GITLAB_SCOPES
-            );
-            log.info("auth.login-provider: seeded default '{}' from env", GITLAB_REGISTRATION_ID);
-        }
+            log.info("auth.login-provider: seeded '{}' ({} {}) from env", id, seed.type(), baseUrl);
+        });
     }
 
     private void seed(

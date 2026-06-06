@@ -19,6 +19,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -60,8 +61,8 @@ public class AuthSecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(AuthSecurityConfig.class);
 
-    /** The seeded GitHub login provider's registration id — selects the email-enriching user service. */
-    private static final String GITHUB_REGISTRATION_ID = "github";
+    /** github.com's user-info API host — selects the email-enriching user service (see {@link #isGitHub}). */
+    private static final String GITHUB_USERINFO_PREFIX = "https://api.github.com";
 
     @Bean
     public CookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository(
@@ -103,22 +104,26 @@ public class AuthSecurityConfig {
     }
 
     /**
-     * OAuth2 user service. Routes the {@code github} registration through
-     * {@link GitHubEmailOAuth2UserService} (fetches the primary+verified email from
-     * {@code api.github.com/user/emails}); every other registration uses the framework default. Scoped
-     * to {@code github} ONLY because the enricher hardcodes github.com's email API. The GitLab login is
-     * OAuth2 (scope {@code read_user}, no {@code openid}), so it takes the default service and reads its
-     * email from {@code /api/v4/user} — see {@code LoginProviderClientRegistrationRepository}.
+     * OAuth2 user service. Routes GitHub registrations through {@link GitHubEmailOAuth2UserService}
+     * (fetches the primary+verified email from {@code api.github.com/user/emails}); every other
+     * registration uses the framework default. GitHub is detected by its user-info endpoint host
+     * ({@value #GITHUB_USERINFO_PREFIX}), NOT by registration id — the id is operator-chosen (it need
+     * not be {@code github}), and GitHub login is github.com-only (GHE out of scope), so the host is the
+     * stable signal. The GitLab login is OAuth2 (scope {@code read_user}, no {@code openid}), so it takes
+     * the default service and reads its email from {@code /api/v4/user} — see
+     * {@code LoginProviderClientRegistrationRepository}.
      */
     @Bean
     public OAuth2UserService<OAuth2UserRequest, OAuth2User> oauthUserService() {
         var github = new GitHubEmailOAuth2UserService();
         var fallback = new DefaultOAuth2UserService();
-        return request ->
-            (GITHUB_REGISTRATION_ID.equals(request.getClientRegistration().getRegistrationId())
-                ? github
-                : fallback
-            ).loadUser(request);
+        return request -> (isGitHub(request.getClientRegistration()) ? github : fallback).loadUser(request);
+    }
+
+    /** A registration is GitHub when its user-info endpoint is github.com's API ({@code api.github.com}). */
+    private static boolean isGitHub(ClientRegistration registration) {
+        String userInfoUri = registration.getProviderDetails().getUserInfoEndpoint().getUri();
+        return userInfoUri != null && userInfoUri.startsWith(GITHUB_USERINFO_PREFIX);
     }
 
     @Bean

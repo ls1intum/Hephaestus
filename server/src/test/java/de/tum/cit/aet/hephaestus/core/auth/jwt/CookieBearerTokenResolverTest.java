@@ -35,8 +35,7 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
             COOKIE_NAME,
             "",
             Duration.ofHours(48),
-            new AuthProperties.GithubLogin("", ""),
-            new AuthProperties.GitlabLogin("", "", URI.create("https://gitlab.com"), "GitLab"),
+            java.util.Map.of(),
             java.util.List.of(),
             "",
             Duration.ofHours(1)
