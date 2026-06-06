@@ -32,7 +32,7 @@ class GithubConnectionStrategyTest extends BaseUnitTest {
         );
 
         strategy.initiate(
-            new ConnectionStrategy.InitiateRequest(7L, IntegrationKind.GITHUB, Map.of(), null, "admin@example.com")
+            new ConnectionStrategy.InitiateRequest(7L, IntegrationKind.GITHUB, Map.of(), "admin@example.com")
         );
 
         verify(oauthStateService).issue(7L, IntegrationKind.GITHUB, "admin@example.com");

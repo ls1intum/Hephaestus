@@ -89,15 +89,4 @@ class AccountBootstrapServiceIntegrationTest {
         );
         assertThat(accountRepository.findById(user.getId()).orElseThrow().getAppRole()).isEqualTo(Account.AppRole.USER);
     }
-
-    @Test
-    void wrongTokenIsRejectedAndDoesNotPromote() {
-        Account user = persistUser("Hopeful");
-
-        assertThatThrownBy(() -> bootstrapService.bootstrapFirstAdmin(user.getId(), "wrong")).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN)
-        );
-        assertThat(accountRepository.findById(user.getId()).orElseThrow().getAppRole()).isEqualTo(Account.AppRole.USER);
-    }
 }

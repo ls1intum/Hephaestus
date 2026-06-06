@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import java.net.URI;
 import java.util.Map;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Inbound payload for {@code POST /workspaces/{workspaceSlug}/connections}.
@@ -14,8 +12,4 @@ import org.jspecify.annotations.Nullable;
  * Validation is the strategy's responsibility — invalid input surfaces as a 400 via
  * {@code IllegalArgumentException}.
  */
-public record InitiateConnectionRequestDTO(
-    IntegrationKind kind,
-    Map<String, String> userInput,
-    @Nullable URI redirectAfter
-) {}
+public record InitiateConnectionRequestDTO(IntegrationKind kind, Map<String, String> userInput) {}

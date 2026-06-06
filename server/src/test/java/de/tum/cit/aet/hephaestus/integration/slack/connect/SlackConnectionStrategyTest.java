@@ -122,7 +122,6 @@ class SlackConnectionStrategyTest extends BaseUnitTest {
                 42L,
                 IntegrationKind.SLACK,
                 Map.of(),
-                null,
                 "admin@example.com"
             )
         );

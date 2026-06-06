@@ -184,6 +184,37 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void resolveOrProvision_nonNumericSubject_throwsConflict() {
+        // IdentityLink.subject must be the IdP-stable NUMERIC provider id (the nOAuth defence, enforced
+        // via userNameAttributeName("id")). A non-numeric subject means a mis-configured registration
+        // mapped a mutable username; the provisioner must refuse (409), never mint an SCM actor keyed on
+        // a forgeable handle.
+        when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
+        IdentityLinkView poisoned = view(100L, GITLAB_PROVIDER_ID, "attacker-handle", "attacker-handle");
+        when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(poisoned));
+        GitProvider provider = gitProvider(GITLAB_PROVIDER_ID, GitProviderType.GITLAB, "https://gitlab.lrz.de");
+        when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(provider));
+
+        assertThatThrownBy(() -> service.resolveOrProvisionCurrentUser())
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(userRepository, never()).upsertUser(
+            anyLong(),
+            anyLong(),
+            anyString(),
+            anyString(),
+            anyString(),
+            anyString(),
+            anyString(),
+            any(),
+            any(),
+            any()
+        );
+        verify(accountIdentityQuery, never()).linkExternalActor(anyLong(), anyLong());
+    }
+
+    @Test
     void resolveOrProvision_returnsEmpty_whenAccountHasNoLinks() {
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of());
