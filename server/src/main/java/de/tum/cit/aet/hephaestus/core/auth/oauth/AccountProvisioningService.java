@@ -63,11 +63,19 @@ public class AccountProvisioningService {
     }
 
     /**
+     * Outcome of {@link #resolveOrProvision}. {@code identityLinked} is true ONLY when a NEW identity
+     * was attached to an existing account (LINK mode) — so the caller can audit IDENTITY_LINKED for a
+     * genuine link and LOGIN for a returning login / re-affirm / JIT create. A LINK-mode flow that merely
+     * re-affirms an already-linked identity persists no new link, so it reports {@code false}.
+     */
+    public record ProvisionResult(Account account, boolean identityLinked) {}
+
+    /**
      * Resolve the account for a completed OAuth login: returning login (link exists),
      * link-mode (attach to current account), or fresh JIT creation.
      */
     @Transactional
-    public Account resolveOrProvision(
+    public ProvisionResult resolveOrProvision(
         String registrationId,
         String subject,
         OAuth2User principal,
@@ -106,7 +114,11 @@ public class AccountProvisioningService {
                 registrationId,
                 link.getAccount().getId()
             );
-            return promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal));
+            // Returning login / re-affirm of an already-linked identity: no NEW link is persisted.
+            return new ProvisionResult(
+                promoteIfBootstrapAdmin(link.getAccount(), registrationId, subject, loginOf(principal)),
+                false
+            );
         }
 
         if (mode == AuthIntentCookie.Intent.Mode.LINK) {
@@ -125,7 +137,8 @@ public class AccountProvisioningService {
             linked.setLinkedVia(IdentityLink.LinkedVia.MANUAL_LINK);
             identityLinkRepository.save(linked);
             log.info("auth.success: linked provider={} to existing accountId={}", registrationId, account.getId());
-            return account;
+            // The one genuine "identity attached to an existing account" outcome.
+            return new ProvisionResult(account, true);
         }
 
         Account account = new Account(displayName(principal, subject));
@@ -164,7 +177,7 @@ public class AccountProvisioningService {
                     login
                 );
             }
-            return result;
+            return new ProvisionResult(result, false); // fresh JIT login, not a link onto an existing account
         } catch (DataIntegrityViolationException e) {
             // First-login race: a concurrent login already created this identity and won the
             // uq_identity_link_provider_subject_team insert. Fail closed by reading the now-existing
@@ -178,7 +191,10 @@ public class AccountProvisioningService {
                         winner.getId(),
                         registrationId
                     );
-                    return promoteIfBootstrapAdmin(winner, registrationId, subject, loginOf(principal));
+                    return new ProvisionResult(
+                        promoteIfBootstrapAdmin(winner, registrationId, subject, loginOf(principal)),
+                        false
+                    );
                 })
                 .orElseThrow(() ->
                     new IllegalStateException(

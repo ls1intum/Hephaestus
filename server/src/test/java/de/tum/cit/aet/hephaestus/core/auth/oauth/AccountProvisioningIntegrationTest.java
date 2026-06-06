@@ -68,19 +68,23 @@ class AccountProvisioningIntegrationTest {
         seedProvider("gitlab-noauth-b", LoginProvider.ProviderType.GITLAB);
         String sharedEmail = "victim@shared.example";
 
-        Account viaGithub = service.resolveOrProvision(
-            "github-noauth-a",
-            "gh-subject-victim",
-            principal("gh-subject-victim", sharedEmail, true, "victim"),
-            AuthIntentCookie.Intent.login(null, null)
-        );
+        Account viaGithub = service
+            .resolveOrProvision(
+                "github-noauth-a",
+                "gh-subject-victim",
+                principal("gh-subject-victim", sharedEmail, true, "victim"),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+            .account();
         // A DIFFERENT provider + subject carrying the SAME verified email — the nOAuth attack shape.
-        Account viaGitlab = service.resolveOrProvision(
-            "gitlab-noauth-b",
-            "gl-subject-attacker",
-            principal("gl-subject-attacker", sharedEmail, true, "attacker"),
-            AuthIntentCookie.Intent.login(null, null)
-        );
+        Account viaGitlab = service
+            .resolveOrProvision(
+                "gitlab-noauth-b",
+                "gl-subject-attacker",
+                principal("gl-subject-attacker", sharedEmail, true, "attacker"),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+            .account();
 
         // Two distinct accounts: the shared email did NOT fold the second identity into the first.
         assertThat(viaGitlab.getId()).isNotEqualTo(viaGithub.getId());
@@ -101,18 +105,22 @@ class AccountProvisioningIntegrationTest {
         seedProvider("github-samesubj", LoginProvider.ProviderType.GITHUB);
         String sharedEmail = "two-accounts@shared.example";
 
-        Account first = service.resolveOrProvision(
-            "github-samesubj",
-            "subject-one",
-            principal("subject-one", sharedEmail, true, "one"),
-            AuthIntentCookie.Intent.login(null, null)
-        );
-        Account second = service.resolveOrProvision(
-            "github-samesubj",
-            "subject-two",
-            principal("subject-two", sharedEmail, true, "two"),
-            AuthIntentCookie.Intent.login(null, null)
-        );
+        Account first = service
+            .resolveOrProvision(
+                "github-samesubj",
+                "subject-one",
+                principal("subject-one", sharedEmail, true, "one"),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+            .account();
+        Account second = service
+            .resolveOrProvision(
+                "github-samesubj",
+                "subject-two",
+                principal("subject-two", sharedEmail, true, "two"),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+            .account();
 
         // Even within ONE provider, the subject is the key — a shared email never merges subjects.
         assertThat(second.getId()).isNotEqualTo(first.getId());
@@ -122,20 +130,24 @@ class AccountProvisioningIntegrationTest {
     void returningLoginWithSameProviderSubjectResolvesTheSameAccount() {
         seedProvider("github-returning", LoginProvider.ProviderType.GITHUB);
 
-        Account firstLogin = service.resolveOrProvision(
-            "github-returning",
-            "returning-subject",
-            principal("returning-subject", "ada@returning.example", true, "ada"),
-            AuthIntentCookie.Intent.login(null, null)
-        );
+        Account firstLogin = service
+            .resolveOrProvision(
+                "github-returning",
+                "returning-subject",
+                principal("returning-subject", "ada@returning.example", true, "ada"),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+            .account();
         // A second login for the SAME (provider, subject) must reuse the account, not JIT a new one —
         // even though the IdP now reports a different email (people change emails; the link is the key).
-        Account secondLogin = service.resolveOrProvision(
-            "github-returning",
-            "returning-subject",
-            principal("returning-subject", "ada-new@returning.example", true, "ada"),
-            AuthIntentCookie.Intent.login(null, null)
-        );
+        Account secondLogin = service
+            .resolveOrProvision(
+                "github-returning",
+                "returning-subject",
+                principal("returning-subject", "ada-new@returning.example", true, "ada"),
+                AuthIntentCookie.Intent.login(null, null)
+            )
+            .account();
 
         assertThat(secondLogin.getId()).isEqualTo(firstLogin.getId());
         // Idempotent: still exactly one identity link for the account.

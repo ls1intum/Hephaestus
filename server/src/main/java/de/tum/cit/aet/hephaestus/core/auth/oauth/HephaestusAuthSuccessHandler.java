@@ -103,7 +103,13 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         AuthIntentCookie.Intent intent = authIntentCookie.read(request);
         authIntentCookie.clear(response);
 
-        Account account = provisioningService.resolveOrProvision(registrationId, subject, principal, intent);
+        AccountProvisioningService.ProvisionResult provisioned = provisioningService.resolveOrProvision(
+            registrationId,
+            subject,
+            principal,
+            intent
+        );
+        Account account = provisioned.account();
 
         // Authoritative account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must
         // never obtain a fresh JWT — otherwise a re-login silently resurrects a deleting account and a
@@ -131,12 +137,16 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond()
         );
 
-        // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT. A link-mode
-        // flow attaches a new identity to an existing account, so it is IDENTITY_LINKED rather than a
-        // fresh LOGIN. (Audit writes are best-effort and never break the login — see AuthEventLogger.)
-        boolean linkMode = intent != null && intent.mode() == AuthIntentCookie.Intent.Mode.LINK;
+        // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT. IDENTITY_LINKED
+        // only when a NEW identity was actually attached to an existing account; a returning login or a
+        // re-affirm of an already-linked identity is a LOGIN (the provisioning result tells us which, so a
+        // LINK-mode re-affirm no longer writes a phantom IDENTITY_LINKED). Audit writes are best-effort and
+        // never break the login — see AuthEventLogger.
         authEventLogger
-            .event(linkMode ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN, AuthEvent.Result.SUCCESS)
+            .event(
+                provisioned.identityLinked() ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN,
+                AuthEvent.Result.SUCCESS
+            )
             .account(account.getId())
             .record();
 

@@ -83,7 +83,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     @EnumSource(value = Account.Status.class, names = { "SUSPENDED", "DELETING", "DELETED" })
     void nonActiveAccountIsRefusedAtLoginWithNoCookie(Account.Status status) throws Exception {
         Account account = account(status);
-        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(account);
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, false));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("sub-1"));
@@ -98,7 +98,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     @Test
     void activeAccountMintsCookieAndRedirectsToValidatedReturnTo() throws Exception {
         Account account = account(Account.Status.ACTIVE);
-        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(account);
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, false));
         when(authIntentCookie.read(any())).thenReturn(AuthIntentCookie.Intent.login(null, "/teams"));
         JwtPrincipal principal = mock(JwtPrincipal.class);
         when(principalFactory.forAccount(account)).thenReturn(principal);
@@ -123,6 +123,25 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.LOGIN);
         assertThat(event.getValue().result()).isEqualTo(AuthEvent.Result.SUCCESS);
         assertThat(event.getValue().accountId()).isEqualTo(42L);
+    }
+
+    @Test
+    void linkOutcomeIsAuditedAsIdentityLinkedNotLogin() throws Exception {
+        // A genuine new-identity link (provisioning reports identityLinked=true) is IDENTITY_LINKED;
+        // a LINK-mode re-affirm would report false and audit LOGIN instead (no phantom IDENTITY_LINKED).
+        Account account = account(Account.Status.ACTIVE);
+        when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, true));
+        when(principalFactory.forAccount(account)).thenReturn(mock(JwtPrincipal.class));
+        when(jwtIssuer.issue(any(), any(), any())).thenReturn(
+            new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900))
+        );
+
+        handler.onAuthenticationSuccess(githubRequest(), new MockHttpServletResponse(), oauthToken("sub-1"));
+
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.IDENTITY_LINKED);
+        assertThat(event.getValue().result()).isEqualTo(AuthEvent.Result.SUCCESS);
     }
 
     @Test
@@ -158,6 +177,10 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         account.setId(42L);
         account.setStatus(status);
         return account;
+    }
+
+    private static AccountProvisioningService.ProvisionResult provision(Account account, boolean identityLinked) {
+        return new AccountProvisioningService.ProvisionResult(account, identityLinked);
     }
 
     private static MockHttpServletRequest githubRequest() {

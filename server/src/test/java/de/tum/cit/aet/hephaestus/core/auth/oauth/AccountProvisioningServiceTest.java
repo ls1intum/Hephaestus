@@ -92,14 +92,15 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         );
         when(adminBootstrapPolicy.shouldPromote(eq("github"), eq("sub-1"), any())).thenReturn(true);
 
-        Account result = service.resolveOrProvision(
+        var result = service.resolveOrProvision(
             "github",
             "sub-1",
             principal(),
             AuthIntentCookie.Intent.login(null, null)
         );
 
-        assertThat(result.getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
+        assertThat(result.account().getAppRole()).isEqualTo(Account.AppRole.APP_ADMIN);
+        assertThat(result.identityLinked()).as("a JIT login is not an identity-link").isFalse();
     }
 
     @Test
@@ -112,14 +113,14 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         );
         // adminBootstrapPolicy.shouldPromote defaults to false.
 
-        Account result = service.resolveOrProvision(
+        var result = service.resolveOrProvision(
             "github",
             "sub-1",
             principal(),
             AuthIntentCookie.Intent.login(null, null)
         );
 
-        assertThat(result.getAppRole()).isEqualTo(Account.AppRole.USER);
+        assertThat(result.account().getAppRole()).isEqualTo(Account.AppRole.USER);
     }
 
     private static OAuth2User principal() {
@@ -194,7 +195,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             )
         );
 
-        Account result = service.resolveOrProvision(
+        var result = service.resolveOrProvision(
             "github",
             "sub-1",
             principal(),
@@ -202,7 +203,8 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         );
 
         // Fail closed: return the concurrently-created winner, never a second orphan account.
-        assertThat(result.getId()).isEqualTo(7L);
+        assertThat(result.account().getId()).isEqualTo(7L);
+        assertThat(result.identityLinked()).isFalse();
         verify(accountRepository, never()).save(any());
     }
 
@@ -232,14 +234,15 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         );
         when(accountRepository.findById(42L)).thenReturn(Optional.of(accountWithId(42L)));
 
-        Account result = service.resolveOrProvision(
+        var result = service.resolveOrProvision(
             "github",
             "sub-1",
             principal(),
             AuthIntentCookie.Intent.link(42L, null)
         );
 
-        assertThat(result.getId()).isEqualTo(42L);
+        assertThat(result.account().getId()).isEqualTo(42L);
+        assertThat(result.identityLinked()).as("attaching a new identity is an identity-link").isTrue();
         ArgumentCaptor<IdentityLink> saved = ArgumentCaptor.forClass(IdentityLink.class);
         verify(identityLinkRepository).save(saved.capture());
         assertThat(saved.getValue().getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.MANUAL_LINK);
@@ -269,14 +272,17 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
             Optional.of(linkOn(accountWithId(42L)))
         );
 
-        Account result = service.resolveOrProvision(
+        var result = service.resolveOrProvision(
             "github",
             "sub-1",
             principal(),
             AuthIntentCookie.Intent.link(42L, null)
         );
 
-        assertThat(result.getId()).isEqualTo(42L);
+        assertThat(result.account().getId()).isEqualTo(42L);
+        // Re-affirming an already-linked identity persists NO new link, so it must NOT report a link
+        // (the handler would otherwise audit a phantom IDENTITY_LINKED for what is really a login).
+        assertThat(result.identityLinked()).isFalse();
         verify(identityLinkRepository).touchLastLogin(any(), any());
         verify(identityLinkRepository, never()).save(any());
     }
