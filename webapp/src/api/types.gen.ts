@@ -2382,9 +2382,9 @@ export type AdminCreateLoginProviderData = {
 
 export type AdminCreateLoginProviderResponses = {
     /**
-     * OK
+     * Login provider created; URL in the Location header
      */
-    200: LoginProviderView;
+    201: LoginProviderView;
 };
 
 export type AdminCreateLoginProviderResponse = AdminCreateLoginProviderResponses[keyof AdminCreateLoginProviderResponses];

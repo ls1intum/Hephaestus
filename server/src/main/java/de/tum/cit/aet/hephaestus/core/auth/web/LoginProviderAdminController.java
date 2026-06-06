@@ -4,10 +4,12 @@ import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -60,6 +62,7 @@ public class LoginProviderAdminController {
 
     @PostMapping
     @Operation(summary = "Create a login provider", operationId = "adminCreateLoginProvider")
+    @ApiResponse(responseCode = "201", description = "Login provider created; URL in the Location header")
     public ResponseEntity<LoginProviderViewDTO> create(@Valid @RequestBody CreateLoginProviderRequestDTO body) {
         LoginProvider created = loginProviderService.create(
             new LoginProviderService.Draft(
@@ -72,9 +75,15 @@ public class LoginProviderAdminController {
                 body.scopes()
             )
         );
-        return ResponseEntity.ok(
-            toView(created, ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString())
+        LoginProviderViewDTO view = toView(
+            created,
+            ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString()
         );
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+            .path("/{registrationId}")
+            .buildAndExpand(created.getRegistrationId())
+            .toUri();
+        return ResponseEntity.created(location).body(view);
     }
 
     @PatchMapping("/{registrationId}")

@@ -282,12 +282,12 @@ paths:
               $ref: "#/components/schemas/CreateLoginProviderRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/LoginProviderView"
-          description: OK
+          description: Login provider created; URL in the Location header
       summary: Create a login provider
       tags:
       - Admin
