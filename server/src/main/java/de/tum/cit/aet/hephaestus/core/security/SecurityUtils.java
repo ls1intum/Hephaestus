@@ -19,6 +19,13 @@ public final class SecurityUtils {
      * @return the login of the current user.
      */
     public static Optional<String> getCurrentUserLogin() {
+        // Inside a workspace request the active identity is the account's SCM user for that workspace's
+        // provider (set by WorkspaceContextFilter), which may differ from the session's login. Outside a
+        // workspace, the JWT preferred_username is authoritative. See CurrentScmIdentityHolder.
+        Optional<String> workspaceScoped = CurrentScmIdentityHolder.get();
+        if (workspaceScoped.isPresent()) {
+            return workspaceScoped;
+        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null) {
             return Optional.empty();
@@ -37,6 +44,30 @@ public final class SecurityUtils {
      */
     public static String getCurrentUserLoginOrThrow() {
         return getCurrentUserLogin().orElseThrow(() -> new IllegalStateException("No authenticated user found"));
+    }
+
+    /**
+     * Get the Hephaestus-native account id of the current principal — the JWT {@code sub} (ADR 0017).
+     * Unlike {@link #getCurrentUserLogin()} (a single {@code preferred_username}), the account id is the
+     * stable handle to the account's FULL set of federated identities, so callers can resolve workspace
+     * access across every linked provider login rather than just the one the session signed in with.
+     *
+     * @return the account id, or empty if unauthenticated / the {@code sub} is not a numeric account id.
+     */
+    public static Optional<Long> getCurrentAccountId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return Optional.empty();
+        }
+        String subject = jwt.getSubject();
+        if (subject == null || subject.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Long.parseLong(subject.trim()));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 
     /**

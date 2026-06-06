@@ -73,6 +73,16 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
     List<WorkspaceMembership> findByUser_Id(Long userId);
 
     /**
+     * Memberships for ANY of the given SCM users — the multi-identity form of {@link #findByUser_Id}.
+     * A single Hephaestus account can mirror several SCM users (one per linked provider identity), so
+     * workspace visibility unions their memberships. Empty input yields an empty list.
+     */
+    List<WorkspaceMembership> findByUser_IdIn(Collection<Long> userIds);
+
+    /** This workspace's membership rows for ANY of the given SCM users (multi-identity role resolution). */
+    List<WorkspaceMembership> findByWorkspace_IdAndUser_IdIn(Long workspaceId, Collection<Long> userIds);
+
+    /**
      * All memberships for the given SCM logins, with the workspace eagerly fetched. Used by the
      * {@code core.auth} GDPR data-export to flatten a principal's workspace memberships without
      * the auth module importing workspace domain types. Login match is case-insensitive.
