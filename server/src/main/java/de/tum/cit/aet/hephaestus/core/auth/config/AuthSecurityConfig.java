@@ -1,11 +1,10 @@
 package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
-import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
-import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
+import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthFailureHandler;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
@@ -134,16 +133,10 @@ public class AuthSecurityConfig {
         HttpSecurity http,
         CookieOAuth2AuthorizationRequestRepository cookieRepo,
         HephaestusAuthSuccessHandler successHandler,
-        AuthEventLogger authEventLogger,
+        HephaestusAuthFailureHandler failureHandler,
         AuthRateLimitFilter authRateLimitFilter,
-        ClientRegistrationRepository clientRegistrationRepository,
-        // SPA origin (blank in prod = same origin). In local dev the SPA (:4200) and API (:8080)
-        // differ, so the OAuth failure redirect must target the app origin, not the API origin.
-        @org.springframework.beans.factory.annotation.Value("${hephaestus.webapp.url:}") String webappBaseUrl
+        ClientRegistrationRepository clientRegistrationRepository
     ) throws Exception {
-        String appBase = webappBaseUrl.endsWith("/")
-            ? webappBaseUrl.substring(0, webappBaseUrl.length() - 1)
-            : webappBaseUrl;
         http
             .securityMatcher("/oauth2/authorization/**", "/login/oauth2/code/**", "/auth/login", "/auth/error")
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -169,15 +162,9 @@ public class AuthSecurityConfig {
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
                 oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
                 oauth.successHandler(successHandler);
-                // Audit failed logins (LOGIN_FAILED) — a security-relevant signal a bare redirect drops —
-                // then send the SPA to the same error page. The reason is the exception TYPE only (no PII).
-                oauth.failureHandler((request, response, exception) -> {
-                    authEventLogger
-                        .event(AuthEvent.EventType.LOGIN_FAILED, AuthEvent.Result.FAILURE)
-                        .failureReason(exception.getClass().getSimpleName())
-                        .record();
-                    response.sendRedirect(appBase + "/auth/error?code=oauth_failure");
-                });
+                // Audit failed logins (LOGIN_FAILED) + redirect the SPA to its error page; see
+                // HephaestusAuthFailureHandler.
+                oauth.failureHandler(failureHandler);
             });
 
         // Same header set as the resource-server chain — this chain serves /auth/error to the SPA.
