@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.config;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
@@ -132,6 +134,7 @@ public class AuthSecurityConfig {
         HttpSecurity http,
         CookieOAuth2AuthorizationRequestRepository cookieRepo,
         HephaestusAuthSuccessHandler successHandler,
+        AuthEventLogger authEventLogger,
         AuthRateLimitFilter authRateLimitFilter,
         ClientRegistrationRepository clientRegistrationRepository,
         // SPA origin (blank in prod = same origin). In local dev the SPA (:4200) and API (:8080)
@@ -166,7 +169,15 @@ public class AuthSecurityConfig {
                 // VerifiedEmailResolver can stamp primaryEmailVerifiedAt. OIDC providers are untouched.
                 oauth.userInfoEndpoint(userInfo -> userInfo.userService(oauthUserService()));
                 oauth.successHandler(successHandler);
-                oauth.failureUrl(appBase + "/auth/error?code=oauth_failure");
+                // Audit failed logins (LOGIN_FAILED) — a security-relevant signal a bare redirect drops —
+                // then send the SPA to the same error page. The reason is the exception TYPE only (no PII).
+                oauth.failureHandler((request, response, exception) -> {
+                    authEventLogger
+                        .event(AuthEvent.EventType.LOGIN_FAILED, AuthEvent.Result.FAILURE)
+                        .failureReason(exception.getClass().getSimpleName())
+                        .record();
+                    response.sendRedirect(appBase + "/auth/error?code=oauth_failure");
+                });
             });
 
         // Same header set as the resource-server chain — this chain serves /auth/error to the SPA.
