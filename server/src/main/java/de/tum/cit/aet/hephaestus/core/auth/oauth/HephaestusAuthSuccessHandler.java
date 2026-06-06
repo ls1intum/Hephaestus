@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
@@ -37,6 +39,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     private final JwtPrincipalFactory principalFactory;
     private final AuthIntentCookie authIntentCookie;
     private final AuthProperties authProperties;
+    private final AuthEventLogger authEventLogger;
     private final Clock clock;
 
     /**
@@ -52,6 +55,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         JwtPrincipalFactory principalFactory,
         AuthIntentCookie authIntentCookie,
         AuthProperties authProperties,
+        AuthEventLogger authEventLogger,
         @Qualifier("authClock") Clock clock,
         @Value("${hephaestus.webapp.url:}") String webappBaseUrl
     ) {
@@ -60,6 +64,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         this.principalFactory = principalFactory;
         this.authIntentCookie = authIntentCookie;
         this.authProperties = authProperties;
+        this.authEventLogger = authEventLogger;
         this.clock = clock;
         this.appBaseUrl = stripTrailingSlash(webappBaseUrl);
         setAlwaysUseDefaultTargetUrl(false);
@@ -125,6 +130,15 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             issued.value(),
             issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond()
         );
+
+        // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT. A link-mode
+        // flow attaches a new identity to an existing account, so it is IDENTITY_LINKED rather than a
+        // fresh LOGIN. (Audit writes are best-effort and never break the login — see AuthEventLogger.)
+        boolean linkMode = intent != null && intent.mode() == AuthIntentCookie.Intent.Mode.LINK;
+        authEventLogger
+            .event(linkMode ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN, AuthEvent.Result.SUCCESS)
+            .account(account.getId())
+            .record();
 
         String redirectTo = (intent != null) ? ReturnToValidator.safeOrFallback(intent.returnTo()) : "/";
         redirectToApp(request, response, redirectTo);

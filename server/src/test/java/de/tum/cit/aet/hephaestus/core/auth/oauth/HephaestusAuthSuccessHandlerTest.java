@@ -9,6 +9,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipal;
@@ -25,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -48,6 +53,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     private HephaestusJwtIssuer jwtIssuer;
     private JwtPrincipalFactory principalFactory;
     private AuthIntentCookie authIntentCookie;
+    private AuthEventWriter authEventWriter;
     private HephaestusAuthSuccessHandler handler;
 
     @BeforeEach
@@ -56,6 +62,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         jwtIssuer = mock(HephaestusJwtIssuer.class);
         principalFactory = mock(JwtPrincipalFactory.class);
         authIntentCookie = mock(AuthIntentCookie.class);
+        authEventWriter = mock(AuthEventWriter.class);
         AuthProperties authProperties = mock(AuthProperties.class);
         lenient().when(authProperties.cookieName()).thenReturn(COOKIE_NAME);
         lenient().when(authIntentCookie.read(any())).thenReturn(null);
@@ -66,6 +73,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
             principalFactory,
             authIntentCookie,
             authProperties,
+            new AuthEventLogger(authEventWriter),
             Clock.fixed(NOW, ZoneOffset.UTC),
             /* webappBaseUrl */ ""
         );
@@ -83,6 +91,8 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         verify(jwtIssuer, never()).issue(any(), any(), any());
         assertThat(response.getCookie(COOKIE_NAME)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/error?code=account_inactive");
+        // A refused login must NOT be audited as a successful LOGIN.
+        verify(authEventWriter, never()).write(any());
     }
 
     @Test
@@ -106,6 +116,13 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         assertThat(cookie.getSecure()).isTrue();
         assertThat(cookie.getMaxAge()).isEqualTo(900);
         assertThat(response.getRedirectedUrl()).isEqualTo("/teams");
+
+        // A successful (LOGIN-mode) authentication is audited as LOGIN/SUCCESS for the account.
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(authEventWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.LOGIN);
+        assertThat(event.getValue().result()).isEqualTo(AuthEvent.Result.SUCCESS);
+        assertThat(event.getValue().accountId()).isEqualTo(42L);
     }
 
     @Test
