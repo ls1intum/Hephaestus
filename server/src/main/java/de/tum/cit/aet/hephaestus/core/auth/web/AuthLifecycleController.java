@@ -53,9 +53,11 @@ public class AuthLifecycleController {
         sessionService.refresh(
             CurrentAccount.requireId(),
             CurrentAccount.requireJti(),
-            CurrentAccount.impersonatorId(),
-            CurrentAccount.impersonationExpiresAt(),
-            CurrentAccount.sessionExpiresAt(),
+            new AuthSessionService.RefreshContext(
+                CurrentAccount.impersonatorId(),
+                CurrentAccount.impersonationExpiresAt(),
+                CurrentAccount.sessionExpiresAt()
+            ),
             request,
             response
         );

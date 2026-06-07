@@ -109,6 +109,14 @@ class AuthSessionServiceTest extends BaseUnitTest {
         return captor.getValue();
     }
 
+    private static AuthSessionService.RefreshContext ctx(
+        Long impersonatorId,
+        Instant impersonationExpiresAt,
+        Instant sessionExpiresAt
+    ) {
+        return new AuthSessionService.RefreshContext(impersonatorId, impersonationExpiresAt, sessionExpiresAt);
+    }
+
     @Test
     void logout_revokesPresentingTokenAndAuditsLogout() {
         UUID jti = UUID.randomUUID();
@@ -139,9 +147,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
         service.refresh(
             ACCOUNT_ID,
             jti,
-            operatorId,
-            NOW.minus(Duration.ofSeconds(1)),
-            null,
+            ctx(operatorId, NOW.minus(Duration.ofSeconds(1)), null),
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -173,9 +179,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
         service.refresh(
             ACCOUNT_ID,
             jti,
-            operatorId,
-            ceiling,
-            null,
+            ctx(operatorId, ceiling, null),
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -198,9 +202,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
         service.refresh(
             ACCOUNT_ID,
             jti,
-            null,
-            null,
-            null,
+            ctx(null, null, null),
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -221,9 +223,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
         service.refresh(
             ACCOUNT_ID,
             jti,
-            null,
-            null,
-            null,
+            ctx(null, null, null),
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -241,9 +241,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
         service.refresh(
             ACCOUNT_ID,
             jti,
-            null,
-            null,
-            null,
+            ctx(null, null, null),
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -264,7 +262,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
         when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(token);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
-        service.refresh(ACCOUNT_ID, jti, null, null, null, mock(HttpServletRequest.class), response);
+        service.refresh(ACCOUNT_ID, jti, ctx(null, null, null), mock(HttpServletRequest.class), response);
 
         assertThat(refreshResult("success")).isEqualTo(1.0);
         assertThat(response.getCookie("__Host-HEPHAESTUS_AT")).isNotNull();
@@ -288,9 +286,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
             service.refresh(
                 ACCOUNT_ID,
                 jti,
-                null,
-                null,
-                null,
+                ctx(null, null, null),
                 mock(HttpServletRequest.class),
                 new MockHttpServletResponse()
             )

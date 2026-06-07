@@ -69,17 +69,30 @@ public class AuthSessionService {
         clearCookie(response);
     }
 
+    /**
+     * The token constraints carried from the presenting token into the re-minted one: the
+     * impersonation pair ({@code act} / {@code imp_exp}) and the absolute session ceiling
+     * ({@code session_exp}). Bundled so {@link #refresh} stays within the parameter-object limit; the
+     * controller reads them off {@code CurrentAccount}.
+     */
+    public record RefreshContext(
+        @Nullable Long impersonatorId,
+        @Nullable Instant impersonationExpiresAt,
+        @Nullable Instant sessionExpiresAt
+    ) {}
+
     /** Rotate: revoke the presenting token, mint a fresh one (preserving impersonation), set cookie. */
     @Transactional
     public void refresh(
         Long accountId,
         UUID jti,
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt,
+        RefreshContext context,
         HttpServletRequest request,
         HttpServletResponse response
     ) {
+        Long impersonatorId = context.impersonatorId();
+        Instant impersonationExpiresAt = context.impersonationExpiresAt();
+        Instant sessionExpiresAt = context.sessionExpiresAt();
         // Time the full rotation critical section (revoke + status-gate + re-mint), including the
         // early-return races — those are the cheap paths and keep the timer's count == refresh calls.
         Timer.Sample sample = metrics.startRefreshTimer();
