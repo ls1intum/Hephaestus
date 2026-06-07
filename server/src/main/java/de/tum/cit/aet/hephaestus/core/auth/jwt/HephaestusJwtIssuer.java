@@ -96,10 +96,31 @@ public class HephaestusJwtIssuer {
         @Nullable Instant impersonationExpiresAt,
         @Nullable HttpServletRequest request
     ) {
+        return issue(principal, impersonatorId, impersonationExpiresAt, null, request);
+    }
+
+    /**
+     * As {@link #issue(JwtPrincipal, Long, Instant, HttpServletRequest)} plus an absolute SESSION
+     * ceiling: the token {@code exp} is capped at {@code min(now + accessTtl, sessionExpiresAt)} and a
+     * constant {@code session_exp} claim carries the ceiling, so {@code AuthSessionService.refresh}
+     * re-caps the rotated token at it — the rolling silent refresh can never extend a session past it
+     * (OWASP absolute timeout). Set at login; carried unchanged across refreshes.
+     */
+    @Transactional
+    public Token issue(
+        JwtPrincipal principal,
+        @Nullable Long impersonatorId,
+        @Nullable Instant impersonationExpiresAt,
+        @Nullable Instant sessionExpiresAt,
+        @Nullable HttpServletRequest request
+    ) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(properties.accessTtl());
         if (impersonationExpiresAt != null && impersonationExpiresAt.isBefore(expiresAt)) {
             expiresAt = impersonationExpiresAt;
+        }
+        if (sessionExpiresAt != null && sessionExpiresAt.isBefore(expiresAt)) {
+            expiresAt = sessionExpiresAt;
         }
         UUID jti = UUID.randomUUID();
         JWK signingKey = keyService.currentSigningKey();
@@ -122,6 +143,10 @@ public class HephaestusJwtIssuer {
             // Absolute impersonation ceiling (epoch seconds), constant across refreshes. refresh reads
             // it to auto-exit; it is NOT the per-token exp (which is min(now+accessTtl, this)).
             claims.claim("imp_exp", impersonationExpiresAt.getEpochSecond());
+        }
+        if (sessionExpiresAt != null) {
+            // Absolute session ceiling (epoch seconds), constant across refreshes (OWASP absolute timeout).
+            claims.claim("session_exp", sessionExpiresAt.getEpochSecond());
         }
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
         Jwt jwt = encoder.encode(JwtEncoderParameters.from(header, claims.build()));

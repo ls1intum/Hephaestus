@@ -129,6 +129,9 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         HephaestusJwtIssuer.Token issued = jwtIssuer.issue(
             principalFactory.forAccount(account),
             /* impersonator */ null,
+            /* impersonationExpiresAt */ null,
+            // Absolute session ceiling, stamped once at login and carried through every refresh.
+            clock.instant().plus(authProperties.sessionMaxLifetime()),
             request
         );
         setAccessCookie(

@@ -110,6 +110,24 @@ public final class CurrentAccount {
         return jwt.getExpiresAt().getEpochSecond();
     }
 
+    /**
+     * Absolute session ceiling ({@code session_exp} claim, epoch seconds) if present, else null. Set at
+     * login and carried unchanged through refreshes so the rolling renewal cannot extend a session past
+     * it (OWASP absolute timeout). {@code AuthSessionService.refresh} reads it to re-cap the new token.
+     */
+    @Nullable
+    public static Instant sessionExpiresAt() {
+        Jwt jwt = jwtOrNull();
+        if (jwt == null) {
+            return null;
+        }
+        Object sessionExp = jwt.getClaim("session_exp");
+        if (sessionExp instanceof Number n) {
+            return Instant.ofEpochSecond(n.longValue());
+        }
+        return null;
+    }
+
     private static Jwt requireJwt() {
         Jwt jwt = jwtOrNull();
         if (jwt == null) {

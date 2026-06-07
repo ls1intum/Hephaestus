@@ -38,7 +38,8 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
             java.util.Map.of(),
             java.util.List.of(),
             "",
-            Duration.ofHours(1)
+            Duration.ofHours(1),
+            Duration.ofHours(12)
         );
         resolver = new CookieBearerTokenResolver(properties);
     }

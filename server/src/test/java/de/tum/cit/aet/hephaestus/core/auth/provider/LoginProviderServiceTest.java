@@ -42,7 +42,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
             providers,
             List.of(),
             "",
-            Duration.ofHours(1)
+            Duration.ofHours(1),
+            Duration.ofHours(12)
         );
         return new LoginProviderService(repository, registrationCache, props);
     }

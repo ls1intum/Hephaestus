@@ -76,6 +76,7 @@ public class AuthSessionService {
         UUID jti,
         @Nullable Long impersonatorId,
         @Nullable Instant impersonationExpiresAt,
+        @Nullable Instant sessionExpiresAt,
         HttpServletRequest request,
         HttpServletResponse response
     ) {
@@ -105,8 +106,15 @@ public class AuthSessionService {
             }
             HephaestusJwtIssuer.Token token;
             if (impersonatorId == null) {
-                // Ordinary (non-impersonation) rotation.
-                token = jwtIssuer.issue(principalFactory.forAccountId(accountId), null, request);
+                // Ordinary (non-impersonation) rotation — carry the absolute session ceiling forward so
+                // the rotated token is re-capped at it (OWASP absolute timeout; impersonation uses imp_exp).
+                token = jwtIssuer.issue(
+                    principalFactory.forAccountId(accountId),
+                    null,
+                    null,
+                    sessionExpiresAt,
+                    request
+                );
                 authEventLogger
                     .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
                     .account(accountId)

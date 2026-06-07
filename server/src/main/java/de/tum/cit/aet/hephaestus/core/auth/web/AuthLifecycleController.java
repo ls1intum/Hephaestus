@@ -55,6 +55,7 @@ public class AuthLifecycleController {
             CurrentAccount.requireJti(),
             CurrentAccount.impersonatorId(),
             CurrentAccount.impersonationExpiresAt(),
+            CurrentAccount.sessionExpiresAt(),
             request,
             response
         );

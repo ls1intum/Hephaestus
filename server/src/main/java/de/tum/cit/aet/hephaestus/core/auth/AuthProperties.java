@@ -59,6 +59,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        enforced on every {@code POST /auth/refresh} rotation (the silent-refresh
  *                        keep-alive cannot extend an impersonation past it). See
  *                        {@code docs/contributor/instance-admin.md}.
+ * @param sessionMaxLifetime Absolute ceiling on an ordinary session ({@code session_exp}), set at login
+ *                        and carried unchanged through every silent refresh. The access token's
+ *                        {@code exp} is capped at {@code min(now + accessTtl, session_exp)}, so the
+ *                        rolling refresh CANNOT extend a session past this — once it passes, the token
+ *                        lapses and the user must re-authenticate (OWASP absolute timeout). Default 12h
+ *                        (a long workday); raise/lower per deployment risk.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
@@ -71,7 +77,8 @@ public record AuthProperties(
     Map<String, LoginProviderSeed> loginProviders,
     @DefaultValue List<String> bootstrapAdmins,
     @DefaultValue("") String bootstrapToken,
-    @DefaultValue("1h") Duration impersonationMaxLifetime
+    @DefaultValue("1h") Duration impersonationMaxLifetime,
+    @DefaultValue("12h") Duration sessionMaxLifetime
 ) {
     /**
      * Null-coalesce the optional provider map so a deployment with no {@code login-providers} block (and

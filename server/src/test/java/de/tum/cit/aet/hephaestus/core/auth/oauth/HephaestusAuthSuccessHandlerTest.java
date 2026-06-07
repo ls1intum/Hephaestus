@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -65,6 +66,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         authEventWriter = mock(AuthEventWriter.class);
         AuthProperties authProperties = mock(AuthProperties.class);
         lenient().when(authProperties.cookieName()).thenReturn(COOKIE_NAME);
+        lenient().when(authProperties.sessionMaxLifetime()).thenReturn(Duration.ofHours(12));
         lenient().when(authIntentCookie.read(any())).thenReturn(null);
 
         handler = new HephaestusAuthSuccessHandler(
@@ -88,7 +90,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("sub-1"));
 
-        verify(jwtIssuer, never()).issue(any(), any(), any());
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
         assertThat(response.getCookie(COOKIE_NAME)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/error?code=account_inactive");
         // A refused login must NOT be audited as a successful LOGIN.
@@ -102,7 +104,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         when(authIntentCookie.read(any())).thenReturn(AuthIntentCookie.Intent.login(null, "/teams"));
         JwtPrincipal principal = mock(JwtPrincipal.class);
         when(principalFactory.forAccount(account)).thenReturn(principal);
-        when(jwtIssuer.issue(any(), any(), any())).thenReturn(
+        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(
             new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900))
         );
 
@@ -132,7 +134,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         Account account = account(Account.Status.ACTIVE);
         when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, true));
         when(principalFactory.forAccount(account)).thenReturn(mock(JwtPrincipal.class));
-        when(jwtIssuer.issue(any(), any(), any())).thenReturn(
+        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(
             new HephaestusJwtIssuer.Token("minted-jwt", UUID.randomUUID(), NOW.plusSeconds(900))
         );
 
@@ -156,7 +158,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         handler.onAuthenticationSuccess(githubRequest(), response, nonOauth);
 
         verify(provisioningService, never()).resolveOrProvision(any(), any(), any(), any());
-        verify(jwtIssuer, never()).issue(any(), any(), any());
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
         assertThat(response.getCookie(COOKIE_NAME)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/error?code=unexpected_auth_type");
     }

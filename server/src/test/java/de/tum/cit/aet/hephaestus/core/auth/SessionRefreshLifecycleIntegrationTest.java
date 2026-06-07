@@ -116,6 +116,35 @@ class SessionRefreshLifecycleIntegrationTest {
         }
     }
 
+    @Test
+    void theAbsoluteSessionCeilingCapsTheTokenAndSurvivesRefresh() {
+        Account account = accountRepository.save(new Account("Capped Cathy"));
+        // A 2-minute absolute session ceiling — well under the 15-min access TTL, so it binds.
+        long ceiling = java.time.Instant.now().getEpochSecond() + 120;
+        String token = jwtIssuer
+            .issue(principalFactory.forAccount(account), null, null, java.time.Instant.ofEpochSecond(ceiling), null)
+            .value();
+
+        // The access expiry is capped at the session ceiling, NOT now + accessTtl (15 min).
+        assertUserExpiryNear(token, ceiling);
+
+        // The decisive guarantee: a refresh CANNOT extend the session past the ceiling — the rotated
+        // token is still capped at it (so the rolling silent refresh can't outlive the absolute timeout).
+        String rotated = refreshAndReadNewCookie(token, fetchCsrfToken());
+        assertUserExpiryNear(rotated, ceiling);
+    }
+
+    private void assertUserExpiryNear(String token, long expectedEpochSeconds) {
+        getUser(token)
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.accessTokenExpiresAt")
+            .value(v ->
+                assertThat(((Number) v).longValue()).isBetween(expectedEpochSeconds - 5, expectedEpochSeconds + 2)
+            );
+    }
+
     private WebTestClient.ResponseSpec getUser(String token) {
         return webTestClient.get().uri("/user").header(HttpHeaders.COOKIE, cookieName + "=" + token).exchange();
     }

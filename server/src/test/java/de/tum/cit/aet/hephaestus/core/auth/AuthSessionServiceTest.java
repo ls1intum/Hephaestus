@@ -141,6 +141,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
             jti,
             operatorId,
             NOW.minus(Duration.ofSeconds(1)),
+            null,
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -174,6 +175,7 @@ class AuthSessionServiceTest extends BaseUnitTest {
             jti,
             operatorId,
             ceiling,
+            null,
             mock(HttpServletRequest.class),
             new MockHttpServletResponse()
         );
@@ -193,11 +195,19 @@ class AuthSessionServiceTest extends BaseUnitTest {
         // A concurrent refresh/logout already rotated this jti — the conditional UPDATE matches 0 rows.
         when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(0);
 
-        service.refresh(ACCOUNT_ID, jti, null, null, mock(HttpServletRequest.class), new MockHttpServletResponse());
+        service.refresh(
+            ACCOUNT_ID,
+            jti,
+            null,
+            null,
+            null,
+            mock(HttpServletRequest.class),
+            new MockHttpServletResponse()
+        );
 
         assertThat(refreshResult("noop")).isEqualTo(1.0);
         assertThat(refreshResult("success")).isZero();
-        verify(jwtIssuer, never()).issue(any(), any(), any());
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -208,10 +218,18 @@ class AuthSessionServiceTest extends BaseUnitTest {
         suspended.setStatus(Account.Status.SUSPENDED);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(suspended));
 
-        service.refresh(ACCOUNT_ID, jti, null, null, mock(HttpServletRequest.class), new MockHttpServletResponse());
+        service.refresh(
+            ACCOUNT_ID,
+            jti,
+            null,
+            null,
+            null,
+            mock(HttpServletRequest.class),
+            new MockHttpServletResponse()
+        );
 
         assertThat(refreshResult("suspended")).isEqualTo(1.0);
-        verify(jwtIssuer, never()).issue(any(), any(), any());
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -220,7 +238,15 @@ class AuthSessionServiceTest extends BaseUnitTest {
         when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.empty());
 
-        service.refresh(ACCOUNT_ID, jti, null, null, mock(HttpServletRequest.class), new MockHttpServletResponse());
+        service.refresh(
+            ACCOUNT_ID,
+            jti,
+            null,
+            null,
+            null,
+            mock(HttpServletRequest.class),
+            new MockHttpServletResponse()
+        );
 
         assertThat(refreshResult("suspended")).isEqualTo(1.0);
     }
@@ -235,10 +261,10 @@ class AuthSessionServiceTest extends BaseUnitTest {
             UUID.randomUUID(),
             NOW.plus(Duration.ofMinutes(15))
         );
-        when(jwtIssuer.issue(any(), any(), any())).thenReturn(token);
+        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(token);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
-        service.refresh(ACCOUNT_ID, jti, null, null, mock(HttpServletRequest.class), response);
+        service.refresh(ACCOUNT_ID, jti, null, null, null, mock(HttpServletRequest.class), response);
 
         assertThat(refreshResult("success")).isEqualTo(1.0);
         assertThat(response.getCookie("__Host-HEPHAESTUS_AT")).isNotNull();
@@ -254,10 +280,20 @@ class AuthSessionServiceTest extends BaseUnitTest {
         UUID jti = UUID.randomUUID();
         when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(activeAccount()));
-        when(jwtIssuer.issue(any(), any(), any())).thenThrow(new IllegalStateException("signing key unavailable"));
+        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenThrow(
+            new IllegalStateException("signing key unavailable")
+        );
 
         assertThatThrownBy(() ->
-            service.refresh(ACCOUNT_ID, jti, null, null, mock(HttpServletRequest.class), new MockHttpServletResponse())
+            service.refresh(
+                ACCOUNT_ID,
+                jti,
+                null,
+                null,
+                null,
+                mock(HttpServletRequest.class),
+                new MockHttpServletResponse()
+            )
         ).isInstanceOf(IllegalStateException.class);
 
         assertThat(refreshResult("error")).isEqualTo(1.0);
