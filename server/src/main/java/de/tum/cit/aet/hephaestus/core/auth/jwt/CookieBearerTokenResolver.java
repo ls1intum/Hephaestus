@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
@@ -33,6 +34,12 @@ public class CookieBearerTokenResolver implements BearerTokenResolver {
 
     @Override
     public String resolve(HttpServletRequest request) {
+        // A stale cookie already rejected by StaleAuthCookieFilter: ignore it so this request stays
+        // anonymous (a permitAll endpoint serves instead of 401ing on the dead token). The header
+        // fallback below still applies for worker/API/bearer clients.
+        if (Boolean.TRUE.equals(request.getAttribute(StaleAuthCookieFilter.COOKIE_INVALID_ATTRIBUTE))) {
+            return headerResolver.resolve(request);
+        }
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {

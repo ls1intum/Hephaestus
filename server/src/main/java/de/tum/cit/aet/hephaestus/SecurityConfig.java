@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.security.CsrfCookieFilter;
 import de.tum.cit.aet.hephaestus.core.security.ImpersonationGuard;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import de.tum.cit.aet.hephaestus.core.security.SpaCsrfTokenRequestHandler;
+import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.observability.ReplicaIdentityFilter;
 import java.util.Collection;
@@ -32,6 +33,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -141,6 +143,7 @@ public class SecurityConfig {
         HttpSecurity http,
         ObjectProvider<JwtDecoder> jwtDecoderProvider,
         ObjectProvider<BearerTokenResolver> bearerTokenResolverProvider,
+        ObjectProvider<StaleAuthCookieFilter> staleAuthCookieFilterProvider,
         Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
         AuthRateLimitFilter authRateLimitFilter,
         tools.jackson.databind.ObjectMapper objectMapper
@@ -188,6 +191,15 @@ public class SecurityConfig {
                 jwtConfigurer.decoder(jwtDecoder).jwtAuthenticationConverter(authenticationConverter);
             });
         });
+
+        // Evict a stale access cookie BEFORE the bearer filter authenticates it: a logged-out browser
+        // still holding the cookie (expired, or signed by a rotated key) must not 401 a public endpoint
+        // like GET /identity-providers, or the login page can't load its sign-in options. The filter
+        // uses a local (no-DB) decode, so the authenticated hot path keeps its single revocation read.
+        StaleAuthCookieFilter staleAuthCookieFilter = staleAuthCookieFilterProvider.getIfAvailable();
+        if (staleAuthCookieFilter != null) {
+            http.addFilterBefore(staleAuthCookieFilter, BearerTokenAuthenticationFilter.class);
+        }
 
         // Stateless double-submit CSRF (ADR 0017). The access-token cookie is sent automatically by
         // the browser on same-site requests, so SameSite=Lax alone is the only forgery barrier — and

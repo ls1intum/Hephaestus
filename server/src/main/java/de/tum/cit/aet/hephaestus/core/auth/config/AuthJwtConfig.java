@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
+import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
 import org.slf4j.Logger;
@@ -70,6 +71,19 @@ public class AuthJwtConfig {
     @Bean
     public CookieBearerTokenResolver cookieBearerTokenResolver(AuthProperties properties) {
         return new CookieBearerTokenResolver(properties);
+    }
+
+    /**
+     * Evicts a stale access cookie before the bearer filter so it can't 401 a public endpoint (the
+     * login page's {@code GET /identity-providers}). Uses the LOCAL signature/exp decoder — no DB hit —
+     * so the authenticated hot path is unaffected. Registered on the app chain by {@code SecurityConfig}.
+     */
+    @Bean
+    public StaleAuthCookieFilter staleAuthCookieFilter(AuthProperties properties) {
+        return new StaleAuthCookieFilter(
+            properties.cookieName(),
+            RevocationAwareJwtDecoder.localSignatureDecoder(keyService, properties)
+        );
     }
 
     /**

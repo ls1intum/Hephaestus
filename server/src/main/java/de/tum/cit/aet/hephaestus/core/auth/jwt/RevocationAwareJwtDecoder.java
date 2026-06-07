@@ -68,14 +68,21 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         Clock clock,
         AuthMetrics metrics
     ) {
-        this.delegate = buildNimbus(keyService, properties);
+        this.delegate = localSignatureDecoder(keyService, properties);
         this.repository = repository;
         this.cache = cacheManager.getCache(CACHE_NAME);
         this.clock = clock;
         this.metrics = metrics;
     }
 
-    private static NimbusJwtDecoder buildNimbus(JwtSigningKeyService keyService, AuthProperties properties) {
+    /**
+     * The LOCAL half of the verification: ES256 signature + the default timestamp/iss/aud validators,
+     * with NO revocation (DB) check. This is what {@link #decode} wraps before the {@code issued_jwt}
+     * lookup. Exposed so {@code StaleAuthCookieFilter} can cheaply decide whether a present cookie is
+     * structurally valid (and thus worth authenticating) WITHOUT a per-request DB hit — a stale cookie
+     * that fails here is evicted before it can 401 a public endpoint.
+     */
+    public static NimbusJwtDecoder localSignatureDecoder(JwtSigningKeyService keyService, AuthProperties properties) {
         ConfigurableJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
         JWSKeySelector<SecurityContext> selector = new JWSVerificationKeySelector<>(JWSAlgorithm.ES256, keyService);
         processor.setJWSKeySelector(selector);
