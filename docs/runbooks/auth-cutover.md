@@ -103,13 +103,12 @@ activity history therefore carry over automatically.
 ### Migration smoke-tested
 
 The Liquibase migration was validated against Postgres 16 in both directions: a **fresh** apply
-(`db/master.xml`, `prod` context → 684 changesets, all auth tables + the `auth_event` RANGE
-partitions seeded) and an **upgrade** from the current `main` schema (apply `main` → then this
-branch). The upgrade applies cleanly (no failed changesets); because this branch re-timestamped the
-PR #1306 changelog (`1780313973588` → `1779790459343`), Liquibase re-encounters those ~25 changesets
-under the new identity and records them `MARK_RAN` via their `onFail="MARK_RAN"` preconditions — the
-DDL is not re-executed, so the only effect is a few duplicate `DATABASECHANGELOG` rows (cosmetic; a
-`logicalFilePath` follow-up would remove it).
+(`db/master.xml`, `prod` context — all auth tables + the `auth_event` RANGE partitions seeded) and an
+**upgrade** from the current `main` schema (apply `main` → then this branch). This branch adds exactly
+**one** new changelog on top of `main` — `1780825201546_changelog.xml` (the consolidated auth
+changelog) — and reuses `main`'s integration changelog (`1780313973588`) unchanged, so the upgrade
+applies cleanly: the only new changesets are this branch's own, and there are no duplicate
+`DATABASECHANGELOG` rows.
 
 ## JWK rotation
 

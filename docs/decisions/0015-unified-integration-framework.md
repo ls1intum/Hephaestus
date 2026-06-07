@@ -132,7 +132,7 @@ Credentials at rest use AES-256-GCM with AAD bound to
 `[version-byte | 12-byte IV | ciphertext+16-byte GCM tag]`. Cross-row
 substitution attacks fail because the AAD doesn't match.
 
-The Liquibase migration is one file, `1779790459343_changelog.xml`,
+The Liquibase migration is one file, `1780313973588_changelog.xml`,
 25 changesets. Changeset 8 runs an idempotent `WorkspaceConnectionBackfillChange`
 Java customChange that re-wraps legacy `Workspace` credentials into `connection`
 rows with AES-GCM v2 blobs. Changeset 9 drops the legacy `Workspace` columns

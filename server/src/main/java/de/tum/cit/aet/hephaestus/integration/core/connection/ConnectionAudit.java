@@ -32,8 +32,8 @@ import org.jspecify.annotations.Nullable;
  * correlation id (manual admin events, some install lifecycle events) would
  * otherwise duplicate under the default NULLS-DISTINCT contract. A JPA
  * {@code @UniqueConstraint} cannot express NULLS NOT DISTINCT, so the
- * contract lives in the migration ({@code 1779790459343_changelog.xml},
- * changeset {@code 1779790459343-3}) and is intentionally NOT mirrored as a
+ * contract lives in the migration ({@code 1780313973588_changelog.xml},
+ * changeset {@code 1780313973588-3}) and is intentionally NOT mirrored as a
  * {@code @Table.uniqueConstraints} annotation here — see ADR 0016.
  */
 @Entity

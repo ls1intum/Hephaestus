@@ -38,7 +38,7 @@
         Subsequent commits in this PR add behavior; this commit ships schema only.
     -->
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-1-extensions">
+    <changeSet author="FelixTJDietrich" id="1780825201546-1-extensions">
         <sql splitStatements="false"><![CDATA[
             CREATE EXTENSION IF NOT EXISTS citext;
         ]]></sql>
@@ -47,7 +47,7 @@
         <rollback/>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-2-account">
+    <changeSet author="FelixTJDietrich" id="1780825201546-2-account">
         <preConditions onFail="MARK_RAN" onFailMessage="account table already present">
             <not><tableExists tableName="account"/></not>
         </preConditions>
@@ -96,7 +96,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-3-identity-link">
+    <changeSet author="FelixTJDietrich" id="1780825201546-3-identity-link">
         <preConditions onFail="MARK_RAN" onFailMessage="identity_link already present">
             <not><tableExists tableName="identity_link"/></not>
         </preConditions>
@@ -156,7 +156,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-4-account-feature">
+    <changeSet author="FelixTJDietrich" id="1780825201546-4-account-feature">
         <preConditions onFail="MARK_RAN" onFailMessage="account_feature already present">
             <not><tableExists tableName="account_feature"/></not>
         </preConditions>
@@ -182,7 +182,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-5-jwt-signing-key">
+    <changeSet author="FelixTJDietrich" id="1780825201546-5-jwt-signing-key">
         <preConditions onFail="MARK_RAN" onFailMessage="jwt_signing_key already present">
             <not><tableExists tableName="jwt_signing_key"/></not>
         </preConditions>
@@ -217,7 +217,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-6-issued-jwt">
+    <changeSet author="FelixTJDietrich" id="1780825201546-6-issued-jwt">
         <preConditions onFail="MARK_RAN" onFailMessage="issued_jwt already present">
             <not><tableExists tableName="issued_jwt"/></not>
         </preConditions>
@@ -266,7 +266,7 @@
              than 12 months. It runs once on ApplicationReadyEvent and monthly thereafter.
         This replaces the prior pg_partman dependency entirely — no non-stock extension required.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-7-auth-event-parent">
+    <changeSet author="FelixTJDietrich" id="1780825201546-7-auth-event-parent">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent already present">
             <not><tableExists tableName="auth_event"/></not>
         </preConditions>
@@ -320,7 +320,7 @@
         every CREATE, and the month names are computed from now() at migration time. Naming
         convention auth_event_pYYYYMM and auth_event_default MUST match AuthEventPartitionManager.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-8-auth-event-bootstrap-partitions">
+    <changeSet author="FelixTJDietrich" id="1780825201546-8-auth-event-bootstrap-partitions">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent missing — partitioning skipped">
             <tableExists tableName="auth_event"/>
         </preConditions>
@@ -367,12 +367,12 @@
 
     <!--
         Drop the legacy user.keycloak_subject column + its unique index (ADR 0016 Stage A,
-        added in 1779790459343). Superseded by ADR 0017: identity now lives on
+        added in 1780313973588). Superseded by ADR 0017: identity now lives on
         account + identity_link; the SCM user row no longer carries an IdP subject, and the
         auth lookup is login → preferred_username, never this column. No backward compat.
-        Idempotent (IF EXISTS) so it's safe whether or not 1779790459343 reached the DB.
+        Idempotent (IF EXISTS) so it's safe whether or not 1780313973588 reached the DB.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-9-drop-keycloak-subject">
+    <changeSet author="FelixTJDietrich" id="1780825201546-9-drop-keycloak-subject">
         <preConditions onFail="MARK_RAN" onFailMessage="user.keycloak_subject already removed">
             <columnExists tableName="user" columnName="keycloak_subject"/>
         </preConditions>
@@ -381,7 +381,7 @@
             ALTER TABLE "user" DROP COLUMN IF EXISTS keycloak_subject;
         ]]></sql>
         <rollback>
-            <!-- Re-add the dropped column + its partial unique index (matching 1779790459343). -->
+            <!-- Re-add the dropped column + its partial unique index (matching 1780313973588). -->
             <sql splitStatements="false"><![CDATA[
                 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS keycloak_subject VARCHAR(128);
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_keycloak_subject
@@ -401,7 +401,7 @@
           - expires_at: epoch-millis expiry (BIGINT), nullable.
         Not a JPA entity (managed by the Bucket4j library, like the shedlock table).
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-10-auth-rate-limit-bucket">
+    <changeSet author="FelixTJDietrich" id="1780825201546-10-auth-rate-limit-bucket">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_rate_limit_bucket already present">
             <not><tableExists tableName="auth_rate_limit_bucket"/></not>
         </preConditions>
@@ -424,7 +424,7 @@
         bundle is stored inline in `payload` (BYTEA). The payload never contains tokens,
         credential blobs, or signing keys — see ExportBundle (the disclosure contract).
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-11-account-export">
+    <changeSet author="FelixTJDietrich" id="1780825201546-11-account-export">
         <preConditions onFail="MARK_RAN" onFailMessage="account_export already present">
             <not><tableExists tableName="account_export"/></not>
         </preConditions>
@@ -475,7 +475,7 @@
         on purpose: the runtime ddl-auto:create schema (AuthEvent.ipInet) and the Liquibase schema must
         agree in every environment.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-12-auth-event-ip-nullable">
+    <changeSet author="FelixTJDietrich" id="1780825201546-12-auth-event-ip-nullable">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event.ip_inet already nullable">
             <sqlCheck expectedResult="NO">
                 SELECT is_nullable FROM information_schema.columns
@@ -507,7 +507,7 @@
         app does not connect as superuser. Row-level triggers on a partitioned parent (PG 13+) cascade to
         all current and future partitions automatically.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-13-auth-event-immutability" context="prod">
+    <changeSet author="FelixTJDietrich" id="1780825201546-13-auth-event-immutability" context="prod">
         <preConditions onFail="MARK_RAN" onFailMessage="auth_event immutability trigger already present">
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_auth_event_block_mutation'
@@ -558,7 +558,7 @@
         DataIntegrityViolationException to the same 409. Stops unbounded async bundle assemblies (each
         persisting a BYTEA blob) — a DoS / storage-amplification vector.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-14-account-export-one-in-flight">
+    <changeSet author="FelixTJDietrich" id="1780825201546-14-account-export-one-in-flight">
         <preConditions onFail="MARK_RAN" onFailMessage="account_export in-flight unique index already present">
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_class WHERE relname = 'uq_account_export_in_flight'
@@ -583,7 +583,7 @@
         registration_id is the OAuth callback id (stable, unique). client_secret is sealed at rest by
         EncryptedStringConverter (AES-256-GCM), stored as the base64 TEXT it emits.
     -->
-    <changeSet author="FelixTJDietrich" id="1780291041748-15-login-provider">
+    <changeSet author="FelixTJDietrich" id="1780825201546-15-login-provider">
         <preConditions onFail="MARK_RAN" onFailMessage="login_provider table already present">
             <not>
                 <tableExists tableName="login_provider"/>
@@ -635,7 +635,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="FelixTJDietrich" id="1780291041748-16-login-provider-instance-unique">
+    <changeSet author="FelixTJDietrich" id="1780825201546-16-login-provider-instance-unique">
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">SELECT COUNT(*) FROM pg_constraint WHERE conname = 'uq_login_provider_type_base_url'</sqlCheck>
         </preConditions>

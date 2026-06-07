@@ -1014,7 +1014,7 @@
                           backing a plain Long id with NO @ManyToOne (chosen to break module cycles).
                           Hibernate emits the column but never the constraint. Real @ManyToOne FKs keep the
                           fk_* name and stay drift-checked; new scalar FKs MUST be named sfk_* (enforced
-                          only by review — see the 1780291041748_changelog.xml header).
+                          only by review — see the 1780825201546_changelog.xml header).
                     -->
                     <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket,table:auth_event_default,table:auth_event_p\d+,foreignkey:sfk_.*</diffExcludeObjects>
                     <verbose>true</verbose>
