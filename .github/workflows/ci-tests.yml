@@ -27,7 +27,11 @@ jobs:
       checks: write
       statuses: write
     name: "${{ matrix.display-name }}"
-    runs-on: ubuntu-latest
+    # App Server test tiers run on the free 4-vCPU/16GB arm64 runners (vs the 2-vCPU/7GB default):
+    # the integration job was CPU-starved on 2 vCPU (slow boots + a ~100s teardown that does NOT
+    # reproduce on a multi-core box), and Temurin 21 + postgres:16 are arm-native. Webapp jobs stay
+    # on ubuntu-latest (Node toolchain).
+    runs-on: ${{ startsWith(matrix.test-type, 'application-server-') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     if: inputs.should_skip != 'true'
     timeout-minutes: 30
     strategy:

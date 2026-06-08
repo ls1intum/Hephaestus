@@ -854,7 +854,7 @@
                          regular unit tests. 2GB OOMs on CI under that load. The dedicated
                          `architecture-tests` profile uses the same 4GB ceiling. -->
                     <argLine>@{argLine} -Xmx${hephaestus.surefire.maxHeap} -Dspring.profiles.active=test -Dfile.encoding=UTF-8
-                        -XX:+EnableDynamicAgentLoading
+                        -XX:+EnableDynamicAgentLoading -XX:+ExitOnOutOfMemoryError
                     </argLine>
                     <!-- Test output -->
                     <printSummary>true</printSummary>
