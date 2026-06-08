@@ -9,18 +9,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Rolls the {@code auth_event} partition set forward via pg_partman. The partitioning itself is
- * defined declaratively by Liquibase (changeset {@code 1780825201546-18} calls
- * {@code partman.create_parent}); this bean only runs the periodic maintenance —
- * {@code partman.run_maintenance_proc()} — which create-aheads upcoming months and DROPs partitions
- * past the 12-month retention window configured in {@code partman.part_config}.
- *
- * <p>Replaces the bespoke {@code AuthEventPartitionManager} (see the ADR superseding 0017): the team
- * now ships pg_partman in the Postgres image, so partition management is a standard extension rather
- * than hand-rolled DDL. Like {@code ExportRetentionSweeper}, {@code @Scheduled} is enabled only on the
- * server role (via {@code ServerSchedulingConfig}) and {@code @SchedulerLock} ensures a single replica
- * runs it. Retention's {@code DROP TABLE} is DDL, so it is unaffected by the {@code auth_event}
- * immutability trigger (which only blocks row UPDATE/DELETE).
+ * Runs pg_partman maintenance for {@code auth_event} (create-ahead + 12-month-retention DROP per
+ * {@code partman.part_config}). The partitioning is defined by Liquibase (changeset
+ * {@code 1780825201546-18}); this only calls {@code run_maintenance_proc()}. Server-role
+ * {@code @Scheduled} (via {@code ServerSchedulingConfig}) + ShedLock so one replica runs it. Replaces
+ * the bespoke {@code AuthEventPartitionManager} (ADR 0018).
  */
 @Component
 @WorkspaceAgnostic("auth_event is account/system-scoped; partition maintenance is global, not tenant data")

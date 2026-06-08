@@ -102,9 +102,10 @@ jobs:
           case "${{ matrix.test-type }}" in
             "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
             "application-server-arch") ./mvnw test -Dsurefire.includedGroups="architecture" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            # forkCount=3 spreads integration classes across 3 isolated JVMs (each its own Testcontainers
-            # Postgres) to use the 4-vCPU arm runner; parallel=none keeps each fork serial (shared DB per fork).
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.forkCount=3 -Dhephaestus.surefire.maxHeap=2048m -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            # forkCount=2 spreads integration classes across 2 isolated JVMs (each its own Testcontainers
+            # Postgres); parallel=none keeps each fork serial (shared DB per fork). (3 forks tipped the
+            # StartupBudget per-bean timing ceiling under CPU contention — 2 is stable and still <10 min.)
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.forkCount=2 -Dhephaestus.surefire.maxHeap=2048m -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
       - name: Run tests

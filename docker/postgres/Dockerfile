@@ -1,8 +1,6 @@
-# ghcr.io/ls1intum/hephaestus/postgres — official PostgreSQL (Debian bookworm) + pg_partman.
-# pg_partman has no Alpine package, so every environment (dev/preview/prod) uses THIS image.
-# No shared_preload_libraries / background worker: partition maintenance runs as plain SQL
-# (CALL partman.run_maintenance_proc()) from the app's ShedLock'd scheduler, so the image stays
-# stock Postgres + one extension — nothing to misconfigure at startup. See ADR superseding 0017.
+# ghcr.io/ls1intum/hephaestus/postgres — official PostgreSQL (Debian) + pg_partman, used in every
+# environment (Alpine has no partman package). No shared_preload_libraries: maintenance runs as plain
+# SQL from the app scheduler, so this stays stock Postgres + one extension. See ADR 0018.
 ARG PG_MAJOR=17
 FROM postgres:${PG_MAJOR}-bookworm
 ARG PG_MAJOR=17

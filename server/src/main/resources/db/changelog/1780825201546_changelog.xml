@@ -626,20 +626,22 @@
     </changeSet>
 
     <!--
-        Hand auth_event to pg_partman (5.x) for monthly RANGE partitioning + retention. Replaces the
-        bespoke AuthEventPartitionManager (ADR superseding 0017): the team now controls the Postgres
-        image (docker/postgres/Dockerfile ships postgresql-NN-partman), so partition maintenance is a
-        standard extension. create_parent synchronously builds current+2 ahead INSIDE this migration,
-        so inserts are safe immediately; ongoing create-ahead + 12-month hard-drop retention run via
-        CALL partman.run_maintenance_proc() from the app's ShedLock scheduler (no BGW, no pg_cron, no
-        shared_preload_libraries). DROP-based retention is unaffected by changeset -13's
-        BEFORE UPDATE/DELETE immutability trigger (DROP TABLE is DDL, not a row delete).
+        Register auth_event with pg_partman (ADR 0018). create_parent builds current+2 partitions + the
+        default synchronously, so inserts are safe immediately; ongoing maintenance (create-ahead +
+        12-month hard-drop retention) runs via AuthEventPartitionMaintenance. Retention's DROP TABLE is
+        DDL, so changeset -13's immutability trigger does not block it.
     -->
     <changeSet author="FelixTJDietrich" id="1780825201546-18-auth-event-partman">
-        <preConditions onFail="MARK_RAN" onFailMessage="pg_partman already installed (auth_event registered)">
-            <!-- Guard on pg_extension (always present) — not partman.part_config, which does not exist
-                 until the body runs CREATE EXTENSION. Runs once, when pg_partman is absent. -->
-            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_extension WHERE extname = 'pg_partman'</sqlCheck>
+        <preConditions onFail="MARK_RAN" onFailMessage="pg_partman unavailable or already installed">
+            <and>
+                <!-- Skip where pg_partman is not installable (the plain Postgres test container);
+                     dev/preview/prod use the pg_partman image. This changeset is validated by the
+                     Quality/Database drift gate, which runs against that image. -->
+                <sqlCheck expectedResult="1">SELECT count(*) FROM pg_available_extensions WHERE name = 'pg_partman'</sqlCheck>
+                <!-- Idempotency: pg_extension always exists; partman.part_config does not until the body
+                     runs CREATE EXTENSION. Runs once, when pg_partman is absent. -->
+                <sqlCheck expectedResult="0">SELECT count(*) FROM pg_extension WHERE extname = 'pg_partman'</sqlCheck>
+            </and>
         </preConditions>
         <sql splitStatements="false"><![CDATA[
             CREATE SCHEMA IF NOT EXISTS partman;
