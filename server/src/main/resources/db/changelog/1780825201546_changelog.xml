@@ -320,51 +320,6 @@
         every CREATE, and the month names are computed from now() at migration time. Naming
         convention auth_event_pYYYYMM and auth_event_default MUST match AuthEventPartitionManager.
     -->
-    <changeSet author="FelixTJDietrich" id="1780825201546-8-auth-event-bootstrap-partitions">
-        <preConditions onFail="MARK_RAN" onFailMessage="auth_event parent missing — partitioning skipped">
-            <tableExists tableName="auth_event"/>
-        </preConditions>
-        <sql splitStatements="false"><![CDATA[
-            DO $auth_event_bootstrap$
-            DECLARE
-                month_start date;
-                part_name   text;
-                offsets     int[] := ARRAY[-1, 0, 1];  -- previous, current, next month
-                off         int;
-            BEGIN
-                -- Always-safe catch-all so an insert can never fail, even before the scheduler runs.
-                IF NOT EXISTS (
-                    SELECT 1 FROM pg_class WHERE relname = 'auth_event_default'
-                ) THEN
-                    EXECUTE 'CREATE TABLE auth_event_default PARTITION OF auth_event DEFAULT';
-                END IF;
-
-                -- Pre-create prev / current / next month so normal rows land in a real monthly
-                -- partition rather than the default.
-                FOREACH off IN ARRAY offsets LOOP
-                    month_start := (date_trunc('month', now()) + (off || ' month')::interval)::date;
-                    part_name   := 'auth_event_p' || to_char(month_start, 'YYYYMM');
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_class WHERE relname = part_name
-                    ) THEN
-                        EXECUTE format(
-                            'CREATE TABLE %I PARTITION OF auth_event FOR VALUES FROM (%L) TO (%L)',
-                            part_name,
-                            month_start,
-                            (month_start + interval '1 month')::date
-                        );
-                    END IF;
-                END LOOP;
-            END
-            $auth_event_bootstrap$;
-        ]]></sql>
-        <rollback>
-            <sql splitStatements="false"><![CDATA[
-                DROP TABLE IF EXISTS auth_event_default;
-            ]]></sql>
-        </rollback>
-    </changeSet>
-
     <!--
         Drop the legacy user.keycloak_subject column + its unique index (ADR 0016 Stage A,
         added in 1780313973588). Superseded by ADR 0017: identity now lives on
@@ -666,6 +621,51 @@
         <rollback>
             <sql><![CDATA[
                 DROP INDEX IF EXISTS ix_auth_rate_limit_bucket_expires_at;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <!--
+        Hand auth_event to pg_partman (5.x) for monthly RANGE partitioning + retention. Replaces the
+        bespoke AuthEventPartitionManager (ADR superseding 0017): the team now controls the Postgres
+        image (docker/postgres/Dockerfile ships postgresql-NN-partman), so partition maintenance is a
+        standard extension. create_parent synchronously builds current+2 ahead INSIDE this migration,
+        so inserts are safe immediately; ongoing create-ahead + 12-month hard-drop retention run via
+        CALL partman.run_maintenance_proc() from the app's ShedLock scheduler (no BGW, no pg_cron, no
+        shared_preload_libraries). DROP-based retention is unaffected by changeset -13's
+        BEFORE UPDATE/DELETE immutability trigger (DROP TABLE is DDL, not a row delete).
+    -->
+    <changeSet author="FelixTJDietrich" id="1780825201546-18-auth-event-partman">
+        <preConditions onFail="MARK_RAN" onFailMessage="pg_partman already installed (auth_event registered)">
+            <!-- Guard on pg_extension (always present) — not partman.part_config, which does not exist
+                 until the body runs CREATE EXTENSION. Runs once, when pg_partman is absent. -->
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_extension WHERE extname = 'pg_partman'</sqlCheck>
+        </preConditions>
+        <sql splitStatements="false"><![CDATA[
+            CREATE SCHEMA IF NOT EXISTS partman;
+            CREATE EXTENSION IF NOT EXISTS pg_partman WITH SCHEMA partman;
+
+            -- Monthly RANGE; premake=2 keeps current+2 ahead (== old CREATE_AHEAD_MONTHS=2).
+            -- p_type defaults 'range', p_default_table defaults true (partman owns the DEFAULT catch-all).
+            SELECT partman.create_parent(
+                p_parent_table := 'public.auth_event',
+                p_control      := 'occurred_at',
+                p_interval     := '1 month',
+                p_premake      := 2
+            );
+
+            -- 12-month HARD-DROP retention (GDPR window). keep_table=false => DROP TABLE (not detach).
+            UPDATE partman.part_config
+               SET retention                = '12 months',
+                   retention_keep_table     = false,
+                   retention_keep_index     = false,
+                   infinite_time_partitions = true
+             WHERE parent_table = 'public.auth_event';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                SELECT partman.undo_partition('public.auth_event', p_keep_table := false);
+                DELETE FROM partman.part_config WHERE parent_table = 'public.auth_event';
             ]]></sql>
         </rollback>
     </changeSet>

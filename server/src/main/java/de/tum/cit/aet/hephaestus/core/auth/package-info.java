@@ -20,7 +20,7 @@
  *       Mirrors to the SCM actor via the optional {@code external_actor_id} FK.</li>
  *   <li><b>{@link de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent AuthEvent}</b>
  *       — append-only auth / impersonation event. Monthly RANGE-partitioned on
- *       {@code occurred_at}, self-managed in-app by {@code AuthEventPartitionManager}
+ *       {@code occurred_at}, managed by pg_partman (run_maintenance_proc via AuthEventPartitionMaintenance)
  *       (create-ahead + 12-month retention) on stock Postgres — no {@code pg_partman}.
  *       Records the impersonation pair {@code (account_id, acting_account_id)} per
  *       impersonation ({@code act}-claim) action.</li>

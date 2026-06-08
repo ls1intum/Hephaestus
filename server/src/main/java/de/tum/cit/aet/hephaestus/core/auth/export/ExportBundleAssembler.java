@@ -114,7 +114,7 @@ public class ExportBundleAssembler {
             .orElse(null);
 
         // Real calendar months (not 30-day approximations) so this window matches the partition
-        // retention (AuthEventPartitionManager.RETENTION_MONTHS), which is also 12 calendar months.
+        // retention (pg_partman, 12 months), which is also 12 calendar months.
         Instant since = Instant.now(clock).atZone(ZoneOffset.UTC).minusMonths(AUTH_EVENT_WINDOW_MONTHS).toInstant();
         List<ExportBundle.AuthEvent> authEvents = authEventRepository
             .findByAccountSince(accountId, since)

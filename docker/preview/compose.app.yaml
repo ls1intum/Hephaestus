@@ -45,7 +45,7 @@ services:
   # after postgres starts, rather than relying on /docker-entrypoint-initdb.d
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:17-alpine
+    image: ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG:-latest}
     hostname: postgres
     restart: unless-stopped
     environment:
@@ -109,7 +109,7 @@ services:
         if [ -z "$$BASE_CTN" ]; then
           BASE_CTN="seed-base-$$RANDOM"
           echo "Starting temporary postgres from base volume: $$BASE_CTN"
-          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data postgres:17-alpine >/tmp/base-start.log 2>/tmp/base-start.err || {
+          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG:-latest} >/tmp/base-start.log 2>/tmp/base-start.err || {
             echo "✗ Failed to start temporary base container; falling back to Liquibase"
             cat /tmp/base-start.err || true
             exit 0

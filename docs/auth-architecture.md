@@ -84,7 +84,7 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
   `ImpersonationGuard` makes such sessions read-only unless the operator sends an explicit
   confirm-writes header. Every begin/exit is audited.
 - **GDPR.** `auth_event` is an append-only, monthly RANGE-partitioned (self-managed in-app by
-  `AuthEventPartitionManager`, 12-month retention, stock Postgres — no `pg_partman`)
+  `pg_partman`, 12-month retention; see ADR 0018)
   audit log. Account deletion is a 48-hour soft-delete cooldown → hard cascade +
   `ExternalActor` pseudonymization (Art. 17(3) — preserves activity-graph integrity on
   other users' work).

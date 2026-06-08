@@ -21,12 +21,11 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
 - [ ] Reverse proxy (Coolify / TUM) verified to NOT inject a `Domain=` on Set-Cookie — a
       `__Host-` cookie with a Domain attribute is silently dropped by browsers → infinite
       redirect loop. Smoke-test the full login on staging behind the real proxy.
-- [ ] Stock Postgres 16/17 is sufficient — only the `citext` extension is needed and it ships
-      with the official images. `auth_event` partitioning is self-managed in-app by
-      `AuthEventPartitionManager` (create-ahead + 12-month retention); `pg_partman` is NOT
-      required and must NOT be registered for this table (it would conflict with the in-app
-      manager). Liquibase seeds the DEFAULT + prev/current/next month partitions so the first
-      insert is safe immediately.
+- [ ] Postgres image ships `pg_partman` (`ghcr.io/ls1intum/hephaestus/postgres` — see ADR 0018)
+      plus `citext`. `auth_event` is partman-managed (create-ahead + 12-month retention); maintenance
+      runs via `AuthEventPartitionMaintenance` (`CALL run_maintenance_proc`, ShedLock) — no
+      `shared_preload_libraries`. Liquibase's `create_parent` builds current+2 partitions + the
+      default at migration time, so the first insert is safe immediately.
 - [ ] `jwt_signing_key` seeded (auto-seeds a sealed key on first boot via
       `AuthJwtConfig.seedKeysOnStartup`; requires `hephaestus.security.encryption-key`, see above).
 - [ ] TLS 1.3 + HSTS preload confirmed at the edge.

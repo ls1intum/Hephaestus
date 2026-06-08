@@ -9,7 +9,9 @@
 
 services:
   postgres:
-    image: 'postgres:16'
+    build:
+      context: ../docker/postgres
+    image: 'ghcr.io/ls1intum/hephaestus/postgres:dev'
     environment:
       POSTGRES_DB: hephaestus
       POSTGRES_PASSWORD: root

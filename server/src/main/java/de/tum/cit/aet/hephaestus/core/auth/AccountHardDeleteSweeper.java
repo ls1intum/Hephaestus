@@ -35,7 +35,7 @@ import org.springframework.stereotype.Component;
  * and is out of scope for this sweep.
  *
  * <h2>Scheduling &amp; safety</h2>
- * Mirrors {@code ExportRetentionSweeper} / {@code AuthEventPartitionManager}: {@code @Scheduled} is
+ * Mirrors {@code ExportRetentionSweeper} / {@code AuthEventPartitionMaintenance}: {@code @Scheduled} is
  * gated by {@code ServerSchedulingConfig} (server role only) and {@code @SchedulerLock} single-flights
  * across replicas. The work is idempotent — re-running after a flipped status is a no-op because the
  * row is no longer {@code DELETING}, and the child deletes are unconditional {@code DELETE ... WHERE

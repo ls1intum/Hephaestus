@@ -301,7 +301,7 @@ services:
         max-file: "5"
 
   postgres:
-    image: "postgres:16"
+    image: "ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG}"
     environment:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root
