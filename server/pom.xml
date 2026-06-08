@@ -35,7 +35,11 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <hephaestus.surefire.timeout>900</hephaestus.surefire.timeout>
+        <!-- Per-fork JVM timeout (forkedProcessTimeoutInSeconds). The integration tier runs ~100
+             @SpringBootTest classes serially in one fork (forkCount=1), so this is a whole-suite budget;
+             1200s gives headroom on a loaded runner. Single source of truth: CI no longer overrides it.
+             The CI job's own timeout-minutes is the backstop against a genuinely hung run. -->
+        <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
 
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
@@ -1054,7 +1058,7 @@
                 </property>
             </activation>
             <properties>
-                <hephaestus.surefire.timeout>900</hephaestus.surefire.timeout>
+                <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
             </properties>
         </profile>
 

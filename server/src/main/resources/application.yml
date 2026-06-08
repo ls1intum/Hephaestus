@@ -55,11 +55,16 @@ spring:
                 order_inserts: true
                 order_updates: true
 
-    # Repository proxy verification deferred to ContextRefreshedEvent (still before readiness).
+    # Synchronous JPA repository bootstrap (Spring Boot's default since 2.4.1). DEFERRED builds the
+    # EntityManagerFactory on the applicationTaskExecutor background thread; that thread starves under
+    # CPU throttling (Paketo CDS-training builder, spec generation), hanging the boot, and combined with
+    # an @PostConstruct repository read it is the documented lock-order deadlock (spring-boot#23758,
+    # reverted as the framework default in #24249). The cold-start overlap it bought is not worth that
+    # footgun, so we keep bootstrap synchronous on the main thread for every profile.
     data:
         jpa:
             repositories:
-                bootstrap-mode: deferred
+                bootstrap-mode: default
 
     liquibase:
         change-log: classpath:db/master.xml
