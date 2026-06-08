@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -126,7 +127,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         // Mock role checker: healthy + assignee has role
         when(userRoleChecker.isHealthy()).thenReturn(true);
-        when(userRoleChecker.hasRole(eq("assignee-user"), anyString())).thenReturn(true);
+        // Role is resolved by the stable (gitProviderId, subject) identity; subject == User.nativeId.
+        when(userRoleChecker.hasRole(anyLong(), eq(String.valueOf(assignee.getNativeId())), anyString())).thenReturn(
+            true
+        );
     }
 
     private Practice createPractice(String slug, String name, List<String> triggerEvents, boolean active) {

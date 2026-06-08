@@ -11,13 +11,16 @@ import org.springframework.stereotype.Repository;
 public interface JwtSigningKeyRepository extends JpaRepository<JwtSigningKey, String> {
     /**
      * All active keys (these both sign and verify). Ordered so the freshest is first; the issuer picks
-     * that one to sign new tokens, while every active key still verifies.
+     * that one to sign new tokens, while every active key still verifies. The {@code kid DESC}
+     * secondary sort is a deterministic tiebreaker: once overlapping-key rotation introduces a second
+     * active key, two rows sharing a {@code created_at} (same-millisecond insert / cross-pod clock skew)
+     * must still pick the SAME signer cluster-wide, not an arbitrary one.
      */
     @Query(
         """
         SELECT k FROM JwtSigningKey k
         WHERE k.active = true
-        ORDER BY k.createdAt DESC
+        ORDER BY k.createdAt DESC, k.kid DESC
         """
     )
     List<JwtSigningKey> findActive();

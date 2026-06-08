@@ -1,5 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
 import de.tum.cit.aet.hephaestus.testconfig.DatabaseTestUtils;
 import de.tum.cit.aet.hephaestus.testconfig.GitHubIntegrationPostgresShutdown;
@@ -71,7 +75,28 @@ class SecurityHeadersIntegrationTest {
             .valueEquals("Cross-Origin-Opener-Policy", "same-origin")
             .expectHeader()
             .valueEquals("Cross-Origin-Embedder-Policy", "credentialless")
+            // CSP is ENFORCED (not report-only) and INSTANCE-AGNOSTIC. Pin the load-bearing directives,
+            // the no-host posture, and the absence of a plaintext-HTTP image downgrade. `script-src 'self';`
+            // (trailing ';') proves no source was appended (no 'unsafe-inline'/host).
             .expectHeader()
-            .exists("Content-Security-Policy-Report-Only");
+            .value(
+                "Content-Security-Policy",
+                allOf(
+                    containsString("default-src 'self'"),
+                    containsString("script-src 'self';"),
+                    containsString("img-src 'self' data: https:"),
+                    containsString("form-action 'self'"),
+                    containsString("frame-ancestors 'none'"),
+                    containsString("base-uri 'self'"),
+                    // Regression guards: no instance-specific host, and no plaintext-HTTP image downgrade
+                    // ('http:' is not a substring of 'https:').
+                    not(containsString("gitlab")),
+                    not(containsString("github")),
+                    not(containsString("http:"))
+                )
+            )
+            // A future accidental re-introduction of reportOnly() must fail this test.
+            .expectHeader()
+            .doesNotExist("Content-Security-Policy-Report-Only");
     }
 }

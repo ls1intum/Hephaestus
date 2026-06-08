@@ -217,7 +217,21 @@ public class PracticeReviewDetectionGate {
     ) {
         for (User assignee : assignees) {
             try {
-                if (userRoleChecker.hasRole(assignee.getLogin(), PRACTICE_REVIEW_ROLE)) {
+                // Identity is the stable (gitProviderId, subject) tuple, not the login: the role lives on
+                // the Hephaestus account behind THIS provider's identity. subject == the provider's numeric
+                // user id (User.nativeId as a string), matching IdentityLink.subject. A synced assignee
+                // always carries both; guard defensively so a half-synced row fails safe (no role).
+                var provider = assignee.getProvider();
+                if (provider == null || provider.getId() == null || assignee.getNativeId() == null) {
+                    continue;
+                }
+                if (
+                    userRoleChecker.hasRole(
+                        provider.getId(),
+                        String.valueOf(assignee.getNativeId()),
+                        PRACTICE_REVIEW_ROLE
+                    )
+                ) {
                     log.info(
                         "Practice review gate: DETECT, reason=hasRole, prId={}, userLogin={}, matchedPractices={}",
                         pullRequest.getId(),

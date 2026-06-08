@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.jwt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -29,6 +30,8 @@ class IssuedJwtCleanupJobTest extends BaseUnitTest {
 
         job.cleanupExpired();
 
+        // Name the real contract directly: the cutoff is the injected clock instant, not "some Instant".
+        verify(repository).deleteExpiredBefore(NOW);
         assertThat(registry.get("auth.issued_jwt.pruned").counter().count()).isEqualTo(7.0);
     }
 }

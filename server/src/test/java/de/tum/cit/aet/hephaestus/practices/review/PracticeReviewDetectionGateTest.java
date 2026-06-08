@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -8,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -94,9 +96,26 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return label;
     }
 
+    private static final long TEST_PROVIDER_ID = 1L;
+
+    /** Stable, positive provider-native id per login (single source of truth for the test identity). */
+    private static long nativeIdOf(String login) {
+        return Math.abs((long) login.hashCode()) + 1;
+    }
+
+    /** The {@code IdentityLink.subject} the gate keys on for this user (== {@code String.valueOf(nativeId)}). */
+    private static String subjectOf(String login) {
+        return String.valueOf(nativeIdOf(login));
+    }
+
     private User createUser(String login) {
         User user = new User();
         user.setLogin(login);
+        // The gate resolves the role by the stable (gitProviderId, subject) identity, not the login.
+        user.setNativeId(nativeIdOf(login));
+        GitProvider provider = new GitProvider();
+        provider.setId(TEST_PROVIDER_ID);
+        user.setProvider(provider);
         return user;
     }
 
@@ -371,7 +390,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User assignee = createUser("test-user");
             pr.setAssignees(Set.of(assignee));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(true);
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
+                true
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -407,7 +428,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(detect.workspace().getId()).isEqualTo(WORKSPACE_ID);
             assertThat(detect.matchedPractices()).containsExactly(practice);
             // Verify role checker was NEVER consulted
-            verify(userRoleChecker, never()).hasRole(anyString(), anyString());
+            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
             verify(userRoleChecker, never()).isHealthy();
         }
     }
@@ -461,7 +482,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("role checker unhealthy");
-            verify(userRoleChecker, never()).hasRole(anyString(), anyString());
+            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
         }
     }
 
@@ -477,7 +498,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User assignee = createUser("test-user");
             pr.setAssignees(Set.of(assignee));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(true);
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
+                true
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -496,7 +519,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User assignee = createUser("test-user");
             pr.setAssignees(Set.of(assignee));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(false);
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
+                false
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -516,9 +541,13 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User userWithoutRole = createUser("user-without-role");
             pr.setAssignees(Set.of(userWithRole, userWithoutRole));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("user-with-role", PRACTICE_REVIEW_ROLE)).thenReturn(true);
+            when(
+                userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-with-role"), PRACTICE_REVIEW_ROLE)
+            ).thenReturn(true);
             // Lenient: HashSet iteration order is nondeterministic, so this mock may not be reached
-            lenient().when(userRoleChecker.hasRole("user-without-role", PRACTICE_REVIEW_ROLE)).thenReturn(false);
+            lenient()
+                .when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-without-role"), PRACTICE_REVIEW_ROLE))
+                .thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -538,8 +567,12 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User user2 = createUser("user-2");
             pr.setAssignees(Set.of(user1, user2));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("user-1", PRACTICE_REVIEW_ROLE)).thenReturn(false);
-            when(userRoleChecker.hasRole("user-2", PRACTICE_REVIEW_ROLE)).thenReturn(false);
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-1"), PRACTICE_REVIEW_ROLE)).thenReturn(
+                false
+            );
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-2"), PRACTICE_REVIEW_ROLE)).thenReturn(
+                false
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -558,7 +591,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User assignee = createUser("test-user");
             pr.setAssignees(Set.of(assignee));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenThrow(
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenThrow(
                 new RuntimeException("Connection refused")
             );
 
@@ -583,7 +616,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             User assignee = createUser("test-user");
             pr.setAssignees(Set.of(assignee));
             when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(true);
+            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
+                true
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 

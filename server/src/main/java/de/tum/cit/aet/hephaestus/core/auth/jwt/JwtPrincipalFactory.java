@@ -87,9 +87,16 @@ public class JwtPrincipalFactory {
     }
 
     /**
-     * The git-provider login for the account: the username on its most recently used active
-     * identity link, falling back to the first active link, then the display name. The login
-     * is what {@code preferred_username} carries — it must match the synced {@code User.login}.
+     * The git-provider login for the account: the username on its most recently used active identity
+     * link. {@code preferred_username} carries this and the whole workspace-authorization model keys on
+     * it ({@code preferred_username → User.login → WorkspaceMembership}).
+     *
+     * <p>Fallback when no active link has a usable username is a synthetic, colon-bearing sentinel —
+     * NOT {@code account.getDisplayName()}. The display name is user-controlled free text from the OAuth
+     * profile; emitting it as the login could (if it happened to equal another user's git login) leak
+     * that user's membership-derived access. A git login can never contain {@code ':'}, so this sentinel
+     * matches no real {@code User.login} — it fails safe (no spurious access) without locking out an
+     * account whose provider returned no username (account-level, {@code sub}-based resolution still works).
      */
     private String resolveLogin(Account account) {
         return identityLinkRepository
@@ -98,7 +105,7 @@ public class JwtPrincipalFactory {
             .filter(il -> il.getUsernameAtSignup() != null && !il.getUsernameAtSignup().isBlank())
             .max(JwtPrincipalFactory::byLastLogin)
             .map(IdentityLink::getUsernameAtSignup)
-            .orElse(account.getDisplayName());
+            .orElse("account:" + account.getId());
     }
 
     private static int byLastLogin(IdentityLink a, IdentityLink b) {

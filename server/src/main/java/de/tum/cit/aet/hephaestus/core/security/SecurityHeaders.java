@@ -14,8 +14,8 @@ import org.springframework.security.web.header.writers.StaticHeadersWriter;
  * <ul>
  *   <li>{@code Strict-Transport-Security} — 1y, includeSubDomains (existing behaviour, preserved).</li>
  *   <li>{@code X-Frame-Options: DENY} + {@code X-Content-Type-Options: nosniff} (existing, preserved).</li>
- *   <li>{@code Content-Security-Policy-Report-Only} — API/Swagger-host policy, report-only so it
- *       cannot break Swagger UI while we observe violations.</li>
+ *   <li>{@code Content-Security-Policy} — enforced (not report-only) and fully instance-agnostic: it
+ *       contains NO hardcoded partner hosts. See {@link #CONTENT_SECURITY_POLICY}.</li>
  *   <li>{@code Referrer-Policy: strict-origin-when-cross-origin}.</li>
  *   <li>{@code Cross-Origin-Opener-Policy: same-origin}.</li>
  *   <li>{@code Cross-Origin-Embedder-Policy: credentialless} — written via a static writer because
@@ -28,20 +28,33 @@ public final class SecurityHeaders {
     private SecurityHeaders() {}
 
     /**
-     * Report-only CSP tuned for an API + Swagger UI host. {@code unsafe-inline} is allowed for
-     * styles only (Swagger injects inline styles); scripts are locked to {@code 'self'}. Image
-     * sources permit the avatar CDNs we render. Report-only for now so a too-tight directive never
-     * breaks the docs UI before we have telemetry.
+     * Enforced CSP for the server-rendered surface this header set covers (Swagger UI, {@code /auth/error},
+     * RFC-7807 error pages). It is deliberately INSTANCE-AGNOSTIC — no partner hosts — because each
+     * directive is keyed to what OUR origin may do, not to an integration allowlist:
+     * <ul>
+     *   <li>{@code script-src 'self'} (no {@code 'unsafe-inline'}) is the actual XSS control; Swagger's
+     *       bundled JS loads from {@code 'self'}, so enforcement is safe. {@code style-src} keeps
+     *       {@code 'unsafe-inline'} because Swagger injects inline <em>styles</em> only.</li>
+     *   <li>{@code img-src 'self' data: https:} — images cannot execute, and SCM avatars render on the
+     *       separate SPA origin, not here; allowing any HTTPS image avoids enumerating per-instance avatar
+     *       hosts (the old {@code gitlab.lrz.de}/{@code *.gitlab.com} list) while still blocking
+     *       plaintext-HTTP. </li>
+     *   <li>{@code form-action 'self'} — this restricts HTML <em>form submission</em> targets only. OAuth
+     *       login is a server {@code 302} redirect (a navigation), not a form post, so the IdP host is not
+     *       needed here; including it was dead weight that also leaked the instance.</li>
+     * </ul>
+     * Because the policy is a compile-time constant with zero configurable hosts, it never reads the
+     * {@code login_provider} table — satisfying the no-DB-at-context-refresh constraint by construction.
      */
     private static final String CONTENT_SECURITY_POLICY =
         "default-src 'self'; " +
         "script-src 'self'; " +
         "style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data: https://avatars.githubusercontent.com https://*.gitlab.com https://gitlab.lrz.de; " +
+        "img-src 'self' data: https:; " +
         "connect-src 'self'; " +
         "frame-ancestors 'none'; " +
         "base-uri 'self'; " +
-        "form-action 'self' https://github.com https://gitlab.lrz.de";
+        "form-action 'self'";
 
     /** Applies the full header set to the given {@link HttpSecurity}. */
     public static void apply(HttpSecurity http) throws Exception {
@@ -50,7 +63,7 @@ public final class SecurityHeaders {
                 .frameOptions(frameOptions -> frameOptions.deny())
                 .contentTypeOptions(contentType -> {})
                 .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
-                .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY).reportOnly())
+                .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
                 .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN))
                 // COEP credentialless: the builder enum lacks this value on the current Spring

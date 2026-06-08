@@ -19,9 +19,14 @@ import org.jspecify.annotations.NonNull;
  */
 public interface UserRoleChecker {
     /**
-     * Fail-closed: returns {@code false} on any error (and never throws), so callers need no try-catch.
+     * Does the actor identified by the stable {@code (gitProviderId, providerUserId)} tuple hold
+     * {@code roleName}? The identity is the git provider's row id plus the provider's immutable numeric
+     * user id (the SCM {@code User.nativeId} as a string) — NOT a bare username. This keeps the check
+     * provider-scoped (the same username on two SCM instances is two different people) and rename-robust.
+     *
+     * <p>Fail-closed: returns {@code false} on any error (and never throws), so callers need no try-catch.
      */
-    boolean hasRole(@NonNull String username, @NonNull String roleName);
+    boolean hasRole(long gitProviderId, @NonNull String providerUserId, @NonNull String roleName);
 
     /**
      * When unhealthy, callers should skip the operation entirely rather than call {@link #hasRole}.

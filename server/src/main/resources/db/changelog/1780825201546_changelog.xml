@@ -649,4 +649,25 @@
         </rollback>
     </changeSet>
 
+    <!--
+        Index the Bucket4j retention sweep. AuthRateLimitBucketSweeper runs hourly; the Postgres
+        ProxyManager's ExpiredEntriesCleaner removes rows in batches whose subquery selects on
+        `expires_at < <now-millis>`, so without this index that subquery full-scans auth_rate_limit_bucket
+        (one row per distinct pre-auth client key). Same shape as the issued_jwt expiry index. Not a JPA
+        entity (Bucket4j owns the table), so it lives only in Liquibase. Raw SQL matches the sibling indexes.
+    -->
+    <changeSet author="FelixTJDietrich" id="1780825201546-17-auth-rate-limit-bucket-expires-index">
+        <preConditions onFail="MARK_RAN" onFailMessage="auth_rate_limit_bucket expires_at index already present">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_class WHERE relname = 'ix_auth_rate_limit_bucket_expires_at'</sqlCheck>
+        </preConditions>
+        <sql><![CDATA[
+            CREATE INDEX ix_auth_rate_limit_bucket_expires_at ON auth_rate_limit_bucket (expires_at);
+        ]]></sql>
+        <rollback>
+            <sql><![CDATA[
+                DROP INDEX IF EXISTS ix_auth_rate_limit_bucket_expires_at;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

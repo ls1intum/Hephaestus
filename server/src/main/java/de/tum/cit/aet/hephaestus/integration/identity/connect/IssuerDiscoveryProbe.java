@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.identity.connect;
 
+import de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuard;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -29,9 +30,12 @@ import tools.jackson.databind.ObjectMapper;
  * register an "issuer" pointing at an internal address (cloud metadata endpoint, a sibling service,
  * localhost) and use the registration / test-login dance to make the server issue requests there.
  *
- * <p><b>NOT yet wired into a registration path.</b> The current login-provider registration validates
- * its base URL with the (synchronous, no-DNS) {@code core.security.ServerUrlValidator}; this stronger
- * probe is staged for the issuer-discovery flow but has no production caller today (only its unit test).
+ * <p><b>The probe object itself is NOT yet wired into a registration path.</b> The current
+ * login-provider registration validates its base URL with the (synchronous, no-DNS)
+ * {@code core.security.ServerUrlValidator}; this stronger probe is staged for the issuer-discovery flow
+ * but has no production caller today (only its unit test). Its IP-safety predicate, however, is now
+ * shared with production: the same {@link PrivateAddressGuard} backs {@code core.SsrfGuardedResolverGroup},
+ * which DOES filter live outbound DNS for the GitLab preflight client.
  *
  * <h2>Checks, in order</h2>
  * <ol>
@@ -39,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  *   <li>Host must resolve only to public, routable addresses — every resolved IP is
  *       rejected if loopback, link-local, site-local (RFC 1918), unique-local,
  *       multicast, wildcard, or an IANA special-purpose range (CGNAT 100.64/10, NAT64
- *       64:ff9b::/32, TEST-NET, benchmarking, Class-E) — see {@link #isReservedRange}.</li>
+ *       64:ff9b::/32, TEST-NET, benchmarking, Class-E) — see {@link PrivateAddressGuard}.</li>
  *   <li>{@code GET {issuer}/.well-known/openid-configuration} must return 200 with a JSON
  *       body carrying {@code issuer}, {@code authorization_endpoint}, and
  *       {@code token_endpoint}.</li>
@@ -285,64 +289,13 @@ public class IssuerDiscoveryProbe {
             throw new IssuerValidationException("host " + host + " resolved to no addresses");
         }
         for (InetAddress addr : addresses) {
-            if (
-                addr.isLoopbackAddress() ||
-                addr.isLinkLocalAddress() ||
-                addr.isSiteLocalAddress() ||
-                addr.isAnyLocalAddress() ||
-                addr.isMulticastAddress() ||
-                isUniqueLocalIpv6(addr) ||
-                isReservedRange(addr)
-            ) {
+            if (PrivateAddressGuard.isNonPublic(addr)) {
                 throw new IssuerValidationException(
                     "host " + host + " resolves to a non-public address (" + addr.getHostAddress() + ")"
                 );
             }
         }
         return List.of(addresses);
-    }
-
-    /** fc00::/7 — IPv6 unique-local; not covered by isSiteLocalAddress(). */
-    private static boolean isUniqueLocalIpv6(InetAddress addr) {
-        byte[] bytes = addr.getAddress();
-        return bytes.length == 16 && (bytes[0] & 0xFE) == 0xFC;
-    }
-
-    /**
-     * IANA special-purpose ranges that {@link InetAddress}'s {@code isXxx()} predicates do NOT flag
-     * but which routinely front internal services, so they must not be reachable as an SSRF target.
-     * {@code isSiteLocalAddress()} is RFC-1918-only, so CGNAT (RFC 6598, standard pod networking in
-     * EKS/GKE), benchmarking, TEST-NET, Class-E and especially the NAT64 well-known prefix (RFC 6052
-     * — its low 32 bits can encode IPv4 loopback) all slip past the predicates above. Per the OWASP
-     * SSRF Prevention Cheat Sheet this covers the SSRF-relevant special-purpose ranges — those that can
-     * front internal or loopback-reachable services — not just RFC 1918; purely non-SSRF assignments
-     * (e.g. 6to4-relay anycast, AS112, AMT) are intentionally not blocked. Operates on the already-resolved
-     * address bytes (allocation-free, IPv4/IPv6-uniform).
-     */
-    private static boolean isReservedRange(InetAddress addr) {
-        byte[] b = addr.getAddress();
-        if (b.length == 4) {
-            int b0 = b[0] & 0xFF,
-                b1 = b[1] & 0xFF,
-                b2 = b[2] & 0xFF;
-            if (b0 == 0) return true; // 0.0.0.0/8 "this network"
-            if (b0 == 100 && (b1 & 0xC0) == 0x40) return true; // 100.64.0.0/10 carrier-grade NAT
-            if (b0 == 192 && b1 == 0 && b2 == 0) return true; // 192.0.0.0/24 IETF protocol assignments
-            if (b0 == 192 && b1 == 0 && b2 == 2) return true; // 192.0.2.0/24 TEST-NET-1
-            if (b0 == 198 && (b1 & 0xFE) == 18) return true; // 198.18.0.0/15 benchmarking
-            if (b0 == 198 && b1 == 51 && b2 == 100) return true; // 198.51.100.0/24 TEST-NET-2
-            if (b0 == 203 && b1 == 0 && b2 == 113) return true; // 203.0.113.0/24 TEST-NET-3
-            return b0 >= 240; // 240.0.0.0/4 reserved (Class E) + 255.255.255.255 broadcast
-        }
-        if (b.length == 16) {
-            // 64:ff9b::/32 NAT64 well-known prefixes (RFC 6052 /96 + RFC 8215 /48) — embed IPv4, incl. loopback.
-            if ((b[0] & 0xFF) == 0x00 && (b[1] & 0xFF) == 0x64 && (b[2] & 0xFF) == 0xff && (b[3] & 0xFF) == 0x9b) {
-                return true;
-            }
-            // 2001:db8::/32 documentation
-            return (b[0] & 0xFF) == 0x20 && (b[1] & 0xFF) == 0x01 && (b[2] & 0xFF) == 0x0d && (b[3] & 0xFF) == 0xb8;
-        }
-        return false;
     }
 
     private static String requireText(JsonNode doc, String field) {

@@ -76,12 +76,29 @@ class AccountServiceTest extends BaseUnitTest {
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
         when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(1);
 
-        service.unlinkIdentity(1L, 10L);
+        service.unlinkIdentity(1L, 10L, /* actingAccountId */ null);
 
         verify(identityLinkRepository).deleteByIdAndAccountId(10L, 1L);
         ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
         verify(auditWriter).write(event.capture());
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.IDENTITY_UNLINKED);
+        // Self-service unlink: no impersonating operator, so no acting account is recorded.
+        assertThat(event.getValue().actingAccountId()).isNull();
+    }
+
+    @Test
+    void unlinkUnderImpersonationAttributesTheOperatorAsActingAccount() {
+        List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
+        when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
+        when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(1);
+
+        service.unlinkIdentity(1L, 10L, /* actingAccountId = impersonating operator */ 7L);
+
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(auditWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.IDENTITY_UNLINKED);
+        assertThat(event.getValue().accountId()).isEqualTo(1L);
+        assertThat(event.getValue().actingAccountId()).isEqualTo(7L);
     }
 
     @Test
@@ -89,7 +106,7 @@ class AccountServiceTest extends BaseUnitTest {
         List<IdentityLink> active = List.of(link(10L, 100L));
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L, null)).isInstanceOfSatisfying(
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
         );
@@ -103,7 +120,7 @@ class AccountServiceTest extends BaseUnitTest {
         List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 999L)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 999L, null)).isInstanceOfSatisfying(
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
         );
@@ -118,7 +135,7 @@ class AccountServiceTest extends BaseUnitTest {
         when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
         when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(0);
 
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L, null)).isInstanceOfSatisfying(
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
         );
@@ -150,6 +167,9 @@ class AccountServiceTest extends BaseUnitTest {
         assertThat(event.getValue().details()).contains("\"from\":\"USER\"", "\"to\":\"APP_ADMIN\"");
         // Promotion never needs the admin-count query.
         verify(accountRepository, never()).findByAppRoleAndStatusForUpdate(any(), any());
+        // Promotion does NOT revoke sessions — the new role is picked up on the next silent refresh,
+        // so the user is not forced to re-login.
+        verify(issuedJwtRepository, never()).revokeAllForAccount(anyLong(), any(), any());
     }
 
     @Test
@@ -164,6 +184,9 @@ class AccountServiceTest extends BaseUnitTest {
         assertThat(account.getAppRole()).isEqualTo(Account.AppRole.USER);
         verify(accountRepository).save(account);
         verify(auditWriter).write(any());
+        // Demotion revokes the stripped admin's live sessions so app_admin authority can't outlive the
+        // role change for the token's TTL.
+        verify(issuedJwtRepository).revokeAllForAccount(eq(2L), any(), eq(IssuedJwt.RevokedReason.ADMIN_REVOKE));
     }
 
     @Test
@@ -212,7 +235,7 @@ class AccountServiceTest extends BaseUnitTest {
     void softDeleteMarksDeletingRevokesAllSessionsAndAuditsAccountDeleted() {
         Account account = accountWithRole(2L, Account.AppRole.USER);
 
-        service.softDelete(2L);
+        service.softDelete(2L, /* actingAccountId */ null);
 
         assertThat(account.getStatus()).isEqualTo(Account.Status.DELETING);
         assertThat(account.getDeletedAt()).isEqualTo(clock.instant());
@@ -222,6 +245,37 @@ class AccountServiceTest extends BaseUnitTest {
         verify(auditWriter).write(event.capture());
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.ACCOUNT_DELETED);
         assertThat(event.getValue().accountId()).isEqualTo(2L);
+        // Self-service deletion: the victim acted, so no separate operator is attributed.
+        assertThat(event.getValue().actingAccountId()).isNull();
+    }
+
+    @Test
+    void softDeleteIsIdempotentForAnAlreadyDeletingAccount() {
+        Account account = accountWithRole(2L, Account.AppRole.USER);
+        account.setStatus(Account.Status.DELETING);
+        Instant cooldownStart = Instant.parse("2025-12-01T00:00:00Z");
+        account.setDeletedAt(cooldownStart);
+
+        service.softDelete(2L, null);
+
+        // No-op: cooldown clock untouched, nothing re-saved/revoked/audited.
+        assertThat(account.getDeletedAt()).isEqualTo(cooldownStart);
+        verify(accountRepository, never()).save(any());
+        verify(issuedJwtRepository, never()).revokeAllForAccount(anyLong(), any(), any());
+        verifyNoInteractions(auditWriter);
+    }
+
+    @Test
+    void softDeleteUnderImpersonationAttributesTheOperatorSoItIsNotMisreadAsSelfDeletion() {
+        accountWithRole(2L, Account.AppRole.USER);
+
+        service.softDelete(2L, /* actingAccountId = impersonating operator */ 1L);
+
+        ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
+        verify(auditWriter).write(event.capture());
+        assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.ACCOUNT_DELETED);
+        assertThat(event.getValue().accountId()).isEqualTo(2L);
+        assertThat(event.getValue().actingAccountId()).isEqualTo(1L);
     }
 
     @Test

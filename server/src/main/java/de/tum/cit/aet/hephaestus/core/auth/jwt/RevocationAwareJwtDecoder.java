@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -151,9 +150,10 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
     }
 
     private static JwtException revokedException() {
-        OAuth2Error error = new OAuth2Error("invalid_token", "token has been revoked or expired", null);
         // BadJwtException (a JwtException subtype): Spring's JwtAuthenticationProvider maps it to
         // InvalidBearerTokenException → 401. A bare JwtException would surface as a 500 instead.
-        return new BadJwtException(error.getDescription());
+        // "revoked" (not "revoked or expired"): plain expiry is rejected earlier by the delegate's
+        // JwtTimestampValidator, so reaching here means the jti is absent from the active set.
+        return new BadJwtException("token has been revoked");
     }
 }

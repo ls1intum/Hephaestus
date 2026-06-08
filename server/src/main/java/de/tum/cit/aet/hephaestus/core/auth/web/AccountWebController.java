@@ -142,7 +142,7 @@ public class AccountWebController {
         }
     )
     public ResponseEntity<Void> unlinkIdentity(@PathVariable Long id) {
-        accountService.unlinkIdentity(CurrentAccount.requireId(), id);
+        accountService.unlinkIdentity(CurrentAccount.requireId(), id, CurrentAccount.impersonatorId());
         return ResponseEntity.noContent().build();
     }
 
@@ -158,7 +158,7 @@ public class AccountWebController {
                 "X-Confirm-Delete header must equal your account id to confirm deletion"
             );
         }
-        accountService.softDelete(accountId);
+        accountService.softDelete(accountId, CurrentAccount.impersonatorId());
         return ResponseEntity.noContent().build();
     }
 

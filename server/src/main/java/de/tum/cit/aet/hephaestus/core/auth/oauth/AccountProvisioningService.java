@@ -210,13 +210,6 @@ public class AccountProvisioningService {
     }
 
     /**
-     * Idempotent, promote-only instance-admin bootstrap: if the resolved login is on the
-     * {@code hephaestus.auth.bootstrap-admins} allowlist and the account is not already APP_ADMIN,
-     * promote it. Runs inside the login transaction so the role is committed before the JWT is minted
-     * (so {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
-     * deliberate {@code /admin/users} action.
-     */
-    /**
      * Resolve the {@code git_provider} row id for a login registration: look up the instance-scoped
      * {@code login_provider} row (this module owns it), then let the integration-side registry upsert
      * the provider row from its {@code (type, baseUrl)} — keeping the GitProvider entity out of auth.
@@ -228,6 +221,13 @@ public class AccountProvisioningService {
         return gitProviderRegistry.resolveProviderId(provider.getType().name(), provider.getBaseUrl());
     }
 
+    /**
+     * Idempotent, promote-only instance-admin bootstrap: if the resolved login is on the
+     * {@code hephaestus.auth.bootstrap-admins} allowlist and the account is not already APP_ADMIN,
+     * promote it. Runs inside the login transaction so the role is committed before the JWT is minted
+     * (so {@code admin} lands on the first token, not the second). Never demotes — demotion stays a
+     * deliberate {@code /admin/users} action.
+     */
     private Account promoteIfBootstrapAdmin(Account account, String registrationId, String subject, String login) {
         if (
             account.getAppRole() != Account.AppRole.APP_ADMIN &&

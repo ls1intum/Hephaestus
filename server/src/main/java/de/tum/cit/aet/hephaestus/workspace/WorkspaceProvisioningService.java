@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
+import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
@@ -339,7 +340,11 @@ public class WorkspaceProvisioningService {
     private String resolveGitLabServerUrl(String configServerUrl) {
         if (!isBlank(configServerUrl)) {
             String url = configServerUrl.trim();
-            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+            url = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+            // SSRF string-layer check on the user-supplied URL (scheme/host/literal-private-IP), matching
+            // GitLabPreflightService. The ssrfGuarded connector additionally blocks DNS-rebind at connect.
+            ServerUrlValidator.validate(url);
+            return url;
         }
         WorkspaceProviderAvailability gitLabAvailability = providerAvailability.get(IntegrationKind.GITLAB);
         if (gitLabAvailability == null) {
@@ -378,7 +383,10 @@ public class WorkspaceProvisioningService {
             }
         }
 
-        WebClient gitlabClient = WebClient.builder().clientConnector(WebClientConnectors.systemDns()).build();
+        // ssrfGuarded (not systemDns): serverUrl is user-supplied (workspace config), so the outbound
+        // DNS must be filtered at connect time — same SSRF sink as GitLabPreflightService. The string
+        // form is additionally validated in resolveGitLabServerUrl.
+        WebClient gitlabClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
 
         // Try personal access token endpoint first
         GitLabTokenUserResponse userInfo = null;

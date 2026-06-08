@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * dependency to trip a breaker; per the SPI contract, failures fail-closed inside the query.
  */
 @Component
-@WorkspaceAgnostic("Role checks are user-scoped (login → account → account_feature)")
+@WorkspaceAgnostic("Role checks are user-scoped ((gitProviderId, subject) → account → account_feature)")
 public class AccountFeatureRoleChecker implements UserRoleChecker {
 
     private final AccountRoleQuery accountRoleQuery;
@@ -26,9 +26,9 @@ public class AccountFeatureRoleChecker implements UserRoleChecker {
     }
 
     @Override
-    public boolean hasRole(@NonNull String username, @NonNull String roleName) {
+    public boolean hasRole(long gitProviderId, @NonNull String providerUserId, @NonNull String roleName) {
         // Fail-closed per the SPI contract: AccountRoleQuery null-guards and never throws.
-        return accountRoleQuery.hasFeatureFlag(username, roleName);
+        return accountRoleQuery.hasFeatureFlag(gitProviderId, providerUserId, roleName);
     }
 
     @Override

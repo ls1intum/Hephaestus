@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  * touch the {@code domain} entities directly; exposes only the narrow SPI to other modules.
  */
 @Service
-@WorkspaceAgnostic("Role/feature lookups are user-scoped (login → account → account_feature)")
+@WorkspaceAgnostic("Role/feature lookups are user-scoped ((gitProviderId, subject) → account → account_feature)")
 public class AccountRoleQueryService implements AccountRoleQuery {
 
     private static final Logger log = LoggerFactory.getLogger(AccountRoleQueryService.class);
@@ -26,14 +26,20 @@ public class AccountRoleQueryService implements AccountRoleQuery {
 
     @Override
     @Transactional(readOnly = true)
-    public boolean hasFeatureFlag(String login, String flag) {
-        if (login == null || flag == null || flag.isBlank()) {
+    public boolean hasFeatureFlag(long gitProviderId, String subject, String flag) {
+        if (subject == null || subject.isBlank() || flag == null || flag.isBlank()) {
             return false;
         }
         try {
-            return accountFeatureRepository.existsActiveFeatureForLogin(login, flag);
+            return accountFeatureRepository.existsActiveFeatureForProviderSubject(gitProviderId, subject, flag);
         } catch (RuntimeException e) {
-            log.error("auth.role: feature-flag check failed for login={}, flag={}", login, flag, e);
+            log.error(
+                "auth.role: feature-flag check failed for gitProviderId={}, subject={}, flag={}",
+                gitProviderId,
+                subject,
+                flag,
+                e
+            );
             return false; // fail-closed
         }
     }

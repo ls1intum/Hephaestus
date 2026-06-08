@@ -226,7 +226,7 @@ public class SecurityConfig {
         // always has a token to echo, even on a bare GET /user.
         http.addFilterAfter(new CsrfCookieFilter(), AuthorizationFilter.class);
 
-        // Security headers (HSTS, CSP-report-only, COOP, COEP, Referrer-Policy,
+        // Security headers (HSTS, CSP (enforced), COOP, COEP, Referrer-Policy,
         // X-Content-Type-Options) for the user-facing resource-server chain.
         SecurityHeaders.apply(http);
 
