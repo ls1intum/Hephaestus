@@ -25,6 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 
@@ -37,6 +38,7 @@ import org.testcontainers.DockerClientFactory;
  * <p>Each test creates real containers that are cleaned up in {@code @AfterEach}.
  */
 @LiveDockerTest
+@Tag("live")
 class DockerSandboxLiveTest {
 
     private DockerSandboxAdapter sandboxAdapter;

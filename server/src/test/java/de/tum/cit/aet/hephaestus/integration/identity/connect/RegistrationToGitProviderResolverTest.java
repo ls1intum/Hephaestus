@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
  * given a login provider's {@code (type, baseUrl)}, it upserts the {@code git_provider} row keyed on
  * the canonical server-url origin (scheme + host + explicit non-default port).
  */
+@Tag("unit")
 class RegistrationToGitProviderResolverTest {
 
     private GitProviderRepository gitProviderRepository;

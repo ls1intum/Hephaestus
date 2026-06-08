@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import tools.jackson.databind.JsonNode;
@@ -52,6 +53,7 @@ import tools.jackson.databind.node.ObjectNode;
  * /workspace} directly. The harness runs as root and the directory is cleaned between tests.
  */
 @LiveLlmTest
+@Tag("live")
 class PracticeRunnerLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
