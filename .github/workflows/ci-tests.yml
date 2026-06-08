@@ -27,10 +27,8 @@ jobs:
       checks: write
       statuses: write
     name: "${{ matrix.display-name }}"
-    # App Server test tiers run on the free 4-vCPU/16GB arm64 runners (vs the 2-vCPU/7GB default):
-    # the integration job was CPU-starved on 2 vCPU (slow boots + a ~100s teardown that does NOT
-    # reproduce on a multi-core box), and Temurin 21 + postgres:16 are arm-native. Webapp jobs stay
-    # on ubuntu-latest (Node toolchain).
+    # App Server tiers on the free 4-vCPU/16GB arm64 runners (the integration job was CPU-starved on
+    # the 2-vCPU default). Webapp jobs stay on ubuntu-latest (Node toolchain).
     runs-on: ${{ startsWith(matrix.test-type, 'application-server-') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     if: inputs.should_skip != 'true'
     timeout-minutes: 30
@@ -99,20 +97,14 @@ jobs:
         run: |
           cd server
           rm -rf target/surefire-reports/*
-          # Use -Dsurefire.includedGroups to override the property defined in pom.xml
-          # The pom.xml configures <groups>${surefire.includedGroups}</groups>
-          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when target/generated-sources exists from cache)
-          # Unit and architecture run as separate parallel jobs (was one combined job): the arch
-          # tier (ArchUnit + Modulith full class graph) and the unit tier each fit in ~half the
-          # wall-clock of the old combined run. Tag filtering (-Dsurefire.includedGroups) is
-          # surefire-owned, so neither tier can silently drop tests.
+          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when cached generated-sources exist).
+          # unit / arch are split into parallel jobs; tag filtering is surefire-owned so no tier silently drops tests.
           case "${{ matrix.test-type }}" in
             "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
             "application-server-arch") ./mvnw test -Dsurefire.includedGroups="architecture" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            # forkCount=2 distributes integration classes across 2 isolated JVMs (each its own
-            # Testcontainers Postgres); parallel=none keeps each fork serial so tests sharing a DB
-            # don't interfere. maxHeap=2048m keeps 2 forks + 2 containers within the runner's RAM.
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.forkCount=2 -Dhephaestus.surefire.maxHeap=2048m -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            # forkCount=3 spreads integration classes across 3 isolated JVMs (each its own Testcontainers
+            # Postgres) to use the 4-vCPU arm runner; parallel=none keeps each fork serial (shared DB per fork).
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.forkCount=3 -Dhephaestus.surefire.maxHeap=2048m -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
       - name: Run tests

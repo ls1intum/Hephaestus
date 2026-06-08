@@ -137,14 +137,9 @@ class MermaidErdGenerator {
 		const exclusionsClause = excludedTables.length
 			? `AND c.relname NOT IN (${excludedTables.map((_, idx) => `$${idx + 2}`).join(", ")})`
 			: "";
-		// Introspect via pg_catalog, not information_schema: a declarative-partition child
-		// (relispartition = true — e.g. auth_event_p202605, auth_event_default) reports as
-		// table_type = 'BASE TABLE', so information_schema would surface each as its own entity and
-		// the ERD would grow a new AuthEventP<YYYYMM> every month (and lose them on retention). The
-		// structural filter relkind IN ('r','p') AND relispartition = false keeps ordinary tables and
-		// the partitioned PARENT (one stable AuthEvent) while dropping every child — no per-partition
-		// maintenance, ever. This mirrors the CI drift gate's intent (physical partitions are not
-		// schema truth), enforced here by an object property rather than a name pattern.
+		// pg_catalog, not information_schema: partition children (relispartition=true, e.g.
+		// auth_event_p202605/_default) report as BASE TABLE and would each become an entity that
+		// churns monthly. relkind IN ('r','p') AND NOT relispartition keeps tables + partitioned parents.
 		const query = `
 			SELECT c.relname AS table_name
 			FROM pg_class c
@@ -270,13 +265,9 @@ class MermaidErdGenerator {
 						.join(", ")})`
 			: "";
 		const params = [this.schema, ...excludedTables, ...excludedTables];
-		// pg_constraint, not information_schema.constraint_column_usage: (1) ccu cross-joins for
-		// composite/multi-column FKs (the audit table's PK is (id, occurred_at)) and needed a DISTINCT
-		// band-aid; (2) declarative-partition children INHERIT the parent's FKs, so every FK was
-		// reported once per child — the relationship explosion. con.conparentid = 0 keeps only the
-		// parent's own constraint and drops the cascaded child copies; relispartition = false is a
-		// belt-and-suspenders guard. unnest(conkey, confkey) WITH ORDINALITY yields one row per FK
-		// column pair, correct for composite keys without DISTINCT.
+		// pg_constraint, not constraint_column_usage: conparentid=0 drops FKs cascaded onto partition
+		// children (else every FK repeats per child); unnest(conkey,confkey) handles composite keys
+		// without the ccu cross-join + DISTINCT.
 		const query = `
 			SELECT
 				conrel.relname  AS child_table,
@@ -535,10 +526,8 @@ class MermaidErdGenerator {
 			relationshipGroups[rel.cardinality].push(rel);
 		}
 
-		// Two FKs to the same parent (e.g. auth_event.account_id and acting_account_id, both -> Account)
-		// otherwise render as byte-identical lines. Count rendered lines and, only where they collide,
-		// qualify the label with the FK column so each edge is distinct and self-documenting. Touching
-		// only true collisions leaves every other label unchanged.
+		// Disambiguate FKs that would render as identical edges (e.g. account_id + acting_account_id
+		// both -> Account): only colliding lines get qualified by column; all other labels unchanged.
 		const renderedLine = (rel: RelationshipInfo) =>
 			`${this.toEntityName(rel.parentTable)} ${rel.cardinality} ${this.toEntityName(
 				rel.childTable,

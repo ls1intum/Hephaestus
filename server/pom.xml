@@ -35,20 +35,15 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <!-- Per-fork JVM timeout (forkedProcessTimeoutInSeconds). With forkCount>1 this is a per-fork
-             budget; 1200s gives headroom on a loaded runner. Single source of truth: CI no longer
-             overrides it. The CI job's own timeout-minutes is the backstop against a genuinely hung run. -->
+        <!-- forkedProcessTimeoutInSeconds; per-fork with forkCount>1. Single source of truth (CI no
+             longer overrides); the CI job's timeout-minutes is the backstop. -->
         <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
 
-        <!-- Parallel forks for the test run. Default 1 (local dev: keeps the per-JVM singleton
-             Testcontainers Postgres a true singleton, so reuse-enabled local runs can't share one DB
-             across concurrent forks). CI's integration job overrides this to 2 — Testcontainers reuse is
-             off in CI, so each fork starts its own isolated Postgres and class-level serialization within
-             a fork is preserved (no new cross-test interference). -->
+        <!-- Default 1 so local dev keeps the singleton Testcontainers Postgres a true singleton.
+             CI's integration job raises forkCount (reuse is off there, so each fork gets its own DB)
+             and lowers maxHeap to fit N forks + N containers in the runner's RAM. -->
         <hephaestus.surefire.forkCount>1</hephaestus.surefire.forkCount>
-        <!-- Per-fork max heap. 4g is sized for the unit+architecture run (ArchUnit + Modulith class
-             graph). CI's integration job lowers this so forkCount=2 stays well within the runner's RAM
-             (2 forks x 2g + 2 Postgres containers < 7g on ubuntu-latest). -->
+        <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
         <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
 
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
@@ -859,14 +854,12 @@
                     <!-- Test output -->
                     <printSummary>true</printSummary>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                    <!-- Forked JVMs. forkCount>1 (CI integration only) distributes test classes across
-                         parallel JVMs; reuseForks keeps each fork warm for its slice. Surefire owns class
-                         discovery + distribution, so this can never silently drop tests. -->
+                    <!-- forkCount>1 (CI integration) distributes classes across parallel JVMs; surefire
+                         owns discovery so it can't drop tests. -->
                     <forkCount>${hephaestus.surefire.forkCount}</forkCount>
                     <reuseForks>true</reuseForks>
-                    <!-- Method-level parallelism within a fork (unit/arch). CI's integration job sets
-                         -Dparallel=none: integration tests share one Postgres per fork, so they must stay
-                         serial within the fork to avoid cross-test interference. -->
+                    <!-- Method parallelism for unit/arch; integration overrides with -Dparallel=none
+                         (shared Postgres per fork must stay serial). -->
                     <parallel>methods</parallel>
                     <threadCount>4</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
