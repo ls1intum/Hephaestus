@@ -135,15 +135,25 @@ class MermaidErdGenerator {
 			: ["databasechangelog", "databasechangeloglock"];
 
 		const exclusionsClause = excludedTables.length
-			? `AND table_name NOT IN (${excludedTables.map((_, idx) => `$${idx + 2}`).join(", ")})`
+			? `AND c.relname NOT IN (${excludedTables.map((_, idx) => `$${idx + 2}`).join(", ")})`
 			: "";
+		// Introspect via pg_catalog, not information_schema: a declarative-partition child
+		// (relispartition = true — e.g. auth_event_p202605, auth_event_default) reports as
+		// table_type = 'BASE TABLE', so information_schema would surface each as its own entity and
+		// the ERD would grow a new AuthEventP<YYYYMM> every month (and lose them on retention). The
+		// structural filter relkind IN ('r','p') AND relispartition = false keeps ordinary tables and
+		// the partitioned PARENT (one stable AuthEvent) while dropping every child — no per-partition
+		// maintenance, ever. This mirrors the CI drift gate's intent (physical partitions are not
+		// schema truth), enforced here by an object property rather than a name pattern.
 		const query = `
-			SELECT table_name
-			FROM information_schema.tables
-			WHERE table_schema = $1
-			  AND table_type = 'BASE TABLE'
+			SELECT c.relname AS table_name
+			FROM pg_class c
+			JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = $1
+			  AND c.relkind IN ('r', 'p')
+			  AND c.relispartition = false
 			  ${exclusionsClause}
-			ORDER BY table_name
+			ORDER BY c.relname
 		`;
 		const params = [this.schema, ...excludedTables];
 		const result = await this.client.query<{ table_name: string }>(
@@ -252,32 +262,42 @@ class MermaidErdGenerator {
 			? []
 			: ["databasechangelog", "databasechangeloglock"];
 		const exclusionsClause = excludedTables.length
-			? `AND tc.table_name NOT IN (${excludedTables
+			? `AND conrel.relname NOT IN (${excludedTables
 					.map((_, idx) => `$${idx + 2}`)
 					.join(", ")})
-			   AND ccu.table_name NOT IN (${excludedTables
+			   AND confrel.relname NOT IN (${excludedTables
 						.map((_, idx) => `$${idx + 2 + excludedTables.length}`)
 						.join(", ")})`
 			: "";
 		const params = [this.schema, ...excludedTables, ...excludedTables];
+		// pg_constraint, not information_schema.constraint_column_usage: (1) ccu cross-joins for
+		// composite/multi-column FKs (the audit table's PK is (id, occurred_at)) and needed a DISTINCT
+		// band-aid; (2) declarative-partition children INHERIT the parent's FKs, so every FK was
+		// reported once per child — the relationship explosion. con.conparentid = 0 keeps only the
+		// parent's own constraint and drops the cascaded child copies; relispartition = false is a
+		// belt-and-suspenders guard. unnest(conkey, confkey) WITH ORDINALITY yields one row per FK
+		// column pair, correct for composite keys without DISTINCT.
 		const query = `
-			SELECT DISTINCT
-				tc.table_name as child_table,
-				kcu.column_name as child_column,
-				ccu.table_name as parent_table,
-				ccu.column_name as parent_column,
-				tc.constraint_name
-			FROM information_schema.table_constraints tc
-			JOIN information_schema.key_column_usage kcu
-			  ON tc.constraint_name = kcu.constraint_name
-			 AND tc.table_schema = kcu.table_schema
-			JOIN information_schema.constraint_column_usage ccu
-			  ON ccu.constraint_name = tc.constraint_name
-			 AND ccu.table_schema = tc.table_schema
-			WHERE tc.constraint_type = 'FOREIGN KEY'
-			  AND tc.table_schema = $1
+			SELECT
+				conrel.relname  AS child_table,
+				att.attname     AS child_column,
+				confrel.relname AS parent_table,
+				fatt.attname    AS parent_column,
+				con.conname     AS constraint_name
+			FROM pg_constraint con
+			JOIN pg_class conrel ON conrel.oid = con.conrelid
+			JOIN pg_namespace conns ON conns.oid = conrel.relnamespace
+			JOIN pg_class confrel ON confrel.oid = con.confrelid
+			JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY
+				AS k(conkey, confkey, ord) ON true
+			JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = k.conkey
+			JOIN pg_attribute fatt ON fatt.attrelid = con.confrelid AND fatt.attnum = k.confkey
+			WHERE con.contype = 'f'
+			  AND con.conparentid = 0
+			  AND conrel.relispartition = false
+			  AND conns.nspname = $1
 			  ${exclusionsClause}
-			ORDER BY tc.table_name, kcu.column_name
+			ORDER BY conrel.relname, att.attnum, k.ord
 		`;
 		const result = await this.client.query<{
 			child_table: string;
@@ -515,6 +535,19 @@ class MermaidErdGenerator {
 			relationshipGroups[rel.cardinality].push(rel);
 		}
 
+		// Two FKs to the same parent (e.g. auth_event.account_id and acting_account_id, both -> Account)
+		// otherwise render as byte-identical lines. Count rendered lines and, only where they collide,
+		// qualify the label with the FK column so each edge is distinct and self-documenting. Touching
+		// only true collisions leaves every other label unchanged.
+		const renderedLine = (rel: RelationshipInfo) =>
+			`${this.toEntityName(rel.parentTable)} ${rel.cardinality} ${this.toEntityName(
+				rel.childTable,
+			)} : ${rel.label || "has"}`;
+		const lineCounts = new Map<string, number>();
+		for (const rel of relationships) {
+			lineCounts.set(renderedLine(rel), (lineCounts.get(renderedLine(rel)) ?? 0) + 1);
+		}
+
 		for (const [cardinality, rels] of Object.entries(relationshipGroups)) {
 			if (rels.length === 0) {
 				continue;
@@ -529,7 +562,10 @@ class MermaidErdGenerator {
 			for (const rel of rels) {
 				const parentEntity = this.toEntityName(rel.parentTable);
 				const childEntity = this.toEntityName(rel.childTable);
-				const label = rel.label || "has";
+				const label =
+					(lineCounts.get(renderedLine(rel)) ?? 0) > 1
+						? rel.childColumn
+						: rel.label || "has";
 				lines.push(
 					`    ${parentEntity} ${cardinality} ${childEntity} : ${label}`,
 				);

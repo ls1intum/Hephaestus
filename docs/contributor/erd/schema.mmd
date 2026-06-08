@@ -126,70 +126,6 @@ erDiagram
         JSONB details
     }
 
-    AuthEventDefault {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at PK
-        BIGINT account_id FK
-        BIGINT acting_account_id FK
-        VARCHAR(48) event_type "NOT NULL"
-        VARCHAR(16) result "NOT NULL"
-        VARCHAR(64) failure_reason
-        BIGINT git_provider_id FK
-        BIGINT workspace_id FK
-        BIGINT identity_link_id FK
-        INET ip_inet
-        VARCHAR(512) user_agent
-        JSONB details
-    }
-
-    AuthEventP202605 {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at PK
-        BIGINT account_id FK
-        BIGINT acting_account_id FK
-        VARCHAR(48) event_type "NOT NULL"
-        VARCHAR(16) result "NOT NULL"
-        VARCHAR(64) failure_reason
-        BIGINT git_provider_id FK
-        BIGINT workspace_id FK
-        BIGINT identity_link_id FK
-        INET ip_inet
-        VARCHAR(512) user_agent
-        JSONB details
-    }
-
-    AuthEventP202606 {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at PK
-        BIGINT account_id FK
-        BIGINT acting_account_id FK
-        VARCHAR(48) event_type "NOT NULL"
-        VARCHAR(16) result "NOT NULL"
-        VARCHAR(64) failure_reason
-        BIGINT git_provider_id FK
-        BIGINT workspace_id FK
-        BIGINT identity_link_id FK
-        INET ip_inet
-        VARCHAR(512) user_agent
-        JSONB details
-    }
-
-    AuthEventP202607 {
-        BIGINT id PK
-        TIMESTAMPTZ occurred_at PK
-        BIGINT account_id FK
-        BIGINT acting_account_id FK
-        VARCHAR(48) event_type "NOT NULL"
-        VARCHAR(16) result "NOT NULL"
-        VARCHAR(64) failure_reason
-        BIGINT git_provider_id FK
-        BIGINT workspace_id FK
-        BIGINT identity_link_id FK
-        INET ip_inet
-        VARCHAR(512) user_agent
-        JSONB details
-    }
-
     AuthRateLimitBucket {
         VARCHAR(255) id PK
         BYTEA state
@@ -991,33 +927,33 @@ erDiagram
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     Workspace ||--|| Connection : has
+    Repository ||--|| Discussion : has
     DiscussionComment ||--|| Discussion : references
     GitProvider ||--|| Discussion : references
-    Repository ||--|| Discussion : has
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
     Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
-    GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
+    GitProvider ||--|| Issue : references
     GitProvider ||--|| IssueComment : commented_on
-    GitProvider ||--|| Label : labeled
     Repository ||--|| Label : labeled
-    GitProvider ||--|| Milestone : references
+    GitProvider ||--|| Label : labeled
     Repository ||--|| Milestone : has
+    GitProvider ||--|| Milestone : references
     GitProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
-    ProjectField ||--|| ProjectFieldValue : has
     ProjectItem ||--|| ProjectFieldValue : has
+    ProjectField ||--|| ProjectFieldValue : has
     Project ||--|| ProjectItem : has
     GitProvider ||--|| ProjectItem : references
     GitProvider ||--|| ProjectStatusUpdate : references
     GitProvider ||--|| PullRequestReview : reviewed
     GitProvider ||--|| PullRequestReviewComment : commented_on
-    GitProvider ||--|| PullRequestReviewThread : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
+    GitProvider ||--|| PullRequestReviewThread : reviewed
     GitProvider ||--|| Repository : references
     GitProvider ||--|| Team : references
     GitProvider ||--|| User : references
@@ -1031,33 +967,13 @@ erDiagram
     Account ||--o{ AccountExport : has
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
-    AgentConfig ||--o{ AgentJob : has
     Workspace ||--o{ AgentJob : has
-    Account ||--o{ AuthEvent : has
-    Account ||--o{ AuthEvent : has
+    AgentConfig ||--o{ AgentJob : has
+    Account ||--o{ AuthEvent : account_id
+    Account ||--o{ AuthEvent : acting_account_id
     GitProvider ||--o{ AuthEvent : has
-    IdentityLink ||--o{ AuthEvent : has
     Workspace ||--o{ AuthEvent : has
-    Account ||--o{ AuthEventDefault : has
-    Account ||--o{ AuthEventDefault : has
-    GitProvider ||--o{ AuthEventDefault : has
-    IdentityLink ||--o{ AuthEventDefault : has
-    Workspace ||--o{ AuthEventDefault : has
-    Account ||--o{ AuthEventP202605 : has
-    Account ||--o{ AuthEventP202605 : has
-    GitProvider ||--o{ AuthEventP202605 : has
-    IdentityLink ||--o{ AuthEventP202605 : has
-    Workspace ||--o{ AuthEventP202605 : has
-    Account ||--o{ AuthEventP202606 : has
-    Account ||--o{ AuthEventP202606 : has
-    GitProvider ||--o{ AuthEventP202606 : has
-    IdentityLink ||--o{ AuthEventP202606 : has
-    Workspace ||--o{ AuthEventP202606 : has
-    Account ||--o{ AuthEventP202607 : has
-    Account ||--o{ AuthEventP202607 : has
-    GitProvider ||--o{ AuthEventP202607 : has
-    IdentityLink ||--o{ AuthEventP202607 : has
-    Workspace ||--o{ AuthEventP202607 : has
+    IdentityLink ||--o{ AuthEvent : has
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
@@ -1065,42 +981,42 @@ erDiagram
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
     Connection ||--o{ ConnectionAudit : has
-    User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
-    User ||--o{ DiscussionComment : commented_on
+    User ||--o{ Discussion : references
     Discussion ||--o{ DiscussionComment : commented_on
+    User ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    User ||--o{ FindingFeedback : references
     PracticeFinding ||--o{ FindingFeedback : has
+    User ||--o{ FindingFeedback : references
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     Account ||--o{ IdentityLink : has
     GitProvider ||--o{ IdentityLink : has
     User ||--o{ Issue : authored_by
-    IssueType ||--o{ Issue : has
-    User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
+    User ||--o{ Issue : merged_by
     Issue ||--o{ Issue : has
+    IssueType ||--o{ Issue : has
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
-    User ||--o{ PracticeFinding : references
     Practice ||--o{ PracticeFinding : has
+    User ||--o{ PracticeFinding : references
     User ||--o{ Project : created_by
-    User ||--o{ ProjectItem : created_by
     Issue ||--o{ ProjectItem : has
-    User ||--o{ ProjectStatusUpdate : created_by
+    User ||--o{ ProjectItem : created_by
     Project ||--o{ ProjectStatusUpdate : has
+    User ||--o{ ProjectStatusUpdate : created_by
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on
-    PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewComment : commented_on
     PullRequestReview ||--o{ PullRequestReviewComment : commented_on
     PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
     Organization ||--o{ Repository : has
@@ -1114,26 +1030,26 @@ erDiagram
     Label }o--o{ DiscussionLabel : labeled
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
-    Issue }o--o{ IssueBlocking : has
-    Issue }o--o{ IssueBlocking : has
+    Issue }o--o{ IssueBlocking : blocked_issue_id
+    Issue }o--o{ IssueBlocking : blocking_issue_id
     Issue }o--o{ IssueLabel : labeled
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
     Repository }o--o{ RepositoryCollaborator : has
     User }o--o{ RepositoryCollaborator : has
-    Team }o--o{ TeamMembership : belongs_to
     User }o--o{ TeamMembership : belongs_to
+    Team }o--o{ TeamMembership : belongs_to
     Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
-    Label }o--o{ WorkspaceTeamLabelFilter : labeled
-    Team }o--o{ WorkspaceTeamLabelFilter : labeled
     Workspace }o--o{ WorkspaceTeamLabelFilter : labeled
-    Repository }o--o{ WorkspaceTeamRepositorySetting : has
-    Team }o--o{ WorkspaceTeamRepositorySetting : has
+    Team }o--o{ WorkspaceTeamLabelFilter : labeled
+    Label }o--o{ WorkspaceTeamLabelFilter : labeled
     Workspace }o--o{ WorkspaceTeamRepositorySetting : has
-    Team }o--o{ WorkspaceTeamSetting : has
+    Team }o--o{ WorkspaceTeamRepositorySetting : has
+    Repository }o--o{ WorkspaceTeamRepositorySetting : has
     Workspace }o--o{ WorkspaceTeamSetting : has
+    Team }o--o{ WorkspaceTeamSetting : has
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px
