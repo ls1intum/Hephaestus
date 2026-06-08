@@ -5,6 +5,14 @@
 spring:
     liquibase:
         enabled: false
+    data:
+        jpa:
+            repositories:
+                # Synchronous JPA bootstrap. The default DEFERRED mode builds the EntityManagerFactory on
+                # a background thread, which starves/stalls in the CPU-constrained buildpack builder and
+                # hangs the CDS-training boot before it reaches spring.context.exit=onRefresh (the image
+                # build then never finishes). Synchronous bootstrap on the main thread is fast + reliable.
+                bootstrap-mode: default
     datasource:
         hikari:
             initialization-fail-timeout: -1
