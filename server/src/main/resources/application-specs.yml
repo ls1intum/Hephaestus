@@ -12,9 +12,13 @@ spring:
         username: sa
         password: ""
         driver-class-name: org.h2.Driver
+    data:
+        jpa:
+            repositories:
+                bootstrap-mode: default
     jpa:
         hibernate:
-            ddl-auto: create-drop
+            ddl-auto: none
         properties:
             hibernate:
                 dialect: org.hibernate.dialect.H2Dialect
