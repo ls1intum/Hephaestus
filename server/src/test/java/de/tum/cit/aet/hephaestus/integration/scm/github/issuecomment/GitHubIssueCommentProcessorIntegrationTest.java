@@ -20,19 +20,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -77,7 +74,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
-    private TestCommentEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -182,7 +179,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getIssue().getId()).isEqualTo(testIssue.getId());
 
             // Verify CommentCreated event was published
-            assertThat(eventListener.getCreatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -197,7 +194,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.process(null, testIssue.getNumber(), createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
         }
 
         @Test
@@ -207,7 +204,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.process(dto, 999999, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
         }
     }
 
@@ -236,7 +233,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getBody()).isEqualTo("Updated body");
 
             // Verify CommentUpdated event was published
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -269,8 +266,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.process(dto, testIssue.getNumber(), createContext());
 
             // No events should be published for unchanged data
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
-            assertThat(eventListener.getUpdatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).isEmpty();
         }
     }
 
@@ -469,7 +466,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             ).isEmpty();
 
             // Verify CommentDeleted event was published
-            assertThat(eventListener.getDeletedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -510,7 +507,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleNullCommentId() {
             processor.delete(null, createContext());
 
-            assertThat(eventListener.getDeletedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class)).isEmpty();
         }
 
         @Test
@@ -518,51 +515,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.delete(999999L, createContext());
 
             // No event should be published for non-existent comment
-            assertThat(eventListener.getDeletedEvents()).isEmpty();
-        }
-    }
-
-    /**
-     * Test event listener that captures comment events.
-     */
-    @Component
-    static class TestCommentEventListener {
-
-        private final List<ScmDomainEvent.CommentCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.CommentUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.CommentDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCommentCreated(ScmDomainEvent.CommentCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onCommentUpdated(ScmDomainEvent.CommentUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onCommentDeleted(ScmDomainEvent.CommentDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.CommentCreated> getCreatedEvents() {
-            return createdEvents;
-        }
-
-        public List<ScmDomainEvent.CommentUpdated> getUpdatedEvents() {
-            return updatedEvents;
-        }
-
-        public List<ScmDomainEvent.CommentDeleted> getDeletedEvents() {
-            return deletedEvents;
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            deletedEvents.clear();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class)).isEmpty();
         }
     }
 }

@@ -15,21 +15,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -51,7 +47,6 @@ import org.springframework.test.context.TestPropertySource;
         "hephaestus.integration.gitlab.sync-page-delay=5m",
     }
 )
-@Import(GitLabIssueCommentProcessorIntegrationTest.TestCommentEventListener.class)
 class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final String FIXTURE_ORG_LOGIN = "hephaestustest";
@@ -85,7 +80,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     private GitProviderRepository gitProviderRepository;
 
     @Autowired
-    private TestCommentEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private GitProvider gitlabProvider;
     private Repository testRepository;
@@ -137,7 +132,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         assertThat(saved.getCreatedAt()).isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
         assertThat(saved.getUpdatedAt()).isNotEqualTo(saved.getCreatedAt());
 
-        List<ScmDomainEvent.CommentUpdated> updates = eventListener.getUpdatedEvents();
+        List<ScmDomainEvent.CommentUpdated> updates = eventListener.ofType(ScmDomainEvent.CommentUpdated.class);
         assertThat(updates).hasSize(1);
         assertThat(updates.get(0).changedFields()).contains("updatedAt");
     }
@@ -157,8 +152,8 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         );
 
         assertThat(saved).isNotNull();
-        assertThat(eventListener.getUpdatedEvents()).isEmpty();
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).isEmpty();
+        assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
     }
 
     @Test
@@ -201,9 +196,9 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         assertThat(saved).isNotNull();
         assertThat(saved.getUpdatedAt()).isEqualTo(OffsetDateTime.parse(UPDATED_AT_LATER_AGAIN).toInstant());
         assertThat(saved.getCreatedAt()).isEqualTo(OffsetDateTime.parse(CREATED_AT).toInstant());
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(1);
         // First-seen comment must not produce a spurious CommentUpdated event.
-        assertThat(eventListener.getUpdatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).isEmpty();
     }
 
     // Helpers
@@ -277,37 +272,5 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(workspace);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestCommentEventListener {
-
-        private final List<ScmDomainEvent.CommentCreated> createdEvents = new CopyOnWriteArrayList<>();
-        private final List<ScmDomainEvent.CommentUpdated> updatedEvents = new CopyOnWriteArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.CommentCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.CommentUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.CommentCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.CommentUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-        }
     }
 }

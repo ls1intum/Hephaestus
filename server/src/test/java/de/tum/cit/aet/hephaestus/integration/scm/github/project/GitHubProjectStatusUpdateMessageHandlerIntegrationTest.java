@@ -17,21 +17,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpd
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectStatusUpdateRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectStatusUpdateEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -40,7 +36,6 @@ import tools.jackson.databind.ObjectMapper;
  * Verifies persistence, field-level correctness, domain event publishing,
  * and edge case handling for status update webhook events.
  */
-@Import(GitHubProjectStatusUpdateMessageHandlerIntegrationTest.TestStatusUpdateEventListener.class)
 class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from projects_v2_status_update.created.json
@@ -72,7 +67,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     private ObjectMapper objectMapper;
 
     @Autowired
-    private TestStatusUpdateEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Organization testOrganization;
     private Project testProject;
@@ -109,8 +104,10 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
             });
 
         // Verify domain event
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getCreatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).hasSize(1);
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class).getFirst().projectId()
+        ).isEqualTo(testProject.getId());
     }
 
     @Test
@@ -132,9 +129,11 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
             });
 
         // Verify ProjectStatusUpdateUpdated event (not Created)
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getUpdatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class)).hasSize(1);
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class).getFirst().projectId()
+        ).isEqualTo(testProject.getId());
     }
 
     @Test
@@ -149,9 +148,13 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         assertThat(statusUpdateRepository.findByNodeId(deletedEvent.statusUpdate().nodeId())).isEmpty();
 
         // Verify domain event (statusUpdateId is the synthetic PK, not native ID)
-        assertThat(eventListener.getDeletedEvents()).hasSize(1);
-        assertThat(eventListener.getDeletedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
-        assertThat(eventListener.getDeletedEvents().getFirst().statusUpdateId()).isNotNull();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class)).hasSize(1);
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class).getFirst().projectId()
+        ).isEqualTo(testProject.getId());
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateDeleted.class).getFirst().statusUpdateId()
+        ).isNotNull();
     }
 
     @Test
@@ -166,7 +169,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         // Then — no status update should be created
         assertThat(statusUpdateRepository.count()).isZero();
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).isEmpty();
     }
 
     @Test
@@ -182,7 +185,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         // Then — no status update should be created
         assertThat(statusUpdateRepository.count()).isZero();
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).isEmpty();
     }
 
     @Test
@@ -197,8 +200,8 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         assertThat(statusUpdateRepository.findByNodeId(event.statusUpdate().nodeId())).isPresent();
 
         // First call publishes Created, second publishes Updated
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateCreated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectStatusUpdateUpdated.class)).hasSize(1);
     }
 
     private void setupTestData() {
@@ -247,49 +250,5 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubProjectStatusUpdateEventDTO.class);
-    }
-
-    /**
-     * Test event listener that captures status update domain events for assertion.
-     */
-    @Component
-    static class TestStatusUpdateEventListener {
-
-        private final List<GitHubProjectEvent.ProjectStatusUpdateCreated> createdEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectStatusUpdateUpdated> updatedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectStatusUpdateDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(GitHubProjectEvent.ProjectStatusUpdateCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(GitHubProjectEvent.ProjectStatusUpdateUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(GitHubProjectEvent.ProjectStatusUpdateDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<GitHubProjectEvent.ProjectStatusUpdateCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectStatusUpdateUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectStatusUpdateDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            deletedEvents.clear();
-        }
     }
 }

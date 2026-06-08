@@ -15,19 +15,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto.GitLabLabelDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 
 class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -53,7 +50,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
     private GitProviderRepository gitProviderRepository;
 
     @Autowired
-    private TestLabelEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -94,7 +91,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getLastSyncAt()).isNotNull();
             assertThat(result.getNativeId()).isNegative(); // deterministic ID
 
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.LabelCreated.class)).hasSize(1);
         }
 
         @Test
@@ -122,7 +119,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getColor()).isEqualTo("#00FF00");
             assertThat(result.getDescription()).isEqualTo("New description");
 
-            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.LabelUpdated.class)).hasSize(1);
             assertThat(labelRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
         }
 
@@ -200,7 +197,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             labelProcessor.delete(label.getId(), testContext());
 
             assertThat(labelRepository.findById(label.getId())).isEmpty();
-            assertThat(eventListener.getDeletedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.LabelDeleted.class)).hasSize(1);
         }
 
         @Test
@@ -212,7 +209,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleNonExistentLabel() {
             labelProcessor.delete(-999L, testContext());
-            assertThat(eventListener.getDeletedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.LabelDeleted.class)).isEmpty();
         }
     }
 
@@ -259,48 +256,5 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestLabelEventListener {
-
-        private final List<ScmDomainEvent.LabelCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.LabelUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.LabelDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        void onCreated(ScmDomainEvent.LabelCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        void onUpdated(ScmDomainEvent.LabelUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        void onDeleted(ScmDomainEvent.LabelDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            deletedEvents.clear();
-        }
-
-        List<ScmDomainEvent.LabelCreated> getCreatedEvents() {
-            return createdEvents;
-        }
-
-        List<ScmDomainEvent.LabelUpdated> getUpdatedEvents() {
-            return updatedEvents;
-        }
-
-        List<ScmDomainEvent.LabelDeleted> getDeletedEvents() {
-            return deletedEvents;
-        }
     }
 }

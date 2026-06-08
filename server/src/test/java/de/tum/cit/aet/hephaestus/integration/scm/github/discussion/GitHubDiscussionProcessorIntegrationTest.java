@@ -23,20 +23,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.Gi
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 
 /**
  * Integration tests for GitHubDiscussionProcessor.
@@ -50,7 +47,6 @@ import org.springframework.stereotype.Component;
  * - Stale-data protection
  * - Edge cases in DTO processing including the critical getDatabaseId() fallback
  */
-@Import(GitHubDiscussionProcessorIntegrationTest.TestDiscussionEventListener.class)
 class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -90,7 +86,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
     private LabelRepository labelRepository;
 
     @Autowired
-    private TestDiscussionEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -308,7 +304,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class)).isEmpty();
         }
     }
 
@@ -336,7 +332,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
 
             // Verify Created event published
-            assertThat(eventListener.getCreatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -650,7 +646,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getBody()).isEqualTo("New body");
 
             // Verify Updated event with changedFields
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -719,7 +715,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             processor.process(sameDto, createContext());
 
             // Then - no Updated event (empty changedFields means no event published)
-            assertThat(eventListener.getUpdatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class)).isEmpty();
         }
 
         @Test
@@ -804,9 +800,9 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getTitle()).isEqualTo("Original Title");
 
             // No Updated event published
-            assertThat(eventListener.getUpdatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class)).isEmpty();
             // No Created event published either (it was already created)
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class)).isEmpty();
         }
 
         @Test
@@ -880,7 +876,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             processor.process(updateDto, createContext());
 
             // Then - Updated event should contain "labels" in changedFields
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -962,7 +958,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getCategory().getName()).isEqualTo("General");
 
             // Updated event should contain "category" in changedFields
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1010,7 +1006,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getStateReason()).isEqualTo(Discussion.StateReason.RESOLVED);
 
             // Verify Closed event
-            assertThat(eventListener.getClosedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionClosed.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1081,7 +1077,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getState()).isEqualTo(Discussion.State.OPEN);
 
             // Verify Reopened event
-            assertThat(eventListener.getReopenedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionReopened.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1138,7 +1134,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result).isNotNull();
 
             // Verify Answered event
-            assertThat(eventListener.getAnsweredEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionAnswered.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1259,7 +1255,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isEmpty();
 
             // Verify Deleted event - the fallback path uses discussion.getId() (synthetic PK)
-            assertThat(eventListener.getDeletedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionDeleted.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1439,82 +1435,6 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             assertThat(result.getLabels()).isEmpty();
-        }
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestDiscussionEventListener {
-
-        private final List<ScmDomainEvent.DiscussionCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionReopened> reopenedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionAnswered> answeredEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.DiscussionCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.DiscussionUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.DiscussionClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.DiscussionReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onAnswered(ScmDomainEvent.DiscussionAnswered event) {
-            answeredEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(ScmDomainEvent.DiscussionDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.DiscussionCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionAnswered> getAnsweredEvents() {
-            return new ArrayList<>(answeredEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            answeredEvents.clear();
-            deletedEvents.clear();
         }
     }
 }

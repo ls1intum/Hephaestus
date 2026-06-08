@@ -18,14 +18,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,9 +33,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -123,7 +120,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private GitLabTestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository savedRepo;
     private GitProvider savedProvider;
@@ -190,7 +187,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
             // Domain event
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class)).hasSize(1);
         }
 
         @Test
@@ -206,7 +203,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(issue).isNotNull();
             assertThat(issue.getState()).isEqualTo(Issue.State.CLOSED);
 
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueClosed.class)).hasSize(1);
         }
 
         @Test
@@ -223,7 +220,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(issue).isNotNull();
             assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
 
-            assertThat(eventListener.getReopenedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueReopened.class)).hasSize(1);
         }
 
         @Test
@@ -252,7 +249,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("issue.confidential.open"));
 
             assertThat(issueRepository.count()).isZero();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class)).isEmpty();
         }
 
         @Test
@@ -267,7 +264,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("issue.confidential.close"));
 
             assertThat(issueRepository.count()).isZero();
-            assertThat(eventListener.getClosedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueClosed.class)).isEmpty();
         }
     }
 
@@ -417,48 +414,5 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .stream()
             .map(l -> l.getName())
             .collect(Collectors.toSet());
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class GitLabTestEventListener {
-
-        private final List<ScmDomainEvent.IssueCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.IssueCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.IssueClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.IssueReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.IssueCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.IssueClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-        }
     }
 }

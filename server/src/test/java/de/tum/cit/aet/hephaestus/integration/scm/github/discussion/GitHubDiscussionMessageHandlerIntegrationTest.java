@@ -20,14 +20,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,10 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -74,7 +70,6 @@ import tools.jackson.databind.ObjectMapper;
  *   <li>Category: General (ID: "46489461")</li>
  * </ul>
  */
-@Import(GitHubDiscussionMessageHandlerIntegrationTest.TestEventListener.class)
 class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -153,7 +148,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private TestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     @BeforeEach
     void setUp() {
@@ -241,7 +236,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             });
 
             // Domain event published
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class)).hasSize(1);
         }
 
         @Test
@@ -283,7 +278,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             assertThat(discussion.getStateReason()).isEqualTo(Discussion.StateReason.RESOLVED);
 
             // Verify Closed event was published (processClosed publishes both Updated and Closed)
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionClosed.class)).hasSize(1);
         }
 
         @Test
@@ -304,7 +299,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             assertThat(discussion.getState()).isEqualTo(Discussion.State.OPEN);
 
             // Verify Reopened event was published
-            assertThat(eventListener.getReopenedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionReopened.class)).hasSize(1);
         }
 
         @Test
@@ -330,7 +325,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 28)).isFalse();
 
             // Verify Deleted event was published
-            assertThat(eventListener.getDeletedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionDeleted.class)).hasSize(1);
         }
     }
 
@@ -359,7 +354,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             });
 
             // Verify Answered event was published
-            assertThat(eventListener.getAnsweredEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionAnswered.class)).hasSize(1);
         }
 
         @Test
@@ -670,81 +665,5 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             .stream()
             .map(l -> l.getName())
             .collect(Collectors.toSet());
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestEventListener {
-
-        private final List<ScmDomainEvent.DiscussionCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionReopened> reopenedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionAnswered> answeredEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.DiscussionCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.DiscussionUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.DiscussionClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.DiscussionReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onAnswered(ScmDomainEvent.DiscussionAnswered event) {
-            answeredEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(ScmDomainEvent.DiscussionDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.DiscussionCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionAnswered> getAnsweredEvents() {
-            return new ArrayList<>(answeredEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            answeredEvents.clear();
-            deletedEvents.clear();
-        }
     }
 }

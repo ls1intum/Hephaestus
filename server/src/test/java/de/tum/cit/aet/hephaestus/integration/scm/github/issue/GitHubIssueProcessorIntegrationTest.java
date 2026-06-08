@@ -26,19 +26,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 
 /**
  * Integration tests for GitHubIssueProcessor.
@@ -94,7 +92,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     private IssueTypeRepository issueTypeRepository;
 
     @Autowired
-    private TestIssueEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -308,7 +306,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class)).isEmpty();
         }
     }
 
@@ -336,7 +334,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
 
             // Verify Created event published
-            assertThat(eventListener.getCreatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -635,7 +633,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getBody()).isEqualTo("New body");
 
             // Verify Updated event with changedFields
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -693,7 +691,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - no Updated event (empty changedFields)
             // Note: Event is still published but with empty changedFields
-            assertThat(eventListener.getUpdatedEvents()).allSatisfy(event -> {
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class)).allSatisfy(event -> {
                 // changedFields should be empty
                 assertThat(event.changedFields()).isEmpty();
             });
@@ -776,7 +774,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             assertThat(result.getMilestone()).isNotNull();
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
                 .first()
                 .satisfies(event -> assertThat(event.changedFields()).contains("milestone"));
         }
@@ -837,7 +835,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             assertThat(result.getMilestone()).isNull();
-            assertThat(eventListener.getUpdatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class))
                 .first()
                 .satisfies(event -> assertThat(event.changedFields()).contains("milestone"));
         }
@@ -881,7 +879,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getStateReason()).isEqualTo(Issue.StateReason.COMPLETED);
 
             // Verify Closed event
-            assertThat(eventListener.getClosedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueClosed.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -935,7 +933,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
 
             // Verify Updated event with "state" in changedFields
-            assertThat(eventListener.getUpdatedEvents()).anySatisfy(event ->
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class)).anySatisfy(event ->
                 assertThat(event.changedFields()).contains("state")
             );
         }
@@ -1000,7 +998,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             processor.processLabeled(issueDto, labelDto, createContext());
 
-            assertThat(eventListener.getLabeledEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueLabeled.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1043,7 +1041,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             processor.processUnlabeled(issueDto, labelDto, createContext());
 
-            assertThat(eventListener.getUnlabeledEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUnlabeled.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1077,7 +1075,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getIssueType()).isNotNull();
             assertThat(result.getIssueType().getName()).isEqualTo("Task");
 
-            assertThat(eventListener.getTypedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueTyped.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1119,7 +1117,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result.getIssueType()).isNull();
 
-            assertThat(eventListener.getUntypedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUntyped.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -1432,104 +1430,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             assertThat(result.getLabels()).isEmpty();
-        }
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestIssueEventListener {
-
-        private final List<ScmDomainEvent.IssueCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueLabeled> labeledEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueUnlabeled> unlabeledEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueTyped> typedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueUntyped> untypedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.IssueCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.IssueUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.IssueClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.IssueReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onLabeled(ScmDomainEvent.IssueLabeled event) {
-            labeledEvents.add(event);
-        }
-
-        @EventListener
-        public void onUnlabeled(ScmDomainEvent.IssueUnlabeled event) {
-            unlabeledEvents.add(event);
-        }
-
-        @EventListener
-        public void onTyped(ScmDomainEvent.IssueTyped event) {
-            typedEvents.add(event);
-        }
-
-        @EventListener
-        public void onUntyped(ScmDomainEvent.IssueUntyped event) {
-            untypedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.IssueCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.IssueUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueLabeled> getLabeledEvents() {
-            return new ArrayList<>(labeledEvents);
-        }
-
-        public List<ScmDomainEvent.IssueUnlabeled> getUnlabeledEvents() {
-            return new ArrayList<>(unlabeledEvents);
-        }
-
-        public List<ScmDomainEvent.IssueTyped> getTypedEvents() {
-            return new ArrayList<>(typedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueUntyped> getUntypedEvents() {
-            return new ArrayList<>(untypedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            labeledEvents.clear();
-            unlabeledEvents.clear();
-            typedEvents.clear();
-            untypedEvents.clear();
         }
     }
 }

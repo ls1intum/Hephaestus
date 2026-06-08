@@ -18,16 +18,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,9 +34,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
@@ -134,7 +131,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private GitLabMergeRequestTestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository savedRepo;
     private GitProvider savedProvider;
@@ -206,7 +203,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             });
 
             // Domain event
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
         }
 
         @Test
@@ -227,8 +224,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(pr.getClosedAt()).isNull();
             });
 
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isFalse();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isFalse();
         }
 
         @Test
@@ -250,9 +247,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(pr.getMergedAt()).isNull();
             });
 
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isTrue();
-            assertThat(eventListener.getMergedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isTrue();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
         }
 
         @Test
@@ -272,7 +269,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
             });
 
-            assertThat(eventListener.getReopenedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class)).hasSize(1);
         }
     }
 
@@ -309,7 +306,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(review.getNativeId()).isEqualTo(expectedNativeId);
             });
 
-            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class)).hasSize(1);
         }
 
         @Test
@@ -329,7 +326,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(review.get().getState()).isEqualTo(PullRequestReview.State.DISMISSED);
             });
 
-            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class)).hasSize(1);
         }
     }
 
@@ -364,7 +361,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void fullLifecycle_openCloseReopen() throws Exception {
             // Open MR !3
             handler.handleEvent(loadPayload("merge_request.open"));
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
@@ -375,8 +372,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             // Close MR !3
             handler.handleEvent(loadPayload("merge_request.close"));
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isFalse();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isFalse();
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
@@ -387,7 +384,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             // Reopen MR !3
             handler.handleEvent(loadPayload("merge_request.reopen"));
-            assertThat(eventListener.getReopenedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class)).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
@@ -401,7 +398,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void fullLifecycle_approveUnapprove() throws Exception {
             // Approve MR !4 (also creates it)
             handler.handleEvent(loadPayload("merge_request.approved"));
-            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class)).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
@@ -410,7 +407,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             // Unapprove MR !4 — should dismiss the review (not delete, not CHANGES_REQUESTED)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
-            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class)).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
@@ -424,11 +421,11 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void fullLifecycle_updateMerge() throws Exception {
             // Create MR !2 via update
             handler.handleEvent(loadPayload("merge_request.update"));
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
 
             // Merge MR !2
             handler.handleEvent(loadPayload("merge_request.merge"));
-            assertThat(eventListener.getMergedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
@@ -501,18 +498,18 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void domainEvents_mr3Lifecycle() throws Exception {
             // Open -> PullRequestCreated
             handler.handleEvent(loadPayload("merge_request.open"));
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
 
             // Close -> PullRequestClosed(wasMerged=false)
             handler.handleEvent(loadPayload("merge_request.close"));
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isFalse();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isFalse();
 
             eventListener.clear();
 
             // Reopen -> PullRequestReopened
             handler.handleEvent(loadPayload("merge_request.reopen"));
-            assertThat(eventListener.getReopenedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class)).hasSize(1);
         }
 
         @Test
@@ -523,22 +520,22 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             // Merge -> PullRequestClosed(wasMerged=true) + PullRequestMerged
             handler.handleEvent(loadPayload("merge_request.merge"));
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isTrue();
-            assertThat(eventListener.getMergedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isTrue();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
         }
 
         @Test
         void domainEvents_mr4Approval() throws Exception {
             // Approve -> ReviewSubmitted
             handler.handleEvent(loadPayload("merge_request.approved"));
-            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class)).hasSize(1);
 
             eventListener.clear();
 
             // Unapprove -> ReviewDismissed (not CHANGES_REQUESTED — unapproval is a distinct action)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
-            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class)).hasSize(1);
         }
     }
 
@@ -613,81 +610,5 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class GitLabMergeRequestTestEventListener {
-
-        private final List<ScmDomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.ReviewSubmitted> reviewSubmittedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.ReviewDismissed> reviewDismissedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.PullRequestCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.PullRequestClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.PullRequestReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onMerged(ScmDomainEvent.PullRequestMerged event) {
-            mergedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReviewSubmitted(ScmDomainEvent.ReviewSubmitted event) {
-            reviewSubmittedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReviewDismissed(ScmDomainEvent.ReviewDismissed event) {
-            reviewDismissedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.PullRequestCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestMerged> getMergedEvents() {
-            return new ArrayList<>(mergedEvents);
-        }
-
-        public List<ScmDomainEvent.ReviewSubmitted> getReviewSubmittedEvents() {
-            return new ArrayList<>(reviewSubmittedEvents);
-        }
-
-        public List<ScmDomainEvent.ReviewDismissed> getReviewDismissedEvents() {
-            return new ArrayList<>(reviewDismissedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            mergedEvents.clear();
-            reviewSubmittedEvents.clear();
-            reviewDismissedEvents.clear();
-        }
     }
 }

@@ -16,21 +16,18 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
 
 /**
@@ -81,7 +78,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     private GitProviderRepository gitProviderRepository;
 
     @Autowired
-    private TestMilestoneEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -137,7 +134,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getUpdatedAt()).isNotNull();
             assertThat(result.getLastSyncAt()).isNotNull();
 
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).hasSize(1);
         }
 
         @Test
@@ -251,7 +248,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                 LocalDate.of(2026, 12, 31).atStartOfDay(ZoneOffset.UTC).toInstant()
             );
 
-            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
             assertThat(milestoneRepository.findAllByRepository_Id(testRepository.getId())).hasSize(1);
         }
 
@@ -406,7 +403,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = milestoneProcessor.process(null, testRepository, testContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).isEmpty();
         }
 
         @Test
@@ -602,7 +599,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             milestoneProcessor.delete(milestone.getId(), testContext());
 
             assertThat(milestoneRepository.findById(milestone.getId())).isEmpty();
-            assertThat(eventListener.getDeletedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).hasSize(1);
         }
 
         @Test
@@ -613,7 +610,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleNonExistentMilestone() {
             milestoneProcessor.delete(-999L, testContext());
-            assertThat(eventListener.getDeletedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).isEmpty();
         }
     }
 
@@ -680,48 +677,5 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestMilestoneEventListener {
-
-        private final List<ScmDomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        void onCreated(ScmDomainEvent.MilestoneCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        void onUpdated(ScmDomainEvent.MilestoneUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        void onDeleted(ScmDomainEvent.MilestoneDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            deletedEvents.clear();
-        }
-
-        List<ScmDomainEvent.MilestoneCreated> getCreatedEvents() {
-            return createdEvents;
-        }
-
-        List<ScmDomainEvent.MilestoneUpdated> getUpdatedEvents() {
-            return updatedEvents;
-        }
-
-        List<ScmDomainEvent.MilestoneDeleted> getDeletedEvents() {
-            return deletedEvents;
-        }
     }
 }
