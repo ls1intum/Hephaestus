@@ -36,6 +36,8 @@ jobs:
       docker-file: "./webapp/Dockerfile"
       docker-context: "."
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -59,6 +61,8 @@ jobs:
       use-buildpacks: true
       maven-module: "server"
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -85,6 +89,8 @@ jobs:
       docker-file: "./docker/agents/pi/Dockerfile"
       docker-context: "./docker/agents"
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -106,6 +112,8 @@ jobs:
       docker-file: "./docker/release-pin-fetcher/Dockerfile"
       docker-context: "./docker/release-pin-fetcher"
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}

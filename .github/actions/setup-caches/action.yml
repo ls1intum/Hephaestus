@@ -13,7 +13,7 @@ runs:
   using: "composite"
   steps:
     - name: Set up JDK 21
-      if: contains(fromJSON('["application-server-unit-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-unit", "application-server-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
       uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
       with:
         distribution: "temurin"
@@ -26,7 +26,7 @@ runs:
       # then activates on the present directory and skips codegen, causing compile
       # failures because the cached classes don't match the current sources. Codegen
       # runs in ~5s — much cheaper than that failure mode.
-      if: contains(fromJSON('["application-server-unit-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
+      if: contains(fromJSON('["application-server-unit", "application-server-arch", "application-server-integration", "application-server-quality", "openapi-validation", "database-validation"]'), inputs.cache-type)
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: |
