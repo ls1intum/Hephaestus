@@ -29,3 +29,7 @@ hephaestus:
       gitlab-workspace-creation: true
   dev:
     trigger-enabled: true
+  # Enable the GitLab integration so a connected workspace actually syncs MRs/commits for review.
+  integration:
+    gitlab:
+      enabled: true
