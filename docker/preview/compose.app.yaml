@@ -191,6 +191,9 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
+      # Coolify fronts previews with its own proxy — set its ingress regex, not staging's range.
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
       DATABASE_URL: postgresql://postgres:5432/hephaestus

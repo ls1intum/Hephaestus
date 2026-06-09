@@ -268,7 +268,6 @@ services:
     environment:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
-      # Worker runs the prod profile (forward-headers=native) so ProxyTrustGuard fires here too.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
