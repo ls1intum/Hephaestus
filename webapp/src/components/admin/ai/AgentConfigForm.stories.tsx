@@ -68,7 +68,7 @@ export const CreateApiKey: Story = {
 export const ValidationError: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await userEvent.click(canvas.getByRole("button", { name: /create runtime/i }));
+		await userEvent.click(canvas.getByRole("button", { name: /create model/i }));
 		await expect(canvas.getByText(/name is required/i)).toBeVisible();
 	},
 };

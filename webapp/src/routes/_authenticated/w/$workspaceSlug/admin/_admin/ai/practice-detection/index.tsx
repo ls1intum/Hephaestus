@@ -54,10 +54,10 @@ function PolicyContainer() {
 		...updatePracticeConfigMutation(),
 		onSuccess: () => {
 			invalidateAiSettings();
-			toast.success("Practice runtime updated");
+			toast.success("Model updated");
 		},
 		onError: (error) => {
-			toast.error("Failed to update practice runtime", {
+			toast.error("Failed to update model", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},

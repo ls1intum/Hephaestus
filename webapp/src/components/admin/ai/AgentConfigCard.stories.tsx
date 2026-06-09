@@ -65,7 +65,7 @@ export const DeleteConfirm: Story = {
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(within(dialog).getByText(/permanently removes this runtime/i)).toBeInTheDocument();
 		await expect(
-			within(dialog).getByRole("button", { name: /^delete runtime$/i }),
+			within(dialog).getByRole("button", { name: /^delete model$/i }),
 		).toBeInTheDocument();
 	},
 };

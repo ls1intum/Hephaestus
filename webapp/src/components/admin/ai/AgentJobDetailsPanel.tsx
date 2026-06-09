@@ -95,7 +95,7 @@ export function AgentJobDetailsPanel({
 												</Badge>
 											}
 										/>
-										<Row label="Runtime" value={configLabel(job)} />
+										<Row label="Model" value={configLabel(job)} />
 										<Row label="Model" value={job.llmModel ?? job.llmModelVersion ?? "—"} />
 										<Row
 											label="Created"

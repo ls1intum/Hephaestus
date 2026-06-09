@@ -77,11 +77,11 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...createConfigMutation(),
 		onSuccess: (created) => {
 			invalidateAll();
-			toast.success("Runtime created");
+			toast.success("Model created");
 			setSelectedId(created.id);
 		},
 		onError: (error) => {
-			toast.error("Failed to create runtime", {
+			toast.error("Failed to create model", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},
@@ -91,10 +91,10 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...updateConfigMutation(),
 		onSuccess: () => {
 			invalidateAll();
-			toast.success("Runtime updated");
+			toast.success("Model updated");
 		},
 		onError: (error) => {
-			toast.error("Failed to update runtime", {
+			toast.error("Failed to update model", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},
@@ -104,14 +104,14 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 		...deleteConfigMutation(),
 		onSuccess: (_data, variables) => {
 			invalidateAll();
-			toast.success("Runtime deleted");
+			toast.success("Model deleted");
 			if (variables.path.configId === selectedId) {
 				setSelectedId(null);
 			}
 		},
 		onError: (error) => {
 			// A 409 means the config is bound to a workspace feature; surface the server message.
-			toast.error("Failed to delete runtime", {
+			toast.error("Failed to delete model", {
 				description:
 					error instanceof Error
 						? error.message
@@ -126,10 +126,10 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 			// Same invalidation as every other runtime mutation — the "Powers mentor" badge derives from
 			// ai-settings, and consistency here keeps this from drifting into a latent stale-cache bug.
 			invalidateAll();
-			toast.success("Mentor runtime updated");
+			toast.success("Mentor model updated");
 		},
 		onError: (error) => {
-			toast.error("Failed to update mentor runtime", {
+			toast.error("Failed to update mentor model", {
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},

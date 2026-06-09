@@ -32,7 +32,7 @@ export const mockConfigApiKey: AgentConfig = {
 
 export const mockConfigDisabled: AgentConfig = {
 	id: 3,
-	name: "Legacy runtime",
+	name: "Legacy model",
 	llmProvider: "AZURE_OPENAI",
 	modelName: "gpt-4o",
 	credentialMode: "OAUTH",

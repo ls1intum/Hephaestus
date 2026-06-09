@@ -111,7 +111,7 @@ export function AgentConfigCard({
 								setConfirmOpen(false);
 							}}
 						>
-							{isDeleting ? "Deleting…" : "Delete runtime"}
+							{isDeleting ? "Deleting…" : "Delete model"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

@@ -5,19 +5,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
@@ -80,7 +80,7 @@ export function AgentJobsTable({
 	onRetry,
 }: AgentJobsTableProps) {
 	const runtimeItems = [
-		{ value: FILTER_ALL, label: "All runtimes" },
+		{ value: FILTER_ALL, label: "All models" },
 		...configs.map((c) => ({ value: String(c.id), label: c.name })),
 	];
 
@@ -111,7 +111,7 @@ export function AgentJobsTable({
 				</div>
 
 				<div className="flex items-center gap-2 text-sm">
-					<span className="text-muted-foreground">Runtime</span>
+					<span className="text-muted-foreground">Model</span>
 					<Select
 						items={runtimeItems}
 						value={configFilter === "ALL" ? FILTER_ALL : String(configFilter)}
@@ -119,11 +119,11 @@ export function AgentJobsTable({
 							onConfigFilterChange(value === FILTER_ALL ? "ALL" : Number(value))
 						}
 					>
-						<SelectTrigger size="sm" className="w-44" aria-label="Filter by runtime">
+						<SelectTrigger size="sm" className="w-44" aria-label="Filter by model">
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value={FILTER_ALL}>All runtimes</SelectItem>
+							<SelectItem value={FILTER_ALL}>All models</SelectItem>
 							{configs.map((c) => (
 								<SelectItem key={c.id} value={String(c.id)}>
 									{c.name}
@@ -166,8 +166,8 @@ export function AgentJobsTable({
 					<TableHeader>
 						<TableRow>
 							<TableHead>Status</TableHead>
-							<TableHead>Runtime</TableHead>
 							<TableHead>Model</TableHead>
+							<TableHead>Model name</TableHead>
 							<TableHead>Created</TableHead>
 							<TableHead>Delivery</TableHead>
 							<TableHead className="text-right">Usage</TableHead>
