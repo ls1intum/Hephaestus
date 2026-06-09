@@ -15,21 +15,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -38,7 +34,6 @@ import tools.jackson.databind.ObjectMapper;
  * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  * Verifies persistence, field-level correctness, and domain event publishing.
  */
-@Import(GitHubProjectMessageHandlerIntegrationTest.TestProjectEventListener.class)
 class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from projects_v2.created.json
@@ -67,7 +62,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private TestProjectEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Organization testOrganization;
 
@@ -142,8 +137,8 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
         // Verify domain event (project().id() is the synthetic PK, not the native ID)
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getCreatedEvents().getFirst().project().id()).isNotNull();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectCreated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectCreated.class).getFirst().project().id()).isNotNull();
     }
 
     @Test
@@ -174,8 +169,8 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
         // Verify ProjectUpdated domain event (not ProjectCreated, since project already existed)
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectCreated.class)).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectUpdated.class)).hasSize(1);
     }
 
     @Test
@@ -203,8 +198,8 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .satisfies(project -> assertThat(project.isClosed()).isTrue());
 
         // Verify ProjectClosed domain event (project().id() is the synthetic PK)
-        assertThat(eventListener.getClosedEvents()).hasSize(1);
-        assertThat(eventListener.getClosedEvents().getFirst().project().id()).isNotNull();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectClosed.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectClosed.class).getFirst().project().id()).isNotNull();
     }
 
     @Test
@@ -235,8 +230,10 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .satisfies(project -> assertThat(project.isClosed()).isFalse());
 
         // Verify ProjectReopened domain event (project().id() is the synthetic PK)
-        assertThat(eventListener.getReopenedEvents()).hasSize(1);
-        assertThat(eventListener.getReopenedEvents().getFirst().project().id()).isNotNull();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectReopened.class)).hasSize(1);
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectReopened.class).getFirst().project().id()
+        ).isNotNull();
     }
 
     @Test
@@ -258,9 +255,11 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(projectRepository.findByNodeId(FIXTURE_PROJECT_NODE_ID)).isEmpty();
 
         // Verify ProjectDeleted domain event (projectId is the synthetic PK)
-        assertThat(eventListener.getDeletedEvents()).hasSize(1);
-        assertThat(eventListener.getDeletedEvents().getFirst().projectId()).isNotNull();
-        assertThat(eventListener.getDeletedEvents().getFirst().projectTitle()).isEqualTo(FIXTURE_PROJECT_TITLE);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectDeleted.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectDeleted.class).getFirst().projectId()).isNotNull();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectDeleted.class).getFirst().projectTitle()).isEqualTo(
+            FIXTURE_PROJECT_TITLE
+        );
     }
 
     @Test
@@ -275,7 +274,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Then - no project should be created and no events published
         assertThat(projectRepository.count()).isZero();
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectCreated.class)).isEmpty();
     }
 
     @Test
@@ -297,79 +296,13 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(projectRepository.count()).isOne();
 
         // First call publishes ProjectCreated, second publishes ProjectUpdated
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectCreated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectUpdated.class)).hasSize(1);
     }
 
     private GitHubProjectEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubProjectEventDTO.class);
-    }
-
-    /**
-     * Test event listener that captures project domain events for assertion.
-     */
-    @Component
-    static class TestProjectEventListener {
-
-        private final List<GitHubProjectEvent.ProjectCreated> createdEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectUpdated> updatedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectClosed> closedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectReopened> reopenedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(GitHubProjectEvent.ProjectCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(GitHubProjectEvent.ProjectUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(GitHubProjectEvent.ProjectClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(GitHubProjectEvent.ProjectReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(GitHubProjectEvent.ProjectDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<GitHubProjectEvent.ProjectCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            deletedEvents.clear();
-        }
     }
 }

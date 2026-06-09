@@ -16,24 +16,20 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
-import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -54,16 +50,6 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Tag("integration")
 @DisplayName("GitLab Milestone Message Handler")
-@TestPropertySource(
-    properties = {
-        "hephaestus.integration.gitlab.enabled=true",
-        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.integration.gitlab.connect-timeout=30s",
-        "hephaestus.integration.gitlab.read-timeout=60s",
-        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
-        "hephaestus.integration.gitlab.sync-page-delay=5m",
-    }
-)
 class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from milestone.create.json
@@ -101,7 +87,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private TestMilestoneWebhookEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository savedRepo;
 
@@ -147,7 +133,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(milestone.getHtmlUrl()).isEqualTo(FIXTURE_MILESTONE_HTML_URL);
             assertThat(milestone.getRepository().getId()).isEqualTo(savedRepo.getId());
 
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).hasSize(1);
         }
 
         @Test
@@ -166,7 +152,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(milestone.getState()).isEqualTo(Milestone.State.CLOSED);
             assertThat(milestone.getClosedAt()).isNotNull();
 
-            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
         }
 
         @Test
@@ -186,7 +172,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
             assertThat(milestone.getClosedAt()).isNull();
 
-            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
         }
     }
 
@@ -297,48 +283,5 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestMilestoneWebhookEventListener {
-
-        private final List<ScmDomainEvent.MilestoneCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.MilestoneUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.MilestoneDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.MilestoneCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.MilestoneUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(ScmDomainEvent.MilestoneDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.MilestoneCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.MilestoneUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<ScmDomainEvent.MilestoneDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            deletedEvents.clear();
-        }
     }
 }

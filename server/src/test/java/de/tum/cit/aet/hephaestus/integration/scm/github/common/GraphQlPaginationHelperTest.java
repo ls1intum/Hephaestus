@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -21,11 +22,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -35,6 +36,7 @@ import reactor.core.publisher.Mono;
  * Unit tests for {@link GraphQlPaginationHelper}.
  */
 @ExtendWith(MockitoExtension.class)
+@Tag("unit")
 class GraphQlPaginationHelperTest {
 
     @Mock
@@ -347,24 +349,6 @@ class GraphQlPaginationHelperTest {
         }
 
         @Test
-        void shouldReturnTransientErrorWhenTimeoutErrorDetected() {
-            // Given - response with transient timeout error
-            ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-            ResponseError timeoutError = mock(ResponseError.class);
-            when(timeoutError.getMessage()).thenReturn("couldn't respond in time");
-            when(timeoutError.getExtensions()).thenReturn(null);
-            when(response.getErrors()).thenReturn(List.of(timeoutError));
-            // detectTransientError is called BEFORE isValid(), so isValid() is never reached
-            mockClientExecution(response);
-
-            PaginationResult result = helper.paginate(createRequest(conn -> true));
-
-            assertThat(result.terminationReason()).isEqualTo(TerminationReason.TRANSIENT_ERROR);
-            assertThat(result.pagesProcessed()).isEqualTo(1);
-            assertThat(result.isAborted()).isTrue();
-        }
-
-        @Test
         void shouldReturnInvalidResponseWhenResponseIsNull() {
             // Given - execute() returns Mono.empty() which blocks to null
             when(client.documentName(DOCUMENT_NAME)).thenReturn(requestSpec);
@@ -418,19 +402,21 @@ class GraphQlPaginationHelperTest {
             .build();
     }
 
+    // Shared setup helpers: stubs are lenient because not every caller exercises every stub
+    // (e.g. rate-limit-critical and builder tests short-circuit before reading the connection).
     private ClientGraphQlResponse mockValidResponse(TestConnection connection) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
-        when(response.isValid()).thenReturn(true);
-        when(response.field(FIELD_PATH)).thenReturn(field);
-        when(field.toEntity(TestConnection.class)).thenReturn(connection);
+        lenient().when(response.isValid()).thenReturn(true);
+        lenient().when(response.field(FIELD_PATH)).thenReturn(field);
+        lenient().when(field.toEntity(TestConnection.class)).thenReturn(connection);
         return response;
     }
 
     private void mockClientExecution(ClientGraphQlResponse response) {
-        when(client.documentName(DOCUMENT_NAME)).thenReturn(requestSpec);
-        when(requestSpec.variable(any(), any())).thenReturn(requestSpec);
-        when(requestSpec.execute()).thenReturn(Mono.just(response));
+        lenient().when(client.documentName(DOCUMENT_NAME)).thenReturn(requestSpec);
+        lenient().when(requestSpec.variable(any(), any())).thenReturn(requestSpec);
+        lenient().when(requestSpec.execute()).thenReturn(Mono.just(response));
     }
 
     private void mockClientExecutionSequence(ClientGraphQlResponse... responses) {

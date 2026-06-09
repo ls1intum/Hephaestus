@@ -1,12 +1,14 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.workspace.CurrentAccountUsers;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
@@ -21,10 +23,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -56,7 +60,7 @@ public class WorkspaceContextFilter implements Filter {
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
-    private final UserRepository userRepository;
+    private final CurrentAccountUsers currentAccountUsers;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ConnectionService connectionService;
@@ -65,7 +69,7 @@ public class WorkspaceContextFilter implements Filter {
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
-        UserRepository userRepository,
+        CurrentAccountUsers currentAccountUsers,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ConnectionService connectionService,
@@ -73,7 +77,7 @@ public class WorkspaceContextFilter implements Filter {
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
-        this.userRepository = userRepository;
+        this.currentAccountUsers = currentAccountUsers;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.connectionService = connectionService;
@@ -153,14 +157,15 @@ public class WorkspaceContextFilter implements Filter {
                 return;
             }
 
-            // Fetch user roles
-            var currentUser = userRepository.getCurrentUser();
-            Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUser);
+            // Fetch user roles across ALL of the account's linked identities (ADR 0017), so a member
+            // signed in via one provider keeps access to workspaces they belong to under another.
+            var currentUsers = currentAccountUsers.resolve();
+            Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUsers);
 
             boolean isPublicRead = Boolean.TRUE.equals(workspace.getIsPubliclyViewable()) && isReadRequest;
 
             if (roles.isEmpty() && !isPublicRead) {
-                if (currentUser.isEmpty()) {
+                if (currentUsers.isEmpty()) {
                     sendWorkspaceUnauthorizedError(httpResponse, slug);
                 } else {
                     log.debug("Denied workspace access: reason=notMember, workspaceSlug={}", safeSlug);
@@ -185,6 +190,14 @@ public class WorkspaceContextFilter implements Filter {
 
             WorkspaceContextHolder.setContext(context);
 
+            // Pin the request's active SCM identity to the account's user FOR THIS workspace's provider
+            // (the linked identity that is a member here), so getCurrentUserLogin() and everything
+            // downstream resolve the provider-correct user — not whichever provider the session logged in
+            // with. Absent for a public workspace the account isn't a member of (falls back to the JWT).
+            resolveWorkspaceIdentity(workspace, currentUsers)
+                .map(User::getLogin)
+                .ifPresent(CurrentScmIdentityHolder::set);
+
             log.debug(
                 "Set workspace context: workspaceSlug={}, workspaceId={}, roles={}",
                 safeSlug,
@@ -197,44 +210,81 @@ public class WorkspaceContextFilter implements Filter {
         } finally {
             // Always clear context to prevent leaks
             WorkspaceContextHolder.clearContext();
+            CurrentScmIdentityHolder.clear();
         }
+    }
+
+    /**
+     * The account's SCM user that holds membership in this workspace — i.e. the identity for the
+     * workspace's provider. Returns empty when none of the account's identities is a member (e.g. a
+     * public workspace viewed by a non-member), leaving the JWT {@code preferred_username} authoritative.
+     */
+    private Optional<User> resolveWorkspaceIdentity(Workspace workspace, Collection<User> users) {
+        Set<Long> userIds = users
+            .stream()
+            .filter(u -> u != null && u.getId() != null)
+            .map(User::getId)
+            .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<Long> memberIds = workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds)
+            .stream()
+            .map(membership -> membership.getId().getUserId())
+            .collect(Collectors.toSet());
+        return users
+            .stream()
+            .filter(u -> memberIds.contains(u.getId()))
+            .findFirst();
     }
 
     /**
      * Fetch workspace roles for the current authenticated user.
      *
      * @param workspace Workspace entity
-     * @param userOpt Optional user
+     * @param users the account's SCM users (one per linked identity); roles are unioned across them
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(Workspace workspace, Optional<User> userOpt) {
+    private Set<WorkspaceRole> fetchUserRoles(Workspace workspace, Collection<User> users) {
         try {
-            if (userOpt.isEmpty()) {
+            Set<Long> userIds = users
+                .stream()
+                .filter(u -> u != null && u.getId() != null)
+                .map(User::getId)
+                .collect(Collectors.toSet());
+            if (userIds.isEmpty()) {
                 log.debug("Skipped role fetch: reason=noAuthenticatedUser");
                 return Set.of();
             }
 
-            var membershipOpt = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
-                workspace.getId(),
-                userOpt.get().getId()
-            );
+            // Union the roles the account holds across every linked identity (each identity mirrors a
+            // distinct SCM user, but they belong to the SAME account, so unioning never widens access
+            // beyond what the account already owns).
+            Set<WorkspaceRole> roles = workspaceMembershipRepository
+                .findByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds)
+                .stream()
+                .map(WorkspaceMembership::getRole)
+                .filter(role -> role != null)
+                .collect(Collectors.toSet());
 
-            if (membershipOpt.isPresent()) {
-                log.debug("Resolved user role: role={}", membershipOpt.get().getRole());
-                return Set.of(membershipOpt.get().getRole());
+            if (!roles.isEmpty()) {
+                log.debug("Resolved user roles: roles={}", roles);
+                return roles;
             }
 
-            // Auto-heal only when workspace has zero memberships (fresh dev DB)
+            // Auto-heal only when workspace has zero memberships (fresh dev DB): seed the first identity.
             if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
+                User primary = users.iterator().next();
                 try {
                     var created = workspaceMembershipService.createMembership(
                         workspace,
-                        userOpt.get().getId(),
+                        primary.getId(),
                         WorkspaceRole.ADMIN
                     );
                     log.info(
                         "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
-                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                        LoggingUtils.sanitizeForLog(primary.getLogin()),
                         LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         created.getRole()
                     );
@@ -242,7 +292,7 @@ public class WorkspaceContextFilter implements Filter {
                 } catch (IllegalArgumentException ex) {
                     log.debug(
                         "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
-                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                        LoggingUtils.sanitizeForLog(primary.getLogin()),
                         LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         ex
                     );
@@ -297,13 +347,17 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         // Avoid leaking workspace existence for private workspaces when the user lacks membership.
+        // Checked across all of the account's linked identities (same union semantics as access control).
         boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
-        boolean hasMembership = userRepository
-            .getCurrentUser()
-            .flatMap(user ->
-                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
-            )
-            .isPresent();
+        Set<Long> currentUserIds = currentAccountUsers
+            .resolve()
+            .stream()
+            .filter(u -> u != null && u.getId() != null)
+            .map(User::getId)
+            .collect(Collectors.toSet());
+        boolean hasMembership =
+            !currentUserIds.isEmpty() &&
+            !workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), currentUserIds).isEmpty();
 
         if (!isPublic && !hasMembership) {
             return false;

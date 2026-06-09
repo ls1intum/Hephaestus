@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.security;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +19,13 @@ public final class SecurityUtils {
      * @return the login of the current user.
      */
     public static Optional<String> getCurrentUserLogin() {
+        // Inside a workspace request the active identity is the account's SCM user for that workspace's
+        // provider (set by WorkspaceContextFilter), which may differ from the session's login. Outside a
+        // workspace, the JWT preferred_username is authoritative. See CurrentScmIdentityHolder.
+        Optional<String> workspaceScoped = CurrentScmIdentityHolder.get();
+        if (workspaceScoped.isPresent()) {
+            return workspaceScoped;
+        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null) {
             return Optional.empty();
@@ -41,8 +47,32 @@ public final class SecurityUtils {
     }
 
     /**
+     * Get the Hephaestus-native account id of the current principal — the JWT {@code sub} (ADR 0017).
+     * Unlike {@link #getCurrentUserLogin()} (a single {@code preferred_username}), the account id is the
+     * stable handle to the account's FULL set of federated identities, so callers can resolve workspace
+     * access across every linked provider login rather than just the one the session signed in with.
+     *
+     * @return the account id, or empty if unauthenticated / the {@code sub} is not a numeric account id.
+     */
+    public static Optional<Long> getCurrentAccountId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return Optional.empty();
+        }
+        String subject = jwt.getSubject();
+        if (subject == null || subject.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Long.parseLong(subject.trim()));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Get the first name (given_name) from a JWT token.
-     * This is the standard OIDC claim for first name used by Keycloak.
+     * This is the standard OIDC {@code given_name} claim, carried on our own issued JWT.
      *
      * @param jwt The JWT token
      * @return The given_name claim value, or empty if not present
@@ -59,12 +89,14 @@ public final class SecurityUtils {
     }
 
     /**
-     * Check if the current user has the super admin realm role.
-     * Users with the admin realm role (configured via KEYCLOAK_GITHUB_ADMIN_USERNAME)
-     * can be elevated to workspace admin level by the authorization layer, but only for workspaces
-     * where they are members. This method itself only checks for the presence of the realm role.
+     * Check if the current user is an instance super-admin (Account.AppRole APP_ADMIN).
+     * Such users can be elevated to workspace-admin level by the authorization layer, but only for
+     * workspaces where they are members. This method itself only checks for the presence of the
+     * authority. The instance-admin authority is the namespaced {@code app_admin} the issuer mints
+     * for APP_ADMIN accounts (see {@code JwtPrincipalFactory}) — deliberately distinct from the
+     * per-workspace {@code admin} role, which is membership-derived and never appears in the JWT.
      *
-     * @return true if the current user has the admin realm role
+     * @return true if the current user has the {@code app_admin} authority
      */
     public static boolean isSuperAdmin() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -72,13 +104,8 @@ public final class SecurityUtils {
             return false;
         }
 
-        // Extract realm_access.roles from JWT claims (following SecurityConfig pattern)
-        var realmAccessObj = jwt.getClaims().get("realm_access");
-        if (!(realmAccessObj instanceof Map<?, ?> realmAccess)) {
-            return false;
-        }
-
-        var rolesObj = realmAccess.get("roles");
-        return rolesObj instanceof List<?> roles && roles.contains("admin");
+        // Flat `roles` claim on the Hephaestus-issued JWT (ADR 0017).
+        var rolesObj = jwt.getClaims().get("roles");
+        return rolesObj instanceof List<?> roles && roles.contains("app_admin");
     }
 }

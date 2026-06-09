@@ -49,6 +49,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import tools.jackson.databind.JsonNode;
@@ -57,6 +58,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Live integration tests — boots real Docker. Run with {@code -Pgroups=live} or {@code live-tests}. */
 @LiveDockerTest
+@Tag("live")
 class DockerInteractiveSandboxLiveTest {
 
     private static final String NODE_IMAGE = "node:22-slim";

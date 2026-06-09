@@ -14,7 +14,7 @@ Hephaestus engages a processor chain of: GitHub (identity provider and source-sy
 |---|---|---|---|
 | AET servers at TUM (container host) | Own infrastructure | No (Art. 4(7) GDPR — controller's own equipment) | — |
 | PostgreSQL (in-house container) | Application data store | No (self-hosted) | — |
-| Keycloak (in-house container) | Identity and session management | No (self-hosted) | — |
+| Hephaestus app server (in-house container) | Identity and session management (native auth, ADR 0017) | No (self-hosted) | — |
 | Spring Boot application server (in-house container) | Application logic, in-process Pi mentor agent | No (self-hosted) | — |
 | Traefik v3 reverse proxy (in-house container) | TLS termination, routing | No (self-hosted) | — |
 | Let's Encrypt ACME endpoint | Domain-validation certificates | No — Let's Encrypt receives no personal data; it only checks control over the domain | — |
@@ -43,7 +43,7 @@ Amend this file, the Art. 30 record, and the privacy statement before deploying 
 
 - A new LLM provider added to the AET-pool (e.g., Anthropic).
 - A new identity provider beyond GitHub and gitlab.lrz.de.
-- Activating Keycloak's SMTP integration (the chosen SMTP host becomes a recipient of personal data; a TUM-internal relay falls under the TUM-internal framework, an external relay needs an Art. 28 DPA).
+- Activating any future transactional-email integration (the chosen SMTP host becomes a recipient of personal data; a TUM-internal relay falls under the TUM-internal framework, an external relay needs an Art. 28 DPA).
 - Activating the bundled Sentry client. A self-hosted Sentry on TUM infrastructure is an in-house recipient; a SaaS Sentry tenant is an Art. 28 U.S. processor that needs a DPA, a privacy-statement entry, and a DPIA re-assessment.
 - Activating the bundled PostHog client. PostHog is an Art. 28 U.S. processor and requires a DPA, a privacy / recipients entry, an Art. 6(1)(a) consent flow, and a DPIA re-assessment.
 - Any external storage (S3, CDN) or any third-party font, script, image, or embed served from the application: requires an AVV and a privacy-statement entry.

@@ -12,6 +12,13 @@ renovate.json                    @ls1intum/hephaestus-maintainers
 # Application Server (Java/Spring)
 server/       @ls1intum/hephaestus-maintainers
 
+# Auth / identity (Account, IdentityLink, JWT issuance, oauth2Login) — see ADR 0017
+server/src/main/java/de/tum/cit/aet/hephaestus/core/auth/   @FelixTJDietrich @ls1intum/hephaestus-maintainers
+docs/decisions/0017-replace-keycloak-with-spring-native-auth.md   @FelixTJDietrich
+docs/auth-glossary.md            @FelixTJDietrich
+docs/auth-architecture.md        @FelixTJDietrich
+docs/runbooks/auth-cutover.md    @FelixTJDietrich
+
 # Webapp (React/TypeScript)
 webapp/                          @ls1intum/hephaestus-maintainers
 

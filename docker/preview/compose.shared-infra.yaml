@@ -9,7 +9,8 @@
 #   - nats-server: Message queue for webhook + sync events
 #   - webhook-server: Java inbound webhook receiver (application-server image with
 #     SPRING_PROFILES_ACTIVE=prod,webhook so only integration.core.webhook beans load — see ADR 0008)
-#   - keycloak + keycloak-db: Authentication (wildcard redirect URIs)
+#   (Authentication is Hephaestus-native — no Keycloak; ADR 0017. The app server federates
+#    to GitHub / gitlab.lrz.de directly and issues its own cookie-session JWT.)
 #
 # Coolify Setup:
 #   1. Create new Service → Docker Compose
@@ -17,7 +18,6 @@
 #   3. Enable "Connect to Predefined Network"
 #   4. Configure environment variables (see .env.example)
 #   5. In Coolify UI, set domains for each service (with Strip Prefix ENABLED):
-#      - keycloak: https://example.com:8080/keycloak
 #      - webhook-server: https://example.com:8080/webhooks
 #
 # IMPORTANT: This shared preview infrastructure does not, by itself, prove that
@@ -27,7 +27,7 @@
 #
 # Domain format: https://domain.com:PORT/path
 # The :PORT tells Coolify which container port to proxy to.
-# Strip Prefix removes /keycloak and /webhooks before forwarding.
+# Strip Prefix removes /webhooks before forwarding.
 #
 # =============================================================================
 
@@ -95,87 +95,8 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # ---------------------------------------------------------------------------
-  # Keycloak PostgreSQL - Database for Keycloak (internal only)
-  # ---------------------------------------------------------------------------
-  keycloak-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Required}
-    volumes:
-      - keycloak-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ---------------------------------------------------------------------------
-  # Keycloak - Authentication with wildcard redirect URIs
-  # Configure domain in Coolify UI: https://example.com/keycloak:8080
-  # ---------------------------------------------------------------------------
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.5
-    restart: unless-stopped
-    depends_on:
-      keycloak-db:
-        condition: service_healthy
-    expose:
-      - "8080"
-    environment:
-      # Database
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Required}
-      # Admin
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USERNAME:-admin}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?Required}
-      # Full public URL including path (Coolify strips /keycloak, but public URLs need it)
-      KC_HOSTNAME: https://${PREVIEW_DOMAIN:?Required}/keycloak
-      KC_HTTP_ENABLED: "true"
-      KC_HEALTH_ENABLED: "true"
-      KC_PROXY_HEADERS: xforwarded
-      # GitHub OAuth for user login
-      KEYCLOAK_GITHUB_CLIENT_ID: ${KEYCLOAK_GITHUB_CLIENT_ID:?Required}
-      KEYCLOAK_GITHUB_CLIENT_SECRET: ${KEYCLOAK_GITHUB_CLIENT_SECRET:?Required}
-      # Confidential client secret (shared across all PR deployments)
-      KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
-      # For realm import template
-      PREVIEW_DOMAIN: ${PREVIEW_DOMAIN:?Required}
-    volumes:
-      - keycloak-data:/opt/keycloak/data
-    configs:
-      - source: realm-import
-        target: /opt/keycloak/data/realm-import.json
-    entrypoint: ["sh", "-c", "mkdir -p /opt/keycloak/data/import && [ -f /opt/keycloak/data/realm-import.json ] && mv /opt/keycloak/data/realm-import.json /opt/keycloak/data/import/realm-import.json; exec /opt/keycloak/bin/kc.sh start --import-realm"]
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
-      interval: 10s
-      timeout: 10s
-      retries: 20
-      start_period: 60s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-# =============================================================================
-# VOLUMES
-# =============================================================================
 volumes:
   nats-data:
-  keycloak-data:
-  keycloak-db-data:
 
 # =============================================================================
 # CONFIGS
@@ -192,167 +113,3 @@ configs:
         max_file: 10G
       }
 
-  realm-import:
-    content: |
-      {
-        "realm": "hephaestus",
-        "displayName": "Hephaestus Preview",
-        "enabled": true,
-        "ssoSessionIdleTimeout": 1209600,
-        "ssoSessionMaxLifespan": 2592000,
-        "browserSecurityHeaders": {
-          "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self' https://*.${PREVIEW_DOMAIN}; object-src 'none';",
-          "xContentTypeOptions": "nosniff",
-          "xRobotsTag": "none",
-          "xFrameOptions": "",
-          "contentSecurityPolicyReportOnly": "",
-          "xXSSProtection": "1; mode=block",
-          "strictTransportSecurity": "max-age=31536000; includeSubDomains"
-        },
-        "clients": [
-          {
-            "clientId": "hephaestus",
-            "enabled": true,
-            "rootUrl": "https://${PREVIEW_DOMAIN}",
-            "surrogateAuthRequired": false,
-            "alwaysDisplayInConsole": false,
-            "clientAuthenticatorType": "client-secret",
-            "redirectUris": [
-              "*"
-            ],
-            "webOrigins": [
-              "*"
-            ],
-            "notBefore": 0,
-            "bearerOnly": false,
-            "consentRequired": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "publicClient": true,
-            "frontchannelLogout": true,
-            "protocol": "openid-connect",
-            "attributes": {
-              "post.logout.redirect.uris": "+",
-              "oauth2.device.authorization.grant.enabled": "false",
-              "backchannel.logout.revoke.offline.tokens": "false",
-              "use.refresh.tokens": "true",
-              "oidc.ciba.grant.enabled": "false",
-              "backchannel.logout.session.required": "true",
-              "display.on.consent.screen": "false"
-            },
-            "fullScopeAllowed": true,
-            "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
-            "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
-          },
-          {
-            "clientId": "hephaestus-confidential",
-            "rootUrl": "https://${PREVIEW_DOMAIN}",
-            "adminUrl": "https://${PREVIEW_DOMAIN}",
-            "baseUrl": "https://${PREVIEW_DOMAIN}/",
-            "surrogateAuthRequired": false,
-            "enabled": true,
-            "alwaysDisplayInConsole": false,
-            "clientAuthenticatorType": "client-secret",
-            "secret": "${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET}",
-            "redirectUris": [
-              "*"
-            ],
-            "webOrigins": [
-              "*"
-            ],
-            "notBefore": 0,
-            "bearerOnly": false,
-            "consentRequired": false,
-            "standardFlowEnabled": false,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": true,
-            "publicClient": false,
-            "frontchannelLogout": true,
-            "protocol": "openid-connect",
-            "attributes": {
-              "post.logout.redirect.uris": "+",
-              "oauth2.device.authorization.grant.enabled": "false",
-              "backchannel.logout.revoke.offline.tokens": "false"
-            },
-            "fullScopeAllowed": true,
-            "protocolMappers": [
-              {
-                "name": "Client ID",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-usersessionmodel-note-mapper",
-                "consentRequired": false,
-                "config": {
-                  "user.session.note": "client_id",
-                  "id.token.claim": "true",
-                  "introspection.token.claim": "true",
-                  "access.token.claim": "true",
-                  "claim.name": "client_id",
-                  "jsonType.label": "String"
-                }
-              }
-            ],
-            "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "basic", "email"],
-            "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
-          }
-        ],
-        "identityProviders": [
-          {
-            "alias": "github",
-            "displayName": "GitHub",
-            "providerId": "github",
-            "enabled": true,
-            "updateProfileFirstLoginMode": "off",
-            "trustEmail": true,
-            "storeToken": false,
-            "addReadTokenRoleOnCreate": false,
-            "authenticateByDefault": false,
-            "linkOnly": false,
-            "config": {
-              "syncMode": "FORCE",
-              "clientSecret": "${KEYCLOAK_GITHUB_CLIENT_SECRET}",
-              "clientId": "${KEYCLOAK_GITHUB_CLIENT_ID}"
-            }
-          }
-        ],
-        "roles": {
-          "realm": [
-            {"name": "admin", "description": "Administrator privileges", "composites": {"realm": ["mentor_access", "notification_access", "run_practice_review"]}},
-            {"name": "mentor_access", "description": "Access to AI Mentor"},
-            {"name": "notification_access", "description": "Get notification emails"},
-            {"name": "run_practice_review", "description": "Trigger practice-aware PR review"},
-            {"name": "offline_access", "description": "Offline access", "composite": false, "clientRole": false},
-            {"name": "uma_authorization", "description": "UMA authorization", "composite": false, "clientRole": false},
-            {"name": "default-roles-hephaestus", "description": "Default roles", "composite": true, "composites": {"realm": ["offline_access", "uma_authorization"], "client": {"account": ["view-profile", "manage-account"]}}, "clientRole": false}
-          ]
-        },
-        "defaultRole": {"name": "default-roles-hephaestus", "composite": true, "clientRole": false},
-        "users": [
-          {
-            "username": "service-account-hephaestus-confidential",
-            "emailVerified": false,
-            "enabled": true,
-            "serviceAccountClientId": "hephaestus-confidential",
-            "realmRoles": ["default-roles-hephaestus"],
-            "clientRoles": {"realm-management": ["view-users", "query-users", "manage-users", "view-identity-providers"]}
-          }
-        ],
-        "authenticatorConfig": [
-          {
-            "alias": "review profile config",
-            "config": {
-              "update.profile.on.first.login": "off"
-            }
-          }
-        ],
-        "components": {
-          "org.keycloak.userprofile.UserProfileProvider": [{
-            "providerId": "declarative-user-profile",
-            "config": {
-              "kc.user.profile.config": ["{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"]
-            }
-          }]
-        }
-      }

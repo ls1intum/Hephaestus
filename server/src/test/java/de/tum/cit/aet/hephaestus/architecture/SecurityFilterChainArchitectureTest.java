@@ -17,7 +17,13 @@ class SecurityFilterChainArchitectureTest extends HephaestusArchitectureTest {
             .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.SecurityConfig")
             .orShould()
             .beDeclaredInClassesThat()
-            .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig");
+            .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig")
+            // core.auth (ADR 0017) owns the oauth2Login filter chain — the user-facing login
+            // flow is its own architectural concern, deliberately separate from the
+            // resource-server chain in SecurityConfig.
+            .orShould()
+            .beDeclaredInClassesThat()
+            .haveFullyQualifiedName("de.tum.cit.aet.hephaestus.core.auth.config.AuthSecurityConfig");
         rule.check(classes);
     }
 }

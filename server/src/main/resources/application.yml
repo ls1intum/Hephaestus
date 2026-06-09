@@ -55,22 +55,35 @@ spring:
                 order_inserts: true
                 order_updates: true
 
-    # Repository proxy verification deferred to ContextRefreshedEvent (still before readiness).
+    # Synchronous JPA repository bootstrap (Spring Boot's default since 2.4.1). DEFERRED builds the
+    # EntityManagerFactory on the applicationTaskExecutor background thread; that thread starves under
+    # CPU throttling (Paketo CDS-training builder, spec generation), hanging the boot, and combined with
+    # an @PostConstruct repository read it is the documented lock-order deadlock (spring-boot#23758,
+    # reverted as the framework default in #24249). The cold-start overlap it bought is not worth that
+    # footgun, so we keep bootstrap synchronous on the main thread for every profile.
     data:
         jpa:
             repositories:
-                bootstrap-mode: deferred
+                bootstrap-mode: default
 
     liquibase:
         change-log: classpath:db/master.xml
         # Gates `context="backfill"` one-shot changesets; prod overrides to `prod`.
         contexts: dev
 
-    security:
-        oauth2:
-            resourceserver:
-                jwt:
-                    issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
+    # Hephaestus issues + verifies its own ES256 cookie-JWTs (core.auth
+    # RevocationAwareJwtDecoder is the sole JwtDecoder bean) and federates login via
+    # oauth2Login. There is no spring.security.oauth2.client.registration here: the default
+    # login providers are configured under hephaestus.auth.{github,gitlab} and seeded into the
+    # instance-scoped login_provider store, which the DB-backed LoginProviderClientRegistrationRepository
+    # reads — so a no-credentials boot does not fail Boot's non-empty-client-id validation. See ADR 0017.
+
+    # RFC 9457 Problem Details for all framework-raised errors (ResponseStatusException,
+    # validation, etc.). Set explicitly so the contract survives a Boot upgrade. The
+    # core.exception.GlobalControllerAdvice supplies richer bodies for domain exceptions.
+    mvc:
+        problemdetails:
+            enabled: true
 
     # Disable Mustache template location check as we don't use Mustache templates
     mustache:
@@ -141,6 +154,63 @@ springdoc:
     writer-with-order-by-keys: true
 
 hephaestus:
+    auth:
+        issuer: ${HEPHAESTUS_AUTH_ISSUER:http://localhost:8080}
+        audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
+        access-ttl: ${HEPHAESTUS_AUTH_ACCESS_TTL:15m}
+        cookie-name: ${HEPHAESTUS_AUTH_COOKIE_NAME:__Host-HEPHAESTUS_AT}
+        state-cookie-key: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:}
+        # Instance login providers seeded into the login_provider store on first boot, keyed by a stable
+        # registrationId (the OAuth callback segment + identity key). A blank client-id skips that entry
+        # (no crash). Seeding is seed-if-absent, so admin edits survive reboots. Multiple providers per
+        # instance are supported — add more keyed entries here or in the local .env (one per (type,
+        # base-url) SCM instance), or at runtime in Instance admin → Login providers. Register this
+        # callback on each upstream OAuth app: {server-url}/login/oauth2/code/{registrationId}.
+        login-providers:
+            github:
+                type: GITHUB
+                display-name: ${GITHUB_OAUTH_DISPLAY_NAME:GitHub}
+                client-id: ${GITHUB_OAUTH_CLIENT_ID:}
+                client-secret: ${GITHUB_OAUTH_CLIENT_SECRET:}
+            # Default GitLab slot (gitlab.com). For a self-hosted instance, either point base-url at it
+            # (e.g. https://gitlab.lrz.de) or — to keep a descriptive id and/or run several GitLabs —
+            # leave this blank and declare keyed entries like `gitlab-lrz` in the .env (see .env.example).
+            gitlab:
+                type: GITLAB
+                base-url: ${GITLAB_OAUTH_BASE_URL:https://gitlab.com}
+                display-name: ${GITLAB_OAUTH_DISPLAY_NAME:GitLab}
+                client-id: ${GITLAB_OAUTH_CLIENT_ID:}
+                client-secret: ${GITLAB_OAUTH_CLIENT_SECRET:}
+        # Token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
+        # Buckets are SHARED across replicas via a Postgres ProxyManager (no Redis) when
+        # postgres-backed=true (default) and a DataSource is present; otherwise an in-JVM
+        # PER-REPLICA fallback is used (logged at startup). Each limit: `capacity` requests
+        # per `period` (interval refill — a fresh budget per window).
+        rate-limit:
+            enabled: ${HEPHAESTUS_AUTH_RATE_LIMIT_ENABLED:true}
+            postgres-backed: ${HEPHAESTUS_AUTH_RATE_LIMIT_POSTGRES_BACKED:true}
+            # GET /oauth2/authorization/* — keyed by client IP
+            oauth-authorization:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_OAUTH_CAPACITY:20}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_OAUTH_PERIOD:1m}
+            # POST /auth/refresh — keyed by account (JWT sub), IP fallback
+            refresh:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_REFRESH_CAPACITY:60}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_REFRESH_PERIOD:1m}
+            # POST /auth/impersonate — keyed by admin account, IP fallback
+            impersonate:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_IMPERSONATE_CAPACITY:10}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_IMPERSONATE_PERIOD:1m}
+            # DELETE /user — keyed by account, IP fallback
+            delete-user:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_DELETE_USER_CAPACITY:3}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_DELETE_USER_PERIOD:1h}
+            # POST /user/exports (async bundle assembly) — keyed by account, IP fallback. The
+            # GET /user/exports/{id}/download is intentionally NOT limited (cheap ownership-gated read).
+            export:
+                capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_CAPACITY:10}
+                period: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_PERIOD:1h}
+
     host-url: https://hephaestus.ase.cit.tum.de/
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -278,7 +348,7 @@ hephaestus:
     # FEATURE FLAGS (operational / development toggles)
     # ═══════════════════════════════════════════════════════════════════════════
     # CONFIG-backed feature flags evaluated by FeatureFlagService.
-    # ROLE-backed flags (mentor_access, admin, etc.) are managed in Keycloak.
+    # ROLE-backed flags (mentor_access, admin, etc.) are stored per account in the account_feature table.
     features:
         flags:
             practice-review-for-all: false
@@ -290,7 +360,7 @@ hephaestus:
     # Controls the detection gate for the practice-aware PR review agent.
     # The gate decides whether to submit an agent job for a PR event.
     practice-review:
-        # true = run for ALL users (bypass Keycloak role check); false = require run_practice_review role
+        # true = run for ALL users (bypass role check); false = require the run_practice_review feature flag
         run-for-all-users: ${PRACTICE_REVIEW_RUN_FOR_ALL:false}
         # true = skip practice review for draft PRs
         skip-drafts: ${PRACTICE_REVIEW_SKIP_DRAFTS:true}
@@ -420,17 +490,6 @@ hephaestus:
             auth-token: ${GH_AUTH_TOKEN:}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # KEYCLOAK IDENTITY PROVIDER
-    # ═══════════════════════════════════════════════════════════════════════════
-    keycloak:
-        url: http://localhost:${KEYCLOAK_PORT:8081}
-        realm: hephaestus
-        client-id: hephaestus-confidential
-        # SECURITY: Never commit secrets. Use environment variables in production.
-        # For local development, the default 'hephaestus-dev-secret' matches the realm import.
-        client-secret: ${KEYCLOAK_CLIENT_SECRET:hephaestus-dev-secret}
-
-    # ═══════════════════════════════════════════════════════════════════════════
     # INTEGRATION FEATURE FLAGS + SCM/SLACK CONFIG
     # ═══════════════════════════════════════════════════════════════════════════
     # Slack and Outline integrations are opt-in. Every bean under
@@ -475,9 +534,9 @@ hephaestus:
         gitlab:
             enabled: ${GITLAB_ENABLED:false}
             # Default GitLab server URL (used when workspace has no custom serverUrl).
-            # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
+            # Falls back to the native-auth GitLab login base URL so deployments with GitLab login
             # automatically use the same instance for workspace creation.
-            default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${KEYCLOAK_GITLAB_BASE_URL:https://gitlab.com}}
+            default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${GITLAB_OAUTH_BASE_URL:https://gitlab.com}}
             # Timeout for standard GraphQL operations (default: 30s)
             graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
             # Extended timeout for complex operations (default: 60s)
@@ -542,7 +601,7 @@ logging:
 # auto-start below is tracked here so `mvn spring-boot:run` works out of the box without it.
 ---
 # Local-profile overlay (the `local` profile is the default for `mvn spring-boot:run` /
-# `pnpm dev:server`). Auto-starts server/compose.yaml — Postgres, Keycloak, NATS — through Spring
+# `pnpm dev:server`). Auto-starts server/compose.yaml — Postgres, NATS — through Spring
 # Boot's docker-compose support and waits for readiness, so a bare `mvn spring-boot:run` brings its
 # own infra up. lifecycle-management=start-only: Ctrl-C never stops the stack, and a stack that
 # `pnpm dev:compose` started first is detected and reused rather than fought.

@@ -27,15 +27,19 @@ jobs:
       checks: write
       statuses: write
     name: "${{ matrix.display-name }}"
-    runs-on: ubuntu-latest
+    # App Server tiers on the free 4-vCPU/16GB arm64 runners (the integration job was CPU-starved on
+    # the 2-vCPU default). Webapp jobs stay on ubuntu-latest (Node toolchain).
+    runs-on: ${{ startsWith(matrix.test-type, 'application-server-') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     if: inputs.should_skip != 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
-          - test-type: application-server-unit-arch
-            display-name: "App Server: Unit + Arch"
+          - test-type: application-server-unit
+            display-name: "App Server: Unit"
+          - test-type: application-server-arch
+            display-name: "App Server: Arch"
           - test-type: application-server-integration
             display-name: "App Server: Integration"
           - test-type: webapp-unit
@@ -53,7 +57,7 @@ jobs:
             "webapp-unit"|"webapp-storybook"|"webapp-visual")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-unit-arch"|"application-server-integration")
+            application-server-*)
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
@@ -93,12 +97,15 @@ jobs:
         run: |
           cd server
           rm -rf target/surefire-reports/*
-          # Use -Dsurefire.includedGroups to override the property defined in pom.xml
-          # The pom.xml configures <groups>${surefire.includedGroups}</groups>
-          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when target/generated-sources exists from cache)
+          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when cached generated-sources exist).
+          # unit / arch are split into parallel jobs; tag filtering is surefire-owned so no tier silently drops tests.
           case "${{ matrix.test-type }}" in
-            "application-server-unit-arch") ./mvnw test -Dsurefire.includedGroups="unit | architecture" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.timeout=600 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-arch") ./mvnw test -Dsurefire.includedGroups="architecture" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            # forkCount=2 spreads integration classes across 2 isolated JVMs (each its own Testcontainers
+            # Postgres); parallel=none keeps each fork serial (shared DB per fork). (3 forks tipped the
+            # StartupBudget per-bean timing ceiling under CPU contention — 2 is stable and still <10 min.)
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.forkCount=2 -Dhephaestus.surefire.maxHeap=2048m -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
       - name: Run tests

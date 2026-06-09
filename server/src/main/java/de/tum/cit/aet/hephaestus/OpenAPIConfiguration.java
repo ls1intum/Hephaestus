@@ -48,7 +48,8 @@ import org.springframework.context.annotation.Configuration;
     type = SecuritySchemeType.HTTP,
     scheme = "bearer",
     bearerFormat = "JWT",
-    description = "JWT authentication via Keycloak. Obtain a token from your Keycloak instance."
+    description = "Hephaestus-native JWT bearer authentication. The SPA normally authenticates via the " +
+        "`__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent bearer token."
 )
 public class OpenAPIConfiguration {
 

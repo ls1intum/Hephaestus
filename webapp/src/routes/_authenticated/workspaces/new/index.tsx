@@ -7,6 +7,7 @@ import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/integrations/auth/AuthContext";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/")({
 	component: ProviderSelectionPage,
@@ -21,6 +22,7 @@ interface Provider {
 }
 
 function ProviderSelectionPage() {
+	const { isAppAdmin } = useAuth();
 	const {
 		data: workspaceProviders,
 		isLoading,
@@ -29,6 +31,11 @@ function ProviderSelectionPage() {
 		...getProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
+
+	// Mirror the server gate (hephaestus.workspace.creation-policy): under ADMIN_ONLY, a non-admin
+	// would get a 403 on submit, so surface that up front instead of letting them fill out the wizard.
+	const adminOnly = workspaceProviders?.creationPolicy === "ADMIN_ONLY";
+	const blockedForNonAdmin = adminOnly && !isAppAdmin;
 
 	const providers: Provider[] = [];
 	if (workspaceProviders?.github) {
@@ -78,6 +85,15 @@ function ProviderSelectionPage() {
 				<div className="flex justify-center py-12">
 					<Spinner />
 				</div>
+			) : blockedForNonAdmin ? (
+				<Alert className="mb-4">
+					<OctagonXIcon aria-hidden="true" />
+					<AlertTitle>Workspace creation is admin-only</AlertTitle>
+					<AlertDescription>
+						An instance admin must create workspaces on this deployment. Ask an admin to set one up
+						for you.
+					</AlertDescription>
+				</Alert>
 			) : providers.length === 0 && !isError ? (
 				<p className="text-center text-muted-foreground py-12">
 					No providers are currently available. Contact your administrator.

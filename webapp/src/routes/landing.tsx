@@ -1,34 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { LandingPage } from "@/components/info/landing/LandingPage";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import { useAuth } from "@/integrations/auth/AuthContext";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+/**
+ * The landing page now lives at `/` (see `routes/index.tsx`). This route is kept only as a redirect
+ * so existing links and bookmarks to `/landing` keep working.
+ */
 export const Route = createFileRoute("/landing")({
-	component: LandingContainer,
+	beforeLoad: () => {
+		throw redirect({ to: "/" });
+	},
 });
-
-export function LandingContainer() {
-	const { login, isAuthenticated } = useAuth();
-	const { workspaceSlug, workspaces } = useActiveWorkspaceSlug();
-	const navigate = useNavigate({ from: Route.fullPath });
-
-	const handleGoToDashboard = () => {
-		const targetSlug = workspaceSlug ?? workspaces[0]?.workspaceSlug;
-		if (targetSlug) {
-			navigate({
-				to: "/w/$workspaceSlug",
-				params: { workspaceSlug: targetSlug },
-			});
-		}
-	};
-
-	return (
-		<div className="-m-4">
-			<LandingPage
-				onSignIn={(idpHint) => login(idpHint)}
-				onGoToDashboard={handleGoToDashboard}
-				isSignedIn={isAuthenticated}
-			/>
-		</div>
-	);
-}

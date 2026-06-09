@@ -72,6 +72,9 @@ export default defineConfig(({ command }) => {
 		test: {
 			globals: true,
 			environment: "jsdom",
+			// Stand up the MSW Node server (handlers shared with Storybook) for the query-driven
+			// auth component tests; harmless for tests that issue no requests (unhandled = bypass).
+			setupFiles: ["./src/test/setup-msw.ts"],
 			reporters: ["default", "junit"],
 			outputFile: {
 				junit: "./test-results/junit-webapp.xml",

@@ -246,8 +246,9 @@ public class OAuthCallbackController {
 
     /**
      * Browser path: 302 to {@code failureRedirect} with {@code status|reason|kind} query params.
-     * JSON path ({@code Accept: application/json}): structured {kind,error,errorDescription} body
-     * with the given status so curl / devtools / E2E suites surface the failure clearly.
+     * JSON path ({@code Accept: application/json}): an RFC-7807 {@code application/problem+json} body
+     * ({@code detail} = description, {@code kind}/{@code error} extension members) with the given
+     * status so curl / devtools / E2E suites surface the failure clearly.
      */
     private ResponseEntity<?> failure(
         @Nullable String kind,

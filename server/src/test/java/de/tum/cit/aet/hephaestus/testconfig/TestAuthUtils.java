@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import java.util.List;
 import java.util.function.Consumer;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Utility class for test authentication helpers.
@@ -87,6 +90,38 @@ public class TestAuthUtils {
         return headers -> {
             String token = getCurrentUserToken();
             headers.setBearerAuth(token);
+        };
+    }
+
+    /** The double-submit CSRF cookie/header pair the SPA echoes (see SpaCsrfTokenRequestHandler). */
+    private static final String XSRF_COOKIE = "__Host-XSRF-TOKEN";
+    private static final String XSRF_HEADER = "X-XSRF-TOKEN";
+
+    /**
+     * Fetches a valid double-submit CSRF token by issuing a safe GET on the public
+     * {@code /identity-providers} endpoint (resource-server chain), where {@code CsrfCookieFilter}
+     * renders the {@code XSRF-TOKEN} cookie. Replay it via {@link #withCsrf(String)} so a cookie-style
+     * state-changing request passes CSRF and is answered by the authentication layer (ADR 0017) — the
+     * canonical way to assert a protected endpoint returns 401, not the CSRF filter's 403.
+     */
+    public static String fetchCsrfToken(WebTestClient client) {
+        var result = client.get().uri("/identity-providers").exchange().expectStatus().isOk().returnResult(Void.class);
+        List<ResponseCookie> cookies = result.getResponseCookies().get(XSRF_COOKIE);
+        if (cookies == null || cookies.isEmpty()) {
+            throw new IllegalStateException("XSRF-TOKEN cookie was not issued on the safe request");
+        }
+        return cookies.get(0).getValue();
+    }
+
+    /**
+     * Headers consumer carrying a matching double-submit CSRF token (cookie + header) but NO
+     * authentication, so a cookie-style state-changing request passes CSRF and reaches the auth layer
+     * (→ 401 for an unauthenticated caller). Pair with {@link #fetchCsrfToken(WebTestClient)}.
+     */
+    public static Consumer<HttpHeaders> withCsrf(String token) {
+        return headers -> {
+            headers.add(HttpHeaders.COOKIE, XSRF_COOKIE + "=" + token);
+            headers.add(XSRF_HEADER, token);
         };
     }
 }

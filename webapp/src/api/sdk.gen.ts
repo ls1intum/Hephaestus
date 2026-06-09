@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ClaimIdentityData, ClaimIdentityResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DeleteUserData, DeleteUserResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetEngagementData, GetEngagementResponses, GetFindingData, GetFindingErrors, GetFindingResponses, GetFindingsForPullRequestData, GetFindingsForPullRequestResponses, GetIdentityProvidersData, GetIdentityProvidersResponses, GetJobData, GetJobErrors, GetJobResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestFeedbackData, GetLatestFeedbackErrors, GetLatestFeedbackResponses, GetLeaderboardData, GetLeaderboardResponses, GetLinkedAccountsData, GetLinkedAccountsResponses, GetMemberData, GetMemberResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListData, ListFindingsData, ListFindingsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListJobsData, ListJobsResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitFeedbackData, SubmitFeedbackErrors, SubmitFeedbackResponses, UnlinkAccountData, UnlinkAccountResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AdminCreateLoginProviderData, AdminCreateLoginProviderResponses, AdminDeleteLoginProviderData, AdminDeleteLoginProviderResponses, AdminExportAuthEventsData, AdminExportAuthEventsResponses, AdminListAuthEventsData, AdminListAuthEventsResponses, AdminListLoginProvidersData, AdminListLoginProvidersResponses, AdminListUsersData, AdminListUsersResponses, AdminListWorkspacesData, AdminListWorkspacesResponses, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponses, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponses, AdminUpdateUserData, AdminUpdateUserResponses, AssignRoleData, AssignRoleResponses, AuditData, AuditResponses, CallbackGetData, CallbackGetResponses, CallbackPostData, CallbackPostResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteCurrentUserData, DeleteCurrentUserResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteThreadData, DeleteThreadErrors, DeleteThreadResponses, DownloadDataExportData, DownloadDataExportResponses, ExitImpersonationData, ExitImpersonationResponses, GetActivityMonitorData, GetActivityMonitorResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetCurrentUserResponses, GetDataExportStatusData, GetDataExportStatusResponses, GetEngagementData, GetEngagementResponses, GetFindingData, GetFindingErrors, GetFindingResponses, GetFindingsForPullRequestData, GetFindingsForPullRequestResponses, GetJobData, GetJobErrors, GetJobResponses, GetJwksData, GetJwksResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestFeedbackData, GetLatestFeedbackErrors, GetLatestFeedbackResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetProvidersData, GetProvidersResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ImpersonateData, ImpersonateResponses, IngestData, IngestResponses, InitiateData, InitiateResponses, ListData, ListFindingsData, ListFindingsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListIdentityProvidersData, ListIdentityProvidersResponses, ListJobsData, ListJobsResponses, ListLinkedIdentitiesData, ListLinkedIdentitiesResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListResponses, ListSessionsData, ListSessionsResponses, ListThreadsData, ListThreadsResponses, ListWorkspacesData, ListWorkspacesResponses, LogoutData, LogoutResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, ReadData, ReadResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, RefreshData, RefreshResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RemoveVoteData, RemoveVoteErrors, RemoveVoteResponses, RenameSlugData, RenameSlugResponses, RequestDataExportData, RequestDataExportResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, RevokeOtherSessionsData, RevokeOtherSessionsResponses, RevokeSessionData, RevokeSessionResponses, SendTestMessageData, SendTestMessageResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitFeedbackData, SubmitFeedbackErrors, SubmitFeedbackResponses, UnlinkIdentityData, UnlinkIdentityErrors, UnlinkIdentityResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponses, UpdateMemberVisibilityData, UpdateMemberVisibilityResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateStatus1Data, UpdateStatus1Responses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteData, VoteErrors, VoteResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,13 +19,153 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
- * List available identity providers
- *
- * Returns all enabled identity providers that can be used for login. Public endpoint — no authentication required.
+ * JWK set (public keys only)
  */
-export const getIdentityProviders = <ThrowOnError extends boolean = false>(options?: Options<GetIdentityProvidersData, ThrowOnError>) => (options?.client ?? client).get<GetIdentityProvidersResponses, unknown, ThrowOnError>({
+export const getJwks = <ThrowOnError extends boolean = false>(options?: Options<GetJwksData, ThrowOnError>) => (options?.client ?? client).get<GetJwksResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/auth/identity-providers',
+    url: '/.well-known/jwks.json',
+    ...options
+});
+
+/**
+ * List auth audit events (paged, newest first)
+ */
+export const adminListAuthEvents = <ThrowOnError extends boolean = false>(options?: Options<AdminListAuthEventsData, ThrowOnError>) => (options?.client ?? client).get<AdminListAuthEventsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/audit',
+    ...options
+});
+
+/**
+ * Export the filtered audit log as CSV (newest first, capped)
+ */
+export const adminExportAuthEvents = <ThrowOnError extends boolean = false>(options?: Options<AdminExportAuthEventsData, ThrowOnError>) => (options?.client ?? client).get<AdminExportAuthEventsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/audit/export',
+    ...options
+});
+
+/**
+ * List login providers
+ */
+export const adminListLoginProviders = <ThrowOnError extends boolean = false>(options?: Options<AdminListLoginProvidersData, ThrowOnError>) => (options?.client ?? client).get<AdminListLoginProvidersResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/login-providers',
+    ...options
+});
+
+/**
+ * Create a login provider
+ */
+export const adminCreateLoginProvider = <ThrowOnError extends boolean = false>(options: Options<AdminCreateLoginProviderData, ThrowOnError>) => (options.client ?? client).post<AdminCreateLoginProviderResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/login-providers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete a login provider
+ */
+export const adminDeleteLoginProvider = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteLoginProviderData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteLoginProviderResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/login-providers/{registrationId}',
+    ...options
+});
+
+/**
+ * Update a login provider
+ */
+export const adminUpdateLoginProvider = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateLoginProviderData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateLoginProviderResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/login-providers/{registrationId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List accounts (paged)
+ */
+export const adminListUsers = <ThrowOnError extends boolean = false>(options?: Options<AdminListUsersData, ThrowOnError>) => (options?.client ?? client).get<AdminListUsersResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/users',
+    ...options
+});
+
+/**
+ * Update an account's app role
+ */
+export const adminUpdateUser = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateUserData, ThrowOnError>) => (options.client ?? client).patch<AdminUpdateUserResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/users/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Force sign-out: revoke all of an account's active sessions
+ */
+export const adminRevokeUserSessions = <ThrowOnError extends boolean = false>(options: Options<AdminRevokeUserSessionsData, ThrowOnError>) => (options.client ?? client).delete<AdminRevokeUserSessionsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/users/{id}/sessions',
+    ...options
+});
+
+/**
+ * List all workspaces (metadata only)
+ */
+export const adminListWorkspaces = <ThrowOnError extends boolean = false>(options?: Options<AdminListWorkspacesData, ThrowOnError>) => (options?.client ?? client).get<AdminListWorkspacesResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/admin/workspaces',
+    ...options
+});
+
+/**
+ * Begin impersonating another account
+ */
+export const impersonate = <ThrowOnError extends boolean = false>(options: Options<ImpersonateData, ThrowOnError>) => (options.client ?? client).post<ImpersonateResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/auth/impersonate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Exit impersonation, restore operator session
+ */
+export const exitImpersonation = <ThrowOnError extends boolean = false>(options?: Options<ExitImpersonationData, ThrowOnError>) => (options?.client ?? client).post<ExitImpersonationResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/auth/impersonate:exit',
+    ...options
+});
+
+/**
+ * Log out — revoke the current token + clear the cookie
+ */
+export const logout = <ThrowOnError extends boolean = false>(options?: Options<LogoutData, ThrowOnError>) => (options?.client ?? client).post<LogoutResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/auth/logout',
+    ...options
+});
+
+/**
+ * Rotate the access token (new jti, old revoked)
+ */
+export const refresh = <ThrowOnError extends boolean = false>(options?: Options<RefreshData, ThrowOnError>) => (options?.client ?? client).post<RefreshResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/auth/refresh',
     ...options
 });
 
@@ -35,6 +175,15 @@ export const getIdentityProviders = <ThrowOnError extends boolean = false>(optio
  * Returns contributors to the Hephaestus project (for the About page)
  */
 export const listGlobalContributors = <ThrowOnError extends boolean = false>(options?: Options<ListGlobalContributorsData, ThrowOnError>) => (options?.client ?? client).get<ListGlobalContributorsResponses, unknown, ThrowOnError>({ url: '/contributors', ...options });
+
+/**
+ * List available identity providers
+ */
+export const listIdentityProviders = <ThrowOnError extends boolean = false>(options?: Options<ListIdentityProvidersData, ThrowOnError>) => (options?.client ?? client).get<ListIdentityProvidersResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/identity-providers',
+    ...options
+});
 
 export const callbackGet = <ThrowOnError extends boolean = false>(options: Options<CallbackGetData, ThrowOnError>) => (options.client ?? client).get<CallbackGetResponses, unknown, ThrowOnError>({
     querySerializer: { parameters: { allParams: { object: { style: 'form' } } } },
@@ -51,20 +200,54 @@ export const callbackPost = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Delete user account
- *
- * Permanently delete the current user's account and all associated data (GDPR)
+ * Delete the current account (GDPR Art. 17)
  */
-export const deleteUser = <ThrowOnError extends boolean = false>(options?: Options<DeleteUserData, ThrowOnError>) => (options?.client ?? client).delete<DeleteUserResponses, unknown, ThrowOnError>({
+export const deleteCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<DeleteCurrentUserData, ThrowOnError>) => (options?.client ?? client).delete<DeleteCurrentUserResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/user',
     ...options
 });
 
 /**
+ * Get the current user
+ */
+export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserData, ThrowOnError>) => (options?.client ?? client).get<GetCurrentUserResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user',
+    ...options
+});
+
+/**
+ * Request a data export (async)
+ */
+export const requestDataExport = <ThrowOnError extends boolean = false>(options?: Options<RequestDataExportData, ThrowOnError>) => (options?.client ?? client).post<RequestDataExportResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user/exports',
+    ...options
+});
+
+/**
+ * Get data-export status
+ */
+export const getDataExportStatus = <ThrowOnError extends boolean = false>(options: Options<GetDataExportStatusData, ThrowOnError>) => (options.client ?? client).get<GetDataExportStatusResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user/exports/{id}',
+    ...options
+});
+
+/**
+ * Download the data-export bundle
+ */
+export const downloadDataExport = <ThrowOnError extends boolean = false>(options: Options<DownloadDataExportData, ThrowOnError>) => (options.client ?? client).get<DownloadDataExportResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user/exports/{id}/download',
+    ...options
+});
+
+/**
  * Get feature flags for the current user
  *
- * Returns all feature flags evaluated for the authenticated user. Combines Keycloak role checks and server-side config toggles.
+ * Returns all feature flags evaluated for the authenticated user. Combines role checks and server-side config toggles.
  */
 export const getUserFeatures = <ThrowOnError extends boolean = false>(options?: Options<GetUserFeaturesData, ThrowOnError>) => (options?.client ?? client).get<GetUserFeaturesResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -74,41 +257,51 @@ export const getUserFeatures = <ThrowOnError extends boolean = false>(options?: 
 
 /**
  * List linked identity providers
- *
- * Returns all configured identity providers with their connection status for the current user
  */
-export const getLinkedAccounts = <ThrowOnError extends boolean = false>(options?: Options<GetLinkedAccountsData, ThrowOnError>) => (options?.client ?? client).get<GetLinkedAccountsResponses, unknown, ThrowOnError>({
+export const listLinkedIdentities = <ThrowOnError extends boolean = false>(options?: Options<ListLinkedIdentitiesData, ThrowOnError>) => (options?.client ?? client).get<ListLinkedIdentitiesResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/user/linked-accounts',
+    url: '/user/identities',
     ...options
 });
 
 /**
- * Unlink an identity provider
- *
- * Remove the federated identity link for the given provider. Cannot unlink the last remaining provider.
+ * Unlink one of the current user's linked identity providers
  */
-export const unlinkAccount = <ThrowOnError extends boolean = false>(options: Options<UnlinkAccountData, ThrowOnError>) => (options.client ?? client).delete<UnlinkAccountResponses, unknown, ThrowOnError>({
+export const unlinkIdentity = <ThrowOnError extends boolean = false>(options: Options<UnlinkIdentityData, ThrowOnError>) => (options.client ?? client).delete<UnlinkIdentityResponses, UnlinkIdentityErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/user/linked-accounts/{providerAlias}',
+    url: '/user/identities/{id}',
     ...options
 });
 
 /**
- * Claim an identity provider from another user
- *
- * Transfers a federated identity from another Keycloak user to the current user. Used when a user has accidentally created two accounts by logging in with different IdPs. Deletes the orphan account if it has no remaining identities.
+ * Revoke all sessions except the current one
  */
-export const claimIdentity = <ThrowOnError extends boolean = false>(options: Options<ClaimIdentityData, ThrowOnError>) => (options.client ?? client).post<ClaimIdentityResponses, unknown, ThrowOnError>({
+export const revokeOtherSessions = <ThrowOnError extends boolean = false>(options?: Options<RevokeOtherSessionsData, ThrowOnError>) => (options?.client ?? client).delete<RevokeOtherSessionsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/user/linked-accounts/{providerAlias}/claim',
+    url: '/user/sessions',
+    ...options
+});
+
+/**
+ * List active sessions for the current user
+ */
+export const listSessions = <ThrowOnError extends boolean = false>(options?: Options<ListSessionsData, ThrowOnError>) => (options?.client ?? client).get<ListSessionsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user/sessions',
+    ...options
+});
+
+/**
+ * Revoke a single session
+ */
+export const revokeSession = <ThrowOnError extends boolean = false>(options: Options<RevokeSessionData, ThrowOnError>) => (options.client ?? client).delete<RevokeSessionResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user/sessions/{jti}',
     ...options
 });
 
 /**
  * Get user settings
- *
- * Get the current user's notification, research participation, and AI review preferences
  */
 export const getUserSettings = <ThrowOnError extends boolean = false>(options?: Options<GetUserSettingsData, ThrowOnError>) => (options?.client ?? client).get<GetUserSettingsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -118,8 +311,6 @@ export const getUserSettings = <ThrowOnError extends boolean = false>(options?: 
 
 /**
  * Update user settings
- *
- * Update the current user's notification, research participation, and AI review preferences
  */
 export const updateUserSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateUserSettingsData, ThrowOnError>) => (options.client ?? client).post<UpdateUserSettingsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -438,7 +629,7 @@ export const assignRole = <ThrowOnError extends boolean = false>(options: Option
  * Get the current user's membership in this workspace.
  *
  * Get the current user's membership in this workspace.
- * Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+ * Super admins (the <code>admin</code> app role, APP_ADMIN) have their effective role elevated to ADMIN
  * if their database role is lower, matching the runtime authorization behaviour in
  * {@link WorkspaceAccessService WorkspaceAccessService}.
  */

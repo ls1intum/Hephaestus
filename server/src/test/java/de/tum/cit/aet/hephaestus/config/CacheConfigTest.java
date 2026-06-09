@@ -22,6 +22,7 @@ class CacheConfigTest extends BaseUnitTest {
 
     private static final List<String> EXPECTED_NAMES = List.of(
         "achievementProgress",
+        "auth_jwt_revoked",
         "contributors",
         "mentor_findings_aspect",
         "mentor_practice_aspect",

@@ -243,9 +243,11 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
 
         @Test
-        void unauthenticatedReturns401() {
+        void unauthenticatedMutationRejected() {
             var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
 
+            // Anonymous POST → the double-submit CSRF gate (ADR 0017) rejects it 403 before auth runs
+            // (no X-XSRF-TOKEN). The mutation stays blocked for anonymous callers.
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
@@ -253,7 +255,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isUnauthorized();
+                .isForbidden();
         }
     }
 

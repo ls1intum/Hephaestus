@@ -56,6 +56,6 @@ The script reuses the system PostgreSQL binaries provided in the Codex base imag
 
 ## Limitations
 
-- Keycloak and the remaining Docker Compose services still require Docker.
+- The remaining Docker Compose services (NATS) still require Docker.
 - `scripts/local-postgres.sh` expects PostgreSQL 14+ binaries (`pg_ctl`, `pg_isready`). Run `./scripts/codex-setup.sh` if commands are missing.
 - Always stop the cluster when you finish (`scripts/local-postgres.sh stop`) to leave port 5432 free for other workflows.

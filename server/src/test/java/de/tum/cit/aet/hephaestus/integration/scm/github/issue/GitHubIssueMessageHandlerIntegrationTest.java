@@ -20,14 +20,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,9 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -141,7 +138,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private TestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     @BeforeEach
     void setUp() {
@@ -225,7 +222,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
             // Domain event published
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueCreated.class)).hasSize(1);
         }
 
         @Test
@@ -259,7 +256,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(issue.getState()).isEqualTo(Issue.State.CLOSED);
 
             // Verify Closed event was published
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueClosed.class)).hasSize(1);
         }
 
         @Test
@@ -329,7 +326,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(labelRepository.findByNativeIdAndProviderId(9567656085L, gitProvider.getId())).isPresent();
 
             // Verify Labeled event was published
-            assertThat(eventListener.getLabeledEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueLabeled.class)).hasSize(1);
         }
 
         @Test
@@ -344,7 +341,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(unlabeledEvent);
 
             // Then - Unlabeled event should be published
-            assertThat(eventListener.getUnlabeledEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUnlabeled.class)).hasSize(1);
         }
     }
 
@@ -453,7 +450,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
             // Verify Typed event was published
-            assertThat(eventListener.getTypedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueTyped.class)).hasSize(1);
         }
 
         @Test
@@ -473,7 +470,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
             // Verify Untyped event was published
-            assertThat(eventListener.getUntypedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.IssueUntyped.class)).hasSize(1);
         }
     }
 
@@ -712,114 +709,5 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .stream()
             .map(l -> l.getName())
             .collect(Collectors.toSet());
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestEventListener {
-
-        private final List<ScmDomainEvent.IssueCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueReopened> reopenedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueLabeled> labeledEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueUnlabeled> unlabeledEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueTyped> typedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueUntyped> untypedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.IssueDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.IssueCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.IssueUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.IssueClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.IssueReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onLabeled(ScmDomainEvent.IssueLabeled event) {
-            labeledEvents.add(event);
-        }
-
-        @EventListener
-        public void onUnlabeled(ScmDomainEvent.IssueUnlabeled event) {
-            unlabeledEvents.add(event);
-        }
-
-        @EventListener
-        public void onTyped(ScmDomainEvent.IssueTyped event) {
-            typedEvents.add(event);
-        }
-
-        @EventListener
-        public void onUntyped(ScmDomainEvent.IssueUntyped event) {
-            untypedEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(ScmDomainEvent.IssueDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.IssueCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.IssueUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueLabeled> getLabeledEvents() {
-            return new ArrayList<>(labeledEvents);
-        }
-
-        public List<ScmDomainEvent.IssueUnlabeled> getUnlabeledEvents() {
-            return new ArrayList<>(unlabeledEvents);
-        }
-
-        public List<ScmDomainEvent.IssueTyped> getTypedEvents() {
-            return new ArrayList<>(typedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueUntyped> getUntypedEvents() {
-            return new ArrayList<>(untypedEvents);
-        }
-
-        public List<ScmDomainEvent.IssueDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            labeledEvents.clear();
-            unlabeledEvents.clear();
-            typedEvents.clear();
-            untypedEvents.clear();
-            deletedEvents.clear();
-        }
     }
 }

@@ -20,19 +20,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -45,7 +41,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * - Context handling and workspace association
  * - Reply threading via parent comment resolution
  */
-@Import(GitHubDiscussionCommentProcessorIntegrationTest.TestCommentEventListener.class)
 class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final Long TEST_ORG_ID = 215361191L;
@@ -83,7 +78,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private TestCommentEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -201,7 +196,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThat(result.getDiscussion().getId()).isEqualTo(testDiscussion.getId());
 
             // Verify DiscussionCommentCreated event was published
-            assertThat(eventListener.getCreatedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -232,7 +227,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             DiscussionComment result = processor.process(dto, testDiscussion, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).isEmpty();
         }
 
         @Test
@@ -259,7 +254,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThat(result).isNotNull();
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getAuthor()).isNull();
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).hasSize(1);
         }
 
         @Test
@@ -314,7 +309,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThat(result.getBody()).isEqualTo("Updated body");
 
             // Verify DiscussionCommentEdited event was published
-            assertThat(eventListener.getEditedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -371,7 +366,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThat(result.isAnswer()).isTrue();
 
             // Verify DiscussionCommentEdited event was published with isAnswer change
-            assertThat(eventListener.getEditedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -394,8 +389,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.process(dto, testDiscussion, context);
 
             // No edited events should be published for unchanged data
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
-            assertThat(eventListener.getEditedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class)).isEmpty();
         }
 
         @Test
@@ -440,7 +435,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             ).isEmpty();
 
             // Verify DiscussionCommentDeleted event was published
-            assertThat(eventListener.getDeletedEvents())
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class))
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
@@ -500,7 +495,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             processor.processDeleted(dto, createContext());
 
-            assertThat(eventListener.getDeletedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class)).isEmpty();
         }
 
         @Test
@@ -510,7 +505,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.processDeleted(dto, createContext());
 
             // No event should be published for non-existent comment
-            assertThat(eventListener.getDeletedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class)).isEmpty();
         }
     }
 
@@ -562,50 +557,6 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
                 assertThat(savedReply.getParentComment()).isNotNull();
                 assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
             });
-        }
-    }
-
-    /**
-     * Test event listener that captures discussion comment events.
-     */
-    @Component
-    static class TestCommentEventListener {
-
-        private final List<ScmDomainEvent.DiscussionCommentCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionCommentEdited> editedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionCommentDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.DiscussionCommentCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onEdited(ScmDomainEvent.DiscussionCommentEdited event) {
-            editedEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(ScmDomainEvent.DiscussionCommentDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.DiscussionCommentCreated> getCreatedEvents() {
-            return createdEvents;
-        }
-
-        public List<ScmDomainEvent.DiscussionCommentEdited> getEditedEvents() {
-            return editedEvents;
-        }
-
-        public List<ScmDomainEvent.DiscussionCommentDeleted> getDeletedEvents() {
-            return deletedEvents;
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            editedEvents.clear();
-            deletedEvents.clear();
         }
     }
 }

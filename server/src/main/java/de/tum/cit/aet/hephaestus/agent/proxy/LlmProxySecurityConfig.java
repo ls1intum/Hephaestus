@@ -15,7 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 /**
  * Separate security filter chain for the internal LLM proxy endpoints.
  *
- * <p>This chain uses {@code @Order(1)} and is evaluated before the main Keycloak/JWT chain
+ * <p>This chain uses {@code @Order(1)} and is evaluated before the main JWT chain
  * (which has no explicit {@code @Order} and defaults to lowest precedence).
  * Authenticates requests using job tokens instead of JWTs.
  * The main chain for all other endpoints remains unchanged.

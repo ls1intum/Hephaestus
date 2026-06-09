@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { expect, within } from "storybook/test";
 import type { ChatThreadSummary } from "@/api/types.gen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -38,6 +39,7 @@ const meta = {
 	args: {
 		username: "johnDoe",
 		isAdmin: false,
+		isAppAdmin: false,
 		hasMentorAccess: false,
 		context: "main",
 		workspaces: [mockWorkspace],
@@ -89,9 +91,44 @@ export const AdminUser: Story = {
 	args: {
 		username: "admin",
 		isAdmin: true,
+		isAppAdmin: true,
 		hasMentorAccess: true,
 		context: "main",
 		activeWorkspace: mockWorkspace,
+	},
+};
+
+/**
+ * The dedicated instance-admin shell (`context === "admin"`): its own "Back to app" header and
+ * section nav, with the workspace switcher suppressed.
+ */
+export const AdminContext: Story = {
+	args: {
+		username: "admin",
+		isAppAdmin: true,
+		context: "admin",
+		activeWorkspace: mockWorkspace,
+	},
+};
+
+/**
+ * Instance-admin shell with ZERO workspaces — the regression guard for the day-one lockout: a
+ * freshly bootstrapped APP_ADMIN must still reach /admin (the shell renders, not the NoWorkspace
+ * empty state), because the admin context is rendered independent of any active workspace.
+ */
+export const AdminContextNoWorkspace: Story = {
+	args: {
+		username: "admin",
+		isAppAdmin: true,
+		context: "admin",
+		workspaces: [],
+		activeWorkspace: undefined,
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await expect(canvas.getByText("Instance administration")).toBeInTheDocument();
+		await expect(canvas.getByText("Back to app")).toBeInTheDocument();
+		await expect(canvas.queryByText(/no workspace/i)).not.toBeInTheDocument();
 	},
 };
 
@@ -182,7 +219,7 @@ export const LoadingWorkspaces: Story = {
 	},
 };
 
-/** User has the MENTOR_ACCESS Keycloak role but the workspace toggle is off — link hidden. */
+/** User has the MENTOR_ACCESS feature flag but the workspace toggle is off — link hidden. */
 export const MentorRoleButFeatureDisabled: Story = {
 	args: {
 		hasMentorAccess: true,

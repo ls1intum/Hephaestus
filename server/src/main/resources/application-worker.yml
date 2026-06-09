@@ -4,9 +4,9 @@ spring:
         activate:
             on-profile: worker
 
-    # Worker pod has no user-facing API; Spring's OAuth2 resource-server autoconfig would
-    # otherwise force-resolve ${KEYCLOAK_URL}/${KEYCLOAK_REALM} from application-prod.yml and
-    # crash at boot if those envs aren't set on the worker compose block.
+    # Worker pod has no user-facing API. The Hephaestus JwtDecoder (core.auth) still wires
+    # harmlessly, but we exclude Boot's resource-server autoconfig so a worker-only pod never
+    # depends on user-auth wiring at boot.
     autoconfigure:
         exclude:
             - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration

@@ -9,6 +9,36 @@ erDiagram
 
     direction LR
 
+    Account {
+        BIGINT id PK
+        VARCHAR(255) display_name "NOT NULL"
+        USER-DEFINED primary_email
+        TIMESTAMPTZ primary_email_verified_at
+        VARCHAR(16) app_role "NOT NULL"
+        VARCHAR(16) status "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+        TIMESTAMPTZ deleted_at
+        BIGINT version "NOT NULL"
+    }
+
+    AccountExport {
+        BIGINT id PK
+        BIGINT account_id FK "NOT NULL"
+        VARCHAR(16) status "NOT NULL"
+        TIMESTAMPTZ requested_at "NOT NULL"
+        TIMESTAMPTZ completed_at
+        TIMESTAMPTZ expires_at
+        VARCHAR(128) failure_reason
+        BYTEA payload
+    }
+
+    AccountFeature {
+        BIGINT account_id PK,FK
+        VARCHAR(64) flag PK
+        TIMESTAMPTZ enabled_at "NOT NULL"
+    }
+
     ActivityEvent {
         UUID id PK
         VARCHAR(255) event_key UK "NOT NULL"
@@ -78,6 +108,28 @@ erDiagram
         VARCHAR(255) worker_id
         VARCHAR(48) integration_kind
         VARCHAR(48) subject_class
+    }
+
+    AuthEvent {
+        BIGINT id PK
+        TIMESTAMPTZ occurred_at PK
+        BIGINT account_id FK
+        BIGINT acting_account_id FK
+        VARCHAR(48) event_type "NOT NULL"
+        VARCHAR(16) result "NOT NULL"
+        VARCHAR(64) failure_reason
+        BIGINT git_provider_id FK
+        BIGINT workspace_id FK
+        BIGINT identity_link_id FK
+        INET ip_inet
+        VARCHAR(512) user_agent
+        JSONB details
+    }
+
+    AuthRateLimitBucket {
+        VARCHAR(255) id PK
+        BYTEA state
+        BIGINT expires_at
     }
 
     ChatMessage {
@@ -282,6 +334,24 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
+    IdentityLink {
+        BIGINT id PK
+        BIGINT account_id FK "NOT NULL"
+        BIGINT git_provider_id FK "NOT NULL"
+        VARCHAR(255) subject "NOT NULL"
+        VARCHAR(255) team_id
+        BIGINT external_actor_id
+        VARCHAR(255) username_at_signup
+        VARCHAR(320) email_at_signup
+        VARCHAR(255) display_name
+        TEXT avatar_url
+        TEXT profile_url
+        TIMESTAMPTZ linked_at "NOT NULL"
+        VARCHAR(16) linked_via "NOT NULL"
+        TIMESTAMPTZ last_login_at
+        TIMESTAMPTZ disabled_at
+    }
+
     Issue {
         VARCHAR(31) issue_type UK "NOT NULL"
         BIGINT id PK
@@ -363,6 +433,27 @@ erDiagram
         TIMESTAMPTZ last_sync_at
     }
 
+    IssuedJwt {
+        UUID jti PK
+        BIGINT account_id FK "NOT NULL"
+        TIMESTAMPTZ issued_at "NOT NULL"
+        TIMESTAMPTZ expires_at "NOT NULL"
+        TIMESTAMPTZ revoked_at
+        VARCHAR(32) revoked_reason
+        VARCHAR(512) user_agent
+        INET ip_inet
+    }
+
+    JwtSigningKey {
+        VARCHAR(64) kid PK
+        VARCHAR(16) algorithm "NOT NULL"
+        TEXT public_key_pem "NOT NULL"
+        BYTEA private_key_pem "NOT NULL"
+        BOOLEAN active "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        VARCHAR(64) encryption_key_id "NOT NULL"
+    }
+
     Label {
         BIGINT id PK
         VARCHAR(255) color
@@ -374,6 +465,21 @@ erDiagram
         TIMESTAMPTZ updated_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    LoginProvider {
+        BIGINT id PK
+        VARCHAR(64) registration_id UK "NOT NULL"
+        VARCHAR(10) type UK "NOT NULL"
+        VARCHAR(255) display_name "NOT NULL"
+        VARCHAR(512) base_url UK "NOT NULL"
+        VARCHAR(512) client_id "NOT NULL"
+        TEXT client_secret "NOT NULL"
+        VARCHAR(512) scopes "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        BOOLEAN seeded_from_env "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
     }
 
     Milestone {
@@ -714,7 +820,6 @@ erDiagram
         VARCHAR(255) type
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
-        VARCHAR(128) keycloak_subject
     }
 
     UserAchievement {
@@ -816,38 +921,39 @@ erDiagram
 
     %% Relationships
     %% One-to-One relationships
+    Account ||--|| AccountFeature : has
     Workspace ||--|| ActivityEvent : has
     Workspace ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessageVote : has
     GitCommit ||--|| CommitContributor : has
     Workspace ||--|| Connection : has
+    Repository ||--|| Discussion : has
     DiscussionComment ||--|| Discussion : references
     GitProvider ||--|| Discussion : references
-    Repository ||--|| Discussion : has
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
     Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
-    GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
+    GitProvider ||--|| Issue : references
     GitProvider ||--|| IssueComment : commented_on
-    GitProvider ||--|| Label : labeled
     Repository ||--|| Label : labeled
-    GitProvider ||--|| Milestone : references
+    GitProvider ||--|| Label : labeled
     Repository ||--|| Milestone : has
+    GitProvider ||--|| Milestone : references
     GitProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
-    ProjectField ||--|| ProjectFieldValue : has
     ProjectItem ||--|| ProjectFieldValue : has
+    ProjectField ||--|| ProjectFieldValue : has
     Project ||--|| ProjectItem : has
     GitProvider ||--|| ProjectItem : references
     GitProvider ||--|| ProjectStatusUpdate : references
     GitProvider ||--|| PullRequestReview : reviewed
     GitProvider ||--|| PullRequestReviewComment : commented_on
-    GitProvider ||--|| PullRequestReviewThread : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
+    GitProvider ||--|| PullRequestReviewThread : reviewed
     GitProvider ||--|| Repository : references
     GitProvider ||--|| Team : references
     GitProvider ||--|| User : references
@@ -858,10 +964,16 @@ erDiagram
     Workspace ||--|| WorkspaceMembership : belongs_to
 
     %% One-to-Many relationships
+    Account ||--o{ AccountExport : has
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
-    AgentConfig ||--o{ AgentJob : has
     Workspace ||--o{ AgentJob : has
+    AgentConfig ||--o{ AgentJob : has
+    Account ||--o{ AuthEvent : account_id
+    Account ||--o{ AuthEvent : acting_account_id
+    GitProvider ||--o{ AuthEvent : has
+    Workspace ||--o{ AuthEvent : has
+    IdentityLink ||--o{ AuthEvent : has
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
@@ -869,39 +981,42 @@ erDiagram
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
     Connection ||--o{ ConnectionAudit : has
-    User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
-    User ||--o{ DiscussionComment : commented_on
+    User ||--o{ Discussion : references
     Discussion ||--o{ DiscussionComment : commented_on
+    User ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    User ||--o{ FindingFeedback : references
     PracticeFinding ||--o{ FindingFeedback : has
+    User ||--o{ FindingFeedback : references
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
+    Account ||--o{ IdentityLink : has
+    GitProvider ||--o{ IdentityLink : has
     User ||--o{ Issue : authored_by
-    IssueType ||--o{ Issue : has
-    User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
+    User ||--o{ Issue : merged_by
     Issue ||--o{ Issue : has
+    IssueType ||--o{ Issue : has
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
+    Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
-    User ||--o{ PracticeFinding : references
     Practice ||--o{ PracticeFinding : has
+    User ||--o{ PracticeFinding : references
     User ||--o{ Project : created_by
-    User ||--o{ ProjectItem : created_by
     Issue ||--o{ ProjectItem : has
-    User ||--o{ ProjectStatusUpdate : created_by
+    User ||--o{ ProjectItem : created_by
     Project ||--o{ ProjectStatusUpdate : has
+    User ||--o{ ProjectStatusUpdate : created_by
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on
-    PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewComment : commented_on
     PullRequestReview ||--o{ PullRequestReviewComment : commented_on
     PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
+    PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
     Organization ||--o{ Repository : has
@@ -915,26 +1030,26 @@ erDiagram
     Label }o--o{ DiscussionLabel : labeled
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
-    Issue }o--o{ IssueBlocking : has
-    Issue }o--o{ IssueBlocking : has
+    Issue }o--o{ IssueBlocking : blocked_issue_id
+    Issue }o--o{ IssueBlocking : blocking_issue_id
     Issue }o--o{ IssueLabel : labeled
     Label }o--o{ IssueLabel : labeled
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
     User }o--o{ PullRequestRequestedReviewer : reviewed
     Repository }o--o{ RepositoryCollaborator : has
     User }o--o{ RepositoryCollaborator : has
-    Team }o--o{ TeamMembership : belongs_to
     User }o--o{ TeamMembership : belongs_to
+    Team }o--o{ TeamMembership : belongs_to
     Repository }o--o{ TeamRepositoryPermission : has
     Team }o--o{ TeamRepositoryPermission : has
-    Label }o--o{ WorkspaceTeamLabelFilter : labeled
-    Team }o--o{ WorkspaceTeamLabelFilter : labeled
     Workspace }o--o{ WorkspaceTeamLabelFilter : labeled
-    Repository }o--o{ WorkspaceTeamRepositorySetting : has
-    Team }o--o{ WorkspaceTeamRepositorySetting : has
+    Team }o--o{ WorkspaceTeamLabelFilter : labeled
+    Label }o--o{ WorkspaceTeamLabelFilter : labeled
     Workspace }o--o{ WorkspaceTeamRepositorySetting : has
-    Team }o--o{ WorkspaceTeamSetting : has
+    Team }o--o{ WorkspaceTeamRepositorySetting : has
+    Repository }o--o{ WorkspaceTeamRepositorySetting : has
     Workspace }o--o{ WorkspaceTeamSetting : has
+    Team }o--o{ WorkspaceTeamSetting : has
 
     %% Styling
     classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px

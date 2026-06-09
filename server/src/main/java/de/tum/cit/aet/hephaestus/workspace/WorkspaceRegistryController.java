@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlagService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -42,6 +43,7 @@ public class WorkspaceRegistryController {
     private final WorkspaceQueryService workspaceQueryService;
     private final WorkspaceProvisioningService workspaceProvisioningService;
     private final FeatureFlagService featureFlagService;
+    private final WorkspaceProperties workspaceProperties;
 
     @GetMapping("/providers")
     @Operation(
@@ -64,19 +66,33 @@ public class WorkspaceRegistryController {
     public ResponseEntity<WorkspaceDTO> createWorkspace(
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
+        // Actor gate (configurable). ADMIN_ONLY (default) restricts creation to instance admins; flip to
+        // SELF_SERVICE to let any authenticated user create a workspace. Orthogonal to per-provider
+        // availability (the GitLab feature flag below).
+        if (
+            workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY &&
+            !SecurityUtils.isSuperAdmin()
+        ) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                "Workspace creation is restricted to instance admins on this deployment"
+            );
+        }
+
         if (
             createWorkspaceRequest.kind() == IntegrationKind.GITLAB &&
             !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
         ) {
-            throw new org.springframework.security.access.AccessDeniedException(
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
                 "GitLab workspace creation is not enabled"
             );
         }
 
-        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity.
-        // This creates the User entity from JWT claims or returns 409 if no GitLab account is linked.
+        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity. This provisions
+        // the User entity from the account's GitLab IdentityLink, or returns 409 if none is linked.
         if (createWorkspaceRequest.kind() == IntegrationKind.GITLAB) {
-            workspaceProvisioningService.ensureAuthenticatedUserExists(createWorkspaceRequest.serverUrl());
+            workspaceProvisioningService.ensureAuthenticatedUserExists();
         }
 
         Workspace workspace = workspaceService.createWorkspaceWithInitialization(createWorkspaceRequest);

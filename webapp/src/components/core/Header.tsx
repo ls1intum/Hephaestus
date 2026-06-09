@@ -75,7 +75,7 @@ export default function Header({
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					) : (
-						<Link to="/landing" className="flex gap-2 items-center hover:text-muted-foreground">
+						<Link to="/" className="flex gap-2 items-center hover:text-muted-foreground">
 							<Hammer className="text-2xl sm:text-3xl" />
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>

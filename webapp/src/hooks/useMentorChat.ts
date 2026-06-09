@@ -14,7 +14,7 @@ import {
 import type { ChatMessageVote, ChatThreadDetail, ChatThreadSummary } from "@/api/types.gen";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import { keycloakService } from "@/integrations/auth";
+import { csrfHeaders } from "@/integrations/auth";
 import { extractVotesFromThreadDetail, parseThreadMessages } from "@/lib/chat-validation";
 import type { ChatMessage } from "@/lib/types";
 
@@ -118,7 +118,10 @@ export function useMentorChat({
 					const lastMessage = messages.at(-1);
 					return {
 						body: { id: effectiveId, message: lastMessage },
-						headers: { Authorization: `Bearer ${keycloakService.getToken()}` },
+						// Cookie-session auth (ADR 0017): session cookie rides credentials:include;
+						// CSRF double-submit header for this state-changing POST.
+						credentials: "include",
+						headers: { ...csrfHeaders() },
 					};
 				},
 			}),

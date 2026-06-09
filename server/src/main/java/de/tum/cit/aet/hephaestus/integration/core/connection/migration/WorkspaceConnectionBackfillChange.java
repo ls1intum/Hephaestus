@@ -385,9 +385,6 @@ public class WorkspaceConnectionBackfillChange implements CustomTaskChange {
 
         @Nullable
         private static byte[] resolveKey() {
-            // Liquibase runs outside Spring, so we can't rely on relaxed-binding — read the same
-            // value the app's @ConfigurationProperties("hephaestus.security") would: the system
-            // property, then the canonical env var Spring maps `hephaestus.security.encryption-key` to.
             String key = System.getProperty("hephaestus.security.encryption-key");
             if (key == null || key.isBlank()) {
                 key = System.getenv("HEPHAESTUS_SECURITY_ENCRYPTION_KEY");

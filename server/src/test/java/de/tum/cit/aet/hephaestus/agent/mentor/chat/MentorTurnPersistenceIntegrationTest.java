@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
@@ -29,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -69,16 +67,6 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private DataSource dataSource;
-
-    /**
-     * {@link MentorChatService} pulls in this collaborator (via an {@code ObjectProvider}); the
-     * production bean belongs to the worker capability ({@code DockerSandboxConfiguration}, gated
-     * on the worker role, which is off in the test profile). Provide a mock so the integration
-     * context loads — this test never touches the sandbox boundary.
-     */
-    @MockitoBean
-    @SuppressWarnings("unused")
-    private InteractiveSandboxService interactiveSandboxService;
 
     private Workspace workspace;
     private User user;

@@ -36,6 +36,8 @@ jobs:
       docker-file: "./webapp/Dockerfile"
       docker-context: "."
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -59,6 +61,8 @@ jobs:
       use-buildpacks: true
       maven-module: "server"
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -85,6 +89,8 @@ jobs:
       docker-file: "./docker/agents/pi/Dockerfile"
       docker-context: "./docker/agents"
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -106,6 +112,8 @@ jobs:
       docker-file: "./docker/release-pin-fetcher/Dockerfile"
       docker-context: "./docker/release-pin-fetcher"
       registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
@@ -117,3 +125,26 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=release-pin-fetcher
+
+  postgres-build:
+    name: "Postgres (pg_partman)"
+    if: inputs.should_skip != 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/postgres"
+      docker-file: "./docker/postgres/Dockerfile"
+      docker-context: "./docker/postgres"
+      registry: "ghcr.io"
+      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
+      single-arch: ${{ github.event_name == 'pull_request' }}
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Postgres
+        org.opencontainers.image.description=PostgreSQL + pg_partman for all environments (dev/preview/prod)
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=postgres

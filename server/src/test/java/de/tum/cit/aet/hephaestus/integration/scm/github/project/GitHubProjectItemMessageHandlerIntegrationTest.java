@@ -17,21 +17,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectItemRepos
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectItemEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -41,7 +37,6 @@ import tools.jackson.databind.ObjectMapper;
  * (create, edit, archive, restore, convert, reorder, delete) using JSON fixtures
  * parsed directly into DTOs for complete isolation.
  */
-@Import(GitHubProjectItemMessageHandlerIntegrationTest.TestProjectItemEventListener.class)
 class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from projects_v2_item.created.json
@@ -76,7 +71,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     private ObjectMapper objectMapper;
 
     @Autowired
-    private TestProjectItemEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private GitProvider testGitProvider;
     private Organization testOrganization;
@@ -179,8 +174,10 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(projectItemRepository.findById(item.getId())).isEmpty();
 
         // Verify ProjectItemDeleted domain event
-        assertThat(eventListener.getDeletedEvents()).hasSize(1);
-        assertThat(eventListener.getDeletedEvents().getFirst().itemId()).isEqualTo(item.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemDeleted.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemDeleted.class).getFirst().itemId()).isEqualTo(
+            item.getId()
+        );
     }
 
     @Test
@@ -207,9 +204,11 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Verify domain events: processArchived() calls process() first (Updated since item exists),
         // then publishes ProjectItemArchived
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getArchivedEvents()).hasSize(1);
-        assertThat(eventListener.getArchivedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemArchived.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemArchived.class).getFirst().projectId()).isEqualTo(
+            testProject.getId()
+        );
     }
 
     // Edge case / guard-clause tests
@@ -226,7 +225,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Then - no item should be created and no events published
         assertThat(projectItemRepository.count()).isZero();
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemCreated.class)).isEmpty();
     }
 
     @Test
@@ -242,7 +241,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Then — no item should be created and no events published
         assertThat(projectItemRepository.count()).isZero();
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemCreated.class)).isEmpty();
     }
 
     // Create / Edit / Convert / Restore / Reorder tests
@@ -268,8 +267,10 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             });
 
         // Verify ProjectItemCreated domain event
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getCreatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemCreated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemCreated.class).getFirst().projectId()).isEqualTo(
+            testProject.getId()
+        );
     }
 
     @Test
@@ -284,8 +285,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(projectItemRepository.findAllByProjectId(testProject.getId())).hasSize(1);
 
         // First call publishes ProjectItemCreated, second publishes ProjectItemUpdated
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemCreated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class)).hasSize(1);
     }
 
     @Test
@@ -314,9 +315,11 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             });
 
         // Verify ProjectItemUpdated domain event (not Created, since item already existed)
-        assertThat(eventListener.getCreatedEvents()).isEmpty();
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getUpdatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemCreated.class)).isEmpty();
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class).getFirst().projectId()).isEqualTo(
+            testProject.getId()
+        );
     }
 
     @Test
@@ -342,9 +345,11 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Verify domain events: processRestored() calls process() first (Updated since item exists),
         // then publishes ProjectItemRestored
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getRestoredEvents()).hasSize(1);
-        assertThat(eventListener.getRestoredEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemRestored.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemRestored.class).getFirst().projectId()).isEqualTo(
+            testProject.getId()
+        );
     }
 
     @Test
@@ -371,9 +376,11 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Verify domain events: processConverted() calls process() first (Updated since item exists),
         // then publishes ProjectItemConverted
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getConvertedEvents()).hasSize(1);
-        assertThat(eventListener.getConvertedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemConverted.class)).hasSize(1);
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectItemConverted.class).getFirst().projectId()
+        ).isEqualTo(testProject.getId());
     }
 
     @Test
@@ -399,102 +406,16 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Verify domain events: processReordered() calls process() first (Updated since item exists),
         // then publishes ProjectItemReordered
-        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getReorderedEvents()).hasSize(1);
-        assertThat(eventListener.getReorderedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class)).hasSize(1);
+        assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemReordered.class)).hasSize(1);
+        assertThat(
+            eventListener.ofType(GitHubProjectEvent.ProjectItemReordered.class).getFirst().projectId()
+        ).isEqualTo(testProject.getId());
     }
 
     private GitHubProjectItemEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubProjectItemEventDTO.class);
-    }
-
-    /**
-     * Test event listener that captures project item domain events for assertion.
-     */
-    @Component
-    static class TestProjectItemEventListener {
-
-        private final List<GitHubProjectEvent.ProjectItemCreated> createdEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectItemUpdated> updatedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectItemArchived> archivedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectItemRestored> restoredEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectItemDeleted> deletedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectItemConverted> convertedEvents = new ArrayList<>();
-        private final List<GitHubProjectEvent.ProjectItemReordered> reorderedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(GitHubProjectEvent.ProjectItemCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(GitHubProjectEvent.ProjectItemUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onArchived(GitHubProjectEvent.ProjectItemArchived event) {
-            archivedEvents.add(event);
-        }
-
-        @EventListener
-        public void onRestored(GitHubProjectEvent.ProjectItemRestored event) {
-            restoredEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(GitHubProjectEvent.ProjectItemDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        @EventListener
-        public void onConverted(GitHubProjectEvent.ProjectItemConverted event) {
-            convertedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReordered(GitHubProjectEvent.ProjectItemReordered event) {
-            reorderedEvents.add(event);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemArchived> getArchivedEvents() {
-            return new ArrayList<>(archivedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemRestored> getRestoredEvents() {
-            return new ArrayList<>(restoredEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemConverted> getConvertedEvents() {
-            return new ArrayList<>(convertedEvents);
-        }
-
-        public List<GitHubProjectEvent.ProjectItemReordered> getReorderedEvents() {
-            return new ArrayList<>(reorderedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            archivedEvents.clear();
-            restoredEvents.clear();
-            deletedEvents.clear();
-            convertedEvents.clear();
-            reorderedEvents.clear();
-        }
     }
 }

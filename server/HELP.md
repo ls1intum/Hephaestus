@@ -13,23 +13,13 @@ This will start your application in a local development environment. You can acc
 Setting environment variables works through profile-based `application.yml` files. For local development, create a `application-local.yml` file overwriting the original properties. See [Using the Plugin :: Spring Boot](https://docs.spring.io/spring-boot/maven-plugin/using.html#using.overriding-command-line) for more information.
 
 
-### Keycloak Development Test Users
+### Local Authentication
 
-If you started server for development it will import the example config for Keycloak from `keycloak-hephaestus-realm-example-config.json`.
-
-#### Admin Account
-
-- Username: `admin`
-- Password: `admin`
-
-Has the `admin` role.
-
-#### Test User Account
-
-- Username: `testuser`
-- Password: `testuser`
-
-Does not have the `admin` role.
+Authentication is Hephaestus-native (Spring Security `oauth2Login`; ADR 0017) — there is no separate
+identity server to bootstrap. For local development, configure a GitHub OAuth app and set
+`GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` (callback `http://localhost:8080/login/oauth2/code/github`),
+then sign in via GitHub. Grant yourself the `admin` app role by setting `app_role = 'APP_ADMIN'` on your
+`account` row. See `docs/contributor/local-development.mdx` for the full walkthrough.
 
 
 ### Reference Documentation
@@ -67,7 +57,7 @@ The following guides illustrate how to use some features concretely:
 This project contains a Docker Compose file named `compose.yaml`.
 In this file, the following services have been defined:
 
--   postgres: [`postgres:16`](https://hub.docker.com/_/postgres)
+-   postgres: `ghcr.io/ls1intum/hephaestus/postgres` (Debian + pg_partman; see docker/postgres/Dockerfile)
 
 Please review the tags of the used images and set them to the same as you're running in production.
 

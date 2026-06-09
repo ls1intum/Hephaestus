@@ -35,7 +35,16 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <hephaestus.surefire.timeout>900</hephaestus.surefire.timeout>
+        <!-- forkedProcessTimeoutInSeconds; per-fork with forkCount>1. Single source of truth (CI no
+             longer overrides); the CI job's timeout-minutes is the backstop. -->
+        <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
+
+        <!-- Default 1 so local dev keeps the singleton Testcontainers Postgres a true singleton.
+             CI's integration job raises forkCount (reuse is off there, so each fork gets its own DB)
+             and lowers maxHeap to fit N forks + N containers in the runner's RAM. -->
+        <hephaestus.surefire.forkCount>1</hephaestus.surefire.forkCount>
+        <!-- 4g sized for the unit+arch run (ArchUnit + Modulith class graph). -->
+        <hephaestus.surefire.maxHeap>4096m</hephaestus.surefire.maxHeap>
 
         <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
@@ -81,12 +90,12 @@
         <slack-bolt.version>1.48.1</slack-bolt.version>
         <jnats.version>2.25.2</jnats.version>
         <jgit.version>7.6.0.202603022253-r</jgit.version>
-        <keycloak-admin.version>26.0.9</keycloak-admin.version>
         <java-jwt.version>4.5.2</java-jwt.version>
         <graphql-codegen.version>5.10.0</graphql-codegen.version>
         <postgresql.version>42.7.11</postgresql.version>
         <therapi.version>0.15.0</therapi.version>
         <shedlock.version>5.16.0</shedlock.version>
+        <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
     <dependencies>
         <!-- JSpecify nullness annotations (@NonNull/@Nullable). The forward-looking standard
@@ -362,11 +371,6 @@
             <artifactId>hibernate-validator</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.keycloak</groupId>
-            <artifactId>keycloak-admin-client</artifactId>
-            <version>${keycloak-admin.version}</version>
-        </dependency>
-        <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-spring-boot-4-starter</artifactId>
             <version>${sentry.version}</version>
@@ -398,6 +402,24 @@
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
             <version>${jgit.version}</version>
+        </dependency>
+        <!--
+            Bucket4j token-bucket rate limiting for the hot auth endpoints (core.auth.ratelimit).
+            Library-only (no Spring Boot starter): the community starter
+            `com.giffing.bucket4j.spring.boot.starter` does not yet declare Boot 4.0 compatibility,
+            and Bucket4j itself is framework-agnostic, so we wire a small OncePerRequestFilter by
+            hand. JDK17 classifier artifacts (8.16.0+ split by JDK). The postgresql module backs a
+            SELECT … FOR UPDATE ProxyManager so limits are SHARED across replicas (no Redis).
+        -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-postgresql</artifactId>
+            <version>${bucket4j.version}</version>
         </dependency>
     </dependencies>
     <dependencyManagement>
@@ -826,13 +848,18 @@
                          Modulith's full class graph (1000+ classes) in the same fork as the
                          regular unit tests. 2GB OOMs on CI under that load. The dedicated
                          `architecture-tests` profile uses the same 4GB ceiling. -->
-                    <argLine>@{argLine} -Xmx4096m -Dspring.profiles.active=test -Dfile.encoding=UTF-8
-                        -XX:+EnableDynamicAgentLoading
+                    <argLine>@{argLine} -Xmx${hephaestus.surefire.maxHeap} -Dspring.profiles.active=test -Dfile.encoding=UTF-8
+                        -XX:+EnableDynamicAgentLoading -XX:+ExitOnOutOfMemoryError
                     </argLine>
                     <!-- Test output -->
                     <printSummary>true</printSummary>
                     <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                    <!-- Parallel execution for faster tests -->
+                    <!-- forkCount>1 (CI integration) distributes classes across parallel JVMs; surefire
+                         owns discovery so it can't drop tests. -->
+                    <forkCount>${hephaestus.surefire.forkCount}</forkCount>
+                    <reuseForks>true</reuseForks>
+                    <!-- Method parallelism for unit/arch; integration overrides with -Dparallel=none
+                         (shared Postgres per fork must stay serial). -->
                     <parallel>methods</parallel>
                     <threadCount>4</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
@@ -986,12 +1013,24 @@
                         hibernate:spring:de.tum.cit.aet.hephaestus?dialect=org.hibernate.dialect.PostgreSQLDialect&amp;hibernate.physical_naming_strategy=org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.hibernate.SpringImplicitNamingStrategy
                     </referenceUrl>
                     <!--
-                        Exclude Liquibase-managed sidecar tables that have no JPA entity
-                        and never will (managed by external libraries).
-                          - shedlock: ShedLock distributed lock table (managed by the
-                            ShedLock library via JdbcTemplateLockProvider, not JPA).
+                        Exclude objects that exist in the Liquibase-managed schema but that Hibernate
+                        cannot (and must not) generate, so the JPA-vs-DB drift diff stays empty for them.
+                        Exclusions are by TYPE + CONVENTION, not a hand-maintained name list, so new
+                        scalar FKs / partitions are covered automatically while genuine drift on the ~50
+                        entities that DO model FKs via JPA associations (named fk_*) is still caught.
+
+                        - table:shedlock / table:auth_rate_limit_bucket — sidecar tables with no JPA
+                          entity (ShedLock + the token-bucket store are managed outside JPA).
+                        - table:auth_event_default / table:auth_event_p\d+ — declarative RANGE partitions
+                          of auth_event. Hibernate models only the parent; PostgreSQL partitions are a known
+                          Liquibase-diff blind spot (liquibase/liquibase#1874), so children read as "extra".
+                        - foreignkey:sfk_.* — the "scalar foreign key" naming convention (ADR 0017): an FK
+                          backing a plain Long id with NO @ManyToOne (chosen to break module cycles).
+                          Hibernate emits the column but never the constraint. Real @ManyToOne FKs keep the
+                          fk_* name and stay drift-checked; new scalar FKs MUST be named sfk_* (enforced
+                          only by review — see the 1780825201546_changelog.xml header).
                     -->
-                    <diffExcludeObjects>table:shedlock</diffExcludeObjects>
+                    <diffExcludeObjects>table:shedlock,table:auth_rate_limit_bucket,table:auth_event_default,table:auth_event_p\d+,foreignkey:sfk_.*</diffExcludeObjects>
                     <verbose>true</verbose>
                 </configuration>
                 <dependencies>
@@ -1029,7 +1068,7 @@
                 </property>
             </activation>
             <properties>
-                <hephaestus.surefire.timeout>900</hephaestus.surefire.timeout>
+                <hephaestus.surefire.timeout>1200</hephaestus.surefire.timeout>
             </properties>
         </profile>
 
@@ -1146,6 +1185,78 @@
                 <!-- maven.main.skip deliberately NOT set — we want incremental compile -->
                 <maven.test.skip>true</maven.test.skip>
             </properties>
+        </profile>
+
+        <!--
+            Mutation testing (PIT) for the security-critical auth logic. Opt-in and NEVER part of CI:
+            run locally with
+              ./mvnw -o -P!quick,pitest -Dmaven.build.cache.enabled=false test-compile org.pitest:pitest-maven:mutationCoverage
+            then open target/pit-reports/index.html. Scoped to small, branch-heavy, pure-logic classes
+            (SSRF deny-list, HMAC state, admin allowlist, open-redirect guard, AAD framing, reserved-range
+            probe) whose tests are pure-unit (@ExtendWith(MockitoExtension)) so PIT forks stay fast and
+            need no Spring context / database. A surviving mutant here means a test asserts too weakly.
+        -->
+        <profile>
+            <id>pitest</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.19.0</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>1.2.3</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <!-- Do NOT inherit surefire's argLine: it carries the jacoco late-binding
+                                 token @{argLine}, which is unresolved outside surefire and makes the PIT
+                                 minion JVM die with "Could not find or load main class @{argLine}". Give
+                                 the minion its own args instead (EnableDynamicAgentLoading for Mockito). -->
+                            <parseSurefireConfig>false</parseSurefireConfig>
+                            <!-- Serialize minions: the default (one minion JVM per core) starves
+                                 fork/socket resources in constrained CI/sandbox containers and every
+                                 minion TIMED_OUT. One minion at a time with a modest heap is reliable;
+                                 these target classes are small so wall-clock stays low. -->
+                            <threads>1</threads>
+                            <!-- Cold-JVM startup in constrained containers (~8s, large classpath) can
+                                 exceed PIT's default 4s minion timeout, killing every minion before its
+                                 tests run. Give the minion ample headroom; these tests are sub-second once
+                                 the JVM is up so the constant dominates, not real per-test time. -->
+                            <timeoutConstant>30000</timeoutConstant>
+                            <jvmArgs>
+                                <value>-Xmx1g</value>
+                                <value>-XX:+EnableDynamicAgentLoading</value>
+                                <value>-Dnet.bytebuddy.experimental=true</value>
+                            </jvmArgs>
+                            <targetClasses>
+                                <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateService</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicy</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidator</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContext</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.identity.connect.IssuerDiscoveryProbe</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidatorTest</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateServiceTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicyTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidatorTest</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContextTest</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.identity.connect.IssuerDiscoveryProbeTest</param>
+                            </targetTests>
+                            <outputFormats>
+                                <param>HTML</param>
+                                <param>XML</param>
+                            </outputFormats>
+                            <timestampedReports>false</timestampedReports>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
 
         <!-- `mvn -P aot package` runs the Spring Boot AOT processor; output is inert until the

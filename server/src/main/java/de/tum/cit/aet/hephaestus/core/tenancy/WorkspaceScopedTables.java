@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.tenancy;
 
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.metamodel.EntityType;
+import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import org.hibernate.SessionFactory;
@@ -54,8 +55,20 @@ public class WorkspaceScopedTables {
         "model_pricing",
         // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
         "worker_token_denylist",
+        // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
+        // Account ↔ Workspace association lives on workspace_membership, not these tables.
+        "account",
+        "identity_link",
+        "account_feature",
+        "auth_event",
+        "issued_jwt",
+        "jwt_signing_key",
+        // GDPR Art. 20 self-service export — account-scoped, spans a principal's data across workspaces.
+        "account_export",
         // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
         "worker_registry",
+        // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
+        "login_provider",
         // Liquibase machinery
         "databasechangelog",
         "databasechangeloglock"
@@ -120,7 +133,7 @@ public class WorkspaceScopedTables {
 
     private static void addIfScoped(Set<String> tables, String rawName) {
         if (rawName == null || rawName.isBlank()) return;
-        String name = rawName.toLowerCase();
+        String name = rawName.toLowerCase(Locale.ROOT);
         if (!GLOBAL_TABLES.contains(name)) {
             tables.add(name);
         }
@@ -133,6 +146,6 @@ public class WorkspaceScopedTables {
 
     /** True iff the table requires a {@code workspace_id} predicate on every query. */
     public boolean isScoped(String tableName) {
-        return tableName != null && scopedTables.contains(tableName.toLowerCase());
+        return tableName != null && scopedTables.contains(tableName.toLowerCase(Locale.ROOT));
     }
 }

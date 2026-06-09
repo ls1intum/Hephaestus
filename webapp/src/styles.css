@@ -240,6 +240,9 @@ code {
 	--color-github-black: var(--bgColor-black);
 	--color-github-black-foreground: var(--fgColor-black);
 
+	/* GitLab brand-only token (used by GitLabSignInButton). Source: design.gitlab.com */
+	--color-gitlab-orange: #fc6d26;
+
 	/* League colors */
 	--color-league-bronze: var(--league-bronze);
 	--color-league-silver: var(--league-silver);

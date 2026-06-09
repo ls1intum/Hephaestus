@@ -1,11 +1,15 @@
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { AccountSection, type AccountSectionProps } from "./AccountSection";
+import { optionalIntegrationsAvailable } from "@/integrations/consent";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
+import { CookiePreferencesSection } from "./CookiePreferencesSection";
+import { DangerZoneSection } from "./DangerZoneSection";
 import { LinkedAccountsSection, type LinkedAccountsSectionProps } from "./LinkedAccountsSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
 } from "./ResearchParticipationSection";
+import { SessionsSection } from "./SessionsSection";
 
 export interface SettingsPageProps {
 	/**
@@ -13,7 +17,7 @@ export interface SettingsPageProps {
 	 */
 	aiReviewProps: AiReviewSectionProps;
 	/**
-	 * Whether to show the AI review section (feature-flagged via Keycloak role)
+	 * Whether to show the AI review section (feature-flagged via account_feature flag)
 	 */
 	showAiReviewSection: boolean;
 	/**
@@ -29,13 +33,21 @@ export interface SettingsPageProps {
 	 */
 	linkedAccountsProps: LinkedAccountsSectionProps;
 	/**
-	 * Props for the AccountSection component
+	 * Called after the account is deleted (logout + redirect).
 	 */
-	accountProps: AccountSectionProps;
+	onAccountDeleted: () => void | Promise<void>;
 	/**
 	 * Whether the settings are still loading
 	 */
 	isLoading?: boolean;
+	/**
+	 * Whether the user-settings query failed. When true the settings-backed sections (AI review,
+	 * research participation) show an error + retry instead of a fabricated default, so a privacy
+	 * toggle is never shown as "on" just because the load failed.
+	 */
+	settingsError?: boolean;
+	/** Retry loading the user settings. */
+	onRetrySettings?: () => void;
 }
 
 /**
@@ -48,19 +60,17 @@ export function SettingsPage({
 	researchProps,
 	showResearchSection,
 	linkedAccountsProps,
-	accountProps,
+	onAccountDeleted,
 	isLoading = false,
+	settingsError = false,
+	onRetrySettings,
 }: SettingsPageProps) {
 	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: linkedLoading = false, ...linkedRest } = linkedAccountsProps;
-	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
 	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
-	const accountPending = isLoading || accountLoading;
-	const showLinkedAccounts =
-		linkedRest.isError || linkedLoading || isLoading || linkedRest.accounts.length > 1;
 
 	return (
 		<div className="w-full max-w-3xl mx-auto space-y-8">
@@ -71,30 +81,59 @@ export function SettingsPage({
 				</p>
 			</div>
 
-			{showAiReviewSection && (
+			{settingsError ? (
+				(showAiReviewSection || showResearchSection) && (
+					<>
+						<Separator />
+						<section className="space-y-2" aria-labelledby="settings-error-heading">
+							<h2 id="settings-error-heading" className="text-xl font-semibold">
+								Preferences
+							</h2>
+							<p className="text-sm text-destructive" role="alert">
+								We couldn't load your preferences, so your AI-review and research-participation
+								settings aren't shown — we won't display a guessed value for a privacy choice.
+							</p>
+							{onRetrySettings && (
+								<Button variant="outline" size="sm" onClick={onRetrySettings}>
+									Retry
+								</Button>
+							)}
+						</section>
+					</>
+				)
+			) : (
 				<>
-					<Separator />
-					<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
-				</>
-			)}
+					{showAiReviewSection && (
+						<>
+							<Separator />
+							<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+						</>
+					)}
 
-			{showResearchSection && (
-				<>
-					<Separator />
-					<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
-				</>
-			)}
-
-			{showLinkedAccounts && (
-				<>
-					<Separator />
-					<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+					{showResearchSection && (
+						<>
+							<Separator />
+							<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
+						</>
+					)}
 				</>
 			)}
 
 			<Separator />
+			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
 
-			<AccountSection {...accountRest} isLoading={accountPending} />
+			<Separator />
+			<SessionsSection />
+
+			{optionalIntegrationsAvailable && (
+				<>
+					<Separator />
+					<CookiePreferencesSection />
+				</>
+			)}
+
+			<Separator />
+			<DangerZoneSection onAccountDeleted={onAccountDeleted} />
 		</div>
 	);
 }
