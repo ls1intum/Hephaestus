@@ -97,6 +97,10 @@ services:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
+      # Tomcat RemoteIpValve proxy trust. forward-headers-strategy=native (application-prod.yml) is
+      # active in prod, so ProxyTrustGuard fails the boot unless this is a non-blank internal-proxies
+      # regex pinned to the ingress (Traefik). Empty default surfaces the guard's clear fail-fast.
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       # Webhook reception runs in a dedicated `webhook-server` container (see ADR 0008
       # + docker/compose.core.yaml). Disable it here so the receiver beans don't load
       # in application-server (saves RAM; prevents accidental localhost traffic).
@@ -108,6 +112,11 @@ services:
       # Auth (Hephaestus-native; ADR 0017). State-cookie key MUST be base64 32-byte AES.
       HEPHAESTUS_AUTH_ISSUER: https://${APP_HOSTNAME}
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
+      # First instance super-admin bootstrap (auth-cutover runbook). The admin UI is admin-gated, so
+      # the first APP_ADMIN must come from operator config — comma-separated <provider>:@user or
+      # <provider>:<subject>. Optional break-glass token enables POST /auth/bootstrap-admin.
+      HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS: ${HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS:-}
+      HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN: ${HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN:-}
       GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
       GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
       GITLAB_OAUTH_CLIENT_ID: ${GITLAB_OAUTH_CLIENT_ID:-}
@@ -141,7 +150,10 @@ services:
       POSTHOG_PROJECT_ID: ${POSTHOG_PROJECT_ID:-}
       POSTHOG_PERSONAL_API_KEY: ${POSTHOG_PERSONAL_API_KEY:-}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-      WEBHOOK_EXTERNAL_URL: https://${APP_HOSTNAME}/webhooks
+      # Bare origin only: GitLab auto-registration appends "/webhooks/gitlab" itself
+      # (GitLabWebhookService), and the webhook-server's filters/controller own the unstripped
+      # "/webhooks/{kind}" path. A "/webhooks" suffix here would double the prefix.
+      WEBHOOK_EXTERNAL_URL: https://${APP_HOSTNAME}
       # AES-256-GCM key for credentials encrypted at rest in the `connection` table. Exactly 32
       # chars. Required in prod (fail-fast); the Liquibase backfill re-encrypts on boot, so this
       # MUST be set on application-server (where Liquibase runs). Keep it stable.
@@ -256,6 +268,8 @@ services:
     environment:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
+      # Worker runs the prod profile (forward-headers=native) so ProxyTrustGuard fires here too.
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
       NATS_SERVER: nats://nats-server:4222
