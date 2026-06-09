@@ -77,6 +77,6 @@
     <include file="./changelog/1779520390544_worker_runtime_substrate.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1780067945030_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1780313973588_changelog.xml" relativeToChangelogFile="true"/>
-    <include file="./changelog/1780431017612_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1780825201546_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1781034806040_changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
