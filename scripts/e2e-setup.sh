@@ -61,6 +61,9 @@ else
   PROVIDER_ORIGIN="$SERVER_URL"
 fi
 [ -n "$SCM_ID" ] && [ "$SCM_ID" != null ] || die "could not resolve SCM user from the PAT"
+# These flow into raw SQL below; validate their shape so a hostile/odd login can't break (or inject) it.
+[[ "$SCM_ID" =~ ^[0-9]+$ ]] || die "unexpected non-numeric SCM id '$SCM_ID'"
+[[ "$SCM_LOGIN" =~ ^[A-Za-z0-9._-]+$ ]] || die "unexpected SCM login '$SCM_LOGIN' (refusing to build SQL)"
 [ -n "$ACCOUNT_LOGIN" ] || ACCOUNT_LOGIN="$SCM_LOGIN"
 say "resolved SCM user: $SCM_LOGIN (id $SCM_ID) on $PROVIDER_ORIGIN"
 
@@ -68,10 +71,12 @@ say "resolved SCM user: $SCM_LOGIN (id $SCM_ID) on $PROVIDER_ORIGIN"
 q() { psql "$DB_URL" -tAqc "$1"; }   # one statement, value-only output
 PROVIDER_ID="$(q "INSERT INTO git_provider (type, server_url, created_at) VALUES ('$KIND','$PROVIDER_ORIGIN',now()) ON CONFLICT (type, server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id")"
 USER_ID="$(q "INSERT INTO \"user\" (native_id, provider_id, login, type, avatar_url, html_url, created_at, updated_at) VALUES ($SCM_ID,$PROVIDER_ID,'$SCM_LOGIN','USER','','$PROVIDER_ORIGIN/$SCM_LOGIN',now(),now()) ON CONFLICT (provider_id, native_id) DO UPDATE SET login=EXCLUDED.login RETURNING id")"
-# No unique constraint on identity_link, so guard against duplicates with NOT EXISTS (idempotent).
-q "INSERT INTO identity_link (account_id, git_provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup) SELECT $ACCOUNT_ID,$PROVIDER_ID,'$SCM_ID',now(),'OAUTH_LOGIN',$USER_ID,'$SCM_LOGIN' WHERE NOT EXISTS (SELECT 1 FROM identity_link WHERE account_id=$ACCOUNT_ID AND git_provider_id=$PROVIDER_ID AND subject='$SCM_ID')" >/dev/null
+# Target the account-scoped unique index so a same-account re-run is idempotent, while a *cross-account*
+# collision on (git_provider_id, subject) — a genuine misconfig — still surfaces loudly via the other
+# unique index (matching identity_link's uq_identity_link_active_per_provider, added in 1780825201546).
+q "INSERT INTO identity_link (account_id, git_provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup) VALUES ($ACCOUNT_ID,$PROVIDER_ID,'$SCM_ID',now(),'OAUTH_LOGIN',$USER_ID,'$SCM_LOGIN') ON CONFLICT (account_id, git_provider_id, COALESCE(team_id, '')) WHERE disabled_at IS NULL DO NOTHING" >/dev/null
 say "seeded SCM identity (user id $USER_ID, linked to account $ACCOUNT_ID)"
-JWT="$(login)"  # re-login so the JWT's preferred_username resolves to the linked SCM user
+JWT="$(login)"; [ -n "$JWT" ] || die "re-login failed after seeding the SCM identity"  # so the JWT's preferred_username resolves to the linked SCM user
 
 # ---- 4. create (or reuse) the workspace + connection -----------------------
 WS_ID="$(api GET /workspaces | jq -r --arg s "$WS_SLUG" '.[] | select(.workspaceSlug==$s or .slug==$s) | .id' | head -1)"

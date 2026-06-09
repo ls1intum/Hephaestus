@@ -1,8 +1,8 @@
 # Authentic end-to-end testing
 
-Drive the **real** product loop locally — sign in through the UI, connect a **real** GitLab/GitHub
-repo, and run **real** LLM practice detection on a **real** PR/MR — in a handful of steps, over plain
-`http://localhost` (no OAuth IdP, no proxy, no TLS).
+Drive the **real** product loop locally — sign in through the UI, connect a GitLab/GitHub repo, and run
+LLM practice detection on a real PR/MR — in a handful of steps, over plain `http://localhost` (no OAuth
+IdP, no proxy, no TLS).
 
 It works because of a few local-only affordances, all **fail-closed or absent under the `prod`
 profile**, bundled in the opt-in **`e2e` profile** (`server/src/main/resources/application-e2e.yml`):

@@ -37,4 +37,12 @@ export async function loginAsDevAdmin(page: Page, username = "e2e"): Promise<voi
 	await page.getByPlaceholder("username").fill(username);
 	await page.getByRole("button", { name: /continue as dev admin/i }).click();
 	await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+	// Fail fast and legibly if the backend wasn't booted with cookie-secure=false: the SPA then reads the
+	// `XSRF-TOKEN` cookie while the server set `__Host-XSRF-TOKEN`, so every later mutation 403s for an
+	// unrelated reason. Assert the non-prefixed CSRF cookie is actually present.
+	const cookies = await page.context().cookies();
+	expect(
+		cookies.some((c) => c.name === "XSRF-TOKEN"),
+		"expected an XSRF-TOKEN cookie — boot the backend with hephaestus.auth.cookie-secure=false",
+	).toBe(true);
 }
