@@ -37,36 +37,36 @@
     </changeSet>
 
     <changeSet author="hephaestus-1011" id="1781034806040-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="fk_workspace_practice_config already present">
-            <not><foreignKeyConstraintExists foreignKeyTableName="workspace" foreignKeyName="fk_workspace_practice_config"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="sfk_workspace_practice_config already present">
+            <not><foreignKeyConstraintExists foreignKeyTableName="workspace" foreignKeyName="sfk_workspace_practice_config"/></not>
         </preConditions>
         <comment>Bound practice-detection config FK; SET NULL on delete so a removed config degrades to fan-out.</comment>
         <addForeignKeyConstraint
                 baseTableName="workspace"
                 baseColumnNames="practice_config_id"
-                constraintName="fk_workspace_practice_config"
+                constraintName="sfk_workspace_practice_config"
                 referencedTableName="agent_config"
                 referencedColumnNames="id"
                 onDelete="SET NULL"/>
         <rollback>
-            <dropForeignKeyConstraint baseTableName="workspace" constraintName="fk_workspace_practice_config"/>
+            <dropForeignKeyConstraint baseTableName="workspace" constraintName="sfk_workspace_practice_config"/>
         </rollback>
     </changeSet>
 
     <changeSet author="hephaestus-1011" id="1781034806040-3">
-        <preConditions onFail="MARK_RAN" onFailMessage="fk_workspace_mentor_config already present">
-            <not><foreignKeyConstraintExists foreignKeyTableName="workspace" foreignKeyName="fk_workspace_mentor_config"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="sfk_workspace_mentor_config already present">
+            <not><foreignKeyConstraintExists foreignKeyTableName="workspace" foreignKeyName="sfk_workspace_mentor_config"/></not>
         </preConditions>
         <comment>Bound mentor config FK; SET NULL on delete so a removed config degrades to oldest-enabled fallback.</comment>
         <addForeignKeyConstraint
                 baseTableName="workspace"
                 baseColumnNames="mentor_config_id"
-                constraintName="fk_workspace_mentor_config"
+                constraintName="sfk_workspace_mentor_config"
                 referencedTableName="agent_config"
                 referencedColumnNames="id"
                 onDelete="SET NULL"/>
         <rollback>
-            <dropForeignKeyConstraint baseTableName="workspace" constraintName="fk_workspace_mentor_config"/>
+            <dropForeignKeyConstraint baseTableName="workspace" constraintName="sfk_workspace_mentor_config"/>
         </rollback>
     </changeSet>
 
