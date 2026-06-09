@@ -251,6 +251,8 @@ export function PracticeDetectionPolicyCard({
 
 					<Field>
 						<FieldLabel htmlFor="policy-cooldown">Cooldown (minutes)</FieldLabel>
+						{/* Uncontrolled on purpose (the lone numeric field): commit on blur to avoid a PATCH per
+						    keystroke, and key-remount on the server-confirmed value to re-sync after save. */}
 						<Input
 							key={settings.cooldownMinutes}
 							id="policy-cooldown"

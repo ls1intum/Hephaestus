@@ -38,7 +38,9 @@ function PracticeDetectionLayout() {
 		return <PracticeDetectionDisabled workspaceSlug={workspaceSlug} />;
 	}
 
-	if (featuresLoading || !practicesEnabled || !workspaceSlug) {
+	// `!practicesEnabled` is unreachable once the confirmed-off guard above has run; this only
+	// catches the still-loading and no-workspace cases.
+	if (featuresLoading || !workspaceSlug) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<Spinner className="h-8 w-8" />

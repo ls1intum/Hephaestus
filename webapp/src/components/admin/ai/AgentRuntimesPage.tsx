@@ -116,9 +116,9 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	const updateMentorConfig = useMutation({
 		...updateMentorConfigMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({
-				queryKey: getAiSettingsQueryKey({ path: { workspaceSlug } }),
-			});
+			// Same invalidation as every other runtime mutation — the "Powers mentor" badge derives from
+			// ai-settings, and consistency here keeps this from drifting into a latent stale-cache bug.
+			invalidateAll();
 			toast.success("Mentor runtime updated");
 		},
 		onError: (error) => {

@@ -176,6 +176,8 @@ export function AgentConfigForm({
 			const body: UpdateAgentConfigRequest = {
 				llmProvider: form.llmProvider,
 				modelName: form.modelName.trim() || undefined,
+				// Edit sends "" (not undefined) so blanking the field actively clears a stored base URL;
+				// create omits it (undefined) to fall back to the provider default. The asymmetry is intentional.
 				llmBaseUrl: form.llmBaseUrl.trim(),
 				credentialMode: form.credentialMode,
 				allowInternet: form.allowInternet,

@@ -23,10 +23,7 @@ import type { JobStatus } from "./jobUtils";
 
 const PAGE_SIZE = 20;
 
-/**
- * Windowed page tokens: first, last, current ±1, with "ellipsis" gaps. Returns
- * zero-based page numbers and "ellipsis" sentinels for rendering.
- */
+/** Windowed page tokens: first, last, current ±1, with "ellipsis" gaps between. */
 function paginationItems(current: number, total: number): (number | "ellipsis")[] {
 	if (total <= 7) {
 		return Array.from({ length: total }, (_, i) => i);
