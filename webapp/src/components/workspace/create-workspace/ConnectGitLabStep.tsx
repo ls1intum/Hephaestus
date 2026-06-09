@@ -1,17 +1,44 @@
 import { useMutation } from "@tanstack/react-query";
 import { CircleCheckIcon, EyeIcon, EyeOffIcon, OctagonXIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { gitLabPreflightMutation } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { type ConnectionFormData, connectionSchema } from "./schemas";
 import { useWizard } from "./wizard-context";
 
-export function ConnectGitLabStep() {
+export interface GitLabInstanceOption {
+	registrationId: string;
+	displayName: string;
+	baseUrl: string;
+}
+
+export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstanceOption[] }) {
 	const { state, dispatch } = useWizard();
+	// Only instances with a known base URL can be offered as a pick; a blank one falls back to the
+	// read-only configured field.
+	const selectableInstances = instances.filter((i) => !!i.baseUrl);
+	const multipleInstances = selectableInstances.length > 1;
+
+	// Keep state.serverUrl pinned to a real instance when a picker is shown, so preflight + creation use
+	// the selected instance even before the user touches the dropdown.
+	useEffect(() => {
+		if (!multipleInstances) return;
+		const matches = selectableInstances.some((i) => i.baseUrl === state.serverUrl);
+		if (!matches) {
+			dispatch({ type: "SET_SERVER_URL", value: selectableInstances[0].baseUrl });
+		}
+	}, [multipleInstances, selectableInstances, state.serverUrl, dispatch]);
 	const [showToken, setShowToken] = useState(false);
 	const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ConnectionFormData, string>>>(
 		{},
@@ -65,14 +92,34 @@ export function ConnectGitLabStep() {
 		<div className="flex flex-col gap-4">
 			<Field data-invalid={fieldErrors.serverUrl ? "true" : undefined}>
 				<FieldLabel htmlFor="gitlab-server-url">GitLab Instance</FieldLabel>
-				<Input
-					id="gitlab-server-url"
-					value={state.serverUrl || "https://gitlab.com"}
-					disabled
-					aria-describedby="gitlab-server-url-description"
-				/>
+				{multipleInstances ? (
+					<Select
+						value={state.serverUrl || selectableInstances[0]?.baseUrl || ""}
+						onValueChange={(value) => dispatch({ type: "SET_SERVER_URL", value: value ?? "" })}
+					>
+						<SelectTrigger id="gitlab-server-url">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{selectableInstances.map((instance) => (
+								<SelectItem key={instance.registrationId} value={instance.baseUrl}>
+									{instance.displayName} ({instance.baseUrl})
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				) : (
+					<Input
+						id="gitlab-server-url"
+						value={state.serverUrl || "https://gitlab.com"}
+						disabled
+						aria-describedby="gitlab-server-url-description"
+					/>
+				)}
 				<FieldDescription id="gitlab-server-url-description">
-					Configured by your administrator.
+					{multipleInstances
+						? "Pick the GitLab instance hosting the group you'll monitor."
+						: "Configured by your administrator."}
 				</FieldDescription>
 			</Field>
 

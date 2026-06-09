@@ -72,7 +72,42 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
 
     List<WorkspaceMembership> findByUser_Id(Long userId);
 
+    /**
+     * Memberships for ANY of the given SCM users — the multi-identity form of {@link #findByUser_Id}.
+     * A single Hephaestus account can mirror several SCM users (one per linked provider identity), so
+     * workspace visibility unions their memberships. Empty input yields an empty list.
+     */
+    List<WorkspaceMembership> findByUser_IdIn(Collection<Long> userIds);
+
+    /** This workspace's membership rows for ANY of the given SCM users (multi-identity role resolution). */
+    List<WorkspaceMembership> findByWorkspace_IdAndUser_IdIn(Long workspaceId, Collection<Long> userIds);
+
+    /**
+     * All memberships for the given SCM logins, with the workspace eagerly fetched. Used by the
+     * {@code core.auth} GDPR data-export to flatten a principal's workspace memberships without
+     * the auth module importing workspace domain types. Login match is case-insensitive.
+     */
+    @Query(
+        """
+            SELECT wm FROM WorkspaceMembership wm
+            JOIN FETCH wm.workspace
+            JOIN wm.user u
+            WHERE LOWER(u.login) IN :logins
+        """
+    )
+    List<WorkspaceMembership> findAllWithWorkspaceByUserLoginInLowercase(@Param("logins") Collection<String> logins);
+
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
+
+    /** Total member count for a workspace (all roles). Backs the instance-admin workspaces overview. */
+    long countByWorkspace_Id(Long workspaceId);
+
+    /** Git logins of a workspace's members in the given role (e.g. OWNER) — for the admin overview. */
+    @Query("SELECT wm.user.login FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.role = :role")
+    List<String> findUserLoginsByWorkspaceIdAndRole(
+        @Param("workspaceId") Long workspaceId,
+        @Param("role") WorkspaceRole role
+    );
 
     @Query("SELECT wm.user.id FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.hidden = true")
     Set<Long> findHiddenUserIdsByWorkspaceId(@Param("workspaceId") Long workspaceId);

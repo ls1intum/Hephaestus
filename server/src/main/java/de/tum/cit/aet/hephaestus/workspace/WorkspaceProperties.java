@@ -72,8 +72,19 @@ public record WorkspaceProperties(
     @DefaultValue("false") boolean initDefault,
     @Name("default") @Valid DefaultProperties defaultProperties,
     @DefaultValue("false") boolean initGitlabDefault,
-    @Valid GitLabDefaultProperties gitlabDefault
+    @Valid GitLabDefaultProperties gitlabDefault,
+    @DefaultValue("ADMIN_ONLY") CreationPolicy creationPolicy
 ) {
+    /**
+     * Who may create workspaces via {@code POST /workspaces}. Defaults to {@code ADMIN_ONLY} (safe for
+     * a shared instance); set {@code SELF_SERVICE} to let any authenticated user create one. This is
+     * the actor gate; per-provider availability (e.g. the GitLab feature flag) is orthogonal.
+     */
+    public enum CreationPolicy {
+        ADMIN_ONLY,
+        SELF_SERVICE,
+    }
+
     /**
      * Compact constructor that ensures nested properties are never null and performs
      * cross-field validation.
@@ -89,6 +100,9 @@ public record WorkspaceProperties(
         }
         if (gitlabDefault == null) {
             gitlabDefault = new GitLabDefaultProperties(null, null, null);
+        }
+        if (creationPolicy == null) {
+            creationPolicy = CreationPolicy.ADMIN_ONLY;
         }
         // Cross-field validation: when initDefault=true, login and token must be present
         if (initDefault) {

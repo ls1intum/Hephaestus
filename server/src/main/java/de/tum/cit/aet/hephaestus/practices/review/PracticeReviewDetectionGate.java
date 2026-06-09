@@ -42,7 +42,7 @@ import tools.jackson.databind.JsonNode;
  *   <li>No active practices match trigger event → SKIP</li>
  *   <li>{@code runForAllUsers} config → DETECT (bypass role check)</li>
  *   <li>No assignee → SKIP</li>
- *   <li>Keycloak circuit breaker open → SKIP</li>
+ *   <li>Role checker unhealthy → SKIP</li>
  *   <li>Assignee has {@code run_practice_review} role → DETECT / SKIP</li>
  * </ol>
  */
@@ -59,7 +59,7 @@ public class PracticeReviewDetectionGate {
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
 
-    private final AtomicLong skippedDueToKeycloakCount = new AtomicLong(0);
+    private final AtomicLong skippedDueToUnhealthyCount = new AtomicLong(0);
     private final AtomicReference<Instant> lastSkipWarningTime = new AtomicReference<>(Instant.EPOCH);
 
     public PracticeReviewDetectionGate(
@@ -81,8 +81,8 @@ public class PracticeReviewDetectionGate {
      * <p>
      * <strong>Transaction design:</strong> This method is intentionally NOT {@code @Transactional}.
      * Each DB read (workspace resolution, agent config check, practice query) runs in its own
-     * transaction via Spring Data defaults / explicit annotation. This avoids holding a DB
-     * connection during the Keycloak HTTP calls in steps 8–9.
+     * transaction via Spring Data defaults / explicit annotation. The role check (step 7) is a
+     * local DB lookup, so the gate holds no connection across an external call.
      *
      * @param pullRequest      the pull request (must have labels, assignees, repository eagerly loaded)
      * @param triggerEventName the domain event name (e.g., "PullRequestCreated", "ReviewSubmitted")
@@ -185,16 +185,16 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no assignee");
         }
 
-        // 7. Keycloak health gate
+        // 7. Role-checker health gate
         if (!userRoleChecker.isHealthy()) {
-            logSkippedDueToKeycloak(pullRequest);
-            return new GateDecision.Skip("keycloak circuit breaker open");
+            logSkippedDueToUnhealthy(pullRequest);
+            return new GateDecision.Skip("role checker unhealthy");
         }
 
         // Reset skip counter on recovery
-        long previousCount = skippedDueToKeycloakCount.getAndSet(0);
+        long previousCount = skippedDueToUnhealthyCount.getAndSet(0);
         if (previousCount > 0) {
-            log.info("Keycloak circuit breaker recovered, resuming practice review gate checks");
+            log.info("Role checker recovered, resuming practice review gate checks");
         }
 
         // 8. Role check: DETECT if ANY assignee has the role
@@ -205,9 +205,9 @@ public class PracticeReviewDetectionGate {
      * Checks all assignees for the practice review role. Returns Detect on first match.
      * <p>
      * On exception: fails closed immediately (returns Skip) rather than continuing to the next
-     * assignee. This is intentional — if the identity provider is misbehaving, we should not
-     * make additional calls. The {@code isHealthy()} gate (step 8) handles the common case;
-     * this catch handles unexpected failures that slip through the circuit breaker.
+     * assignee. This is intentional — if the role checker is misbehaving, we should not
+     * make additional calls. The {@code isHealthy()} gate (step 7) handles the common case;
+     * this catch handles unexpected failures that slip through.
      */
     private GateDecision checkAssigneeRoles(
         PullRequest pullRequest,
@@ -217,7 +217,21 @@ public class PracticeReviewDetectionGate {
     ) {
         for (User assignee : assignees) {
             try {
-                if (userRoleChecker.hasRole(assignee.getLogin(), PRACTICE_REVIEW_ROLE)) {
+                // Identity is the stable (gitProviderId, subject) tuple, not the login: the role lives on
+                // the Hephaestus account behind THIS provider's identity. subject == the provider's numeric
+                // user id (User.nativeId as a string), matching IdentityLink.subject. A synced assignee
+                // always carries both; guard defensively so a half-synced row fails safe (no role).
+                var provider = assignee.getProvider();
+                if (provider == null || provider.getId() == null || assignee.getNativeId() == null) {
+                    continue;
+                }
+                if (
+                    userRoleChecker.hasRole(
+                        provider.getId(),
+                        String.valueOf(assignee.getNativeId()),
+                        PRACTICE_REVIEW_ROLE
+                    )
+                ) {
                     log.info(
                         "Practice review gate: DETECT, reason=hasRole, prId={}, userLogin={}, matchedPractices={}",
                         pullRequest.getId(),
@@ -265,24 +279,21 @@ public class PracticeReviewDetectionGate {
         return false;
     }
 
-    private void logSkippedDueToKeycloak(PullRequest pullRequest) {
-        long currentCount = skippedDueToKeycloakCount.incrementAndGet();
+    private void logSkippedDueToUnhealthy(PullRequest pullRequest) {
+        long currentCount = skippedDueToUnhealthyCount.incrementAndGet();
         Instant now = Instant.now();
         Instant lastWarning = lastSkipWarningTime.get();
 
         log.debug(
-            "Practice review gate: SKIP, reason=keycloakCircuitBreakerOpen, prId={}, skippedCount={}",
+            "Practice review gate: SKIP, reason=roleCheckerUnhealthy, prId={}, skippedCount={}",
             pullRequest.getId(),
             currentCount
         );
 
-        // Rate-limit WARN logging to avoid log spam during Keycloak outages
+        // Rate-limit WARN logging to avoid log spam during role-checker outages
         if (Duration.between(lastWarning, now).compareTo(SKIP_WARNING_INTERVAL) >= 0) {
             if (lastSkipWarningTime.compareAndSet(lastWarning, now)) {
-                log.warn(
-                    "Practice review gate skipping due to Keycloak circuit breaker open: skippedCount={}",
-                    currentCount
-                );
+                log.warn("Practice review gate skipping due to role checker unhealthy: skippedCount={}", currentCount);
             }
         }
     }

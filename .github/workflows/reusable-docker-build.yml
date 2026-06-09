@@ -61,22 +61,43 @@ on:
         type: string
         required: false
         description: "Build arguments"
+      single-arch:
+        type: boolean
+        required: false
+        default: false
+        description: |
+          Build only linux/amd64. Callers set this on pull requests to halve Docker build
+          wall-clock + cost (the arm64 native build adds ~7 min and PR images are never deployed
+          to production). main + release builds leave this false so :latest and pinned digests stay
+          multi-arch.
     outputs:
       manifest-digest:
         description: "Digest (sha256:…) of the multi-arch manifest list. The release workflow records this for production pinning."
         value: ${{ jobs.merge.outputs.manifest-digest }}
 
 jobs:
+  # Compute the build matrix so PRs (single-arch=true) build amd64 only while main/release build
+  # both arches. A static matrix can't be made conditional, so we emit it as JSON here.
+  setup:
+    name: Resolve build platforms
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          if [ "${{ inputs.single-arch }}" = "true" ]; then
+            echo 'matrix={"include":[{"platform":"linux/amd64","runner":"ubuntu-24.04"}]}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"include":[{"platform":"linux/amd64","runner":"ubuntu-24.04"},{"platform":"linux/arm64","runner":"ubuntu-24.04-arm"}]}' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build ${{ matrix.platform }} Docker Image
+    needs: setup
     strategy:
       fail-fast: true
-      matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-24.04
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read

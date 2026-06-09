@@ -14,7 +14,7 @@ on:
       deploy-core:
         default: false
         type: boolean
-        description: (Re-)deploys NATS, Keycloak, and the Webhook Server (application-server image with the webhook profile). Usually not necessary and might cause data gaps.
+        description: (Re-)deploys NATS and the Webhook Server (application-server image with the webhook profile). Usually not necessary and might cause data gaps.
       deploy-proxy:
         default: false
         type: boolean
@@ -33,7 +33,7 @@ on:
       deploy-core:
         default: false
         type: boolean
-        description: (Re-)deploys NATS, Keycloak, and the Webhook Server (application-server image with the webhook profile). Usually not necessary and might cause data gaps.
+        description: (Re-)deploys NATS and the Webhook Server (application-server image with the webhook profile). Usually not necessary and might cause data gaps.
       deploy-proxy:
         default: false
         type: boolean

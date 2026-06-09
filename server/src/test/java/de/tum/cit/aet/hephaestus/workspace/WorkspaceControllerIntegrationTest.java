@@ -101,6 +101,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             null
         );
 
+        // Anonymous state-changing request: the double-submit CSRF gate (ADR 0017) rejects it 403
+        // before authentication runs (no X-XSRF-TOKEN). The mutation is still blocked for anonymous
+        // callers; dedicated CSRF + cookie-auth coverage lives in CsrfProtectionIntegrationTest.
         webTestClient
             .post()
             .uri("/workspaces")
@@ -108,7 +111,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .bodyValue(request)
             .exchange()
             .expectStatus()
-            .isUnauthorized();
+            .isForbidden();
 
         assertThat(workspaceRepository.count()).isZero();
     }

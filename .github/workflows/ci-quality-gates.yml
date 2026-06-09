@@ -157,9 +157,11 @@ jobs:
           pnpm install --frozen-lockfile
 
           # Start a single shared Postgres instance for all DB checks
+          # pg_partman-enabled image: the auth_event changelog calls partman.create_parent.
+          docker build -t hephaestus-postgres:ci docker/postgres
           docker run -d --name postgres-db \
             -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
-            -p 5432:5432 postgres:16
+            -p 5432:5432 hephaestus-postgres:ci
           # Guarantee cleanup regardless of how the step exits
           trap 'docker stop postgres-db 2>/dev/null; docker rm postgres-db 2>/dev/null' EXIT
           until docker exec postgres-db pg_isready -U root -d hephaestus; do sleep 2; done

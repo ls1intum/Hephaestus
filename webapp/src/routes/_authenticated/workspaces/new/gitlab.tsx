@@ -1,15 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
-	claimIdentityMutation,
 	createWorkspaceMutation,
-	getIdentityProvidersOptions,
-	getLinkedAccountsQueryKey,
 	getProvidersOptions,
 	listGitLabGroupsMutation,
+	listIdentityProvidersOptions,
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,90 +39,95 @@ const STEP_META = [
 	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
 ] as const;
 
+interface GitLabProvider {
+	registrationId: string;
+	displayName: string;
+	baseUrl: string;
+}
+
+function BackToProviders() {
+	return (
+		<Link
+			to="/workspaces/new"
+			className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+		>
+			<ArrowLeftIcon className="size-3.5" />
+			Back
+		</Link>
+	);
+}
+
 /**
- * Prompts the user to link their GitLab account. Offers two paths:
- * 1. "Link GitLab" — standard Keycloak account linking (works when no conflict)
- * 2. "Claim GitLab Identity" — transfers the identity from an orphan account (handles the
- *    case where the user previously logged in via GitLab directly, creating a separate account)
+ * Shown when no GitLab sign-in is configured for this instance, so there is nothing to link. An admin
+ * must add a GitLab login provider first (Instance admin → Login providers).
  */
-function GitLabLinkPrompt({
-	gitlabIdpAlias,
-	linkAccount,
-}: {
-	gitlabIdpAlias?: string;
-	linkAccount: (alias: string) => Promise<void>;
-}) {
-	const queryClient = useQueryClient();
-	const [showClaim, setShowClaim] = useState(false);
-
-	const claimMutation = useMutation({
-		...claimIdentityMutation(),
-		onSuccess: () => {
-			toast.success(
-				"GitLab account linked successfully. Please log out and back in for the changes to take effect.",
-			);
-			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
-		},
-		onError: (error) => {
-			toast.error(`Failed to claim identity: ${(error as Error).message}`);
-		},
-	});
-
+function NoGitLabProviderNotice({ isAppAdmin }: { isAppAdmin: boolean }) {
 	return (
 		<div className="mx-auto max-w-2xl py-8">
-			<Link
-				to="/workspaces/new"
-				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
-			>
-				<ArrowLeftIcon className="size-3.5" />
-				Back
-			</Link>
+			<BackToProviders />
+			<div className="space-y-4">
+				<h1 className="text-2xl font-semibold tracking-tight">GitLab sign-in isn't configured</h1>
+				<p className="text-muted-foreground">
+					This instance has no GitLab login provider, so a GitLab account can't be linked yet.
+					{isAppAdmin
+						? " Add one to enable GitLab sign-in."
+						: " Ask an instance admin to add one (Instance admin → Login providers)."}
+				</p>
+				{isAppAdmin && (
+					<Button className="w-fit" render={<Link to="/admin/login-providers" />}>
+						Manage login providers
+					</Button>
+				)}
+			</div>
+		</div>
+	);
+}
 
+/**
+ * Prompts the user to link a GitLab account via re-login linking: a top-level redirect to the GitLab
+ * identity provider that attaches the identity to the current account. When more than one GitLab
+ * instance is configured, the user picks which instance to link (no arbitrary default).
+ */
+function GitLabLinkPrompt({
+	providers,
+	linkedServerUrls,
+	linkAccount,
+}: {
+	providers: GitLabProvider[];
+	linkedServerUrls: Set<string>;
+	linkAccount: (alias: string) => Promise<void>;
+}) {
+	const multiple = providers.length > 1;
+	return (
+		<div className="mx-auto max-w-2xl py-8">
+			<BackToProviders />
 			<div className="space-y-4">
 				<div className="space-y-1.5">
-					<h1 className="text-2xl font-semibold tracking-tight">Link Your GitLab Account</h1>
+					<h1 className="text-2xl font-semibold tracking-tight">Link your GitLab account</h1>
 					<p className="text-muted-foreground">
-						To create a GitLab workspace, you need to link your GitLab account first.
+						{multiple
+							? "To create a GitLab workspace, link the GitLab instance you'll monitor. You'll be redirected to sign in; the identity is then attached to your current account."
+							: "To create a GitLab workspace, link your GitLab account first. You'll be redirected to GitLab to sign in; the identity is then attached to your current account."}
 					</p>
 				</div>
-
-				<div className="flex flex-col gap-3">
-					{gitlabIdpAlias && (
-						<Button className="w-fit" onClick={() => linkAccount(gitlabIdpAlias)}>
-							Link GitLab Account
-						</Button>
-					)}
-
-					{!showClaim && (
-						<button
-							type="button"
-							className="text-sm text-muted-foreground hover:text-foreground text-left"
-							onClick={() => setShowClaim(true)}
-						>
-							Already logged in with GitLab before? Having trouble linking?
-						</button>
-					)}
-
-					{showClaim && gitlabIdpAlias && (
-						<Alert>
-							<AlertTitle>Previously logged in with GitLab?</AlertTitle>
-							<AlertDescription className="space-y-3">
-								<p>
-									If you previously signed in with GitLab directly, a separate account was created.
-									Click below to merge it with your current account.
-								</p>
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={claimMutation.isPending}
-									onClick={() => claimMutation.mutate({ path: { providerAlias: gitlabIdpAlias } })}
-								>
-									{claimMutation.isPending ? <Spinner className="mr-2" /> : null}
-									Merge GitLab Identity
-								</Button>
-							</AlertDescription>
-						</Alert>
-					)}
+				<div className="flex flex-col items-start gap-2">
+					{providers.map((provider) => {
+						const linked = linkedServerUrls.has(provider.baseUrl);
+						return (
+							<Button
+								key={provider.registrationId}
+								variant={linked ? "outline" : "default"}
+								disabled={linked}
+								onClick={() => linkAccount(provider.registrationId)}
+							>
+								{linked
+									? `${provider.displayName} — already linked`
+									: multiple
+										? `Link ${provider.displayName}`
+										: "Link GitLab account"}
+							</Button>
+						);
+					})}
 				</div>
 			</div>
 		</div>
@@ -132,7 +135,7 @@ function GitLabLinkPrompt({
 }
 
 function GitLabWizardPage() {
-	const { hasGitLabIdentity, linkAccount } = useAuth();
+	const { hasGitLabIdentity, linkAccount, linkedProviders, isAppAdmin } = useAuth();
 
 	const {
 		data: providers,
@@ -143,12 +146,24 @@ function GitLabWizardPage() {
 		staleTime: 5 * 60 * 1000,
 	});
 
-	// Find the GitLab IdP alias for account linking
+	// The configured GitLab sign-in options (one per instance). Used to gate + drive instance-scoped
+	// account linking — never an arbitrary "first gitlab-ish" provider.
 	const { data: identityProviders } = useQuery({
-		...getIdentityProvidersOptions(),
+		...listIdentityProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
-	const gitlabIdpAlias = identityProviders?.find((p) => p.alias.startsWith("gitlab"))?.alias;
+	const gitlabProviders: GitLabProvider[] = (identityProviders ?? [])
+		.filter((p) => p.providerType === "GITLAB" && !!p.registrationId)
+		.map((p) => ({
+			registrationId: p.registrationId as string,
+			displayName: p.displayName || (p.registrationId as string),
+			baseUrl: p.baseUrl ?? "",
+		}));
+	const linkedGitlabServerUrls = new Set(
+		linkedProviders
+			.filter((p) => p.type === "GITLAB" && p.serverUrl)
+			.map((p) => p.serverUrl as string),
+	);
 
 	const gitlabEnabled = !!providers?.gitlab;
 	const defaultServerUrl = providers?.gitlab?.defaultServerUrl;
@@ -204,16 +219,14 @@ function GitLabWizardPage() {
 
 	const canAdvanceFromStep1 = state.preflightResult?.valid === true;
 	const canAdvanceFromStep2 = state.selectedGroup !== null;
-	const canSubmit = useMemo(
-		() =>
-			state.step === 3 &&
-			state.selectedGroup !== null &&
-			workspaceDetailsSchema.safeParse({
-				displayName: state.displayName,
-				workspaceSlug: state.workspaceSlug,
-			}).success,
-		[state.step, state.selectedGroup, state.displayName, state.workspaceSlug],
-	);
+	// React Compiler handles memoization; no manual useMemo (see webapp/AGENTS.md).
+	const canSubmit =
+		state.step === 3 &&
+		state.selectedGroup !== null &&
+		workspaceDetailsSchema.safeParse({
+			displayName: state.displayName,
+			workspaceSlug: state.workspaceSlug,
+		}).success;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: state.step is an intentional trigger to refocus heading on step change
 	useEffect(() => {
@@ -263,7 +276,7 @@ function GitLabWizardPage() {
 	};
 
 	const meta = STEP_META[state.step - 1];
-	const wizardContextValue = useMemo(() => ({ state, dispatch }), [state]);
+	const wizardContextValue = { state, dispatch };
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
 	if (providersLoading) {
@@ -290,8 +303,18 @@ function GitLabWizardPage() {
 		return <Navigate to="/workspaces/new" />;
 	}
 
+	if (gitlabProviders.length === 0) {
+		return <NoGitLabProviderNotice isAppAdmin={isAppAdmin} />;
+	}
+
 	if (!hasGitLabIdentity) {
-		return <GitLabLinkPrompt gitlabIdpAlias={gitlabIdpAlias} linkAccount={linkAccount} />;
+		return (
+			<GitLabLinkPrompt
+				providers={gitlabProviders}
+				linkedServerUrls={linkedGitlabServerUrls}
+				linkAccount={linkAccount}
+			/>
+		);
 	}
 
 	return (
@@ -326,7 +349,7 @@ function GitLabWizardPage() {
 
 			<div className="mt-6" role="region" aria-labelledby="wizard-heading">
 				<WizardContext.Provider value={wizardContextValue}>
-					{state.step === 1 && <ConnectGitLabStep />}
+					{state.step === 1 && <ConnectGitLabStep instances={gitlabProviders} />}
 					{state.step === 2 && <SelectGroupStep />}
 					{state.step === 3 && <ConfigureWorkspaceStep />}
 				</WizardContext.Provider>

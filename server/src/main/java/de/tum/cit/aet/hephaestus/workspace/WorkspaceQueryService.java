@@ -6,16 +6,17 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceProvidersDTO;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,7 @@ public class WorkspaceQueryService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
-    private final UserRepository userRepository;
+    private final CurrentAccountUsers currentAccountUsers;
     private final ConnectionService connectionService;
 
     /**
@@ -53,20 +54,23 @@ public class WorkspaceQueryService {
      * delegates the "is this provider exposable to the wizard?" decision back to the adapter.
      */
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
+    private final WorkspaceProperties workspaceProperties;
 
     public WorkspaceQueryService(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
-        UserRepository userRepository,
+        CurrentAccountUsers currentAccountUsers,
         ConnectionService connectionService,
+        WorkspaceProperties workspaceProperties,
         List<WorkspaceProviderAvailability> providerAvailabilityList
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
-        this.userRepository = userRepository;
+        this.currentAccountUsers = currentAccountUsers;
         this.connectionService = connectionService;
+        this.workspaceProperties = workspaceProperties;
         Map<IntegrationKind, WorkspaceProviderAvailability> map = new EnumMap<>(IntegrationKind.class);
         for (WorkspaceProviderAvailability a : providerAvailabilityList) {
             map.put(a.kind(), a);
@@ -116,7 +120,7 @@ public class WorkspaceQueryService {
                 ? glAvail.hintUrl().map(WorkspaceProvidersDTO.GitLabProviderDTO::new).orElse(null)
                 : null;
 
-        return new WorkspaceProvidersDTO(github, gitlab);
+        return new WorkspaceProvidersDTO(github, gitlab, workspaceProperties.creationPolicy());
     }
 
     /**
@@ -145,30 +149,45 @@ public class WorkspaceQueryService {
      * @return list of accessible workspaces for the current user
      */
     public List<Workspace> findAccessibleWorkspaces() {
-        return findAccessibleWorkspaces(userRepository.getCurrentUser());
+        // Union across ALL of the account's linked identities (ADR 0017): a single account can mirror
+        // several SCM users (one per provider login), so a member signed in via one provider must still
+        // see workspaces they belong to under another. See CurrentAccountUsers.
+        return findAccessibleWorkspaces(currentAccountUsers.resolve());
     }
 
     /**
-     * Returns workspaces a specific user can see: memberships + publicly viewable workspaces.
-     * If the user is empty, only publicly viewable workspaces are returned.
-     * Only ACTIVE workspaces are included - SUSPENDED and PURGED workspaces are excluded.
+     * Returns workspaces the given SCM users can see: the UNION of their memberships + publicly viewable
+     * workspaces. An empty user set yields only the publicly viewable workspaces. Only ACTIVE workspaces
+     * are included - SUSPENDED and PURGED workspaces are excluded. Passing several users is how a single
+     * account's multiple linked identities are unioned.
      *
-     * @param currentUser the user to check accessibility for
+     * @param currentUsers the SCM users (the account's identity mirrors) to check accessibility for
      * @return list of accessible workspaces
      */
-    List<Workspace> findAccessibleWorkspaces(Optional<User> currentUser) {
+    List<Workspace> findAccessibleWorkspaces(Collection<User> currentUsers) {
         // Always include public, active workspaces
         List<Workspace> publicWorkspaces = workspaceRepository.findByStatusAndIsPubliclyViewableTrue(
             Workspace.WorkspaceStatus.ACTIVE
         );
 
-        if (currentUser.isEmpty()) {
+        Set<Long> userIds = currentUsers
+            .stream()
+            .filter(u -> u != null && u.getId() != null)
+            .map(User::getId)
+            .collect(Collectors.toSet());
+
+        if (userIds.isEmpty()) {
             return publicWorkspaces.stream().sorted(ACCESSIBLE_WORKSPACE_COMPARATOR).toList();
         }
 
-        // Fetch memberships for the current user and load workspaces by ID
-        var memberships = workspaceMembershipRepository.findByUser_Id(currentUser.get().getId());
-        var workspaceIds = memberships.stream().map(WorkspaceMembership::getWorkspace).map(Workspace::getId).toList();
+        // Fetch memberships across every identity and load workspaces by ID
+        var memberships = workspaceMembershipRepository.findByUser_IdIn(userIds);
+        var workspaceIds = memberships
+            .stream()
+            .map(WorkspaceMembership::getWorkspace)
+            .map(Workspace::getId)
+            .distinct()
+            .toList();
 
         List<Workspace> memberWorkspaces = workspaceIds.isEmpty()
             ? List.of()

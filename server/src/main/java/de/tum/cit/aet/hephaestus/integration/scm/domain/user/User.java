@@ -75,11 +75,6 @@ public class User extends BaseGitServiceEntity {
 
     private String email;
 
-    /** Keycloak {@code sub} claim — populated on first authenticated upsert. See ADR 0016. */
-    @Nullable
-    @Column(name = "keycloak_subject", length = 128)
-    private String keycloakSubject;
-
     @NonNull
     private String htmlUrl;
 

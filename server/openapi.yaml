@@ -19,21 +19,14 @@ tags:
   name: Achievements
 - description: Global contributor information
   name: Contributors
-- description: |-
-    Workspace registry endpoints that operate outside of a specific workspace slug.
-     These routes stay under the classic /workspaces base path while slugged routes
-     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
-  name: workspace-registry-controller
-- description: Read-only access to practice evaluation findings
-  name: Practice Findings
-- description: Workspace integration connection management
-  name: Connections
+- description: User preferences
+  name: Account
+- description: Instance-admin login provider management
+  name: Admin
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
-- description: Up/down votes on mentor assistant messages
-  name: Mentor Votes
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -42,18 +35,8 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
-- description: |-
-    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
-     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
-     on both success and failure; only <code>Accept: application/json</code> requests get
-     4xx JSON.
-  name: o-auth-callback-controller
-- description: Authentication discovery (public)
-  name: Auth
-- description: Manage practice definitions
-  name: Practice Catalog
-- description: Workspace-scoped team settings management
-  name: Team Settings
+- description: Instance-admin account management
+  name: Admin
 - description: Team management within workspace
   name: Teams
 - description: |-
@@ -73,6 +56,39 @@ tags:
   name: Finding Feedback
 - description: User profile and activity data
   name: Profile
+- description: Contributor rankings and league statistics
+  name: Leaderboard
+- description: Session lifecycle
+  name: Auth
+- description: Active sessions
+  name: Account
+- description: |-
+    Workspace registry endpoints that operate outside of a specific workspace slug.
+     These routes stay under the classic /workspaces base path while slugged routes
+     live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
+  name: workspace-registry-controller
+- description: Read-only access to practice evaluation findings
+  name: Practice Findings
+- description: Workspace integration connection management
+  name: Connections
+- description: Up/down votes on mentor assistant messages
+  name: Mentor Votes
+- description: Public JWK set for verifying Hephaestus session JWTs
+  name: Auth discovery
+- description: GDPR Art. 20 self-service data export
+  name: Account
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
+     on both success and failure; only <code>Accept: application/json</code> requests get
+     4xx JSON.
+  name: o-auth-callback-controller
+- description: Manage practice definitions
+  name: Practice Catalog
+- description: Workspace-scoped team settings management
+  name: Team Settings
+- description: Identity provider discovery (public)
+  name: Auth discovery
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard:
      <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
@@ -83,14 +99,168 @@ tags:
      <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
      <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
   name: git-lab-preflight-controller
-- description: Contributor rankings and league statistics
-  name: Leaderboard
+- description: "Current user identity, linked accounts, deletion"
+  name: Account
 paths:
-  /auth/identity-providers:
+  /.well-known/jwks.json:
     get:
-      description: Returns all enabled identity providers that can be used for login.
-        Public endpoint — no authentication required.
-      operationId: getIdentityProviders
+      operationId: getJwks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: OK
+      summary: JWK set (public keys only)
+      tags:
+      - Auth discovery
+  /admin/audit:
+    get:
+      operationId: adminListAuthEvents
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      - in: query
+        name: accountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: actingAccountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: eventType
+        required: false
+        schema:
+          type: string
+          enum:
+          - LOGIN
+          - LOGIN_FAILED
+          - LOGOUT
+          - TOKEN_REFRESH
+          - JWT_REVOKED
+          - IDENTITY_LINKED
+          - IDENTITY_UNLINKED
+          - IMPERSONATION_BEGIN
+          - IMPERSONATION_END
+          - ACCOUNT_DELETED
+          - EXPORT_REQUESTED
+          - APP_ROLE_CHANGED
+      - in: query
+        name: result
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCESS
+          - FAILURE
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageAuthEventView"
+          description: OK
+      summary: "List auth audit events (paged, newest first)"
+      tags:
+      - Admin
+  /admin/audit/export:
+    get:
+      operationId: adminExportAuthEvents
+      parameters:
+      - in: query
+        name: accountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: actingAccountId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: eventType
+        required: false
+        schema:
+          type: string
+          enum:
+          - LOGIN
+          - LOGIN_FAILED
+          - LOGOUT
+          - TOKEN_REFRESH
+          - JWT_REVOKED
+          - IDENTITY_LINKED
+          - IDENTITY_UNLINKED
+          - IMPERSONATION_BEGIN
+          - IMPERSONATION_END
+          - ACCOUNT_DELETED
+          - EXPORT_REQUESTED
+          - APP_ROLE_CHANGED
+      - in: query
+        name: result
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCESS
+          - FAILURE
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: OK
+      summary: "Export the filtered audit log as CSV (newest first, capped)"
+      tags:
+      - Admin
+  /admin/login-providers:
+    get:
+      operationId: adminListLoginProviders
       responses:
         "200":
           content:
@@ -98,9 +268,199 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/IdentityProvider"
+                  $ref: "#/components/schemas/LoginProviderView"
           description: OK
-      summary: List available identity providers
+      summary: List login providers
+      tags:
+      - Admin
+    post:
+      operationId: adminCreateLoginProvider
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoginProviderRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginProviderView"
+          description: Login provider created; URL in the Location header
+      summary: Create a login provider
+      tags:
+      - Admin
+  /admin/login-providers/{registrationId}:
+    delete:
+      operationId: adminDeleteLoginProvider
+      parameters:
+      - in: path
+        name: registrationId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Delete a login provider
+      tags:
+      - Admin
+    patch:
+      operationId: adminUpdateLoginProvider
+      parameters:
+      - in: path
+        name: registrationId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLoginProviderRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginProviderView"
+          description: OK
+      summary: Update a login provider
+      tags:
+      - Admin
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAccountView"
+          description: OK
+      summary: List accounts (paged)
+      tags:
+      - Admin
+  /admin/users/{id}:
+    patch:
+      operationId: adminUpdateUser
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAccountRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountView"
+          description: OK
+      summary: Update an account's app role
+      tags:
+      - Admin
+  /admin/users/{id}/sessions:
+    delete:
+      operationId: adminRevokeUserSessions
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeSessionsResult"
+          description: OK
+      summary: "Force sign-out: revoke all of an account's active sessions"
+      tags:
+      - Admin
+  /admin/workspaces:
+    get:
+      operationId: adminListWorkspaces
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminWorkspaceView"
+          description: OK
+      summary: List all workspaces (metadata only)
+      tags:
+      - Admin
+  /auth/impersonate:
+    post:
+      operationId: impersonate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImpersonateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Begin impersonating another account
+      tags:
+      - Auth
+  /auth/impersonate:exit:
+    post:
+      operationId: exitImpersonation
+      responses:
+        "200":
+          description: OK
+      summary: "Exit impersonation, restore operator session"
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      operationId: logout
+      responses:
+        "200":
+          description: OK
+      summary: Log out — revoke the current token + clear the cookie
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      operationId: refresh
+      responses:
+        "200":
+          description: OK
+      summary: "Rotate the access token (new jti, old revoked)"
       tags:
       - Auth
   /contributors:
@@ -120,6 +480,21 @@ paths:
       summary: List global contributors
       tags:
       - Contributors
+  /identity-providers:
+    get:
+      operationId: listIdentityProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IdentityProviderView"
+          description: OK
+      summary: List available identity providers
+      tags:
+      - Auth discovery
   /oauth/callback/{kind}:
     get:
       operationId: callbackGet
@@ -201,19 +576,89 @@ paths:
       - o-auth-callback
   /user:
     delete:
-      description: Permanently delete the current user's account and all associated
-        data (GDPR)
-      operationId: deleteUser
+      operationId: deleteCurrentUser
+      parameters:
+      - in: header
+        name: X-Confirm-Delete
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           description: OK
-      summary: Delete user account
+      summary: Delete the current account (GDPR Art. 17)
+      tags:
+      - Account
+    get:
+      operationId: getCurrentUser
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserView"
+          description: OK
+      summary: Get the current user
+      tags:
+      - Account
+  /user/exports:
+    post:
+      operationId: requestDataExport
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportCreated"
+          description: OK
+      summary: Request a data export (async)
+      tags:
+      - Account
+  /user/exports/{id}:
+    get:
+      operationId: getDataExportStatus
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportStatus"
+          description: OK
+      summary: Get data-export status
+      tags:
+      - Account
+  /user/exports/{id}/download:
+    get:
+      operationId: downloadDataExport
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+                format: byte
+          description: OK
+      summary: Download the data-export bundle
       tags:
       - Account
   /user/features:
     get:
       description: Returns all feature flags evaluated for the authenticated user.
-        Combines Keycloak role checks and server-side config toggles.
+        Combines role checks and server-side config toggles.
       operationId: getUserFeatures
       responses:
         "200":
@@ -225,11 +670,9 @@ paths:
       summary: Get feature flags for the current user
       tags:
       - Account
-  /user/linked-accounts:
+  /user/identities:
     get:
-      description: Returns all configured identity providers with their connection
-        status for the current user
-      operationId: getLinkedAccounts
+      operationId: listLinkedIdentities
       responses:
         "200":
           content:
@@ -237,53 +680,72 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LinkedAccount"
+                  $ref: "#/components/schemas/IdentityView"
           description: OK
       summary: List linked identity providers
       tags:
       - Account
-  /user/linked-accounts/{providerAlias}:
+  /user/identities/{id}:
     delete:
-      description: Remove the federated identity link for the given provider. Cannot
-        unlink the last remaining provider.
-      operationId: unlinkAccount
+      operationId: unlinkIdentity
       parameters:
       - in: path
-        name: providerAlias
+        name: id
         required: true
         schema:
-          type: string
-          pattern: "^[a-z0-9-]{1,64}$"
+          type: integer
+          format: int64
       responses:
-        "200":
-          description: OK
-      summary: Unlink an identity provider
+        "204":
+          description: Identity unlinked
+        "404":
+          description: No such identity on the current account
+        "409":
+          description: Cannot unlink the account's only remaining sign-in method
+      summary: Unlink one of the current user's linked identity providers
       tags:
       - Account
-  /user/linked-accounts/{providerAlias}/claim:
-    post:
-      description: Transfers a federated identity from another Keycloak user to the
-        current user. Used when a user has accidentally created two accounts by logging
-        in with different IdPs. Deletes the orphan account if it has no remaining
-        identities.
-      operationId: claimIdentity
-      parameters:
-      - in: path
-        name: providerAlias
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9-]{1,64}$"
+  /user/sessions:
+    delete:
+      operationId: revokeOtherSessions
       responses:
         "200":
           description: OK
-      summary: Claim an identity provider from another user
+      summary: Revoke all sessions except the current one
+      tags:
+      - Account
+    get:
+      operationId: listSessions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionView"
+          description: OK
+      summary: List active sessions for the current user
+      tags:
+      - Account
+  /user/sessions/{jti}:
+    delete:
+      operationId: revokeSession
+      parameters:
+      - in: path
+        name: jti
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      summary: Revoke a single session
       tags:
       - Account
   /user/settings:
     get:
-      description: "Get the current user's notification, research participation, and\
-        \ AI review preferences"
       operationId: getUserSettings
       responses:
         "200":
@@ -296,8 +758,6 @@ paths:
       tags:
       - Account
     post:
-      description: "Update the current user's notification, research participation,\
-        \ and AI review preferences"
       operationId: updateUserSettings
       requestBody:
         content:
@@ -1181,7 +1641,7 @@ paths:
     get:
       description: |-
         Get the current user's membership in this workspace.
-         Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+         Super admins (the <code>admin</code> app role, APP_ADMIN) have their effective role elevated to ADMIN
          if their database role is lower, matching the runtime authorization behaviour in
          {@link WorkspaceAccessService WorkspaceAccessService}.
       operationId: getCurrentUserMembership
@@ -2764,6 +3224,20 @@ paths:
       - Achievements
 components:
   schemas:
+    AccountRef:
+      type: object
+      description: A human-readable account identity. <code>displayName</code>/<code>email</code>
+        are null for deleted accounts.
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        id:
+          type: integer
+          format: int64
+      required:
+      - id
     Achievement:
       type: object
       description: Achievement with user-specific progress information
@@ -2888,6 +3362,56 @@ components:
           type: string
       required:
       - type
+    AdminAccountView:
+      type: object
+      properties:
+        appRole:
+          type: string
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        primaryEmail:
+          type: string
+        status:
+          type: string
+    AdminWorkspaceView:
+      type: object
+      description: Metadata-only workspace summary for the instance-admin overview
+      properties:
+        accountLogin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        memberCount:
+          type: integer
+          format: int64
+        ownerLogin:
+          type: string
+        providerType:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+        status:
+          type: string
+        workspaceSlug:
+          type: string
+      required:
+      - accountLogin
+      - createdAt
+      - displayName
+      - id
+      - memberCount
+      - status
+      - workspaceSlug
     AgentConfig:
       type: object
       description: Agent configuration for a workspace (API key redacted)
@@ -3081,6 +3605,46 @@ components:
       required:
       - role
       - userId
+    AuthEventView:
+      type: object
+      description: "One audit row, flattened for the admin viewer."
+      properties:
+        account:
+          $ref: "#/components/schemas/AccountRef"
+        accountId:
+          type: integer
+          format: int64
+        actingAccountId:
+          type: integer
+          format: int64
+        actor:
+          $ref: "#/components/schemas/AccountRef"
+        details:
+          type: string
+        eventType:
+          type: string
+        failureReason:
+          type: string
+        id:
+          type: integer
+          format: int64
+        ipAddress:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        result:
+          type: string
+        userAgent:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - eventType
+      - id
+      - occurredAt
+      - result
     BinaryAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -3461,6 +4025,41 @@ components:
           minLength: 0
       required:
       - action
+    CreateLoginProviderRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+          description: Instance base URL (GitLab only; GitHub is always github.com)
+          example: https://gitlab.example.com
+        clientId:
+          type: string
+          minLength: 1
+        clientSecret:
+          type: string
+          description: "OAuth client secret; sealed at rest, never returned"
+          minLength: 1
+        displayName:
+          type: string
+          description: Label shown on the login button; defaults to the registrationId
+        registrationId:
+          type: string
+          description: Stable id used in the OAuth callback path and identity resolution
+          example: gitlab-acme
+          minLength: 1
+        scopes:
+          type: string
+          description: Space-separated scopes; defaulted by provider type if omitted
+        type:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+      required:
+      - clientId
+      - clientSecret
+      - registrationId
+      - type
     CreatePracticeRequest:
       type: object
       description: Request to create a new practice definition
@@ -3571,6 +4170,76 @@ components:
       - displayName
       - kind
       - workspaceSlug
+    CurrentUserView:
+      type: object
+      properties:
+        accessTokenExpiresAt:
+          type: integer
+          format: int64
+        appRole:
+          type: string
+        avatarUrl:
+          type: string
+        displayName:
+          type: string
+        gitProviderId:
+          type: string
+        hasGitLabIdentity:
+          type: boolean
+        id:
+          type: integer
+          format: int64
+        identityProvider:
+          type: string
+        impersonating:
+          type: boolean
+        impersonatorId:
+          type: integer
+          format: int64
+        linkedProviders:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkedProvider"
+        primaryEmail:
+          type: string
+        profileUrl:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        username:
+          type: string
+    ExportCreated:
+      type: object
+      description: Acknowledgement returned when a data export is requested.
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          type: string
+    ExportStatus:
+      type: object
+      description: Status of a requested data export; timestamps are null until the
+        matching transition occurs.
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        id:
+          type: integer
+          format: int64
+        requestedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
     FeatureFlags:
       type: object
       description: Feature flags evaluated for the current user
@@ -3729,23 +4398,51 @@ components:
           type: string
           description: Default GitLab server URL
           example: https://gitlab.lrz.de
-    IdentityProvider:
+    IdentityProviderView:
       type: object
-      description: An enabled identity provider available for login
+      description: |-
+        One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
+         the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
       properties:
-        alias:
+        baseUrl:
           type: string
-          description: "Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')"
         displayName:
           type: string
-          description: Display name of the identity provider
-        type:
+        providerType:
           type: string
-          description: "Provider type (e.g. 'github', 'oidc')"
+        registrationId:
+          type: string
+    IdentityView:
+      type: object
+      properties:
+        avatarUrl:
+          type: string
+        displayName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        lastLoginAt:
+          type: string
+          format: date-time
+        providerType:
+          type: string
+        subject:
+          type: string
+        username:
+          type: string
+    ImpersonateRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+        targetAccountId:
+          type: integer
+          format: int64
       required:
-      - alias
-      - displayName
-      - type
+      - reason
+      - targetAccountId
     InitiateConnectionRequest:
       type: object
       description: |-
@@ -3950,26 +4647,51 @@ components:
       required:
       - current
       - target
-    LinkedAccount:
+    LinkedProvider:
       type: object
-      description: An identity provider account that can be linked to the user
+      description: "A provider instance the current user is linked to: its type +\
+        \ server-url origin."
       properties:
-        connected:
+        serverUrl:
+          type: string
+        type:
+          type: string
+    LoginProviderView:
+      type: object
+      description: Admin view of a login provider. The client secret is never included.
+      properties:
+        baseUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type: string
+        enabled:
           type: boolean
-          description: Whether the user has linked this provider
-        linkedUsername:
+        redirectUri:
           type: string
-          description: "Username on the external provider, if connected"
-        providerAlias:
+          description: Redirect/callback URI to register on the upstream OAuth app
+        registrationId:
           type: string
-          description: "Identity provider alias (e.g. 'github', 'gitlab-lrz')"
-        providerName:
+        scopes:
           type: string
-          description: Display name of the identity provider
+        seededFromEnv:
+          type: boolean
+        type:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
       required:
-      - connected
-      - providerAlias
-      - providerName
+      - baseUrl
+      - createdAt
+      - displayName
+      - redirectUri
+      - registrationId
+      - scopes
+      - type
+      - updatedAt
     PageAgentJob:
       type: object
       properties:
@@ -3977,6 +4699,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AgentJob"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageAuthEventView:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthEventView"
         empty:
           type: boolean
         first:
@@ -4651,6 +5405,30 @@ components:
       - id
       - name
       - nameWithOwner
+    RevokeSessionsResult:
+      type: object
+      properties:
+        revoked:
+          type: integer
+          format: int32
+    SessionView:
+      type: object
+      properties:
+        current:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        ip:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        jti:
+          type: string
+          format: uuid
+        userAgent:
+          type: string
     SlackTestMessageRequest:
       type: object
       description: |-
@@ -4783,6 +5561,11 @@ components:
       - hidden
       - id
       - name
+    UpdateAccountRequest:
+      type: object
+      properties:
+        appRole:
+          type: string
     UpdateAgentConfigRequest:
       type: object
       description: Request to update an existing agent configuration (all fields optional
@@ -4887,6 +5670,22 @@ components:
       required:
       - day
       - time
+    UpdateLoginProviderRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+          description: Omit to leave the existing secret unchanged
+        displayName:
+          type: string
+        enabled:
+          type: boolean
+        scopes:
+          type: string
     UpdatePracticeActiveRequest:
       type: object
       description: Request to set a practice's active state
@@ -5358,6 +6157,13 @@ components:
       type: object
       description: Available workspace creation providers and their configuration
       properties:
+        creationPolicy:
+          type: string
+          description: Who may create workspaces — ADMIN_ONLY restricts creation to
+            instance admins
+          enum:
+          - ADMIN_ONLY
+          - SELF_SERVICE
         github:
           $ref: "#/components/schemas/GitHubProvider"
           description: "GitHub workspace provider config, null if not available"
@@ -5412,7 +6218,8 @@ components:
   securitySchemes:
     bearerAuth:
       bearerFormat: JWT
-      description: JWT authentication via Keycloak. Obtain a token from your Keycloak
-        instance.
+      description: Hephaestus-native JWT bearer authentication. The SPA normally authenticates
+        via the `__Host-HEPHAESTUS_AT` session cookie; this scheme documents the equivalent
+        bearer token.
       scheme: bearer
       type: http

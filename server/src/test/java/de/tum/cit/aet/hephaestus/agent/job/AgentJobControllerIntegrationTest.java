@@ -368,9 +368,14 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         User owner = persistUser("unauth-cancel-owner");
         Workspace workspace = createWorkspace("unauth-cancel-ws", "Unauth", "unauth-cancel", AccountType.ORG, owner);
 
+        // Pass CSRF (cookie-style write) but send no authentication, so the auth layer — not the CSRF
+        // filter — answers: an unauthenticated caller gets 401 (ADR 0017; see CsrfProtectionIntegrationTest
+        // for the tokenless-write 403 case).
+        String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
         webTestClient
             .post()
             .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .headers(TestAuthUtils.withCsrf(csrf))
             .exchange()
             .expectStatus()
             .isUnauthorized();

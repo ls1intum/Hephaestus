@@ -2,7 +2,7 @@
  * Cross-cutting Spring {@code @Configuration} classes — shared kernel.
  *
  * <p>Holds {@code @Configuration} beans that wire integrations needed by multiple
- * modules (Keycloak, Slack, Sentry, NATS connection, GraphQL clients, Resilience4j,
+ * modules (Slack, Sentry, NATS connection, GraphQL clients, Resilience4j,
  * Jackson formats, JWT decoders). Marked {@code Type.OPEN} so any module can depend
  * on the beans here without Modulith violation.
  *

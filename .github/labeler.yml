@@ -55,7 +55,6 @@ security:
     - any-glob-to-any-file:
       - "**/*security*"
       - "**/*auth*"
-      - "**/keycloak*/**"
 
 performance:
   - head-branch: ['^perf', 'perf']

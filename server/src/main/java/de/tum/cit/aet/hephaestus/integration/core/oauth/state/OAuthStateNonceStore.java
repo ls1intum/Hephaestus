@@ -43,8 +43,8 @@ public class OAuthStateNonceStore {
             throw new IllegalArgumentException("nonce must be non-empty");
         }
         if (repository.existsById(nonce)) {
-            // SecureRandom collision on 12 bytes is ~1 in 2^96. Defensive guard
-            // against tests reusing a stubbed RNG.
+            // SecureRandom 12-byte nonce: collision ~1 in 2^96. Fail-safe no-op rather than overwriting
+            // a live nonce.
             log.warn(
                 "OAuth state nonce collision (existing row reused): nonce-prefix={}",
                 nonce.substring(0, Math.min(4, nonce.length()))

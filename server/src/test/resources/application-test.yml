@@ -73,14 +73,22 @@ hephaestus:
         encryption-key: test-encryption-key-32-bytes-aes
     workspace:
         init-default: false # Disable PAT workspace bootstrap
+        # Tests exercise creation mechanics as a regular user; the ADMIN_ONLY gate is covered
+        # explicitly by WorkspaceCreationPolicyIntegrationTest via a property override.
+        creation-policy: SELF_SERVICE
     # OAuth state HMAC secret + webhook secret — required by HmacOAuthStateService
     # at boot. Without these the integration framework can't construct.
     integration:
         oauth-state:
             secret: test-oauth-state-hmac-secret-not-real
+        # Suite-wide so GitLab @ConditionalOnProperty beans load in the base context — the GitLab
+        # tests no longer need a per-class @TestPropertySource (which forked a context each).
+        gitlab:
+            enabled: true
+            default-server-url: https://gitlab.lrz.de
     webhook:
         secret: test-webhook-shared-secret-not-real
-        external-url: http://localhost:38080
+        external-url: http://localhost:8080
     cors:
         allowed-origins:
             - http://localhost:4200

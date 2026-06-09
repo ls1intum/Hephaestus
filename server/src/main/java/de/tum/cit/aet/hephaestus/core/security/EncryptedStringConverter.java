@@ -92,12 +92,17 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
             );
             this.secretKey = null;
             this.enabled = false;
-        } else if (encryptionKey.length() != 32) {
-            throw new IllegalArgumentException(
-                "Encryption key must be exactly 32 characters (256 bits). Got: " + encryptionKey.length()
-            );
         } else {
-            this.secretKey = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
+            // Validate the actual AES key length in BYTES (not chars): a 32-char key with multibyte
+            // characters is >32 UTF-8 bytes and would otherwise construct fine here and only throw
+            // InvalidKeyException on the first encrypt. Fail fast at startup instead.
+            byte[] keyBytes = encryptionKey.getBytes(StandardCharsets.UTF_8);
+            if (keyBytes.length != 32) {
+                throw new IllegalArgumentException(
+                    "Encryption key must be exactly 32 bytes (256 bits). Got: " + keyBytes.length
+                );
+            }
+            this.secretKey = new SecretKeySpec(keyBytes, "AES");
             this.enabled = true;
             log.info("Enabled encryption for sensitive database fields");
         }

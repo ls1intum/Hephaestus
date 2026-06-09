@@ -23,18 +23,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMile
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
-import org.springframework.stereotype.Component;
 
 /**
  * Integration tests for GitHubPullRequestProcessor.
@@ -90,7 +88,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     private IssueRepository issueRepository;
 
     @Autowired
-    private TestPullRequestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -368,7 +366,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.process(dto, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).isEmpty();
         }
     }
 
@@ -427,7 +425,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isPresent();
 
             // Verify Created event was published (treated as new from PR perspective)
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
         }
     }
 
@@ -452,8 +450,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify Created event
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
-            assertThat(eventListener.getUpdatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUpdated.class)).isEmpty();
         }
 
         @Test
@@ -655,8 +653,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(result.isMerged()).isFalse();
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getMergedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).isEmpty();
         }
 
         @Test
@@ -710,8 +708,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(result.isMerged()).isTrue();
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getMergedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
         }
     }
 
@@ -808,7 +806,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.processReadyForReview(readyDto, createContext());
 
             assertThat(result.isDraft()).isFalse();
-            assertThat(eventListener.getReadyEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReady.class)).hasSize(1);
         }
     }
 
@@ -866,7 +864,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.processConvertedToDraft(draftDto, createContext());
 
             assertThat(result.isDraft()).isTrue();
-            assertThat(eventListener.getDraftedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestDrafted.class)).hasSize(1);
         }
     }
 
@@ -924,7 +922,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             PullRequest result = processor.processSynchronize(syncDto, createContext());
 
             assertThat(result.getCommits()).isEqualTo(3);
-            assertThat(eventListener.getSynchronizedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestSynchronized.class)).hasSize(1);
         }
     }
 
@@ -992,7 +990,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             processor.processLabeled(labeledDto, labelDto, createContext());
 
-            assertThat(eventListener.getLabeledEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestLabeled.class)).hasSize(1);
         }
 
         @Test
@@ -1093,127 +1091,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             processor.processUnlabeled(unlabeledDto, labelDto, createContext());
 
-            assertThat(eventListener.getUnlabeledEvents()).hasSize(1);
-        }
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestPullRequestEventListener {
-
-        private final List<ScmDomainEvent.PullRequestCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestUpdated> updatedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestClosed> closedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestReopened> reopenedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestLabeled> labeledEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestUnlabeled> unlabeledEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestMerged> mergedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestReady> readyEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestDrafted> draftedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.PullRequestSynchronized> synchronizedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.PullRequestCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.PullRequestUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        @EventListener
-        public void onClosed(ScmDomainEvent.PullRequestClosed event) {
-            closedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReopened(ScmDomainEvent.PullRequestReopened event) {
-            reopenedEvents.add(event);
-        }
-
-        @EventListener
-        public void onLabeled(ScmDomainEvent.PullRequestLabeled event) {
-            labeledEvents.add(event);
-        }
-
-        @EventListener
-        public void onUnlabeled(ScmDomainEvent.PullRequestUnlabeled event) {
-            unlabeledEvents.add(event);
-        }
-
-        @EventListener
-        public void onMerged(ScmDomainEvent.PullRequestMerged event) {
-            mergedEvents.add(event);
-        }
-
-        @EventListener
-        public void onReady(ScmDomainEvent.PullRequestReady event) {
-            readyEvents.add(event);
-        }
-
-        @EventListener
-        public void onDrafted(ScmDomainEvent.PullRequestDrafted event) {
-            draftedEvents.add(event);
-        }
-
-        @EventListener
-        public void onSynchronized(ScmDomainEvent.PullRequestSynchronized event) {
-            synchronizedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.PullRequestCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestClosed> getClosedEvents() {
-            return new ArrayList<>(closedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestReopened> getReopenedEvents() {
-            return new ArrayList<>(reopenedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestLabeled> getLabeledEvents() {
-            return new ArrayList<>(labeledEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestUnlabeled> getUnlabeledEvents() {
-            return new ArrayList<>(unlabeledEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestMerged> getMergedEvents() {
-            return new ArrayList<>(mergedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestReady> getReadyEvents() {
-            return new ArrayList<>(readyEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestDrafted> getDraftedEvents() {
-            return new ArrayList<>(draftedEvents);
-        }
-
-        public List<ScmDomainEvent.PullRequestSynchronized> getSynchronizedEvents() {
-            return new ArrayList<>(synchronizedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-            closedEvents.clear();
-            reopenedEvents.clear();
-            labeledEvents.clear();
-            unlabeledEvents.clear();
-            mergedEvents.clear();
-            readyEvents.clear();
-            draftedEvents.clear();
-            synchronizedEvents.clear();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUnlabeled.class)).hasSize(1);
         }
     }
 }

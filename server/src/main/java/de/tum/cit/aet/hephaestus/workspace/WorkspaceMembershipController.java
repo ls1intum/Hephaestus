@@ -39,7 +39,7 @@ public class WorkspaceMembershipController {
 
     /**
      * Get the current user's membership in this workspace.
-     * Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+     * Super admins (the {@code admin} app role, APP_ADMIN) have their effective role elevated to ADMIN
      * if their database role is lower, matching the runtime authorization behaviour in
      * {@link WorkspaceAccessService}.
      *

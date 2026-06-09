@@ -271,19 +271,21 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
+        // Each config subtype maps to the one kind it may legally bind to; the exhaustive switch
+        // makes adding a new ConnectionConfig a compile error here rather than a silent mismatch.
         IntegrationKind expected = switch (config) {
             case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
             case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
             case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
             case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
         };
-        if (expected != kind) {
+        if (kind != expected) {
             throw new IllegalStateException(
                 "Connection kind=" +
                     kind +
                     " incompatible with config=" +
                     config.getClass().getSimpleName() +
-                    " (expected kind=" +
+                    " (expected " +
                     expected +
                     ")"
             );

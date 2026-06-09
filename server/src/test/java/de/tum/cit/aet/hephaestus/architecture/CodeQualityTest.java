@@ -160,7 +160,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "CommitRepository.updateEnrichmentMetadata",
                 "DiscussionCategoryRepository.upsertCategory",
                 "DiscussionRepository.upsertCore",
-                "PracticeFindingRepository.insertIfAbsent"
+                "PracticeFindingRepository.insertIfAbsent",
+                // JPQL admin-audit query: each nullable filter needs its own @Param for the
+                // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
+                "AuthEventRepository.findForAdmin"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
@@ -476,7 +479,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
-                "AccountService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
+                "AccountPreferencesService", // PosthogClient is optional, gated by @ConditionalOnProperty(hephaestus.posthog.enabled=true)
                 "GitHubWorkspaceDataSyncTrigger", // Lazy-loads GithubDataSyncService + SyncTargetProvider to break the same circular reference WorkspaceProvisioningAdapter handled; the workspace-side trigger sits on the GitHub adapter post-SPI extraction
                 "WorkspaceScopedTables", // EntityManagerFactory is consumed transitively by HibernatePropertiesCustomizer — lazy lookup breaks the EMF<->tenancy startup cycle (see WorkspaceScopedTables javadoc)
                 "MentorChatService" // InteractiveSandboxService is part of the worker capability (DockerSandboxConfiguration, gated on the worker role); absent on non-worker pods — resolved lazily at attach time

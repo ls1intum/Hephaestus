@@ -459,7 +459,7 @@ class OAuthCallbackControllerTest extends BaseUnitTest {
             Map.of("code", "c", "state", "s"),
             htmlRequest()
         );
-        // Server-side wiring bug — always JSON 500, no point redirecting a broken flow.
+        // Server-side wiring bug — always problem+json 500, no point redirecting a broken flow.
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         ProblemDetail body = (ProblemDetail) response.getBody();
         assertThat(body).isNotNull();

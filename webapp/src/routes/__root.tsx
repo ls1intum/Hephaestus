@@ -10,6 +10,8 @@ import {
 import type React from "react";
 import { Toaster } from "sonner";
 import { getUserSettingsOptions, listThreadsOptions } from "@/api/@tanstack/react-query.gen";
+import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
+import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
@@ -65,22 +67,42 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		const showCopilot = !isLoading && isAuthenticated && hasMentorAccess && !isExcludedRoute;
 
+		// Auth screens (/login, /w/<slug>/login, /auth/*) render on a focused, full-viewport canvas with
+		// NO app chrome — no header (which otherwise duplicates the sign-in buttons), no footer, no
+		// sidebar. The page owns the whole viewport, so it can center cleanly without subtracting header/
+		// footer height.
+		const isAuthRoute =
+			pathname === "/login" ||
+			pathname.startsWith("/auth/") ||
+			/^\/w\/[^/]+\/login\/?$/.test(pathname);
+
+		if (isAuthRoute) {
+			return (
+				<>
+					<CookieConsentBanner />
+					<ProviderColorScope>
+						<Outlet />
+					</ProviderColorScope>
+					<Toaster theme={theme} />
+				</>
+			);
+		}
+
 		return (
 			<>
+				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
+				<CookieConsentBanner />
+				<ImpersonationBanner />
 				<ProviderColorScope>
 					<SidebarProvider>
 						<AppSidebarContainer />
 						<SidebarInset style={{ marginRight: "var(--right-sidebar-width, 0)" }}>
 							<HeaderContainer />
-							<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
-								<main className={`${isFullscreenRoute ? "" : "p-4"}`}>
+							<div className="flex min-h-[calc(100dvh-4rem)] flex-col">
+								<main className={isFullscreenRoute ? "" : "flex-1 p-4"}>
 									<Outlet />
 								</main>
-								{!isFullscreenRoute && (
-									<div className="flex justify-end flex-col h-full">
-										<Footer buildInfo={environment.buildInfo} />
-									</div>
-								)}
+								{!isFullscreenRoute && <Footer buildInfo={environment.buildInfo} />}
 							</div>
 						</SidebarInset>
 					</SidebarProvider>
@@ -190,7 +212,6 @@ function GlobalCopilot() {
 }
 
 function HeaderContainer() {
-	const { pathname } = useLocation();
 	const {
 		isAuthenticated,
 		isLoading,
@@ -200,18 +221,28 @@ function HeaderContainer() {
 		logout,
 		getUserProfilePictureUrl,
 	} = useAuth();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const {
+		workspaceSlug,
+		userLogin: workspaceUserLogin,
+		userName: workspaceUserName,
+	} = useWorkspaceAccess();
+
+	// Inside a workspace, "you" are the account's identity for that workspace's provider (ADR 0017):
+	// e.g. a GitLab-logged-in account is its GitHub user in a GitHub workspace. Prefer that identity for
+	// the displayed name and the "My Profile" link so it points at the right per-provider profile;
+	// fall back to the global account identity outside a workspace (or before membership resolves).
+	const effectiveUsername = workspaceUserLogin ?? username;
+	const effectiveName =
+		workspaceUserName ?? (userProfile && `${userProfile.firstName} ${userProfile.lastName}`);
 
 	return (
 		<Header
-			sidebarTrigger={
-				!(pathname === "/landing" || !isAuthenticated) && <SidebarTrigger className="-ml-1" />
-			}
+			sidebarTrigger={isAuthenticated && <SidebarTrigger className="-ml-1" />}
 			version={environment.version}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
-			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
-			username={username}
+			name={effectiveName}
+			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
 			workspaceSlug={workspaceSlug}
 			onLogin={login}
@@ -232,7 +263,7 @@ function ProviderColorScope({ children }: { children: React.ReactNode }) {
 
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
-	const { isAuthenticated, username } = useAuth();
+	const { isAuthenticated, username, isAppAdmin } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const navigate = useNavigate();
 	const workspaceAccess = useWorkspaceAccess();
@@ -241,8 +272,11 @@ function AppSidebarContainer() {
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
 
-	const sidebarContext: SidebarContext =
-		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname) ? "mentor" : "main";
+	const sidebarContext: SidebarContext = pathname.startsWith("/admin")
+		? "admin"
+		: pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname)
+			? "mentor"
+			: "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
@@ -256,7 +290,7 @@ function AppSidebarContainer() {
 		enabled: sidebarContext === "mentor" && isAuthenticated && hasWorkspace,
 	});
 
-	if (pathname === "/landing" || !isAuthenticated || username === undefined) {
+	if (!isAuthenticated || username === undefined) {
 		return null;
 	}
 
@@ -265,7 +299,9 @@ function AppSidebarContainer() {
 		selectWorkspace(ws.workspaceSlug);
 		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
 		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		navigate({ to: target as never, replace: true });
+		// Runtime-built internal path (slug + preserved subpath): use the typed `href` field
+		// rather than `to as never` — relative href stays an SPA navigation.
+		navigate({ href: target, replace: true });
 	};
 
 	const handleAddWorkspace = () => {
@@ -276,6 +312,7 @@ function AppSidebarContainer() {
 		<AppSidebar
 			username={username}
 			isAdmin={workspaceAccess.isAdmin}
+			isAppAdmin={isAppAdmin}
 			hasMentorAccess={hasMentorAccess}
 			context={sidebarContext}
 			workspaces={workspaceList}

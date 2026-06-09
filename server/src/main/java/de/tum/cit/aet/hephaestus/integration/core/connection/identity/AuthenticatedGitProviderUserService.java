@@ -1,18 +1,18 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection.identity;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery.IdentityLinkView;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -21,202 +21,185 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Resolves / provisions the SCM {@code User} row for the JWT-authenticated principal.
+ * Resolves / provisions the SCM {@code User} row for the JWT-authenticated principal from the
+ * account's federated identities. Each {@link IdentityLinkView} supplies the IdP-stable numeric
+ * {@code subject} (the {@code native_id}) and the {@code usernameAtSignup} (the {@code login});
+ * the provider <em>type</em> / <em>server URL</em> is resolved here through
+ * {@link GitProviderRepository} so {@code core.auth} stays vendor-neutral.
  *
- * <p>The GitLab default server URL is read directly from the operator-facing
- * {@code hephaestus.integration.gitlab.default-server-url} property (binding to
- * {@code GitLabProperties} would couple this vendor-neutral identity service to a
- * vendor adapter, banned by {@code IntegrationCoreVendorNeutralityTest}). The GitHub
- * default is the project-wide constant {@code https://github.com} — GitHub Enterprise
- * Server support is deferred until a dedicated property is added.
+ * <p>After the {@code User} is upserted, its id is wired back onto the {@code IdentityLink}'s
+ * {@code externalActorId} (idempotent) so profile surfaces can resolve "your activity" without a
+ * {@code (provider, subject) → (provider_id, native_id)} join.
+ *
+ * @see AccountIdentityQuery for the {@code sub → Account → IdentityLink} provisioning rationale
+ *      (why the SCM mirror comes from IdentityLinks, not absent JWT claims).
  */
 @Service
 public class AuthenticatedGitProviderUserService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticatedGitProviderUserService.class);
-    private static final String GITHUB_SERVER_URL = "https://github.com";
 
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
-    private final String gitLabDefaultServerUrl;
+    private final AccountIdentityQuery accountIdentityQuery;
 
     public AuthenticatedGitProviderUserService(
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
-        @Value("${hephaestus.integration.gitlab.default-server-url:https://gitlab.com}") String gitLabDefaultServerUrl
+        AccountIdentityQuery accountIdentityQuery
     ) {
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
-        this.gitLabDefaultServerUrl = stripTrailingSlash(gitLabDefaultServerUrl);
+        this.accountIdentityQuery = accountIdentityQuery;
     }
 
-    private static String stripTrailingSlash(String url) {
-        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-    }
-
+    /**
+     * Resolve the SCM {@code User} for the current principal, provisioning it from the account's
+     * federated identities on first sight. GitLab identities take precedence over GitHub when an
+     * account has both (preserving the prior {@code gitlab_id}-first ordering). The provider server
+     * URL comes from each {@code IdentityLink}'s own {@code git_provider} row, which is authoritative
+     * for the provider the user actually logged in with.
+     */
     @Transactional
-    public Optional<User> resolveOrProvisionCurrentUser(@Nullable String gitLabServerUrl) {
+    public Optional<User> resolveOrProvisionCurrentUser() {
         var currentUser = userRepository.getCurrentUser();
         if (currentUser.isPresent()) {
             return currentUser;
         }
 
-        Optional<String> currentLogin = SecurityUtils.getCurrentUserLogin();
-        if (currentLogin.isEmpty()) {
-            return Optional.empty();
-        }
-        String login = currentLogin.orElseThrow();
-
-        Jwt jwt = getCurrentJwt();
-        if (jwt == null) {
+        List<IdentityLinkView> links = activeLinksForCurrentAccount();
+        if (links.isEmpty()) {
             return Optional.empty();
         }
 
-        String keycloakSubject = jwt.getSubject();
-
-        Long gitlabId = jwt.getClaim("gitlab_id");
-        if (gitlabId != null) {
-            String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
-            Long userId = upsertGitLabUser(
-                gitlabId,
-                login,
-                login,
-                "",
-                resolvedUrl + "/" + login,
-                resolvedUrl,
-                User.Type.USER,
-                keycloakSubject
-            );
-            return userRepository.findById(userId);
+        // GitLab first (matches the historical gitlab_id-before-github_id ordering), then GitHub.
+        IdentityLinkView gitLabLink = firstOfType(links, GitProviderType.GITLAB);
+        if (gitLabLink != null) {
+            return Optional.of(provisionUser(gitLabLink));
         }
-
-        Long githubId = jwt.getClaim("github_id");
-        if (githubId != null) {
-            Long userId = upsertGitHubUser(
-                githubId,
-                login,
-                login,
-                "",
-                GITHUB_SERVER_URL + "/" + login,
-                User.Type.USER,
-                keycloakSubject
-            );
-            return userRepository.findById(userId);
+        IdentityLinkView gitHubLink = firstOfType(links, GitProviderType.GITHUB);
+        if (gitHubLink != null) {
+            return Optional.of(provisionUser(gitHubLink));
         }
-
         return Optional.empty();
     }
 
+    /**
+     * Ensure a GitLab SCM {@code User} exists for the current principal (workspace-owner bootstrap).
+     * Succeeds for any account with an active GitLab {@code IdentityLink} — including a user who just
+     * logged in via GitLab. Throws {@code 409} only when the account genuinely has no GitLab identity.
+     */
     @Transactional
-    public void ensureCurrentGitLabUserExists(@Nullable String gitLabServerUrl) {
-        String login = SecurityUtils.getCurrentUserLoginOrThrow();
-        if (userRepository.findByLogin(login).isPresent()) {
+    public void ensureCurrentGitLabUserExists() {
+        List<IdentityLinkView> links = activeLinksForCurrentAccount();
+
+        IdentityLinkView gitLabLink = firstOfType(links, GitProviderType.GITLAB);
+        if (gitLabLink != null) {
+            provisionUser(gitLabLink);
             return;
         }
 
-        Jwt jwt = getCurrentJwt();
-        if (jwt == null) {
-            throw new IllegalStateException("No JWT found for authenticated user");
-        }
-
-        String keycloakSubject = jwt.getSubject();
-
-        Long gitlabId = jwt.getClaim("gitlab_id");
-        if (gitlabId != null) {
-            String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
-            upsertGitLabUser(
-                gitlabId,
-                login,
-                login,
-                "",
-                resolvedUrl + "/" + login,
-                resolvedUrl,
-                User.Type.USER,
-                keycloakSubject
-            );
-            return;
-        }
-
-        Long githubId = jwt.getClaim("github_id");
-        if (githubId != null) {
+        if (firstOfType(links, GitProviderType.GITHUB) != null) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
+                org.springframework.http.HttpStatus.CONFLICT,
                 "You need to link your GitLab account before creating a GitLab workspace. Go to Settings → Linked Accounts to connect your GitLab identity."
             );
         }
 
         throw new ResponseStatusException(
-            HttpStatus.CONFLICT,
+            org.springframework.http.HttpStatus.CONFLICT,
             "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
         );
     }
 
+    private List<IdentityLinkView> activeLinksForCurrentAccount() {
+        Long accountId = currentAccountId();
+        if (accountId == null) {
+            return List.of();
+        }
+        return accountIdentityQuery.activeLinksForAccount(accountId);
+    }
+
+    /**
+     * The first active identity link whose {@code git_provider} row is of {@code type}. Links whose
+     * provider id no longer resolves are skipped (defensive — a dangling FK is a data bug, not a
+     * login condition).
+     */
     @Nullable
-    private Jwt getCurrentJwt() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
-            return null;
+    private IdentityLinkView firstOfType(List<IdentityLinkView> links, GitProviderType type) {
+        for (IdentityLinkView link : links) {
+            GitProvider provider = gitProviderRepository.findById(link.gitProviderId()).orElse(null);
+            if (provider != null && provider.getType() == type) {
+                return link;
+            }
         }
-        return jwt;
+        return null;
     }
 
-    private String resolveGitLabServerUrl(@Nullable String configServerUrl) {
-        if (configServerUrl != null && !configServerUrl.isBlank()) {
-            return stripTrailingSlash(configServerUrl.trim());
+    /**
+     * Upsert the SCM {@code User} for an identity link and wire the link back to the resulting actor
+     * mirror. The {@code native_id} is the link's numeric {@code subject}; the {@code login} is its
+     * {@code usernameAtSignup}; the server URL / provider come from the link's {@code git_provider} row.
+     */
+    private User provisionUser(IdentityLinkView link) {
+        GitProvider provider = gitProviderRepository
+            .findById(link.gitProviderId())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "git_provider row missing for IdentityLink.gitProviderId=" + link.gitProviderId()
+                )
+            );
+        long nativeId = parseSubject(link.subject(), provider.getType());
+        String login = (link.usernameAtSignup() != null && !link.usernameAtSignup().isBlank())
+            ? link.usernameAtSignup()
+            : link.subject();
+        String name = (link.displayName() != null && !link.displayName().isBlank()) ? link.displayName() : login;
+        String webUrl = (link.profileUrl() != null && !link.profileUrl().isBlank())
+            ? link.profileUrl()
+            : provider.getServerUrl() + "/" + login;
+        String avatar = normalizeAvatar(link.avatarUrl(), provider.getServerUrl());
+
+        Long userId = upsertUser(nativeId, login, name, avatar, webUrl, provider);
+        accountIdentityQuery.linkExternalActor(link.identityLinkId(), userId);
+        return userRepository
+            .findById(userId)
+            .orElseThrow(() -> new IllegalStateException("User not found after upsert: userId=" + userId));
+    }
+
+    private static long parseSubject(String subject, GitProviderType type) {
+        try {
+            return Long.parseLong(subject);
+        } catch (NumberFormatException e) {
+            // IdentityLink.subject must be the IdP-stable numeric provider id (enforced for the
+            // env-default registrations via userNameAttributeName("id")). A non-numeric subject
+            // means a mis-configured registration mapped a mutable username as the subject.
+            throw new ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "Linked " +
+                    type +
+                    " identity has a non-numeric subject; the account must be re-linked. Go to Settings → Linked Accounts."
+            );
         }
-        return gitLabDefaultServerUrl;
     }
 
-    private Long upsertGitHubUser(
-        Long nativeId,
-        String login,
-        String name,
-        String avatarUrl,
-        String webUrl,
-        User.Type userType,
-        @Nullable String keycloakSubject
-    ) {
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, GITHUB_SERVER_URL)));
-
-        return upsertUser(nativeId, login, name, avatarUrl, webUrl, userType, provider, keycloakSubject);
-    }
-
-    private Long upsertGitLabUser(
-        Long nativeId,
-        String login,
-        String name,
-        String avatarUrl,
-        String webUrl,
-        String serverUrl,
-        User.Type userType,
-        @Nullable String keycloakSubject
-    ) {
-        String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, serverUrl)
-            .orElseGet(() -> {
-                log.info("Creating GitProvider for self-hosted GitLab: serverUrl={}", serverUrl);
-                return gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, serverUrl));
-            });
-
-        return upsertUser(nativeId, login, name, safeAvatar, webUrl, userType, provider, keycloakSubject);
+    @Nullable
+    private static String normalizeAvatar(@Nullable String avatarUrl, String serverUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return "";
+        }
+        return avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl;
     }
 
     private Long upsertUser(
-        Long nativeId,
+        long nativeId,
         String login,
         String name,
-        String avatarUrl,
+        @Nullable String avatarUrl,
         String webUrl,
-        User.Type userType,
-        GitProvider provider,
-        @Nullable String keycloakSubject
+        GitProvider provider
     ) {
         String safeName = name != null ? name : login;
         String safeAvatar = avatarUrl != null ? avatarUrl : "";
-        String safeWebUrl = webUrl != null ? webUrl : "";
         Long providerId = provider.getId();
 
         userRepository.acquireLoginLock(login, providerId);
@@ -227,35 +210,39 @@ public class AuthenticatedGitProviderUserService {
             login,
             safeName,
             safeAvatar,
-            safeWebUrl,
-            userType.name(),
+            webUrl != null ? webUrl : "",
+            User.Type.USER.name(),
             null,
             null,
             null
         );
         log.info(
-            "Upserted authenticated git provider user: userLogin={}, nativeId={}, providerType={}, type={}",
+            "Upserted authenticated git provider user: userLogin={}, nativeId={}, providerType={}",
             LoggingUtils.sanitizeForLog(login),
             nativeId,
-            provider.getType(),
-            userType
+            provider.getType()
         );
-        Long userId = userRepository
+        return userRepository
             .findByLoginAndProviderId(login, providerId)
             .map(User::getId)
             .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
+    }
 
-        if (keycloakSubject != null && !keycloakSubject.isBlank()) {
-            int updated = userRepository.setKeycloakSubjectIfChanged(userId, keycloakSubject);
-            if (updated > 0) {
-                log.info(
-                    "Seeded Keycloak subject on SCM User row: userId={}, userLogin={}, providerType={}",
-                    userId,
-                    LoggingUtils.sanitizeForLog(login),
-                    provider.getType()
-                );
-            }
+    @Nullable
+    private Long currentAccountId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof Jwt jwt)) {
+            return null;
         }
-        return userId;
+        String sub = jwt.getSubject();
+        if (sub == null || sub.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(sub);
+        } catch (NumberFormatException e) {
+            log.warn("auth: JWT sub is not a numeric account id: {}", LoggingUtils.sanitizeForLog(sub));
+            return null;
+        }
     }
 }

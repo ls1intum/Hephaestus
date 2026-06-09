@@ -1,13 +1,14 @@
 import { type DefaultError, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	deleteUserMutation,
-	getLinkedAccountsOptions,
-	getLinkedAccountsQueryKey,
+	getCurrentUserQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
-	unlinkAccountMutation,
+	listIdentityProvidersOptions,
+	listLinkedIdentitiesOptions,
+	listLinkedIdentitiesQueryKey,
+	unlinkIdentityMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Options } from "@/api/sdk.gen";
@@ -20,13 +21,13 @@ import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAcc
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
+import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,
 });
 
 function RouteComponent() {
-	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { logout, linkAccount, hasRole } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
@@ -34,33 +35,24 @@ function RouteComponent() {
 	// Feature flag: AI review section visible only for users with the practice review role
 	const showAiReviewSection = hasRole("run_practice_review");
 
-	// Query for user settings
-	const { data: settings, isLoading } = useQuery({
+	const {
+		data: settings,
+		isLoading,
+		isError: settingsError,
+		refetch: refetchSettings,
+	} = useQuery({
 		...getUserSettingsOptions({}),
 		retry: 1,
 	});
 
-	// Query for linked accounts
-	const linkedAccountsQuery = useQuery({
-		...getLinkedAccountsOptions({}),
+	const linkedIdentitiesQuery = useQuery({
+		...listLinkedIdentitiesOptions({}),
 	});
 
-	// Mutation for unlinking an account
-	const unlinkMutation = useMutation({
-		...unlinkAccountMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
-			toast.success("Account disconnected");
-		},
-		onError: (error) => {
-			console.error("Failed to unlink account:", {
-				message: error instanceof Error ? error.message : "Unknown error",
-			});
-			toast.error("Failed to disconnect account. You must have at least one connected provider.");
-		},
+	const identityProvidersQuery = useQuery({
+		...listIdentityProvidersOptions({}),
 	});
 
-	// Mutation for updating user settings
 	const updateSettingsMutation = useMutation<
 		UpdateUserSettingsResponse,
 		DefaultError,
@@ -95,19 +87,6 @@ function RouteComponent() {
 		},
 	});
 
-	// Mutation for deleting account
-	const deleteAccountMutation = useMutation({
-		...deleteUserMutation(),
-		onSuccess: async () => {
-			await logout();
-			navigate({ to: "/" });
-		},
-		onError: (error) => {
-			console.error("Failed to delete user account:", error);
-			toast.error("Failed to delete account. Please try again later.");
-		},
-	});
-
 	// Spread-based helper: reads latest cache to avoid stale-closure race under rapid toggling
 	const updateSetting = (patch: Partial<UserSettings>) => {
 		const current = queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
@@ -122,23 +101,50 @@ function RouteComponent() {
 	const handleResearchToggle = (checked: boolean) =>
 		updateSetting({ participateInResearch: checked });
 
-	// Handle account deletion
-	const handleDeleteAccount = () => {
-		deleteAccountMutation.mutate({});
+	// After deletion: end the session. `logout()` performs a full reload to "/",
+	// so no further navigation is needed here.
+	const handleAccountDeleted = async () => {
+		await logout();
 	};
 
+	// Disconnect a federated identity. The server enforces the lockout guard (409 on the last
+	// identity) and ownership; the UI also disables that case, so this path is the happy one.
+	const unlinkMutation = useMutation({
+		...unlinkIdentityMutation(),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: listLinkedIdentitiesQueryKey({}) });
+			// The primary identity (avatar, username) the app shows may have been the one removed.
+			queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
+			toast.success("Account disconnected.");
+		},
+		onError: (error: DefaultError) => {
+			console.error("Failed to disconnect account:", error);
+			toast.error(problemDetailOf(error, "Couldn't disconnect that account. Please try again."));
+		},
+	});
+
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
-		accounts: linkedAccountsQuery.data ?? [],
+		identities: linkedIdentitiesQuery.data ?? [],
+		providers: identityProvidersQuery.data ?? [],
 		onLink: linkAccount,
-		onUnlink: (providerAlias) => unlinkMutation.mutate({ path: { providerAlias } }),
-		isUnlinking: unlinkMutation.isPending,
-		isLoading: linkedAccountsQuery.isLoading,
-		isError: linkedAccountsQuery.isError,
+		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
+		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a
+		// second DELETE against the already-removed row.
+		onUnlink: (id) => {
+			if (!unlinkMutation.isPending) {
+				unlinkMutation.mutate({ path: { id } });
+			}
+		},
+		unlinkingId: unlinkMutation.isPending ? (unlinkMutation.variables?.path?.id ?? null) : null,
+		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
+		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 	};
 
 	return (
 		<SettingsPage
 			isLoading={isLoading}
+			settingsError={settingsError}
+			onRetrySettings={() => refetchSettings()}
 			aiReviewProps={{
 				aiReviewEnabled: settings?.aiReviewEnabled ?? true,
 				onToggleAiReview: handleAiReviewToggle,
@@ -152,10 +158,7 @@ function RouteComponent() {
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			linkedAccountsProps={linkedAccountsProps}
-			accountProps={{
-				onDeleteAccount: handleDeleteAccount,
-				isDeleting: deleteAccountMutation.isPending,
-			}}
+			onAccountDeleted={handleAccountDeleted}
 		/>
 	);
 }

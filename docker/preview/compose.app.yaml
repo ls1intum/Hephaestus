@@ -29,7 +29,7 @@
 #
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
-#   - keycloak: Authentication
+#   (auth is Hephaestus-native — no Keycloak; ADR 0017)
 #
 # IMPORTANT: This preview stack does not validate the full GitLab practice-review
 # rollout by default. GitLab IdP, sandbox execution, git checkout, and agent job
@@ -45,7 +45,7 @@ services:
   # after postgres starts, rather than relying on /docker-entrypoint-initdb.d
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:17-alpine
+    image: ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG:-latest}
     hostname: postgres
     restart: unless-stopped
     environment:
@@ -109,7 +109,7 @@ services:
         if [ -z "$$BASE_CTN" ]; then
           BASE_CTN="seed-base-$$RANDOM"
           echo "Starting temporary postgres from base volume: $$BASE_CTN"
-          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data postgres:17-alpine >/tmp/base-start.log 2>/tmp/base-start.err || {
+          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG:-latest} >/tmp/base-start.log 2>/tmp/base-start.err || {
             echo "✗ Failed to start temporary base container; falling back to Liquibase"
             cat /tmp/base-start.err || true
             exit 0
@@ -201,14 +201,16 @@ services:
       NATS_SERVER: nats://nats-server:4222
       NATS_ENABLED: ${NATS_ENABLED:-true}
       NATS_DURABLE_CONSUMER_NAME: ${COOLIFY_CONTAINER_NAME:-preview}-consumer
-      # Shared Keycloak
-      # Public URL for issuer validation (must match token's iss claim)
-      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
-      KEYCLOAK_REALM: hephaestus
-      # Internal URL for direct container-to-container JWKS fetches (no /keycloak - Keycloak serves at root)
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
-      KEYCLOAK_CLIENT_ID: hephaestus-confidential
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
+      # Auth (Hephaestus-native; ADR 0017).
+      # Public URL for issuer validation (must match token's iss claim).
+      HEPHAESTUS_AUTH_ISSUER: https://${PREVIEW_DOMAIN:?Required}
+      HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Required}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
+      GITLAB_OAUTH_CLIENT_ID: ${GITLAB_OAUTH_CLIENT_ID:-}
+      GITLAB_OAUTH_CLIENT_SECRET: ${GITLAB_OAUTH_CLIENT_SECRET:-}
+      GITLAB_OAUTH_BASE_URL: ${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}
+      GITLAB_OAUTH_DISPLAY_NAME: ${GITLAB_OAUTH_DISPLAY_NAME:-GitLab}
       # GitHub integration
       GH_APP_ID: ${GH_APP_ID:?Required}
       GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY:?Required}
@@ -271,11 +273,6 @@ services:
       GIT_COMMIT: ${SOURCE_COMMIT:-}
       # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
       APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
-      # Shared Keycloak
-      KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
-      KEYCLOAK_REALM: hephaestus
-      KEYCLOAK_CLIENT_ID: hephaestus
-      KEYCLOAK_SKIP_LOGIN: ${KEYCLOAK_SKIP_LOGIN:-false}
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-true}
       # Optional
       SENTRY_ENVIRONMENT: preview

@@ -594,7 +594,13 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "RepositoryAboutToBeDeletedEvent", // Carries repositoryId → workspace via FK
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
-                                "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
+                                "WorkspacesInitializedEvent", // Startup lifecycle, signals all workspaces ready
+                                // core.auth (ADR 0017): authentication is USER/SYSTEM-scoped, never
+                                // workspace-scoped (same rationale as the @WorkspaceAgnostic auth controllers
+                                // exempted below). These Spring Security login events drive auth.login metrics
+                                // in AuthLoginEventMetrics and carry no workspace by design.
+                                "InteractiveAuthenticationSuccessEvent",
+                                "AbstractAuthenticationFailureEvent"
                             );
 
                             boolean isWorkspaceAware = workspaceAwareEventPrefixes
@@ -892,6 +898,16 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         controllerName.contains("FeatureFlag") ||
                         controllerName.contains("IdentityProvider")
                     ) {
+                        return;
+                    }
+
+                    // Skip the core.auth module (ADR 0017): authentication / session / OIDC
+                    // discovery endpoints are USER- or SYSTEM-scoped by definition, never
+                    // workspace-scoped. Login (AuthBegin), session lifecycle (AuthLifecycle),
+                    // session inventory (SessionWeb), and OIDC discovery (WellKnown) all
+                    // operate outside any single workspace. The module is annotated
+                    // @WorkspaceAgnostic at the package level.
+                    if (method.getOwner().getPackageName().startsWith("de.tum.cit.aet.hephaestus.core.auth")) {
                         return;
                     }
 

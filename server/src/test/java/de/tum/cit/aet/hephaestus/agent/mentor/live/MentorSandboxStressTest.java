@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -52,6 +53,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Defaults to N=5 to stay polite on shared infra.
  */
 @LiveLlmTest
+@Tag("live")
 class MentorSandboxStressTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();

@@ -48,11 +48,23 @@ public class CacheConfig {
     /** TTL for mentor aspect caches. Short enough to be invisible per-turn, long enough to be warm across consecutive turns. */
     private static final Duration MENTOR_ASPECT_TTL = Duration.ofMinutes(5);
 
+    /**
+     * TTL for the JWT revocation NEGATIVE cache. Only REVOKED verdicts are cached (see
+     * {@code RevocationAwareJwtDecoder}), so this is not a staleness window — a cached REVOKED entry
+     * can never be wrong (revocation is monotonic). It only bounds how long a revocation is remembered
+     * locally to shed token-replay load; sized to the access-token lifetime so a revoked token is
+     * remembered for as long as it could still be presented.
+     */
+    private static final Duration AUTH_JWT_REVOKED_TTL = Duration.ofMinutes(15);
+
     /** Max entries for the long-lived caches. */
     private static final long LONG_MAX = 1000L;
 
     /** Max entries for mentor aspect caches — bounded per active user, not per workspace. */
     private static final long MENTOR_MAX = 512L;
+
+    /** Max entries for the JWT revocation cache — bounded per active session. */
+    private static final long AUTH_JWT_REVOKED_MAX = 10_000L;
 
     /**
      * Declarative cache specs. Order doesn't matter at runtime — the manager owns the lookup
@@ -60,6 +72,9 @@ public class CacheConfig {
      */
     static final List<CacheSpec> SPECS = List.of(
         new CacheSpec(AchievementService.ACHIEVEMENT_PROGRESS_CACHE, LONG_TTL, LONG_MAX),
+        // Name mirrors core.auth.jwt.RevocationAwareJwtDecoder.CACHE_NAME (kept as a literal to
+        // avoid a config→core.auth internal-type dependency; the decoder owns the canonical const).
+        new CacheSpec("auth_jwt_revoked", AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
         new CacheSpec("contributors", LONG_TTL, LONG_MAX),
         new CacheSpec("mentor_findings_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("mentor_practice_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),

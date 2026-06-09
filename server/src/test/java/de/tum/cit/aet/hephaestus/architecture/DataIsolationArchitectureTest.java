@@ -96,6 +96,16 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "GitProvider", // Global provider instances (e.g., github.com, gitlab.com)
         "ModelPricing", // Vendor list prices per LLM model — not tenant-scoped
         "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
+        // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
+        // Account ↔ Workspace association lives on WorkspaceMembership, not on these rows.
+        "Account", // Hephaestus-native principal; spans workspaces
+        "IdentityLink", // Federated-login association; user-scoped
+        "AccountFeature", // Per-account feature opt-ins
+        "AuthEvent", // Append-only auth audit; references workspace optionally, not scoped by it
+        "IssuedJwt", // JWT revocation list; account-scoped
+        "JwtSigningKey", // System-wide signing keys
+        "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
+        "LoginProvider", // Instance-scoped OAuth login provider (sign-in option); not workspace-scoped
         "WorkerRegistry" // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
     );
 

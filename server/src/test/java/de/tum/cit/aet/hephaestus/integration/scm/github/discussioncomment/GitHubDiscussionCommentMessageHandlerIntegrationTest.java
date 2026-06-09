@@ -15,21 +15,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -45,7 +41,6 @@ import tools.jackson.databind.ObjectMapper;
  * chain calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
  * Having @Transactional here would cause connection pool deadlocks.
  */
-@Import(GitHubDiscussionCommentMessageHandlerIntegrationTest.TestEventListener.class)
 class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private static final Long FIXTURE_ORG_ID = 215361191L;
@@ -91,7 +86,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private TestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private static final int FIXTURE_DISCUSSION_NUMBER = 27;
 
@@ -185,7 +180,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         ).isPresent();
 
         // Domain event published
-        assertThat(eventListener.getCreatedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).hasSize(1);
     }
 
     @Test
@@ -226,55 +221,12 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
 
         // Domain event published
-        assertThat(eventListener.getDeletedEvents()).hasSize(1);
+        assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class)).hasSize(1);
     }
 
     private GitHubDiscussionCommentEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubDiscussionCommentEventDTO.class);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class TestEventListener {
-
-        private final List<ScmDomainEvent.DiscussionCommentCreated> createdEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionCommentEdited> editedEvents = new ArrayList<>();
-        private final List<ScmDomainEvent.DiscussionCommentDeleted> deletedEvents = new ArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.DiscussionCommentCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onEdited(ScmDomainEvent.DiscussionCommentEdited event) {
-            editedEvents.add(event);
-        }
-
-        @EventListener
-        public void onDeleted(ScmDomainEvent.DiscussionCommentDeleted event) {
-            deletedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.DiscussionCommentCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionCommentEdited> getEditedEvents() {
-            return new ArrayList<>(editedEvents);
-        }
-
-        public List<ScmDomainEvent.DiscussionCommentDeleted> getDeletedEvents() {
-            return new ArrayList<>(deletedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            editedEvents.clear();
-            deletedEvents.clear();
-        }
     }
 }

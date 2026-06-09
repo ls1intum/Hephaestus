@@ -1,29 +1,38 @@
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
-import keycloakService, { type UserProfile } from "./keycloak";
+import { createContext, useContext } from "react";
+import { getCurrentUserOptions } from "@/api/@tanstack/react-query.gen";
+import { authClient, toUserProfile, type UserProfile } from "./authClient";
+import { isAppAdmin as computeIsAppAdmin } from "./guard";
 
-// Global state to prevent duplicate initialization across strict mode renders
-const globalState = {
-	initialized: false,
-	initPromise: null as Promise<boolean> | null,
-};
+export type { UserProfile } from "./authClient";
 
 export interface AuthContextType {
 	isAuthenticated: boolean;
 	isLoading: boolean;
+	/** True when the `/user` probe settled in an error state (e.g. 401/403) rather than returning a user. */
+	isError: boolean;
 	username: string | undefined;
 	userRoles: string[];
+	/** True when the current account is an application super-admin (appRole === "APP_ADMIN"). */
+	isAppAdmin: boolean;
 	userProfile: UserProfile | undefined;
-	login: (idpHint?: string) => Promise<void>;
-	linkAccount: (providerAlias: string) => Promise<void>;
+	login: (idpHint?: string, returnTo?: string) => Promise<void>;
+	linkAccount: (providerAlias: string, returnTo?: string) => Promise<void>;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
 	isCurrentUser: (login?: string) => boolean;
 	getUserId: () => string | undefined;
+	getGitProviderId: () => string | undefined;
 	getUserProfilePictureUrl: () => string;
-	getUserProfileUrl: () => string;
 	/** Whether the user has a linked GitLab identity (logged in via GitLab or account linked) */
 	hasGitLabIdentity: boolean;
+	/** SCM instances the account has an active identity on — for instance-scoped gating. */
+	linkedProviders: Array<{ type: string; serverUrl?: string }>;
+	/** True when the current session is impersonating another account. */
+	isImpersonating: boolean;
+	/** Display name of the impersonated account (the current user) while impersonating. */
+	impersonatedDisplayName: string | undefined;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,168 +49,83 @@ interface AuthProviderProps {
 	children: ReactNode;
 }
 
+/**
+ * Cookie-session auth provider (ADR 0017).
+ *
+ * Backed by the SAME TanStack Query (`getCurrentUserOptions()`, key `getCurrentUser`) that the
+ * route guards read via `resolveCurrentUser`, so there is ONE shared cache — no duplicate
+ * `/user` fetch on load and no drift (e.g. an admin changing their own role invalidates this
+ * query and the in-app surface updates with it). A 401/403 makes the query error with no data,
+ * which we treat as unauthenticated. The `useAuth()` API is unchanged from the former
+ * keycloak-js implementation so existing consumers keep working.
+ */
 export function AuthProvider({ children }: AuthProviderProps) {
-	const [isAuthenticated, setIsAuthenticated] = useState(false);
-	const [isLoading, setIsLoading] = useState(true);
-	const [username, setUsername] = useState<string | undefined>(undefined);
-	const [userRoles, setUserRoles] = useState<string[]>([]);
-	const [userProfile, setUserProfile] = useState<UserProfile | undefined>(undefined);
+	// Don't retry on auth failure (a 401 is a definitive "not signed in", not a transient error)
+	// and keep the result fresh-enough to avoid a refetch storm; the guards seed the same cache.
+	const userQuery = useQuery({
+		...getCurrentUserOptions(),
+		retry: false,
+		staleTime: 30_000,
+	});
 
-	// Initialize Keycloak once
-	useEffect(() => {
-		const cleanUrlFromAuthParams = () => {
-			if (
-				window.location.hash &&
-				(window.location.hash.includes("state=") ||
-					window.location.hash.includes("session_state=") ||
-					window.location.hash.includes("code="))
-			) {
-				const baseUrl = window.location.pathname + window.location.search;
-				if (process.env.NODE_ENV !== "production") {
-					console.debug("AuthProvider: Cleaning URL from auth params, redirecting to:", baseUrl);
-				}
+	const user = userQuery.data ?? null;
+	// `isPending` is true only while the very first fetch is in flight (no cached data yet),
+	// matching the previous mount-time loading window.
+	const isLoading = userQuery.isPending;
+	// Distinguish "probe failed" (401/403/network) from "probe settled with no user". Callers that
+	// must not optimistically route into a protected area on a failed probe (e.g. /auth/callback)
+	// branch on this instead of relying on a downstream guard to bounce them back.
+	const isError = userQuery.isError;
 
-				// Use history API to replace the current URL without auth parameters
-				if (window.history?.replaceState) {
-					window.history.replaceState(null, "", baseUrl);
-					return true;
-				}
-			}
-			return false;
-		};
+	const userProfile = user ? toUserProfile(user) : undefined;
 
-		// Prevent multiple initializations in strict mode
-		if (globalState.initialized) {
-			if (process.env.NODE_ENV !== "production") {
-				console.debug("AuthProvider: Already initialized globally");
-			}
-			setIsLoading(false);
+	const isAppAdmin = computeIsAppAdmin(user);
 
-			// Update local state with current authentication status
-			const authenticated = keycloakService.isAuthenticated();
-			if (authenticated) {
-				const userName = keycloakService.getUsername();
-				const roles = keycloakService.getUserRoles();
-				const profile = keycloakService.getUserProfile();
-				setUsername(userName);
-				setUserRoles(roles);
-				setUserProfile(profile);
-			}
-			setIsAuthenticated(authenticated);
-			return;
-		}
-
-		// If initialization is already in progress, wait for it
-		if (globalState.initPromise) {
-			if (process.env.NODE_ENV !== "production") {
-				console.debug("AuthProvider: Waiting for existing initialization");
-			}
-			globalState.initPromise
-				.then((authenticated) => {
-					if (process.env.NODE_ENV !== "production") {
-						console.debug("AuthProvider: Existing initialization completed:", authenticated);
-					}
-					if (authenticated) {
-						const userName = keycloakService.getUsername();
-						const roles = keycloakService.getUserRoles();
-						const profile = keycloakService.getUserProfile();
-						setUsername(userName);
-						setUserRoles(roles);
-						setUserProfile(profile);
-					}
-					setIsAuthenticated(authenticated);
-					setIsLoading(false);
-				})
-				.catch((error) => {
-					console.error("AuthProvider: Initialization failed:", error);
-					setIsLoading(false);
-				});
-			return;
-		}
-
-		const initKeycloak = async () => {
-			try {
-				// Clean URL from auth parameters first
-				cleanUrlFromAuthParams();
-
-				if (process.env.NODE_ENV !== "production") {
-					console.debug("AuthProvider: Initializing Keycloak");
-				}
-				const authenticated = await keycloakService.init();
-				if (process.env.NODE_ENV !== "production") {
-					console.debug("AuthProvider: Keycloak initialized, authenticated:", authenticated);
-				}
-
-				if (authenticated) {
-					const userName = keycloakService.getUsername();
-					const roles = keycloakService.getUserRoles();
-					const profile = keycloakService.getUserProfile();
-
-					setUsername(userName);
-					setUserRoles(roles);
-					setUserProfile(profile);
-				}
-
-				setIsAuthenticated(authenticated);
-				globalState.initialized = true;
-				globalState.initPromise = null;
-				return authenticated;
-			} catch (error) {
-				console.error("AuthProvider: Failed to initialize authentication", error);
-				globalState.initPromise = null;
-				throw error;
-			} finally {
-				setIsLoading(false);
-			}
-		};
-
-		// Start initialization and store the promise
-		globalState.initPromise = initKeycloak();
-	}, []);
-
-	const login = async (idpHint?: string) => {
-		await keycloakService.login(idpHint);
+	const login = async (idpHint?: string, returnTo?: string) => {
+		authClient.login(idpHint, returnTo);
 	};
 
-	const linkAccount = async (providerAlias: string) => {
-		await keycloakService.linkAccount(providerAlias);
+	const linkAccount = async (providerAlias: string, returnTo?: string) => {
+		// Thread `returnTo` so a link initiated from settings returns to settings (defaulting to
+		// the current page), rather than dumping the user back on `/` after the OAuth dance.
+		const destination =
+			returnTo ?? (typeof window !== "undefined" ? window.location.pathname : undefined);
+		authClient.linkAccount(providerAlias, destination);
 	};
 
 	const logout = async () => {
-		// Reset global initialization state
-		globalState.initialized = false;
-		globalState.initPromise = null;
-
-		await keycloakService.logout();
+		await authClient.logout();
 	};
 
-	const hasRole = (role: string) => {
-		return keycloakService.hasRole(role);
-	};
+	const hasRole = (role: string) => (user?.roles ?? []).includes(role);
 
-	const isCurrentUser = (login?: string) => {
-		return keycloakService.isCurrentUser(login);
-	};
+	const isCurrentUser = (login?: string) =>
+		!!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase();
 
-	const getUserId = () => {
-		return keycloakService.getUserId();
-	};
+	// Return undefined (never the string "undefined" / a value that coerces to NaN) until the
+	// user is loaded, so callers like `Number(getUserId())` get `NaN` only when there genuinely
+	// is no id — and can guard on `undefined` instead.
+	const getUserId = () => (user?.id != null ? String(user.id) : undefined);
+
+	const getGitProviderId = () => user?.gitProviderId ?? undefined;
 
 	const getUserProfilePictureUrl = () => {
-		return keycloakService.getUserProfilePictureUrl();
+		if (user?.avatarUrl) {
+			return user.avatarUrl;
+		}
+		if (user?.identityProvider === "GITHUB" && user.gitProviderId) {
+			return `https://avatars.githubusercontent.com/u/${user.gitProviderId}`;
+		}
+		return "";
 	};
 
-	const getUserProfileUrl = () => {
-		return keycloakService.getUserProfileUrl();
-	};
-
-	const hasGitLabIdentity = keycloakService.hasGitLabIdentity();
-
-	const value = {
-		isAuthenticated,
+	const value: AuthContextType = {
+		isAuthenticated: user !== null,
 		isLoading,
-		username,
-		userRoles,
+		isError,
+		username: user?.username ?? undefined,
+		userRoles: user?.roles ?? [],
+		isAppAdmin,
 		userProfile,
 		login,
 		linkAccount,
@@ -209,9 +133,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		hasRole,
 		isCurrentUser,
 		getUserId,
+		getGitProviderId,
 		getUserProfilePictureUrl,
-		getUserProfileUrl,
-		hasGitLabIdentity,
+		hasGitLabIdentity: user?.hasGitLabIdentity ?? false,
+		linkedProviders: userProfile?.linkedProviders ?? [],
+		isImpersonating: user?.impersonating ?? false,
+		impersonatedDisplayName: user?.displayName ?? undefined,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

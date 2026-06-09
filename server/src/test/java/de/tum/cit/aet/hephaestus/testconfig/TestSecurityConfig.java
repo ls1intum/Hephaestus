@@ -23,10 +23,16 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 @Profile("test")
 public class TestSecurityConfig {
 
+    /** Stable token strings + claims used by the impersonation-guard integration test. */
+    public static final String IMPERSONATION_TOKEN = "mock-jwt-token-for-impersonation";
+    public static final String NUMERIC_SUBJECT_TOKEN = "mock-jwt-token-for-numeric-user";
+    private static final String IMPERSONATION_JTI = "11111111-1111-1111-1111-111111111111";
+    private static final String NUMERIC_JTI = "22222222-2222-2222-2222-222222222222";
+
     /**
      * Mock JWT decoder that creates a valid JWT for testing.
      * This decoder will be used by the main SecurityConfig's OAuth2 resource server configuration.
-     * The JWT contains the same realm_access structure as a real Keycloak token.
+     * The JWT carries the same flat `roles` claim the Hephaestus issuer emits (ADR 0017).
      *
      * It dynamically determines the user based on the token value pattern:
      * - "mock-jwt-token-for-mentor-user" -> mentor user
@@ -38,6 +44,57 @@ public class TestSecurityConfig {
     @Primary
     public JwtDecoder mockJwtDecoder() {
         return token -> {
+            // Impersonation token: numeric sub + RFC 8693 `act` claim so ImpersonationGuard treats
+            // the session as read-only. A valid jti keeps the controller path (logout) clean.
+            if (IMPERSONATION_TOKEN.equals(token)) {
+                return Jwt.withTokenValue(token)
+                    .header("alg", "ES256")
+                    .header("typ", "JWT")
+                    .claim("sub", "1")
+                    .claim("preferred_username", "impersonated")
+                    .claim("iss", "https://test-issuer")
+                    .claim("aud", "test-audience")
+                    .claim("jti", IMPERSONATION_JTI)
+                    .claim("roles", Arrays.asList("app_admin"))
+                    .claim("act", Map.of("sub", "2"))
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+            }
+            // Plain (non-act) token with a numeric sub + valid jti — a normal write must be allowed.
+            if (NUMERIC_SUBJECT_TOKEN.equals(token)) {
+                return Jwt.withTokenValue(token)
+                    .header("alg", "ES256")
+                    .header("typ", "JWT")
+                    .claim("sub", "1")
+                    .claim("preferred_username", "numericuser")
+                    .claim("iss", "https://test-issuer")
+                    .claim("aud", "test-audience")
+                    .claim("jti", NUMERIC_JTI)
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+            }
+
+            // Dynamic numeric-subject token: "mock-jwt-sub-<accountId>" decodes to that exact `sub`,
+            // so a test can authenticate AS a specific (DB-assigned) Account id — required since the
+            // native-auth migration keys currentAccountId() on a numeric JWT sub (ADR 0017). Carries the
+            // common roles so it works for both authenticated and mentor-gated endpoints.
+            if (token.startsWith("mock-jwt-sub-")) {
+                String sub = token.substring("mock-jwt-sub-".length());
+                return Jwt.withTokenValue(token)
+                    .header("alg", "HS256")
+                    .header("typ", "JWT")
+                    .claim("sub", sub)
+                    .claim("preferred_username", "account-" + sub)
+                    .claim("iss", "https://test-issuer")
+                    .claim("aud", "test-audience")
+                    .claim("roles", Arrays.asList("mentor_access", "app_admin"))
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+            }
+
             // Determine user based on token pattern
             String username;
             String userId;
@@ -47,14 +104,10 @@ public class TestSecurityConfig {
                 username = "mentor";
                 userId = "mentor-user-id";
                 roles = new String[] { "mentor_access" };
-            } else if ("mock-jwt-token-for-gitlab-user".equals(token)) {
-                username = "gitlabuser";
-                userId = "gitlab-user-id";
-                roles = new String[] {};
             } else if ("mock-jwt-token-for-admin-user".equals(token)) {
                 username = "admin";
                 userId = "admin-user-id";
-                roles = new String[] { "admin" };
+                roles = new String[] { "app_admin" };
             } else if ("mock-jwt-token-for-test-user".equals(token)) {
                 username = "testuser";
                 userId = "test-user-id";
@@ -73,16 +126,9 @@ public class TestSecurityConfig {
             claims.put("iss", "https://test-issuer");
             claims.put("aud", "test-audience");
 
-            if ("mock-jwt-token-for-gitlab-user".equals(token)) {
-                claims.put("gitlab_id", 18024L);
-                claims.put("identity_provider", "gitlab-lrz");
-            }
-
-            // Add realm_access with roles (same structure as Keycloak)
+            // Flat `roles` claim — same shape the Hephaestus issuer emits (ADR 0017).
             if (roles.length > 0) {
-                Map<String, Object> realmAccess = new HashMap<>();
-                realmAccess.put("roles", Arrays.asList(roles));
-                claims.put("realm_access", realmAccess);
+                claims.put("roles", Arrays.asList(roles));
             }
 
             return Jwt.withTokenValue(token)

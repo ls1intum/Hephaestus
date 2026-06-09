@@ -2,9 +2,13 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.GitProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -12,10 +16,12 @@ import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
@@ -38,10 +44,68 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     @Autowired
     private WorkspaceLifecycleService workspaceLifecycleService;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private IdentityLinkRepository identityLinkRepository;
+
+    /**
+     * Creating a GitLab workspace now requires the CALLER to have an active GitLab identity (the
+     * native-auth migration's {@code AuthenticatedGitProviderUserService.ensureCurrentGitLabUserExists}).
+     * Seed that precondition — a real {@link Account} + an active GitLab {@link IdentityLink} — and
+     * return headers authenticating as that account (sub = the account id, via the {@code mock-jwt-sub-}
+     * dynamic test token).
+     */
+    private Consumer<HttpHeaders> gitLabCaller(String login) {
+        Account account = accountRepository.save(new Account(login));
+        GitProvider gitlab = ensureGitLabProvider();
+        IdentityLink link = new IdentityLink();
+        link.setAccount(account);
+        link.setGitProviderId(gitlab.getId());
+        link.setSubject(String.valueOf(70_000 + account.getId())); // numeric GitLab native id
+        link.setUsernameAtSignup(login);
+        identityLinkRepository.save(link);
+        String token = "mock-jwt-sub-" + account.getId();
+        return headers -> headers.setBearerAuth(token);
+    }
+
+    /** A seeded GitLab caller plus its resolved SCM {@link User} mirror (for owner/membership setup). */
+    private record GitLabCaller(Consumer<HttpHeaders> headers, User scmUser) {}
+
+    /**
+     * Like {@link #gitLabCaller}, but also provisions the SCM {@link User} mirror the auth layer would
+     * lazily create (same {@code (nativeId, provider)}) and wires it as the identity's external actor, so
+     * the caller resolves to a stable User that can own workspaces and appear in their listings.
+     */
+    private GitLabCaller gitLabCallerWithMirror(String login) {
+        Account account = accountRepository.save(new Account(login));
+        GitProvider gitlab = ensureGitLabProvider();
+        long nativeId = 70_000 + account.getId();
+        // The SCM mirror's login MUST equal the token's preferred_username, because the current user is
+        // resolved by login (SecurityUtils.getCurrentUserLogin → UserRepository.findByLogin). The
+        // mock-jwt-sub-<id> token sets preferred_username = "account-<id>".
+        String scmLogin = "account-" + account.getId();
+        User scmUser = de.tum.cit.aet.hephaestus.testconfig.TestUserFactory.ensureUser(
+            userRepository,
+            scmLogin,
+            nativeId,
+            gitlab
+        );
+        IdentityLink link = new IdentityLink();
+        link.setAccount(account);
+        link.setGitProviderId(gitlab.getId());
+        link.setSubject(String.valueOf(nativeId));
+        link.setUsernameAtSignup(scmLogin);
+        link.setExternalActorId(scmUser.getId());
+        identityLinkRepository.save(link);
+        return new GitLabCaller(headers -> headers.setBearerAuth("mock-jwt-sub-" + account.getId()), scmUser);
+    }
+
     @Test
-    @WithMentorUser
     void createGitLabWorkspacePersistsCorrectProviderModeAndServerUrl() {
         User owner = persistUser("mentor");
+        Consumer<HttpHeaders> auth = gitLabCaller("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-space",
@@ -57,7 +121,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO created = webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(auth)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -86,9 +150,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspaceWithDefaultServerUrlOmitsServerUrl() {
         User owner = persistUser("mentor");
+        Consumer<HttpHeaders> auth = gitLabCaller("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-default",
@@ -104,7 +168,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO created = webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(auth)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -120,9 +184,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithAdminUser
     void createGitLabWorkspaceWithoutTokenReturnsValidationError() {
         User owner = persistUser("admin");
+        Consumer<HttpHeaders> auth = gitLabCaller("admin");
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-notoken",
@@ -138,7 +202,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         ProblemDetail problem = webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(auth)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -158,9 +222,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithAdminUser
     void createGitLabWorkspaceWithHttpServerUrlReturnsValidationError() {
         User owner = persistUser("admin");
+        Consumer<HttpHeaders> auth = gitLabCaller("admin");
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-http",
@@ -176,7 +240,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         ProblemDetail problem = webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(auth)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -196,9 +260,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspaceAssignsOwnerMembership() {
         User owner = persistUser("mentor");
+        Consumer<HttpHeaders> auth = gitLabCaller("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-ownership",
@@ -214,7 +278,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO created = webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(auth)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -233,9 +297,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     @Test
-    @WithMentorUser
     void createGitLabWorkspaceResponseNeverContainsRawToken() {
         User owner = persistUser("mentor");
+        Consumer<HttpHeaders> auth = gitLabCaller("mentor");
         String secretToken = "test-token-placeholder";
 
         var request = new CreateWorkspaceRequestDTO(
@@ -252,7 +316,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         String responseBody = webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(auth)
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -270,19 +334,16 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     @Test
     @WithMentorUser
     void gitLabWorkspaceAppearsInListWithCorrectProviderType() {
-        User owner = persistUser("mentor");
+        // The caller owns the workspace (listing is by the current user's memberships, resolved via the
+        // identity's external-actor SCM mirror), so the GitLab workspace surfaces in their list.
+        GitLabCaller caller = gitLabCallerWithMirror("mentor");
 
-        // Create a GitHub workspace
-        Workspace githubWorkspace = createWorkspace("github-ws", "GitHub WS", "github-org", AccountType.ORG, owner);
-        ensureAdminMembership(githubWorkspace);
-
-        // Create a GitLab workspace
         var gitlabRequest = new CreateWorkspaceRequestDTO(
             "gitlab-ws",
             "GitLab WS",
             "gitlab-group",
             AccountType.ORG,
-            owner.getId(),
+            caller.scmUser().getId(),
             de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.GITLAB,
             "glpat-list-token",
             null
@@ -291,21 +352,17 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         webTestClient
             .post()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(caller.headers())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(gitlabRequest)
             .exchange()
             .expectStatus()
             .isCreated();
 
-        // Ensure admin membership for listing
-        Workspace gitlabPersisted = workspaceRepository.findByWorkspaceSlug("gitlab-ws").orElseThrow();
-        ensureAdminMembership(gitlabPersisted);
-
         List<WorkspaceListItemDTO> workspaces = webTestClient
             .get()
             .uri("/workspaces")
-            .headers(TestAuthUtils.withCurrentUser())
+            .headers(caller.headers())
             .exchange()
             .expectStatus()
             .isOk()
@@ -314,11 +371,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .getResponseBody();
 
         assertThat(workspaces).isNotNull();
-        // providerType is now derived from the active Connection. The
-        // GitHub workspace created via the 5-arg path has no Connection (App
-        // installations come in via GithubLifecycleListener), so its providerType is
-        // null. The GitLab workspace created via the REST API path provisions a GitLab
-        // Connection inline and surfaces as GITLAB.
+        // providerType is derived from the active Connection: the GitLab workspace created via the REST
+        // API path provisions a GitLab Connection inline and surfaces as GITLAB.
         assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).contains(GitProviderType.GITLAB);
     }
 

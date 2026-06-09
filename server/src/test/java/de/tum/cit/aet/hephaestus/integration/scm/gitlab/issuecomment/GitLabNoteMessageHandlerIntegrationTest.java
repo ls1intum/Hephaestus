@@ -21,13 +21,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,28 +35,13 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /** Integration tests: JSON fixtures → DTO → handler → processor → DB. */
 @Tag("integration")
 @DisplayName("GitLab Note Message Handler")
-@TestPropertySource(
-    properties = {
-        "hephaestus.integration.gitlab.enabled=true",
-        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.integration.gitlab.connect-timeout=30s",
-        "hephaestus.integration.gitlab.read-timeout=60s",
-        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
-        "hephaestus.integration.gitlab.sync-page-delay=5m",
-    }
-)
-@Import(GitLabNoteMessageHandlerIntegrationTest.GitLabNoteTestEventListener.class)
 class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Native IDs from fixtures
@@ -118,7 +103,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private GitLabNoteTestEventListener eventListener;
+    private RecordingScmEventListener eventListener;
 
     private Repository savedRepo;
     private GitProvider savedProvider;
@@ -162,7 +147,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
             });
 
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(1);
         }
 
         @Test
@@ -181,7 +166,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getBody()).isEqualTo(FIXTURE_NOTE_UPDATED_BODY);
             });
 
-            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).hasSize(1);
         }
     }
 
@@ -204,7 +189,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getIssue().getId()).isEqualTo(savedPr.getId());
             });
 
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(1);
         }
 
         @Test
@@ -223,7 +208,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(comment.getBody()).isEqualTo(FIXTURE_MR_NOTE_UPDATED_BODY);
             });
 
-            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentUpdated.class)).hasSize(1);
         }
     }
 
@@ -237,7 +222,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("note.system"));
 
             assertThat(commentRepository.count()).isZero();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
         }
     }
 
@@ -251,7 +236,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("note.confidential.issue.create"));
 
             assertThat(commentRepository.count()).isZero();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
         }
     }
 
@@ -306,7 +291,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("note.commit.create"));
 
             assertThat(commentRepository.count()).isZero();
-            assertThat(eventListener.getCreatedEvents()).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).isEmpty();
         }
     }
 
@@ -394,39 +379,5 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
-    }
-
-    // Test Event Listener
-
-    @Component
-    static class GitLabNoteTestEventListener {
-
-        private final List<ScmDomainEvent.CommentCreated> createdEvents =
-            new java.util.concurrent.CopyOnWriteArrayList<>();
-        private final List<ScmDomainEvent.CommentUpdated> updatedEvents =
-            new java.util.concurrent.CopyOnWriteArrayList<>();
-
-        @EventListener
-        public void onCreated(ScmDomainEvent.CommentCreated event) {
-            createdEvents.add(event);
-        }
-
-        @EventListener
-        public void onUpdated(ScmDomainEvent.CommentUpdated event) {
-            updatedEvents.add(event);
-        }
-
-        public List<ScmDomainEvent.CommentCreated> getCreatedEvents() {
-            return new ArrayList<>(createdEvents);
-        }
-
-        public List<ScmDomainEvent.CommentUpdated> getUpdatedEvents() {
-            return new ArrayList<>(updatedEvents);
-        }
-
-        public void clear() {
-            createdEvents.clear();
-            updatedEvents.clear();
-        }
     }
 }

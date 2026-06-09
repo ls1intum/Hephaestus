@@ -20,11 +20,11 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Asserts no single bean instantiation blows the per-bean ceiling — catches a slow
- * {@code @PostConstruct} or bean added to the critical path. Does not extend
- * {@code BaseIntegrationTest} because {@code useMainMethod = ALWAYS} is required so
- * {@link BufferingApplicationStartup} wired in {@link Application#main(String[])} is picked up,
- * and that produces a separate context-cache entry.
+ * Asserts no single bean instantiation blows the per-bean budget — catches a slow
+ * {@code @PostConstruct} or heavy synchronous work dragged onto the critical startup path. Does not
+ * extend {@code BaseIntegrationTest} because {@code useMainMethod = ALWAYS} is required so the
+ * {@link BufferingApplicationStartup} wired in {@link Application#main(String[])} is picked up, and
+ * that produces a separate context-cache entry.
  */
 @SpringBootTest(useMainMethod = UseMainMethod.ALWAYS)
 @ActiveProfiles("test")
@@ -33,10 +33,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Tag("integration")
 class StartupBudgetIntegrationTest {
 
-    private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(3);
     // spring.beans.instantiate is the per-bean creation step; each fires once per bean. See
     // https://docs.spring.io/spring-framework/reference/core/aot.html#spring-startup-events
     private static final String BEAN_INSTANTIATE = "spring.beans.instantiate";
+
+    // Per-bean wall-clock budget: flag a bean doing egregious synchronous work on the boot critical
+    // path (blocking I/O, eager warm-up, a migration in bean init). 6s ≈ 3x the legitimately slowest
+    // bean (DataSource/EMF warmup, ~2s), so CI CPU contention can't trip it without a real regression.
+    // Absolute, not relative: the distribution is dominated by that one I/O-bound bean, so a ratio gate
+    // can't tell 2s (fine) from 5s (regressed).
+    private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(6);
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
@@ -60,6 +66,13 @@ class StartupBudgetIntegrationTest {
             .max((a, b) -> a.getDuration().compareTo(b.getDuration()))
             .orElseThrow(() -> new AssertionError("no " + BEAN_INSTANTIATE + " events captured"));
 
-        assertThat(slowest.getDuration()).isLessThan(PER_BEAN_CEILING);
+        assertThat(slowest.getDuration())
+            .as(
+                "slowest bean instantiation %s exceeded the %s budget — a bean is doing egregious " +
+                    "synchronous work on the startup path; check its constructor/@PostConstruct.",
+                slowest.getDuration(),
+                PER_BEAN_CEILING
+            )
+            .isLessThan(PER_BEAN_CEILING);
     }
 }

@@ -1,0 +1,121 @@
+package de.tum.cit.aet.hephaestus.core.auth;
+
+import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
+import java.net.URI;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
+
+/**
+ * Runtime configuration for the core.auth module.
+ *
+ * <p>All knobs that vary by environment live here. Defaults are tuned for production;
+ * integration tests override via {@code @TestPropertySource}.
+ *
+ * @param issuer          Canonical issuer URI; populates the {@code iss} claim.
+ * @param audience        Default {@code aud} claim for SPA cookies.
+ * @param accessTtl       Cookie-JWT lifetime.
+ * @param cookieName      Access-token cookie name (the {@code __Host-} prefix is
+ *                        browser-enforced — must be {@code Secure}, no {@code Domain},
+ *                        {@code Path=/}).
+ * @param stateCookieKey  Base64-encoded 32-byte AES key used to seal the OAuth state
+ *                        cookie and the auth-intent cookie. Required in non-dev profiles.
+ *                        Bean wiring will generate an ephemeral key (and log a warning)
+ *                        if this is left blank — fine for local dev, fatal in prod.
+ * @param deleteCooldown  GDPR Art. 17 soft-delete cooldown. A DELETING account is invisible but
+ *                        recoverable for this window; once {@code deleted_at} is older than this,
+ *                        {@code AccountHardDeleteSweeper} hard-deletes the account (cascading its
+ *                        auth rows) and flips status to DELETED. Default 48h.
+ * @param loginProviders  Instance login providers to seed on first boot, keyed by a stable
+ *                        {@code registrationId} (the OAuth callback segment {@code /login/oauth2/code/
+ *                        {id}} and the identity key — e.g. {@code github}, {@code gitlab},
+ *                        {@code gitlab-lrz}). Each entry is blank-tolerant: a blank client id omits
+ *                        that provider (no crash), so credential-less CI/specs/worker pods still boot.
+ *                        Multiple providers per instance are supported (one per {@code (type, base-url)}
+ *                        SCM instance); seeding is seed-if-absent, so an admin's later edits are never
+ *                        clobbered on reboot. Additional providers can also be added at runtime in
+ *                        Instance admin → Login providers.
+ * @param bootstrapAdmins Instance super-admin (APP_ADMIN) allowlist of {@code <registrationId>:<who>}.
+ *                        {@code who} is either {@code @username} (recommended, readable — e.g.
+ *                        {@code gitlab:@m.mustermann}, matched against the git login) or the
+ *                        stable numeric {@code subject} (e.g. {@code github:1234567}, reclaim-proof,
+ *                        best on public github.com). A listed identity is promoted to APP_ADMIN on
+ *                        login (idempotent, promote-only — never demotes). Matched on the authenticated
+ *                        identity, NEVER email (so it is not nOAuth-vulnerable); the {@code @username}
+ *                        form's only residual risk is username reclaim (negligible on an institutional
+ *                        GitLab where usernames aren't recycled; prefer {@code subject} on github.com).
+ *                        This is the operator-scoped source of truth for "who runs this instance",
+ *                        deliberately separate from per-workspace roles (those derive from SCM team /
+ *                        WorkspaceMembership). Empty by default.
+ * @param bootstrapToken  Optional one-time break-glass token. When non-blank it enables
+ *                        {@code POST /auth/bootstrap-admin}, which promotes the authenticated
+ *                        caller to APP_ADMIN exactly while NO active admin exists (self-disables
+ *                        afterwards). Proof-of-control is deployment access; deliver out-of-band,
+ *                        never log it. Blank = endpoint disabled (404). Prefer {@code bootstrapAdmins};
+ *                        keep this as the lockout safety net.
+ * @param impersonationMaxLifetime Absolute ceiling on an impersonation session ({@code imp_exp}),
+ *                        enforced on every {@code POST /auth/refresh} rotation (the silent-refresh
+ *                        keep-alive cannot extend an impersonation past it). See
+ *                        {@code docs/contributor/instance-admin.md}.
+ * @param sessionMaxLifetime Absolute ceiling on an ordinary session ({@code session_exp}), set at login
+ *                        and carried unchanged through every silent refresh. The access token's
+ *                        {@code exp} is capped at {@code min(now + accessTtl, session_exp)}, so the
+ *                        rolling refresh CANNOT extend a session past this — once it passes, the token
+ *                        lapses and the user must re-authenticate (OWASP absolute timeout). Default 12h
+ *                        (a long workday); raise/lower per deployment risk.
+ */
+@ConfigurationProperties(prefix = "hephaestus.auth")
+public record AuthProperties(
+    @DefaultValue("http://localhost:8080") URI issuer,
+    @DefaultValue("hephaestus-spa") String audience,
+    @DefaultValue("15m") Duration accessTtl,
+    @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,
+    @DefaultValue("") String stateCookieKey,
+    @DefaultValue("48h") Duration deleteCooldown,
+    Map<String, LoginProviderSeed> loginProviders,
+    @DefaultValue List<String> bootstrapAdmins,
+    @DefaultValue("") String bootstrapToken,
+    @DefaultValue("1h") Duration impersonationMaxLifetime,
+    @DefaultValue("12h") Duration sessionMaxLifetime
+) {
+    /**
+     * Null-coalesce the optional provider map so a deployment with no {@code login-providers} block (and
+     * direct test construction passing {@code null}) binds to an empty map rather than NPEing at seed time.
+     */
+    public AuthProperties {
+        loginProviders = loginProviders == null ? Map.of() : loginProviders;
+    }
+
+    /**
+     * Access-token cookie name. The {@code __Host-} prefix forces Secure + host-only (no Domain),
+     * so the browser drops it if a proxy injects a Domain attribute. Single source of truth — also
+     * referenced by {@code SecurityConfig}'s CSRF cookie check so the two cannot drift.
+     */
+    public static final String DEFAULT_COOKIE_NAME = "__Host-HEPHAESTUS_AT";
+
+    /**
+     * One instance login provider to seed. {@code type} selects the OAuth wiring (GitHub → github.com
+     * endpoints; GitLab → endpoints derived from {@code baseUrl}); {@code baseUrl} is the instance root
+     * for a self-hosted GitLab (ignored for GitHub, which is github.com only). {@code displayName} is the
+     * login-button label (defaults to the registration id when blank). A blank {@code clientId} omits the
+     * provider so credential-less pods still boot.
+     *
+     * <p>Scopes are intentionally NOT settable here — they are derived from {@code type} in
+     * {@code LoginProviderService} so the GitLab "must not request {@code openid}" invariant cannot be
+     * misconfigured from env.
+     */
+    public record LoginProviderSeed(
+        LoginProvider.ProviderType type,
+        @DefaultValue("") String baseUrl,
+        @DefaultValue("") String clientId,
+        @DefaultValue("") String clientSecret,
+        @DefaultValue("") String displayName
+    ) {
+        /** A provider with a blank client id is skipped at seed time (no crash). */
+        public boolean configured() {
+            return clientId != null && !clientId.isBlank();
+        }
+    }
+}

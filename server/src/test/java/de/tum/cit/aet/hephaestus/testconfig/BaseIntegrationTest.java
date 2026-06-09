@@ -17,7 +17,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @AutoConfigureWebTestClient
-@Import({ TestSecurityConfig.class, GitHubIntegrationPostgresShutdown.class, TestAsyncConfiguration.class })
+@Import(
+    {
+        TestSecurityConfig.class,
+        GitHubIntegrationPostgresShutdown.class,
+        TestAsyncConfiguration.class,
+        RecordingScmEventListener.class,
+        WorkspaceEchoControllers.ScopedEchoController.class,
+        WorkspaceEchoControllers.WorkspaceContextEchoController.class,
+    }
+)
 @Testcontainers
 @Tag("integration")
 public abstract class BaseIntegrationTest {

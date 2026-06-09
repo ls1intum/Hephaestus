@@ -43,7 +43,7 @@ That's it. The filter handles slug resolution, membership checks, and 403/404 re
 
 ## Authorization
 
-Super admins (users with the Keycloak `admin` realm role, configured via `KEYCLOAK_GITHUB_ADMIN_USERNAME`) are automatically elevated to workspace ADMIN level for workspaces where they have membership. They must be members of the workspace (any role) to access it, but their permissions are elevated to ADMIN. They cannot perform OWNER-only operations (ownership transfer remains explicit).
+Super admins (accounts with the `APP_ADMIN` role — authority `admin` in the JWT, managed from `/admin/users`) are automatically elevated to workspace ADMIN level for workspaces where they have membership. They must be members of the workspace (any role) to access it, but their permissions are elevated to ADMIN. They cannot perform OWNER-only operations (ownership transfer remains explicit).
 
 Check roles via the context:
 

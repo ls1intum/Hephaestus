@@ -1,13 +1,51 @@
 import { withThemeByClassName, withThemeFromJSXProvider } from "@storybook/addon-themes";
 import type { Decorator, Preview } from "@storybook/react-vite";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	createRootRoute,
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
+import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
 import { ThemeProvider } from "../src/integrations/theme";
+import { handlers } from "../src/mocks/handlers";
 import "../src/styles.css";
+
+// Initialize MSW once for the Storybook browser. `onUnhandledRequest: "bypass"`
+// lets non-API requests (assets, fonts, the worker script itself) through while
+// still mocking the auth endpoints. `serviceWorker.url` resolves the worker under
+// Storybook's base path so it loads from `public/mockServiceWorker.js`.
+initialize(
+	{
+		onUnhandledRequest: "bypass",
+		quiet: true,
+		serviceWorker: { url: "./mockServiceWorker.js" },
+	},
+	handlers,
+);
+
+// A fresh QueryClient per story keeps query caches isolated between stories and
+// disables retries/refetches so query-driven components reach a deterministic
+// rendered state immediately (rather than spinning or retrying on the mock).
+const QueryDecorator: Decorator = (Story) => {
+	const queryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				retry: false,
+				refetchOnWindowFocus: false,
+				refetchOnReconnect: false,
+				staleTime: Number.POSITIVE_INFINITY,
+			},
+			mutations: { retry: false },
+		},
+	});
+	return React.createElement(
+		QueryClientProvider,
+		{ client: queryClient },
+		React.createElement(Story),
+	);
+};
 
 // Create a Tanstack Router decorator
 const RouterDecorator: Decorator = (Story) => {
@@ -126,7 +164,9 @@ const preview: Preview = {
 			},
 		},
 	},
+	loaders: [mswLoader],
 	decorators: [
+		QueryDecorator,
 		RouterDecorator,
 		ThemeDecorator,
 		// Apply CSS classes to both canvas and docs

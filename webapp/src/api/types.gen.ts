@@ -49,6 +49,10 @@ export type WorkspaceTeamRepositorySettings = {
  */
 export type WorkspaceProviders = {
     /**
+     * Who may create workspaces — ADMIN_ONLY restricts creation to instance admins
+     */
+    creationPolicy?: 'ADMIN_ONLY' | 'SELF_SERVICE';
+    /**
      * GitHub workspace provider config, null if not available
      */
     github?: GitHubProvider;
@@ -548,6 +552,18 @@ export type UpdatePracticeActiveRequest = {
     active: boolean;
 };
 
+export type UpdateLoginProviderRequest = {
+    baseUrl?: string;
+    clientId?: string;
+    /**
+     * Omit to leave the existing secret unchanged
+     */
+    clientSecret?: string;
+    displayName?: string;
+    enabled?: boolean;
+    scopes?: string;
+};
+
 /**
  * Request to update the entire weekly leaderboard digest configuration atomically
  */
@@ -628,6 +644,10 @@ export type UpdateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
+};
+
+export type UpdateAccountRequest = {
+    appRole?: string;
 };
 
 /**
@@ -766,6 +786,19 @@ export type SlackTestMessageResponse = {
  */
 export type SlackTestMessageRequest = {
     channelId?: string;
+};
+
+export type SessionView = {
+    current?: boolean;
+    expiresAt?: Date;
+    ip?: string;
+    issuedAt?: Date;
+    jti?: string;
+    userAgent?: string;
+};
+
+export type RevokeSessionsResult = {
+    revoked?: number;
 };
 
 /**
@@ -1251,6 +1284,48 @@ export type PagePracticeFindingList = {
     totalPages?: number;
 };
 
+export type PageAuthEventView = {
+    content?: Array<AuthEventView>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+/**
+ * A human-readable account identity. <code>displayName</code>/<code>email</code> are null for deleted accounts.
+ */
+export type AccountRef = {
+    displayName?: string;
+    email?: string;
+    id: number;
+};
+
+/**
+ * One audit row, flattened for the admin viewer.
+ */
+export type AuthEventView = {
+    account?: AccountRef;
+    accountId?: number;
+    actingAccountId?: number;
+    actor?: AccountRef;
+    details?: string;
+    eventType: string;
+    failureReason?: string;
+    id: number;
+    ipAddress?: string;
+    occurredAt: Date;
+    result: string;
+    userAgent?: string;
+    workspaceId?: number;
+};
+
 export type PageAgentJob = {
     content?: Array<AgentJob>;
     empty?: boolean;
@@ -1368,25 +1443,30 @@ export type AgentJob = {
 };
 
 /**
- * An identity provider account that can be linked to the user
+ * Admin view of a login provider. The client secret is never included.
  */
-export type LinkedAccount = {
+export type LoginProviderView = {
+    baseUrl: string;
+    createdAt: Date;
+    displayName: string;
+    enabled?: boolean;
     /**
-     * Whether the user has linked this provider
+     * Redirect/callback URI to register on the upstream OAuth app
      */
-    connected: boolean;
-    /**
-     * Username on the external provider, if connected
-     */
-    linkedUsername?: string;
-    /**
-     * Identity provider alias (e.g. 'github', 'gitlab-lrz')
-     */
-    providerAlias: string;
-    /**
-     * Display name of the identity provider
-     */
-    providerName: string;
+    redirectUri: string;
+    registrationId: string;
+    scopes: string;
+    seededFromEnv?: boolean;
+    type: string;
+    updatedAt: Date;
+};
+
+/**
+ * A provider instance the current user is linked to: its type + server-url origin.
+ */
+export type LinkedProvider = {
+    serverUrl?: string;
+    type?: string;
 };
 
 /**
@@ -1523,22 +1603,30 @@ export type InitiateConnectionRequest = {
     };
 };
 
+export type ImpersonateRequest = {
+    reason: string;
+    targetAccountId: number;
+};
+
+export type IdentityView = {
+    avatarUrl?: string;
+    displayName?: string;
+    id?: number;
+    lastLoginAt?: Date;
+    providerType?: string;
+    subject?: string;
+    username?: string;
+};
+
 /**
- * An enabled identity provider available for login
+ * One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
+ * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
  */
-export type IdentityProvider = {
-    /**
-     * Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')
-     */
-    alias: string;
-    /**
-     * Display name of the identity provider
-     */
-    displayName: string;
-    /**
-     * Provider type (e.g. 'github', 'oidc')
-     */
-    type: string;
+export type IdentityProviderView = {
+    baseUrl?: string;
+    displayName?: string;
+    providerType?: string;
+    registrationId?: string;
 };
 
 /**
@@ -1686,6 +1774,44 @@ export type FeatureFlags = {
 };
 
 /**
+ * Status of a requested data export; timestamps are null until the matching transition occurs.
+ */
+export type ExportStatus = {
+    completedAt?: Date;
+    expiresAt?: Date;
+    id?: number;
+    requestedAt?: Date;
+    status?: string;
+};
+
+/**
+ * Acknowledgement returned when a data export is requested.
+ */
+export type ExportCreated = {
+    id?: number;
+    status?: string;
+};
+
+export type CurrentUserView = {
+    accessTokenExpiresAt?: number;
+    appRole?: string;
+    avatarUrl?: string;
+    displayName?: string;
+    gitProviderId?: string;
+    hasGitLabIdentity?: boolean;
+    id?: number;
+    identityProvider?: string;
+    impersonating?: boolean;
+    impersonatorId?: number;
+    linkedProviders?: Array<LinkedProvider>;
+    primaryEmail?: string;
+    profileUrl?: string;
+    roles?: Array<string>;
+    status?: string;
+    username?: string;
+};
+
+/**
  * Request to create a new workspace
  */
 export type CreateWorkspaceRequest = {
@@ -1753,6 +1879,31 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+};
+
+export type CreateLoginProviderRequest = {
+    /**
+     * Instance base URL (GitLab only; GitHub is always github.com)
+     */
+    baseUrl?: string;
+    clientId: string;
+    /**
+     * OAuth client secret; sealed at rest, never returned
+     */
+    clientSecret: string;
+    /**
+     * Label shown on the login button; defaults to the registrationId
+     */
+    displayName?: string;
+    /**
+     * Stable id used in the OAuth callback path and identity resolution
+     */
+    registrationId: string;
+    /**
+     * Space-separated scopes; defaulted by provider type if omitted
+     */
+    scopes?: string;
+    type: 'GITHUB' | 'GITLAB';
 };
 
 /**
@@ -2077,6 +2228,29 @@ export type AgentConfig = {
     updatedAt?: Date;
 };
 
+/**
+ * Metadata-only workspace summary for the instance-admin overview
+ */
+export type AdminWorkspaceView = {
+    accountLogin: string;
+    createdAt: Date;
+    displayName: string;
+    id: number;
+    memberCount: number;
+    ownerLogin?: string;
+    providerType?: 'GITHUB' | 'GITLAB';
+    status: string;
+    workspaceSlug: string;
+};
+
+export type AdminAccountView = {
+    appRole?: string;
+    displayName?: string;
+    id?: number;
+    primaryEmail?: string;
+    status?: string;
+};
+
 export type AchievementId = 'commit.common.1' | 'commit.common.2' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.rare' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'commit.special.itsy_bitsy' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.epic' | 'issue.close.legendary' | 'issue.close.rare' | 'issue.close.uncommon' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.open.rare' | 'issue.open.uncommon' | 'issue.special.hive_mind' | 'issue.special.necromancer' | 'issue.special.oracle' | 'milestone.all_epic' | 'milestone.all_legendary' | 'milestone.all_rare' | 'milestone.first_action' | 'milestone.long_time_return' | 'milestone.night_owl' | 'milestone.polyglot' | 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.merged.rare' | 'pr.merged.uncommon' | 'pr.special.speedster' | 'review.common.1' | 'review.common.2' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'review.rare' | 'review.uncommon.1' | 'review.uncommon.2';
 
 /**
@@ -2117,21 +2291,264 @@ export type Achievement = {
     unlockedAt: Date;
 };
 
-export type GetIdentityProvidersData = {
+export type GetJwksData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/auth/identity-providers';
+    url: '/.well-known/jwks.json';
 };
 
-export type GetIdentityProvidersResponses = {
+export type GetJwksResponses = {
     /**
      * OK
      */
-    200: Array<IdentityProvider>;
+    200: {
+        [key: string]: unknown;
+    };
 };
 
-export type GetIdentityProvidersResponse = GetIdentityProvidersResponses[keyof GetIdentityProvidersResponses];
+export type GetJwksResponse = GetJwksResponses[keyof GetJwksResponses];
+
+export type AdminListAuthEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        size?: number;
+        accountId?: number;
+        actingAccountId?: number;
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED';
+        result?: 'SUCCESS' | 'FAILURE';
+        from?: Date;
+        to?: Date;
+    };
+    url: '/admin/audit';
+};
+
+export type AdminListAuthEventsResponses = {
+    /**
+     * OK
+     */
+    200: PageAuthEventView;
+};
+
+export type AdminListAuthEventsResponse = AdminListAuthEventsResponses[keyof AdminListAuthEventsResponses];
+
+export type AdminExportAuthEventsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        accountId?: number;
+        actingAccountId?: number;
+        eventType?: 'LOGIN' | 'LOGIN_FAILED' | 'LOGOUT' | 'TOKEN_REFRESH' | 'JWT_REVOKED' | 'IDENTITY_LINKED' | 'IDENTITY_UNLINKED' | 'IMPERSONATION_BEGIN' | 'IMPERSONATION_END' | 'ACCOUNT_DELETED' | 'EXPORT_REQUESTED' | 'APP_ROLE_CHANGED';
+        result?: 'SUCCESS' | 'FAILURE';
+        from?: Date;
+        to?: Date;
+    };
+    url: '/admin/audit/export';
+};
+
+export type AdminExportAuthEventsResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type AdminExportAuthEventsResponse = AdminExportAuthEventsResponses[keyof AdminExportAuthEventsResponses];
+
+export type AdminListLoginProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/login-providers';
+};
+
+export type AdminListLoginProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<LoginProviderView>;
+};
+
+export type AdminListLoginProvidersResponse = AdminListLoginProvidersResponses[keyof AdminListLoginProvidersResponses];
+
+export type AdminCreateLoginProviderData = {
+    body: CreateLoginProviderRequest;
+    path?: never;
+    query?: never;
+    url: '/admin/login-providers';
+};
+
+export type AdminCreateLoginProviderResponses = {
+    /**
+     * Login provider created; URL in the Location header
+     */
+    201: LoginProviderView;
+};
+
+export type AdminCreateLoginProviderResponse = AdminCreateLoginProviderResponses[keyof AdminCreateLoginProviderResponses];
+
+export type AdminDeleteLoginProviderData = {
+    body?: never;
+    path: {
+        registrationId: string;
+    };
+    query?: never;
+    url: '/admin/login-providers/{registrationId}';
+};
+
+export type AdminDeleteLoginProviderResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type AdminUpdateLoginProviderData = {
+    body: UpdateLoginProviderRequest;
+    path: {
+        registrationId: string;
+    };
+    query?: never;
+    url: '/admin/login-providers/{registrationId}';
+};
+
+export type AdminUpdateLoginProviderResponses = {
+    /**
+     * OK
+     */
+    200: LoginProviderView;
+};
+
+export type AdminUpdateLoginProviderResponse = AdminUpdateLoginProviderResponses[keyof AdminUpdateLoginProviderResponses];
+
+export type AdminListUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/admin/users';
+};
+
+export type AdminListUsersResponses = {
+    /**
+     * OK
+     */
+    200: Array<AdminAccountView>;
+};
+
+export type AdminListUsersResponse = AdminListUsersResponses[keyof AdminListUsersResponses];
+
+export type AdminUpdateUserData = {
+    body: UpdateAccountRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}';
+};
+
+export type AdminUpdateUserResponses = {
+    /**
+     * OK
+     */
+    200: AdminAccountView;
+};
+
+export type AdminUpdateUserResponse = AdminUpdateUserResponses[keyof AdminUpdateUserResponses];
+
+export type AdminRevokeUserSessionsData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/admin/users/{id}/sessions';
+};
+
+export type AdminRevokeUserSessionsResponses = {
+    /**
+     * OK
+     */
+    200: RevokeSessionsResult;
+};
+
+export type AdminRevokeUserSessionsResponse = AdminRevokeUserSessionsResponses[keyof AdminRevokeUserSessionsResponses];
+
+export type AdminListWorkspacesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/workspaces';
+};
+
+export type AdminListWorkspacesResponses = {
+    /**
+     * OK
+     */
+    200: Array<AdminWorkspaceView>;
+};
+
+export type AdminListWorkspacesResponse = AdminListWorkspacesResponses[keyof AdminListWorkspacesResponses];
+
+export type ImpersonateData = {
+    body: ImpersonateRequest;
+    path?: never;
+    query?: never;
+    url: '/auth/impersonate';
+};
+
+export type ImpersonateResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type ExitImpersonationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/impersonate:exit';
+};
+
+export type ExitImpersonationResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type LogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/logout';
+};
+
+export type LogoutResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type RefreshData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/refresh';
+};
+
+export type RefreshResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type ListGlobalContributorsData = {
     body?: never;
@@ -2148,6 +2565,22 @@ export type ListGlobalContributorsResponses = {
 };
 
 export type ListGlobalContributorsResponse = ListGlobalContributorsResponses[keyof ListGlobalContributorsResponses];
+
+export type ListIdentityProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/identity-providers';
+};
+
+export type ListIdentityProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<IdentityProviderView>;
+};
+
+export type ListIdentityProvidersResponse = ListIdentityProvidersResponses[keyof ListIdentityProvidersResponses];
 
 export type CallbackGetData = {
     body?: never;
@@ -2203,19 +2636,90 @@ export type CallbackPostResponses = {
 
 export type CallbackPostResponse = CallbackPostResponses[keyof CallbackPostResponses];
 
-export type DeleteUserData = {
+export type DeleteCurrentUserData = {
+    body?: never;
+    headers?: {
+        'X-Confirm-Delete'?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/user';
+};
+
+export type DeleteCurrentUserResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetCurrentUserData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/user';
 };
 
-export type DeleteUserResponses = {
+export type GetCurrentUserResponses = {
     /**
      * OK
      */
-    200: unknown;
+    200: CurrentUserView;
 };
+
+export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
+
+export type RequestDataExportData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/exports';
+};
+
+export type RequestDataExportResponses = {
+    /**
+     * OK
+     */
+    200: ExportCreated;
+};
+
+export type RequestDataExportResponse = RequestDataExportResponses[keyof RequestDataExportResponses];
+
+export type GetDataExportStatusData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/user/exports/{id}';
+};
+
+export type GetDataExportStatusResponses = {
+    /**
+     * OK
+     */
+    200: ExportStatus;
+};
+
+export type GetDataExportStatusResponse = GetDataExportStatusResponses[keyof GetDataExportStatusResponses];
+
+export type DownloadDataExportData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/user/exports/{id}/download';
+};
+
+export type DownloadDataExportResponses = {
+    /**
+     * OK
+     */
+    200: string;
+};
+
+export type DownloadDataExportResponse = DownloadDataExportResponses[keyof DownloadDataExportResponses];
 
 export type GetUserFeaturesData = {
     body?: never;
@@ -2233,48 +2737,91 @@ export type GetUserFeaturesResponses = {
 
 export type GetUserFeaturesResponse = GetUserFeaturesResponses[keyof GetUserFeaturesResponses];
 
-export type GetLinkedAccountsData = {
+export type ListLinkedIdentitiesData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/user/linked-accounts';
+    url: '/user/identities';
 };
 
-export type GetLinkedAccountsResponses = {
+export type ListLinkedIdentitiesResponses = {
     /**
      * OK
      */
-    200: Array<LinkedAccount>;
+    200: Array<IdentityView>;
 };
 
-export type GetLinkedAccountsResponse = GetLinkedAccountsResponses[keyof GetLinkedAccountsResponses];
+export type ListLinkedIdentitiesResponse = ListLinkedIdentitiesResponses[keyof ListLinkedIdentitiesResponses];
 
-export type UnlinkAccountData = {
+export type UnlinkIdentityData = {
     body?: never;
     path: {
-        providerAlias: string;
+        id: number;
     };
     query?: never;
-    url: '/user/linked-accounts/{providerAlias}';
+    url: '/user/identities/{id}';
 };
 
-export type UnlinkAccountResponses = {
+export type UnlinkIdentityErrors = {
+    /**
+     * No such identity on the current account
+     */
+    404: unknown;
+    /**
+     * Cannot unlink the account's only remaining sign-in method
+     */
+    409: unknown;
+};
+
+export type UnlinkIdentityResponses = {
+    /**
+     * Identity unlinked
+     */
+    204: void;
+};
+
+export type UnlinkIdentityResponse = UnlinkIdentityResponses[keyof UnlinkIdentityResponses];
+
+export type RevokeOtherSessionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/sessions';
+};
+
+export type RevokeOtherSessionsResponses = {
     /**
      * OK
      */
     200: unknown;
 };
 
-export type ClaimIdentityData = {
+export type ListSessionsData = {
     body?: never;
-    path: {
-        providerAlias: string;
-    };
+    path?: never;
     query?: never;
-    url: '/user/linked-accounts/{providerAlias}/claim';
+    url: '/user/sessions';
 };
 
-export type ClaimIdentityResponses = {
+export type ListSessionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<SessionView>;
+};
+
+export type ListSessionsResponse = ListSessionsResponses[keyof ListSessionsResponses];
+
+export type RevokeSessionData = {
+    body?: never;
+    path: {
+        jti: string;
+    };
+    query?: never;
+    url: '/user/sessions/{jti}';
+};
+
+export type RevokeSessionResponses = {
     /**
      * OK
      */

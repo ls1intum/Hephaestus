@@ -1,0 +1,31 @@
+package de.tum.cit.aet.hephaestus.core.auth.spi;
+
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Cross-module read query: which workspaces is the principal a member of, and with what role?
+ *
+ * <p>Workspace membership lives in the {@code workspace} module, keyed by the SCM
+ * {@code user_id} (login bridge), not by {@code Account}. The {@code core.auth} module owns the
+ * {@code Account → login} mapping (via {@code IdentityLink.usernameAtSignup}) and supplies the
+ * resolved login set; the {@code workspace} module resolves {@code login → User → membership}
+ * internally. This keeps the boundary clean: {@code core.auth} never imports workspace domain
+ * types, and {@code workspace} never imports auth domain types — the contract lives here and is
+ * implemented in {@code workspace} (dependency inversion, same shape as {@link AccountRoleQuery}).
+ */
+public interface AccountWorkspaceMembershipQuery {
+    /**
+     * @param logins the principal's git-provider logins (case-insensitive), resolved from its
+     *               active identity links; empty input yields an empty result
+     * @return one row per workspace the principal belongs to (across all supplied logins),
+     *         deduplicated by workspace
+     */
+    List<WorkspaceMembershipView> membershipsForLogins(Set<String> logins);
+
+    /**
+     * A single workspace membership, flattened for export. Contains no SCM-user PII beyond what
+     * the principal already owns (the workspace they belong to + their role).
+     */
+    record WorkspaceMembershipView(Long workspaceId, String workspaceSlug, String workspaceName, String role) {}
+}

@@ -39,10 +39,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * </ol>
  *
  * <p><b>Transaction design:</b> Each handler runs in a {@code REQUIRES_NEW} transaction.
- * The gate's repository calls join this transaction, so the Keycloak HTTP call (gate steps 8–9)
- * holds the DB connection. This is acceptable because: the circuit breaker bounds Keycloak
- * latency, {@code @Async} prevents blocking the webhook thread, and {@code runForAllUsers=true}
- * skips Keycloak entirely. See {@link PracticeReviewDetectionGate} for the standalone contract.
+ * The gate's repository calls join this transaction, so the role lookup (gate steps 8–9)
+ * holds the DB connection. This is acceptable because: the role check is a local
+ * {@code account_feature} DB lookup (no external call), {@code @Async} prevents blocking the
+ * webhook thread, and {@code runForAllUsers=true} skips the role check entirely.
+ * See {@link PracticeReviewDetectionGate} for the standalone contract.
  *
  * <p>Only active when the NATS submitter is available.
  */

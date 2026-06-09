@@ -42,7 +42,7 @@ The DSK list of processing operations requiring a DPIA under Art. 35(4) GDPR add
 | Server access logs retain IP addresses | Low | Low | Tomcat AccessLogValve deletes entries after 14 days; pattern minimised to timestamp, IP, method, path, protocol, status, response size, processing time. |
 | gitlab.lrz.de content leaks via the LRZ integration | Low | Low | LRZ is a separate controller; inter-public-body transmission under Art. 5(1) Nr. 1 BayDSG; LRZ applies its own TOMs on its own infrastructure. |
 | Workspace administrator routes personal data through an unexpected channel (Slack digest containing leaderboard snippets, for example) | Low | Low | Joint-controller / shared-responsibility model documented in privacy §10; the administrator invokes the lawful basis for the workspace and accepts the corresponding duties; contributors can see the configuration and raise Art. 21 objections. |
-| Keycloak compromise exposes federated identity tokens | Low | Medium | Self-hosted on AET infrastructure; confidential client; TLS-only ingress; regular patching; incident response under TUM DPO oversight. |
+| Compromise of the application DB exposes federated identity links + cookie-session revocation list | Low | Medium | Self-hosted on AET infrastructure; upstream tokens encrypted at rest; short-lived ES256 cookie-JWTs with server-side revocation; TLS-only ingress; incident response under TUM DPO oversight. |
 
 ## 5. DPIA-light mitigations that must remain in place
 

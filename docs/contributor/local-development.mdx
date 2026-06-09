@@ -12,7 +12,7 @@ Hephaestus supports full-stack development across Java and TypeScript. This guid
 Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
-2. **Docker Desktop** – Used for the PostgreSQL and Keycloak containers.
+2. **Docker Desktop** – Used for PostgreSQL and NATS containers.
 3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
 4. **NATS CLI (optional)** – Helpful when inspecting the agent job stream (NATS is disabled by default locally).
 
@@ -49,12 +49,12 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    pnpm dev
    ```
 
-   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL and Keycloak containers are brought up automatically.
+   This launches an `mprocs` session with the server and webapp in separate panes (switch with the arrow keys). The PostgreSQL container is brought up automatically.
 
    Prefer plain terminals? Run the two sides yourself:
 
    ```bash
-   pnpm dev:server   # terminal 1 — brings up Postgres/Keycloak, then Spring Boot
+   pnpm dev:server   # terminal 1 — brings up Postgres, then Spring Boot
    pnpm dev:webapp   # terminal 2 — Vite dev server
    ```
 
@@ -71,7 +71,6 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | Service              | Default | Variable                    | Config location                  |
 | -------------------- | ------- | --------------------------- | -------------------------------- |
 | PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/.env` |
-| Keycloak             | 8081    | `KEYCLOAK_PORT`             | `server/.env` |
 | Application server   | 8080    | `SERVER_PORT`               | `server/.env` |
 | Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env or `webapp/.env`       |
 
@@ -93,15 +92,14 @@ Ports flow through the system like this:
 
 #### Changing ports
 
-**Basic example** – move PostgreSQL and Keycloak to non-standard ports:
+**Basic example** – move PostgreSQL to a non-standard port:
 
 ```bash
 # server/.env
 POSTGRES_PORT=15432
-KEYCLOAK_PORT=18081
 ```
 
-That's it for these two. The application server automatically picks up the new ports from the same `.env` file.
+The application server automatically picks up the new port from the same `.env` file.
 
 **Changing the application server port:**
 
@@ -138,19 +136,12 @@ Changing a port in one place may require updates elsewhere. This table shows the
 
 | When you change...          | Also update...                                             | Why                                      |
 | --------------------------- | ---------------------------------------------------------- | ---------------------------------------- |
-| `KEYCLOAK_PORT`             | GitHub OAuth callback URL                                  | Keycloak's broker endpoint moves         |
 | `WEBAPP_PORT`               | `APPLICATION_HOST_URL` in `.env`                           | CORS origin must match                   |
 | `SERVER_PORT`               | Webapp's `APPLICATION_SERVER_URL` (if connecting directly) | API base URL changes                     |
 | `POSTGRES_PORT`             | Nothing (automatic)                                        | Both Compose and Spring read from `.env` |
 
-Update the GitHub OAuth callback URL when changing `KEYCLOAK_PORT`:
-
-```
-http://localhost:<KEYCLOAK_PORT>/realms/hephaestus/broker/github/endpoint
-```
-
 :::warning Webapp defaults
-The webapp has hardcoded dev defaults in `webapp/src/environment/index.ts` for `APPLICATION_SERVER_URL` (`http://localhost:8080`) and `KEYCLOAK_URL` (`http://localhost:8081`). In production these are injected via `window.__ENV__`. For local development with non-standard ports, set these as Vite environment variables or update the defaults.
+The webapp has a hardcoded dev default in `webapp/src/environment/index.ts` for `APPLICATION_SERVER_URL` (`http://localhost:8080`). In production this is injected via `window.__ENV__`. For local development with non-standard ports, set it as a Vite environment variable or update the default.
 :::
 
 ### GitHub configuration
@@ -227,43 +218,38 @@ Empty lists = no filtering (production behavior). Non-empty = only sync matching
 Filters don't delete data – they just skip sync operations. Workspace and organization metadata is still created for all installations.
 :::
 
-### Keycloak integration
+### Authentication (local)
 
-Keycloak runs in Docker as part of the development compose stack. The bundled realm import no longer ships test users – authentication always flows through GitHub and mirrors production.
+Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md)). The server federates to GitHub (and optionally GitLab — gitlab.com or a self-hosted instance) via Spring Security `oauth2Login`, then issues its own short-lived ES256 cookie-session JWT. The webapp reads `GET /user` and redirects to `/auth/login` — there is no token in the browser.
 
-#### Configure the GitHub identity provider
+#### Configure GitHub login
 
-1. [Create a new GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8081/realms/hephaestus/broker/github/endpoint`.
-2. Export the generated **Client ID** and **Client secret**, then copy `server/.env.example` to `server/.env` and update the placeholders:
+1. [Create a GitHub OAuth application](https://github.com/settings/developers) with the callback URL `http://localhost:8080/login/oauth2/code/github` (use your `SERVER_PORT` if you overrode it).
+2. Copy `server/.env.example` to `server/.env` and set the credentials:
 
    ```bash
    cp server/.env.example server/.env
    # Edit .env and set:
-   # KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
-   # KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
-   # KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
+   # GITHUB_OAUTH_CLIENT_ID=<github-client-id>
+   # GITHUB_OAUTH_CLIENT_SECRET=<github-client-secret>
    ```
 
-   The Keycloak container resolves these placeholders during realm import, as documented in the [Keycloak import guide](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
+3. (Optional) To enable GitLab login locally, register an OAuth application on your GitLab instance
+   (callback `http://localhost:8080/login/oauth2/code/gitlab`, scope `read_user`),
+   set `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET`, and point `GITLAB_OAUTH_BASE_URL` at the
+   instance (defaults to `https://gitlab.com`; e.g. `https://gitlab.lrz.de`). Leave the client id blank to hide the GitLab button.
+4. Run the application server with `./mvnw spring-boot:run`; Postgres + NATS start automatically via Spring Boot's Docker Compose support. Open the webapp and click **Sign in with GitHub**.
 
-   :::tip Pre-configured client secret
-   The `KEYCLOAK_CLIENT_SECRET` is pre-configured with a development default (`hephaestus-dev-secret`). You do not need to copy a secret from the Keycloak admin console for local development.
-   :::
+#### Super admin
 
-3. Start the stack with `pnpm dev` (or `pnpm dev:server`). The `dev:*` scripts bring up the Keycloak and PostgreSQL containers via Docker Compose.
-4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
+App-level admin is the `APP_ADMIN` role on the `account` table (authority `admin` in the JWT), managed from the `/admin/users` UI by an existing admin. There is no first-login auto-elevation; seed the first admin directly in the DB (`UPDATE account SET app_role = 'APP_ADMIN' WHERE id = …`) or via a one-off Liquibase change.
 
-#### Troubleshooting Keycloak
+#### Troubleshooting auth
 
-If you encounter 401 Unauthorized errors or authentication issues after changing configuration:
+- **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
+- **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
+- **Reset everything:** run `pnpm dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
 
-```bash
-cd server
-docker compose down -v  # Clear Keycloak data volume
-docker compose up       # Re-import realm with fresh settings
-```
-
-This deletes the Keycloak H2 database and forces a fresh realm import with your current `.env` values.
 
 ### Webhook receiver
 

@@ -44,7 +44,10 @@ public class GitLabPreflightService {
 
     public GitLabPreflightService(GitLabProperties gitLabProperties) {
         this.gitLabProperties = gitLabProperties;
-        this.webClient = WebClient.builder().clientConnector(WebClientConnectors.systemDns()).build();
+        // ssrfGuarded (not systemDns): serverUrl is user-supplied, so the outbound DNS must be filtered
+        // at connect time. ServerUrlValidator already blocks literal private IPs; the guarded resolver
+        // extends that same policy to hostnames that RESOLVE to private IPs, closing the DNS-rebind bypass.
+        this.webClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
     }
 
     /**

@@ -89,6 +89,7 @@ public final class PostgreSQLTestContainer {
             .withReuse(true); // Reuse container across test runs for faster startup
 
         newContainer.start();
+        ensureExtensions(newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
 
         LOGGER.info(
             "Started PostgreSQL Testcontainer via Docker: jdbcUrl={}, username={}, database={}",
@@ -133,6 +134,25 @@ public final class PostgreSQLTestContainer {
         }
     }
 
+    /**
+     * Hibernate's {@code ddl-auto: create} (test profile) emits the schema directly from the JPA
+     * entities — including {@code account.primary_email CITEXT} — but cannot enable the required
+     * extensions itself (Liquibase, which normally owns {@code CREATE EXTENSION}, is disabled in
+     * tests). Run them here, idempotently, before the context builds its schema. Applied on every
+     * acquisition so a reused container created before this fix is upgraded too.
+     */
+    private static void ensureExtensions(String jdbcUrl, String username, String password) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
+            connection.createStatement().execute("CREATE EXTENSION IF NOT EXISTS citext");
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                "Failed to enable required PostgreSQL extension 'citext' on the test database: " +
+                    exception.getMessage(),
+                exception
+            );
+        }
+    }
+
     private static boolean isDockerAvailable() {
         try {
             return DockerClientFactory.instance().isDockerAvailable();
@@ -162,6 +182,7 @@ public final class PostgreSQLTestContainer {
         public void start() {
             try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
                 connection.createStatement().execute("SELECT 1");
+                connection.createStatement().execute("CREATE EXTENSION IF NOT EXISTS citext");
                 LOGGER.info(
                     "Using locally managed PostgreSQL instance: jdbcUrl={}, username={}, database={}",
                     jdbcUrl,

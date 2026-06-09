@@ -18,7 +18,7 @@ export interface AiReviewSectionProps {
 
 /**
  * AiReviewSection component for managing AI-generated review comment preferences.
- * Gated by the run_practice_review Keycloak role (visibility controlled by parent).
+ * Gated by the run_practice_review feature flag (visibility controlled by parent).
  */
 export function AiReviewSection({
 	aiReviewEnabled,

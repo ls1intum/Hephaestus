@@ -69,7 +69,8 @@ class WorkspaceProvisioningServiceTest {
             true,
             new WorkspaceProperties.DefaultProperties("aet-org", "pat-token", List.of()),
             false,
-            null
+            null,
+            WorkspaceProperties.CreationPolicy.SELF_SERVICE
         );
 
         provisioningService = new WorkspaceProvisioningService(

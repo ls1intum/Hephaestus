@@ -1,9 +1,9 @@
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
-import { SignInButtons } from "@/components/auth/SignInButtons";
+import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
@@ -142,17 +142,13 @@ export function LandingHeroSection({
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-						{isSignedIn ? (
-							<Button onClick={onGoToDashboard} size="lg" className="gap-2">
-								Go to Dashboard <ArrowRight className="h-4 w-4" />
-							</Button>
-						) : (
-							<SignInButtons
-								onSignIn={onSignIn}
-								size="lg"
-								className="w-full justify-center sm:w-auto"
-							/>
-						)}
+						<LandingSignInCTA
+							isSignedIn={isSignedIn}
+							onSignIn={onSignIn}
+							onGoToDashboard={onGoToDashboard}
+							size="lg"
+							className="w-full sm:w-auto"
+						/>
 						<Button variant="outline" size="lg" onClick={onLearnMoreClick} className="gap-2">
 							Learn More <ChevronDown className="h-4 w-4" />
 						</Button>
