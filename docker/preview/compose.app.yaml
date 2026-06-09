@@ -191,6 +191,9 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
+      # Coolify fronts previews with its own proxy — set its ingress regex, not staging's range.
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
       DATABASE_URL: postgresql://postgres:5432/hephaestus
@@ -225,9 +228,11 @@ services:
       LEADERBOARD_NOTIFICATION_ENABLED: "false"
       # Observability (optional)
       SENTRY_DSN: ${SENTRY_DSN:-}
-      # Webhook auto-registration
+      # Webhook auto-registration. Override (not the APPLICATION_HOST_URL default) because previews
+      # route webhooks via PREVIEW_DOMAIN, not the webapp's SERVICE_FQDN_WEBAPP. Bare origin:
+      # GitLabWebhookService appends /webhooks/gitlab itself.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
-      WEBHOOK_EXTERNAL_URL: https://${PREVIEW_DOMAIN:?Required}/webhooks
+      WEBHOOK_EXTERNAL_URL: https://${PREVIEW_DOMAIN:?Required}
     depends_on:
       postgres:
         condition: service_healthy
