@@ -54,7 +54,7 @@ export const CreateApiKey: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// The credential-mode Select is a base-ui combobox rendered in a portal.
-		const modeTrigger = canvas.getByRole("combobox", { name: /credential mode/i });
+		const modeTrigger = canvas.getByRole("combobox", { name: /how to authenticate/i });
 		await userEvent.click(modeTrigger);
 		const apiKeyOption = await screen.findByRole("option", { name: /api key/i });
 		await userEvent.click(apiKeyOption);

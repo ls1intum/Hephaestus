@@ -97,8 +97,8 @@ export function AgentConfigCard({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{config.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently removes this runtime configuration. A runtime bound to a workspace
-							feature cannot be deleted until it is unbound.
+							This permanently removes this model. A model bound to practice detection or the mentor
+							can't be deleted until you unbind it.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

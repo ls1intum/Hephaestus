@@ -63,7 +63,7 @@ export const DeleteConfirm: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /delete default reviewer/i }));
 		// AlertDialog renders in a portal — query the whole document.
 		const dialog = await screen.findByRole("alertdialog");
-		await expect(within(dialog).getByText(/permanently removes this runtime/i)).toBeInTheDocument();
+		await expect(within(dialog).getByText(/permanently removes this model/i)).toBeInTheDocument();
 		await expect(
 			within(dialog).getByRole("button", { name: /^delete model$/i }),
 		).toBeInTheDocument();
