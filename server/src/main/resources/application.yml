@@ -449,8 +449,10 @@ hephaestus:
     #     publish/stream/http blocks for the inbound receiver.
     # `secret` is shared by design — same value registered with the provider and used
     # to verify incoming bodies. The receiver runs in the `webhook-server` container.
+    # external-url defaults to the app's own origin (APPLICATION_HOST_URL); set WEBHOOK_EXTERNAL_URL
+    # only when the receiver is fronted at a different origin than the app (e.g. preview).
     webhook:
-        external-url: ${WEBHOOK_EXTERNAL_URL:}
+        external-url: ${WEBHOOK_EXTERNAL_URL:${APPLICATION_HOST_URL:}}
         secret: ${WEBHOOK_SECRET:}
         token-rotation:
             threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}

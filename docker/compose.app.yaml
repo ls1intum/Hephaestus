@@ -150,10 +150,8 @@ services:
       POSTHOG_PROJECT_ID: ${POSTHOG_PROJECT_ID:-}
       POSTHOG_PERSONAL_API_KEY: ${POSTHOG_PERSONAL_API_KEY:-}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-      # Bare origin only: GitLab auto-registration appends "/webhooks/gitlab" itself
-      # (GitLabWebhookService), and the webhook-server's filters/controller own the unstripped
-      # "/webhooks/{kind}" path. A "/webhooks" suffix here would double the prefix.
-      WEBHOOK_EXTERNAL_URL: https://${APP_HOSTNAME}
+      # WEBHOOK_EXTERNAL_URL intentionally unset: GitLab auto-registration defaults it to
+      # APPLICATION_HOST_URL (same origin here), then appends /webhooks/gitlab itself.
       # AES-256-GCM key for credentials encrypted at rest in the `connection` table. Exactly 32
       # chars. Required in prod (fail-fast); the Liquibase backfill re-encrypts on boot, so this
       # MUST be set on application-server (where Liquibase runs). Keep it stable.
