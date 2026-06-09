@@ -208,8 +208,9 @@ services:
       # Public URL for issuer validation (must match token's iss claim).
       HEPHAESTUS_AUTH_ISSUER: https://${PREVIEW_DOMAIN:?Required}
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY:?Required}
-      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
-      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
+      # Sourced from GH_OAUTH_* — GitHub Actions reserves the GITHUB_ prefix for secret/variable names.
+      GITHUB_OAUTH_CLIENT_ID: ${GH_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GH_OAUTH_CLIENT_SECRET:-}
       GITLAB_OAUTH_CLIENT_ID: ${GITLAB_OAUTH_CLIENT_ID:-}
       GITLAB_OAUTH_CLIENT_SECRET: ${GITLAB_OAUTH_CLIENT_SECRET:-}
       GITLAB_OAUTH_BASE_URL: ${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}
