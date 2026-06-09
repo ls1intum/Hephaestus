@@ -15,17 +15,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Durable guard against Spring test-context fragmentation from per-class event listeners.
- *
- * <p><b>Why this rule exists.</b> Each integration test that declared its own
- * {@code @Component} class with {@code @EventListener} methods (imported per class) produced a
- * <em>distinct</em> Spring {@code ApplicationContext} cache key, forcing a fresh, Testcontainers-backed
- * context boot (~10–36s) for every such class. Nine handler/processor tests did this — ~9 of the
- * suite's ~20 context boots. They now share {@link de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener},
- * imported once by {@code BaseIntegrationTest}, so they reuse one context. This rule keeps it that way:
- * record SCM / GitHub-project domain events via the shared recorder, never a test-local listener.
- *
- * <p>Source scan (same approach as {@link TestTierTagCompletenessTest}); the shared recorder itself is
+ * Guards against test-context fragmentation: a per-class {@code @EventListener} for SCM/GitHub-project
+ * domain events forks a fresh (Testcontainers-backed) Spring context per class. Record via the shared
+ * {@link de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener} (imported by
+ * {@code BaseIntegrationTest}) instead, so those tests reuse one context. Source scan; the recorder is
  * the only allowed declaration site.
  */
 @Tag("architecture")

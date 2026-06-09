@@ -8,13 +8,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Shared recorder for SCM domain events in integration tests. Imported once by
- * {@link BaseIntegrationTest}, so handler/processor tests do not each declare their own
- * {@code @Component} listener — that gave every such class a distinct Spring context cache key and
- * forced a fresh (Testcontainers-backed) context boot per class. Tests record via the shared bean and
- * read back with {@link #ofType(Class)}; {@link #clear()} between tests.
- *
- * <p>Passive recorder only (no side effects), so it never alters event-publish semantics.
+ * Shared passive recorder for SCM domain events, imported once by {@link BaseIntegrationTest} so
+ * handler/processor tests reuse one Spring context instead of each declaring (and forking a context
+ * for) their own listener. Read back with {@link #ofType(Class)}; {@link #clear()} between tests.
  */
 @Component
 public class RecordingScmEventListener {

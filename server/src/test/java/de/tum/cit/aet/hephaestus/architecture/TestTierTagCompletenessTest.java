@@ -20,21 +20,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Durable guard against test classes that execute in <em>zero</em> tiers.
- *
- * <p><b>Why this rule exists.</b> CI runs each tier by JUnit tag — {@code unit}, {@code architecture},
- * {@code integration}, {@code live} (see {@code ci-tests.yml} and {@code pom.xml}). A concrete test
- * class that carries none of those tags (directly or via a tagged base such as {@code BaseUnitTest} /
- * {@code BaseIntegrationTest} / {@code HephaestusArchitectureTest}) is excluded from every tier and
- * silently never runs while looking like coverage. This actually happened — three unit tests
- * (incl. a security-relevant resolver) and five live tests rotted undetected because they were
- * untagged. {@link IntegrationTestNamingConventionTest} only covers direct {@code BaseIntegrationTest}
- * subclasses; this rule covers the general case.
- *
- * <p><b>Scope.</b> A source scan (same approach as {@link IntegrationTestNamingConventionTest}):
- * every concrete class containing test methods ({@code @Test}/{@code @ParameterizedTest}/
- * {@code @RepeatedTest}/{@code @TestFactory}/{@code @Nested}) must resolve to a tier tag through its
- * own {@code @Tag} or its superclass chain. Abstract bases are exempt (never executed directly).
+ * Guards against test classes that run in <em>zero</em> tiers. CI selects tests by JUnit tag
+ * ({@code unit}/{@code architecture}/{@code integration}/{@code live}); a concrete test class with no
+ * such tag — directly or via a tagged base — is silently excluded from every tier while looking like
+ * coverage (this happened: 3 unit + 5 live tests had rotted untagged). Source scan: every concrete
+ * class with test methods must resolve to a tier tag through its own {@code @Tag} or superclass chain.
  */
 @Tag("architecture")
 class TestTierTagCompletenessTest {

@@ -37,26 +37,11 @@ class StartupBudgetIntegrationTest {
     // https://docs.spring.io/spring-framework/reference/core/aot.html#spring-startup-events
     private static final String BEAN_INSTANTIATE = "spring.beans.instantiate";
 
-    // Per-bean wall-clock budget. INTENT: catch a bean whose constructor/@PostConstruct does
-    // EGREGIOUS synchronous work on the boot critical path (e.g. a blocking network call, a heavy
-    // eager cache warm, a migration shoved into bean init) — an order-of-magnitude regression, not a
-    // few-hundred-ms creep.
-    //
-    // WHY 6s and not tighter: spring.beans.instantiate durations are wall time measured on the
-    // single-threaded boot path, so they absorb scheduler preemption. Under CI CPU contention the
-    // whole timeline dilates together. The legitimately slowest bean on a healthy boot is the
-    // DataSource/Hikari + EntityManagerFactory warmup, observed at ~0.6-2.0s here (full healthy
-    // distribution: ~1300 beans, median ~1ms, p90 ~27ms, p95 ~72ms, p99 ~280ms, top5
-    // [619,621,854,879,1959]ms). The old 3s ceiling sat barely ~1s above that ~2s legitimate peak, so
-    // contention on a 2s I/O wait routinely pushed it to 3.0-3.3s and the test flaked WITHOUT any
-    // regression. 6s gives ~3x headroom over the legitimate peak: moderate contention inflates a 2s
-    // bean toward ~3s, not 6s — crossing 6s means a bean is doing real, excessive work, which is
-    // exactly what we want to flag.
-    //
-    // WHY NOT a relative gate (slowest vs median/p95): the distribution is intrinsically dominated by
-    // one I/O-bound bean that is naturally ~27x the p95 bean on a HEALTHY boot, so a ratio gate cannot
-    // separate "DataSource at 2s (fine)" from "DataSource at 5s (regressed)" — same shape. An absolute
-    // floor with real headroom is the honest, non-flaky signal here.
+    // Per-bean wall-clock budget: flag a bean doing egregious synchronous work on the boot critical
+    // path (blocking I/O, eager warm-up, a migration in bean init). 6s ≈ 3x the legitimately slowest
+    // bean (DataSource/EMF warmup, ~2s), so CI CPU contention can't trip it without a real regression.
+    // Absolute, not relative: the distribution is dominated by that one I/O-bound bean, so a ratio gate
+    // can't tell 2s (fine) from 5s (regressed).
     private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(6);
 
     @DynamicPropertySource
@@ -83,10 +68,8 @@ class StartupBudgetIntegrationTest {
 
         assertThat(slowest.getDuration())
             .as(
-                "slowest bean instantiation %s exceeded the %s per-bean budget — a bean is doing egregious " +
-                    "synchronous work on the startup critical path. Investigate its constructor/@PostConstruct " +
-                    "(blocking I/O, eager warm-up, migration). This is sized ~3x above the legitimate DataSource " +
-                    "warmup peak, so it should NOT trip on CI contention alone.",
+                "slowest bean instantiation %s exceeded the %s budget — a bean is doing egregious " +
+                    "synchronous work on the startup path; check its constructor/@PostConstruct.",
                 slowest.getDuration(),
                 PER_BEAN_CEILING
             )

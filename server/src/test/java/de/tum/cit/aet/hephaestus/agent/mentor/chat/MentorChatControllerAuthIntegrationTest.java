@@ -33,9 +33,8 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @Autowired
     private WebTestClient webTestClient;
 
-    // Only MentorChatService needs stubbing/verification here. InteractiveSandboxService (a worker
-    // capability, off in the test profile) resolves to an empty ObjectProvider, and AgentConfigRepository
-    // is a real JPA bean — neither needs a mock, and removing them shrinks this context's override set.
+    // Only MentorChatService is stubbed/verified; the other collaborators resolve fine unmocked, so
+    // they stay out of the override set (a smaller set = fewer distinct test contexts).
     @MockitoBean
     private MentorChatService mentorChatService;
 
