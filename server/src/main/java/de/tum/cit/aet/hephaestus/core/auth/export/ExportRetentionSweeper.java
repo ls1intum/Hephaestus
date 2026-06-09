@@ -36,6 +36,7 @@ public class ExportRetentionSweeper {
     /** Runs hourly. {@code expireNow()} is also callable directly from tests. */
     @Scheduled(cron = "0 0 * * * *")
     @SchedulerLock(name = "account-export-retention-sweep", lockAtMostFor = "PT5M", lockAtLeastFor = "PT30S")
+    @Transactional
     public void sweep() {
         int expired = expireNow();
         if (expired > 0) {
