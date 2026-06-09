@@ -83,10 +83,30 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
 
     @Test
     @WithAdminUser
-    void adminWithoutMembershipIsAlsoForbidden() {
+    void instanceSuperAdminWithoutMembershipIsElevatedToAdmin() {
+        // An instance super-admin (APP_ADMIN, app_admin authority) reaches ANY workspace as ADMIN even
+        // without an explicit membership — the GitLab admin model (WorkspaceContextFilter elevation).
+        // Deliberately ADMIN, never OWNER (ownership is member-granted).
         persistUser("admin");
         User workspaceOwner = persistUser("admin-workspace-owner");
         Workspace workspace = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, workspaceOwner);
+
+        WorkspaceEchoControllers.WorkspaceContextSnapshot response = requestContextEcho(workspace.getWorkspaceSlug());
+
+        assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
+        assertThat(response.roles()).containsExactly("ADMIN");
+    }
+
+    @Test
+    @WithAdminUser
+    void superAdminElevationDoesNotResurrectSuspendedWorkspace() {
+        // The ACTIVE-status gate runs BEFORE the elevation, so a super-admin (no membership) is still
+        // 404'd on a suspended workspace's scoped routes — elevation never widens access to non-active tenants.
+        persistUser("admin");
+        User owner = persistUser("suspended-elev-owner");
+        Workspace workspace = createWorkspace("suspended-elev", "Suspended", "suspendedelev", AccountType.ORG, owner);
+        workspace.setStatus(WorkspaceStatus.SUSPENDED);
+        workspaceRepository.save(workspace);
 
         webTestClient
             .get()
@@ -94,7 +114,7 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
-            .isForbidden();
+            .isNotFound();
     }
 
     @Test

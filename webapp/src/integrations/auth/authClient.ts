@@ -115,6 +115,26 @@ export const authClient = {
 		window.location.assign(url.toString());
 	},
 
+	/**
+	 * Passwordless dev/test sign-in (server endpoint gated by {@code hephaestus.auth.dev-login-enabled},
+	 * fail-closed in prod). Mints the same cookie session as the OAuth flow for a local account, then
+	 * lands on the sanitised `returnTo`. Only reachable when the discovery list advertises the `dev`
+	 * provider, so this is a no-op surface in production. Mirrors `logout`'s direct-fetch pattern (these
+	 * auth kickoff/session calls are intentionally outside the generated client).
+	 */
+	async devLogin(username: string, admin: boolean, returnTo?: string): Promise<void> {
+		const response = await fetch(`${serverUrl()}/auth/dev-login`, {
+			method: "POST",
+			credentials: "include",
+			headers: { "Content-Type": "application/json", ...csrfHeaders() },
+			body: JSON.stringify({ username, admin }),
+		});
+		if (!response.ok) {
+			throw new Error(`Dev sign-in failed (${response.status})`);
+		}
+		window.location.assign(safeReturnTo(returnTo));
+	},
+
 	/** Revoke the session server-side, then return home. */
 	async logout(): Promise<void> {
 		try {

@@ -49,15 +49,18 @@ public class SecurityConfig {
 
     private final CorsProperties corsProperties;
     private final boolean devTriggerEnabled;
+    private final boolean devLoginEnabled;
     private final String authCookieName;
 
     public SecurityConfig(
         CorsProperties corsProperties,
         @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
+        @Value("${hephaestus.auth.dev-login-enabled:false}") boolean devLoginEnabled,
         @Value("${hephaestus.auth.cookie-name:" + AuthProperties.DEFAULT_COOKIE_NAME + "}") String authCookieName
     ) {
         this.corsProperties = corsProperties;
         this.devTriggerEnabled = devTriggerEnabled;
+        this.devLoginEnabled = devLoginEnabled;
         this.authCookieName = authCookieName;
     }
 
@@ -263,6 +266,12 @@ public class SecurityConfig {
             if (devTriggerEnabled) {
                 requests.requestMatchers(DEV_TRIGGER_MATCHER).permitAll();
             }
+            // Dev-only: permit the passwordless dev sign-in (pre-auth POST) when explicitly enabled
+            // (defaults to false; fail-closed in prod — see DevLoginService). Same canonical matcher as
+            // the CSRF carve-out below so they cannot drift.
+            if (devLoginEnabled) {
+                requests.requestMatchers(DEV_LOGIN_MATCHER).permitAll();
+            }
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
@@ -322,6 +331,16 @@ public class SecurityConfig {
     static final RequestMatcher DEV_TRIGGER_MATCHER = PathPatternRequestMatcher.withDefaults().matcher("/api/dev/**");
 
     /**
+     * Single canonical matcher for the optional passwordless dev sign-in, shared by the authorize rule
+     * and the CSRF predicate. The POST is pre-auth (no {@code __Host-} cookie yet), so it is not
+     * CSRF-vulnerable; the carve-out is scoped to exactly this path and only active when the flag is on.
+     */
+    static final RequestMatcher DEV_LOGIN_MATCHER = PathPatternRequestMatcher.withDefaults().matcher(
+        HttpMethod.POST,
+        "/auth/dev-login"
+    );
+
+    /**
      * CSRF applies only to cookie-authenticated, state-changing browser requests. Returns
      * {@code false} (skip CSRF) for safe methods, for any request bearing an
      * {@code Authorization: Bearer} header (bearer auth is not CSRF-vulnerable; covers API clients +
@@ -346,6 +365,11 @@ public class SecurityConfig {
         // here was dead. The only live carve-out is the optional dev trigger, matched by the SAME
         // PathPatternRequestMatcher the authorize rule uses (DEV_TRIGGER_MATCHER) so the two cannot drift.
         if (devTriggerEnabled && DEV_TRIGGER_MATCHER.matches(request)) {
+            return false;
+        }
+        // The passwordless dev sign-in is a pre-auth POST with no auth cookie → not CSRF-vulnerable.
+        // Scoped to exactly /auth/dev-login and only when the flag is on (same matcher as the permit rule).
+        if (devLoginEnabled && DEV_LOGIN_MATCHER.matches(request)) {
             return false;
         }
         return true;

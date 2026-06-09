@@ -60,6 +60,7 @@ function LoginPage() {
 			description="Your AI mentor for growing as a software engineer."
 			error={error}
 			onSignIn={(registrationId) => login(registrationId, returnTo)}
+			devReturnTo={returnTo}
 		/>
 	);
 }

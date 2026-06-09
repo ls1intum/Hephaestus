@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -37,6 +38,13 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
         """
     )
     List<Long> findDeletingPastCooldown(@Param("cutoff") Instant cutoff, Pageable pageable);
+
+    /**
+     * Resolve an account by {@code primary_email} — dev-login only ({@code DevLoginService}, for
+     * idempotent repeat logins). The production login path NEVER resolves by email (nOAuth defence —
+     * email is forensic-only).
+     */
+    Optional<Account> findByPrimaryEmail(String primaryEmail);
 
     /**
      * Usable (ACTIVE) accounts in the given role, write-locked for the surrounding transaction. Backs
