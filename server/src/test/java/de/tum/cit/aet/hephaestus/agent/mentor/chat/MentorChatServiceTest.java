@@ -242,6 +242,48 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
     }
 
+    // 1b. Mentor runtime resolution — a bound + enabled config is preferred and the workspace-scoped
+    // finder (the only real cross-tenant guard) is used; the fan-out fallback is NOT consulted.
+
+    @Test
+    void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
+        Workspace boundWs = new Workspace();
+        boundWs.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
+        AgentConfig boundConfig = new AgentConfig();
+        boundConfig.setEnabled(true);
+        boundConfig.setLlmProvider(LlmProvider.OPENAI);
+        boundConfig.setCredentialMode(CredentialMode.API_KEY);
+        boundConfig.setLlmApiKey("bound-key");
+        boundConfig.setModelName("bound-model");
+        boundConfig.setTimeoutSeconds(600);
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(boundConfig));
+
+        scheduleHappyPathResponses(sandbox).run();
+        runTurnSync();
+
+        verify(agentConfigRepository).findByIdAndWorkspaceId(99L, WORKSPACE_ID);
+        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+    }
+
+    // 1c. The deliberate asymmetry vs practice detection: a bound-but-DISABLED mentor config does NOT
+    // pause the mentor (which would block chat) — it falls back to the oldest enabled config.
+
+    @Test
+    void runTurn_fallsBackToOldestEnabled_whenBoundMentorConfigDisabled() throws Exception {
+        Workspace boundWs = new Workspace();
+        boundWs.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
+        AgentConfig disabled = new AgentConfig();
+        disabled.setEnabled(false);
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
+
+        scheduleHappyPathResponses(sandbox).run();
+        runTurnSync();
+
+        verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+    }
+
     // 2. Client disconnect: runner draining, abort sent, finalise still runs
 
     @Test

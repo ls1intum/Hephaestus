@@ -186,6 +186,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123def456");
+            // The MR title + description are the only inputs for the process practices
+            // (mr-description-quality, commit-discipline); a regression here makes them silently un-evaluable.
+            assertThat(metadata.get("title").asString()).isEqualTo("Fix authentication bug");
+            assertThat(metadata.get("body").asString()).isEqualTo("This PR fixes the login issue");
             assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123def456");
         }
 
