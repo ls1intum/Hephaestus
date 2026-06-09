@@ -11,6 +11,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
@@ -145,13 +152,15 @@ export function AgentJobsTable({
 					<Spinner className="h-6 w-6" />
 				</div>
 			) : jobs.length === 0 ? (
-				<div className="flex h-48 flex-col items-center justify-center gap-2 rounded-md border border-dashed">
-					<Bot className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-					<p className="text-sm font-medium">No jobs found</p>
-					<p className="text-xs text-muted-foreground">
-						Agent jobs appear here once practice reviews run.
-					</p>
-				</div>
+				<Empty className="border border-dashed">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<Bot />
+						</EmptyMedia>
+						<EmptyTitle>No reviews yet</EmptyTitle>
+						<EmptyDescription>Reviews appear here once practice detection runs.</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
 			) : (
 				<Table>
 					<TableHeader>

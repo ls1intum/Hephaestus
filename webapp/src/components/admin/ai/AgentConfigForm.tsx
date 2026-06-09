@@ -235,14 +235,14 @@ export function AgentConfigForm({
 						aria-describedby={errors.name ? "agent-name-error" : undefined}
 					/>
 					{isEdit && (
-						<FieldDescription>The runtime name cannot be changed after creation.</FieldDescription>
+						<FieldDescription>This name can't be changed after creation.</FieldDescription>
 					)}
 					{errors.name && <FieldError id="agent-name-error">{errors.name}</FieldError>}
 				</Field>
 
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<Field>
-						<FieldLabel htmlFor="agent-provider">LLM provider</FieldLabel>
+						<FieldLabel htmlFor="agent-provider">Provider</FieldLabel>
 						<Select
 							items={PROVIDER_ITEMS}
 							value={form.llmProvider}
@@ -277,7 +277,7 @@ export function AgentConfigForm({
 				</div>
 
 				<Field>
-					<FieldLabel htmlFor="agent-base-url">LLM base URL</FieldLabel>
+					<FieldLabel htmlFor="agent-base-url">Base URL</FieldLabel>
 					<Input
 						id="agent-base-url"
 						value={form.llmBaseUrl}
@@ -286,12 +286,12 @@ export function AgentConfigForm({
 						placeholder="https://gpu.example.edu/api (optional)"
 					/>
 					<FieldDescription>
-						Override for OpenAI/Anthropic-compatible gateways. Leave blank for provider defaults.
+						Optional. Point to a compatible gateway instead of the provider's default.
 					</FieldDescription>
 				</Field>
 
 				<Field>
-					<FieldLabel htmlFor="agent-mode">Credential mode</FieldLabel>
+					<FieldLabel htmlFor="agent-mode">How to authenticate</FieldLabel>
 					<Select
 						items={MODE_ITEMS}
 						value={form.credentialMode}
@@ -330,20 +330,25 @@ export function AgentConfigForm({
 				{form.clearLlmApiKey && (
 					<p className="text-sm text-muted-foreground">
 						The stored key will be removed when you save.{" "}
-						<button
+						<Button
 							type="button"
-							className="underline underline-offset-2"
+							variant="link"
+							size="sm"
+							className="h-auto p-0"
 							onClick={() => set("clearLlmApiKey", false)}
 						>
 							Undo
-						</button>
+						</Button>
 					</p>
 				)}
 
 				<Field orientation="horizontal" data-invalid={Boolean(errors.allowInternet)}>
 					<FieldContent>
 						<FieldLabel htmlFor="agent-internet">Allow internet access</FieldLabel>
-						<FieldDescription>Required for direct API-key / OAuth authentication.</FieldDescription>
+						<FieldDescription>
+							The model connects directly to the provider. Required for API key or OAuth; not needed
+							for the shared proxy.
+						</FieldDescription>
 						{errors.allowInternet && <FieldError>{errors.allowInternet}</FieldError>}
 					</FieldContent>
 					<Switch
@@ -395,7 +400,9 @@ export function AgentConfigForm({
 				<Field orientation="horizontal">
 					<FieldContent>
 						<FieldLabel htmlFor="agent-enabled">Enabled</FieldLabel>
-						<FieldDescription>Disabled runtimes are skipped during fan-out.</FieldDescription>
+						<FieldDescription>
+							Disabled models are skipped when running all models.
+						</FieldDescription>
 					</FieldContent>
 					<Switch
 						id="agent-enabled"
@@ -421,7 +428,7 @@ export function AgentConfigForm({
 					) : isEdit ? (
 						"Save changes"
 					) : (
-						"Create runtime"
+						"Create model"
 					)}
 				</Button>
 			</div>

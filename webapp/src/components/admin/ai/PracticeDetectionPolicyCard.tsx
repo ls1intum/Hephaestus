@@ -29,7 +29,7 @@ const COVERAGE_ROLE = "role";
 
 const COVERAGE_ITEMS = [
 	{ value: COVERAGE_ALL, label: "All contributors" },
-	{ value: COVERAGE_ROLE, label: "Opted-in role only" },
+	{ value: COVERAGE_ROLE, label: "Only users with the review role" },
 ];
 
 export interface PracticeDetectionPolicyCardProps {
@@ -93,7 +93,7 @@ export function PracticeDetectionPolicyCard({
 		: undefined;
 	const boundRuntimePaused = boundConfig?.enabled === false;
 	const runtimeItems = [
-		{ value: FANOUT, label: "All enabled (fan-out)" },
+		{ value: FANOUT, label: "All enabled models" },
 		...configs.map((config) => ({ value: String(config.id), label: config.name })),
 	];
 
@@ -120,11 +120,11 @@ export function PracticeDetectionPolicyCard({
 		<div className="space-y-6">
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base">Practice runtime</CardTitle>
+					<CardTitle className="text-base">AI model</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<Field>
-						<FieldLabel htmlFor="practice-runtime">Runtime</FieldLabel>
+						<FieldLabel htmlFor="practice-runtime">Model</FieldLabel>
 						<Select
 							items={runtimeItems}
 							value={hasBoundConfig ? String(boundConfigId) : FANOUT}
@@ -138,7 +138,7 @@ export function PracticeDetectionPolicyCard({
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value={FANOUT}>All enabled (fan-out)</SelectItem>
+								<SelectItem value={FANOUT}>All enabled models</SelectItem>
 								{configs.map((config) => (
 									<SelectItem key={config.id} value={String(config.id)}>
 										{config.name}
@@ -147,25 +147,25 @@ export function PracticeDetectionPolicyCard({
 							</SelectContent>
 						</Select>
 						<FieldDescription>
-							Bind a single runtime, or fan out to every enabled runtime.
+							Use one specific model, or run every enabled model in parallel.
 						</FieldDescription>
 					</Field>
 
 					{!hasBoundConfig && (
 						<Alert>
 							<Info />
-							<AlertTitle>No runtime bound</AlertTitle>
-							<AlertDescription>Reviews fan out to all enabled runtimes.</AlertDescription>
+							<AlertTitle>No specific model selected</AlertTitle>
+							<AlertDescription>Reviews run on all enabled models.</AlertDescription>
 						</Alert>
 					)}
 
 					{boundRuntimePaused && (
 						<Alert variant="destructive">
 							<AlertCircle />
-							<AlertTitle>Bound runtime is paused</AlertTitle>
+							<AlertTitle>Selected model is disabled</AlertTitle>
 							<AlertDescription>
-								“{boundConfig?.name}” is disabled — practice reviews won't run until it's re-enabled
-								(on the Runtimes page) or you bind another runtime.
+								“{boundConfig?.name}” is turned off — practice reviews won't run until you re-enable
+								it (on the AI models page) or pick a different model.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -194,7 +194,9 @@ export function PracticeDetectionPolicyCard({
 					<Field orientation="horizontal">
 						<FieldContent>
 							<FieldLabel htmlFor="trigger-manual">Manual reviews</FieldLabel>
-							<FieldDescription>Allow on-demand reviews via bot command.</FieldDescription>
+							<FieldDescription>
+								Let contributors request a review with a bot command on a PR/MR.
+							</FieldDescription>
 						</FieldContent>
 						<Switch
 							id="trigger-manual"
@@ -233,7 +235,7 @@ export function PracticeDetectionPolicyCard({
 
 					<Field orientation="horizontal">
 						<FieldContent>
-							<FieldLabel htmlFor="policy-deliver-merged">Deliver to merged</FieldLabel>
+							<FieldLabel htmlFor="policy-deliver-merged">Comment on merged PRs/MRs</FieldLabel>
 							<FieldDescription>Post feedback even after a PR/MR is merged.</FieldDescription>
 							{inheritHint(
 								settings.deliverToMergedOverride != null,
@@ -279,7 +281,7 @@ export function PracticeDetectionPolicyCard({
 					</Field>
 
 					<Field>
-						<FieldLabel htmlFor="policy-coverage">Run for</FieldLabel>
+						<FieldLabel htmlFor="policy-coverage">Who gets reviews</FieldLabel>
 						<Select
 							items={COVERAGE_ITEMS}
 							value={settings.runForAllUsers ? COVERAGE_ALL : COVERAGE_ROLE}
@@ -294,17 +296,17 @@ export function PracticeDetectionPolicyCard({
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value={COVERAGE_ALL}>All contributors</SelectItem>
-								<SelectItem value={COVERAGE_ROLE}>Opted-in role only</SelectItem>
+								<SelectItem value={COVERAGE_ROLE}>Only users with the review role</SelectItem>
 							</SelectContent>
 						</Select>
 						<FieldDescription>
-							Review coverage: run for everyone, or only contributors granted the practice-review
-							role (not yet self-serve in-product).
+							Review every contributor, or only those with the review role. Assigning that role
+							isn't self-serve in-product yet.
 						</FieldDescription>
 						{inheritHint(
 							settings.runForAllUsersOverride != null,
 							"RUN_FOR_ALL_USERS",
-							settings.runForAllUsers ? "All contributors" : "Opted-in role only",
+							settings.runForAllUsers ? "All contributors" : "Only the review role",
 						)}
 					</Field>
 				</CardContent>

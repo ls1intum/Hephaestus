@@ -12,7 +12,7 @@ test("dev-login then configure practice detection (read + mutate over http)", as
 
 	await page.goto("/w/e2e/admin/ai/practice-detection");
 	await expect(page.getByRole("heading", { name: "Practice detection" })).toBeVisible();
-	await expect(page.getByText("Practice runtime")).toBeVisible();
+	await expect(page.getByText("AI model")).toBeVisible();
 	await expect(page.getByText("Review policy")).toBeVisible();
 
 	// Toggle "Skip drafts" — the PATCH proves CSRF double-submit works over plain http.

@@ -52,7 +52,7 @@ export const LLM_PROVIDER_LABELS: Record<LlmProvider, string> = {
 };
 
 export const CREDENTIAL_MODE_LABELS: Record<CredentialMode, string> = {
-	PROXY: "Internal proxy",
+	PROXY: "Shared proxy (no key needed)",
 	API_KEY: "API key",
 	OAUTH: "OAuth",
 };

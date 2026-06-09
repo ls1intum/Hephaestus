@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Plus } from "lucide-react";
+import { AlertCircle, Bot, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,13 @@ import type {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import {
 	Select,
 	SelectContent,
@@ -159,39 +166,38 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	const mentorEnabled = aiSettingsQuery.data?.mentorEnabled ?? false;
 	const mentorConfigId = aiSettingsQuery.data?.mentorConfigId;
 	const mentorRuntimeItems = [
-		{ value: MENTOR_FANOUT, label: "Oldest enabled runtime" },
+		{ value: MENTOR_FANOUT, label: "Automatic (first available model)" },
 		...configs.map((config) => ({ value: String(config.id), label: config.name })),
 	];
 
 	return (
 		<div className="container mx-auto max-w-6xl py-6">
 			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">Runtimes</h1>
+				<h1 className="text-3xl font-bold tracking-tight">AI models</h1>
 				<p className="text-muted-foreground">
-					Configure the LLM runtimes that power practice detection and the mentor.
+					Set up the AI models that power practice reviews and the mentor.
 				</p>
 			</div>
 
 			<div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
 				<div className="space-y-3">
-					<div className="flex items-center justify-between">
-						<h2 className="text-sm font-semibold text-muted-foreground">Runtimes</h2>
+					<div className="flex items-center justify-end">
 						<Button
 							size="sm"
 							variant={selectedId === null ? "default" : "outline"}
 							onClick={() => setSelectedId(null)}
 						>
 							<Plus className="mr-1.5 h-4 w-4" />
-							New runtime
+							New model
 						</Button>
 					</div>
 
 					{isError ? (
 						<Alert variant="destructive">
 							<AlertCircle />
-							<AlertTitle>Failed to load runtimes</AlertTitle>
+							<AlertTitle>Failed to load models</AlertTitle>
 							<AlertDescription>
-								<p>The runtime list could not be loaded.</p>
+								<p>The model list could not be loaded.</p>
 								<Button variant="outline" size="sm" className="mt-2" onClick={handleRetry}>
 									Retry
 								</Button>
@@ -202,9 +208,17 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 							<Spinner className="h-6 w-6" />
 						</div>
 					) : configs.length === 0 ? (
-						<p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-							No runtimes yet. Create your first one with the form.
-						</p>
+						<Empty className="border border-dashed">
+							<EmptyHeader>
+								<EmptyMedia variant="icon">
+									<Bot />
+								</EmptyMedia>
+								<EmptyTitle>No models yet</EmptyTitle>
+								<EmptyDescription>
+									Add your first AI model with the form to start running practice reviews.
+								</EmptyDescription>
+							</EmptyHeader>
+						</Empty>
 					) : (
 						configs.map((config) => (
 							<AgentConfigCard
@@ -224,7 +238,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 					{mentorEnabled && (
 						<Card className="mt-4">
 							<CardHeader>
-								<CardTitle className="text-sm">Mentor runtime</CardTitle>
+								<CardTitle className="text-sm">Mentor model</CardTitle>
 							</CardHeader>
 							<CardContent className="space-y-2">
 								<Select
@@ -239,7 +253,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value={MENTOR_FANOUT}>Oldest enabled runtime</SelectItem>
+										<SelectItem value={MENTOR_FANOUT}>Automatic (first available model)</SelectItem>
 										{configs.map((config) => (
 											<SelectItem key={config.id} value={String(config.id)}>
 												{config.name}
@@ -248,7 +262,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 									</SelectContent>
 								</Select>
 								<p className="text-xs text-muted-foreground">
-									Runtime that powers the Pi mentor chat for this workspace.
+									The model that powers the mentor chat for this workspace.
 								</p>
 							</CardContent>
 						</Card>
@@ -258,7 +272,7 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 				<Card>
 					<CardHeader>
 						<CardTitle className="text-base">
-							{selectedConfig ? `Edit: ${selectedConfig.name}` : "New runtime"}
+							{selectedConfig ? `Edit: ${selectedConfig.name}` : "New model"}
 						</CardTitle>
 					</CardHeader>
 					<CardContent>

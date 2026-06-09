@@ -35,17 +35,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A runtime is bound; triggers and policy populated. */
+/** A specific model is selected; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No runtime bound — fan-out alert is shown. */
+/** No specific model selected — the all-models alert is shown. */
 export const FanOut: Story = {
 	args: {
 		settings: { ...mockAiSettings, practiceConfigId: undefined },
 	},
 };
 
-/** The bound runtime was disabled elsewhere — detection is paused (destructive warning). */
+/** The selected model was disabled elsewhere — detection is paused (destructive warning). */
 export const BoundRuntimeDisabled: Story = {
 	args: {
 		settings: { ...mockAiSettings, practiceConfigId: 3 }, // mockConfigDisabled (enabled: false)
