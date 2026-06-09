@@ -128,6 +128,7 @@ services:
       GH_APP_PRIVATE_KEY_LOCATION: ${GH_APP_PRIVATE_KEY_LOCATION:-}
       GH_APP_INSTALLATION_URL: ${GH_APP_INSTALLATION_URL:-}
       GH_AUTH_TOKEN: ${GH_AUTH_TOKEN}
+      # Default on: the integration event flow needs NATS in prod (the code-level fallback is off for local dev).
       NATS_ENABLED: ${NATS_ENABLED:-true}
       NATS_DURABLE_CONSUMER_NAME: ${NATS_DURABLE_CONSUMER_NAME:-}
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-7}
