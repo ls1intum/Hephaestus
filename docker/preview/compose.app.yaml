@@ -194,6 +194,8 @@ services:
       # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
       # Coolify fronts previews with its own proxy — set its ingress regex, not staging's range.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
+      # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
       DATABASE_URL: postgresql://postgres:5432/hephaestus
@@ -239,19 +241,7 @@ services:
         condition: service_healthy
       seed-loader:
         condition: service_completed_successfully
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--spider",
-          "--quiet",
-          "http://127.0.0.1:8080/actuator/health",
-        ]
-      interval: 10s
-      timeout: 10s
-      retries: 20
-      start_period: 90s
+    # No container healthcheck: the distroless run image has no shell/wget (see application-server).
     logging:
       driver: "json-file"
       options:
@@ -286,7 +276,9 @@ services:
       POSTHOG_ENABLED: "false"
     depends_on:
       application-server:
-        condition: service_healthy
+        # service_started, not service_healthy: the app-server image is distroless and has no
+        # container healthcheck (see application-server), so a healthy gate would never be met.
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
       interval: 10s

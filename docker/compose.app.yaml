@@ -167,6 +167,10 @@ services:
       GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de}
       # Agent sandbox (practice review + Pi mentor chat). Activated by the worker role
       # (hephaestus.runtime.worker.enabled), then gated per-workspace via WorkspaceFeatures.
+      # AgentImagePinGuard requires a digest-pinned agent image in prod; the release-pin-fetcher
+      # supplies it for release tags. Set false for non-release (e.g. main/latest) deploys that skip
+      # the pin, otherwise the boot fails on agent-pi:<tag>. Keep true for release deploys.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
@@ -243,12 +247,9 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/liveness"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
-    healthcheck:
-      test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
-      interval: 5s
-      timeout: 10s
-      retries: 10
-      start_period: 10s
+    # No container healthcheck: the Paketo run image is distroless (no shell/wget), so a wget probe
+    # can never succeed → the container would be permanently "unhealthy" and Traefik v3 drops unhealthy
+    # backends. Routing health is owned by Traefik's loadbalancer.healthcheck above (/actuator/health/liveness).
     # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
     # to drain in-flight requests before Docker SIGKILLs the launcher.
     stop_grace_period: 30s
@@ -265,6 +266,7 @@ services:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
       NATS_SERVER: nats://nats-server:4222
@@ -296,12 +298,7 @@ services:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
-    healthcheck:
-      test: "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 30s
+    # No container healthcheck: distroless run image has no shell/wget (see application-server).
     logging:
       driver: "json-file"
       options:

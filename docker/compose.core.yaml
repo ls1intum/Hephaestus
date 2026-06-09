@@ -32,6 +32,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       # forward-headers=native (application-prod.yml) → ProxyTrustGuard fails the boot unless pinned.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
+      # AgentImagePinGuard loads in any prod pod; set false for non-release deploys that skip the pin.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
     depends_on:
       nats-server:
         condition: service_healthy
@@ -58,12 +60,11 @@ services:
       - "traefik.http.routers.http-webhook-server.priority=100"
       - "traefik.http.routers.https-webhook-server.priority=100"
       - "traefik.http.services.https-webhook-server.loadbalancer.server.port=8080"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      # Health-gate routing via Traefik's HTTP probe — the distroless run image has no shell/wget for a
+      # container healthcheck, and a broken one would leave the pod "unhealthy" so Traefik drops it.
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.path=/actuator/health/readiness"
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.interval=15s"
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.timeout=5s"
     logging:
       driver: "json-file"
       options:

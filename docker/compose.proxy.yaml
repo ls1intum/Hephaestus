@@ -1,6 +1,7 @@
 services:
   reverse-proxy:
-    image: traefik:v3.4
+    # >=3.3 required for the app-server sticky.cookie.path label (workspace replica affinity).
+    image: traefik:v3.7.4
     restart: unless-stopped
     networks:
       - shared-network
