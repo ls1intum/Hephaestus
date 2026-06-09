@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Hidden
 @RestController
 @RequestMapping("/auth")
+// Public by design: access is gated by the dev-login flag + SecurityConfig (fail-closed in prod), not by
+// roles. The explicit permitAll declaration satisfies the "every endpoint declares its security" arch rule
+// (mirrors DevTriggerController).
+@PreAuthorize("permitAll()")
 public class DevLoginController {
 
     private final DevLoginService devLoginService;
