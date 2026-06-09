@@ -25,8 +25,10 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO "user" (id, native_id, provider_id, login, type, avatar_url, html_url, created_at, updated_at)
 VALUES (900001, 900001, 1, 'e2e', 'USER', '', 'https://gitlab.lrz.de/e2e', now(), now())
 ON CONFLICT (id) DO NOTHING;
+-- Resolve the dev account by its synthetic email (set by dev-login) rather than assuming id 1.
 INSERT INTO identity_link (id, account_id, git_provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup)
-VALUES (1, 1, 1, '900001', now(), 'OAUTH_LOGIN', 900001, 'e2e')
+SELECT 1, a.id, 1, '900001', now(), 'OAUTH_LOGIN', 900001, 'e2e'
+FROM account a WHERE a.primary_email = 'e2e@dev.invalid'
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at)
 VALUES (1, 900001, 'ADMIN', 0, false, now())

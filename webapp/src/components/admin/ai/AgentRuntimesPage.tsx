@@ -166,9 +166,9 @@ export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
 	return (
 		<div className="container mx-auto max-w-6xl py-6">
 			<div className="mb-6">
-				<h1 className="text-3xl font-bold tracking-tight">Agents</h1>
+				<h1 className="text-3xl font-bold tracking-tight">Runtimes</h1>
 				<p className="text-muted-foreground">
-					Configure the agent runtimes that power practice detection and the mentor.
+					Configure the LLM runtimes that power practice detection and the mentor.
 				</p>
 			</div>
 

@@ -88,14 +88,18 @@ export function PracticeDetectionPolicyCard({
 
 	const boundConfigId = settings.practiceConfigId;
 	const hasBoundConfig = boundConfigId != null;
+	const boundConfig = hasBoundConfig
+		? configs.find((config) => config.id === boundConfigId)
+		: undefined;
+	const boundRuntimePaused = boundConfig?.enabled === false;
 	const runtimeItems = [
 		{ value: FANOUT, label: "All enabled (fan-out)" },
 		...configs.map((config) => ({ value: String(config.id), label: config.name })),
 	];
 
-	// Each policy knob shows whether its value is an explicit workspace override or inherited from
-	// the fleet default, with a one-click reset back to inherit when overridden.
-	const inheritHint = (overridden: boolean, field: PracticeReviewField) =>
+	// Each policy knob shows whether its value is an explicit workspace override or inherited — and when
+	// inherited, spells out the inherited value so a "Reset to default" is a predictable action.
+	const inheritHint = (overridden: boolean, field: PracticeReviewField, inheritedValue: string) =>
 		overridden ? (
 			<Button
 				variant="link"
@@ -107,7 +111,9 @@ export function PracticeDetectionPolicyCard({
 				Reset to default
 			</Button>
 		) : (
-			<span className="text-muted-foreground text-xs">Inherited from default</span>
+			<span className="text-muted-foreground text-xs">
+				Inherited from default ({inheritedValue})
+			</span>
 		);
 
 	return (
@@ -150,6 +156,17 @@ export function PracticeDetectionPolicyCard({
 							<Info />
 							<AlertTitle>No runtime bound</AlertTitle>
 							<AlertDescription>Reviews fan out to all enabled runtimes.</AlertDescription>
+						</Alert>
+					)}
+
+					{boundRuntimePaused && (
+						<Alert variant="destructive">
+							<AlertCircle />
+							<AlertTitle>Bound runtime is paused</AlertTitle>
+							<AlertDescription>
+								“{boundConfig?.name}” is disabled — practice reviews won't run until it's re-enabled
+								(on the Runtimes page) or you bind another runtime.
+							</AlertDescription>
 						</Alert>
 					)}
 				</CardContent>
@@ -200,7 +217,11 @@ export function PracticeDetectionPolicyCard({
 						<FieldContent>
 							<FieldLabel htmlFor="policy-skip-drafts">Skip drafts</FieldLabel>
 							<FieldDescription>Don't review draft PRs/MRs.</FieldDescription>
-							{inheritHint(settings.skipDraftsOverride != null, "SKIP_DRAFTS")}
+							{inheritHint(
+								settings.skipDraftsOverride != null,
+								"SKIP_DRAFTS",
+								settings.skipDrafts ? "on" : "off",
+							)}
 						</FieldContent>
 						<Switch
 							id="policy-skip-drafts"
@@ -214,7 +235,11 @@ export function PracticeDetectionPolicyCard({
 						<FieldContent>
 							<FieldLabel htmlFor="policy-deliver-merged">Deliver to merged</FieldLabel>
 							<FieldDescription>Post feedback even after a PR/MR is merged.</FieldDescription>
-							{inheritHint(settings.deliverToMergedOverride != null, "DELIVER_TO_MERGED")}
+							{inheritHint(
+								settings.deliverToMergedOverride != null,
+								"DELIVER_TO_MERGED",
+								settings.deliverToMerged ? "on" : "off",
+							)}
 						</FieldContent>
 						<Switch
 							id="policy-deliver-merged"
@@ -244,7 +269,11 @@ export function PracticeDetectionPolicyCard({
 						<FieldDescription>
 							Minimum minutes between reviews for the same PR/MR. 0 disables the cooldown.
 						</FieldDescription>
-						{inheritHint(settings.cooldownMinutesOverride != null, "COOLDOWN_MINUTES")}
+						{inheritHint(
+							settings.cooldownMinutesOverride != null,
+							"COOLDOWN_MINUTES",
+							`${settings.cooldownMinutes} min`,
+						)}
 					</Field>
 
 					<Field>
@@ -267,9 +296,14 @@ export function PracticeDetectionPolicyCard({
 							</SelectContent>
 						</Select>
 						<FieldDescription>
-							Review coverage: run for everyone, or only contributors with the opt-in role.
+							Review coverage: run for everyone, or only contributors granted the practice-review
+							role (not yet self-serve in-product).
 						</FieldDescription>
-						{inheritHint(settings.runForAllUsersOverride != null, "RUN_FOR_ALL_USERS")}
+						{inheritHint(
+							settings.runForAllUsersOverride != null,
+							"RUN_FOR_ALL_USERS",
+							settings.runForAllUsers ? "All contributors" : "Opted-in role only",
+						)}
 					</Field>
 				</CardContent>
 			</Card>

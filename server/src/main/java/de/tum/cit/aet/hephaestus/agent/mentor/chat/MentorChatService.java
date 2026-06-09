@@ -531,6 +531,10 @@ public class MentorChatService {
      * {@code mentor_config_id}; if it is unset, foreign, or disabled, falls back to the oldest
      * enabled config (deterministic — replaces the previous nondeterministic {@code findFirst()}).
      *
+     * <p>Deliberate asymmetry with practice detection ({@code AgentJobService.resolvePracticeConfigs}):
+     * a disabled <em>mentor</em> binding FALLS BACK (the mentor must stay answerable mid-conversation),
+     * whereas a disabled <em>practice</em> binding PAUSES detection (opt-in automation — silence is safe).
+     *
      * <p>The bound id is always loaded via the workspace-scoped finder — never a bare
      * {@code findById} — because prod tenancy enforcement is advisory ({@code log}), so the
      * scoped query is the only real cross-tenant guard.

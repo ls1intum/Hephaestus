@@ -186,8 +186,13 @@ public class AgentJobService {
     /**
      * Resolve the configs to submit for practice detection. If the workspace has an explicit
      * {@code practiceConfigId} binding, return only that config when it exists and is enabled
-     * (bound-but-disabled = paused, returns empty); otherwise return all enabled configs
+     * (bound-but-disabled = <strong>paused, returns empty</strong>); otherwise return all enabled configs
      * (legacy fan-out). The bound id is loaded via the workspace-scoped finder for tenancy safety.
+     *
+     * <p>Note the deliberate asymmetry with the mentor ({@code MentorChatService.resolveLlmConfig}): a
+     * disabled <em>practice</em> binding PAUSES detection (it is opt-in automation — silence is the safe
+     * outcome), whereas a disabled <em>mentor</em> binding FALLS BACK to the oldest enabled config (the
+     * mentor must stay answerable to a user who is mid-conversation).
      */
     private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
         Long boundConfigId = workspace.getPracticeConfigId();

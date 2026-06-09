@@ -102,11 +102,11 @@ export function NavAdmin({
 					<SidebarMenu>
 						<SidebarMenuItem>
 							<SidebarMenuButton
-								tooltip="Agents"
+								tooltip="Runtimes"
 								render={<Link to="/w/$workspaceSlug/admin/ai/agents" params={{ workspaceSlug }} />}
 							>
 								<Bot />
-								<span>Agents</span>
+								<span>Runtimes</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 						{practicesEnabled && (

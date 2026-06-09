@@ -45,6 +45,13 @@ export const FanOut: Story = {
 	},
 };
 
+/** The bound runtime was disabled elsewhere — detection is paused (destructive warning). */
+export const BoundRuntimeDisabled: Story = {
+	args: {
+		settings: { ...mockAiSettings, practiceConfigId: 3 }, // mockConfigDisabled (enabled: false)
+	},
+};
+
 /** Coverage scoped to the opt-in role. */
 export const RoleScopedCoverage: Story = {
 	args: {
