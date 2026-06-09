@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig, type PluginOption, type ViteDevServer } from "vite";
+import { configDefaults } from "vitest/config";
 import Terminal from "vite-plugin-terminal";
 import * as fs from "node:fs";
 
@@ -72,6 +73,9 @@ export default defineConfig(({ command }) => {
 		test: {
 			globals: true,
 			environment: "jsdom",
+			// Keep Vitest out of the Playwright harness — e2e/*.spec.ts is browser-driven and must run via
+			// `playwright test`, not Vitest (it imports @playwright/test and has no jsdom equivalent).
+			exclude: [...configDefaults.exclude, "e2e/**"],
 			// Stand up the MSW Node server (handlers shared with Storybook) for the query-driven
 			// auth component tests; harmless for tests that issue no requests (unhandled = bypass).
 			setupFiles: ["./src/test/setup-msw.ts"],
