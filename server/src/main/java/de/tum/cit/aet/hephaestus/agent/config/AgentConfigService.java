@@ -174,7 +174,10 @@ public class AgentConfigService {
         if (!config.isAllowInternet()) {
             throw AgentConfigCredentialModeException.requiresInternet(config.getCredentialMode());
         }
-        if (config.getLlmApiKey() == null || config.getLlmApiKey().isBlank()) {
+        // Only an ENABLED runtime must carry a usable key — a disabled one never runs, so a keyless
+        // config can still be renamed or left parked (and, importantly, an already-keyless config can be
+        // disabled) without being forced to supply a key first.
+        if (config.isEnabled() && (config.getLlmApiKey() == null || config.getLlmApiKey().isBlank())) {
             throw AgentConfigCredentialModeException.missingCredential(config.getCredentialMode());
         }
     }

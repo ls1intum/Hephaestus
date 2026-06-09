@@ -124,6 +124,27 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldAcceptDisabledApiKeyWithoutCredential() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // A disabled runtime never runs, so it can be saved/parked without a key (and, importantly, a
+            // pre-existing keyless API_KEY config can be disabled) — only an ENABLED runtime is forced to
+            // carry one.
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(false)
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .allowInternet(true)
+                .credentialMode(CredentialMode.API_KEY)
+                .build();
+
+            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
+            assertThat(result.isEnabled()).isFalse();
+        }
+
+        @Test
         void shouldRejectDirectModeWithoutCredential() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
