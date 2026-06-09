@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +40,9 @@ class DevLoginServiceTest extends BaseUnitTest {
     private final JwtPrincipalFactory principalFactory = mock(JwtPrincipalFactory.class);
     private final HephaestusJwtIssuer jwtIssuer = mock(HephaestusJwtIssuer.class);
 
+    private static final Instant FIXED_NOW = Instant.parse("2026-01-01T00:00:00Z");
+    private static final Duration SESSION_MAX = Duration.ofHours(8);
+
     private final HephaestusJwtIssuer.Token token = new HephaestusJwtIssuer.Token(
         "jwt-value",
         UUID.randomUUID(),
@@ -48,7 +52,7 @@ class DevLoginServiceTest extends BaseUnitTest {
     private DevLoginService service(boolean enabled, String... activeProfiles) {
         AuthProperties props = mock(AuthProperties.class);
         when(props.devLoginEnabled()).thenReturn(enabled);
-        when(props.sessionMaxLifetime()).thenReturn(Duration.ofHours(8));
+        when(props.sessionMaxLifetime()).thenReturn(SESSION_MAX);
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles(activeProfiles);
         return new DevLoginService(
@@ -56,7 +60,7 @@ class DevLoginServiceTest extends BaseUnitTest {
             accountRepository,
             principalFactory,
             jwtIssuer,
-            Clock.systemUTC(),
+            Clock.fixed(FIXED_NOW, ZoneOffset.UTC),
             environment
         );
     }
@@ -107,7 +111,11 @@ class DevLoginServiceTest extends BaseUnitTest {
         verify(accountRepository).save(saved.capture());
         assertThat(saved.getValue().getPrimaryEmail()).isEqualTo("alice@dev.invalid");
         assertThat(saved.getValue().getAppRole()).isEqualTo(Account.AppRole.USER);
-        verify(jwtIssuer).issue(any(), isNull(), isNull(), any(), any());
+        // The mint must stamp the same absolute session ceiling the OAuth path does (now + sessionMaxLifetime),
+        // not the unbounded 3-arg overload — capture the 4th arg so a revert to null is caught.
+        ArgumentCaptor<Instant> sessionCeiling = ArgumentCaptor.forClass(Instant.class);
+        verify(jwtIssuer).issue(any(), isNull(), isNull(), sessionCeiling.capture(), any());
+        assertThat(sessionCeiling.getValue()).isEqualTo(FIXED_NOW.plus(SESSION_MAX));
     }
 
     @Test
