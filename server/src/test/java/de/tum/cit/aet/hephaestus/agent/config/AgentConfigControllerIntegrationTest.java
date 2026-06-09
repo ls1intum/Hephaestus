@@ -43,18 +43,16 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     private AgentConfigDTO createConfig(Workspace workspace, String name) {
-        var request = new CreateAgentConfigRequestDTO(
-            name,
-            true,
-            "claude-sonnet-4-20250514",
-            "sk-test-secret-key-123",
-            null,
-            LlmProvider.ANTHROPIC,
-            300,
-            2,
-            false,
-            null
-        );
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name(name)
+            .enabled(true)
+            .modelName("claude-sonnet-4-20250514")
+            .llmApiKey("sk-test-secret-key-123")
+            .llmProvider(LlmProvider.ANTHROPIC)
+            .timeoutSeconds(300)
+            .maxConcurrentJobs(2)
+            .allowInternet(false)
+            .build();
 
         return webTestClient
             .post()
@@ -151,18 +149,11 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         createConfig(workspace, "duplicate-name");
 
-        var duplicateRequest = new CreateAgentConfigRequestDTO(
-            "duplicate-name",
-            true,
-            null,
-            null,
-            null,
-            LlmProvider.OPENAI,
-            null,
-            null,
-            null,
-            null
-        );
+        var duplicateRequest = CreateAgentConfigRequestDTO.builder()
+            .name("duplicate-name")
+            .enabled(true)
+            .llmProvider(LlmProvider.OPENAI)
+            .build();
 
         ProblemDetail problem = webTestClient
             .post()
@@ -188,17 +179,13 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         AgentConfigDTO created = createConfig(workspace, "update-test");
 
         // Update — omit llmApiKey (null = keep existing)
-        var updateRequest = new UpdateAgentConfigRequestDTO(
-            null,
-            "gpt-4o",
-            null,
-            null,
-            LlmProvider.OPENAI,
-            120,
-            1,
-            true,
-            null
-        );
+        var updateRequest = UpdateAgentConfigRequestDTO.builder()
+            .modelName("gpt-4o")
+            .llmProvider(LlmProvider.OPENAI)
+            .timeoutSeconds(120)
+            .maxConcurrentJobs(1)
+            .allowInternet(true)
+            .build();
 
         AgentConfigDTO updated = webTestClient
             .patch()
@@ -326,18 +313,11 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void postWithBlankNameReturns400() {
         Workspace workspace = setupWorkspace();
 
-        var request = new CreateAgentConfigRequestDTO(
-            "",
-            true,
-            null,
-            null,
-            null,
-            LlmProvider.ANTHROPIC,
-            null,
-            null,
-            null,
-            null
-        );
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("")
+            .enabled(true)
+            .llmProvider(LlmProvider.ANTHROPIC)
+            .build();
 
         webTestClient
             .post()
@@ -355,18 +335,12 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void postWithTimeoutOutOfRangeReturns400() {
         Workspace workspace = setupWorkspace();
 
-        var request = new CreateAgentConfigRequestDTO(
-            "bad-timeout",
-            true,
-            null,
-            null,
-            null,
-            LlmProvider.ANTHROPIC,
-            5, // below minimum of 30
-            null,
-            null,
-            null
-        );
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("bad-timeout")
+            .enabled(true)
+            .llmProvider(LlmProvider.ANTHROPIC)
+            .timeoutSeconds(5) // below minimum of 30
+            .build();
 
         webTestClient
             .post()
@@ -384,18 +358,11 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void postReturnsLocationHeader() {
         Workspace workspace = setupWorkspace();
 
-        var request = new CreateAgentConfigRequestDTO(
-            "location-test",
-            true,
-            null,
-            null,
-            null,
-            LlmProvider.ANTHROPIC,
-            null,
-            null,
-            null,
-            null
-        );
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("location-test")
+            .enabled(true)
+            .llmProvider(LlmProvider.ANTHROPIC)
+            .build();
 
         webTestClient
             .post()
@@ -428,18 +395,12 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void apiKeyNeverExposedInResponse() {
         Workspace workspace = setupWorkspace();
 
-        var request = new CreateAgentConfigRequestDTO(
-            "secret-test",
-            true,
-            null,
-            "sk-super-secret-key",
-            null,
-            LlmProvider.ANTHROPIC,
-            null,
-            null,
-            null,
-            null
-        );
+        var request = CreateAgentConfigRequestDTO.builder()
+            .name("secret-test")
+            .enabled(true)
+            .llmApiKey("sk-super-secret-key")
+            .llmProvider(LlmProvider.ANTHROPIC)
+            .build();
 
         String responseBody = webTestClient
             .post()

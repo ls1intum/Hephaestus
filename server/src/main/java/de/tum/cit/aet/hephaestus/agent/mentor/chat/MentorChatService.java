@@ -23,6 +23,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.List;
@@ -62,6 +64,7 @@ public class MentorChatService {
     private final UserRepository userRepository;
     private final ChatThreadRepository chatThreadRepository;
     private final AgentConfigRepository agentConfigRepository;
+    private final WorkspaceRepository workspaceRepository;
     private final MentorAgentProperties mentorAgentProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final MentorPiAdapter mentorPiAdapter;
@@ -524,15 +527,24 @@ public class MentorChatService {
     }
 
     /**
-     * Resolve the LLM config mentor should use: first enabled workspace-scoped
-     * {@link AgentConfig}. A single source of truth — no instance-level override path.
+     * Resolve the LLM config the mentor should use. Prefers the workspace's explicitly bound
+     * {@code mentor_config_id}; if it is unset, foreign, or disabled, falls back to the oldest
+     * enabled config (deterministic — replaces the previous nondeterministic {@code findFirst()}).
+     *
+     * <p>The bound id is always loaded via the workspace-scoped finder — never a bare
+     * {@code findById} — because prod tenancy enforcement is advisory ({@code log}), so the
+     * scoped query is the only real cross-tenant guard.
      */
     private MentorLlmConfig resolveLlmConfig(long workspaceId) {
+        Long boundConfigId = workspaceRepository.findById(workspaceId).map(Workspace::getMentorConfigId).orElse(null);
+        if (boundConfigId != null) {
+            Optional<AgentConfig> bound = agentConfigRepository.findByIdAndWorkspaceId(boundConfigId, workspaceId);
+            if (bound.isPresent() && bound.get().isEnabled()) {
+                return MentorLlmConfig.fromAgentConfig(bound.get());
+            }
+        }
         return agentConfigRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .filter(AgentConfig::isEnabled)
-            .findFirst()
+            .findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(workspaceId)
             .map(MentorLlmConfig::fromAgentConfig)
             .orElseThrow(() ->
                 new IllegalStateException(

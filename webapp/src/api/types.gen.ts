@@ -517,6 +517,32 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
+ * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
+ */
+export type UpdatePracticeReviewSettings = {
+    /**
+     * Minimum minutes between reviews for the same PR; 0 disables the cooldown
+     */
+    cooldownMinutes?: number;
+    /**
+     * Deliver feedback to already-merged PRs/MRs
+     */
+    deliverToMerged?: boolean;
+    /**
+     * Fields to reset to the inherited fleet default
+     */
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES'>;
+    /**
+     * Run practice review for all contributors (vs only the run_practice_review role)
+     */
+    runForAllUsers?: boolean;
+    /**
+     * Skip practice review for draft PRs/MRs
+     */
+    skipDrafts?: boolean;
+};
+
+/**
  * Request to update an existing practice definition (PATCH — only non-null fields applied)
  */
 export type UpdatePracticeRequest = {
@@ -613,6 +639,10 @@ export type UpdateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
+     * Set true to remove the stored API key (takes precedence over llmApiKey)
+     */
+    clearLlmApiKey?: boolean;
+    /**
      * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
      */
     credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
@@ -644,6 +674,16 @@ export type UpdateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
+};
+
+/**
+ * Bind an agent config to a workspace purpose; null unbinds
+ */
+export type UpdateAgentBindingRequest = {
+    /**
+     * Agent config id to bind, or null to unbind
+     */
+    configId?: number;
 };
 
 export type UpdateAccountRequest = {
@@ -1348,6 +1388,14 @@ export type AgentJob = {
      * Timestamp when the job completed
      */
     completedAt?: Date;
+    /**
+     * ID of the agent config that ran this job (from the frozen snapshot)
+     */
+    configId?: number;
+    /**
+     * Name of the agent config that ran this job (from the frozen snapshot)
+     */
+    configName?: string;
     /**
      * Frozen agent config at submit time
      */
@@ -2168,6 +2216,60 @@ export type AssignRoleRequest = {
      * User ID of the member to update
      */
     userId: number;
+};
+
+/**
+ * Aggregate workspace AI settings: runtime bindings + effective + raw-override practice-review policy
+ */
+export type AiSettingsView = {
+    /**
+     * Effective: minimum minutes between reviews for the same PR
+     */
+    cooldownMinutes: number;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    cooldownMinutesOverride?: number;
+    /**
+     * Effective: deliver feedback to merged PRs/MRs
+     */
+    deliverToMerged: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    deliverToMergedOverride?: boolean;
+    /**
+     * Config bound to power the mentor (null = oldest enabled config)
+     */
+    mentorConfigId?: number;
+    /**
+     * Whether the mentor feature is enabled for this workspace
+     */
+    mentorEnabled: boolean;
+    /**
+     * Config bound to power practice detection (null = fan-out to all enabled configs)
+     */
+    practiceConfigId?: number;
+    /**
+     * Whether the practices feature is enabled for this workspace
+     */
+    practicesEnabled: boolean;
+    /**
+     * Effective: run practice review for all contributors
+     */
+    runForAllUsers: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    runForAllUsersOverride?: boolean;
+    /**
+     * Effective: skip draft PRs/MRs
+     */
+    skipDrafts: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    skipDraftsOverride?: boolean;
 };
 
 /**
@@ -3268,6 +3370,104 @@ export type RetryDeliveryResponses = {
 };
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+
+export type GetAiSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings';
+};
+
+export type GetAiSettingsResponses = {
+    /**
+     * AI settings returned
+     */
+    200: AiSettingsView;
+};
+
+export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
+
+export type UpdateMentorConfigData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config';
+};
+
+export type UpdateMentorConfigErrors = {
+    /**
+     * Config not found in this workspace
+     */
+    404: unknown;
+};
+
+export type UpdateMentorConfigResponses = {
+    /**
+     * Binding updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdateMentorConfigResponse = UpdateMentorConfigResponses[keyof UpdateMentorConfigResponses];
+
+export type UpdatePracticeConfigData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config';
+};
+
+export type UpdatePracticeConfigErrors = {
+    /**
+     * Config not found in this workspace
+     */
+    404: unknown;
+};
+
+export type UpdatePracticeConfigResponses = {
+    /**
+     * Binding updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdatePracticeConfigResponse = UpdatePracticeConfigResponses[keyof UpdatePracticeConfigResponses];
+
+export type UpdatePracticeReviewSettingsData = {
+    body: UpdatePracticeReviewSettings;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review';
+};
+
+export type UpdatePracticeReviewSettingsResponses = {
+    /**
+     * Policy updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
 export type ListData = {
     body?: never;

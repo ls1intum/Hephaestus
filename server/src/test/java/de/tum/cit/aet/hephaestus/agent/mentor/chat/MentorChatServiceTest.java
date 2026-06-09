@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -41,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -89,6 +91,9 @@ class MentorChatServiceTest extends BaseUnitTest {
     AgentConfigRepository agentConfigRepository;
 
     @Mock
+    WorkspaceRepository workspaceRepository;
+
+    @Mock
     WorkspaceContextBuilder workspaceContextBuilder;
 
     @Mock
@@ -134,6 +139,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             userRepository,
             chatThreadRepository,
             agentConfigRepository,
+            workspaceRepository,
             mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
@@ -160,7 +166,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         agentConfig.setLlmApiKey("test-key");
         agentConfig.setModelName("test-model");
         agentConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findByWorkspaceId(eq(WORKSPACE_ID))).thenReturn(List.of(agentConfig));
+        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+            Optional.of(agentConfig)
+        );
 
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");

@@ -160,6 +160,11 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void skipDraftPr() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
+            // The draft gate runs after workspace resolution so it can read the per-workspace
+            // skipDrafts override (which inherits the property default of true here).
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(
+                Optional.of(createWorkspace())
+            );
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
@@ -191,13 +196,19 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
-        void draftSkipPreventsDbCalls() {
+        void draftSkipShortCircuitsBeforeExpensiveChecks() {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
+            // The draft gate runs after (cheap) workspace resolution but before the expensive
+            // agent-config / practice / role checks — assert those are never touched.
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(
+                Optional.of(createWorkspace())
+            );
 
-            gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
-            verifyNoInteractions(workspaceResolver, agentConfigChecker, practiceRepository, userRoleChecker);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("draft PR");
+            verifyNoInteractions(agentConfigChecker, practiceRepository, userRoleChecker);
         }
     }
 

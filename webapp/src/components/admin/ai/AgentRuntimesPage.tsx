@@ -1,0 +1,278 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertCircle, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+	createConfigMutation,
+	deleteConfigMutation,
+	getAiSettingsOptions,
+	getAiSettingsQueryKey,
+	getConfigsOptions,
+	getConfigsQueryKey,
+	updateConfigMutation,
+	updateMentorConfigMutation,
+} from "@/api/@tanstack/react-query.gen";
+import type {
+	AgentConfig,
+	CreateAgentConfigRequest,
+	UpdateAgentConfigRequest,
+} from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { AgentConfigCard } from "./AgentConfigCard";
+import { AgentConfigForm } from "./AgentConfigForm";
+import { deriveDesignations } from "./utils";
+
+const NEW_RUNTIME = "__new__";
+const MENTOR_FANOUT = "__none__";
+
+interface AgentRuntimesPageProps {
+	workspaceSlug: string;
+}
+
+export function AgentRuntimesPage({ workspaceSlug }: AgentRuntimesPageProps) {
+	const queryClient = useQueryClient();
+	// null = "New runtime" form; number = editing that config id.
+	const [selectedId, setSelectedId] = useState<number | null>(null);
+
+	const configsQuery = useQuery({
+		...getConfigsOptions({ path: { workspaceSlug } }),
+		enabled: Boolean(workspaceSlug),
+	});
+	const aiSettingsQuery = useQuery({
+		...getAiSettingsOptions({ path: { workspaceSlug } }),
+		enabled: Boolean(workspaceSlug),
+	});
+
+	const configs = configsQuery.data ?? [];
+	const designations = deriveDesignations(aiSettingsQuery.data);
+	const selectedConfig = selectedId != null ? configs.find((c) => c.id === selectedId) : undefined;
+
+	const invalidateAll = () => {
+		queryClient.invalidateQueries({
+			queryKey: getConfigsQueryKey({ path: { workspaceSlug } }),
+		});
+		queryClient.invalidateQueries({
+			queryKey: getAiSettingsQueryKey({ path: { workspaceSlug } }),
+		});
+	};
+
+	const createConfig = useMutation({
+		...createConfigMutation(),
+		onSuccess: (created) => {
+			invalidateAll();
+			toast.success("Runtime created");
+			setSelectedId(created.id);
+		},
+		onError: (error) => {
+			toast.error("Failed to create runtime", {
+				description: error instanceof Error ? error.message : undefined,
+			});
+		},
+	});
+
+	const updateConfig = useMutation({
+		...updateConfigMutation(),
+		onSuccess: () => {
+			invalidateAll();
+			toast.success("Runtime updated");
+		},
+		onError: (error) => {
+			toast.error("Failed to update runtime", {
+				description: error instanceof Error ? error.message : undefined,
+			});
+		},
+	});
+
+	const deleteConfig = useMutation({
+		...deleteConfigMutation(),
+		onSuccess: (_data, variables) => {
+			invalidateAll();
+			toast.success("Runtime deleted");
+			if (variables.path.configId === selectedId) {
+				setSelectedId(null);
+			}
+		},
+		onError: (error) => {
+			// A 409 means the config is bound to a workspace feature; surface the server message.
+			toast.error("Failed to delete runtime", {
+				description:
+					error instanceof Error
+						? error.message
+						: "It may still be bound to practice detection or the mentor.",
+			});
+		},
+	});
+
+	const updateMentorConfig = useMutation({
+		...updateMentorConfigMutation(),
+		onSuccess: () => {
+			queryClient.invalidateQueries({
+				queryKey: getAiSettingsQueryKey({ path: { workspaceSlug } }),
+			});
+			toast.success("Mentor runtime updated");
+		},
+		onError: (error) => {
+			toast.error("Failed to update mentor runtime", {
+				description: error instanceof Error ? error.message : undefined,
+			});
+		},
+	});
+
+	const handleCreate = (body: CreateAgentConfigRequest) => {
+		createConfig.mutate({ path: { workspaceSlug }, body });
+	};
+
+	const handleUpdate = (body: UpdateAgentConfigRequest) => {
+		if (selectedId == null) return;
+		updateConfig.mutate({ path: { workspaceSlug, configId: selectedId }, body });
+	};
+
+	const handleDelete = (config: AgentConfig) => {
+		deleteConfig.mutate({ path: { workspaceSlug, configId: config.id } });
+	};
+
+	const handleBindMentor = (value: string) => {
+		updateMentorConfig.mutate({
+			path: { workspaceSlug },
+			body: { configId: value === MENTOR_FANOUT ? undefined : Number(value) },
+		});
+	};
+
+	const isLoading = configsQuery.isLoading || aiSettingsQuery.isLoading;
+	const isError = configsQuery.isError || aiSettingsQuery.isError;
+	const formPending = createConfig.isPending || updateConfig.isPending;
+
+	const handleRetry = () => {
+		configsQuery.refetch();
+		aiSettingsQuery.refetch();
+	};
+	const mentorEnabled = aiSettingsQuery.data?.mentorEnabled ?? false;
+	const mentorConfigId = aiSettingsQuery.data?.mentorConfigId;
+	const mentorRuntimeItems = [
+		{ value: MENTOR_FANOUT, label: "Oldest enabled runtime" },
+		...configs.map((config) => ({ value: String(config.id), label: config.name })),
+	];
+
+	return (
+		<div className="container mx-auto max-w-6xl py-6">
+			<div className="mb-6">
+				<h1 className="text-3xl font-bold tracking-tight">Agents</h1>
+				<p className="text-muted-foreground">
+					Configure the agent runtimes that power practice detection and the mentor.
+				</p>
+			</div>
+
+			<div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+				<div className="space-y-3">
+					<div className="flex items-center justify-between">
+						<h2 className="text-sm font-semibold text-muted-foreground">Runtimes</h2>
+						<Button
+							size="sm"
+							variant={selectedId === null ? "default" : "outline"}
+							onClick={() => setSelectedId(null)}
+						>
+							<Plus className="mr-1.5 h-4 w-4" />
+							New runtime
+						</Button>
+					</div>
+
+					{isError ? (
+						<Alert variant="destructive">
+							<AlertCircle />
+							<AlertTitle>Failed to load runtimes</AlertTitle>
+							<AlertDescription>
+								<p>The runtime list could not be loaded.</p>
+								<Button variant="outline" size="sm" className="mt-2" onClick={handleRetry}>
+									Retry
+								</Button>
+							</AlertDescription>
+						</Alert>
+					) : isLoading ? (
+						<div className="flex h-40 items-center justify-center">
+							<Spinner className="h-6 w-6" />
+						</div>
+					) : configs.length === 0 ? (
+						<p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+							No runtimes yet. Create your first one with the form.
+						</p>
+					) : (
+						configs.map((config) => (
+							<AgentConfigCard
+								key={config.id}
+								config={config}
+								designation={designations.get(config.id)}
+								selected={config.id === selectedId}
+								isDeleting={
+									deleteConfig.isPending && deleteConfig.variables?.path.configId === config.id
+								}
+								onEdit={(c) => setSelectedId(c.id)}
+								onDelete={handleDelete}
+							/>
+						))
+					)}
+
+					{mentorEnabled && (
+						<Card className="mt-4">
+							<CardHeader>
+								<CardTitle className="text-sm">Mentor runtime</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-2">
+								<Select
+									items={mentorRuntimeItems}
+									value={mentorConfigId != null ? String(mentorConfigId) : MENTOR_FANOUT}
+									disabled={updateMentorConfig.isPending || configs.length === 0}
+									onValueChange={(value) => {
+										if (value) handleBindMentor(value);
+									}}
+								>
+									<SelectTrigger>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value={MENTOR_FANOUT}>Oldest enabled runtime</SelectItem>
+										{configs.map((config) => (
+											<SelectItem key={config.id} value={String(config.id)}>
+												{config.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<p className="text-xs text-muted-foreground">
+									Runtime that powers the Pi mentor chat for this workspace.
+								</p>
+							</CardContent>
+						</Card>
+					)}
+				</div>
+
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-base">
+							{selectedConfig ? `Edit: ${selectedConfig.name}` : "New runtime"}
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<AgentConfigForm
+							key={selectedConfig?.id ?? NEW_RUNTIME}
+							config={selectedConfig}
+							isPending={formPending}
+							onCreate={handleCreate}
+							onUpdate={handleUpdate}
+							onCancel={selectedConfig ? () => setSelectedId(null) : undefined}
+						/>
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	);
+}

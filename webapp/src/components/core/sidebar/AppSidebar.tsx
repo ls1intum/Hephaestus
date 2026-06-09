@@ -128,6 +128,7 @@ export function AppSidebar({
 						workspaceSlug={activeWorkspace.workspaceSlug}
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
 						practicesEnabled={activeWorkspace.practicesEnabled}
+						mentorEnabled={activeWorkspace.mentorEnabled}
 					/>
 				)}
 				{/* Instance-admin is intentionally NOT mixed into the per-workspace nav anymore — it lives

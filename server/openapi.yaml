@@ -99,6 +99,9 @@ tags:
      <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
      <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
   name: git-lab-preflight-controller
+- description: Workspace-scoped AI configuration (runtime bindings + practice-review
+    policy)
+  name: AI Settings
 - description: "Current user identity, linked accounts, deletion"
   name: Account
 paths:
@@ -1206,6 +1209,112 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/ai-settings:
+    get:
+      operationId: getAiSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: AI settings returned
+      summary: Get aggregate workspace AI settings
+      tags:
+      - AI Settings
+  /workspaces/{workspaceSlug}/ai-settings/mentor-config:
+    put:
+      operationId: updateMentorConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentBindingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: Binding updated
+        "404":
+          description: Config not found in this workspace
+      summary: Bind (or unbind) the agent config that powers the mentor
+      tags:
+      - AI Settings
+  /workspaces/{workspaceSlug}/ai-settings/practice-config:
+    put:
+      operationId: updatePracticeConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentBindingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: Binding updated
+        "404":
+          description: Config not found in this workspace
+      summary: Bind (or unbind) the agent config that powers practice detection
+      tags:
+      - AI Settings
+  /workspaces/{workspaceSlug}/ai-settings/practice-review:
+    patch:
+      operationId: updatePracticeReviewSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeReviewSettings"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: Policy updated
+      summary: Update per-workspace practice-review policy
+      tags:
+      - AI Settings
   /workspaces/{workspaceSlug}/connections:
     get:
       operationId: list
@@ -3488,6 +3597,14 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job completed
+        configId:
+          type: integer
+          format: int64
+          description: ID of the agent config that ran this job (from the frozen snapshot)
+        configName:
+          type: string
+          description: Name of the agent config that ran this job (from the frozen
+            snapshot)
         configSnapshot:
           description: Frozen agent config at submit time
         containerId:
@@ -3587,6 +3704,59 @@ components:
       - jobType
       - retryCount
       - status
+    AiSettingsView:
+      type: object
+      description: "Aggregate workspace AI settings: runtime bindings + effective\
+        \ + raw-override practice-review policy"
+      properties:
+        cooldownMinutes:
+          type: integer
+          format: int32
+          description: "Effective: minimum minutes between reviews for the same PR"
+        cooldownMinutesOverride:
+          type: integer
+          format: int32
+          description: Raw override; null = inheriting the fleet default
+        deliverToMerged:
+          type: boolean
+          description: "Effective: deliver feedback to merged PRs/MRs"
+        deliverToMergedOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+        mentorConfigId:
+          type: integer
+          format: int64
+          description: Config bound to power the mentor (null = oldest enabled config)
+        mentorEnabled:
+          type: boolean
+          description: Whether the mentor feature is enabled for this workspace
+        practiceConfigId:
+          type: integer
+          format: int64
+          description: Config bound to power practice detection (null = fan-out to
+            all enabled configs)
+        practicesEnabled:
+          type: boolean
+          description: Whether the practices feature is enabled for this workspace
+        runForAllUsers:
+          type: boolean
+          description: "Effective: run practice review for all contributors"
+        runForAllUsersOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+        skipDrafts:
+          type: boolean
+          description: "Effective: skip draft PRs/MRs"
+        skipDraftsOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+      required:
+      - cooldownMinutes
+      - deliverToMerged
+      - mentorEnabled
+      - practicesEnabled
+      - runForAllUsers
+      - skipDrafts
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -5566,6 +5736,14 @@ components:
       properties:
         appRole:
           type: string
+    UpdateAgentBindingRequest:
+      type: object
+      description: Bind an agent config to a workspace purpose; null unbinds
+      properties:
+        configId:
+          type: integer
+          format: int64
+          description: "Agent config id to bind, or null to unbind"
     UpdateAgentConfigRequest:
       type: object
       description: Request to update an existing agent configuration (all fields optional
@@ -5574,6 +5752,10 @@ components:
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        clearLlmApiKey:
+          type: boolean
+          description: Set true to remove the stored API key (takes precedence over
+            llmApiKey)
         credentialMode:
           type: string
           description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
@@ -5732,6 +5914,39 @@ components:
             type: string
           maxItems: 10
           minItems: 1
+    UpdatePracticeReviewSettings:
+      type: object
+      description: Update per-workspace practice-review policy. Null fields unchanged;
+        'reset' clears to inherit.
+      properties:
+        cooldownMinutes:
+          type: integer
+          format: int32
+          description: Minimum minutes between reviews for the same PR; 0 disables
+            the cooldown
+          maximum: 1440
+          minimum: 0
+        deliverToMerged:
+          type: boolean
+          description: Deliver feedback to already-merged PRs/MRs
+        reset:
+          type: array
+          description: Fields to reset to the inherited fleet default
+          items:
+            type: string
+            enum:
+            - RUN_FOR_ALL_USERS
+            - SKIP_DRAFTS
+            - DELIVER_TO_MERGED
+            - COOLDOWN_MINUTES
+          uniqueItems: true
+        runForAllUsers:
+          type: boolean
+          description: Run practice review for all contributors (vs only the run_practice_review
+            role)
+        skipDrafts:
+          type: boolean
+          description: Skip practice review for draft PRs/MRs
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

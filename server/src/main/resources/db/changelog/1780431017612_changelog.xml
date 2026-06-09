@@ -1,0 +1,92 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Workspace-configurable practice detection & mentor (PR #1011 reborn).
+        Adds runtime-binding FK columns + practice-review policy overrides to workspace.
+        Columns are all-nullable with no default: null = inherit the fleet hephaestus.practice-review.*
+        property, so existing workspaces are behaviourally unchanged (zero backfill). ON DELETE SET NULL
+        is a direct-SQL backstop — the app blocks deleting a bound config with a 409.
+    -->
+
+    <changeSet author="hephaestus-1011" id="1780431017612-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace.practice_config_id already present">
+            <not><columnExists tableName="workspace" columnName="practice_config_id"/></not>
+        </preConditions>
+        <comment>AI runtime bindings + per-workspace practice-review policy (all nullable = inherit fleet default).</comment>
+        <addColumn tableName="workspace">
+            <column name="practice_config_id" type="bigint"/>
+            <column name="mentor_config_id" type="bigint"/>
+            <column name="practice_run_for_all_users" type="boolean"/>
+            <column name="practice_skip_drafts" type="boolean"/>
+            <column name="practice_deliver_to_merged" type="boolean"/>
+            <column name="practice_cooldown_minutes" type="integer"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="workspace" columnName="practice_config_id"/>
+            <dropColumn tableName="workspace" columnName="mentor_config_id"/>
+            <dropColumn tableName="workspace" columnName="practice_run_for_all_users"/>
+            <dropColumn tableName="workspace" columnName="practice_skip_drafts"/>
+            <dropColumn tableName="workspace" columnName="practice_deliver_to_merged"/>
+            <dropColumn tableName="workspace" columnName="practice_cooldown_minutes"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1011" id="1780431017612-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_workspace_practice_config already present">
+            <not><foreignKeyConstraintExists foreignKeyTableName="workspace" foreignKeyName="fk_workspace_practice_config"/></not>
+        </preConditions>
+        <comment>Bound practice-detection config FK; SET NULL on delete so a removed config degrades to fan-out.</comment>
+        <addForeignKeyConstraint
+                baseTableName="workspace"
+                baseColumnNames="practice_config_id"
+                constraintName="fk_workspace_practice_config"
+                referencedTableName="agent_config"
+                referencedColumnNames="id"
+                onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="workspace" constraintName="fk_workspace_practice_config"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1011" id="1780431017612-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_workspace_mentor_config already present">
+            <not><foreignKeyConstraintExists foreignKeyTableName="workspace" foreignKeyName="fk_workspace_mentor_config"/></not>
+        </preConditions>
+        <comment>Bound mentor config FK; SET NULL on delete so a removed config degrades to oldest-enabled fallback.</comment>
+        <addForeignKeyConstraint
+                baseTableName="workspace"
+                baseColumnNames="mentor_config_id"
+                constraintName="fk_workspace_mentor_config"
+                referencedTableName="agent_config"
+                referencedColumnNames="id"
+                onDelete="SET NULL"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="workspace" constraintName="fk_workspace_mentor_config"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-1011" id="1780431017612-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="ix_workspace_practice_config already present">
+            <not><indexExists indexName="ix_workspace_practice_config"/></not>
+        </preConditions>
+        <comment>
+            Index the FK columns. Postgres does not auto-index referencing columns, so both the
+            ON DELETE SET NULL action and the delete-guard exists-query would otherwise seq-scan
+            workspace on every agent_config delete. Partial (most workspaces inherit = NULL).
+        </comment>
+        <sql>
+            CREATE INDEX ix_workspace_practice_config ON workspace (practice_config_id) WHERE practice_config_id IS NOT NULL;
+            CREATE INDEX ix_workspace_mentor_config ON workspace (mentor_config_id) WHERE mentor_config_id IS NOT NULL;
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS ix_workspace_practice_config;</sql>
+            <sql>DROP INDEX IF EXISTS ix_workspace_mentor_config;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

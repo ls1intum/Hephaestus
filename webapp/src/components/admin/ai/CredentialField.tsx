@@ -1,0 +1,95 @@
+import { Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import type { CredentialMode } from "./utils";
+
+export interface CredentialFieldProps {
+	mode: CredentialMode;
+	/** Whether a key is already stored server-side (never revealed to the client). */
+	hasStoredKey: boolean;
+	/** The in-progress (new) key value. */
+	value: string;
+	onChange: (value: string) => void;
+	/** Request clearing the stored key (edit mode only). */
+	onClear?: () => void;
+	disabled?: boolean;
+	error?: string;
+}
+
+/**
+ * Credential input for direct-auth modes (API_KEY / OAUTH). In PROXY mode the
+ * key lives on the internal proxy and this field renders nothing. The Eye toggle
+ * only reveals what the admin is typing — the API never returns a stored key.
+ */
+export function CredentialField({
+	mode,
+	hasStoredKey,
+	value,
+	onChange,
+	onClear,
+	disabled,
+	error,
+}: CredentialFieldProps) {
+	const [revealed, setRevealed] = useState(false);
+
+	if (mode === "PROXY") {
+		return null;
+	}
+
+	const showClear = hasStoredKey && onClear !== undefined;
+
+	return (
+		<Field data-invalid={Boolean(error)}>
+			<FieldLabel htmlFor="agent-llm-key">LLM API key</FieldLabel>
+			<div className="flex items-center gap-2">
+				<div className="relative flex-1">
+					<Input
+						id="agent-llm-key"
+						type={revealed ? "text" : "password"}
+						value={value}
+						onChange={(e) => onChange(e.target.value)}
+						disabled={disabled}
+						placeholder={hasStoredKey ? "••••••••••••••••" : "Enter API key"}
+						autoComplete="off"
+						aria-invalid={Boolean(error)}
+						aria-describedby={error ? "agent-llm-key-error" : undefined}
+						className="pr-9"
+					/>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="absolute top-1/2 right-1 -translate-y-1/2"
+						onClick={() => setRevealed((r) => !r)}
+						aria-label={revealed ? "Hide key" : "Show key"}
+						disabled={disabled || value.length === 0}
+					>
+						{revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+					</Button>
+				</div>
+				{showClear && (
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={onClear}
+						disabled={disabled}
+						className="text-destructive"
+					>
+						Clear key
+					</Button>
+				)}
+			</div>
+			{hasStoredKey ? (
+				<FieldDescription>Leave blank to keep the current key.</FieldDescription>
+			) : (
+				<FieldDescription>
+					Stored encrypted; required for direct (non-proxy) authentication.
+				</FieldDescription>
+			)}
+			{error && <FieldError id="agent-llm-key-error">{error}</FieldError>}
+		</Field>
+	);
+}

@@ -68,18 +68,14 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                null,
-                "sk-key",
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                false,
-                CredentialMode.API_KEY
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(true)
+                .llmApiKey("sk-key")
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .allowInternet(false)
+                .credentialMode(CredentialMode.API_KEY)
+                .build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigCredentialModeException.class)
@@ -92,18 +88,14 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                null,
-                "oauth-token",
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                false,
-                CredentialMode.OAUTH
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(true)
+                .llmApiKey("oauth-token")
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .allowInternet(false)
+                .credentialMode(CredentialMode.OAUTH)
+                .build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigCredentialModeException.class)
@@ -117,22 +109,36 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                null,
-                "sk-key",
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                true,
-                CredentialMode.API_KEY
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(true)
+                .llmApiKey("sk-key")
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .allowInternet(true)
+                .credentialMode(CredentialMode.API_KEY)
+                .build();
 
             AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
             assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.API_KEY);
             assertThat(result.isAllowInternet()).isTrue();
+        }
+
+        @Test
+        void shouldRejectDirectModeWithoutCredential() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(true)
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .allowInternet(true)
+                .credentialMode(CredentialMode.API_KEY)
+                .build();
+
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+                .isInstanceOf(AgentConfigCredentialModeException.class)
+                .hasMessageContaining("API key");
         }
 
         @Test
@@ -141,18 +147,13 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                null,
-                null,
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                false,
-                CredentialMode.PROXY
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(true)
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .allowInternet(false)
+                .credentialMode(CredentialMode.PROXY)
+                .build();
 
             AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
             assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
@@ -165,18 +166,11 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new CreateAgentConfigRequestDTO(
-                "test",
-                true,
-                null,
-                null,
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                null,
-                null
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("test")
+                .enabled(true)
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .build();
 
             AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
             assertThat(result.getCredentialMode()).isEqualTo(CredentialMode.PROXY);
@@ -193,17 +187,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
 
-            var request = new UpdateAgentConfigRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                CredentialMode.API_KEY
-            );
+            var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
                 AgentConfigCredentialModeException.class
@@ -221,7 +205,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
 
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, false, null);
+            var request = UpdateAgentConfigRequestDTO.builder().allowInternet(false).build();
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
                 AgentConfigCredentialModeException.class
@@ -273,18 +257,16 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new CreateAgentConfigRequestDTO(
-                "my-agent",
-                true,
-                "claude-sonnet-4-20250514",
-                "sk-abc",
-                null,
-                LlmProvider.ANTHROPIC,
-                300,
-                2,
-                true,
-                null
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("my-agent")
+                .enabled(true)
+                .modelName("claude-sonnet-4-20250514")
+                .llmApiKey("sk-abc")
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .timeoutSeconds(300)
+                .maxConcurrentJobs(2)
+                .allowInternet(true)
+                .build();
 
             AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
 
@@ -302,18 +284,11 @@ class AgentConfigServiceTest extends BaseUnitTest {
         void shouldRejectDuplicateName() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
 
-            var request = new CreateAgentConfigRequestDTO(
-                "my-agent",
-                true,
-                null,
-                null,
-                null,
-                LlmProvider.ANTHROPIC,
-                null,
-                null,
-                null,
-                null
-            );
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("my-agent")
+                .enabled(true)
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .build();
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(AgentConfigNameConflictException.class)
@@ -335,17 +310,11 @@ class AgentConfigServiceTest extends BaseUnitTest {
             when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateAgentConfigRequestDTO(
-                null,
-                "gpt-4o",
-                null,
-                null,
-                LlmProvider.OPENAI,
-                120,
-                null,
-                null,
-                null
-            );
+            var request = UpdateAgentConfigRequestDTO.builder()
+                .modelName("gpt-4o")
+                .llmProvider(LlmProvider.OPENAI)
+                .timeoutSeconds(120)
+                .build();
 
             AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
 
@@ -355,10 +324,29 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldClearApiKeyWhenClearFlagSet() {
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            existing.setLlmProvider(LlmProvider.ANTHROPIC);
+            existing.setLlmApiKey("sk-existing-secret");
+
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // clearLlmApiKey wins over any provided key.
+            var request = UpdateAgentConfigRequestDTO.builder().llmApiKey("sk-ignored").clearLlmApiKey(true).build();
+
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
+
+            assertThat(result.getLlmApiKey()).isNull();
+        }
+
+        @Test
         void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
             when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 
-            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null, null);
+            var request = UpdateAgentConfigRequestDTO.builder().build();
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
                 EntityNotFoundException.class
@@ -382,6 +370,8 @@ class AgentConfigServiceTest extends BaseUnitTest {
                     eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
                 )
             ).thenReturn(0L);
+            // Workspace has no bound pointers → delete proceeds.
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             agentConfigService.deleteConfig(workspaceContext, 10L);
 
@@ -405,6 +395,29 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L))
                 .isInstanceOf(AgentConfigHasActiveJobsException.class)
                 .hasMessageContaining("2 active job(s)");
+
+            verify(agentConfigRepository, never()).delete(any());
+        }
+
+        @Test
+        void shouldRejectDeleteWhenConfigBound() {
+            AgentConfig config = new AgentConfig();
+            config.setId(10L);
+            config.setWorkspace(workspace);
+
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
+            when(
+                agentJobRepository.countByConfigIdAndStatusIn(
+                    eq(10L),
+                    eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+                )
+            ).thenReturn(0L);
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L)).isInstanceOf(
+                AgentConfigBoundException.class
+            );
 
             verify(agentConfigRepository, never()).delete(any());
         }

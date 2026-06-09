@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
+@Builder
 @Schema(
     description = "Request to update an existing agent configuration (all fields optional — null fields are not changed)"
 )
@@ -16,6 +18,8 @@ public record UpdateAgentConfigRequestDTO(
     @Schema(description = "LLM model name", example = "gpt-5.4-mini")
     String modelName,
     @Schema(description = "LLM API key (omit or null to keep existing key)") String llmApiKey,
+    @Schema(description = "Set true to remove the stored API key (takes precedence over llmApiKey)")
+    Boolean clearLlmApiKey,
     @Size(max = 512, message = "LLM base URL must not exceed 512 characters")
     @Schema(
         description = "Optional LLM base URL override (omit or null to keep existing value; " +

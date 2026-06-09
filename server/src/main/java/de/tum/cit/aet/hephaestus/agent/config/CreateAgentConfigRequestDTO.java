@@ -8,7 +8,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 
+@Builder
 @Schema(description = "Request to create a new agent configuration for a workspace")
 public record CreateAgentConfigRequestDTO(
     @NotBlank(message = "Name is required")
