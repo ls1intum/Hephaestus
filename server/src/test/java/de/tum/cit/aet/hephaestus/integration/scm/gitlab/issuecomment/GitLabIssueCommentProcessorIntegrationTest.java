@@ -26,7 +26,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * Integration tests for {@link GitLabIssueCommentProcessor#processFromSync} covering Gap 8
@@ -37,16 +36,6 @@ import org.springframework.test.context.TestPropertySource;
  * this divergence to detect edits.
  */
 @DisplayName("GitLab Issue Comment Processor — sync path")
-@TestPropertySource(
-    properties = {
-        "hephaestus.integration.gitlab.enabled=true",
-        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.integration.gitlab.connect-timeout=30s",
-        "hephaestus.integration.gitlab.read-timeout=60s",
-        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
-        "hephaestus.integration.gitlab.sync-page-delay=5m",
-    }
-)
 class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     private static final String FIXTURE_ORG_LOGIN = "hephaestustest";

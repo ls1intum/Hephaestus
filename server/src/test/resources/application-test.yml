@@ -81,6 +81,11 @@ hephaestus:
     integration:
         oauth-state:
             secret: test-oauth-state-hmac-secret-not-real
+        # Suite-wide so GitLab @ConditionalOnProperty beans load in the base context — the GitLab
+        # tests no longer need a per-class @TestPropertySource (which forked a context each).
+        gitlab:
+            enabled: true
+            default-server-url: https://gitlab.lrz.de
     webhook:
         secret: test-webhook-shared-secret-not-real
         external-url: http://localhost:8080

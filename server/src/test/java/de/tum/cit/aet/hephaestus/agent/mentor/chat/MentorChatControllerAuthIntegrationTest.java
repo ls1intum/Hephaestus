@@ -5,7 +5,6 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
-import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -34,14 +33,9 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @Autowired
     private WebTestClient webTestClient;
 
-    // The mentor beans now wire unconditionally; InteractiveSandboxService is part of the
-    // worker capability (absent in the test profile, where the worker role is off), so mock it.
-    @MockitoBean
-    private InteractiveSandboxService interactiveSandboxService;
-
-    @MockitoBean
-    private de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository agentConfigRepository;
-
+    // Only MentorChatService needs stubbing/verification here. InteractiveSandboxService (a worker
+    // capability, off in the test profile) resolves to an empty ObjectProvider, and AgentConfigRepository
+    // is a real JPA bean — neither needs a mock, and removing them shrinks this context's override set.
     @MockitoBean
     private MentorChatService mentorChatService;
 

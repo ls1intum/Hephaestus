@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -51,16 +50,6 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Tag("integration")
 @DisplayName("GitLab Milestone Message Handler")
-@TestPropertySource(
-    properties = {
-        "hephaestus.integration.gitlab.enabled=true",
-        "hephaestus.integration.gitlab.default-server-url=https://gitlab.lrz.de",
-        "hephaestus.integration.gitlab.connect-timeout=30s",
-        "hephaestus.integration.gitlab.read-timeout=60s",
-        "hephaestus.integration.gitlab.rate-limit-delay=200ms",
-        "hephaestus.integration.gitlab.sync-page-delay=5m",
-    }
-)
 class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // Fixture values from milestone.create.json
