@@ -61,8 +61,8 @@ Activity view.
 ## Browser tests (Playwright)
 
 `webapp/e2e/` holds a `@playwright/test` harness (`pnpm --filter webapp run test:e2e`) that drives the
-SPA over plain http via the dev-login. See [`webapp/e2e/README.md`](../../webapp/e2e/README.md). It uses
-the same `cookie-secure=false` + `XSRF-TOKEN` wiring this page relies on.
+SPA over plain http via the dev-login — see the `README.md` in that directory. It uses the same
+`cookie-secure=false` + `XSRF-TOKEN` wiring this page relies on.
 
 ## Caveats
 
