@@ -50,18 +50,34 @@ public class SecurityConfig {
     private final CorsProperties corsProperties;
     private final boolean devTriggerEnabled;
     private final boolean devLoginEnabled;
+    private final boolean cookieSecure;
     private final String authCookieName;
 
     public SecurityConfig(
         CorsProperties corsProperties,
+        org.springframework.core.env.Environment environment,
         @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled,
         @Value("${hephaestus.auth.dev-login-enabled:false}") boolean devLoginEnabled,
+        @Value("${hephaestus.auth.cookie-secure:true}") boolean cookieSecure,
         @Value("${hephaestus.auth.cookie-name:" + AuthProperties.DEFAULT_COOKIE_NAME + "}") String authCookieName
     ) {
+        // Fail-closed: insecure cookies (Secure off, __Host- prefix dropped) are a local-http-E2E-only
+        // affordance and must be impossible in production.
+        if (!cookieSecure && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"))) {
+            throw new IllegalStateException(
+                "hephaestus.auth.cookie-secure must NOT be false under the 'prod' profile (fail-closed)."
+            );
+        }
         this.corsProperties = corsProperties;
         this.devTriggerEnabled = devTriggerEnabled;
         this.devLoginEnabled = devLoginEnabled;
+        this.cookieSecure = cookieSecure;
         this.authCookieName = authCookieName;
+    }
+
+    /** CSRF cookie name: {@code __Host-}-prefixed in production; the prefix is dropped for local http E2E. */
+    static String csrfCookieName(boolean cookieSecure) {
+        return cookieSecure ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
     }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
@@ -312,10 +328,10 @@ public class SecurityConfig {
      * forged {@code XSRF-TOKEN} cookie onto this host and defeat the double-submit check — matching the
      * un-tossable {@code __Host-} access cookie ({@link AuthProperties#DEFAULT_COOKIE_NAME}).
      */
-    private static CookieCsrfTokenRepository csrfTokenRepository() {
+    private CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        repository.setCookieName("__Host-XSRF-TOKEN");
-        repository.setCookieCustomizer(cookie -> cookie.secure(true).path("/").sameSite("Lax"));
+        repository.setCookieName(csrfCookieName(cookieSecure));
+        repository.setCookieCustomizer(cookie -> cookie.secure(cookieSecure).path("/").sameSite("Lax"));
         return repository;
     }
 
