@@ -23,6 +23,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         GitHubIntegrationPostgresShutdown.class,
         TestAsyncConfiguration.class,
         RecordingScmEventListener.class,
+        WorkspaceEchoControllers.ScopedEchoController.class,
+        WorkspaceEchoControllers.WorkspaceContextEchoController.class,
     }
 )
 @Testcontainers

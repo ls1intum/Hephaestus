@@ -5,19 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
-import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceEchoControllers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 
-@Import(WorkspaceScopedControllerIntegrationTest.ScopedEchoController.class)
 class WorkspaceScopedControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -30,14 +22,14 @@ class WorkspaceScopedControllerIntegrationTest extends AbstractWorkspaceIntegrat
         Workspace workspace = createWorkspace("scoped-alpha", "Scoped Alpha", "alpha", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
 
-        ScopedEcho response = webTestClient
+        WorkspaceEchoControllers.ScopedEcho response = webTestClient
             .get()
             .uri("/workspaces/{workspaceSlug}/scoped-test/echo", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isOk()
-            .expectBody(ScopedEcho.class)
+            .expectBody(WorkspaceEchoControllers.ScopedEcho.class)
             .returnResult()
             .getResponseBody();
 
@@ -72,23 +64,5 @@ class WorkspaceScopedControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .exchange()
             .expectStatus()
             .isNotFound();
-    }
-
-    record ScopedEcho(String requestPath, String contextSlug, Long contextId, List<String> roles) {}
-
-    @WorkspaceScopedController
-    @RequestMapping("/scoped-test")
-    static class ScopedEchoController {
-
-        @GetMapping("/echo")
-        ResponseEntity<ScopedEcho> echo(HttpServletRequest request, WorkspaceContext context) {
-            ScopedEcho payload = new ScopedEcho(
-                request.getRequestURI(),
-                context != null ? context.slug() : null,
-                context != null ? context.id() : null,
-                context != null ? context.roles().stream().map(Enum::name).toList() : List.of()
-            );
-            return ResponseEntity.ok(payload);
-        }
     }
 }

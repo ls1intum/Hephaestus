@@ -6,28 +6,20 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceEchoControllers;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
-import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
-@Import(WorkspaceContextFilterIntegrationTest.WorkspaceContextEchoController.class)
 class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -46,7 +38,7 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         Workspace workspace = createWorkspace("alpha-space", "Alpha", "alpha", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
 
-        WorkspaceContextSnapshot response = requestContextEcho(workspace.getWorkspaceSlug());
+        WorkspaceEchoControllers.WorkspaceContextSnapshot response = requestContextEcho(workspace.getWorkspaceSlug());
 
         assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
         assertThat(response.contextId()).isEqualTo(workspace.getId());
@@ -112,8 +104,10 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         Workspace first = createWorkspace("gamma-space", "Gamma", "gamma", AccountType.ORG, owner);
         Workspace second = createWorkspace("delta-space", "Delta", "delta", AccountType.ORG, owner);
 
-        WorkspaceContextSnapshot firstResponse = requestContextEcho(first.getWorkspaceSlug());
-        WorkspaceContextSnapshot secondResponse = requestContextEcho(second.getWorkspaceSlug());
+        WorkspaceEchoControllers.WorkspaceContextSnapshot firstResponse = requestContextEcho(first.getWorkspaceSlug());
+        WorkspaceEchoControllers.WorkspaceContextSnapshot secondResponse = requestContextEcho(
+            second.getWorkspaceSlug()
+        );
 
         assertThat(firstResponse.contextSlug()).isEqualTo(first.getWorkspaceSlug());
         assertThat(secondResponse.contextSlug()).isEqualTo(second.getWorkspaceSlug());
@@ -176,13 +170,13 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         Workspace workspace = createWorkspace("public-space", "Public", "public", AccountType.ORG, owner);
         workspaceService.updatePublicVisibility(workspace.getWorkspaceSlug(), true);
 
-        WorkspaceContextSnapshot response = webTestClient
+        WorkspaceEchoControllers.WorkspaceContextSnapshot response = webTestClient
             .get()
             .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
             .exchange()
             .expectStatus()
             .isOk()
-            .expectBody(WorkspaceContextSnapshot.class)
+            .expectBody(WorkspaceEchoControllers.WorkspaceContextSnapshot.class)
             .returnResult()
             .getResponseBody();
 
@@ -318,44 +312,18 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
             });
     }
 
-    private WorkspaceContextSnapshot requestContextEcho(String slug) {
-        WorkspaceContextSnapshot response = webTestClient
+    private WorkspaceEchoControllers.WorkspaceContextSnapshot requestContextEcho(String slug) {
+        WorkspaceEchoControllers.WorkspaceContextSnapshot response = webTestClient
             .get()
             .uri("/workspaces/{workspaceSlug}/context-echo", slug)
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
             .isOk()
-            .expectBody(WorkspaceContextSnapshot.class)
+            .expectBody(WorkspaceEchoControllers.WorkspaceContextSnapshot.class)
             .returnResult()
             .getResponseBody();
 
         return Objects.requireNonNull(response, "Expected workspace context payload");
-    }
-
-    record WorkspaceContextSnapshot(String pathSlug, String contextSlug, Long contextId, List<String> roles) {}
-
-    @RestController
-    @RequestMapping("/workspaces/{workspaceSlug}/context-echo")
-    static class WorkspaceContextEchoController {
-
-        @GetMapping
-        ResponseEntity<WorkspaceContextSnapshot> echo(
-            @PathVariable String workspaceSlug,
-            WorkspaceContext workspaceContext
-        ) {
-            WorkspaceContextSnapshot snapshot;
-            if (workspaceContext == null) {
-                snapshot = new WorkspaceContextSnapshot(workspaceSlug, null, null, List.of());
-            } else {
-                snapshot = new WorkspaceContextSnapshot(
-                    workspaceSlug,
-                    workspaceContext.slug(),
-                    workspaceContext.id(),
-                    workspaceContext.roles().stream().map(Enum::name).toList()
-                );
-            }
-            return ResponseEntity.ok(snapshot);
-        }
     }
 }
