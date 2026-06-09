@@ -7,10 +7,13 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
@@ -44,18 +47,23 @@ public class DevLoginService {
     private final AccountRepository accountRepository;
     private final JwtPrincipalFactory principalFactory;
     private final HephaestusJwtIssuer jwtIssuer;
+    private final Clock clock;
+    private final Duration sessionMaxLifetime;
 
     public DevLoginService(
         AuthProperties authProperties,
         AccountRepository accountRepository,
         JwtPrincipalFactory principalFactory,
         HephaestusJwtIssuer jwtIssuer,
+        @Qualifier("authClock") Clock clock,
         Environment environment
     ) {
         this.enabled = authProperties.devLoginEnabled();
         this.accountRepository = accountRepository;
         this.principalFactory = principalFactory;
         this.jwtIssuer = jwtIssuer;
+        this.clock = clock;
+        this.sessionMaxLifetime = authProperties.sessionMaxLifetime();
 
         // acceptsProfiles (not a raw spring.profiles.active string-split) so the guard also fires when
         // prod is activated via a deploy-role GROUP alias — webhook-server/worker-node expand to include
@@ -114,6 +122,15 @@ public class DevLoginService {
             account = accountRepository.save(account);
         }
         log.info("auth.dev-login: signed in dev account id={} login={} admin={}", account.getId(), username, admin);
-        return jwtIssuer.issue(principalFactory.forAccountId(account.getId()), null, request);
+        // Parity with the OAuth success path: stamp the same absolute session ceiling so a dev session
+        // can't be silently kept alive past sessionMaxLifetime by the rolling refresh (OWASP absolute
+        // timeout). Reuses the identical issuer seam, so the token stays issued_jwt-backed and revocable.
+        return jwtIssuer.issue(
+            principalFactory.forAccountId(account.getId()),
+            /* impersonator */ null,
+            /* impersonationExpiresAt */ null,
+            clock.instant().plus(sessionMaxLifetime),
+            request
+        );
     }
 }

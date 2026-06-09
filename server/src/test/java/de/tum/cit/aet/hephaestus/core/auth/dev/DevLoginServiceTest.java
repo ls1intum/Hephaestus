@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipal;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -46,16 +48,24 @@ class DevLoginServiceTest extends BaseUnitTest {
     private DevLoginService service(boolean enabled, String... activeProfiles) {
         AuthProperties props = mock(AuthProperties.class);
         when(props.devLoginEnabled()).thenReturn(enabled);
+        when(props.sessionMaxLifetime()).thenReturn(Duration.ofHours(8));
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles(activeProfiles);
-        return new DevLoginService(props, accountRepository, principalFactory, jwtIssuer, environment);
+        return new DevLoginService(
+            props,
+            accountRepository,
+            principalFactory,
+            jwtIssuer,
+            Clock.systemUTC(),
+            environment
+        );
     }
 
     private void stubIssuer() {
         // The mocked repository returns an account with a null id (JPA would assign it), so use lenient
         // matchers: typed/anyLong matchers reject null in Mockito.
         when(principalFactory.forAccountId(any())).thenReturn(new JwtPrincipal(7L, "dev", "dev", Set.of()));
-        when(jwtIssuer.issue(any(), any(), any())).thenReturn(token);
+        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(token);
     }
 
     @Test
@@ -65,7 +75,7 @@ class DevLoginServiceTest extends BaseUnitTest {
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
         );
-        verify(jwtIssuer, never()).issue(any(), any(), any());
+        verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -97,7 +107,7 @@ class DevLoginServiceTest extends BaseUnitTest {
         verify(accountRepository).save(saved.capture());
         assertThat(saved.getValue().getPrimaryEmail()).isEqualTo("alice@dev.invalid");
         assertThat(saved.getValue().getAppRole()).isEqualTo(Account.AppRole.USER);
-        verify(jwtIssuer).issue(any(), isNull(), any());
+        verify(jwtIssuer).issue(any(), isNull(), isNull(), any(), any());
     }
 
     @Test
@@ -127,7 +137,7 @@ class DevLoginServiceTest extends BaseUnitTest {
 
         // No save: the account already exists and no promotion was requested.
         verify(accountRepository, never()).save(any());
-        verify(jwtIssuer).issue(any(), isNull(), any());
+        verify(jwtIssuer).issue(any(), isNull(), isNull(), any(), any());
     }
 
     @Test
