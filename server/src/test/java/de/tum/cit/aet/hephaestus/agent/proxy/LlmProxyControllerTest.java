@@ -37,8 +37,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         true,
         "",
         "api-key",
-        false,
-        true
+        false
     );
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -620,8 +619,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             false,
             "",
             "api-key",
-            false,
-            true
+            false
         );
 
         @Test

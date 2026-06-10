@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * constructor; callers construct positionally.
  *
  * <p><b>baseUrl trap:</b> exported as {@code OPENAI_BASE_URL} / {@code ANTHROPIC_BASE_URL} only in
- * API_KEY/OAUTH modes — PROXY mode resolves its base URL from the sandbox-injected
+ * API_KEY modes — PROXY mode resolves its base URL from the sandbox-injected
  * {@code $LLM_PROXY_URL}, so a baseUrl here would be silently shadowed.
  */
 public record PiPlanSpec(
@@ -48,7 +48,7 @@ public record PiPlanSpec(
                     throw new IllegalArgumentException("jobToken is required in PROXY mode");
                 }
             }
-            case API_KEY, OAUTH -> {
+            case API_KEY -> {
                 if (credential == null || credential.isBlank()) {
                     throw new IllegalArgumentException("credential is required in " + credentialMode + " mode");
                 }

@@ -14,6 +14,8 @@ export interface CredentialFieldProps {
 	onClear?: () => void;
 	disabled?: boolean;
 	error?: string;
+	/** Show the required marker (the proxy needs a key, so one is required on create). */
+	required?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export function CredentialField({
 	onClear,
 	disabled,
 	error,
+	required = false,
 }: CredentialFieldProps) {
 	const [revealed, setRevealed] = useState(false);
 
@@ -35,7 +38,14 @@ export function CredentialField({
 
 	return (
 		<Field data-invalid={Boolean(error)}>
-			<FieldLabel htmlFor="agent-llm-key">LLM API key</FieldLabel>
+			<FieldLabel htmlFor="agent-llm-key">
+				LLM API key
+				{required && (
+					<span className="text-destructive" aria-hidden="true">
+						{" *"}
+					</span>
+				)}
+			</FieldLabel>
 			<div className="flex items-center gap-2">
 				<div className="relative flex-1">
 					<Input

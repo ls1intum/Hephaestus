@@ -5,9 +5,9 @@
 # through the dev-login API: connect the workspace, wire the LLM runtime, create the practices, and
 # print the trigger. Idempotent — safe to re-run.
 #
-# Prereq: the app booted with the `local` profile (dev-login + cookie-secure=false +
-# gitlab-workspace-creation + dev-trigger — all on by default; see application-local.yml) and Postgres
-# reachable. See docs/contributor/e2e-testing.md.
+# Prereq: the app booted with the `local,e2e` profiles (dev-login + cookie-secure=false +
+# gitlab-workspace-creation + dev-trigger — all on in the `e2e` profile; see application-e2e.yml) and
+# Postgres reachable. See docs/contributor/e2e-testing.md.
 #
 # Usage:
 #   scripts/e2e-setup.sh --gitlab-pat glpat-… --llm-key sk-… \

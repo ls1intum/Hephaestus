@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
-import de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -25,23 +24,12 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     private static final PracticeRunnerProfile PRACTICE = new PracticeRunnerProfile();
     private static final MentorRunnerProfile MENTOR = new MentorRunnerProfile();
 
-    private static final LlmProxyProperties PROXY_PROPS = new LlmProxyProperties(
-        "https://api.anthropic.com",
-        "https://api.openai.com",
-        "Authorization",
-        true,
-        "",
-        "api-key",
-        false,
-        true
-    );
-
     private final ObjectMapper objectMapper = new ObjectMapper();
     private PiRuntimeFactory factory;
 
     @BeforeEach
     void setUp() {
-        factory = new PiRuntimeFactory(objectMapper, PROXY_PROPS);
+        factory = new PiRuntimeFactory(objectMapper);
     }
 
     private PiPlanSpec proxySpec(LlmProvider provider, String modelName) {
@@ -135,7 +123,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @ParameterizedTest(name = "{0} → defaultProvider {1}")
         @CsvSource({ "AZURE_OPENAI, azure-openai-responses", "OPENAI, openai", "ANTHROPIC, anthropic" })
         void mapsProvider(LlmProvider provider, String expected) throws Exception {
-            byte[] json = factory.buildPiSettingsJson(provider, "some-model");
+            byte[] json = factory.buildPiSettingsJson(provider, "some-model", false);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.path("defaultProvider").asString()).isEqualTo(expected);
             assertThat(root.path("defaultModel").asString()).isEqualTo("some-model");
@@ -144,7 +132,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void omitsModelAndIncludesCompaction() throws Exception {
-            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null);
+            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null, false);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.has("defaultModel")).isFalse();
             assertThat(root.path("compaction").path("enabled").asBoolean()).isTrue();

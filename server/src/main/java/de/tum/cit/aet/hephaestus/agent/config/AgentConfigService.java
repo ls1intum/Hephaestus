@@ -163,7 +163,7 @@ public class AgentConfigService {
     }
 
     /**
-     * Validates direct credential modes (API_KEY, OAUTH): they require internet access AND a stored
+     * Validates the direct credential mode (API_KEY): it requires internet access AND a stored
      * credential, since the container reaches the provider directly. Runs on both create and update;
      * on update the merged config still carries the existing key, so a kept key passes.
      */

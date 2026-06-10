@@ -35,7 +35,7 @@ export const mockConfigDisabled: AgentConfig = {
 	name: "Legacy model",
 	llmProvider: "AZURE_OPENAI",
 	modelName: "gpt-4o",
-	credentialMode: "OAUTH",
+	credentialMode: "API_KEY",
 	allowInternet: true,
 	enabled: false,
 	hasLlmApiKey: true,

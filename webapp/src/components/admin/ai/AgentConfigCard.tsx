@@ -42,9 +42,7 @@ export function AgentConfigCard({
 			<CardHeader>
 				<div className="flex items-start justify-between gap-3">
 					<div className="min-w-0 flex-1">
-						<div className="flex items-center gap-2">
-							<CardTitle className="text-base">{config.name}</CardTitle>
-						</div>
+						<CardTitle className="text-base">{config.name}</CardTitle>
 						<p className="mt-0.5 text-xs text-muted-foreground">
 							{LLM_PROVIDER_LABELS[config.llmProvider]}
 							{config.modelName ? ` · ${config.modelName}` : ""}

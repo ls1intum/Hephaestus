@@ -3538,7 +3538,6 @@ components:
           enum:
           - PROXY
           - API_KEY
-          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -4121,12 +4120,10 @@ components:
         credentialMode:
           type: string
           default: PROXY
-          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
-            \ or OAUTH (direct OAuth)"
+          description: "Authentication mode: PROXY (internal proxy) or API_KEY (direct)"
           enum:
           - PROXY
           - API_KEY
-          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -5758,12 +5755,10 @@ components:
             llmApiKey)
         credentialMode:
           type: string
-          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
-            \ or OAUTH (direct OAuth)"
+          description: "Authentication mode: PROXY (internal proxy) or API_KEY (direct)"
           enum:
           - PROXY
           - API_KEY
-          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled

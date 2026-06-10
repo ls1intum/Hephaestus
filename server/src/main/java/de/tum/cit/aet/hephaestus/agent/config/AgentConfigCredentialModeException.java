@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
  * Thrown when a credential mode configuration violates business rules: {@link CredentialMode#API_KEY}
- * and {@link CredentialMode#OAUTH} require both internet access and a stored credential, because the
- * container reaches the LLM provider directly.
+ * requires both internet access and a stored credential, because the container reaches the LLM
+ * provider directly.
  */
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class AgentConfigCredentialModeException extends RuntimeException {

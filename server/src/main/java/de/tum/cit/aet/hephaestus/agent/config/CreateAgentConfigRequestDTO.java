@@ -40,9 +40,6 @@ public record CreateAgentConfigRequestDTO(
     @Schema(description = "Maximum concurrent jobs", example = "3", minimum = "1", maximum = "10")
     Integer maxConcurrentJobs,
     @Schema(description = "Whether agent containers have internet access") Boolean allowInternet,
-    @Schema(
-        description = "Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)",
-        defaultValue = "PROXY"
-    )
+    @Schema(description = "Authentication mode: PROXY (internal proxy) or API_KEY (direct)", defaultValue = "PROXY")
     CredentialMode credentialMode
 ) {}

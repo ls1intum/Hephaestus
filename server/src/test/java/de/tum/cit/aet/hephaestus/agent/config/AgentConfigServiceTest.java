@@ -84,26 +84,6 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRejectOauthWithoutInternet() {
-            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            var request = CreateAgentConfigRequestDTO.builder()
-                .name("test")
-                .enabled(true)
-                .llmApiKey("oauth-token")
-                .llmProvider(LlmProvider.ANTHROPIC)
-                .allowInternet(false)
-                .credentialMode(CredentialMode.OAUTH)
-                .build();
-
-            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(AgentConfigCredentialModeException.class)
-                .hasMessageContaining("OAUTH")
-                .hasMessageContaining("internet");
-        }
-
-        @Test
         void shouldAcceptApiKeyWithInternet() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));

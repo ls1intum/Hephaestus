@@ -643,9 +643,9 @@ export type UpdateAgentConfigRequest = {
      */
     clearLlmApiKey?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
      */
-    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode?: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -1977,9 +1977,9 @@ export type CreateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
      */
-    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode?: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -2287,7 +2287,7 @@ export type AgentConfig = {
     /**
      * Authentication mode
      */
-    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */

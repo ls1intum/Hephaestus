@@ -16,8 +16,7 @@ class ProviderProxyConfigTest extends BaseUnitTest {
         true,
         "",
         "api-key",
-        false,
-        true
+        false
     );
 
     @Nested
@@ -87,8 +86,7 @@ class ProviderProxyConfigTest extends BaseUnitTest {
                 true,
                 "",
                 "api-key",
-                false,
-                true
+                false
             );
             var anthropicConfig = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, props);
             var openaiConfig = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, props);
@@ -110,8 +108,7 @@ class ProviderProxyConfigTest extends BaseUnitTest {
                 true,
                 "https://myresource.openai.azure.com",
                 "api-key",
-                false,
-                true
+                false
             )
         );
 

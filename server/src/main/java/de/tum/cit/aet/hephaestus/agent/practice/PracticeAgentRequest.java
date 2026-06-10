@@ -7,14 +7,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Input for {@link PracticePiAdapter#buildSandboxSpec}. PROXY mode requires {@code jobToken};
- * API_KEY/OAUTH require {@code credential}. The task prompt is carried by the
+ * API_KEY require {@code credential}. The task prompt is carried by the
  * {@code task.json} envelope written by the handler — not by this request.
  *
  * @param baseUrl optional OpenAI-compatible base URL override. {@code null} in production
  *                (the provider URL is intrinsic to the configured LLM provider). Live tests use
  *                it to point Pi at a non-default endpoint such as the TUM AET ASE gateway.
  *                Threaded through to {@link PiPlanSpec}; see {@link LlmProxyAuthShell} for the
- *                env-var semantics (only exported in API_KEY/OAUTH modes).
+ *                env-var semantics (only exported in API_KEY modes).
  */
 public record PracticeAgentRequest(
     LlmProvider llmProvider,
@@ -38,7 +38,7 @@ public record PracticeAgentRequest(
                     throw new IllegalArgumentException("jobToken is required in PROXY mode");
                 }
             }
-            case API_KEY, OAUTH -> {
+            case API_KEY -> {
                 if (credential == null || credential.isBlank()) {
                     throw new IllegalArgumentException("credential is required in " + credentialMode + " mode");
                 }

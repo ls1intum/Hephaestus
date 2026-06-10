@@ -6,11 +6,9 @@ package de.tum.cit.aet.hephaestus.agent;
  * <ul>
  *   <li>{@link #PROXY} — container routes through internal LLM proxy; no internet needed</li>
  *   <li>{@link #API_KEY} — container calls the provider directly with an API key; internet required</li>
- *   <li>{@link #OAUTH} — container calls the provider directly with an OAuth token; internet required</li>
  * </ul>
  */
 public enum CredentialMode {
     PROXY,
     API_KEY,
-    OAUTH,
 }

@@ -389,10 +389,6 @@ hephaestus:
         azure-openai-upstream-url: ${LLM_PROXY_AZURE_OPENAI_URL:}
         azure-openai-auth-header: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:api-key}
         azure-openai-use-bearer-prefix: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:false}
-        # OpenAI wire format the agent uses (both routed through this proxy): true = Chat Completions
-        # (/chat/completions — universal: OpenAI, vLLM, OpenAI-compatible gateways like Open WebUI);
-        # false = the Responses API (/responses, only where the upstream implements it).
-        openai-use-chat-completions: ${LLM_PROXY_OPENAI_USE_CHAT_COMPLETIONS:true}
 
     sandbox:
         # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
@@ -442,6 +438,15 @@ hephaestus:
             max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
             fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
             heartbeat-interval: 25s
+        # Dev convenience: seed one workspace model at startup so a fresh boot has a working
+        # agent without using the admin UI. Off by default; set enabled=true + an api-key.
+        # PROXY mode — the key is stored encrypted and injected by the LLM proxy, never the sandbox.
+        default-config:
+            enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}
+            name: ${AGENT_DEFAULT_CONFIG_NAME:Default model}
+            provider: ${AGENT_DEFAULT_CONFIG_PROVIDER:ANTHROPIC}
+            model-name: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:}
+            api-key: ${AGENT_DEFAULT_CONFIG_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION

@@ -270,7 +270,7 @@ public class AgentJobService {
 
             // Copy LLM API key — needed for all credential modes:
             // PROXY mode: proxy controller reads it to forward to upstream provider
-            // API_KEY/OAUTH mode: adapter injects it as env var into the container
+            // API_KEY mode: adapter injects it as env var into the container
             if (config.getLlmApiKey() != null) {
                 job.setLlmApiKey(config.getLlmApiKey());
             }

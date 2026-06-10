@@ -30,9 +30,13 @@ import { LLM_PROVIDER_LABELS, type LlmProvider } from "./utils";
 const PROVIDERS: LlmProvider[] = ["ANTHROPIC", "OPENAI", "AZURE_OPENAI"];
 const PROVIDER_ITEMS = PROVIDERS.map((p) => ({ value: p, label: LLM_PROVIDER_LABELS[p] }));
 
-// Models always authenticate as "API key over the in-app proxy": the key is stored server-side and the
-// LLM proxy injects it on each call, so it never reaches the sandbox and the container needs no internet.
-// (The legacy direct/internet credential modes are operator-only and not exposed here — see ADR 0006.)
+const MODEL_PLACEHOLDER: Record<LlmProvider, string> = {
+	ANTHROPIC: "e.g. claude-sonnet-4-5",
+	OPENAI: "e.g. gpt-5.4-mini",
+	AZURE_OPENAI: "e.g. gpt-5.4-mini (deployment name)",
+};
+
+// Workspace models always authenticate as "API key over the in-app proxy" — see CredentialField + ADR 0006.
 const agentConfigSchema = z.object({
 	name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
 	modelName: z.string().trim().max(200).optional(),
@@ -160,7 +164,12 @@ export function AgentConfigForm({
 		<form onSubmit={handleSubmit} className="space-y-6">
 			<FieldGroup>
 				<Field data-invalid={Boolean(errors.name)}>
-					<FieldLabel htmlFor="agent-name">Name</FieldLabel>
+					<FieldLabel htmlFor="agent-name">
+						Name{" "}
+						<span className="text-destructive" aria-hidden="true">
+							*
+						</span>
+					</FieldLabel>
 					<Input
 						id="agent-name"
 						value={form.name}
@@ -201,19 +210,22 @@ export function AgentConfigForm({
 					</Field>
 
 					<Field>
-						<FieldLabel htmlFor="agent-model">Model name</FieldLabel>
+						<FieldLabel htmlFor="agent-model">
+							Model name <span className="font-normal text-muted-foreground">(optional)</span>
+						</FieldLabel>
 						<Input
 							id="agent-model"
 							value={form.modelName}
 							onChange={(e) => set("modelName", e.target.value)}
 							disabled={isPending}
-							placeholder="e.g. claude-sonnet-4-5"
+							placeholder={MODEL_PLACEHOLDER[form.llmProvider]}
 						/>
 					</Field>
 				</div>
 
 				<CredentialField
 					hasStoredKey={config?.hasLlmApiKey ?? false}
+					required={!isEdit}
 					value={form.llmApiKey}
 					error={errors.llmApiKey}
 					onChange={(value) => set("llmApiKey", value)}

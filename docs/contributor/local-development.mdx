@@ -218,6 +218,20 @@ Empty lists = no filtering (production behavior). Non-empty = only sync matching
 Filters don't delete data – they just skip sync operations. Workspace and organization metadata is still created for all installations.
 :::
 
+### AI model (local)
+
+Practice detection and the mentor need at least one enabled model. You can add one through the admin UI (**AI → Agents**), or seed one automatically at startup so a fresh boot is ready without clicking through the UI:
+
+```bash
+# server/.env
+AGENT_DEFAULT_CONFIG_ENABLED=true
+AGENT_DEFAULT_CONFIG_PROVIDER=OPENAI          # or ANTHROPIC, AZURE_OPENAI
+AGENT_DEFAULT_CONFIG_MODEL_NAME=gpt-5.4-mini  # optional; blank = provider default
+AGENT_DEFAULT_CONFIG_API_KEY=sk-...           # required when enabled
+```
+
+The seeder runs once the default workspace exists, is idempotent (skips if a model of the same name is already present), and stores the key encrypted. Models always use the in-app LLM proxy: the key is injected by the proxy and never reaches the sandbox, so also set the upstream the proxy forwards to (`LLM_PROXY_OPENAI_URL` — any OpenAI-compatible gateway works).
+
 ### Authentication (local)
 
 Authentication is Hephaestus-native (no Keycloak — see [ADR 0017](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md)). The server federates to GitHub (and optionally GitLab — gitlab.com or a self-hosted instance) via Spring Security `oauth2Login`, then issues its own short-lived ES256 cookie-session JWT. The webapp reads `GET /user` and redirects to `/auth/login` — there is no token in the browser.

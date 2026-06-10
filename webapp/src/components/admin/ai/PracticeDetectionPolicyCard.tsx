@@ -1,4 +1,4 @@
-import { AlertCircle, Info } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type {
 	AgentConfig,
 	AiSettingsView,
@@ -150,14 +150,6 @@ export function PracticeDetectionPolicyCard({
 							Use one specific model, or run every enabled model in parallel.
 						</FieldDescription>
 					</Field>
-
-					{!hasBoundConfig && (
-						<Alert>
-							<Info />
-							<AlertTitle>No specific model selected</AlertTitle>
-							<AlertDescription>Reviews run on all enabled models.</AlertDescription>
-						</Alert>
-					)}
 
 					{boundRuntimePaused && (
 						<Alert variant="destructive">
