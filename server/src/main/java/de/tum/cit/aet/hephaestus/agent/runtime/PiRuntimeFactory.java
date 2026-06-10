@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,9 +39,18 @@ public class PiRuntimeFactory {
     static final String AGENT_RESOURCE_PREFIX = "agent/";
 
     private final ObjectMapper objectMapper;
+    private final boolean openaiUseChatCompletions;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    public PiRuntimeFactory(ObjectMapper objectMapper, LlmProxyProperties proxyProperties) {
+        this.objectMapper = objectMapper;
+        this.openaiUseChatCompletions = proxyProperties.openaiUseChatCompletions();
+    }
+
+    /** Test convenience — defaults the OpenAI wire format to Chat Completions. */
     public PiRuntimeFactory(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.openaiUseChatCompletions = true;
     }
 
     /** Build a Pi sandbox plan ready for the executor. */
@@ -53,6 +63,7 @@ public class PiRuntimeFactory {
             spec.credential(),
             spec.baseUrl(),
             spec.modelName(),
+            openaiUseChatCompletions,
             env
         );
 
@@ -60,7 +71,7 @@ public class PiRuntimeFactory {
         // calls registerProvider("hephaestus", {...}) BEFORE createAgentSession, sidestepping
         // the Pi 0.74.x race where findInitialModel runs ahead of extension loading. Settings.json
         // pins defaultProvider/defaultModel so the runner's registration is what Pi resolves to.
-        boolean useCustomProvider = useHephaestusProvider(spec);
+        boolean useCustomProvider = useHephaestusProvider(spec, openaiUseChatCompletions);
         inputFiles.put(
             WorkspaceAbi.PI_AGENT_PREFIX + "settings.json",
             buildPiSettingsJson(spec.provider(), spec.modelName(), useCustomProvider)
@@ -199,9 +210,15 @@ public class PiRuntimeFactory {
      * API_KEY/OAUTH mode with a non-blank {@code baseUrl}. PROXY mode and Azure both have their
      * own routing primitives (proxy URL injected at runtime; Azure deployment-name map).
      */
-    static boolean useHephaestusProvider(PiPlanSpec spec) {
-        if (spec.credentialMode() == CredentialMode.PROXY) return false;
+    static boolean useHephaestusProvider(PiPlanSpec spec, boolean openaiUseChatCompletions) {
         if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
+        if (spec.credentialMode() == CredentialMode.PROXY) {
+            // OpenAI over the proxy uses the native openai-completions provider when configured for Chat
+            // Completions (the universal wire format). Anthropic keeps its Messages API. Responses mode
+            // (openaiUseChatCompletions=false) falls through to Pi's built-in provider.
+            return spec.provider() == LlmProvider.OPENAI && openaiUseChatCompletions;
+        }
+        // Direct (operator/worker) mode: custom provider only when a gateway base URL is set.
         return spec.baseUrl() != null && !spec.baseUrl().isBlank();
     }
 

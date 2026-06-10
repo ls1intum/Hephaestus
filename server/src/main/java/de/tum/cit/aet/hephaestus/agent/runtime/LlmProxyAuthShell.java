@@ -42,15 +42,31 @@ public final class LlmProxyAuthShell {
         @Nullable String credential,
         @Nullable String baseUrl,
         @Nullable String modelName,
+        boolean openaiUseChatCompletions,
         Map<String, String> env
     ) {
         return switch (mode) {
-            case PROXY -> proxyMode(provider);
+            case PROXY -> proxyMode(provider, modelName, openaiUseChatCompletions, env);
             case API_KEY, OAUTH -> apiKeyMode(provider, credential, baseUrl, modelName, env);
         };
     }
 
-    private static String proxyMode(LlmProvider provider) {
+    /**
+     * Every provider here talks to the in-app LLM proxy ({@code $LLM_PROXY_URL}); the proxy injects the
+     * real key ({@code $LLM_PROXY_TOKEN} → the stored key) and forwards to the operator-configured
+     * upstream. The container needs no internet and never sees the key.
+     *
+     * <p>For OPENAI, {@code openaiUseChatCompletions=true} routes through Pi's native
+     * {@code openai-completions} provider (the universal {@code /chat/completions} format — OpenAI, vLLM,
+     * Open WebUI) via the {@code PI_HEPHAESTUS_*} vars the runner registers; {@code false} uses Pi's
+     * built-in provider (the Responses API), for upstreams that implement {@code /responses}.
+     */
+    private static String proxyMode(
+        LlmProvider provider,
+        @Nullable String modelName,
+        boolean openaiUseChatCompletions,
+        Map<String, String> env
+    ) {
         return switch (provider) {
             case AZURE_OPENAI ->
                 // Pi appends /responses to AZURE_OPENAI_BASE_URL — must end at /openai (not /openai/v1)
@@ -61,9 +77,19 @@ public final class LlmProxyAuthShell {
                 AZURE_API_VERSION +
                 "\"" +
                 " && ";
-            case OPENAI -> "export OPENAI_BASE_URL=\"$LLM_PROXY_URL\"" +
-            " OPENAI_API_KEY=\"$LLM_PROXY_TOKEN\"" +
-            " && ";
+            case OPENAI -> {
+                if (openaiUseChatCompletions) {
+                    // Native openai-completions provider over the proxy. PI_HEPHAESTUS_API_KEY carries the
+                    // per-job proxy token (NOT the real key); the proxy swaps it for the stored key.
+                    if (modelName != null && !modelName.isBlank()) {
+                        env.put("PI_HEPHAESTUS_MODEL", modelName);
+                    }
+                    yield "export PI_HEPHAESTUS_BASE_URL=\"$LLM_PROXY_URL\"" +
+                    " PI_HEPHAESTUS_API_KEY=\"$LLM_PROXY_TOKEN\"" +
+                    " && ";
+                }
+                yield "export OPENAI_BASE_URL=\"$LLM_PROXY_URL\"" + " OPENAI_API_KEY=\"$LLM_PROXY_TOKEN\"" + " && ";
+            }
             case ANTHROPIC -> "export ANTHROPIC_BASE_URL=\"$LLM_PROXY_URL\"" +
             " ANTHROPIC_API_KEY=\"$LLM_PROXY_TOKEN\"" +
             " && ";

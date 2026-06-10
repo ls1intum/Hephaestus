@@ -23,13 +23,12 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @CsvSource(
             {
                 "AZURE_OPENAI, AZURE_OPENAI_BASE_URL=\"$LLM_PROXY_URL/openai\", AZURE_OPENAI_API_KEY=\"$LLM_PROXY_TOKEN\"",
-                "OPENAI,       OPENAI_BASE_URL=\"$LLM_PROXY_URL\",              OPENAI_API_KEY=\"$LLM_PROXY_TOKEN\"",
                 "ANTHROPIC,    ANTHROPIC_BASE_URL=\"$LLM_PROXY_URL\",           ANTHROPIC_API_KEY=\"$LLM_PROXY_TOKEN\"",
             }
         )
         void bridgesProxyEnv(LlmProvider provider, String expectedBaseUrl, String expectedApiKey) {
             Map<String, String> env = new HashMap<>();
-            String script = LlmProxyAuthShell.build(CredentialMode.PROXY, provider, null, null, null, env);
+            String script = LlmProxyAuthShell.build(CredentialMode.PROXY, provider, null, null, null, true, env);
             assertThat(script).contains(expectedBaseUrl).contains(expectedApiKey).endsWith(" && ");
             assertThat(env).isEmpty();
         }
@@ -43,9 +42,52 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                true,
                 env
             );
             assertThat(script).contains("AZURE_OPENAI_API_VERSION=\"2025-04-01-preview\"");
+        }
+
+        @Test
+        @DisplayName("OpenAI Chat Completions (default) routes the hephaestus provider through the proxy")
+        void openaiChatCompletionsOverProxy() {
+            Map<String, String> env = new HashMap<>();
+            String script = LlmProxyAuthShell.build(
+                CredentialMode.PROXY,
+                LlmProvider.OPENAI,
+                null,
+                null,
+                "openai/gpt-oss-120b",
+                true,
+                env
+            );
+            // The provider points at the proxy; the token (not the real key) is the auth — the proxy swaps it.
+            assertThat(script)
+                .contains("PI_HEPHAESTUS_BASE_URL=\"$LLM_PROXY_URL\"")
+                .contains("PI_HEPHAESTUS_API_KEY=\"$LLM_PROXY_TOKEN\"")
+                .doesNotContain("OPENAI_API_KEY")
+                .endsWith(" && ");
+            assertThat(env).containsEntry("PI_HEPHAESTUS_MODEL", "openai/gpt-oss-120b");
+        }
+
+        @Test
+        @DisplayName("OpenAI Responses mode uses Pi's built-in provider over the proxy")
+        void openaiResponsesOverProxy() {
+            Map<String, String> env = new HashMap<>();
+            String script = LlmProxyAuthShell.build(
+                CredentialMode.PROXY,
+                LlmProvider.OPENAI,
+                null,
+                null,
+                "gpt-4o",
+                false,
+                env
+            );
+            assertThat(script)
+                .contains("OPENAI_BASE_URL=\"$LLM_PROXY_URL\"")
+                .contains("OPENAI_API_KEY=\"$LLM_PROXY_TOKEN\"")
+                .doesNotContain("PI_HEPHAESTUS");
+            assertThat(env).isEmpty();
         }
     }
 
@@ -61,6 +103,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 "secret-key",
                 null,
                 null,
+                true,
                 env
             );
             assertThat(env).doesNotContainKey("AZURE_OPENAI_API_KEY");
@@ -71,7 +114,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @CsvSource({ "OPENAI, OPENAI_API_KEY", "ANTHROPIC, ANTHROPIC_API_KEY" })
         void nonAzureKeyInEnvMap(LlmProvider provider, String envVar) {
             Map<String, String> env = new HashMap<>();
-            String script = LlmProxyAuthShell.build(CredentialMode.API_KEY, provider, "sk-test", null, null, env);
+            String script = LlmProxyAuthShell.build(CredentialMode.API_KEY, provider, "sk-test", null, null, true, env);
             assertThat(env).containsEntry(envVar, "sk-test");
             assertThat(script).isEmpty();
         }
@@ -85,6 +128,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 "sk-oauth",
                 null,
                 null,
+                true,
                 env
             );
             assertThat(env).containsEntry("OPENAI_API_KEY", "sk-oauth");
@@ -95,7 +139,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         void nullCredentialThrows() {
             Map<String, String> env = new HashMap<>();
             assertThatThrownBy(() ->
-                LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, null, null, null, env)
+                LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, null, null, null, true, env)
             ).isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -108,11 +152,9 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
 
         @Test
         void openaiBaseUrlExported() {
-            // Pi does NOT read OPENAI_BASE_URL natively. The base URL is consumed by the
-            // hephaestus provider extension via PI_HEPHAESTUS_BASE_URL / PI_HEPHAESTUS_API_KEY.
-            // Critically, OPENAI_API_KEY must NOT also be set — Pi's built-in OpenAI provider
-            // would auto-activate against api.openai.com and win resolution, sending the
-            // gateway key to OpenAI (silent 401 against the wrong host).
+            // Direct mode with a gateway base URL: the hephaestus provider extension reads the creds.
+            // Critically OPENAI_API_KEY must NOT also be set — Pi's built-in provider would auto-activate
+            // against api.openai.com and win resolution (silent 401 against the wrong host).
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(
                 CredentialMode.API_KEY,
@@ -120,6 +162,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 "sk-test",
                 "https://gpu.example.com/api",
                 "openai/gpt-oss-120b",
+                true,
                 env
             );
             assertThat(env)
@@ -139,6 +182,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 "sk-test",
                 "https://proxy.example.com",
                 "claude-test",
+                true,
                 env
             );
             assertThat(env)
@@ -151,7 +195,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @Test
         void blankBaseUrlSkipped() {
             Map<String, String> env = new HashMap<>();
-            LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", "   ", null, env);
+            LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", "   ", null, true, env);
             assertThat(env)
                 .doesNotContainKey("PI_HEPHAESTUS_BASE_URL")
                 .doesNotContainKey("PI_HEPHAESTUS_API_KEY")
@@ -161,7 +205,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         @Test
         void nullBaseUrlOmitsHephaestusVars() {
             Map<String, String> env = new HashMap<>();
-            LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", null, null, env);
+            LlmProxyAuthShell.build(CredentialMode.API_KEY, LlmProvider.OPENAI, "sk-test", null, null, true, env);
             assertThat(env)
                 .containsEntry("OPENAI_API_KEY", "sk-test")
                 .doesNotContainKey("PI_HEPHAESTUS_BASE_URL")
@@ -169,7 +213,8 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
         }
 
         @Test
-        void proxyModeDoesNotWriteHephaestusVars() {
+        @DisplayName("Responses proxy mode ignores any base URL (built-in provider, no hephaestus vars)")
+        void proxyResponsesModeIgnoresBaseUrl() {
             Map<String, String> env = new HashMap<>();
             LlmProxyAuthShell.build(
                 CredentialMode.PROXY,
@@ -177,6 +222,7 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
                 null,
                 "https://ignored.example.com",
                 "ignored-model",
+                false,
                 env
             );
             assertThat(env)

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -24,12 +25,23 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     private static final PracticeRunnerProfile PRACTICE = new PracticeRunnerProfile();
     private static final MentorRunnerProfile MENTOR = new MentorRunnerProfile();
 
+    private static final LlmProxyProperties PROXY_PROPS = new LlmProxyProperties(
+        "https://api.anthropic.com",
+        "https://api.openai.com",
+        "Authorization",
+        true,
+        "",
+        "api-key",
+        false,
+        true
+    );
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private PiRuntimeFactory factory;
 
     @BeforeEach
     void setUp() {
-        factory = new PiRuntimeFactory(objectMapper);
+        factory = new PiRuntimeFactory(objectMapper, PROXY_PROPS);
     }
 
     private PiPlanSpec proxySpec(LlmProvider provider, String modelName) {

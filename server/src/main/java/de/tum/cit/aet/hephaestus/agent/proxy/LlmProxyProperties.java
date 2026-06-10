@@ -24,5 +24,12 @@ public record LlmProxyProperties(
     @DefaultValue("true") boolean openaiUseBearerPrefix,
     @DefaultValue("") String azureOpenaiUpstreamUrl,
     @DefaultValue("api-key") String azureOpenaiAuthHeader,
-    @DefaultValue("false") boolean azureOpenaiUseBearerPrefix
+    @DefaultValue("false") boolean azureOpenaiUseBearerPrefix,
+    /**
+     * Wire format the agent uses for the OPENAI provider, both routed through this proxy:
+     * {@code true} = Chat Completions ({@code /chat/completions}) — universal, works with OpenAI, vLLM,
+     * and OpenAI-compatible gateways like Open WebUI; {@code false} = the Responses API
+     * ({@code /responses}), only for upstreams that implement it. Default Chat Completions.
+     */
+    @DefaultValue("true") boolean openaiUseChatCompletions
 ) {}

@@ -389,6 +389,10 @@ hephaestus:
         azure-openai-upstream-url: ${LLM_PROXY_AZURE_OPENAI_URL:}
         azure-openai-auth-header: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:api-key}
         azure-openai-use-bearer-prefix: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:false}
+        # OpenAI wire format the agent uses (both routed through this proxy): true = Chat Completions
+        # (/chat/completions — universal: OpenAI, vLLM, OpenAI-compatible gateways like Open WebUI);
+        # false = the Responses API (/responses, only where the upstream implements it).
+        openai-use-chat-completions: ${LLM_PROXY_OPENAI_USE_CHAT_COMPLETIONS:true}
 
     sandbox:
         # Capability flag (not a role): worker-internal LLM proxy controller. Stays on
