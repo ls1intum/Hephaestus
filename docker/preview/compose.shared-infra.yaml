@@ -77,6 +77,8 @@ services:
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
+      # prod runs forward-headers=native → ProxyTrustGuard aborts the boot unless set (Coolify ingress regex).
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
     depends_on:
       nats-server:
         condition: service_healthy

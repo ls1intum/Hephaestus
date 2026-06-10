@@ -30,6 +30,8 @@ services:
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       SENTRY_DSN: ${SENTRY_DSN}
+      # forward-headers=native (application-prod.yml) → ProxyTrustGuard fails the boot unless pinned.
+      HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
     depends_on:
       nats-server:
         condition: service_healthy
@@ -42,13 +44,14 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.middlewares.gzip.compress=true"
-      - "traefik.http.middlewares.https-webhook-server-stripprefix.stripprefix.prefixes=/webhooks"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-webhook-server.entryPoints=http"
       - "traefik.http.routers.http-webhook-server.middlewares=redirect-to-https"
       - "traefik.http.routers.http-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-server.entryPoints=https"
-      - "traefik.http.routers.https-webhook-server.middlewares=https-webhook-server-stripprefix,gzip"
+      # No stripprefix: the receiver owns the full "/webhooks/{kind}" path (controller + payload-size
+      # filter + security chain all bind to /webhooks/**). Stripping it would 404 every delivery.
+      - "traefik.http.routers.https-webhook-server.middlewares=gzip"
       - "traefik.http.routers.https-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webhook-server.tls=true"
