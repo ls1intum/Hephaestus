@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,8 +25,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Immutable;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -44,7 +41,9 @@ import org.jspecify.annotations.Nullable;
  * on read and persist only {@code FeedbackInteraction} engagement; the conversational mentor consumes
  * feedback as context and is not a delivery (its turns live in the session transcript).
  *
- * <p>The findings bundled into this delivery are linked many-to-many via {@link FeedbackDeliveryFinding}.
+ * <p>The findings rendered in this delivery are linked via {@link FeedbackDeliveryFinding} (one row per
+ * finding, with its display role). The goal context is NOT stored here — a delivery can span goals, so
+ * the goal is derived per finding via {@code finding → practice → practiceGoal}, the single source of truth.
  */
 @Entity
 @Immutable
@@ -94,16 +93,6 @@ public class FeedbackDelivery {
     )
     @ToString.Exclude
     private User recipient;
-
-    /**
-     * Optional practice-goal context (the Phase-2 aggregation key for goal-scoped channels). NULL for
-     * PR deliveries that span goals. SET NULL if the goal is deleted (the delivery's history survives).
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "practice_goal_id", foreignKey = @ForeignKey(name = "fk_feedback_delivery_goal"))
-    @OnDelete(action = OnDeleteAction.SET_NULL)
-    @ToString.Exclude
-    private @Nullable PracticeGoal goal;
 
     /** The exact rendered text shown (SNAPSHOT — byte-exact provenance, never recomputed). */
     @NotNull

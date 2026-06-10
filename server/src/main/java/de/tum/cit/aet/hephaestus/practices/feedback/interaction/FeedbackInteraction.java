@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback.interaction;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackDelivery;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,6 +28,8 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -93,10 +97,23 @@ public class FeedbackInteraction {
     @Column(name = "target_type", nullable = false, length = 24)
     private FeedbackInteractionTarget targetType;
 
-    /** The target's id as text (heterogeneous: finding/delivery UUID, goal long, session opaque id). */
-    @NotNull
-    @Column(name = "target_ref", nullable = false, length = 64)
-    private String targetRef;
+    /** Typed FK when {@link #targetType} is FINDING — the high-value join ("was this finding's note resolved?"). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "finding_id", foreignKey = @ForeignKey(name = "fk_feedback_interaction_finding"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @ToString.Exclude
+    private @Nullable PracticeFinding finding;
+
+    /** Typed FK when {@link #targetType} is DELIVERY. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_id", foreignKey = @ForeignKey(name = "fk_feedback_interaction_delivery"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @ToString.Exclude
+    private @Nullable FeedbackDelivery delivery;
+
+    /** Opaque id for targets with no table (PRACTICE_GOAL id, DASHBOARD_SESSION / MENTOR_SESSION). */
+    @Column(name = "target_ref", length = 64)
+    private @Nullable String targetRef;
 
     /** Free-form event detail (dwell ms, emoji, session id, turn ref). */
     @JdbcTypeCode(SqlTypes.JSON)

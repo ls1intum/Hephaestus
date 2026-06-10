@@ -46,7 +46,11 @@ import tools.jackson.databind.JsonNode;
         name = "uk_practice_workspace_slug",
         columnNames = { "workspace_id", "slug" }
     ),
-    indexes = @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active")
+    indexes = {
+        @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
+        // Goal-scoped reads (Reflection/Facilitator dashboards) join finding→practice→goal; index the FK.
+        @Index(name = "idx_practice_practice_goal", columnList = "practice_goal_id"),
+    }
 )
 @Getter
 @Setter

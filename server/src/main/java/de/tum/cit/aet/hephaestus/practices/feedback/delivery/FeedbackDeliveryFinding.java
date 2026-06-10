@@ -26,10 +26,13 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 /**
- * Many-to-many link between a {@link FeedbackDelivery} (one message bundles many findings) and a
- * {@link PracticeFinding} (one finding recurs across channels and across re-posts over time). This
- * join is the analytic backbone connecting "what was delivered" to "what was found" to (via
- * {@code FindingReaction}) "what the contributor did about it".
+ * Link rows of a {@link FeedbackDelivery} to the {@link PracticeFinding}s it rendered, with each
+ * finding's display role. A delivery bundles many findings; within one delivery a finding appears at
+ * most once (enforced by the unique constraint), so this is effectively a 1:N child of the delivery —
+ * recurrence across re-reviews is a new finding row + a new delivery in the {@code supersedes} chain,
+ * never a second link here. Progress queries must therefore {@code COUNT(DISTINCT finding_id)} across
+ * the supersedes chain. This is the analytic backbone connecting "what was delivered" to "what was
+ * found" to (via {@code FindingReaction}) "what the contributor did about it".
  */
 @Entity
 @Immutable

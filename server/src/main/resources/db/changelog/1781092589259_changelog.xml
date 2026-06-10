@@ -167,7 +167,6 @@
             <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="channel" type="VARCHAR(32)"><constraints nullable="false"/></column>
             <column name="recipient_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="practice_goal_id" type="BIGINT"/>
             <column name="rendered_body" type="TEXT"><constraints nullable="false"/></column>
             <column name="composer_version" type="VARCHAR(64)"/>
             <column name="external_ref" type="VARCHAR(255)"/>
@@ -187,8 +186,6 @@
             constraintName="fk_feedback_delivery_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
         <addForeignKeyConstraint baseTableName="feedback_delivery" baseColumnNames="recipient_id"
             constraintName="fk_feedback_delivery_recipient" referencedTableName="user" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_delivery" baseColumnNames="practice_goal_id"
-            constraintName="fk_feedback_delivery_goal" referencedTableName="practice_goal" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
         <addForeignKeyConstraint baseTableName="feedback_delivery" baseColumnNames="supersedes_id"
             constraintName="fk_feedback_delivery_supersedes" referencedTableName="feedback_delivery" referencedColumnNames="id" validate="true"/>
         <rollback><dropTable tableName="feedback_delivery"/></rollback>
@@ -226,7 +223,9 @@
             <column name="channel" type="VARCHAR(32)"><constraints nullable="false"/></column>
             <column name="verb" type="VARCHAR(24)"><constraints nullable="false"/></column>
             <column name="target_type" type="VARCHAR(24)"><constraints nullable="false"/></column>
-            <column name="target_ref" type="VARCHAR(64)"><constraints nullable="false"/></column>
+            <column name="finding_id" type="UUID"/>
+            <column name="delivery_id" type="UUID"/>
+            <column name="target_ref" type="VARCHAR(64)"/>
             <column name="metadata" type="JSONB"/>
             <column name="occurred_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
         </createTable>
@@ -240,7 +239,22 @@
             constraintName="fk_feedback_interaction_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
         <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="actor_id"
             constraintName="fk_feedback_interaction_actor" referencedTableName="user" referencedColumnNames="id" validate="true"/>
+        <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="finding_id"
+            constraintName="fk_feedback_interaction_finding" referencedTableName="practice_finding" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
+        <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="delivery_id"
+            constraintName="fk_feedback_interaction_delivery" referencedTableName="feedback_delivery" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
         <rollback><dropTable tableName="feedback_interaction"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_practice_goal already present">
+            <not><indexExists indexName="idx_practice_practice_goal"/></not>
+        </preConditions>
+        <comment>Index the goal FK: goal-scoped dashboard reads join finding→practice→goal.</comment>
+        <createIndex indexName="idx_practice_practice_goal" tableName="practice">
+            <column name="practice_goal_id"/>
+        </createIndex>
+        <rollback><dropIndex indexName="idx_practice_practice_goal" tableName="practice"/></rollback>
     </changeSet>
 
 </databaseChangeLog>

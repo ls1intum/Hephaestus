@@ -281,7 +281,6 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
         VARCHAR(32) channel "NOT NULL"
         BIGINT recipient_id FK "NOT NULL"
-        BIGINT practice_goal_id FK
         TEXT rendered_body "NOT NULL"
         VARCHAR(64) composer_version
         VARCHAR(255) external_ref
@@ -306,7 +305,9 @@ erDiagram
         VARCHAR(32) channel "NOT NULL"
         VARCHAR(24) verb "NOT NULL"
         VARCHAR(24) target_type "NOT NULL"
-        VARCHAR(64) target_ref "NOT NULL"
+        UUID finding_id FK
+        UUID delivery_id FK
+        VARCHAR(64) target_ref
         JSONB metadata
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
@@ -1046,10 +1047,11 @@ erDiagram
     DiscussionComment ||--o{ DiscussionComment : commented_on
     Workspace ||--o{ FeedbackDelivery : has
     User ||--o{ FeedbackDelivery : references
-    PracticeGoal ||--o{ FeedbackDelivery : has
     FeedbackDelivery ||--o{ FeedbackDelivery : references
     Workspace ||--o{ FeedbackInteraction : has
     User ||--o{ FeedbackInteraction : references
+    PracticeFinding ||--o{ FeedbackInteraction : references
+    FeedbackDelivery ||--o{ FeedbackInteraction : references
     PracticeFinding ||--o{ FindingReaction : has
     User ||--o{ FindingReaction : references
     User ||--o{ GitCommit : authored_by
