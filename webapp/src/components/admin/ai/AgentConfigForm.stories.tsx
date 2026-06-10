@@ -58,7 +58,8 @@ export const ValidationError: Story = {
 export const MissingKey: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await userEvent.type(canvas.getByLabelText(/^name$/i), "GPT-4o");
+		// Anchored + word boundary: matches the "Name *" label, not "Model name (optional)".
+		await userEvent.type(canvas.getByLabelText(/^name\b/i), "GPT-4o");
 		await userEvent.click(canvas.getByRole("button", { name: /create model/i }));
 		await expect(canvas.getByText(/api key is required/i)).toBeVisible();
 	},

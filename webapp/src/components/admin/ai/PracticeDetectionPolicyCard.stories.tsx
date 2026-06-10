@@ -38,7 +38,7 @@ type Story = StoryObj<typeof meta>;
 /** A specific model is selected; triggers and policy populated. */
 export const RuntimeBound: Story = {};
 
-/** No specific model selected — the all-models alert is shown. */
+/** No specific model selected — reviews run on every enabled model (the Select shows "All enabled models"). */
 export const FanOut: Story = {
 	args: {
 		settings: { ...mockAiSettings, practiceConfigId: undefined },
