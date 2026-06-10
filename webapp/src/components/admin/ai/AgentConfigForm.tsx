@@ -176,6 +176,7 @@ export function AgentConfigForm({
 						onChange={(e) => set("name", e.target.value)}
 						disabled={isPending || isEdit}
 						placeholder="e.g. Default reviewer"
+						aria-required="true"
 						aria-invalid={Boolean(errors.name)}
 						aria-describedby={errors.name ? "agent-name-error" : undefined}
 					/>

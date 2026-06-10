@@ -10,13 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Creates the {@link DefaultAgentConfigProperties}-described model in the default workspace once
- * workspaces exist ({@link WorkspacesInitializedEvent} — the same hook integration consumers use,
- * so it fires after async provisioning, never racing it). Idempotent: skips when disabled, when no
- * API key is set, when no workspace exists, or when a config of the same name is already present.
+ * workspaces exist ({@link WorkspacesInitializedEvent}). Idempotent: skips when disabled, when no
+ * API key is set, when no workspace exists, or when a config of the same name already exists.
  */
 @Component
 class DefaultAgentConfigSeeder {
@@ -41,11 +39,21 @@ class DefaultAgentConfigSeeder {
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
-    @Transactional
     public void seed() {
         if (!properties.enabled()) {
             return;
         }
+        // The publisher (WorkspaceStartupListener) calls this inline, then runs workspace activation;
+        // isolate failures so a bad seed can't abort the rest of startup. createConfig manages its own
+        // transaction, so no @Transactional is needed here.
+        try {
+            seedDefaultConfig();
+        } catch (RuntimeException e) {
+            log.error("Default agent config seeding failed; continuing startup.", e);
+        }
+    }
+
+    private void seedDefaultConfig() {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             log.warn("Default agent config enabled but hephaestus.agent.default-config.api-key is unset; skipping.");
             return;

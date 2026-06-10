@@ -56,6 +56,7 @@ export function CredentialField({
 						disabled={disabled}
 						placeholder={hasStoredKey ? "••••••••••••••••" : "Enter API key"}
 						autoComplete="off"
+						aria-required={required}
 						aria-invalid={Boolean(error)}
 						aria-describedby={error ? "agent-llm-key-error" : undefined}
 						className="pr-9"

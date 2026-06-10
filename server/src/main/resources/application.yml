@@ -438,9 +438,7 @@ hephaestus:
             max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
             fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
             heartbeat-interval: 25s
-        # Dev convenience: seed one workspace model at startup so a fresh boot has a working
-        # agent without using the admin UI. Off by default; set enabled=true + an api-key.
-        # PROXY mode — the key is stored encrypted and injected by the LLM proxy, never the sandbox.
+        # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
         default-config:
             enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}
             name: ${AGENT_DEFAULT_CONFIG_NAME:Default model}
