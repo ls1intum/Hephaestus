@@ -13,7 +13,10 @@ export interface WorkspaceFeatures {
 	leaguesEnabled: boolean;
 }
 
-export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean } {
+export function useWorkspaceFeatures(): WorkspaceFeatures & {
+	isLoading: boolean;
+	isError: boolean;
+} {
 	const { selectedSlug } = useWorkspaceStore();
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -29,6 +32,7 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean
 	return {
 		...getWorkspaceFeatures(activeWorkspace),
 		isLoading: query.isLoading,
+		isError: query.isError,
 	};
 }
 

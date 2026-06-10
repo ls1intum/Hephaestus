@@ -438,6 +438,13 @@ hephaestus:
             max-ack-pending: ${AGENT_NATS_MAX_ACK_PENDING:16}
             fetch-batch-size: ${AGENT_NATS_FETCH_BATCH_SIZE:5}
             heartbeat-interval: 25s
+        # Dev convenience: seed one workspace model at startup (off by default). See docker/.env.example.
+        default-config:
+            enabled: ${AGENT_DEFAULT_CONFIG_ENABLED:false}
+            name: ${AGENT_DEFAULT_CONFIG_NAME:Default model}
+            provider: ${AGENT_DEFAULT_CONFIG_PROVIDER:ANTHROPIC}
+            model-name: ${AGENT_DEFAULT_CONFIG_MODEL_NAME:}
+            api-key: ${AGENT_DEFAULT_CONFIG_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # WEBHOOK CONFIGURATION

@@ -7,6 +7,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +33,7 @@ class FeedbackDeliveryService {
     private final DiffNotePoster diffNotePoster;
     private final UserPreferencesRepository userPreferencesRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewProperties reviewProperties;
 
     FeedbackDeliveryService(
@@ -37,12 +41,14 @@ class FeedbackDeliveryService {
         DiffNotePoster diffNotePoster,
         UserPreferencesRepository userPreferencesRepository,
         PullRequestRepository pullRequestRepository,
+        WorkspaceRepository workspaceRepository,
         PracticeReviewProperties reviewProperties
     ) {
         this.commentPoster = commentPoster;
         this.diffNotePoster = diffNotePoster;
         this.userPreferencesRepository = userPreferencesRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.workspaceRepository = workspaceRepository;
         this.reviewProperties = reviewProperties;
     }
 
@@ -81,11 +87,19 @@ class FeedbackDeliveryService {
             log.info("Delivery suppressed: PR closed, jobId={}", job.getId());
             return;
         }
-        if (pr.getState() == Issue.State.MERGED && !reviewProperties.deliverToMerged()) {
+        // Resolve per-workspace overrides. getId() on the lazy proxy is safe outside a tx (the id is
+        // known without initialisation); the settings query then runs in its own repository tx.
+        PracticeReviewSettings settings = workspaceRepository
+            .findById(job.getWorkspace().getId())
+            .map(Workspace::getReviewSettings)
+            .orElseGet(PracticeReviewSettings::new);
+        if (
+            pr.getState() == Issue.State.MERGED && !settings.resolveDeliverToMerged(reviewProperties.deliverToMerged())
+        ) {
             log.info("Delivery suppressed: PR merged, jobId={}", job.getId());
             return;
         }
-        if (reviewProperties.skipDrafts() && pr.isDraft()) {
+        if (settings.resolveSkipDrafts(reviewProperties.skipDrafts()) && pr.isDraft()) {
             log.info("Delivery suppressed: PR is draft, jobId={}", job.getId());
             return;
         }

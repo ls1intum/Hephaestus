@@ -18,6 +18,7 @@ interface RuntimeEnvVars {
 	APPLICATION_VERSION?: string;
 	APPLICATION_CLIENT_URL?: string;
 	APPLICATION_SERVER_URL?: string;
+	XSRF_COOKIE_NAME?: string;
 	SENTRY_ENVIRONMENT?: string;
 	SENTRY_DSN?: string;
 	POSTHOG_ENABLED?: string;
@@ -35,6 +36,7 @@ const defaults: RuntimeEnvVars = {
 	APPLICATION_VERSION: "DEV",
 	APPLICATION_CLIENT_URL: "http://localhost:4200",
 	APPLICATION_SERVER_URL: "http://localhost:8080",
+	XSRF_COOKIE_NAME: "__Host-XSRF-TOKEN",
 	SENTRY_ENVIRONMENT: "local",
 	SENTRY_DSN: "https://289f1f62feeb4f70a8878dc0101825cd@sentry.ase.in.tum.de/3",
 	POSTHOG_ENABLED: "false",
@@ -53,6 +55,10 @@ const environment = {
 	version: env("APPLICATION_VERSION").replace(/^v/, "") || "DEV",
 	clientUrl: env("APPLICATION_CLIENT_URL"),
 	serverUrl: env("APPLICATION_SERVER_URL"),
+	// CSRF double-submit cookie name. `__Host-`-prefixed in production; dropped for local http E2E
+	// (the browser rejects `__Host-` cookies over http://localhost) — must match the server's
+	// hephaestus.auth.cookie-secure setting.
+	xsrfCookieName: env("XSRF_COOKIE_NAME"),
 
 	buildInfo: {
 		branch: env("GIT_BRANCH"),

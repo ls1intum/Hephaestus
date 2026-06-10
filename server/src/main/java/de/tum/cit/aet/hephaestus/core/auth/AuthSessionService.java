@@ -173,7 +173,7 @@ public class AuthSessionService {
         long maxAge = token.expiresAt().getEpochSecond() - clock.instant().getEpochSecond();
         Cookie cookie = new Cookie(properties.cookieName(), token.value());
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(properties.cookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge((int) Math.max(0, maxAge));
         cookie.setAttribute("SameSite", "Lax");
@@ -220,7 +220,7 @@ public class AuthSessionService {
     public void clearCookie(HttpServletResponse response) {
         Cookie cookie = new Cookie(properties.cookieName(), "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(properties.cookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(0);
         cookie.setAttribute("SameSite", "Lax");

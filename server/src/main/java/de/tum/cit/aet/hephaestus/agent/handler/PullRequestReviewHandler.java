@@ -129,6 +129,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put("commit_sha", submissionRequest.headRefOid());
         metadata.put("source_branch", submissionRequest.headRefName());
         metadata.put("target_branch", submissionRequest.baseRefName());
+        // The MR title + description are the sole inputs for the communication/process practices
+        // (mr-description-quality, commit-discipline) — their precompute scripts read metadata.title /
+        // metadata.body. Without these the practices silently can't evaluate.
+        metadata.put("title", pullRequestData.title());
+        metadata.put("body", pullRequestData.body());
 
         String idempotencyKey =
             "pr_review:" +

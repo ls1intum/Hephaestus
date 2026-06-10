@@ -32,4 +32,7 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
     Optional<AgentConfig> findByIdForUpdate(@Param("id") Long id);
 
     boolean existsByWorkspaceIdAndEnabledTrue(Long workspaceId);
+
+    /** Deterministic default enabled config (oldest wins) — the mentor fallback when unbound. */
+    Optional<AgentConfig> findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(Long workspaceId);
 }

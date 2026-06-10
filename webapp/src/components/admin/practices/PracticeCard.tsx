@@ -70,7 +70,7 @@ export function PracticeCard({
 							size="icon-sm"
 							render={
 								<Link
-									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+									to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
 									params={{ workspaceSlug, practiceSlug: practice.slug }}
 								/>
 							}

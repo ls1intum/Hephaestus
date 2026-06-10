@@ -880,6 +880,12 @@ erDiagram
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
         TIMESTAMPTZ leaderboard_league_cycle_at
+        BIGINT practice_config_id FK
+        BIGINT mentor_config_id FK
+        BOOLEAN practice_run_for_all_users
+        BOOLEAN practice_skip_drafts
+        BOOLEAN practice_deliver_to_merged
+        INTEGER practice_cooldown_minutes
     }
 
     WorkspaceMembership {
@@ -1021,6 +1027,8 @@ erDiagram
     User ||--o{ PullRequestReviewThread : reviewed
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
+    AgentConfig ||--o{ Workspace : practice_config_id
+    AgentConfig ||--o{ Workspace : mentor_config_id
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships

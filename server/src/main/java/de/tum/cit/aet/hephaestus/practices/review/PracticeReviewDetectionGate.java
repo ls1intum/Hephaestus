@@ -93,13 +93,7 @@ public class PracticeReviewDetectionGate {
         @NonNull String triggerEventName,
         @NonNull TriggerMode triggerMode
     ) {
-        // 1. Draft gate
-        if (properties.skipDrafts() && pullRequest.isDraft()) {
-            log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", pullRequest.getId());
-            return new GateDecision.Skip("draft PR");
-        }
-
-        // 2. Workspace resolution
+        // 1. Workspace resolution (first — per-workspace settings drive the draft gate below)
         String nameWithOwner =
             pullRequest.getRepository() != null ? pullRequest.getRepository().getNameWithOwner() : null;
         Workspace workspace = workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
@@ -110,6 +104,12 @@ public class PracticeReviewDetectionGate {
                 nameWithOwner
             );
             return new GateDecision.Skip("no workspace");
+        }
+
+        // 2. Draft gate (per-workspace skipDrafts override, falls back to the fleet property)
+        if (workspace.getReviewSettings().resolveSkipDrafts(properties.skipDrafts()) && pullRequest.isDraft()) {
+            log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", pullRequest.getId());
+            return new GateDecision.Skip("draft PR");
         }
 
         // 2a. Practices feature must be enabled for the workspace (complete block)
@@ -168,8 +168,8 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no matching practices");
         }
 
-        // 5. Run-for-all bypass: skip role check entirely
-        if (properties.runForAllUsers()) {
+        // 5. Run-for-all bypass: skip role check entirely (per-workspace override, falls back to property)
+        if (workspace.getReviewSettings().resolveRunForAllUsers(properties.runForAllUsers())) {
             log.info(
                 "Practice review gate: DETECT, reason=runForAllUsers, prId={}, matchedPractices={}",
                 pullRequest.getId(),

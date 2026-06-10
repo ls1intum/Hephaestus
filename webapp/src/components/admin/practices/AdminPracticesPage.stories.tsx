@@ -9,7 +9,7 @@ import { mockPractices } from "./storyMockData";
  */
 const meta = {
 	component: AdminPracticesPage,
-	parameters: { layout: "fullscreen" },
+	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
@@ -20,6 +20,13 @@ const meta = {
 		onDeletePractice: fn().mockResolvedValue(undefined),
 		onSetActive: fn(),
 	},
+	decorators: [
+		(Story) => (
+			<div className="mx-auto max-w-3xl">
+				<Story />
+			</div>
+		),
+	],
 } satisfies Meta<typeof AdminPracticesPage>;
 
 export default meta;
@@ -40,5 +47,14 @@ export const Loading: Story = {
 export const Empty: Story = {
 	args: {
 		practices: [],
+	},
+};
+
+/** Error state when the catalog fails to load. */
+export const LoadError: Story = {
+	args: {
+		practices: [],
+		isError: true,
+		onRetry: fn(),
 	},
 };

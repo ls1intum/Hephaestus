@@ -123,7 +123,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @ParameterizedTest(name = "{0} → defaultProvider {1}")
         @CsvSource({ "AZURE_OPENAI, azure-openai-responses", "OPENAI, openai", "ANTHROPIC, anthropic" })
         void mapsProvider(LlmProvider provider, String expected) throws Exception {
-            byte[] json = factory.buildPiSettingsJson(provider, "some-model");
+            byte[] json = factory.buildPiSettingsJson(provider, "some-model", false);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.path("defaultProvider").asString()).isEqualTo(expected);
             assertThat(root.path("defaultModel").asString()).isEqualTo("some-model");
@@ -132,7 +132,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void omitsModelAndIncludesCompaction() throws Exception {
-            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null);
+            byte[] json = factory.buildPiSettingsJson(LlmProvider.OPENAI, null, false);
             JsonNode root = objectMapper.readTree(new String(json, StandardCharsets.UTF_8));
             assertThat(root.has("defaultModel")).isFalse();
             assertThat(root.path("compaction").path("enabled").asBoolean()).isTrue();

@@ -65,6 +65,18 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        rolling refresh CANNOT extend a session past this — once it passes, the token
  *                        lapses and the user must re-authenticate (OWASP absolute timeout). Default 12h
  *                        (a long workday); raise/lower per deployment risk.
+ * @param devLoginEnabled  Enables the passwordless dev/test sign-in ({@code POST /auth/dev-login}),
+ *                        which mints a real session for an arbitrary local {@code Account} without an
+ *                        OAuth IdP — for local development and live (Playwright) E2E. Default
+ *                        {@code false}: the endpoint 404s and is invisible. FATAL at startup under the
+ *                        {@code prod} profile (fail-closed) — see {@code DevLoginService}. Never enable
+ *                        on an internet-exposed deployment.
+ * @param cookieSecure    Whether the auth + CSRF cookies carry the {@code Secure} attribute and the
+ *                        {@code __Host-} name prefix. Default {@code true} (production). Set {@code false}
+ *                        ONLY for local http E2E (Playwright over {@code http://localhost}, where the
+ *                        browser rejects {@code __Host-}/Secure cookies): the cookies drop the prefix and
+ *                        the Secure flag. FATAL at startup under the {@code prod} profile when {@code false}
+ *                        (fail-closed) — insecure cookies must be impossible in production.
  */
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
@@ -78,7 +90,9 @@ public record AuthProperties(
     @DefaultValue List<String> bootstrapAdmins,
     @DefaultValue("") String bootstrapToken,
     @DefaultValue("1h") Duration impersonationMaxLifetime,
-    @DefaultValue("12h") Duration sessionMaxLifetime
+    @DefaultValue("12h") Duration sessionMaxLifetime,
+    @DefaultValue("false") boolean devLoginEnabled,
+    @DefaultValue("true") boolean cookieSecure
 ) {
     /**
      * Null-coalesce the optional provider map so a deployment with no {@code login-providers} block (and

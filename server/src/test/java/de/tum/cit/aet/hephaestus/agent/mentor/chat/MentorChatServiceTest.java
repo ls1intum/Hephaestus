@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -41,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -89,6 +91,9 @@ class MentorChatServiceTest extends BaseUnitTest {
     AgentConfigRepository agentConfigRepository;
 
     @Mock
+    WorkspaceRepository workspaceRepository;
+
+    @Mock
     WorkspaceContextBuilder workspaceContextBuilder;
 
     @Mock
@@ -134,6 +139,7 @@ class MentorChatServiceTest extends BaseUnitTest {
             userRepository,
             chatThreadRepository,
             agentConfigRepository,
+            workspaceRepository,
             mentorProps,
             workspaceContextBuilder,
             mentorPiAdapter,
@@ -160,7 +166,9 @@ class MentorChatServiceTest extends BaseUnitTest {
         agentConfig.setLlmApiKey("test-key");
         agentConfig.setModelName("test-model");
         agentConfig.setTimeoutSeconds(600);
-        when(agentConfigRepository.findByWorkspaceId(eq(WORKSPACE_ID))).thenReturn(List.of(agentConfig));
+        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+            Optional.of(agentConfig)
+        );
 
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
@@ -232,6 +240,48 @@ class MentorChatServiceTest extends BaseUnitTest {
         // counter — without this assertion the metrics wiring is decoupled from real flow.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
         assertThat(meterRegistry.find("mentor.turn.duration").timer().count()).isEqualTo(1L);
+    }
+
+    // 1b. Mentor runtime resolution — a bound + enabled config is preferred and the workspace-scoped
+    // finder (the only real cross-tenant guard) is used; the fan-out fallback is NOT consulted.
+
+    @Test
+    void runTurn_prefersBoundEnabledMentorConfig_overFallback() throws Exception {
+        Workspace boundWs = new Workspace();
+        boundWs.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
+        AgentConfig boundConfig = new AgentConfig();
+        boundConfig.setEnabled(true);
+        boundConfig.setLlmProvider(LlmProvider.OPENAI);
+        boundConfig.setCredentialMode(CredentialMode.API_KEY);
+        boundConfig.setLlmApiKey("bound-key");
+        boundConfig.setModelName("bound-model");
+        boundConfig.setTimeoutSeconds(600);
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(boundConfig));
+
+        scheduleHappyPathResponses(sandbox).run();
+        runTurnSync();
+
+        verify(agentConfigRepository).findByIdAndWorkspaceId(99L, WORKSPACE_ID);
+        verify(agentConfigRepository, never()).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
+    }
+
+    // 1c. The deliberate asymmetry vs practice detection: a bound-but-DISABLED mentor config does NOT
+    // pause the mentor (which would block chat) — it falls back to the oldest enabled config.
+
+    @Test
+    void runTurn_fallsBackToOldestEnabled_whenBoundMentorConfigDisabled() throws Exception {
+        Workspace boundWs = new Workspace();
+        boundWs.setMentorConfigId(99L);
+        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(boundWs));
+        AgentConfig disabled = new AgentConfig();
+        disabled.setEnabled(false);
+        when(agentConfigRepository.findByIdAndWorkspaceId(99L, WORKSPACE_ID)).thenReturn(Optional.of(disabled));
+
+        scheduleHappyPathResponses(sandbox).run();
+        runTurnSync();
+
+        verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
     }
 
     // 2. Client disconnect: runner draining, abort sent, finalise still runs

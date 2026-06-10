@@ -71,13 +71,15 @@ public class JobTypeHandlerConfiguration {
         PullRequestCommentPoster commentPoster,
         DiffNotePoster diffNotePoster,
         UserPreferencesRepository userPreferencesRepository,
-        PullRequestRepository pullRequestRepository
+        PullRequestRepository pullRequestRepository,
+        WorkspaceRepository workspaceRepository
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,
             userPreferencesRepository,
             pullRequestRepository,
+            workspaceRepository,
             reviewProperties
         );
     }

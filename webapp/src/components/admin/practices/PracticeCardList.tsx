@@ -48,7 +48,12 @@ export function PracticeCardList({
 				<Button
 					variant="outline"
 					size="sm"
-					render={<Link to="/w/$workspaceSlug/admin/practices/new" params={{ workspaceSlug }} />}
+					render={
+						<Link
+							to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/new"
+							params={{ workspaceSlug }}
+						/>
+					}
 					className="mt-2"
 				>
 					Create Practice

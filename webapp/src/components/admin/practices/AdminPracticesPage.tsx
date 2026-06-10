@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { AlertCircle, Plus } from "lucide-react";
 import { useState } from "react";
 import type { Practice } from "@/api/types.gen";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -20,20 +21,24 @@ interface AdminPracticesPageProps {
 	workspaceSlug: string;
 	practices: Practice[];
 	isLoading: boolean;
+	isError?: boolean;
 	isDeleting: boolean;
 	togglingPractices: Set<string>;
 	onDeletePractice: (slug: string) => Promise<void>;
 	onSetActive: (slug: string, active: boolean) => void;
+	onRetry?: () => void;
 }
 
 export function AdminPracticesPage({
 	workspaceSlug,
 	practices,
 	isLoading,
+	isError = false,
 	isDeleting,
 	togglingPractices,
 	onDeletePractice,
 	onSetActive,
+	onRetry,
 }: AdminPracticesPageProps) {
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
 
@@ -46,30 +51,44 @@ export function AdminPracticesPage({
 	};
 
 	return (
-		<div className="container mx-auto max-w-3xl py-6">
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Manage Practices</h1>
-					<p className="text-muted-foreground">
-						Configure practice definitions for evaluating developer contributions.
-					</p>
-				</div>
+		<div>
+			<div className="mb-6 flex justify-end">
 				<Button
-					render={<Link to="/w/$workspaceSlug/admin/practices/new" params={{ workspaceSlug }} />}
+					render={
+						<Link
+							to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/new"
+							params={{ workspaceSlug }}
+						/>
+					}
 				>
 					<Plus className="mr-2 h-4 w-4" />
 					Create Practice
 				</Button>
 			</div>
 
-			<PracticeCardList
-				workspaceSlug={workspaceSlug}
-				practices={practices}
-				isLoading={isLoading}
-				togglingPractices={togglingPractices}
-				onDelete={setDeletingPractice}
-				onSetActive={onSetActive}
-			/>
+			{isError ? (
+				<Alert variant="destructive">
+					<AlertCircle />
+					<AlertTitle>Failed to load practices</AlertTitle>
+					<AlertDescription>
+						<p>The practice catalog could not be loaded.</p>
+						{onRetry && (
+							<Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
+								Retry
+							</Button>
+						)}
+					</AlertDescription>
+				</Alert>
+			) : (
+				<PracticeCardList
+					workspaceSlug={workspaceSlug}
+					practices={practices}
+					isLoading={isLoading}
+					togglingPractices={togglingPractices}
+					onDelete={setDeletingPractice}
+					onSetActive={onSetActive}
+				/>
+			)}
 
 			<AlertDialog
 				open={deletingPractice !== null}

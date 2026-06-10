@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentConfigBoundException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigCredentialModeException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigHasActiveJobsException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigNameConflictException;
@@ -29,6 +30,11 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigNameConflictException.class)
     ProblemDetail handleAgentConfigNameConflict(AgentConfigNameConflictException exception) {
         return problem(HttpStatus.CONFLICT, "Agent config name conflict", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentConfigBoundException.class)
+    ProblemDetail handleAgentConfigBound(AgentConfigBoundException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent config is bound", exception.getMessage());
     }
 
     @ExceptionHandler(AgentConfigCredentialModeException.class)
