@@ -23,6 +23,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
+    /** Practices bound to a goal (the per-goal dashboard aggregation key). */
+    List<Practice> findByWorkspaceIdAndGoalId(Long workspaceId, Long goalId);
+
     boolean existsByWorkspaceId(Long workspaceId);
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);

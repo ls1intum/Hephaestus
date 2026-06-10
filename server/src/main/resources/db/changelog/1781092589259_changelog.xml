@@ -1,0 +1,117 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Practice goals: a workspace-scoped, configurable learning-objective grouping over practices
+        (the proposal's "practice goal"). A goal is a read-model/organizing concept ONLY — it never
+        enters the detector or the finding schema. Binding is 1:N (one goal owns many practices; a
+        practice belongs to at most one goal) via practice.practice_goal_id, a real @ManyToOne FK
+        (fk_practice_goal, drift-checked) with ON DELETE SET NULL so deleting a goal unbinds — never
+        deletes — its practices. Column types mirror Hibernate ddl-auto emission (db:draft-changelog).
+    -->
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_goal table already present">
+            <not><tableExists tableName="practice_goal"/></not>
+        </preConditions>
+        <comment>Workspace-scoped practice goals (configurable learning-objective grouping over practices).</comment>
+        <createTable tableName="practice_goal">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="practice_goalPK"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="is_active" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_order" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </createTable>
+        <rollback><dropTable tableName="practice_goal"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="uk_practice_goal_workspace_slug already present">
+            <not><indexExists indexName="uk_practice_goal_workspace_slug"/></not>
+        </preConditions>
+        <comment>Slug unique per workspace; the stable key survives a name rename.</comment>
+        <addUniqueConstraint
+            tableName="practice_goal"
+            columnNames="workspace_id, slug"
+            constraintName="uk_practice_goal_workspace_slug"/>
+        <rollback>
+            <dropUniqueConstraint tableName="practice_goal" constraintName="uk_practice_goal_workspace_slug"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-3">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_goal_workspace_active already present">
+            <not><indexExists indexName="idx_practice_goal_workspace_active"/></not>
+        </preConditions>
+        <comment>Surface "findings under active goals" per workspace.</comment>
+        <createIndex indexName="idx_practice_goal_workspace_active" tableName="practice_goal">
+            <column name="workspace_id"/>
+            <column name="is_active"/>
+        </createIndex>
+        <rollback><dropIndex indexName="idx_practice_goal_workspace_active" tableName="practice_goal"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_goal_workspace already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_practice_goal_workspace"/></not>
+        </preConditions>
+        <comment>Tenancy FK. No DB cascade — the workspace purge contributor removes goals explicitly (mirrors fk_practice_workspace).</comment>
+        <addForeignKeyConstraint
+            baseTableName="practice_goal" baseColumnNames="workspace_id"
+            constraintName="fk_practice_goal_workspace"
+            referencedTableName="workspace" referencedColumnNames="id"
+            validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice_goal" constraintName="fk_practice_goal_workspace"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.practice_goal_id already present">
+            <not><columnExists tableName="practice" columnName="practice_goal_id"/></not>
+        </preConditions>
+        <comment>1:N binding column (NULL = ungrouped).</comment>
+        <addColumn tableName="practice">
+            <column name="practice_goal_id" type="BIGINT"/>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="practice_goal_id"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-6">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_goal already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_practice_goal"/></not>
+        </preConditions>
+        <comment>practice → practice_goal. ON DELETE SET NULL: deleting a goal unbinds (never deletes) its practices.</comment>
+        <addForeignKeyConstraint
+            baseTableName="practice" baseColumnNames="practice_goal_id"
+            constraintName="fk_practice_goal"
+            referencedTableName="practice_goal" referencedColumnNames="id"
+            onDelete="SET NULL" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice" constraintName="fk_practice_goal"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

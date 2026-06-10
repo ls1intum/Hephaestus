@@ -551,6 +551,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
+        BIGINT practice_goal_id FK
     }
 
     PracticeFinding {
@@ -569,6 +570,18 @@ erDiagram
         TEXT reasoning
         TEXT guidance
         TIMESTAMPTZ detected_at "NOT NULL"
+    }
+
+    PracticeGoal {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) name "NOT NULL"
+        TEXT description
+        BOOLEAN is_active "NOT NULL"
+        INTEGER display_order "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
     }
 
     Project {
@@ -949,6 +962,7 @@ erDiagram
     GitProvider ||--|| Milestone : references
     GitProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
+    Workspace ||--|| PracticeGoal : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectItem ||--|| ProjectFieldValue : has
@@ -1009,6 +1023,7 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
+    PracticeGoal ||--o{ Practice : has
     Practice ||--o{ PracticeFinding : has
     User ||--o{ PracticeFinding : references
     User ||--o{ Project : created_by

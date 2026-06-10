@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
+import de.tum.cit.aet.hephaestus.practices.PracticeGoalRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -19,22 +20,30 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @Mock
     private PracticeRepository practiceRepository;
 
+    @Mock
+    private PracticeGoalRepository practiceGoalRepository;
+
     private PracticesWorkspacePurgeAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new PracticesWorkspacePurgeAdapter(practiceFindingRepository, practiceRepository);
+        adapter = new PracticesWorkspacePurgeAdapter(
+            practiceFindingRepository,
+            practiceRepository,
+            practiceGoalRepository
+        );
     }
 
     @Test
-    void deleteWorkspaceData_deletesFindingsAndPractices() {
+    void deleteWorkspaceData_deletesFindingsPracticesAndGoals() {
         Long workspaceId = 789L;
 
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then — both deletes called (explicit finding deletion is defense-in-depth; CASCADE also handles it)
+        // Then — findings, practices, and goals are all removed (practices first so goals are unreferenced).
         verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
+        verify(practiceGoalRepository).deleteAllByWorkspaceId(workspaceId);
     }
 
     @Test

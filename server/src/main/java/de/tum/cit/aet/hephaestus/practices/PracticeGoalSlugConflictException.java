@@ -1,0 +1,23 @@
+package de.tum.cit.aet.hephaestus.practices;
+
+import java.io.Serial;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+/**
+ * Thrown when attempting to create a practice goal with a slug that already exists in the workspace.
+ */
+@ResponseStatus(HttpStatus.CONFLICT)
+public class PracticeGoalSlugConflictException extends RuntimeException {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    public PracticeGoalSlugConflictException(String message) {
+        super(message);
+    }
+
+    public PracticeGoalSlugConflictException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}

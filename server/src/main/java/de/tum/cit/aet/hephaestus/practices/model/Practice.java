@@ -22,6 +22,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
@@ -71,6 +73,18 @@ public class Practice {
 
     @Column(name = "category", length = 64)
     private String category;
+
+    /**
+     * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
+     * many practices; a practice belongs to at most one goal): the single owning bucket keeps the
+     * per-goal acted-on/total progress denominator unambiguous. Do not loosen to a join table without
+     * also switching progress math to per-(goal, practice) rows. Orthogonal to {@link #category}.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "practice_goal_id", foreignKey = @ForeignKey(name = "fk_practice_goal"))
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @ToString.Exclude
+    private PracticeGoal goal;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
