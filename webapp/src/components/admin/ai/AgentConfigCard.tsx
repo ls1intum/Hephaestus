@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { type ConfigDesignation, CREDENTIAL_MODE_LABELS, LLM_PROVIDER_LABELS } from "./utils";
+import { type ConfigDesignation, LLM_PROVIDER_LABELS } from "./utils";
 
 interface AgentConfigCardProps {
 	config: AgentConfig;
@@ -47,8 +47,7 @@ export function AgentConfigCard({
 						</div>
 						<p className="mt-0.5 text-xs text-muted-foreground">
 							{LLM_PROVIDER_LABELS[config.llmProvider]}
-							{config.modelName ? ` · ${config.modelName}` : ""} ·{" "}
-							{CREDENTIAL_MODE_LABELS[config.credentialMode]}
+							{config.modelName ? ` · ${config.modelName}` : ""}
 						</p>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">

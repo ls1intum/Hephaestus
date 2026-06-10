@@ -3,10 +3,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import type { CredentialMode } from "./utils";
 
 export interface CredentialFieldProps {
-	mode: CredentialMode;
 	/** Whether a key is already stored server-side (never revealed to the client). */
 	hasStoredKey: boolean;
 	/** The in-progress (new) key value. */
@@ -19,12 +17,11 @@ export interface CredentialFieldProps {
 }
 
 /**
- * Credential input for direct-auth modes (API_KEY / OAUTH). In PROXY mode the
- * key lives on the internal proxy and this field renders nothing. The Eye toggle
- * only reveals what the admin is typing — the API never returns a stored key.
+ * API-key input for a model. The key is stored encrypted server-side and injected by the LLM proxy on
+ * each call, so it never reaches the sandbox. The Eye toggle only reveals what the admin is typing — the
+ * API never returns a stored key.
  */
 export function CredentialField({
-	mode,
 	hasStoredKey,
 	value,
 	onChange,
@@ -33,10 +30,6 @@ export function CredentialField({
 	error,
 }: CredentialFieldProps) {
 	const [revealed, setRevealed] = useState(false);
-
-	if (mode === "PROXY") {
-		return null;
-	}
 
 	const showClear = hasStoredKey && onClear !== undefined;
 
@@ -86,7 +79,7 @@ export function CredentialField({
 				<FieldDescription>Leave blank to keep the current key.</FieldDescription>
 			) : (
 				<FieldDescription>
-					Stored encrypted; required for direct (non-proxy) authentication.
+					Stored encrypted; injected by the proxy, never sent to the sandbox.
 				</FieldDescription>
 			)}
 			{error && <FieldError id="agent-llm-key-error">{error}</FieldError>}

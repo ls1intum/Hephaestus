@@ -1,7 +1,6 @@
 import type { AgentConfig, AiSettingsView } from "@/api/types.gen";
 
-// types.gen exposes these unions only inline, so re-derive them here.
-export type CredentialMode = AgentConfig["credentialMode"];
+// types.gen exposes this union only inline, so re-derive it here.
 export type LlmProvider = AgentConfig["llmProvider"];
 
 /** How a config is wired into a workspace's AI features. */
@@ -33,26 +32,8 @@ export function deriveDesignations(
 	return map;
 }
 
-/**
- * Whether an in-progress credential input should be sent on save. PROXY never carries a key;
- * otherwise a non-empty input sets/replaces it and a blank input is a no-op (keep current —
- * clearing is the separate explicit clearLlmApiKey action).
- */
-export function shouldSendKey(args: { mode: CredentialMode; input: string }): boolean {
-	if (args.mode === "PROXY") {
-		return false;
-	}
-	return args.input.trim().length > 0;
-}
-
 export const LLM_PROVIDER_LABELS: Record<LlmProvider, string> = {
 	ANTHROPIC: "Anthropic",
 	OPENAI: "OpenAI",
 	AZURE_OPENAI: "Azure OpenAI",
-};
-
-export const CREDENTIAL_MODE_LABELS: Record<CredentialMode, string> = {
-	PROXY: "Shared proxy (no key needed)",
-	API_KEY: "API key",
-	OAUTH: "OAuth",
 };

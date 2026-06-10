@@ -25,24 +25,18 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { CredentialField } from "./CredentialField";
-import {
-	CREDENTIAL_MODE_LABELS,
-	type CredentialMode,
-	LLM_PROVIDER_LABELS,
-	type LlmProvider,
-	shouldSendKey,
-} from "./utils";
+import { LLM_PROVIDER_LABELS, type LlmProvider } from "./utils";
 
 const PROVIDERS: LlmProvider[] = ["ANTHROPIC", "OPENAI", "AZURE_OPENAI"];
-const MODES: CredentialMode[] = ["PROXY", "API_KEY", "OAUTH"];
-
 const PROVIDER_ITEMS = PROVIDERS.map((p) => ({ value: p, label: LLM_PROVIDER_LABELS[p] }));
-const MODE_ITEMS = MODES.map((m) => ({ value: m, label: CREDENTIAL_MODE_LABELS[m] }));
 
-const baseShape = {
+// Models always authenticate as "API key over the in-app proxy": the key is stored server-side and the
+// LLM proxy injects it on each call, so it never reaches the sandbox and the container needs no internet.
+// (The legacy direct/internet credential modes are operator-only and not exposed here — see ADR 0006.)
+const agentConfigSchema = z.object({
 	name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
 	modelName: z.string().trim().max(200).optional(),
-	llmBaseUrl: z.string().trim().max(500).optional(),
+	llmProvider: z.enum(["ANTHROPIC", "OPENAI", "AZURE_OPENAI"]),
 	timeoutSeconds: z
 		.number()
 		.int("Must be a whole number")
@@ -54,40 +48,12 @@ const baseShape = {
 		.min(1, "Minimum is 1")
 		.max(10, "Maximum is 10"),
 	enabled: z.boolean(),
-	llmProvider: z.enum(["ANTHROPIC", "OPENAI", "AZURE_OPENAI"]),
-};
-
-// Direct-auth modes require internet access (the container reaches the provider
-// directly); PROXY routes through the internal proxy and hides the key field.
-const agentConfigSchema = z.discriminatedUnion("credentialMode", [
-	z.object({
-		...baseShape,
-		credentialMode: z.literal("PROXY"),
-		allowInternet: z.boolean(),
-	}),
-	z.object({
-		...baseShape,
-		credentialMode: z.literal("API_KEY"),
-		allowInternet: z.literal(true, {
-			message: "Internet access is required for direct API-key auth",
-		}),
-	}),
-	z.object({
-		...baseShape,
-		credentialMode: z.literal("OAUTH"),
-		allowInternet: z.literal(true, {
-			message: "Internet access is required for direct OAuth auth",
-		}),
-	}),
-]);
+});
 
 interface FormState {
 	name: string;
 	llmProvider: LlmProvider;
 	modelName: string;
-	llmBaseUrl: string;
-	credentialMode: CredentialMode;
-	allowInternet: boolean;
 	timeoutSeconds: number;
 	maxConcurrentJobs: number;
 	enabled: boolean;
@@ -100,9 +66,6 @@ function initialState(config?: AgentConfig): FormState {
 		name: config?.name ?? "",
 		llmProvider: config?.llmProvider ?? "ANTHROPIC",
 		modelName: config?.modelName ?? "",
-		llmBaseUrl: config?.llmBaseUrl ?? "",
-		credentialMode: config?.credentialMode ?? "PROXY",
-		allowInternet: config?.allowInternet ?? false,
 		timeoutSeconds: config?.timeoutSeconds ?? 600,
 		maxConcurrentJobs: config?.maxConcurrentJobs ?? 1,
 		enabled: config?.enabled ?? true,
@@ -139,13 +102,10 @@ export function AgentConfigForm({
 		const parsed = agentConfigSchema.safeParse({
 			name: form.name,
 			modelName: form.modelName,
-			llmBaseUrl: form.llmBaseUrl,
+			llmProvider: form.llmProvider,
 			timeoutSeconds: form.timeoutSeconds,
 			maxConcurrentJobs: form.maxConcurrentJobs,
 			enabled: form.enabled,
-			llmProvider: form.llmProvider,
-			credentialMode: form.credentialMode,
-			allowInternet: form.allowInternet,
 		});
 
 		if (!parsed.success) {
@@ -158,66 +118,42 @@ export function AgentConfigForm({
 			return;
 		}
 
-		// Create mode requires an API key for direct-auth modes (edit mode keeps the
-		// existing stored key when blank).
-		if (!isEdit && form.credentialMode !== "PROXY" && form.llmApiKey.trim().length === 0) {
-			setErrors((prev) => ({
-				...prev,
-				llmApiKey: "API key is required for direct authentication.",
-			}));
+		// The proxy needs a key to inject, so one is required on create. On edit a blank field keeps the
+		// stored key (the value is never sent back to the browser).
+		if (!isEdit && form.llmApiKey.trim().length === 0) {
+			setErrors({ llmApiKey: "An API key is required." });
 			return;
 		}
 		setErrors({});
 
-		const sendKey = shouldSendKey({ mode: form.credentialMode, input: form.llmApiKey });
+		const hasKeyInput = form.llmApiKey.trim().length > 0;
 
 		if (isEdit) {
-			// Note: the update endpoint cannot rename a config (no `name` field).
+			// The update endpoint cannot rename a config (no `name` field).
 			const body: UpdateAgentConfigRequest = {
 				llmProvider: form.llmProvider,
 				modelName: form.modelName.trim() || undefined,
-				// Edit sends "" (not undefined) so blanking the field actively clears a stored base URL;
-				// create omits it (undefined) to fall back to the provider default. The asymmetry is intentional.
-				llmBaseUrl: form.llmBaseUrl.trim(),
-				credentialMode: form.credentialMode,
-				allowInternet: form.allowInternet,
 				timeoutSeconds: form.timeoutSeconds,
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,
 			};
 			if (form.clearLlmApiKey) {
 				body.clearLlmApiKey = true;
-			} else if (sendKey) {
+			} else if (hasKeyInput) {
 				body.llmApiKey = form.llmApiKey.trim();
 			}
 			onUpdate(body);
 		} else {
-			const body: CreateAgentConfigRequest = {
+			onCreate({
 				name: form.name.trim(),
 				llmProvider: form.llmProvider,
 				modelName: form.modelName.trim() || undefined,
-				llmBaseUrl: form.llmBaseUrl.trim() || undefined,
-				credentialMode: form.credentialMode,
-				allowInternet: form.allowInternet,
 				timeoutSeconds: form.timeoutSeconds,
 				maxConcurrentJobs: form.maxConcurrentJobs,
 				enabled: form.enabled,
-			};
-			if (sendKey) {
-				body.llmApiKey = form.llmApiKey.trim();
-			}
-			onCreate(body);
+				llmApiKey: form.llmApiKey.trim(),
+			});
 		}
-	};
-
-	const handleModeChange = (mode: CredentialMode) => {
-		setForm((prev) => ({
-			...prev,
-			credentialMode: mode,
-			allowInternet: mode === "PROXY" ? prev.allowInternet : true,
-			llmApiKey: mode === "PROXY" ? "" : prev.llmApiKey,
-			clearLlmApiKey: mode === "PROXY" ? false : prev.clearLlmApiKey,
-		}));
 	};
 
 	return (
@@ -276,45 +212,7 @@ export function AgentConfigForm({
 					</Field>
 				</div>
 
-				<Field>
-					<FieldLabel htmlFor="agent-base-url">Base URL</FieldLabel>
-					<Input
-						id="agent-base-url"
-						value={form.llmBaseUrl}
-						onChange={(e) => set("llmBaseUrl", e.target.value)}
-						disabled={isPending}
-						placeholder="https://gpu.example.edu/api (optional)"
-					/>
-					<FieldDescription>
-						Optional. Point to a compatible gateway instead of the provider's default.
-					</FieldDescription>
-				</Field>
-
-				<Field>
-					<FieldLabel htmlFor="agent-mode">How to authenticate</FieldLabel>
-					<Select
-						items={MODE_ITEMS}
-						value={form.credentialMode}
-						disabled={isPending}
-						onValueChange={(value) => {
-							if (value) handleModeChange(value as CredentialMode);
-						}}
-					>
-						<SelectTrigger id="agent-mode">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{MODES.map((m) => (
-								<SelectItem key={m} value={m}>
-									{CREDENTIAL_MODE_LABELS[m]}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</Field>
-
 				<CredentialField
-					mode={form.credentialMode}
 					hasStoredKey={config?.hasLlmApiKey ?? false}
 					value={form.llmApiKey}
 					error={errors.llmApiKey}
@@ -341,23 +239,6 @@ export function AgentConfigForm({
 						</Button>
 					</p>
 				)}
-
-				<Field orientation="horizontal" data-invalid={Boolean(errors.allowInternet)}>
-					<FieldContent>
-						<FieldLabel htmlFor="agent-internet">Allow internet access</FieldLabel>
-						<FieldDescription>
-							The model connects directly to the provider. Required for API key or OAuth; not needed
-							for the shared proxy.
-						</FieldDescription>
-						{errors.allowInternet && <FieldError>{errors.allowInternet}</FieldError>}
-					</FieldContent>
-					<Switch
-						id="agent-internet"
-						checked={form.allowInternet}
-						disabled={isPending || form.credentialMode !== "PROXY"}
-						onCheckedChange={(checked) => set("allowInternet", checked)}
-					/>
-				</Field>
 
 				<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 					<Field data-invalid={Boolean(errors.timeoutSeconds)}>
