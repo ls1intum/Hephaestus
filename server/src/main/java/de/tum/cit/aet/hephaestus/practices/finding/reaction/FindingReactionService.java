@@ -1,12 +1,12 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Collection;
@@ -30,17 +30,17 @@ import org.springframework.transaction.annotation.Transactional;
  * reaction, not a third party's assessment.
  *
  * <h2>Append-only semantics</h2>
- * <p>Each call to {@link #submitFeedback} creates a new row. There is no upsert.
+ * <p>Each call to {@link #submitReaction} creates a new row. There is no upsert.
  * The latest feedback per finding is the "current" state for dashboard display.
  */
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class FindingFeedbackService {
+public class FindingReactionService {
 
-    private static final Logger log = LoggerFactory.getLogger(FindingFeedbackService.class);
+    private static final Logger log = LoggerFactory.getLogger(FindingReactionService.class);
 
-    private final FindingFeedbackRepository feedbackRepository;
+    private final FindingReactionRepository reactionRepository;
     private final PracticeFindingRepository findingRepository;
     private final UserRepository userRepository;
 
@@ -55,10 +55,10 @@ public class FindingFeedbackService {
      * @throws AccessForbiddenException if the current user is not the finding's contributor
      * @throws IllegalArgumentException if DISPUTED without an explanation
      */
-    public FindingFeedbackDTO submitFeedback(
+    public FindingReactionDTO submitReaction(
         WorkspaceContext workspaceContext,
         UUID findingId,
-        CreateFindingFeedbackDTO request
+        CreateFindingReactionDTO request
     ) {
         PracticeFinding finding = findingRepository
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
@@ -70,13 +70,13 @@ public class FindingFeedbackService {
         }
 
         if (
-            request.action() == FindingFeedbackAction.DISPUTED &&
+            request.action() == FindingReactionAction.DISPUTED &&
             (request.explanation() == null || request.explanation().isBlank())
         ) {
             throw new IllegalArgumentException("Explanation is required when disputing a finding");
         }
 
-        FindingFeedback feedback = FindingFeedback.builder()
+        FindingReaction feedback = FindingReaction.builder()
             .finding(finding)
             .findingId(findingId)
             .contributor(currentUser)
@@ -85,46 +85,46 @@ public class FindingFeedbackService {
             .explanation(request.explanation())
             .build();
 
-        FindingFeedback saved = feedbackRepository.save(feedback);
+        FindingReaction saved = reactionRepository.save(feedback);
         log.info(
             "Recorded feedback: findingId={}, action={}, contributorId={}",
             findingId,
             request.action(),
             currentUser.getId()
         );
-        return FindingFeedbackDTO.from(saved);
+        return FindingReactionDTO.from(saved);
     }
 
     /**
      * Returns the latest feedback by the current user for a specific finding.
      */
     @Transactional(readOnly = true)
-    public Optional<FindingFeedbackDTO> getLatestFeedback(WorkspaceContext workspaceContext, UUID findingId) {
+    public Optional<FindingReactionDTO> getLatestReaction(WorkspaceContext workspaceContext, UUID findingId) {
         // Verify finding exists in this workspace
         findingRepository
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
-        return feedbackRepository
+        return reactionRepository
             .findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(findingId, currentUser.getId())
-            .map(FindingFeedbackDTO::from);
+            .map(FindingReactionDTO::from);
     }
 
     /**
      * Returns engagement statistics (action counts) for the current user in this workspace.
      */
     @Transactional(readOnly = true)
-    public FindingFeedbackEngagementDTO getEngagement(WorkspaceContext workspaceContext) {
+    public FindingReactionEngagementDTO getEngagement(WorkspaceContext workspaceContext) {
         var currentUser = userRepository.getCurrentUserElseThrow();
-        Map<FindingFeedbackAction, Long> counts = new EnumMap<>(FindingFeedbackAction.class);
-        feedbackRepository
+        Map<FindingReactionAction, Long> counts = new EnumMap<>(FindingReactionAction.class);
+        reactionRepository
             .countByContributorAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
             .forEach(p -> counts.put(p.getAction(), p.getCount()));
-        return new FindingFeedbackEngagementDTO(
-            counts.getOrDefault(FindingFeedbackAction.APPLIED, 0L),
-            counts.getOrDefault(FindingFeedbackAction.DISPUTED, 0L),
-            counts.getOrDefault(FindingFeedbackAction.NOT_APPLICABLE, 0L)
+        return new FindingReactionEngagementDTO(
+            counts.getOrDefault(FindingReactionAction.APPLIED, 0L),
+            counts.getOrDefault(FindingReactionAction.DISPUTED, 0L),
+            counts.getOrDefault(FindingReactionAction.NOT_APPLICABLE, 0L)
         );
     }
 
@@ -135,16 +135,16 @@ public class FindingFeedbackService {
      * @return map of findingId → latest feedback DTO
      */
     @Transactional(readOnly = true)
-    public Map<UUID, FindingFeedbackDTO> getLatestFeedbackByFindingIds(
+    public Map<UUID, FindingReactionDTO> getLatestReactionByFindingIds(
         Collection<UUID> findingIds,
         Long contributorId
     ) {
         if (findingIds.isEmpty()) {
             return Map.of();
         }
-        return feedbackRepository
+        return reactionRepository
             .findLatestByFindingIdsAndContributor(findingIds, contributorId)
             .stream()
-            .collect(Collectors.toMap(FindingFeedback::getFindingId, FindingFeedbackDTO::from));
+            .collect(Collectors.toMap(FindingReaction::getFindingId, FindingReactionDTO::from));
     }
 }

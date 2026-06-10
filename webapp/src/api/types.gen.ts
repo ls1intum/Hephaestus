@@ -1750,7 +1750,7 @@ export type GitLabGroup = {
 /**
  * Feedback engagement statistics for a contributor in a workspace
  */
-export type FindingFeedbackEngagement = {
+export type FindingReactionEngagement = {
     /**
      * Number of findings marked as applied/fixed
      */
@@ -1768,7 +1768,7 @@ export type FindingFeedbackEngagement = {
 /**
  * Contributor feedback on an AI-generated practice finding
  */
-export type FindingFeedback = {
+export type FindingReaction = {
     /**
      * The feedback action taken
      */
@@ -1957,7 +1957,7 @@ export type CreateLoginProviderRequest = {
 /**
  * Submit feedback on an AI-generated practice finding
  */
-export type CreateFindingFeedback = {
+export type CreateFindingReaction = {
     /**
      * The feedback action to record
      */
@@ -4157,7 +4157,7 @@ export type GetEngagementResponses = {
     /**
      * Engagement statistics returned
      */
-    200: FindingFeedbackEngagement;
+    200: FindingReactionEngagement;
 };
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
@@ -4234,7 +4234,7 @@ export type GetFindingResponses = {
 
 export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
 
-export type GetLatestFeedbackData = {
+export type GetLatestReactionData = {
     body?: never;
     path: {
         /**
@@ -4244,31 +4244,31 @@ export type GetLatestFeedbackData = {
         findingId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions';
 };
 
-export type GetLatestFeedbackErrors = {
+export type GetLatestReactionErrors = {
     /**
      * Finding not found in this workspace
      */
     404: unknown;
 };
 
-export type GetLatestFeedbackResponses = {
+export type GetLatestReactionResponses = {
     /**
      * Latest feedback returned
      */
-    200: FindingFeedback;
+    200: FindingReaction;
     /**
      * No feedback exists for this finding
      */
     204: void;
 };
 
-export type GetLatestFeedbackResponse = GetLatestFeedbackResponses[keyof GetLatestFeedbackResponses];
+export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
 
-export type SubmitFeedbackData = {
-    body: CreateFindingFeedback;
+export type SubmitReactionData = {
+    body: CreateFindingReaction;
     path: {
         /**
          * Workspace slug
@@ -4277,10 +4277,10 @@ export type SubmitFeedbackData = {
         findingId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions';
 };
 
-export type SubmitFeedbackErrors = {
+export type SubmitReactionErrors = {
     /**
      * Invalid request (e.g., DISPUTED without explanation)
      */
@@ -4295,14 +4295,14 @@ export type SubmitFeedbackErrors = {
     404: unknown;
 };
 
-export type SubmitFeedbackResponses = {
+export type SubmitReactionResponses = {
     /**
      * Feedback recorded
      */
-    201: FindingFeedback;
+    201: FindingReaction;
 };
 
-export type SubmitFeedbackResponse = SubmitFeedbackResponses[keyof SubmitFeedbackResponses];
+export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
 
 export type DeletePracticeData = {
     body?: never;

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -11,9 +11,9 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -31,7 +31,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 
-class FindingFeedbackServiceTest extends BaseUnitTest {
+class FindingReactionServiceTest extends BaseUnitTest {
 
     private static final Long WORKSPACE_ID = 1L;
     private static final Long CONTRIBUTOR_ID = 10L;
@@ -39,7 +39,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
     private static final UUID FINDING_ID = UUID.randomUUID();
 
     @Mock
-    private FindingFeedbackRepository feedbackRepository;
+    private FindingReactionRepository reactionRepository;
 
     @Mock
     private PracticeFindingRepository findingRepository;
@@ -48,14 +48,14 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Captor
-    private ArgumentCaptor<FindingFeedback> feedbackCaptor;
+    private ArgumentCaptor<FindingReaction> feedbackCaptor;
 
-    private FindingFeedbackService service;
+    private FindingReactionService service;
     private WorkspaceContext workspaceContext;
 
     @BeforeEach
     void setUp() {
-        service = new FindingFeedbackService(feedbackRepository, findingRepository, userRepository);
+        service = new FindingReactionService(reactionRepository, findingRepository, userRepository);
         workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, false, Set.of());
     }
 
@@ -81,22 +81,22 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
-            when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
-                FindingFeedback fb = inv.getArgument(0);
+            when(reactionRepository.save(any(FindingReaction.class))).thenAnswer(inv -> {
+                FindingReaction fb = inv.getArgument(0);
                 fb.onCreate();
                 return fb;
             });
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
-            FindingFeedbackDTO result = service.submitFeedback(workspaceContext, FINDING_ID, request);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            FindingReactionDTO result = service.submitReaction(workspaceContext, FINDING_ID, request);
 
-            assertThat(result.action()).isEqualTo(FindingFeedbackAction.APPLIED);
+            assertThat(result.action()).isEqualTo(FindingReactionAction.APPLIED);
             assertThat(result.explanation()).isNull();
 
-            verify(feedbackRepository).save(feedbackCaptor.capture());
-            FindingFeedback saved = feedbackCaptor.getValue();
+            verify(reactionRepository).save(feedbackCaptor.capture());
+            FindingReaction saved = feedbackCaptor.getValue();
             assertThat(saved.getContributorId()).isEqualTo(CONTRIBUTOR_ID);
-            assertThat(saved.getAction()).isEqualTo(FindingFeedbackAction.APPLIED);
+            assertThat(saved.getAction()).isEqualTo(FindingReactionAction.APPLIED);
         }
 
         @Test
@@ -104,16 +104,16 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
-            when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
-                FindingFeedback fb = inv.getArgument(0);
+            when(reactionRepository.save(any(FindingReaction.class))).thenAnswer(inv -> {
+                FindingReaction fb = inv.getArgument(0);
                 fb.onCreate();
                 return fb;
             });
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "The AI is wrong about this");
-            FindingFeedbackDTO result = service.submitFeedback(workspaceContext, FINDING_ID, request);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "The AI is wrong about this");
+            FindingReactionDTO result = service.submitReaction(workspaceContext, FINDING_ID, request);
 
-            assertThat(result.action()).isEqualTo(FindingFeedbackAction.DISPUTED);
+            assertThat(result.action()).isEqualTo(FindingReactionAction.DISPUTED);
             assertThat(result.explanation()).isEqualTo("The AI is wrong about this");
         }
 
@@ -122,19 +122,19 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
-            when(feedbackRepository.save(any(FindingFeedback.class))).thenAnswer(inv -> {
-                FindingFeedback fb = inv.getArgument(0);
+            when(reactionRepository.save(any(FindingReaction.class))).thenAnswer(inv -> {
+                FindingReaction fb = inv.getArgument(0);
                 fb.onCreate();
                 return fb;
             });
 
-            var request = new CreateFindingFeedbackDTO(
-                FindingFeedbackAction.NOT_APPLICABLE,
+            var request = new CreateFindingReactionDTO(
+                FindingReactionAction.NOT_APPLICABLE,
                 "Not relevant to my use case"
             );
-            FindingFeedbackDTO result = service.submitFeedback(workspaceContext, FINDING_ID, request);
+            FindingReactionDTO result = service.submitReaction(workspaceContext, FINDING_ID, request);
 
-            assertThat(result.action()).isEqualTo(FindingFeedbackAction.NOT_APPLICABLE);
+            assertThat(result.action()).isEqualTo(FindingReactionAction.NOT_APPLICABLE);
         }
 
         @Test
@@ -143,8 +143,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, null);
-            assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request))
+            var request = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, null);
+            assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Explanation is required");
         }
@@ -155,8 +155,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "   ");
-            assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request))
+            var request = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "   ");
+            assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Explanation is required");
         }
@@ -167,8 +167,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(OTHER_USER_ID));
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
-            assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request))
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request))
                 .isInstanceOf(AccessForbiddenException.class)
                 .hasMessageContaining("contributor");
         }
@@ -177,8 +177,8 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void findingNotFoundThrows() {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
-            assertThatThrownBy(() -> service.submitFeedback(workspaceContext, FINDING_ID, request)).isInstanceOf(
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }
@@ -195,22 +195,22 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
 
-            FindingFeedback feedback = FindingFeedback.builder()
+            FindingReaction feedback = FindingReaction.builder()
                 .id(UUID.randomUUID())
                 .finding(finding)
                 .findingId(FINDING_ID)
                 .contributorId(CONTRIBUTOR_ID)
-                .action(FindingFeedbackAction.APPLIED)
+                .action(FindingReactionAction.APPLIED)
                 .createdAt(Instant.now())
                 .build();
             when(
-                feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
+                reactionRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
             ).thenReturn(Optional.of(feedback));
 
-            Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
+            Optional<FindingReactionDTO> result = service.getLatestReaction(workspaceContext, FINDING_ID);
 
             assertThat(result).isPresent();
-            assertThat(result.get().action()).isEqualTo(FindingFeedbackAction.APPLIED);
+            assertThat(result.get().action()).isEqualTo(FindingReactionAction.APPLIED);
             assertThat(result.get().findingId()).isEqualTo(FINDING_ID);
         }
 
@@ -220,10 +220,10 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(
-                feedbackRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
+                reactionRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
             ).thenReturn(Optional.empty());
 
-            Optional<FindingFeedbackDTO> result = service.getLatestFeedback(workspaceContext, FINDING_ID);
+            Optional<FindingReactionDTO> result = service.getLatestReaction(workspaceContext, FINDING_ID);
 
             assertThat(result).isEmpty();
         }
@@ -232,7 +232,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void throwsWhenFindingNotInWorkspace() {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.getLatestFeedback(workspaceContext, FINDING_ID)).isInstanceOf(
+            assertThatThrownBy(() -> service.getLatestReaction(workspaceContext, FINDING_ID)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }
@@ -247,10 +247,10 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void returnsCorrectCounts() {
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
 
-            var appliedProjection = new FindingFeedbackRepository.ActionCountProjection() {
+            var appliedProjection = new FindingReactionRepository.ActionCountProjection() {
                 @Override
-                public FindingFeedbackAction getAction() {
-                    return FindingFeedbackAction.APPLIED;
+                public FindingReactionAction getAction() {
+                    return FindingReactionAction.APPLIED;
                 }
 
                 @Override
@@ -258,10 +258,10 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
                     return 3L;
                 }
             };
-            var disputedProjection = new FindingFeedbackRepository.ActionCountProjection() {
+            var disputedProjection = new FindingReactionRepository.ActionCountProjection() {
                 @Override
-                public FindingFeedbackAction getAction() {
-                    return FindingFeedbackAction.DISPUTED;
+                public FindingReactionAction getAction() {
+                    return FindingReactionAction.DISPUTED;
                 }
 
                 @Override
@@ -271,10 +271,10 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             };
 
             when(
-                feedbackRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
+                reactionRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
             ).thenReturn(List.of(appliedProjection, disputedProjection));
 
-            FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+            FindingReactionEngagementDTO result = service.getEngagement(workspaceContext);
 
             assertThat(result.applied()).isEqualTo(3L);
             assertThat(result.disputed()).isEqualTo(1L);
@@ -286,10 +286,10 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
         void returnsZerosWhenEmpty() {
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(
-                feedbackRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
+                reactionRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
             ).thenReturn(List.of());
 
-            FindingFeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+            FindingReactionEngagementDTO result = service.getEngagement(workspaceContext);
 
             assertThat(result.applied()).isZero();
             assertThat(result.disputed()).isZero();
@@ -304,7 +304,7 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
 
         @Test
         void returnsEmptyForEmptyInput() {
-            Map<UUID, FindingFeedbackDTO> result = service.getLatestFeedbackByFindingIds(List.of(), CONTRIBUTOR_ID);
+            Map<UUID, FindingReactionDTO> result = service.getLatestReactionByFindingIds(List.of(), CONTRIBUTOR_ID);
 
             assertThat(result).isEmpty();
         }
@@ -316,36 +316,36 @@ class FindingFeedbackServiceTest extends BaseUnitTest {
             PracticeFinding finding1 = PracticeFinding.builder().id(findingId1).build();
             PracticeFinding finding2 = PracticeFinding.builder().id(findingId2).build();
 
-            FindingFeedback fb1 = FindingFeedback.builder()
+            FindingReaction fb1 = FindingReaction.builder()
                 .id(UUID.randomUUID())
                 .finding(finding1)
                 .findingId(findingId1)
                 .contributorId(CONTRIBUTOR_ID)
-                .action(FindingFeedbackAction.APPLIED)
+                .action(FindingReactionAction.APPLIED)
                 .createdAt(Instant.now())
                 .build();
-            FindingFeedback fb2 = FindingFeedback.builder()
+            FindingReaction fb2 = FindingReaction.builder()
                 .id(UUID.randomUUID())
                 .finding(finding2)
                 .findingId(findingId2)
                 .contributorId(CONTRIBUTOR_ID)
-                .action(FindingFeedbackAction.DISPUTED)
+                .action(FindingReactionAction.DISPUTED)
                 .explanation("Wrong")
                 .createdAt(Instant.now())
                 .build();
 
             when(
-                feedbackRepository.findLatestByFindingIdsAndContributor(List.of(findingId1, findingId2), CONTRIBUTOR_ID)
+                reactionRepository.findLatestByFindingIdsAndContributor(List.of(findingId1, findingId2), CONTRIBUTOR_ID)
             ).thenReturn(List.of(fb1, fb2));
 
-            Map<UUID, FindingFeedbackDTO> result = service.getLatestFeedbackByFindingIds(
+            Map<UUID, FindingReactionDTO> result = service.getLatestReactionByFindingIds(
                 List.of(findingId1, findingId2),
                 CONTRIBUTOR_ID
             );
 
             assertThat(result).hasSize(2);
-            assertThat(result.get(findingId1).action()).isEqualTo(FindingFeedbackAction.APPLIED);
-            assertThat(result.get(findingId2).action()).isEqualTo(FindingFeedbackAction.DISPUTED);
+            assertThat(result.get(findingId1).action()).isEqualTo(FindingReactionAction.APPLIED);
+            assertThat(result.get(findingId2).action()).isEqualTo(FindingReactionAction.DISPUTED);
         }
     }
 }

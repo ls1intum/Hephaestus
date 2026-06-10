@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback.dto;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * Zero counts are returned as 0, not omitted.
  */
 @Schema(description = "Feedback engagement statistics for a contributor in a workspace")
-public record FindingFeedbackEngagementDTO(
+public record FindingReactionEngagementDTO(
     @Schema(description = "Number of findings marked as applied/fixed", requiredMode = Schema.RequiredMode.REQUIRED)
     long applied,
     @Schema(description = "Number of findings disputed as incorrect", requiredMode = Schema.RequiredMode.REQUIRED)

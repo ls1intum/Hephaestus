@@ -23,6 +23,12 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @Mock
     private PracticeGoalRepository practiceGoalRepository;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackDeliveryRepository feedbackDeliveryRepository;
+
+    @Mock
+    private de.tum.cit.aet.hephaestus.practices.feedback.interaction.FeedbackInteractionRepository feedbackInteractionRepository;
+
     private PracticesWorkspacePurgeAdapter adapter;
 
     @BeforeEach
@@ -30,17 +36,21 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         adapter = new PracticesWorkspacePurgeAdapter(
             practiceFindingRepository,
             practiceRepository,
-            practiceGoalRepository
+            practiceGoalRepository,
+            feedbackDeliveryRepository,
+            feedbackInteractionRepository
         );
     }
 
     @Test
-    void deleteWorkspaceData_deletesFindingsPracticesAndGoals() {
+    void deleteWorkspaceData_deletesAllPracticesData() {
         Long workspaceId = 789L;
 
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then — findings, practices, and goals are all removed (practices first so goals are unreferenced).
+        // Then — feedback, findings, practices, and goals are all removed.
+        verify(feedbackDeliveryRepository).deleteAllByWorkspaceId(workspaceId);
+        verify(feedbackInteractionRepository).deleteAllByWorkspaceId(workspaceId);
         verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
         verify(practiceGoalRepository).deleteAllByWorkspaceId(workspaceId);

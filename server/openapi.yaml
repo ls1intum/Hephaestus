@@ -52,8 +52,6 @@ tags:
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Contributor feedback on AI-generated practice findings
-  name: Finding Feedback
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
@@ -89,6 +87,8 @@ tags:
   name: Team Settings
 - description: Identity provider discovery (public)
   name: Auth discovery
+- description: Contributor feedback on AI-generated practice findings
+  name: Finding Reaction
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard:
      <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
@@ -2181,11 +2181,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingFeedbackEngagement"
+                $ref: "#/components/schemas/FindingReactionEngagement"
           description: Engagement statistics returned
       summary: Get engagement statistics
       tags:
-      - Finding Feedback
+      - Finding Reaction
   /workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}:
     get:
       description: All findings for a specific pull request within the workspace
@@ -2272,11 +2272,11 @@ paths:
       summary: Get finding detail
       tags:
       - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback:
+  /workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions:
     get:
       description: "Returns the current user's most recent feedback on the specified\
         \ finding, or 204 if none exists."
-      operationId: getLatestFeedback
+      operationId: getLatestReaction
       parameters:
       - description: Workspace slug
         in: path
@@ -2296,7 +2296,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingFeedback"
+                $ref: "#/components/schemas/FindingReaction"
           description: Latest feedback returned
         "204":
           description: No feedback exists for this finding
@@ -2304,12 +2304,12 @@ paths:
           description: Finding not found in this workspace
       summary: Get latest feedback for a finding
       tags:
-      - Finding Feedback
+      - Finding Reaction
     post:
       description: "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE)\
         \ to an AI-generated finding. Append-only: submitting again creates a new\
         \ record, preserving temporal history."
-      operationId: submitFeedback
+      operationId: submitReaction
       parameters:
       - description: Workspace slug
         in: path
@@ -2328,14 +2328,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateFindingFeedback"
+              $ref: "#/components/schemas/CreateFindingReaction"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingFeedback"
+                $ref: "#/components/schemas/FindingReaction"
           description: Feedback recorded
         "400":
           description: "Invalid request (e.g., DISPUTED without explanation)"
@@ -2345,7 +2345,7 @@ paths:
           description: Finding not found in this workspace
       summary: Submit feedback on a practice finding
       tags:
-      - Finding Feedback
+      - Finding Reaction
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -4174,7 +4174,7 @@ components:
       required:
       - llmProvider
       - name
-    CreateFindingFeedback:
+    CreateFindingReaction:
       type: object
       description: Submit feedback on an AI-generated practice finding
       properties:
@@ -4429,7 +4429,7 @@ components:
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
-    FindingFeedback:
+    FindingReaction:
       type: object
       description: Contributor feedback on an AI-generated practice finding
       properties:
@@ -4460,7 +4460,7 @@ components:
       - createdAt
       - findingId
       - id
-    FindingFeedbackEngagement:
+    FindingReactionEngagement:
       type: object
       description: Feedback engagement statistics for a contributor in a workspace
       properties:

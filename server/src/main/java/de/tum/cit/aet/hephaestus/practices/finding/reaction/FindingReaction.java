@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
@@ -37,16 +37,16 @@ import org.hibernate.annotations.OnDeleteAction;
  * a contributor previously disputed a finding, to avoid contaminating accuracy measurement.
  *
  * @see PracticeFinding for the finding being reacted to
- * @see FindingFeedbackAction for the action taxonomy
+ * @see FindingReactionAction for the action taxonomy
  */
 @Entity
 @Immutable
 @Table(
-    name = "finding_feedback",
+    name = "finding_reaction",
     indexes = {
-        @Index(name = "idx_finding_feedback_contributor_created", columnList = "contributor_id, created_at DESC"),
+        @Index(name = "idx_finding_reaction_contributor_created", columnList = "contributor_id, created_at DESC"),
         @Index(
-            name = "idx_finding_feedback_finding_contributor",
+            name = "idx_finding_reaction_finding_contributor",
             columnList = "finding_id, contributor_id, created_at DESC"
         ),
     }
@@ -55,7 +55,7 @@ import org.hibernate.annotations.OnDeleteAction;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FindingFeedback {
+public class FindingReaction {
 
     @Id
     @Column(columnDefinition = "UUID")
@@ -67,7 +67,7 @@ public class FindingFeedback {
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "finding_id", nullable = false, foreignKey = @ForeignKey(name = "fk_finding_feedback_finding"))
+    @JoinColumn(name = "finding_id", nullable = false, foreignKey = @ForeignKey(name = "fk_finding_reaction_finding"))
     @OnDelete(action = OnDeleteAction.CASCADE)
     private PracticeFinding finding;
 
@@ -88,7 +88,7 @@ public class FindingFeedback {
     @JoinColumn(
         name = "contributor_id",
         nullable = false,
-        foreignKey = @ForeignKey(name = "fk_finding_feedback_contributor")
+        foreignKey = @ForeignKey(name = "fk_finding_reaction_contributor")
     )
     private User contributor;
 
@@ -102,7 +102,7 @@ public class FindingFeedback {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "action", nullable = false, length = 16)
-    private FindingFeedbackAction action;
+    private FindingReactionAction action;
 
     @Column(name = "explanation", columnDefinition = "TEXT")
     private String explanation;

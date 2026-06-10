@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 /**
  * Actions a contributor can take on an AI-generated practice finding.
@@ -12,7 +12,7 @@ package de.tum.cit.aet.hephaestus.practices.finding.feedback;
  *
  * <p>No DISMISSED or ACKNOWLEDGED — non-action is the absence of a feedback row.
  */
-public enum FindingFeedbackAction {
+public enum FindingReactionAction {
     /** Contributor fixed or will fix the issue identified by the finding. */
     APPLIED,
     /** Contributor believes the AI assessment is incorrect. Requires an explanation. */

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFindingTargetType;
@@ -36,10 +36,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
-class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback";
+    private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions";
     private static final String ENGAGEMENT_URI = "/workspaces/{workspaceSlug}/practices/findings/engagement";
 
     @Autowired
@@ -52,7 +52,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private PracticeFindingRepository practiceFindingRepository;
 
     @Autowired
-    private FindingFeedbackRepository feedbackRepository;
+    private FindingReactionRepository reactionRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -104,18 +104,18 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practiceFindingRepository.save(finding);
     }
 
-    // POST /{findingId}/feedback
+    // POST /{findingId}/reactions
 
     @Nested
-    @DisplayName("POST /{findingId}/feedback")
+    @DisplayName("POST /{findingId}/reactions")
     class SubmitFeedback {
 
         @Test
         @WithAdminUser
         void appliedReturns201() {
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
 
-            FindingFeedbackDTO response = webTestClient
+            FindingReactionDTO response = webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -124,12 +124,12 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange()
                 .expectStatus()
                 .isCreated()
-                .expectBody(FindingFeedbackDTO.class)
+                .expectBody(FindingReactionDTO.class)
                 .returnResult()
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.action()).isEqualTo(FindingFeedbackAction.APPLIED);
+            assertThat(response.action()).isEqualTo(FindingReactionAction.APPLIED);
             assertThat(response.findingId()).isEqualTo(finding.getId());
             assertThat(response.id()).isNotNull();
             assertThat(response.createdAt()).isNotNull();
@@ -138,9 +138,9 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @WithAdminUser
         void disputedWithExplanationReturns201() {
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "The AI is wrong about this");
+            var request = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "The AI is wrong about this");
 
-            FindingFeedbackDTO response = webTestClient
+            FindingReactionDTO response = webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -149,19 +149,19 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange()
                 .expectStatus()
                 .isCreated()
-                .expectBody(FindingFeedbackDTO.class)
+                .expectBody(FindingReactionDTO.class)
                 .returnResult()
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.action()).isEqualTo(FindingFeedbackAction.DISPUTED);
+            assertThat(response.action()).isEqualTo(FindingReactionAction.DISPUTED);
             assertThat(response.explanation()).isEqualTo("The AI is wrong about this");
         }
 
         @Test
         @WithAdminUser
         void disputedWithoutExplanationReturns400() {
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, null);
 
             webTestClient
                 .post()
@@ -177,8 +177,8 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @WithAdminUser
         void appendOnlyCreatesNewRow() {
-            var request1 = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
-            var request2 = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "Changed my mind");
+            var request1 = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            var request2 = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "Changed my mind");
 
             // First feedback
             webTestClient
@@ -203,13 +203,13 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isCreated();
 
             // Verify two rows exist
-            assertThat(feedbackRepository.findAll()).hasSize(2);
+            assertThat(reactionRepository.findAll()).hasSize(2);
         }
 
         @Test
         @WithAdminUser
         void nonExistentFindingReturns404() {
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
 
             webTestClient
                 .post()
@@ -229,7 +229,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
 
             webTestClient
                 .post()
@@ -244,7 +244,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         void unauthenticatedMutationRejected() {
-            var request = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
 
             // Anonymous POST → the double-submit CSRF gate (ADR 0017) rejects it 403 before auth runs
             // (no X-XSRF-TOKEN). The mutation stays blocked for anonymous callers.
@@ -259,7 +259,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // GET /{findingId}/feedback
+    // GET /{findingId}/reactions
 
     @Nested
     class GetLatestFeedback {
@@ -293,8 +293,8 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void returnsLatestAfterMultipleSubmissions() {
             // Submit two feedbacks
-            var request1 = new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null);
-            var request2 = new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "Actually wrong");
+            var request1 = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            var request2 = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "Actually wrong");
 
             webTestClient
                 .post()
@@ -317,19 +317,19 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isCreated();
 
             // GET should return the latest (DISPUTED)
-            FindingFeedbackDTO response = webTestClient
+            FindingReactionDTO response = webTestClient
                 .get()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FindingFeedbackDTO.class)
+                .expectBody(FindingReactionDTO.class)
                 .returnResult()
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.action()).isEqualTo(FindingFeedbackAction.DISPUTED);
+            assertThat(response.action()).isEqualTo(FindingReactionAction.DISPUTED);
             assertThat(response.explanation()).isEqualTo("Actually wrong");
         }
     }
@@ -349,7 +349,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null))
+                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null))
                 .exchange()
                 .expectStatus()
                 .isCreated();
@@ -360,14 +360,14 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureWorkspaceMembership(otherWorkspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
 
             // Engagement in the second workspace should be all zeros
-            FindingFeedbackEngagementDTO response = webTestClient
+            FindingReactionEngagementDTO response = webTestClient
                 .get()
                 .uri(ENGAGEMENT_URI, otherWorkspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FindingFeedbackEngagementDTO.class)
+                .expectBody(FindingReactionEngagementDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -386,14 +386,14 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @WithAdminUser
         void returnsZerosWhenNoFeedback() {
-            FindingFeedbackEngagementDTO response = webTestClient
+            FindingReactionEngagementDTO response = webTestClient
                 .get()
                 .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FindingFeedbackEngagementDTO.class)
+                .expectBody(FindingReactionEngagementDTO.class)
                 .returnResult()
                 .getResponseBody();
 
@@ -412,7 +412,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreateFindingFeedbackDTO(FindingFeedbackAction.APPLIED, null))
+                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null))
                 .exchange()
                 .expectStatus()
                 .isCreated();
@@ -422,19 +422,19 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreateFindingFeedbackDTO(FindingFeedbackAction.DISPUTED, "Wrong detection"))
+                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "Wrong detection"))
                 .exchange()
                 .expectStatus()
                 .isCreated();
 
-            FindingFeedbackEngagementDTO response = webTestClient
+            FindingReactionEngagementDTO response = webTestClient
                 .get()
                 .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(FindingFeedbackEngagementDTO.class)
+                .expectBody(FindingReactionEngagementDTO.class)
                 .returnResult()
                 .getResponseBody();
 

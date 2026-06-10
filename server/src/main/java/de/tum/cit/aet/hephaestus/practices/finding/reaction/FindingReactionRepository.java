@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Collection;
@@ -14,15 +14,15 @@ import org.springframework.stereotype.Repository;
  * Repository for immutable finding feedback with append-only semantics.
  *
  * <p>Workspace-agnostic: feedback is scoped through
- * {@code FindingFeedback.finding → PracticeFinding.practice → Practice.workspace}.
+ * {@code FindingReaction.finding → PracticeFinding.practice → Practice.workspace}.
  */
 @Repository
 @WorkspaceAgnostic("Feedback scoped through PracticeFinding -> Practice.workspace relationship")
-public interface FindingFeedbackRepository extends JpaRepository<FindingFeedback, UUID> {
+public interface FindingReactionRepository extends JpaRepository<FindingReaction, UUID> {
     /**
      * Returns the most recent feedback for a specific finding by a specific contributor.
      */
-    Optional<FindingFeedback> findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(
+    Optional<FindingReaction> findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(
         UUID findingId,
         Long contributorId
     );
@@ -36,14 +36,14 @@ public interface FindingFeedbackRepository extends JpaRepository<FindingFeedback
     @Query(
         value = """
         SELECT DISTINCT ON (ff.finding_id) ff.*
-        FROM finding_feedback ff
+        FROM finding_reaction ff
         WHERE ff.finding_id IN (:findingIds)
           AND ff.contributor_id = :contributorId
         ORDER BY ff.finding_id, ff.created_at DESC
         """,
         nativeQuery = true
     )
-    List<FindingFeedback> findLatestByFindingIdsAndContributor(
+    List<FindingReaction> findLatestByFindingIdsAndContributor(
         @Param("findingIds") Collection<UUID> findingIds,
         @Param("contributorId") Long contributorId
     );
@@ -57,7 +57,7 @@ public interface FindingFeedbackRepository extends JpaRepository<FindingFeedback
     @Query(
         """
         SELECT ff.action AS action, COUNT(ff) AS count
-        FROM FindingFeedback ff
+        FROM FindingReaction ff
         JOIN ff.finding f
         JOIN f.practice p
         WHERE ff.contributorId = :contributorId
@@ -74,7 +74,7 @@ public interface FindingFeedbackRepository extends JpaRepository<FindingFeedback
      * Projection for feedback action counts used in engagement statistics.
      */
     interface ActionCountProjection {
-        FindingFeedbackAction getAction();
+        FindingReactionAction getAction();
 
         Long getCount();
     }

@@ -1,8 +1,8 @@
-package de.tum.cit.aet.hephaestus.practices.finding.feedback;
+package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.CreateFindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.finding.feedback.dto.FindingFeedbackEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,14 +31,14 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/findings")
-@Tag(name = "Finding Feedback", description = "Contributor feedback on AI-generated practice findings")
+@Tag(name = "Finding Reaction", description = "Contributor feedback on AI-generated practice findings")
 @RequiredArgsConstructor
 @Validated
-public class FindingFeedbackController {
+public class FindingReactionController {
 
-    private final FindingFeedbackService feedbackService;
+    private final FindingReactionService reactionService;
 
-    @PostMapping("/{findingId}/feedback")
+    @PostMapping("/{findingId}/reactions")
     @Operation(
         summary = "Submit feedback on a practice finding",
         description = "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
@@ -47,7 +47,7 @@ public class FindingFeedbackController {
     @ApiResponse(
         responseCode = "201",
         description = "Feedback recorded",
-        content = @Content(schema = @Schema(implementation = FindingFeedbackDTO.class))
+        content = @Content(schema = @Schema(implementation = FindingReactionDTO.class))
     )
     @ApiResponse(
         responseCode = "400",
@@ -64,17 +64,17 @@ public class FindingFeedbackController {
         description = "Finding not found in this workspace",
         content = @Content(schema = @Schema(hidden = true))
     )
-    public ResponseEntity<FindingFeedbackDTO> submitFeedback(
+    public ResponseEntity<FindingReactionDTO> submitReaction(
         WorkspaceContext workspaceContext,
         @PathVariable UUID findingId,
-        @Valid @RequestBody CreateFindingFeedbackDTO request
+        @Valid @RequestBody CreateFindingReactionDTO request
     ) {
-        FindingFeedbackDTO feedback = feedbackService.submitFeedback(workspaceContext, findingId, request);
+        FindingReactionDTO feedback = reactionService.submitReaction(workspaceContext, findingId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).body(feedback);
     }
 
-    @GetMapping("/{findingId}/feedback")
+    @GetMapping("/{findingId}/reactions")
     @Operation(
         summary = "Get latest feedback for a finding",
         description = "Returns the current user's most recent feedback on the specified finding, or 204 if none exists."
@@ -82,7 +82,7 @@ public class FindingFeedbackController {
     @ApiResponse(
         responseCode = "200",
         description = "Latest feedback returned",
-        content = @Content(schema = @Schema(implementation = FindingFeedbackDTO.class))
+        content = @Content(schema = @Schema(implementation = FindingReactionDTO.class))
     )
     @ApiResponse(
         responseCode = "204",
@@ -94,12 +94,12 @@ public class FindingFeedbackController {
         description = "Finding not found in this workspace",
         content = @Content(schema = @Schema(hidden = true))
     )
-    public ResponseEntity<FindingFeedbackDTO> getLatestFeedback(
+    public ResponseEntity<FindingReactionDTO> getLatestReaction(
         WorkspaceContext workspaceContext,
         @PathVariable UUID findingId
     ) {
-        return feedbackService
-            .getLatestFeedback(workspaceContext, findingId)
+        return reactionService
+            .getLatestReaction(workspaceContext, findingId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.noContent().build());
     }
@@ -112,10 +112,10 @@ public class FindingFeedbackController {
     @ApiResponse(
         responseCode = "200",
         description = "Engagement statistics returned",
-        content = @Content(schema = @Schema(implementation = FindingFeedbackEngagementDTO.class))
+        content = @Content(schema = @Schema(implementation = FindingReactionEngagementDTO.class))
     )
-    public ResponseEntity<FindingFeedbackEngagementDTO> getEngagement(WorkspaceContext workspaceContext) {
-        FindingFeedbackEngagementDTO engagement = feedbackService.getEngagement(workspaceContext);
+    public ResponseEntity<FindingReactionEngagementDTO> getEngagement(WorkspaceContext workspaceContext) {
+        FindingReactionEngagementDTO engagement = reactionService.getEngagement(workspaceContext);
         return ResponseEntity.ok(engagement);
     }
 }
