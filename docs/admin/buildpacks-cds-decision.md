@@ -40,11 +40,11 @@ Bump as part of release cycles; the digest is the source of truth.
 
 ## Container healthcheck on the distroless run image
 
-`run-tiny` has no shell/wget, and `builder-noble-java-tiny` does not bundle a probe, so a container
-`HEALTHCHECK` is impossible out of the box. Rather than drop it (the only container-level health signal
-on Docker Compose — `service_healthy` gating + `docker compose ps` depend on it), `pom.xml` adds an
-explicit `<buildpacks>` order. That **replaces** the builder's default order, so the `java` composite
-must be re-listed (`urn:cnb:builder:paketo-buildpacks/java`) before appending
+On Docker Compose the container `HEALTHCHECK` is the only container-level health signal —
+`service_healthy` gating and the `docker compose ps` column both depend on it. `run-tiny` has no
+shell/wget and `builder-noble-java-tiny` bundles no probe, so `pom.xml` adds an explicit `<buildpacks>`
+order. Specifying `<buildpacks>` **replaces** the builder's default order, so the `java` composite must
+be re-listed (`urn:cnb:builder:paketo-buildpacks/java`) before appending
 `docker://paketobuildpacks/health-checker`; `BP_HEALTH_CHECKER_ENABLED=true` opts it in. It contributes
 the static, shell-free `thc` binary at `/workspace/health-check`, which the compose services invoke as an
 exec-form `HEALTHCHECK` (`THC_PORT`/`THC_PATH` → actuator liveness/readiness). No `health-check` process

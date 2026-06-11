@@ -18,7 +18,7 @@ services:
     ports:
       - "80"
     depends_on:
-      # Gate on app-server readiness (a real healthcheck now exists) — no cold-start 502 window.
+      # Gate on app-server readiness so the SPA isn't served before the API answers.
       application-server:
         condition: service_healthy
     restart: unless-stopped
@@ -252,9 +252,8 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/liveness"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
-    # Healthcheck via the static thc binary the health-checker buildpack adds (server/pom.xml + docs/admin/
-    # buildpacks-cds-decision.md) — the distroless image has no shell for a wget probe. Restores
-    # service_healthy gating and the `docker compose ps` health column.
+    # The distroless image has no shell for a wget probe; the probe is the static thc binary the
+    # health-checker buildpack adds at /workspace/health-check (server/pom.xml).
     healthcheck:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s
@@ -312,8 +311,8 @@ services:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
-    # thc healthcheck (see application-server). The worker fronts no Traefik router, so this is its only
-    # health signal — a wedged worker now shows unhealthy instead of being entirely silent.
+    # thc healthcheck (see application-server). The worker fronts no Traefik router, so this is its
+    # only health signal.
     healthcheck:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s

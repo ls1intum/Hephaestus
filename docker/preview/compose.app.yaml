@@ -244,7 +244,7 @@ services:
         condition: service_healthy
       seed-loader:
         condition: service_completed_successfully
-    # thc healthcheck (see docker/compose.app.yaml) — lets the webapp gate on service_healthy below.
+    # thc healthcheck (see docker/compose.app.yaml).
     healthcheck:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s
@@ -285,7 +285,7 @@ services:
       POSTHOG_ENABLED: "false"
     depends_on:
       application-server:
-        # Gate on app-server readiness (a real healthcheck now exists) — no cold-start 502 window.
+        # Gate on app-server readiness so the SPA isn't served before the API answers.
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]

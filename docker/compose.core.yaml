@@ -63,7 +63,7 @@ services:
       - "traefik.http.routers.http-webhook-server.priority=100"
       - "traefik.http.routers.https-webhook-server.priority=100"
       - "traefik.http.services.https-webhook-server.loadbalancer.server.port=8080"
-      # Routing-layer probe (drops a bad backend from the LB pool); the container healthcheck below is separate.
+      # Routing-layer probe: drops a bad backend from the LB pool.
       - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.path=/actuator/health/readiness"
       - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.interval=15s"
       - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.timeout=5s"
