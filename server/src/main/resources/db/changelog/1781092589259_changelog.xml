@@ -206,21 +206,4 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-12">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding confidence CHECK already present">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_constraint WHERE conname = 'chk_practice_finding_confidence'
-            </sqlCheck>
-        </preConditions>
-        <comment>Bound confidence to its advertised [0,1] range so a native insert / agent bug cannot store an out-of-range value.</comment>
-        <sql>
-            ALTER TABLE practice_finding
-            ADD CONSTRAINT chk_practice_finding_confidence
-            CHECK (confidence &gt;= 0 AND confidence &lt;= 1);
-        </sql>
-        <rollback>
-            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_confidence;
-        </rollback>
-    </changeSet>
-
 </databaseChangeLog>

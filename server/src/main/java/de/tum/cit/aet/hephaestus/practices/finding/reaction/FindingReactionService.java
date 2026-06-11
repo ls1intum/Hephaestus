@@ -22,16 +22,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for managing contributor feedback on AI-generated practice findings.
+ * Service for managing contributor reaction on AI-generated practice findings.
  *
  * <h2>Authorization</h2>
- * <p>Only the contributor who is the subject of a finding may submit feedback on it.
- * This ensures research data integrity — feedback represents the contributor's own
+ * <p>Only the contributor who is the subject of a finding may submit reaction on it.
+ * This ensures research data integrity — reaction represents the contributor's own
  * reaction, not a third party's assessment.
  *
  * <h2>Append-only semantics</h2>
  * <p>Each call to {@link #submitReaction} creates a new row. There is no upsert.
- * The latest feedback per finding is the "current" state for dashboard display.
+ * The latest reaction per finding is the "current" state for dashboard display.
  */
 @Service
 @Transactional
@@ -45,12 +45,12 @@ public class FindingReactionService {
     private final UserRepository userRepository;
 
     /**
-     * Submits feedback on a practice finding. Creates a new append-only record.
+     * Submits reaction on a practice finding. Creates a new append-only record.
      *
      * @param workspaceContext the workspace context (for scoping the finding lookup)
-     * @param findingId        the finding to provide feedback on
-     * @param request          the feedback action and optional explanation
-     * @return the created feedback DTO
+     * @param findingId        the finding to submit a reaction on
+     * @param request          the reaction action and optional explanation
+     * @return the created reaction DTO
      * @throws EntityNotFoundException  if the finding does not exist in this workspace
      * @throws AccessForbiddenException if the current user is not the finding's contributor
      * @throws IllegalArgumentException if DISPUTED without an explanation
@@ -66,7 +66,7 @@ public class FindingReactionService {
 
         var currentUser = userRepository.getCurrentUserElseThrow();
         if (!finding.getContributor().getId().equals(currentUser.getId())) {
-            throw new AccessForbiddenException("Only the finding's contributor can provide feedback");
+            throw new AccessForbiddenException("Only the finding's contributor can submit a reaction");
         }
 
         if (
@@ -76,7 +76,7 @@ public class FindingReactionService {
             throw new IllegalArgumentException("Explanation is required when disputing a finding");
         }
 
-        FindingReaction feedback = FindingReaction.builder()
+        FindingReaction reaction = FindingReaction.builder()
             .finding(finding)
             .findingId(findingId)
             .contributor(currentUser)
@@ -85,9 +85,9 @@ public class FindingReactionService {
             .explanation(request.explanation())
             .build();
 
-        FindingReaction saved = reactionRepository.save(feedback);
+        FindingReaction saved = reactionRepository.save(reaction);
         log.info(
-            "Recorded feedback: findingId={}, action={}, contributorId={}",
+            "Recorded reaction: findingId={}, action={}, contributorId={}",
             findingId,
             request.action(),
             currentUser.getId()
@@ -96,7 +96,7 @@ public class FindingReactionService {
     }
 
     /**
-     * Returns the latest feedback by the current user for a specific finding.
+     * Returns the latest reaction by the current user for a specific finding.
      */
     @Transactional(readOnly = true)
     public Optional<FindingReactionDTO> getLatestReaction(WorkspaceContext workspaceContext, UUID findingId) {
@@ -129,10 +129,10 @@ public class FindingReactionService {
     }
 
     /**
-     * Returns the latest feedback per finding for a given contributor.
+     * Returns the latest reaction per finding for a given contributor.
      * Composable API for enriching finding lists (e.g., for issue #896).
      *
-     * @return map of findingId → latest feedback DTO
+     * @return map of findingId → latest reaction DTO
      */
     @Transactional(readOnly = true)
     public Map<UUID, FindingReactionDTO> getLatestReactionByFindingIds(

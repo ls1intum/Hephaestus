@@ -60,6 +60,8 @@ tags:
   name: Leaderboard
 - description: Session lifecycle
   name: Auth
+- description: Contributor reactions to AI-generated practice findings
+  name: Finding Reaction
 - description: Active sessions
   name: Account
 - description: |-
@@ -89,8 +91,6 @@ tags:
   name: Team Settings
 - description: Identity provider discovery (public)
   name: Auth discovery
-- description: Contributor feedback on AI-generated practice findings
-  name: Finding Reaction
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard:
      <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
@@ -2346,7 +2346,7 @@ paths:
       - Practice Findings
   /workspaces/{workspaceSlug}/practices/findings/engagement:
     get:
-      description: Returns the current user's feedback action counts across all findings
+      description: Returns the current user's reaction action counts across all findings
         in this workspace.
       operationId: getEngagement
       parameters:
@@ -2455,7 +2455,7 @@ paths:
       - Practice Findings
   /workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions:
     get:
-      description: "Returns the current user's most recent feedback on the specified\
+      description: "Returns the current user's most recent reaction to the specified\
         \ finding, or 204 if none exists."
       operationId: getLatestReaction
       parameters:
@@ -2478,12 +2478,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FindingReaction"
-          description: Latest feedback returned
+          description: Latest reaction returned
         "204":
-          description: No feedback exists for this finding
+          description: No reaction exists for this finding
         "404":
           description: Finding not found in this workspace
-      summary: Get latest feedback for a finding
+      summary: Get the latest reaction to a finding
       tags:
       - Finding Reaction
     post:
@@ -2517,14 +2517,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FindingReaction"
-          description: Feedback recorded
+          description: Reaction recorded
         "400":
           description: "Invalid request (e.g., DISPUTED without explanation)"
         "403":
           description: Current user is not the finding's contributor
         "404":
           description: Finding not found in this workspace
-      summary: Submit feedback on a practice finding
+      summary: Submit a reaction to a practice finding
       tags:
       - Finding Reaction
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
@@ -4403,18 +4403,18 @@ components:
       - name
     CreateFindingReaction:
       type: object
-      description: Submit feedback on an AI-generated practice finding
+      description: Submit a reaction to an AI-generated practice finding
       properties:
         action:
           type: string
-          description: The feedback action to record
+          description: The reaction action to record
           enum:
           - APPLIED
           - DISPUTED
           - NOT_APPLICABLE
         explanation:
           type: string
-          description: Explanation for the feedback. Required when action is DISPUTED.
+          description: Explanation for the reaction. Required when action is DISPUTED.
           maxLength: 2000
           minLength: 0
       required:
@@ -4696,11 +4696,11 @@ components:
           description: User's PRs trigger practice review
     FindingReaction:
       type: object
-      description: Contributor feedback on an AI-generated practice finding
+      description: Contributor reaction to an AI-generated practice finding
       properties:
         action:
           type: string
-          description: The feedback action taken
+          description: The reaction action taken
           enum:
           - APPLIED
           - DISPUTED
@@ -4708,18 +4708,18 @@ components:
         createdAt:
           type: string
           format: date-time
-          description: When the feedback was submitted
+          description: When the reaction was submitted
         explanation:
           type: string
-          description: Optional explanation for the feedback
+          description: Optional explanation for the reaction
         findingId:
           type: string
           format: uuid
-          description: ID of the finding this feedback is about
+          description: ID of the finding this reaction is about
         id:
           type: string
           format: uuid
-          description: Unique feedback ID
+          description: Unique reaction ID
       required:
       - action
       - createdAt
@@ -4727,7 +4727,7 @@ components:
       - id
     FindingReactionEngagement:
       type: object
-      description: Feedback engagement statistics for a contributor in a workspace
+      description: Reaction engagement statistics for a contributor in a workspace
       properties:
         applied:
           type: integer

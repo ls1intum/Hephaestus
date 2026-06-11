@@ -1786,7 +1786,7 @@ export const getEngagementQueryKey = (options: Options<GetEngagementData>) => cr
 /**
  * Get engagement statistics
  *
- * Returns the current user's feedback action counts across all findings in this workspace.
+ * Returns the current user's reaction action counts across all findings in this workspace.
  */
 export const getEngagementOptions = (options: Options<GetEngagementData>) => queryOptions<GetEngagementResponse, DefaultError, GetEngagementResponse, ReturnType<typeof getEngagementQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1862,9 +1862,9 @@ export const getFindingOptions = (options: Options<GetFindingData>) => queryOpti
 export const getLatestReactionQueryKey = (options: Options<GetLatestReactionData>) => createQueryKey('getLatestReaction', options);
 
 /**
- * Get latest feedback for a finding
+ * Get the latest reaction to a finding
  *
- * Returns the current user's most recent feedback on the specified finding, or 204 if none exists.
+ * Returns the current user's most recent reaction to the specified finding, or 204 if none exists.
  */
 export const getLatestReactionOptions = (options: Options<GetLatestReactionData>) => queryOptions<GetLatestReactionResponse, DefaultError, GetLatestReactionResponse, ReturnType<typeof getLatestReactionQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1880,7 +1880,7 @@ export const getLatestReactionOptions = (options: Options<GetLatestReactionData>
 });
 
 /**
- * Submit feedback on a practice finding
+ * Submit a reaction to a practice finding
  *
  * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */

@@ -11,16 +11,16 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Repository for immutable finding feedback with append-only semantics.
+ * Repository for immutable finding reaction with append-only semantics.
  *
- * <p>Workspace-agnostic: feedback is scoped through
+ * <p>Workspace-agnostic: reaction is scoped through
  * {@code FindingReaction.finding → PracticeFinding.practice → Practice.workspace}.
  */
 @Repository
-@WorkspaceAgnostic("Feedback scoped through PracticeFinding -> Practice.workspace relationship")
+@WorkspaceAgnostic("Reaction scoped through PracticeFinding -> Practice.workspace relationship")
 public interface FindingReactionRepository extends JpaRepository<FindingReaction, UUID> {
     /**
-     * Returns the most recent feedback for a specific finding by a specific contributor.
+     * Returns the most recent reaction for a specific finding by a specific contributor.
      */
     Optional<FindingReaction> findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(
         UUID findingId,
@@ -28,10 +28,10 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
     );
 
     /**
-     * Returns the latest feedback per finding for a given contributor, using PostgreSQL's
+     * Returns the latest reaction per finding for a given contributor, using PostgreSQL's
      * {@code DISTINCT ON} for efficient "latest row per group" retrieval.
      *
-     * <p>Used to enrich finding lists with the contributor's current feedback state.
+     * <p>Used to enrich finding lists with the contributor's current reaction state.
      */
     @Query(
         value = """
@@ -49,7 +49,7 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
     );
 
     /**
-     * Engagement statistics: count of feedback actions grouped by action type,
+     * Engagement statistics: count of reaction actions grouped by action type,
      * scoped to a specific workspace through the finding → practice → workspace chain.
      *
      * @see ActionCountProjection
@@ -71,7 +71,7 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
     );
 
     /**
-     * Projection for feedback action counts used in engagement statistics.
+     * Projection for reaction action counts used in engagement statistics.
      */
     interface ActionCountProjection {
         FindingReactionAction getAction();

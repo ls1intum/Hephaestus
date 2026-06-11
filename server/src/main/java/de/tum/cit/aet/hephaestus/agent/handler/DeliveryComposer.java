@@ -188,7 +188,7 @@ class DeliveryComposer {
         return "Nice work " + strengths + tail;
     }
 
-    /** Humanises a slug ("issue-has-checkable-outcome" → "handling issue has checkable outcome"); fallback only. */
+    /** Fallback strength phrase for a practice not in {@link #STRENGTH_PHRASES}: the slug with dashes as spaces. */
     @Nullable
     private static String humanisePracticeSlug(@Nullable String slug) {
         if (slug == null || slug.isBlank()) {
@@ -216,30 +216,17 @@ class DeliveryComposer {
             ")"
     );
 
-    /** Residual bare-phrase replacements applied after sentence-dropping (defence in depth). */
-    private static final List<Map.Entry<Pattern, String>> RESIDUAL_SCRUBS = List.of(
-        Map.entry(
-            Pattern.compile("(?i)[≤<=>]*\\s*\\d+[\\s-]*line\\s+threshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)"),
-            "the size that stays easy to review in one pass"
-        ),
-        Map.entry(Pattern.compile("(?i)\\b(?:the\\s+)?\\w+\\s+severity\\s+(?:band|level|bucket)\\b"), ""),
-        Map.entry(
-            Pattern.compile("(?i)\\ba\\s+(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:finding|verdict)\\b"),
-            "this point"
-        )
-    );
-
     /**
-     * Strips internal grading vocabulary from text headed to a student. Two passes: drop any sentence
-     * that is pure rubric meta ({@link #GRADING_SENTENCE}), then scrub residual bare phrases, then tidy
-     * the whitespace the removals leave behind. Idempotent and locale-safe (no naked case folding).
+     * Strips internal grading vocabulary from text headed to a student: split into sentences, drop any
+     * that is pure rubric meta ({@link #GRADING_SENTENCE}), then tidy the whitespace the drops leave
+     * behind. Idempotent and locale-safe (no naked case folding).
      */
     static String sanitizeStudentText(@Nullable String text) {
         if (text == null || text.isBlank()) {
             return text == null ? "" : text;
         }
-        // Pass 1: split into sentences and drop any that is grading meta. Split on sentence-ending
-        // punctuation followed by whitespace so mid-paragraph rubric sentences are removed wholesale.
+        // Split on sentence-ending punctuation followed by whitespace so a mid-paragraph rubric sentence
+        // is removed wholesale.
         StringBuilder kept = new StringBuilder(text.length());
         for (String sentence : text.split("(?<=[.!?])\\s+")) {
             if (!GRADING_SENTENCE.matcher(sentence).find()) {
@@ -250,10 +237,6 @@ class DeliveryComposer {
             }
         }
         String out = kept.toString();
-        // Pass 2: residual bare phrases that survived inside an otherwise-useful sentence.
-        for (Map.Entry<Pattern, String> rule : RESIDUAL_SCRUBS) {
-            out = rule.getKey().matcher(out).replaceAll(rule.getValue());
-        }
         // Tidy the gaps the drops leave: doubled spaces, space-before-punctuation, blank lines.
         out = out.replaceAll("[ \\t]{2,}", " ").replaceAll("\\s+([.,;])", "$1").replaceAll("\\n{3,}", "\n\n");
         return out.strip();

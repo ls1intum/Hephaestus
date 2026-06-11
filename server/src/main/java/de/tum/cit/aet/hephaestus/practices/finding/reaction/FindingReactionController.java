@@ -24,14 +24,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * REST controller for contributor feedback on AI-generated practice findings.
+ * REST controller for contributor reaction on AI-generated practice findings.
  *
  * <p>All endpoints are workspace-scoped and require authentication.
- * Feedback submission is restricted to the finding's contributor.
+ * Reaction submission is restricted to the finding's contributor.
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/findings")
-@Tag(name = "Finding Reaction", description = "Contributor feedback on AI-generated practice findings")
+@Tag(name = "Finding Reaction", description = "Contributor reactions to AI-generated practice findings")
 @RequiredArgsConstructor
 @Validated
 public class FindingReactionController {
@@ -40,13 +40,13 @@ public class FindingReactionController {
 
     @PostMapping("/{findingId}/reactions")
     @Operation(
-        summary = "Submit feedback on a practice finding",
+        summary = "Submit a reaction to a practice finding",
         description = "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
             "Append-only: submitting again creates a new record, preserving temporal history."
     )
     @ApiResponse(
         responseCode = "201",
-        description = "Feedback recorded",
+        description = "Reaction recorded",
         content = @Content(schema = @Schema(implementation = FindingReactionDTO.class))
     )
     @ApiResponse(
@@ -69,24 +69,24 @@ public class FindingReactionController {
         @PathVariable UUID findingId,
         @Valid @RequestBody CreateFindingReactionDTO request
     ) {
-        FindingReactionDTO feedback = reactionService.submitReaction(workspaceContext, findingId, request);
+        FindingReactionDTO reaction = reactionService.submitReaction(workspaceContext, findingId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
-        return ResponseEntity.created(location).body(feedback);
+        return ResponseEntity.created(location).body(reaction);
     }
 
     @GetMapping("/{findingId}/reactions")
     @Operation(
-        summary = "Get latest feedback for a finding",
-        description = "Returns the current user's most recent feedback on the specified finding, or 204 if none exists."
+        summary = "Get the latest reaction to a finding",
+        description = "Returns the current user's most recent reaction to the specified finding, or 204 if none exists."
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Latest feedback returned",
+        description = "Latest reaction returned",
         content = @Content(schema = @Schema(implementation = FindingReactionDTO.class))
     )
     @ApiResponse(
         responseCode = "204",
-        description = "No feedback exists for this finding",
+        description = "No reaction exists for this finding",
         content = @Content(schema = @Schema(hidden = true))
     )
     @ApiResponse(
@@ -107,7 +107,7 @@ public class FindingReactionController {
     @GetMapping("/engagement")
     @Operation(
         summary = "Get engagement statistics",
-        description = "Returns the current user's feedback action counts across all findings in this workspace."
+        description = "Returns the current user's reaction action counts across all findings in this workspace."
     )
     @ApiResponse(
         responseCode = "200",

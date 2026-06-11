@@ -1830,7 +1830,7 @@ export type GitLabGroup = {
 };
 
 /**
- * Feedback engagement statistics for a contributor in a workspace
+ * Reaction engagement statistics for a contributor in a workspace
  */
 export type FindingReactionEngagement = {
     /**
@@ -1848,27 +1848,27 @@ export type FindingReactionEngagement = {
 };
 
 /**
- * Contributor feedback on an AI-generated practice finding
+ * Contributor reaction to an AI-generated practice finding
  */
 export type FindingReaction = {
     /**
-     * The feedback action taken
+     * The reaction action taken
      */
     action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
     /**
-     * When the feedback was submitted
+     * When the reaction was submitted
      */
     createdAt: Date;
     /**
-     * Optional explanation for the feedback
+     * Optional explanation for the reaction
      */
     explanation?: string;
     /**
-     * ID of the finding this feedback is about
+     * ID of the finding this reaction is about
      */
     findingId: string;
     /**
-     * Unique feedback ID
+     * Unique reaction ID
      */
     id: string;
 };
@@ -2063,15 +2063,15 @@ export type CreateLoginProviderRequest = {
 };
 
 /**
- * Submit feedback on an AI-generated practice finding
+ * Submit a reaction to an AI-generated practice finding
  */
 export type CreateFindingReaction = {
     /**
-     * The feedback action to record
+     * The reaction action to record
      */
     action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
     /**
-     * Explanation for the feedback. Required when action is DISPUTED.
+     * Explanation for the reaction. Required when action is DISPUTED.
      */
     explanation?: string;
 };
@@ -4543,11 +4543,11 @@ export type GetLatestReactionErrors = {
 
 export type GetLatestReactionResponses = {
     /**
-     * Latest feedback returned
+     * Latest reaction returned
      */
     200: FindingReaction;
     /**
-     * No feedback exists for this finding
+     * No reaction exists for this finding
      */
     204: void;
 };
@@ -4584,7 +4584,7 @@ export type SubmitReactionErrors = {
 
 export type SubmitReactionResponses = {
     /**
-     * Feedback recorded
+     * Reaction recorded
      */
     201: FindingReaction;
 };

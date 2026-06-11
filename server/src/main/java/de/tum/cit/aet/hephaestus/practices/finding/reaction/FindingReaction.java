@@ -62,8 +62,8 @@ public class FindingReaction {
     private UUID id;
 
     /**
-     * The finding this feedback is about. Uses DB-level {@code ON DELETE CASCADE}
-     * so that deleting a finding automatically cleans up its immutable feedback rows.
+     * The finding this reaction is about. Uses DB-level {@code ON DELETE CASCADE}
+     * so that deleting a finding automatically cleans up its immutable reaction rows.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -79,8 +79,8 @@ public class FindingReaction {
     private UUID findingId;
 
     /**
-     * The contributor who submitted this feedback. No cascade — users are long-lived
-     * and feedback must survive independently; deleting a user with existing feedback
+     * The contributor who submitted this reaction. No cascade — users are long-lived
+     * and reaction must survive independently; deleting a user with existing reaction
      * is blocked by the FK constraint (RESTRICT).
      */
     @NotNull

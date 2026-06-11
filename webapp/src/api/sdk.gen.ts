@@ -872,7 +872,7 @@ export const listFindings = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Get engagement statistics
  *
- * Returns the current user's feedback action counts across all findings in this workspace.
+ * Returns the current user's reaction action counts across all findings in this workspace.
  */
 export const getEngagement = <ThrowOnError extends boolean = false>(options: Options<GetEngagementData, ThrowOnError>) => (options.client ?? client).get<GetEngagementResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -900,9 +900,9 @@ export const getSummary = <ThrowOnError extends boolean = false>(options: Option
 export const getFinding = <ThrowOnError extends boolean = false>(options: Options<GetFindingData, ThrowOnError>) => (options.client ?? client).get<GetFindingResponses, GetFindingErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}', ...options });
 
 /**
- * Get latest feedback for a finding
+ * Get the latest reaction to a finding
  *
- * Returns the current user's most recent feedback on the specified finding, or 204 if none exists.
+ * Returns the current user's most recent reaction to the specified finding, or 204 if none exists.
  */
 export const getLatestReaction = <ThrowOnError extends boolean = false>(options: Options<GetLatestReactionData, ThrowOnError>) => (options.client ?? client).get<GetLatestReactionResponses, GetLatestReactionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -911,7 +911,7 @@ export const getLatestReaction = <ThrowOnError extends boolean = false>(options:
 });
 
 /**
- * Submit feedback on a practice finding
+ * Submit a reaction to a practice finding
  *
  * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */
