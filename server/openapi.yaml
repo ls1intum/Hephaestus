@@ -37,6 +37,8 @@ tags:
   name: Account
 - description: Instance-admin account management
   name: Admin
+- description: Manage practice goals
+  name: Practice Goals
 - description: Team management within workspace
   name: Teams
 - description: |-
@@ -52,8 +54,6 @@ tags:
 
      <p>Active only on the webhook runtime role.
   name: webhook-controller
-- description: Contributor feedback on AI-generated practice findings
-  name: Finding Feedback
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
@@ -89,6 +89,8 @@ tags:
   name: Team Settings
 - description: Identity provider discovery (public)
   name: Auth discovery
+- description: Contributor feedback on AI-generated practice findings
+  name: Finding Reaction
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard:
      <code>POST /workspaces/gitlab/preflight</code> validates a PAT, <code>POST /workspaces/gitlab/groups</code>
@@ -99,6 +101,9 @@ tags:
      <p>Both endpoints are gated by the <code>GITLAB_WORKSPACE_CREATION</code> feature flag via
      <code>@PreAuthorize</code> — identical to the previous protection on the merged controller.
   name: git-lab-preflight-controller
+- description: Workspace-scoped AI configuration (runtime bindings + practice-review
+    policy)
+  name: AI Settings
 - description: "Current user identity, linked accounts, deletion"
   name: Account
 paths:
@@ -1206,6 +1211,112 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/ai-settings:
+    get:
+      operationId: getAiSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: AI settings returned
+      summary: Get aggregate workspace AI settings
+      tags:
+      - AI Settings
+  /workspaces/{workspaceSlug}/ai-settings/mentor-config:
+    put:
+      operationId: updateMentorConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentBindingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: Binding updated
+        "404":
+          description: Config not found in this workspace
+      summary: Bind (or unbind) the agent config that powers the mentor
+      tags:
+      - AI Settings
+  /workspaces/{workspaceSlug}/ai-settings/practice-config:
+    put:
+      operationId: updatePracticeConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentBindingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: Binding updated
+        "404":
+          description: Config not found in this workspace
+      summary: Bind (or unbind) the agent config that powers practice detection
+      tags:
+      - AI Settings
+  /workspaces/{workspaceSlug}/ai-settings/practice-review:
+    patch:
+      operationId: updatePracticeReviewSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeReviewSettings"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettingsView"
+          description: Policy updated
+      summary: Update per-workspace practice-review policy
+      tags:
+      - AI Settings
   /workspaces/{workspaceSlug}/connections:
     get:
       operationId: list
@@ -1934,6 +2045,185 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/practice-goals:
+    get:
+      description: Returns the workspace's practice goals
+      operationId: listGoals
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Return only active goals
+        in: query
+        name: activeOnly
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeGoal"
+          description: Goals returned
+      security: []
+      summary: List practice goals
+      tags:
+      - Practice Goals
+    post:
+      operationId: createGoal
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePracticeGoalRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGoal"
+          description: Goal created
+        "409":
+          description: Goal slug already exists in this workspace
+      summary: Create a new practice goal
+      tags:
+      - Practice Goals
+  /workspaces/{workspaceSlug}/practice-goals/reorder:
+    patch:
+      description: Sets each goal's display order to its index in the provided slug
+        list (one atomic write)
+      operationId: reorderGoals
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPracticeGoalsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeGoal"
+          description: Goals reordered; the full ordered list is returned
+        "404":
+          description: A slug is unknown
+      summary: Reorder practice goals
+      tags:
+      - Practice Goals
+  /workspaces/{workspaceSlug}/practice-goals/{goalSlug}:
+    delete:
+      description: "Bound practices are unbound (their goal link is cleared), not\
+        \ deleted"
+      operationId: deleteGoal
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: goalSlug
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Goal deleted
+        "404":
+          description: Goal not found
+      summary: Delete a practice goal
+      tags:
+      - Practice Goals
+    get:
+      operationId: getGoal
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: goalSlug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGoal"
+          description: Goal returned
+        "404":
+          description: Goal not found
+      security: []
+      summary: Get a practice goal
+      tags:
+      - Practice Goals
+    patch:
+      operationId: updateGoal
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: goalSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeGoalRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGoal"
+          description: Goal updated
+        "404":
+          description: Goal not found
+      summary: Update a practice goal
+      tags:
+      - Practice Goals
   /workspaces/{workspaceSlug}/practices:
     get:
       description: "Returns all practice definitions for the workspace, optionally\
@@ -2072,11 +2362,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingFeedbackEngagement"
+                $ref: "#/components/schemas/FindingReactionEngagement"
           description: Engagement statistics returned
       summary: Get engagement statistics
       tags:
-      - Finding Feedback
+      - Finding Reaction
   /workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}:
     get:
       description: All findings for a specific pull request within the workspace
@@ -2163,11 +2453,11 @@ paths:
       summary: Get finding detail
       tags:
       - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback:
+  /workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions:
     get:
       description: "Returns the current user's most recent feedback on the specified\
         \ finding, or 204 if none exists."
-      operationId: getLatestFeedback
+      operationId: getLatestReaction
       parameters:
       - description: Workspace slug
         in: path
@@ -2187,7 +2477,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingFeedback"
+                $ref: "#/components/schemas/FindingReaction"
           description: Latest feedback returned
         "204":
           description: No feedback exists for this finding
@@ -2195,12 +2485,12 @@ paths:
           description: Finding not found in this workspace
       summary: Get latest feedback for a finding
       tags:
-      - Finding Feedback
+      - Finding Reaction
     post:
       description: "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE)\
         \ to an AI-generated finding. Append-only: submitting again creates a new\
         \ record, preserving temporal history."
-      operationId: submitFeedback
+      operationId: submitReaction
       parameters:
       - description: Workspace slug
         in: path
@@ -2219,14 +2509,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateFindingFeedback"
+              $ref: "#/components/schemas/CreateFindingReaction"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingFeedback"
+                $ref: "#/components/schemas/FindingReaction"
           description: Feedback recorded
         "400":
           description: "Invalid request (e.g., DISPUTED without explanation)"
@@ -2236,7 +2526,7 @@ paths:
           description: Finding not found in this workspace
       summary: Submit feedback on a practice finding
       tags:
-      - Finding Feedback
+      - Finding Reaction
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -2354,6 +2644,42 @@ paths:
         "404":
           description: Practice not found
       summary: Set practice active state
+      tags:
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/goal:
+    put:
+      description: "Binds the practice to the goal named by goalSlug, or unbinds it\
+        \ when goalSlug is null"
+      operationId: bindGoal
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BindPracticeGoalRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Binding updated
+        "404":
+          description: Practice or goal not found
+      summary: Bind a practice to a goal
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -3429,7 +3755,6 @@ components:
           enum:
           - PROXY
           - API_KEY
-          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -3488,6 +3813,14 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job completed
+        configId:
+          type: integer
+          format: int64
+          description: ID of the agent config that ran this job (from the frozen snapshot)
+        configName:
+          type: string
+          description: Name of the agent config that ran this job (from the frozen
+            snapshot)
         configSnapshot:
           description: Frozen agent config at submit time
         containerId:
@@ -3524,6 +3857,7 @@ components:
           description: Job type
           enum:
           - PULL_REQUEST_REVIEW
+          - ISSUE_REVIEW
         llmCacheReadTokens:
           type: integer
           format: int32
@@ -3587,6 +3921,59 @@ components:
       - jobType
       - retryCount
       - status
+    AiSettingsView:
+      type: object
+      description: "Aggregate workspace AI settings: runtime bindings + effective\
+        \ + raw-override practice-review policy"
+      properties:
+        cooldownMinutes:
+          type: integer
+          format: int32
+          description: "Effective: minimum minutes between reviews for the same PR"
+        cooldownMinutesOverride:
+          type: integer
+          format: int32
+          description: Raw override; null = inheriting the fleet default
+        deliverToMerged:
+          type: boolean
+          description: "Effective: deliver feedback to merged PRs/MRs"
+        deliverToMergedOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+        mentorConfigId:
+          type: integer
+          format: int64
+          description: Config bound to power the mentor (null = oldest enabled config)
+        mentorEnabled:
+          type: boolean
+          description: Whether the mentor feature is enabled for this workspace
+        practiceConfigId:
+          type: integer
+          format: int64
+          description: Config bound to power practice detection (null = fan-out to
+            all enabled configs)
+        practicesEnabled:
+          type: boolean
+          description: Whether the practices feature is enabled for this workspace
+        runForAllUsers:
+          type: boolean
+          description: "Effective: run practice review for all contributors"
+        runForAllUsersOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+        skipDrafts:
+          type: boolean
+          description: "Effective: skip draft PRs/MRs"
+        skipDraftsOverride:
+          type: boolean
+          description: Raw override; null = inheriting the fleet default
+      required:
+      - cooldownMinutes
+      - deliverToMerged
+      - mentorEnabled
+      - practicesEnabled
+      - runForAllUsers
+      - skipDrafts
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -3655,6 +4042,15 @@ components:
       description: Binary progress indicating unlocked state
       required:
       - unlocked
+    BindPracticeGoalRequest:
+      type: object
+      description: "Request to bind a practice to a goal, or unbind it when goalSlug\
+        \ is null"
+      properties:
+        goalSlug:
+          type: string
+          description: "Slug of the goal to bind to, or null to unbind"
+          example: review-ready-work
     ChatMessage:
       type: object
       description: Mentor chat message in AI SDK UIMessage shape.
@@ -3951,12 +4347,10 @@ components:
         credentialMode:
           type: string
           default: PROXY
-          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
-            \ or OAUTH (direct OAuth)"
+          description: "Authentication mode: PROXY (internal proxy) or API_KEY (direct)"
           enum:
           - PROXY
           - API_KEY
-          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -4007,7 +4401,7 @@ components:
       required:
       - llmProvider
       - name
-    CreateFindingFeedback:
+    CreateFindingReaction:
       type: object
       description: Submit feedback on an AI-generated practice finding
       properties:
@@ -4060,6 +4454,36 @@ components:
       - clientSecret
       - registrationId
       - type
+    CreatePracticeGoalRequest:
+      type: object
+      description: Request to create a new practice goal
+      properties:
+        description:
+          type: string
+          description: What this goal develops
+          maxLength: 5000
+          minLength: 0
+        displayOrder:
+          type: integer
+          format: int32
+          description: Sort order within the workspace. Defaults to 0 when omitted.
+          example: 1
+        name:
+          type: string
+          description: Human-readable name
+          example: Submitting review-ready work
+          maxLength: 128
+          minLength: 3
+        slug:
+          type: string
+          description: URL-safe identifier unique within the workspace
+          example: review-ready-work
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      required:
+      - name
+      - slug
     CreatePracticeRequest:
       type: object
       description: Request to create a new practice definition
@@ -4075,6 +4499,14 @@ components:
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
+        focusArtifact:
+          type: string
+          description: Artifact this practice evaluates. Defaults to PULL_REQUEST
+            when omitted.
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          example: PULL_REQUEST
         name:
           type: string
           description: Human-readable name
@@ -4262,7 +4694,7 @@ components:
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
-    FindingFeedback:
+    FindingReaction:
       type: object
       description: Contributor feedback on an AI-generated practice finding
       properties:
@@ -4293,7 +4725,7 @@ components:
       - createdAt
       - findingId
       - id
-    FindingFeedbackEngagement:
+    FindingReactionEngagement:
       type: object
       description: Feedback engagement statistics for a contributor in a workspace
       properties:
@@ -4823,6 +5255,15 @@ components:
         criteria:
           type: string
           description: Practice evaluation criteria
+        focusArtifact:
+          type: string
+          description: Artifact this practice evaluates
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+        goalSlug:
+          type: string
+          description: "Slug of the practice goal this practice is bound to, if any"
         id:
           type: integer
           format: int64
@@ -4850,6 +5291,7 @@ components:
       - active
       - createdAt
       - criteria
+      - focusArtifact
       - id
       - name
       - slug
@@ -4908,6 +5350,7 @@ components:
           description: Target type (e.g. PULL_REQUEST)
           enum:
           - PULL_REQUEST
+          - ISSUE
         title:
           type: string
           description: Finding title
@@ -4971,6 +5414,7 @@ components:
           description: Target type (e.g. PULL_REQUEST)
           enum:
           - PULL_REQUEST
+          - ISSUE
         title:
           type: string
           description: Finding title
@@ -4992,6 +5436,45 @@ components:
       - targetType
       - title
       - verdict
+    PracticeGoal:
+      type: object
+      description: A practice goal grouping related practices into a learning objective
+      properties:
+        active:
+          type: boolean
+          description: Whether this goal is active
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the goal was created
+        description:
+          type: string
+          description: What this goal develops
+        displayOrder:
+          type: integer
+          format: int32
+          description: Sort order within the workspace
+        id:
+          type: integer
+          format: int64
+          description: Goal ID
+        name:
+          type: string
+          description: Human-readable name
+        slug:
+          type: string
+          description: URL-safe identifier unique within the workspace
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the goal was last updated
+      required:
+      - active
+      - createdAt
+      - displayOrder
+      - id
+      - name
+      - slug
     Profile:
       type: object
       description: "User profile header: identity, league standing, contribution surface,\
@@ -5370,6 +5853,21 @@ components:
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
+    ReorderPracticeGoalsRequest:
+      type: object
+      description: Reorder practice goals — displayOrder follows the list index
+      properties:
+        orderedSlugs:
+          type: array
+          description: Goal slugs in the desired display order
+          example:
+          - review-ready-work
+          - acting-on-review-feedback
+          items:
+            type: string
+          minItems: 1
+      required:
+      - orderedSlugs
     RepositoryInfo:
       type: object
       description: Information about a git repository
@@ -5566,6 +6064,14 @@ components:
       properties:
         appRole:
           type: string
+    UpdateAgentBindingRequest:
+      type: object
+      description: Bind an agent config to a workspace purpose; null unbinds
+      properties:
+        configId:
+          type: integer
+          format: int64
+          description: "Agent config id to bind, or null to unbind"
     UpdateAgentConfigRequest:
       type: object
       description: Request to update an existing agent configuration (all fields optional
@@ -5574,14 +6080,16 @@ components:
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        clearLlmApiKey:
+          type: boolean
+          description: Set true to remove the stored API key (takes precedence over
+            llmApiKey)
         credentialMode:
           type: string
-          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
-            \ or OAUTH (direct OAuth)"
+          description: "Authentication mode: PROXY (internal proxy) or API_KEY (direct)"
           enum:
           - PROXY
           - API_KEY
-          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -5695,6 +6203,29 @@ components:
           description: Whether the practice should be active
       required:
       - active
+    UpdatePracticeGoalRequest:
+      type: object
+      description: Request to update an existing practice goal (PATCH — only non-null
+        fields applied)
+      properties:
+        active:
+          type: boolean
+          description: Whether this goal is active
+        description:
+          type: string
+          description: What this goal develops
+          maxLength: 5000
+          minLength: 0
+        displayOrder:
+          type: integer
+          format: int32
+          description: Sort order within the workspace
+        name:
+          type: string
+          description: Human-readable name
+          maxLength: 128
+          minLength: 3
+          pattern: .*\S.*
     UpdatePracticeRequest:
       type: object
       description: Request to update an existing practice definition (PATCH — only
@@ -5712,6 +6243,13 @@ components:
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
+        focusArtifact:
+          type: string
+          description: Artifact this practice evaluates
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+          example: ISSUE
         name:
           type: string
           description: Human-readable name
@@ -5732,6 +6270,39 @@ components:
             type: string
           maxItems: 10
           minItems: 1
+    UpdatePracticeReviewSettings:
+      type: object
+      description: Update per-workspace practice-review policy. Null fields unchanged;
+        'reset' clears to inherit.
+      properties:
+        cooldownMinutes:
+          type: integer
+          format: int32
+          description: Minimum minutes between reviews for the same PR; 0 disables
+            the cooldown
+          maximum: 1440
+          minimum: 0
+        deliverToMerged:
+          type: boolean
+          description: Deliver feedback to already-merged PRs/MRs
+        reset:
+          type: array
+          description: Fields to reset to the inherited fleet default
+          items:
+            type: string
+            enum:
+            - RUN_FOR_ALL_USERS
+            - SKIP_DRAFTS
+            - DELIVER_TO_MERGED
+            - COOLDOWN_MINUTES
+          uniqueItems: true
+        runForAllUsers:
+          type: boolean
+          description: Run practice review for all contributors (vs only the run_practice_review
+            role)
+        skipDrafts:
+          type: boolean
+          description: Skip practice review for draft PRs/MRs
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

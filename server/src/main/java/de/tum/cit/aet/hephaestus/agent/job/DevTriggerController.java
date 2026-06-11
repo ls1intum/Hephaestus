@@ -27,9 +27,16 @@ public class DevTriggerController {
     }
 
     @PostMapping("/api/dev/trigger-review")
-    public String triggerReview(@RequestParam @Nullable Long prId, @RequestParam @Nullable Long workspaceId) {
-        if (prId == null || workspaceId == null) {
-            return "Error: prId and workspaceId are required";
+    public String triggerReview(
+        @RequestParam @Nullable Long prId,
+        @RequestParam @Nullable Long issueId,
+        @RequestParam @Nullable Long workspaceId
+    ) {
+        if (workspaceId == null || (prId == null && issueId == null)) {
+            return "Error: workspaceId and one of prId / issueId are required";
+        }
+        if (issueId != null) {
+            return agentJobService.submitDetectionForIssue(workspaceId, issueId);
         }
         return agentJobService.submitReviewForPullRequest(workspaceId, prId);
     }

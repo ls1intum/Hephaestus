@@ -27,7 +27,7 @@ public final class LlmProxyAuthShell {
 
     /**
      * Variant that writes the {@code PI_HEPHAESTUS_*} env vars for the custom provider
-     * extension when {@code baseUrl} is non-blank in API_KEY/OAUTH mode for {@code OPENAI} /
+     * extension when {@code baseUrl} is non-blank in API_KEY mode for {@code OPENAI} /
      * {@code ANTHROPIC}. Azure does not get this treatment: its deployment routing is
      * already handled via {@code AZURE_OPENAI_DEPLOYMENT_NAME_MAP}, and Pi's
      * {@code azure-openai-responses} provider mints the effective URL from the env-var-driven
@@ -45,12 +45,20 @@ public final class LlmProxyAuthShell {
         Map<String, String> env
     ) {
         return switch (mode) {
-            case PROXY -> proxyMode(provider);
-            case API_KEY, OAUTH -> apiKeyMode(provider, credential, baseUrl, modelName, env);
+            case PROXY -> proxyMode(provider, modelName, env);
+            case API_KEY -> apiKeyMode(provider, credential, baseUrl, modelName, env);
         };
     }
 
-    private static String proxyMode(LlmProvider provider) {
+    /**
+     * Every provider here talks to the in-app LLM proxy ({@code $LLM_PROXY_URL}); the proxy injects the
+     * real key ({@code $LLM_PROXY_TOKEN} → the stored key) and forwards to the operator-configured
+     * upstream. The container needs no internet and never sees the key.
+     *
+     * <p>OPENAI uses Pi's native {@code openai-completions} provider (the universal {@code /chat/completions}
+     * format — OpenAI, vLLM, Open WebUI) via the {@code PI_HEPHAESTUS_*} vars the runner registers.
+     */
+    private static String proxyMode(LlmProvider provider, @Nullable String modelName, Map<String, String> env) {
         return switch (provider) {
             case AZURE_OPENAI ->
                 // Pi appends /responses to AZURE_OPENAI_BASE_URL — must end at /openai (not /openai/v1)
@@ -61,9 +69,15 @@ public final class LlmProxyAuthShell {
                 AZURE_API_VERSION +
                 "\"" +
                 " && ";
-            case OPENAI -> "export OPENAI_BASE_URL=\"$LLM_PROXY_URL\"" +
-            " OPENAI_API_KEY=\"$LLM_PROXY_TOKEN\"" +
-            " && ";
+            case OPENAI -> {
+                // PI_HEPHAESTUS_API_KEY carries the per-job proxy token (NOT the real key); the proxy swaps it.
+                if (modelName != null && !modelName.isBlank()) {
+                    env.put("PI_HEPHAESTUS_MODEL", modelName);
+                }
+                yield "export PI_HEPHAESTUS_BASE_URL=\"$LLM_PROXY_URL\"" +
+                " PI_HEPHAESTUS_API_KEY=\"$LLM_PROXY_TOKEN\"" +
+                " && ";
+            }
             case ANTHROPIC -> "export ANTHROPIC_BASE_URL=\"$LLM_PROXY_URL\"" +
             " ANTHROPIC_API_KEY=\"$LLM_PROXY_TOKEN\"" +
             " && ";
@@ -78,7 +92,7 @@ public final class LlmProxyAuthShell {
         Map<String, String> env
     ) {
         if (credential == null) {
-            throw new IllegalArgumentException("credential must not be null in API_KEY/OAUTH mode");
+            throw new IllegalArgumentException("credential must not be null in API_KEY mode");
         }
         boolean hasBaseUrl = baseUrl != null && !baseUrl.isBlank();
         return switch (provider) {

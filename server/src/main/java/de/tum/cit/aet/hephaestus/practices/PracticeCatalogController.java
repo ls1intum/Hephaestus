@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGoalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -46,6 +48,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeCatalogController {
 
     private final PracticeService practiceService;
+    private final PracticeGoalService goalService;
 
     @GetMapping
     @Operation(
@@ -160,6 +163,31 @@ public class PracticeCatalogController {
         @Valid @RequestBody UpdatePracticeActiveRequestDTO request
     ) {
         Practice practice = practiceService.setActive(workspaceContext, practiceSlug, request.active());
+        return ResponseEntity.ok(PracticeDTO.from(practice));
+    }
+
+    @PutMapping("/{practiceSlug}/goal")
+    @Operation(
+        summary = "Bind a practice to a goal",
+        description = "Binds the practice to the goal named by goalSlug, or unbinds it when goalSlug is null"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Binding updated",
+        content = @Content(schema = @Schema(implementation = PracticeDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Practice or goal not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<PracticeDTO> bindGoal(
+        WorkspaceContext workspaceContext,
+        @PathVariable String practiceSlug,
+        @Valid @RequestBody BindPracticeGoalRequestDTO request
+    ) {
+        Practice practice = goalService.bindPractice(workspaceContext, practiceSlug, request.goalSlug());
         return ResponseEntity.ok(PracticeDTO.from(practice));
     }
 

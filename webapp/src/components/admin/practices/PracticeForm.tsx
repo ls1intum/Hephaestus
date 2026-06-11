@@ -1,19 +1,44 @@
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
+import type {
+	CreatePracticeRequest,
+	Practice,
+	PracticeGoal,
+	UpdatePracticeRequest,
+} from "@/api/types.gen";
 import { CodeEditor } from "@/components/shared/CodeEditor";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { generateSlug, isValidSlug, TRIGGER_EVENT_OPTIONS } from "./constants";
+import {
+	FOCUS_ARTIFACT_OPTIONS,
+	generateSlug,
+	isValidSlug,
+	TRIGGER_EVENTS_BY_FOCUS,
+	triggerEventsForFocus,
+} from "./constants";
+
+/** Sentinel for the "not bound to any goal" option (shadcn SelectItem cannot use an empty value). */
+const NO_GOAL = "__none__";
+
+type FocusArtifact = NonNullable<CreatePracticeRequest["focusArtifact"]>;
 
 interface PracticeFormCreateProps {
 	mode: "create";
-	onSubmit: (data: CreatePracticeRequest) => void;
+	/** Goals offered in the binding picker. Binding is a separate mutation the container runs after create. */
+	goals: PracticeGoal[];
+	onSubmit: (data: CreatePracticeRequest, goalSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
 	initialData?: never;
@@ -22,7 +47,8 @@ interface PracticeFormCreateProps {
 interface PracticeFormEditProps {
 	mode: "edit";
 	initialData: Practice;
-	onSubmit: (slug: string, data: UpdatePracticeRequest) => void;
+	goals: PracticeGoal[];
+	onSubmit: (slug: string, data: UpdatePracticeRequest, goalSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
 }
@@ -33,6 +59,8 @@ interface FormState {
 	name: string;
 	slug: string;
 	category: string;
+	focusArtifact: FocusArtifact;
+	goalSlug: string;
 	triggerEvents: string[];
 	criteria: string;
 	precomputeScript: string;
@@ -44,6 +72,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 			name: initialData.name,
 			slug: initialData.slug,
 			category: initialData.category ?? "",
+			focusArtifact: initialData.focusArtifact,
+			goalSlug: initialData.goalSlug ?? NO_GOAL,
 			triggerEvents: [...initialData.triggerEvents],
 			criteria: initialData.criteria,
 			precomputeScript: initialData.precomputeScript ?? "",
@@ -53,6 +83,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 		name: "",
 		slug: "",
 		category: "",
+		focusArtifact: "PULL_REQUEST",
+		goalSlug: NO_GOAL,
 		triggerEvents: [],
 		criteria: "",
 		precomputeScript: "",
@@ -61,6 +93,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 
 export function PracticeForm({
 	mode,
+	goals,
 	onSubmit,
 	onCancel,
 	isPending,
@@ -68,6 +101,9 @@ export function PracticeForm({
 }: PracticeFormProps) {
 	const [form, setForm] = useState<FormState>(() => getInitialState(mode, initialData));
 	const [submitted, setSubmitted] = useState(false);
+	// Precompute is optional support — the LLM does the heavy lifting — so it stays collapsed unless the
+	// practice already has a script, keeping the criteria (the product) the focus of the form.
+	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 
 	const handleNameChange = (name: string) => {
 		setForm((prev) => {
@@ -115,25 +151,29 @@ export function PracticeForm({
 		setSubmitted(true);
 		if (!isValid) return;
 
+		const goalSlug = form.goalSlug === NO_GOAL ? null : form.goalSlug;
+
 		if (mode === "create") {
 			const data: CreatePracticeRequest = {
 				name: form.name,
 				slug: form.slug,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
+				focusArtifact: form.focusArtifact,
 				...(form.category.trim() ? { category: form.category.trim() } : {}),
 				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
 			};
-			onSubmit(data);
+			onSubmit(data, goalSlug);
 		} else {
 			const data: UpdatePracticeRequest = {
 				name: form.name,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
+				focusArtifact: form.focusArtifact,
 				category: form.category.trim() || undefined,
 				precomputeScript: form.precomputeScript.trim() || undefined,
 			};
-			onSubmit(initialData.slug, data);
+			onSubmit(initialData.slug, data, goalSlug);
 		}
 	};
 
@@ -237,6 +277,76 @@ export function PracticeForm({
 										maxLength={64}
 									/>
 								</div>
+
+								<div className="grid gap-4 sm:grid-cols-2">
+									<div className="grid gap-2">
+										<Label htmlFor="practice-focus">Evaluates</Label>
+										<Select
+											value={form.focusArtifact}
+											onValueChange={(value) =>
+												setForm((prev) => {
+													const focusArtifact = value as FocusArtifact;
+													// Drop any selected triggers that don't belong to the new focus —
+													// the server rejects cross-focus combinations.
+													const allowed = triggerEventsForFocus(focusArtifact);
+													return {
+														...prev,
+														focusArtifact,
+														triggerEvents: prev.triggerEvents.filter((e) => allowed.includes(e)),
+													};
+												})
+											}
+										>
+											<SelectTrigger id="practice-focus">
+												<SelectValue>
+													{
+														FOCUS_ARTIFACT_OPTIONS.find((o) => o.value === form.focusArtifact)
+															?.label
+													}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												{FOCUS_ARTIFACT_OPTIONS.map((option) => (
+													<SelectItem key={option.value} value={option.value}>
+														{option.label}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<p className="text-xs text-muted-foreground">
+											{FOCUS_ARTIFACT_OPTIONS.find((o) => o.value === form.focusArtifact)?.hint}
+										</p>
+									</div>
+
+									<div className="grid gap-2">
+										<Label htmlFor="practice-goal">Goal</Label>
+										<Select
+											value={form.goalSlug}
+											onValueChange={(value) =>
+												setForm((prev) => ({ ...prev, goalSlug: value ?? NO_GOAL }))
+											}
+										>
+											<SelectTrigger id="practice-goal">
+												<SelectValue placeholder="Not assigned">
+													{form.goalSlug === NO_GOAL
+														? undefined
+														: goals.find((g) => g.slug === form.goalSlug)?.name}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value={NO_GOAL}>Not assigned</SelectItem>
+												{goals.map((goal) => (
+													<SelectItem key={goal.slug} value={goal.slug}>
+														{goal.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<p className="text-xs text-muted-foreground">
+											The learning objective this practice rolls up to.
+										</p>
+									</div>
+								</div>
 							</div>
 						</section>
 
@@ -250,13 +360,14 @@ export function PracticeForm({
 								aria-describedby={triggerError ? "trigger-error" : undefined}
 							>
 								<div>
-									<legend className="text-lg font-semibold">Trigger Events *</legend>
+									<legend className="text-lg font-semibold">Run this practice when… *</legend>
 									<p className="text-sm text-muted-foreground">
-										Domain events that trigger this practice's evaluation.
+										Pick the {form.focusArtifact === "ISSUE" ? "issue" : "pull request"} activity
+										that should trigger an evaluation.
 									</p>
 								</div>
 								<div className="grid grid-cols-2 gap-3">
-									{TRIGGER_EVENT_OPTIONS.map((option) => (
+									{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
 										<Label
 											key={option.value}
 											htmlFor={`trigger-${option.value}`}
@@ -310,21 +421,39 @@ export function PracticeForm({
 
 						<Separator />
 
-						{/* Section: Precompute Script */}
+						{/* Section: Advanced — precompute script (optional support; the LLM does the heavy lifting) */}
 						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">Precompute Script</h2>
-								<p className="text-sm text-muted-foreground">
-									TypeScript/Bun script that runs static analysis before the AI review. Produces
-									structured hints from diff and file inspection.
-								</p>
-							</div>
-							<CodeEditor
-								value={form.precomputeScript}
-								onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
-								language="typescript"
-								className="h-[400px]"
-							/>
+							<button
+								type="button"
+								onClick={() => setShowAdvanced((open) => !open)}
+								className="flex items-center gap-1.5 text-lg font-semibold"
+								aria-expanded={showAdvanced}
+							>
+								{showAdvanced ? (
+									<ChevronDown className="h-4 w-4" />
+								) : (
+									<ChevronRight className="h-4 w-4" />
+								)}
+								Advanced
+								<span className="text-sm font-normal text-muted-foreground">
+									— precompute script (optional)
+								</span>
+							</button>
+							{showAdvanced && (
+								<>
+									<p className="text-sm text-muted-foreground">
+										An optional TypeScript/Bun script that runs static analysis before the AI review
+										and feeds it structured hints. Most practices need none — the AI evaluates the
+										criteria directly.
+									</p>
+									<CodeEditor
+										value={form.precomputeScript}
+										onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
+										language="typescript"
+										className="h-[400px]"
+									/>
+								</>
+							)}
 						</section>
 					</div>
 				</div>

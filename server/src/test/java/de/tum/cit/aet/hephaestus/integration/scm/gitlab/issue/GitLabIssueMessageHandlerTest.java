@@ -94,14 +94,18 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void updateAction_routesToProcess() throws IOException {
+        void updateAction_routesToProcessUpdated() throws IOException {
+            // GitLab has no native "labeled" action — a label add arrives as action=update with a
+            // changes.labels diff. UPDATE therefore routes to processUpdated (which derives the added
+            // labels and publishes IssueLabeled), not the plain process() path.
             GitLabIssueEventDTO event = createEvent("update", "closed", false);
             setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
 
-            verify(issueProcessor).process(eq(event), any(ProcessingContext.class));
+            verify(issueProcessor).processUpdated(eq(event), any(ProcessingContext.class));
+            verify(issueProcessor, never()).process(any(), any());
         }
 
         @Test
@@ -183,6 +187,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
                 createProject(),
                 attrs,
                 null,
+                null,
                 null
             );
 
@@ -205,6 +210,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
                 "issue",
                 createUser(),
                 createProject(),
+                null,
                 null,
                 null,
                 null
@@ -240,6 +246,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
                 createUser(),
                 null,
                 attrs,
+                null,
                 null,
                 null
             );
@@ -312,6 +319,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             createProject(),
             attrs,
             List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+            null,
             null
         );
     }

@@ -158,6 +158,21 @@ class DeliveryComposerTest extends BaseUnitTest {
         return findings;
     }
 
+    @Test
+    void compose_forIssueArtifact_dropsBeforeMergingFromBlockingCta() {
+        // Issues are not merged: the blocking CTA must read "to fix", never "to fix before merging".
+        DeliveryContent result = DeliveryComposer.compose(
+            mixedFindings(),
+            de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.ISSUE
+        );
+
+        assertThat(result).isNotNull();
+        String mrNote = result.mrNote();
+        assertThat(mrNote).contains("2 issues to fix");
+        assertThat(mrNote).doesNotContain("before merging");
+        assertThat(mrNote).contains("2 suggestions for improvement");
+    }
+
     // Test 1: Mixed findings
 
     @Test
@@ -219,7 +234,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     // Test 2: All positive findings produce an approval comment
 
     @Test
-    void compose_withAllPositive_producesApprovalNote() {
+    void compose_withAllPositive_producesObservationNoteWithoutPraise() {
         List<ValidatedFinding> findings = List.of(
             positiveFinding("error-state-handling"),
             positiveFinding("view-decomposition"),
@@ -229,9 +244,35 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent result = DeliveryComposer.compose(findings);
 
         assertThat(result).isNotNull();
-        assertThat(result.mrNote()).contains("No issues found");
-        assertThat(result.mrNote()).contains("error state handling");
-        assertThat(result.mrNote()).contains("view decomposition");
+        assertThat(result.mrNote()).contains("Reviewed against the active practices");
+        // Mentoring stance: feedback stays on the work, never self-level praise.
+        assertThat(result.mrNote()).doesNotContain("Nice work").doesNotContain("stood out");
+        assertThat(result.diffNotes()).isEmpty();
+    }
+
+    @Test
+    void compose_withAllPositiveAndReasoning_listsEvidenceAnchoredObservations() {
+        ValidatedFinding withReasoning = new ValidatedFinding(
+            "error-state-handling",
+            "Error state handling (positive)",
+            Verdict.POSITIVE,
+            Severity.INFO,
+            0.95f,
+            null,
+            "Network errors are surfaced to the user via an alert.",
+            null,
+            List.of()
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(withReasoning));
+
+        assertThat(result).isNotNull();
+        assertThat(result.mrNote())
+            .contains("What I observed")
+            .contains("Error state handling")
+            .contains("Network errors are surfaced")
+            .doesNotContain("Nice work")
+            .doesNotContain("No issues found");
         assertThat(result.diffNotes()).isEmpty();
     }
 

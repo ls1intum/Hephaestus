@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Request DTO for creating a new practice definition.
@@ -47,5 +49,12 @@ public record CreatePracticeRequestDTO(
 
     @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
-    String precomputeScript
+    String precomputeScript,
+
+    @Schema(
+        description = "Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.",
+        example = "PULL_REQUEST"
+    )
+    @Nullable
+    FocusArtifact focusArtifact
 ) {}

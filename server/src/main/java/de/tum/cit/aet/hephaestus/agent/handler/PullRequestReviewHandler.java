@@ -17,10 +17,8 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,9 +29,9 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -75,34 +73,37 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     private final JsonMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
-    private final PracticeRepository practiceRepository;
+    private final PracticeCatalogInjector practiceCatalogInjector;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
     private final GitDiffOperations gitDiffOperations;
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
+    private final SecretDiffScanner secretDiffScanner;
 
     PullRequestReviewHandler(
         JsonMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
-        PracticeRepository practiceRepository,
+        PracticeCatalogInjector practiceCatalogInjector,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
         GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService
+        FeedbackDeliveryService feedbackService,
+        SecretDiffScanner secretDiffScanner
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
-        this.practiceRepository = practiceRepository;
+        this.practiceCatalogInjector = practiceCatalogInjector;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
         this.gitDiffOperations = gitDiffOperations;
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
+        this.secretDiffScanner = secretDiffScanner;
     }
 
     @Override
@@ -129,6 +130,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put("commit_sha", submissionRequest.headRefOid());
         metadata.put("source_branch", submissionRequest.headRefName());
         metadata.put("target_branch", submissionRequest.baseRefName());
+        // The MR title + description are the sole inputs for the communication/process practices
+        // (mr-description-quality, commit-discipline) — their precompute scripts read metadata.title /
+        // metadata.body. Without these the practices silently can't evaluate.
+        metadata.put("title", pullRequestData.title());
+        metadata.put("body", pullRequestData.body());
 
         String idempotencyKey =
             "pr_review:" +
@@ -164,7 +170,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // Task envelope replaces the legacy /workspace/.prompt file.
         files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
-        injectPracticeContext(files, job);
+        practiceCatalogInjector.inject(files, job, FocusArtifact.PULL_REQUEST);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -230,95 +236,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return prompt;
     }
 
-    // Practice catalog injection (intentionally kept here — per-job, not provider-shaped)
-
-    /**
-     * Inject the practice registry, criteria, and precompute scripts into the workspace. These
-     * files drive the Pi agent's behaviour and are per-job (workspace-active practices), so they
-     * are not handled by the generic {@code ContentProvider} SPI.
-     */
-    private void injectPracticeContext(Map<String, byte[]> files, AgentJob job) {
-        if (job.getWorkspace() == null) {
-            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
-        }
-        Long workspaceId = job.getWorkspace().getId();
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
-        if (practices.isEmpty()) {
-            throw new JobPreparationException(
-                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
-            );
-        }
-        // Defense in depth: slugs are interpolated into filesystem paths below; reject any
-        // value that doesn't match the ABI pattern before it can escape ".practices/" / ".precompute/".
-        for (Practice p : practices) {
-            String slug = p.getSlug();
-            if (slug == null || !WorkspaceAbi.PRACTICE_SLUG.matcher(slug).matches()) {
-                throw new JobPreparationException(
-                    "Practice slug fails ABI pattern " + WorkspaceAbi.PRACTICE_SLUG.pattern() + ": " + slug
-                );
-            }
-        }
-
-        StringBuilder indexJson = new StringBuilder("[\n");
-        for (int i = 0; i < practices.size(); i++) {
-            Practice p = practices.get(i);
-            if (i > 0) indexJson.append(",\n");
-            indexJson
-                .append("  {\"slug\": \"")
-                .append(escapeJson(p.getSlug()))
-                .append("\", \"name\": \"")
-                .append(escapeJson(p.getName()))
-                .append("\", \"category\": \"")
-                .append(escapeJson(p.getCategory() != null ? p.getCategory() : ""))
-                .append("\"}");
-        }
-        indexJson.append("\n]");
-        files.put(WorkspaceAbi.PRACTICES_PREFIX + "index.json", indexJson.toString().getBytes(StandardCharsets.UTF_8));
-
-        StringBuilder bundle = new StringBuilder();
-        for (Practice p : practices) {
-            String criteria = p.getCriteria();
-            files.put(WorkspaceAbi.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
-            bundle.append("# ").append(p.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
-        }
-        files.put(
-            WorkspaceAbi.PRACTICES_PREFIX + "all-criteria.md",
-            bundle.toString().getBytes(StandardCharsets.UTF_8)
-        );
-
-        files.put(WorkspaceAbi.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
-
-        int precomputeCount = 0;
-        for (Practice p : practices) {
-            String script = p.getPrecomputeScript();
-            if (script != null && !script.isBlank()) {
-                files.put(
-                    WorkspaceAbi.PRECOMPUTE_PREFIX + "practices/" + p.getSlug() + ".ts",
-                    script.getBytes(StandardCharsets.UTF_8)
-                );
-                precomputeCount++;
-            }
-        }
-
-        log.info(
-            "Injected orchestrator files: {} practices ({} with precompute scripts), workspaceId={}, jobId={}",
-            practices.size(),
-            precomputeCount,
-            workspaceId,
-            job.getId()
-        );
-    }
-
-    /** JSON string escaping via Jackson (handles all control characters correctly). */
-    private String escapeJson(String s) {
-        try {
-            String quoted = objectMapper.writeValueAsString(s);
-            return quoted.substring(1, quoted.length() - 1);
-        } catch (JacksonException e) {
-            return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
-        }
-    }
-
     // Delivery
 
     @Override
@@ -338,11 +255,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
+        // Deterministic, LLM-independent secret pre-pass over the raw diff. This catches a committed
+        // credential even when the model abstains, the precompute crashes, or the clone is checked
+        // out at the merge base (so a working-tree grep finds nothing). The synthetic NEGATIVE
+        // findings flow through the normal persist+compose+deliver path and force the green→red flip.
+        List<PracticeDetectionResultParser.ValidatedFinding> secretFindings = scanForSecrets(
+            job,
+            parsed.validFindings()
+        );
+
         boolean allNotApplicable = parsed
             .validFindings()
             .stream()
             .allMatch(f -> f.verdict() == Verdict.NOT_APPLICABLE);
-        if (allNotApplicable) {
+        if (allNotApplicable && secretFindings.isEmpty()) {
             Set<String> diffFiles = computeDiffStatFiles(job);
             boolean hasDiffContent = !diffFiles.isEmpty();
             if (hasDiffContent) {
@@ -357,7 +283,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         Set<String> diffFiles = computeDiffStatFiles(job);
-        var scopedFindings = filterByDiffScope(parsed.validFindings(), diffFiles);
+        var scopedFindings = new ArrayList<>(filterByDiffScope(parsed.validFindings(), diffFiles));
         if (scopedFindings.size() < parsed.validFindings().size()) {
             log.info(
                 "Diff scope filter removed {} out-of-scope findings: jobId={}, before={}, after={}",
@@ -365,6 +291,16 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 job.getId(),
                 parsed.validFindings().size(),
                 scopedFindings.size()
+            );
+        }
+        // Secret findings are inherently in-diff (their location is an added line) — inject AFTER the
+        // diff-scope filter so a path-normalisation mismatch can never silently drop a credential.
+        if (!secretFindings.isEmpty()) {
+            scopedFindings.addAll(secretFindings);
+            log.warn(
+                "Secret pre-pass injected {} hardcoded-secrets NEGATIVE finding(s); blocking any all-clear comment: jobId={}",
+                secretFindings.size(),
+                job.getId()
             );
         }
         if (scopedFindings.isEmpty()) {
@@ -415,9 +351,78 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     // Delivery-phase diff helpers (use GitDiffOperations; no longer duplicated in the handler)
 
-    private Map<String, TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
+    /**
+     * Run the deterministic secret pre-pass over the job's raw diff and map each hit to a synthetic
+     * {@code hardcoded-secrets} NEGATIVE finding. Hits already covered by an LLM-produced
+     * hardcoded-secrets finding (same matched token already quoted) are skipped to avoid double-posting.
+     */
+    private List<PracticeDetectionResultParser.ValidatedFinding> scanForSecrets(
+        AgentJob job,
+        List<PracticeDetectionResultParser.ValidatedFinding> existing
+    ) {
+        String diff = computeUnifiedDiff(job);
+        List<SecretDiffScanner.SecretHit> hits = secretDiffScanner.scan(diff);
+        if (hits.isEmpty()) return List.of();
+
+        // Tokens an LLM finding already quotes — don't re-post the same credential.
+        Set<String> llmQuoted = new HashSet<>();
+        for (var f : existing) {
+            if (
+                "hardcoded-secrets".equals(f.practiceSlug()) && f.verdict() == Verdict.NEGATIVE && f.evidence() != null
+            ) {
+                llmQuoted.add(f.evidence().toString());
+            }
+        }
+
+        List<PracticeDetectionResultParser.ValidatedFinding> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (SecretDiffScanner.SecretHit hit : hits) {
+            String key = hit.path() + ":" + hit.newLine() + ":" + hit.ruleId();
+            if (!seen.add(key)) continue;
+            if (llmQuoted.stream().anyMatch(q -> q.contains(hit.matchedToken()))) continue;
+            out.add(toSecretFinding(hit));
+        }
+        return out;
+    }
+
+    private PracticeDetectionResultParser.ValidatedFinding toSecretFinding(SecretDiffScanner.SecretHit hit) {
+        ObjectNode evidence = objectMapper.createObjectNode();
+        ArrayNode locations = evidence.putArray("locations");
+        ObjectNode location = locations.addObject();
+        location.put("path", hit.path());
+        location.put("startLine", hit.newLine());
+        ArrayNode snippets = evidence.putArray("snippets");
+        snippets.add(hit.addedLine());
+
+        boolean lowSignal = secretDiffScanner.isLowSignalPath(hit.path());
+        de.tum.cit.aet.hephaestus.practices.model.Severity severity = (hit.isCritical() && !lowSignal)
+            ? de.tum.cit.aet.hephaestus.practices.model.Severity.CRITICAL
+            : de.tum.cit.aet.hephaestus.practices.model.Severity.MAJOR;
+
+        String reasoning =
+            "A credential appears on a changed line: `" +
+            hit.addedLine() +
+            "`. Committed secrets remain in the git history permanently — even after the line is removed — so the key must be treated as compromised.";
+        String guidance =
+            "Remove the literal value, rotate the credential immediately, and load it at runtime from an environment variable or a secrets manager instead of hardcoding it.";
+
+        return new PracticeDetectionResultParser.ValidatedFinding(
+            "hardcoded-secrets",
+            "Hardcoded secret on a changed line",
+            Verdict.NEGATIVE,
+            severity,
+            1.0f,
+            evidence,
+            reasoning,
+            guidance,
+            List.of()
+        );
+    }
+
+    /** Raw (un-annotated) unified diff for the job's PR range, or null when unavailable. */
+    private String computeUnifiedDiff(AgentJob job) {
         JsonNode metadata = job.getMetadata();
-        if (metadata == null) return Map.of();
+        if (metadata == null) return null;
 
         long repositoryId;
         String headSha, targetBranch, sourceBranch;
@@ -427,19 +432,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             targetBranch = requireText(metadata, "target_branch");
             sourceBranch = requireText(metadata, "source_branch");
         } catch (Exception e) {
-            log.debug("Cannot compute diff valid lines, missing metadata: {}", e.getMessage());
-            return Map.of();
+            log.debug("Cannot compute unified diff, missing metadata: {}", e.getMessage());
+            return null;
         }
 
-        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return Map.of();
+        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return null;
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
         String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
-        if (range == null) return Map.of();
+        if (range == null) return null;
 
         String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
-        if (diff == null || diff.isBlank()) return Map.of();
+        return (diff == null || diff.isBlank()) ? null : diff;
+    }
 
+    private Map<String, TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
+        String diff = computeUnifiedDiff(job);
+        if (diff == null) return Map.of();
         return DiffHunkValidator.parseValidLines(diff);
     }
 

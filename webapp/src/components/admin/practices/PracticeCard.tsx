@@ -34,6 +34,9 @@ export function PracticeCard({
 				<div className="flex items-start justify-between gap-3">
 					<div className="flex-1 min-w-0">
 						<div className="flex items-center gap-2 mb-0.5">
+							<Badge variant="outline" className="text-xs">
+								{practice.focusArtifact === "ISSUE" ? "Issue" : "Pull request"}
+							</Badge>
 							{practice.category && (
 								<Badge variant="secondary" className="text-xs">
 									{practice.category}
@@ -70,7 +73,7 @@ export function PracticeCard({
 							size="icon-sm"
 							render={
 								<Link
-									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+									to="/w/$workspaceSlug/admin/ai/practice-detection/catalog/$practiceSlug"
 									params={{ workspaceSlug, practiceSlug: practice.slug }}
 								/>
 							}
@@ -101,11 +104,9 @@ export function PracticeCard({
 					</div>
 				)}
 
-				<div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2">
-					<FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden="true" />
-					<p className="text-sm text-muted-foreground line-clamp-3 whitespace-pre-line">
-						{practice.criteria}
-					</p>
+				<div className="flex items-center gap-2 text-muted-foreground">
+					<FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+					<p className="text-sm line-clamp-1">{practice.criteria}</p>
 				</div>
 			</CardContent>
 		</Card>

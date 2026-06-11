@@ -23,6 +23,8 @@ public final class ScmDomainEvent {
         public static final String PULL_REQUEST_READY = "PullRequestReady";
         public static final String PULL_REQUEST_SYNCHRONIZED = "PullRequestSynchronized";
         public static final String REVIEW_SUBMITTED = "ReviewSubmitted";
+        public static final String ISSUE_CREATED = "IssueCreated";
+        public static final String ISSUE_LABELED = "IssueLabeled";
 
         private TriggerEventNames() {}
     }

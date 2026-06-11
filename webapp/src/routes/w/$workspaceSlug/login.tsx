@@ -51,6 +51,7 @@ function WorkspaceLoginPage() {
 			description="Sign in to continue to this workspace."
 			error={error}
 			onSignIn={(registrationId) => login(registrationId, `/w/${workspaceSlug}`)}
+			devReturnTo={`/w/${workspaceSlug}`}
 		/>
 	);
 }

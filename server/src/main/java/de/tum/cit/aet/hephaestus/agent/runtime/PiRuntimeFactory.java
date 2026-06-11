@@ -156,11 +156,6 @@ public class PiRuntimeFactory {
         };
     }
 
-    /** Two-arg overload for tests that don't exercise custom-provider routing. */
-    byte[] buildPiSettingsJson(LlmProvider provider, @Nullable String modelName) {
-        return buildPiSettingsJson(provider, modelName, false);
-    }
-
     /**
      * Build the settings JSON Pi loads at session start. When {@code useCustomProvider} is true,
      * {@code defaultProvider} resolves to the {@code hephaestus} provider that the runner script
@@ -195,13 +190,17 @@ public class PiRuntimeFactory {
 
     /**
      * True when the spec routes the LLM through the {@code hephaestus} custom provider that the
-     * runner script registers directly on the ModelRegistry: non-Azure providers in
-     * API_KEY/OAUTH mode with a non-blank {@code baseUrl}. PROXY mode and Azure both have their
-     * own routing primitives (proxy URL injected at runtime; Azure deployment-name map).
+     * runner script registers directly on the ModelRegistry: OpenAI over the proxy (Pi's native
+     * {@code openai-completions} wire format), or a non-Azure provider in direct API_KEY mode with
+     * a gateway {@code baseUrl}. Azure always uses its own deployment-name routing; Anthropic over
+     * the proxy keeps its native Messages API.
      */
     static boolean useHephaestusProvider(PiPlanSpec spec) {
-        if (spec.credentialMode() == CredentialMode.PROXY) return false;
         if (spec.provider() == LlmProvider.AZURE_OPENAI) return false;
+        // OpenAI rides the proxy via Pi's native openai-completions provider (universal /chat/completions);
+        // Anthropic keeps its Messages API.
+        if (spec.credentialMode() == CredentialMode.PROXY) return spec.provider() == LlmProvider.OPENAI;
+        // Direct (operator/worker) mode: custom provider only when a gateway base URL is set.
         return spec.baseUrl() != null && !spec.baseUrl().isBlank();
     }
 

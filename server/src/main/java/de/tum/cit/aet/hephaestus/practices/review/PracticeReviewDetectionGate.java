@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -93,30 +94,56 @@ public class PracticeReviewDetectionGate {
         @NonNull String triggerEventName,
         @NonNull TriggerMode triggerMode
     ) {
-        // 1. Draft gate
-        if (properties.skipDrafts() && pullRequest.isDraft()) {
-            log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", pullRequest.getId());
-            return new GateDecision.Skip("draft PR");
-        }
+        return evaluateReviewable(pullRequest, pullRequest.isDraft(), triggerEventName, triggerMode);
+    }
 
-        // 2. Workspace resolution
+    /**
+     * Issue-side counterpart of {@link #evaluate}: runs the same workspace / feature / trigger-mode /
+     * agent-config / practice-matching / role checks for an issue event. Practice matching filters by
+     * the stored trigger-event strings, so only ISSUE-focused practices (which alone carry issue
+     * trigger events) match — PR-only workspaces short-circuit with no extra cost. There is no draft
+     * concept for issues, so that check is skipped.
+     *
+     * @param issue the issue (must have repository + assignees eagerly loaded)
+     */
+    public GateDecision evaluateIssue(
+        @NonNull Issue issue,
+        @NonNull String triggerEventName,
+        @NonNull TriggerMode triggerMode
+    ) {
+        return evaluateReviewable(issue, false, triggerEventName, triggerMode);
+    }
+
+    private GateDecision evaluateReviewable(
+        @NonNull Issue reviewable,
+        boolean draft,
+        @NonNull String triggerEventName,
+        @NonNull TriggerMode triggerMode
+    ) {
+        // 1. Workspace resolution (first — per-workspace settings drive the draft gate below)
         String nameWithOwner =
-            pullRequest.getRepository() != null ? pullRequest.getRepository().getNameWithOwner() : null;
+            reviewable.getRepository() != null ? reviewable.getRepository().getNameWithOwner() : null;
         Workspace workspace = workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
         if (workspace == null) {
             log.debug(
                 "Practice review gate: SKIP, reason=noWorkspace, prId={}, repo={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 nameWithOwner
             );
             return new GateDecision.Skip("no workspace");
+        }
+
+        // 2. Draft gate (per-workspace skipDrafts override, falls back to the fleet property)
+        if (workspace.getReviewSettings().resolveSkipDrafts(properties.skipDrafts()) && draft) {
+            log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", reviewable.getId());
+            return new GateDecision.Skip("draft PR");
         }
 
         // 2a. Practices feature must be enabled for the workspace (complete block)
         if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())) {
             log.debug(
                 "Practice review gate: SKIP, reason=practicesDisabled, prId={}, workspaceId={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 workspace.getId()
             );
             return new GateDecision.Skip("practices disabled for workspace");
@@ -129,7 +156,7 @@ public class PracticeReviewDetectionGate {
         ) {
             log.debug(
                 "Practice review gate: SKIP, reason=autoTriggerDisabled, prId={}, workspaceId={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 workspace.getId()
             );
             return new GateDecision.Skip("auto-trigger disabled for workspace");
@@ -140,7 +167,7 @@ public class PracticeReviewDetectionGate {
         ) {
             log.debug(
                 "Practice review gate: SKIP, reason=manualTriggerDisabled, prId={}, workspaceId={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 workspace.getId()
             );
             return new GateDecision.Skip("manual trigger disabled for workspace");
@@ -150,7 +177,7 @@ public class PracticeReviewDetectionGate {
         if (!agentConfigChecker.hasEnabledConfig(workspace.getId())) {
             log.debug(
                 "Practice review gate: SKIP, reason=noEnabledAgentConfig, prId={}, workspaceId={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 workspace.getId()
             );
             return new GateDecision.Skip("no enabled agent config");
@@ -161,33 +188,33 @@ public class PracticeReviewDetectionGate {
         if (matchedPractices.isEmpty()) {
             log.debug(
                 "Practice review gate: SKIP, reason=noMatchingPractices, prId={}, triggerEvent={}, workspaceId={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 triggerEventName,
                 workspace.getId()
             );
             return new GateDecision.Skip("no matching practices");
         }
 
-        // 5. Run-for-all bypass: skip role check entirely
-        if (properties.runForAllUsers()) {
+        // 5. Run-for-all bypass: skip role check entirely (per-workspace override, falls back to property)
+        if (workspace.getReviewSettings().resolveRunForAllUsers(properties.runForAllUsers())) {
             log.info(
                 "Practice review gate: DETECT, reason=runForAllUsers, prId={}, matchedPractices={}",
-                pullRequest.getId(),
+                reviewable.getId(),
                 matchedPractices.size()
             );
             return new GateDecision.Detect(workspace, matchedPractices);
         }
 
         // 6. Assignee gate: at least one assignee required for role checking
-        var assignees = pullRequest.getAssignees();
+        var assignees = reviewable.getAssignees();
         if (assignees == null || assignees.isEmpty()) {
-            log.debug("Practice review gate: SKIP, reason=noAssignee, prId={}", pullRequest.getId());
+            log.debug("Practice review gate: SKIP, reason=noAssignee, prId={}", reviewable.getId());
             return new GateDecision.Skip("no assignee");
         }
 
         // 7. Role-checker health gate
         if (!userRoleChecker.isHealthy()) {
-            logSkippedDueToUnhealthy(pullRequest);
+            logSkippedDueToUnhealthy(reviewable);
             return new GateDecision.Skip("role checker unhealthy");
         }
 
@@ -198,7 +225,7 @@ public class PracticeReviewDetectionGate {
         }
 
         // 8. Role check: DETECT if ANY assignee has the role
-        return checkAssigneeRoles(pullRequest, assignees, workspace, matchedPractices);
+        return checkAssigneeRoles(reviewable, assignees, workspace, matchedPractices);
     }
 
     /**
@@ -210,7 +237,7 @@ public class PracticeReviewDetectionGate {
      * this catch handles unexpected failures that slip through.
      */
     private GateDecision checkAssigneeRoles(
-        PullRequest pullRequest,
+        Issue reviewable,
         Set<User> assignees,
         Workspace workspace,
         List<Practice> matchedPractices
@@ -234,7 +261,7 @@ public class PracticeReviewDetectionGate {
                 ) {
                     log.info(
                         "Practice review gate: DETECT, reason=hasRole, prId={}, userLogin={}, matchedPractices={}",
-                        pullRequest.getId(),
+                        reviewable.getId(),
                         assignee.getLogin(),
                         matchedPractices.size()
                     );
@@ -243,7 +270,7 @@ public class PracticeReviewDetectionGate {
             } catch (Exception e) {
                 log.warn(
                     "Practice review gate: role check failed, prId={}, userLogin={}, error={}",
-                    pullRequest.getId(),
+                    reviewable.getId(),
                     assignee.getLogin(),
                     e.getMessage()
                 );
@@ -253,7 +280,7 @@ public class PracticeReviewDetectionGate {
 
         log.debug(
             "Practice review gate: SKIP, reason=noAssigneeWithRole, prId={}, role={}",
-            pullRequest.getId(),
+            reviewable.getId(),
             PRACTICE_REVIEW_ROLE
         );
         return new GateDecision.Skip("no assignee with role: " + PRACTICE_REVIEW_ROLE);
@@ -279,14 +306,14 @@ public class PracticeReviewDetectionGate {
         return false;
     }
 
-    private void logSkippedDueToUnhealthy(PullRequest pullRequest) {
+    private void logSkippedDueToUnhealthy(Issue reviewable) {
         long currentCount = skippedDueToUnhealthyCount.incrementAndGet();
         Instant now = Instant.now();
         Instant lastWarning = lastSkipWarningTime.get();
 
         log.debug(
             "Practice review gate: SKIP, reason=roleCheckerUnhealthy, prId={}, skippedCount={}",
-            pullRequest.getId(),
+            reviewable.getId(),
             currentCount
         );
 

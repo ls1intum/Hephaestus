@@ -1,0 +1,220 @@
+import { ArrowDown, ArrowUp, Check, Plus, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import type { Practice, PracticeGoal } from "@/api/types.gen";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+
+interface PracticeGoalsPanelProps {
+	goals: PracticeGoal[];
+	practices: Practice[];
+	onCreate: (name: string) => void;
+	onRename: (slug: string, name: string) => void;
+	onToggleActive: (slug: string, active: boolean) => void;
+	onDelete: (slug: string) => void;
+	/** Persist a new top-to-bottom ordering of all goal slugs. */
+	onReorder: (orderedSlugs: string[]) => void;
+	isMutating: boolean;
+}
+
+/**
+ * Presentational CRUD surface for practice goals: create, rename inline, toggle active, and delete.
+ * A goal is just a grouping — deleting it unbinds its practices (they keep their definitions), which
+ * the delete confirmation states plainly.
+ */
+export function PracticeGoalsPanel({
+	goals,
+	practices,
+	onCreate,
+	onRename,
+	onToggleActive,
+	onDelete,
+	onReorder,
+	isMutating,
+}: PracticeGoalsPanelProps) {
+	const [newName, setNewName] = useState("");
+	const [editingSlug, setEditingSlug] = useState<string | null>(null);
+	const [editDraft, setEditDraft] = useState("");
+
+	const countFor = (slug: string) => practices.filter((p) => p.goalSlug === slug).length;
+
+	/** Swap the goal at `index` with its neighbour and persist the whole new ordering. */
+	const move = (index: number, direction: -1 | 1) => {
+		const target = index + direction;
+		if (target < 0 || target >= goals.length) return;
+		const slugs = goals.map((g) => g.slug);
+		[slugs[index], slugs[target]] = [slugs[target], slugs[index]];
+		onReorder(slugs);
+	};
+
+	const submitNew = () => {
+		const name = newName.trim();
+		if (name.length < 3) return;
+		onCreate(name);
+		setNewName("");
+	};
+
+	const commitRename = (slug: string) => {
+		const name = editDraft.trim();
+		if (name.length >= 3) onRename(slug, name);
+		setEditingSlug(null);
+	};
+
+	return (
+		<div className="space-y-6">
+			<div>
+				<h2 className="text-lg font-semibold">Goals</h2>
+				<p className="text-sm text-muted-foreground">
+					Goals group related practices into a learning objective. Create your own or adjust the
+					seeded defaults — practices are bound to a goal from the practice editor.
+				</p>
+			</div>
+
+			{/* Add a goal */}
+			<div className="flex items-center gap-2">
+				<Input
+					placeholder="New goal name, e.g. Submitting review-ready work"
+					value={newName}
+					onChange={(e) => setNewName(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") submitNew();
+					}}
+					aria-label="New goal name"
+				/>
+				<Button onClick={submitNew} disabled={newName.trim().length < 3 || isMutating}>
+					<Plus className="h-4 w-4" />
+					Add goal
+				</Button>
+			</div>
+
+			{/* Goals list */}
+			<ul className="divide-y rounded-lg border">
+				{goals.length === 0 && (
+					<li className="px-4 py-6 text-sm text-muted-foreground">
+						No goals yet. Add one above to start grouping practices.
+					</li>
+				)}
+				{goals.map((goal, index) => (
+					<li key={goal.slug} className="flex items-center gap-3 px-4 py-3">
+						{/* Reorder controls — drive the seeded catalog grouping order on the dashboards. */}
+						<div className="flex flex-col">
+							<Button
+								size="icon-sm"
+								variant="ghost"
+								className="h-5 w-5"
+								onClick={() => move(index, -1)}
+								disabled={index === 0 || isMutating}
+								aria-label={`Move ${goal.name} up`}
+							>
+								<ArrowUp className="h-3.5 w-3.5" />
+							</Button>
+							<Button
+								size="icon-sm"
+								variant="ghost"
+								className="h-5 w-5"
+								onClick={() => move(index, 1)}
+								disabled={index === goals.length - 1 || isMutating}
+								aria-label={`Move ${goal.name} down`}
+							>
+								<ArrowDown className="h-3.5 w-3.5" />
+							</Button>
+						</div>
+						<div className="flex-1 min-w-0">
+							{editingSlug === goal.slug ? (
+								<div className="flex items-center gap-1.5">
+									<Input
+										value={editDraft}
+										onChange={(e) => setEditDraft(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === "Enter") commitRename(goal.slug);
+											if (e.key === "Escape") setEditingSlug(null);
+										}}
+										className="h-8"
+										autoFocus
+										aria-label={`Rename ${goal.name}`}
+									/>
+									<Button
+										size="icon-sm"
+										variant="ghost"
+										onClick={() => commitRename(goal.slug)}
+										aria-label="Save name"
+									>
+										<Check className="h-4 w-4" />
+									</Button>
+									<Button
+										size="icon-sm"
+										variant="ghost"
+										onClick={() => setEditingSlug(null)}
+										aria-label="Cancel rename"
+									>
+										<X className="h-4 w-4" />
+									</Button>
+								</div>
+							) : (
+								<div className="flex items-center gap-2">
+									<button
+										type="button"
+										className="font-medium truncate hover:underline"
+										onClick={() => {
+											setEditingSlug(goal.slug);
+											setEditDraft(goal.name);
+										}}
+									>
+										{goal.name}
+									</button>
+									<Badge variant="secondary">{countFor(goal.slug)} practices</Badge>
+									{!goal.active && <Badge variant="outline">Inactive</Badge>}
+								</div>
+							)}
+							<p className="text-xs text-muted-foreground truncate">{goal.slug}</p>
+						</div>
+
+						<Switch
+							checked={goal.active}
+							onCheckedChange={(checked) => onToggleActive(goal.slug, checked)}
+							disabled={isMutating}
+							aria-label={`${goal.active ? "Deactivate" : "Activate"} ${goal.name}`}
+						/>
+
+						<AlertDialog>
+							<AlertDialogTrigger
+								render={
+									<Button size="icon-sm" variant="ghost" aria-label={`Delete ${goal.name}`}>
+										<Trash2 className="h-4 w-4 text-destructive" />
+									</Button>
+								}
+							/>
+							<AlertDialogContent>
+								<AlertDialogHeader>
+									<AlertDialogTitle>Delete “{goal.name}”?</AlertDialogTitle>
+									<AlertDialogDescription>
+										The {countFor(goal.slug)} practices bound to this goal keep their definitions —
+										they just become unassigned. This cannot be undone.
+									</AlertDialogDescription>
+								</AlertDialogHeader>
+								<AlertDialogFooter>
+									<AlertDialogCancel>Cancel</AlertDialogCancel>
+									<AlertDialogAction onClick={() => onDelete(goal.slug)}>
+										Delete goal
+									</AlertDialogAction>
+								</AlertDialogFooter>
+							</AlertDialogContent>
+						</AlertDialog>
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}

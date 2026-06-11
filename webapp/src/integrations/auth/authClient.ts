@@ -60,8 +60,9 @@ function readCookie(name: string): string | undefined {
 /** The CSRF header/cookie pair Spring Security's CookieCsrfTokenRepository expects. */
 export function csrfHeaders(): Record<string, string> {
 	// The double-submit cookie carries the __Host- prefix (host-only + Secure) so a sibling subdomain
-	// cannot toss a forged token onto this host; the echoed header name stays X-XSRF-TOKEN.
-	const token = readCookie("__Host-XSRF-TOKEN");
+	// cannot toss a forged token onto this host; the echoed header name stays X-XSRF-TOKEN. The cookie
+	// name is configurable (environment.xsrfCookieName) because local http E2E drops the __Host- prefix.
+	const token = readCookie(environment.xsrfCookieName);
 	return token ? { "X-XSRF-TOKEN": token } : {};
 }
 
@@ -113,6 +114,26 @@ export const authClient = {
 		url.searchParams.set("mode", "link");
 		url.searchParams.set("returnTo", safeReturnTo(returnTo));
 		window.location.assign(url.toString());
+	},
+
+	/**
+	 * Passwordless dev/test sign-in (server endpoint gated by {@code hephaestus.auth.dev-login-enabled},
+	 * fail-closed in prod). Mints the same cookie session as the OAuth flow for a local account, then
+	 * lands on the sanitised `returnTo`. Only reachable when the discovery list advertises the `dev`
+	 * provider, so this is a no-op surface in production. Mirrors `logout`'s direct-fetch pattern (these
+	 * auth kickoff/session calls are intentionally outside the generated client).
+	 */
+	async devLogin(username: string, admin: boolean, returnTo?: string): Promise<void> {
+		const response = await fetch(`${serverUrl()}/auth/dev-login`, {
+			method: "POST",
+			credentials: "include",
+			headers: { "Content-Type": "application/json", ...csrfHeaders() },
+			body: JSON.stringify({ username, admin }),
+		});
+		if (!response.ok) {
+			throw new Error(`Dev sign-in failed (${response.status})`);
+		}
+		window.location.assign(safeReturnTo(returnTo));
 	},
 
 	/** Revoke the session server-side, then return home. */

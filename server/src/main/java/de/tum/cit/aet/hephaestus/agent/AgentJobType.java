@@ -8,4 +8,5 @@ package de.tum.cit.aet.hephaestus.agent;
  */
 public enum AgentJobType {
     PULL_REQUEST_REVIEW,
+    ISSUE_REVIEW,
 }

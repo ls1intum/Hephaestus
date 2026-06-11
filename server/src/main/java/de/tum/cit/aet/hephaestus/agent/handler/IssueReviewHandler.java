@@ -1,0 +1,189 @@
+package de.tum.cit.aet.hephaestus.agent.handler;
+
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
+import de.tum.cit.aet.hephaestus.agent.task.Task;
+import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+/**
+ * Handler for {@link AgentJobType#ISSUE_REVIEW} jobs — the issue counterpart of
+ * {@link PullRequestReviewHandler}. Issues have NO diff: the case context is the issue body, the
+ * comment thread, and the lifecycle metadata, materialised by {@code IssueContentProvider} under
+ * {@code context/target/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
+ *
+ * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE) and
+ * composes the student-facing feedback; posting that feedback as an issue comment is a follow-up
+ * (the existing {@code FeedbackDeliveryService} is PR-coupled). Detection quality is the goal here.
+ */
+public class IssueReviewHandler implements JobTypeHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(IssueReviewHandler.class);
+
+    private final JsonMapper objectMapper;
+    private final WorkspaceContextBuilder workspaceContextBuilder;
+    private final TaskEnvelopeWriter taskEnvelopeWriter;
+    private final PracticeCatalogInjector practiceCatalogInjector;
+    private final PracticeDetectionResultParser resultParser;
+    private final PracticeDetectionDeliveryService deliveryService;
+
+    IssueReviewHandler(
+        JsonMapper objectMapper,
+        WorkspaceContextBuilder workspaceContextBuilder,
+        TaskEnvelopeWriter taskEnvelopeWriter,
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService
+    ) {
+        this.objectMapper = objectMapper;
+        this.workspaceContextBuilder = workspaceContextBuilder;
+        this.taskEnvelopeWriter = taskEnvelopeWriter;
+        this.practiceCatalogInjector = practiceCatalogInjector;
+        this.resultParser = resultParser;
+        this.deliveryService = deliveryService;
+    }
+
+    @Override
+    public AgentJobType jobType() {
+        return AgentJobType.ISSUE_REVIEW;
+    }
+
+    @Override
+    public JobSubmission createSubmission(JobSubmissionRequest request) {
+        if (!(request instanceof IssueReviewSubmissionRequest r)) {
+            throw new IllegalArgumentException(
+                "Expected IssueReviewSubmissionRequest, got: " + request.getClass().getSimpleName()
+            );
+        }
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("target_type", "ISSUE");
+        metadata.put("repository_id", r.repositoryId());
+        metadata.put("repository_full_name", r.repositoryFullName());
+        metadata.put("issue_id", r.issueId());
+        metadata.put("issue_number", r.issueNumber());
+        metadata.put("title", r.title());
+        metadata.put("body", r.body());
+        metadata.put("state", r.state());
+
+        // Trailing freshness segment (mirrors the PR head-SHA slot): an edited issue gets a new key
+        // and re-reviews, while extractCooldownKeyPrefix strips it so cooldown scopes per-issue — NOT
+        // per-repo. Without a 4th segment the prefix would collapse to "issue_review:repo:" and block
+        // every other issue in the repo.
+        String version = r.updatedAt() != null ? String.valueOf(r.updatedAt().toEpochMilli()) : "0";
+        String idempotencyKey = "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + version;
+        return new JobSubmission(metadata, idempotencyKey);
+    }
+
+    @Override
+    public Map<String, byte[]> prepareInputFiles(AgentJob job) {
+        JsonNode metadata = job.getMetadata();
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
+        }
+        Map<String, byte[]> files = new LinkedHashMap<>(
+            workspaceContextBuilder.build(new ContextRequest.IssueReviewRequest(job))
+        );
+        files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
+        practiceCatalogInjector.inject(files, job, FocusArtifact.ISSUE);
+        log.info(
+            "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
+            files.size(),
+            metadata.path("issue_number").asInt(),
+            job.getId()
+        );
+        return files;
+    }
+
+    private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        int issueNumber = requireInt(metadata, "issue_number");
+        String repoName = requireText(metadata, "repository_full_name");
+        // Reuse the PracticeReview task kind — the agent is artifact-agnostic; the prompt + the
+        // issue context files (context/target/issue_summary.md, metadata.json, comments.json) drive it.
+        Task task = new Task.PracticeReview(buildPrompt(issueNumber, repoName, job), issueNumber, repoName);
+        return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
+    }
+
+    private String buildPrompt(int issueNumber, String repoName, AgentJob job) {
+        String prompt =
+            "Review issue #" +
+            issueNumber +
+            " in " +
+            repoName +
+            ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files " +
+            "(context/target/issue_summary.md, context/target/metadata.json, context/target/comments.json), then " +
+            "evaluate each practice in .practices/ against the issue and persist every justified finding via the " +
+            "report_finding tool. Evidence locations should reference the issue thread/metadata, not source files. " +
+            "Follow " +
+            WorkspaceAbi.ORCHESTRATOR_PATH +
+            " for the finding schema and rules.";
+        log.info("Built issue orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
+        return prompt;
+    }
+
+    @Override
+    public void deliver(AgentJob job) {
+        var parsed = resultParser.parse(job.getOutput());
+        if (!parsed.discarded().isEmpty()) {
+            log.info("Discarded {} findings during parsing: jobId={}", parsed.discarded().size(), job.getId());
+        }
+        if (parsed.validFindings().isEmpty()) {
+            throw new JobDeliveryException(
+                "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
+            );
+        }
+        // No diff-scope filtering: issue findings reference the thread/metadata, not diff files.
+        PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, parsed.validFindings());
+        log.info(
+            "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+            result.inserted(),
+            result.discardedUnknownSlug(),
+            result.discardedDuplicate(),
+            job.getId()
+        );
+
+        PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
+            parsed.validFindings(),
+            FocusArtifact.ISSUE
+        );
+        if (delivery != null && delivery.mrNote() != null) {
+            // Issue-comment posting is a follow-up (FeedbackDeliveryService is PR-coupled). Log the
+            // composed student-facing feedback so it is inspectable.
+            log.info("Issue feedback composed (not yet posted): jobId={}, note=\n{}", job.getId(), delivery.mrNote());
+        }
+    }
+
+    private static String requireText(JsonNode metadata, String field) {
+        JsonNode node = metadata.get(field);
+        if (node == null || node.isNull() || node.asString().isBlank()) {
+            throw new JobPreparationException("Missing required metadata field: " + field);
+        }
+        return node.asString();
+    }
+
+    private static int requireInt(JsonNode metadata, String field) {
+        JsonNode node = metadata.get(field);
+        if (node == null || node.isNull() || !node.isNumber()) {
+            throw new JobPreparationException("Missing/invalid numeric metadata field: " + field);
+        }
+        return node.asInt();
+    }
+}

@@ -96,7 +96,9 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
         }
 
         switch (action) {
-            case OPEN, UPDATE -> issueProcessor.process(event, context);
+            case OPEN -> issueProcessor.process(event, context);
+            // UPDATE carries the changes.labels diff — processUpdated also emits IssueLabeled per added label.
+            case UPDATE -> issueProcessor.processUpdated(event, context);
             case CLOSE -> issueProcessor.processClosed(event, context);
             case REOPEN -> issueProcessor.processReopened(event, context);
             default -> log.debug("Unhandled issue action: projectPath={}, action={}", safeProjectPath, action);

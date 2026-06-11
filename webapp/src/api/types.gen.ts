@@ -517,6 +517,32 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
+ * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
+ */
+export type UpdatePracticeReviewSettings = {
+    /**
+     * Minimum minutes between reviews for the same PR; 0 disables the cooldown
+     */
+    cooldownMinutes?: number;
+    /**
+     * Deliver feedback to already-merged PRs/MRs
+     */
+    deliverToMerged?: boolean;
+    /**
+     * Fields to reset to the inherited fleet default
+     */
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES'>;
+    /**
+     * Run practice review for all contributors (vs only the run_practice_review role)
+     */
+    runForAllUsers?: boolean;
+    /**
+     * Skip practice review for draft PRs/MRs
+     */
+    skipDrafts?: boolean;
+};
+
+/**
  * Request to update an existing practice definition (PATCH — only non-null fields applied)
  */
 export type UpdatePracticeRequest = {
@@ -529,6 +555,10 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
+     * Artifact this practice evaluates
+     */
+    focusArtifact?: 'PULL_REQUEST' | 'ISSUE';
+    /**
      * Human-readable name
      */
     name?: string;
@@ -540,6 +570,28 @@ export type UpdatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents?: Array<string>;
+};
+
+/**
+ * Request to update an existing practice goal (PATCH — only non-null fields applied)
+ */
+export type UpdatePracticeGoalRequest = {
+    /**
+     * Whether this goal is active
+     */
+    active?: boolean;
+    /**
+     * What this goal develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace
+     */
+    displayOrder?: number;
+    /**
+     * Human-readable name
+     */
+    name?: string;
 };
 
 /**
@@ -613,9 +665,13 @@ export type UpdateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     * Set true to remove the stored API key (takes precedence over llmApiKey)
      */
-    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    clearLlmApiKey?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -644,6 +700,16 @@ export type UpdateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
+};
+
+/**
+ * Bind an agent config to a workspace purpose; null unbinds
+ */
+export type UpdateAgentBindingRequest = {
+    /**
+     * Agent config id to bind, or null to unbind
+     */
+    configId?: number;
 };
 
 export type UpdateAccountRequest = {
@@ -799,6 +865,16 @@ export type SessionView = {
 
 export type RevokeSessionsResult = {
     revoked?: number;
+};
+
+/**
+ * Reorder practice goals — displayOrder follows the list index
+ */
+export type ReorderPracticeGoalsRequest = {
+    /**
+     * Goal slugs in the desired display order
+     */
+    orderedSlugs: Array<string>;
 };
 
 /**
@@ -1102,6 +1178,44 @@ export type Profile = {
 };
 
 /**
+ * A practice goal grouping related practices into a learning objective
+ */
+export type PracticeGoal = {
+    /**
+     * Whether this goal is active
+     */
+    active: boolean;
+    /**
+     * Timestamp when the goal was created
+     */
+    createdAt: Date;
+    /**
+     * What this goal develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace
+     */
+    displayOrder: number;
+    /**
+     * Goal ID
+     */
+    id: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
+    /**
+     * Timestamp when the goal was last updated
+     */
+    updatedAt?: Date;
+};
+
+/**
  * Practice finding summary for list views
  */
 export type PracticeFindingList = {
@@ -1140,7 +1254,7 @@ export type PracticeFindingList = {
     /**
      * Target type (e.g. PULL_REQUEST)
      */
-    targetType: 'PULL_REQUEST';
+    targetType: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Finding title
      */
@@ -1204,7 +1318,7 @@ export type PracticeFindingDetail = {
     /**
      * Target type (e.g. PULL_REQUEST)
      */
-    targetType: 'PULL_REQUEST';
+    targetType: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Finding title
      */
@@ -1235,6 +1349,14 @@ export type Practice = {
      * Practice evaluation criteria
      */
     criteria: string;
+    /**
+     * Artifact this practice evaluates
+     */
+    focusArtifact: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Slug of the practice goal this practice is bound to, if any
+     */
+    goalSlug?: string;
     /**
      * Practice ID
      */
@@ -1349,6 +1471,14 @@ export type AgentJob = {
      */
     completedAt?: Date;
     /**
+     * ID of the agent config that ran this job (from the frozen snapshot)
+     */
+    configId?: number;
+    /**
+     * Name of the agent config that ran this job (from the frozen snapshot)
+     */
+    configName?: string;
+    /**
      * Frozen agent config at submit time
      */
     configSnapshot: unknown;
@@ -1383,7 +1513,7 @@ export type AgentJob = {
     /**
      * Job type
      */
-    jobType: 'PULL_REQUEST_REVIEW';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW';
     /**
      * Tokens read from prompt cache
      */
@@ -1702,7 +1832,7 @@ export type GitLabGroup = {
 /**
  * Feedback engagement statistics for a contributor in a workspace
  */
-export type FindingFeedbackEngagement = {
+export type FindingReactionEngagement = {
     /**
      * Number of findings marked as applied/fixed
      */
@@ -1720,7 +1850,7 @@ export type FindingFeedbackEngagement = {
 /**
  * Contributor feedback on an AI-generated practice finding
  */
-export type FindingFeedback = {
+export type FindingReaction = {
     /**
      * The feedback action taken
      */
@@ -1864,6 +1994,10 @@ export type CreatePracticeRequest = {
      */
     criteria: string;
     /**
+     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
+     */
+    focusArtifact?: 'PULL_REQUEST' | 'ISSUE';
+    /**
      * Human-readable name
      */
     name: string;
@@ -1879,6 +2013,28 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+};
+
+/**
+ * Request to create a new practice goal
+ */
+export type CreatePracticeGoalRequest = {
+    /**
+     * What this goal develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace. Defaults to 0 when omitted.
+     */
+    displayOrder?: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
 };
 
 export type CreateLoginProviderRequest = {
@@ -1909,7 +2065,7 @@ export type CreateLoginProviderRequest = {
 /**
  * Submit feedback on an AI-generated practice finding
  */
-export type CreateFindingFeedback = {
+export type CreateFindingReaction = {
     /**
      * The feedback action to record
      */
@@ -1929,9 +2085,9 @@ export type CreateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
-     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     * Authentication mode: PROXY (internal proxy) or API_KEY (direct)
      */
-    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode?: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -2149,6 +2305,16 @@ export type ChatMessageVote = {
 };
 
 /**
+ * Request to bind a practice to a goal, or unbind it when goalSlug is null
+ */
+export type BindPracticeGoalRequest = {
+    /**
+     * Slug of the goal to bind to, or null to unbind
+     */
+    goalSlug?: string;
+};
+
+/**
  * Binary progress indicating unlocked state
  */
 export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -2171,6 +2337,60 @@ export type AssignRoleRequest = {
 };
 
 /**
+ * Aggregate workspace AI settings: runtime bindings + effective + raw-override practice-review policy
+ */
+export type AiSettingsView = {
+    /**
+     * Effective: minimum minutes between reviews for the same PR
+     */
+    cooldownMinutes: number;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    cooldownMinutesOverride?: number;
+    /**
+     * Effective: deliver feedback to merged PRs/MRs
+     */
+    deliverToMerged: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    deliverToMergedOverride?: boolean;
+    /**
+     * Config bound to power the mentor (null = oldest enabled config)
+     */
+    mentorConfigId?: number;
+    /**
+     * Whether the mentor feature is enabled for this workspace
+     */
+    mentorEnabled: boolean;
+    /**
+     * Config bound to power practice detection (null = fan-out to all enabled configs)
+     */
+    practiceConfigId?: number;
+    /**
+     * Whether the practices feature is enabled for this workspace
+     */
+    practicesEnabled: boolean;
+    /**
+     * Effective: run practice review for all contributors
+     */
+    runForAllUsers: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    runForAllUsersOverride?: boolean;
+    /**
+     * Effective: skip draft PRs/MRs
+     */
+    skipDrafts: boolean;
+    /**
+     * Raw override; null = inheriting the fleet default
+     */
+    skipDraftsOverride?: boolean;
+};
+
+/**
  * Agent configuration for a workspace (API key redacted)
  */
 export type AgentConfig = {
@@ -2185,7 +2405,7 @@ export type AgentConfig = {
     /**
      * Authentication mode
      */
-    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
+    credentialMode: 'PROXY' | 'API_KEY';
     /**
      * Whether the agent is enabled
      */
@@ -3269,6 +3489,104 @@ export type RetryDeliveryResponses = {
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
 
+export type GetAiSettingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings';
+};
+
+export type GetAiSettingsResponses = {
+    /**
+     * AI settings returned
+     */
+    200: AiSettingsView;
+};
+
+export type GetAiSettingsResponse = GetAiSettingsResponses[keyof GetAiSettingsResponses];
+
+export type UpdateMentorConfigData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/mentor-config';
+};
+
+export type UpdateMentorConfigErrors = {
+    /**
+     * Config not found in this workspace
+     */
+    404: unknown;
+};
+
+export type UpdateMentorConfigResponses = {
+    /**
+     * Binding updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdateMentorConfigResponse = UpdateMentorConfigResponses[keyof UpdateMentorConfigResponses];
+
+export type UpdatePracticeConfigData = {
+    body: UpdateAgentBindingRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-config';
+};
+
+export type UpdatePracticeConfigErrors = {
+    /**
+     * Config not found in this workspace
+     */
+    404: unknown;
+};
+
+export type UpdatePracticeConfigResponses = {
+    /**
+     * Binding updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdatePracticeConfigResponse = UpdatePracticeConfigResponses[keyof UpdatePracticeConfigResponses];
+
+export type UpdatePracticeReviewSettingsData = {
+    body: UpdatePracticeReviewSettings;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/ai-settings/practice-review';
+};
+
+export type UpdatePracticeReviewSettingsResponses = {
+    /**
+     * Policy updated
+     */
+    200: AiSettingsView;
+};
+
+export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+
 export type ListData = {
     body?: never;
     path: {
@@ -3851,6 +4169,175 @@ export type UpdateNotificationsResponses = {
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
 
+export type ListGoalsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Return only active goals
+         */
+        activeOnly?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-goals';
+};
+
+export type ListGoalsResponses = {
+    /**
+     * Goals returned
+     */
+    200: Array<PracticeGoal>;
+};
+
+export type ListGoalsResponse = ListGoalsResponses[keyof ListGoalsResponses];
+
+export type CreateGoalData = {
+    body: CreatePracticeGoalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals';
+};
+
+export type CreateGoalErrors = {
+    /**
+     * Goal slug already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateGoalResponses = {
+    /**
+     * Goal created
+     */
+    201: PracticeGoal;
+};
+
+export type CreateGoalResponse = CreateGoalResponses[keyof CreateGoalResponses];
+
+export type ReorderGoalsData = {
+    body: ReorderPracticeGoalsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/reorder';
+};
+
+export type ReorderGoalsErrors = {
+    /**
+     * A slug is unknown
+     */
+    404: unknown;
+};
+
+export type ReorderGoalsResponses = {
+    /**
+     * Goals reordered; the full ordered list is returned
+     */
+    200: Array<PracticeGoal>;
+};
+
+export type ReorderGoalsResponse = ReorderGoalsResponses[keyof ReorderGoalsResponses];
+
+export type DeleteGoalData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        goalSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+};
+
+export type DeleteGoalErrors = {
+    /**
+     * Goal not found
+     */
+    404: unknown;
+};
+
+export type DeleteGoalResponses = {
+    /**
+     * Goal deleted
+     */
+    204: void;
+};
+
+export type DeleteGoalResponse = DeleteGoalResponses[keyof DeleteGoalResponses];
+
+export type GetGoalData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        goalSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+};
+
+export type GetGoalErrors = {
+    /**
+     * Goal not found
+     */
+    404: unknown;
+};
+
+export type GetGoalResponses = {
+    /**
+     * Goal returned
+     */
+    200: PracticeGoal;
+};
+
+export type GetGoalResponse = GetGoalResponses[keyof GetGoalResponses];
+
+export type UpdateGoalData = {
+    body: UpdatePracticeGoalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        goalSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+};
+
+export type UpdateGoalErrors = {
+    /**
+     * Goal not found
+     */
+    404: unknown;
+};
+
+export type UpdateGoalResponses = {
+    /**
+     * Goal updated
+     */
+    200: PracticeGoal;
+};
+
+export type UpdateGoalResponse = UpdateGoalResponses[keyof UpdateGoalResponses];
+
 export type ListPracticesData = {
     body?: never;
     path: {
@@ -3957,7 +4444,7 @@ export type GetEngagementResponses = {
     /**
      * Engagement statistics returned
      */
-    200: FindingFeedbackEngagement;
+    200: FindingReactionEngagement;
 };
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
@@ -4034,7 +4521,7 @@ export type GetFindingResponses = {
 
 export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
 
-export type GetLatestFeedbackData = {
+export type GetLatestReactionData = {
     body?: never;
     path: {
         /**
@@ -4044,31 +4531,31 @@ export type GetLatestFeedbackData = {
         findingId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions';
 };
 
-export type GetLatestFeedbackErrors = {
+export type GetLatestReactionErrors = {
     /**
      * Finding not found in this workspace
      */
     404: unknown;
 };
 
-export type GetLatestFeedbackResponses = {
+export type GetLatestReactionResponses = {
     /**
      * Latest feedback returned
      */
-    200: FindingFeedback;
+    200: FindingReaction;
     /**
      * No feedback exists for this finding
      */
     204: void;
 };
 
-export type GetLatestFeedbackResponse = GetLatestFeedbackResponses[keyof GetLatestFeedbackResponses];
+export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
 
-export type SubmitFeedbackData = {
-    body: CreateFindingFeedback;
+export type SubmitReactionData = {
+    body: CreateFindingReaction;
     path: {
         /**
          * Workspace slug
@@ -4077,10 +4564,10 @@ export type SubmitFeedbackData = {
         findingId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions';
 };
 
-export type SubmitFeedbackErrors = {
+export type SubmitReactionErrors = {
     /**
      * Invalid request (e.g., DISPUTED without explanation)
      */
@@ -4095,14 +4582,14 @@ export type SubmitFeedbackErrors = {
     404: unknown;
 };
 
-export type SubmitFeedbackResponses = {
+export type SubmitReactionResponses = {
     /**
      * Feedback recorded
      */
-    201: FindingFeedback;
+    201: FindingReaction;
 };
 
-export type SubmitFeedbackResponse = SubmitFeedbackResponses[keyof SubmitFeedbackResponses];
+export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
 
 export type DeletePracticeData = {
     body?: never;
@@ -4219,6 +4706,35 @@ export type SetActiveResponses = {
 };
 
 export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
+
+export type BindGoalData = {
+    body: BindPracticeGoalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/goal';
+};
+
+export type BindGoalErrors = {
+    /**
+     * Practice or goal not found
+     */
+    404: unknown;
+};
+
+export type BindGoalResponses = {
+    /**
+     * Binding updated
+     */
+    200: Practice;
+};
+
+export type BindGoalResponse = BindGoalResponses[keyof BindGoalResponses];
 
 export type GetUserProfileData = {
     body?: never;

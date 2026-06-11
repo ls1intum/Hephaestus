@@ -10,6 +10,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PR
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.util.ArrayList;
@@ -17,7 +18,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -38,15 +38,6 @@ import tools.jackson.databind.JsonNode;
  */
 class DeliveryComposer {
 
-    /** Min confidence to name a positive practice in the opening line. */
-    static final float POSITIVE_CONFIDENCE_FLOOR = 0.90f;
-
-    /** Max positives to name in the opening (more than 2 creates a run-on). */
-    static final int MAX_NAMED_POSITIVES = 2;
-
-    /** When there are many blocking issues, avoid leading with praise. */
-    static final int BLOCKING_ISSUES_SUPPRESS_PRAISE_THRESHOLD = 2;
-
     /** Practices that are inherently non-inlinable (no file-level location). */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
 
@@ -66,8 +57,18 @@ class DeliveryComposer {
      * @param findings validated findings (may include POSITIVE, NEGATIVE, and NOT_APPLICABLE)
      * @return delivery content with mrNote and diffNotes, or null if findings list is empty
      */
+    /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
+        return compose(findings, FocusArtifact.PULL_REQUEST);
+    }
+
+    /**
+     * Compose feedback for a specific artifact. The blocking call-to-action is artifact-aware: a PR
+     * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged).
+     */
+    @Nullable
+    static DeliveryContent compose(List<ValidatedFinding> findings, FocusArtifact artifact) {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
@@ -78,15 +79,31 @@ class DeliveryComposer {
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // Only name high-confidence positives in the opening
-        List<ValidatedFinding> positives = findings
-            .stream()
-            .filter(f -> f.verdict() == Verdict.POSITIVE && f.confidence() >= POSITIVE_CONFIDENCE_FLOOR)
-            .toList();
-
-        // All positive/not-applicable → post an approval comment
+        // Nothing to change → an observation note (no self-level praise; see composeNoIssuesNote)
         if (negatives.isEmpty()) {
-            return new DeliveryContent(composeAllPositiveNote(positives), List.of());
+            // Defense-in-depth tripwire: a hardcoded-secrets finding that is neither POSITIVE nor
+            // NOT_APPLICABLE is by definition a NEGATIVE and would already be in `negatives` — so it
+            // can never legitimately reach the green path. If a future refactor ever routes a secret
+            // finding here, fail loud rather than post a clean bill of health over a committed key.
+            boolean leakedSecret = findings
+                .stream()
+                .anyMatch(
+                    f ->
+                        "hardcoded-secrets".equals(f.practiceSlug()) &&
+                        f.verdict() != Verdict.POSITIVE &&
+                        f.verdict() != Verdict.NOT_APPLICABLE
+                );
+            if (leakedSecret) {
+                throw new IllegalStateException(
+                    "Refusing to compose an all-clear comment: a non-positive hardcoded-secrets finding " +
+                        "was present but did not register as NEGATIVE. This is a delivery-integrity bug."
+                );
+            }
+            List<ValidatedFinding> observed = findings
+                .stream()
+                .filter(f -> f.verdict() == Verdict.POSITIVE)
+                .toList();
+            return new DeliveryContent(composeNoIssuesNote(observed), List.of());
         }
 
         // Partition negatives: inlinable (has valid file location) vs non-inlinable
@@ -101,7 +118,7 @@ class DeliveryComposer {
         }
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview
-        String mrNote = composeMrNote(positives, negatives, nonInlinable, inlinable);
+        String mrNote = composeMrNote(negatives, nonInlinable, inlinable, artifact);
 
         // Diff notes: ALL inlinable negatives get inline comments
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
@@ -110,50 +127,34 @@ class DeliveryComposer {
     }
 
     /**
-     * Compose an approval note when all findings are positive. Uses the agent's actual
-     * per-finding reasoning to build a specific, contextual summary rather than a generic template.
+     * Compose the note posted when no issues were found. Reports what was reviewed and, where the
+     * agent recorded reasoning, what it observed against each practice — evidence-anchored, on the
+     * work. Deliberately carries NO self-level praise: person-directed praise is the least effective
+     * feedback level (Hattie &amp; Timperley, The Power of Feedback), so the mentoring stance keeps
+     * feedback at the task/process level.
      */
-    private static String composeAllPositiveNote(List<ValidatedFinding> positives) {
-        var sb = new StringBuilder(1024);
-        sb.append("\u2705 "); // ✅
-
-        if (positives.isEmpty()) {
-            sb.append("No issues found in this review.\n");
-            return sb.toString();
-        }
-
-        // Collect findings that have actual reasoning to build a natural summary
-        List<ValidatedFinding> withReasoning = positives
+    private static String composeNoIssuesNote(List<ValidatedFinding> observed) {
+        // Findings whose reasoning lets us cite a concrete observation rather than a bare pass.
+        List<ValidatedFinding> withReasoning = observed
             .stream()
             .filter(f -> f.reasoning() != null && !f.reasoning().isBlank())
             .toList();
 
         if (withReasoning.isEmpty()) {
-            // Fallback: no reasoning available, name the practices
-            List<String> namedPositives = positives
-                .stream()
-                .limit(MAX_NAMED_POSITIVES)
-                .map(f -> humanizePracticeSlug(f.practiceSlug()))
-                .toList();
-            sb.append("No issues found — the ").append(joinNatural(namedPositives));
-            sb.append(positives.size() == 1 ? " looks good.\n" : " look good.\n");
-            return sb.toString();
+            return "Reviewed against the active practices \u2014 nothing to change here.\n";
         }
 
-        // Build a contextual summary using the agent's own observations
-        sb.append("**No issues found.** Here's what stood out:\n\n");
+        var sb = new StringBuilder(1024);
+        sb.append("Reviewed against the active practices. What I observed:\n\n");
         int shown = 0;
         for (ValidatedFinding f : withReasoning) {
-            if (shown >= 4) break; // Cap at 4 to avoid wall of text
-            String label = humanizePracticeSlug(f.practiceSlug());
-            String reasoning = f.reasoning().strip();
-            // Truncate long reasoning to first sentence or 200 chars
-            String summary = truncateToFirstSentence(reasoning, 200);
-            sb.append("- **").append(capitalize(label)).append(":** ").append(summary).append("\n");
+            if (shown >= 4) break; // Cap at 4 to avoid a wall of text
+            String label = capitalize(f.practiceSlug().replace('-', ' '));
+            String summary = truncateToFirstSentence(f.reasoning().strip(), 200);
+            sb.append("- **").append(label).append(":** ").append(summary).append("\n");
             shown++;
         }
         sb.append("\n");
-
         return sb.toString();
     }
 
@@ -206,20 +207,20 @@ class DeliveryComposer {
 
     /**
      * Compose the MR note. Structure:
-     * 1. Opening praise line + issue counts
+     * 1. Opening issue/suggestion counts (evidence-anchored, no praise)
      * 2. Non-inlinable findings (full detail, with separators)
      * 3. Brief overview of inline findings (just title + severity, no full content)
      */
     static String composeMrNote(
-        List<ValidatedFinding> positives,
         List<ValidatedFinding> allNegatives,
         List<ValidatedFinding> nonInlinable,
-        List<ValidatedFinding> inlinable
+        List<ValidatedFinding> inlinable,
+        FocusArtifact artifact
     ) {
         var sb = new StringBuilder(4096);
 
-        // Opening: praise + issue summary
-        composeOpening(sb, positives, allNegatives);
+        // Opening: evidence-anchored issue summary (no self-level praise)
+        composeOpening(sb, allNegatives, artifact);
 
         // Non-inlinable findings (full detail) — these only exist in the summary
         for (int i = 0; i < nonInlinable.size(); i++) {
@@ -249,33 +250,21 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(
-        StringBuilder sb,
-        List<ValidatedFinding> positives,
-        List<ValidatedFinding> negatives
-    ) {
+    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, FocusArtifact artifact) {
+        // PRs are merged → "to fix before merging"; issues are not → "to fix".
+        String blockingCta = artifact == FocusArtifact.PULL_REQUEST ? " to fix before merging" : " to fix";
         long blockingCount = negatives
             .stream()
             .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
             .count();
         long improvementCount = negatives.size() - blockingCount;
 
-        // Name up to MAX_NAMED_POSITIVES specific positive practices, but do not front-load praise
-        // when there are multiple blocking issues.
-        if (!positives.isEmpty() && blockingCount < BLOCKING_ISSUES_SUPPRESS_PRAISE_THRESHOLD) {
-            List<String> namedPositives = positives
-                .stream()
-                .limit(MAX_NAMED_POSITIVES)
-                .map(f -> humanizePracticeSlug(f.practiceSlug()))
-                .toList();
-            sb.append("Nice work on the ").append(joinNatural(namedPositives)).append(". ");
-        }
-
         if (blockingCount > 0 && improvementCount > 0) {
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
-                .append(" to fix before merging, plus ")
+                .append(blockingCta)
+                .append(", plus ")
                 .append(improvementCount)
                 .append(improvementCount == 1 ? " suggestion" : " suggestions")
                 .append(" for improvement:\n\n");
@@ -283,7 +272,8 @@ class DeliveryComposer {
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
-                .append(" to fix before merging:\n\n");
+                .append(blockingCta)
+                .append(":\n\n");
         } else {
             sb
                 .append(improvementCount)
@@ -414,42 +404,6 @@ class DeliveryComposer {
         if (snippets == null || !snippets.isArray() || snippets.isEmpty()) return null;
         String snippet = snippets.get(0).asString();
         return (snippet != null && !snippet.isBlank()) ? snippet.strip() : null;
-    }
-
-    /**
-     * Maps practice slugs to natural positive labels for the opening line.
-     */
-    private static final Map<String, String> SLUG_TO_POSITIVE_LABEL = Map.ofEntries(
-        Map.entry("hardcoded-secrets", "credential hygiene"),
-        Map.entry("fatal-error-crash", "crash avoidance"),
-        Map.entry("silent-failure-patterns", "error propagation"),
-        Map.entry("error-state-handling", "error state handling"),
-        Map.entry("view-decomposition", "view decomposition"),
-        Map.entry("view-logic-separation", "separation of concerns"),
-        Map.entry("state-ownership-misuse", "state ownership"),
-        Map.entry("meaningful-naming", "naming clarity"),
-        Map.entry("code-hygiene", "code hygiene"),
-        Map.entry("preview-quality", "preview coverage"),
-        Map.entry("accessibility-support", "accessibility support"),
-        Map.entry("mr-description-quality", "MR documentation"),
-        Map.entry("commit-discipline", "commit discipline")
-    );
-
-    /** Map a practice slug to a human-friendly positive label. */
-    private static String humanizePracticeSlug(String slug) {
-        return SLUG_TO_POSITIVE_LABEL.getOrDefault(slug, slug.replace('-', ' '));
-    }
-
-    /** Join ["a", "b", "c"] as "a, b, and c". */
-    private static String joinNatural(List<String> items) {
-        if (items.isEmpty()) return "";
-        if (items.size() == 1) return items.get(0);
-        if (items.size() == 2) return items.get(0) + " and " + items.get(1);
-        return (
-            items.subList(0, items.size() - 1).stream().collect(Collectors.joining(", ")) +
-            ", and " +
-            items.get(items.size() - 1)
-        );
     }
 
     /**

@@ -81,13 +81,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         handler = new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            practiceRepository,
+            new PracticeCatalogInjector(objectMapper, practiceRepository),
             workspaceContextBuilder,
             taskEnvelopeWriter,
             gitDiffOperations,
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            new SecretDiffScanner()
         );
     }
 
@@ -162,7 +163,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .thenReturn(
                 new LinkedHashMap<>(Map.of("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
             );
-        lenient().when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+        lenient()
+            .when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                )
+            )
+            .thenReturn(samplePractices());
     }
 
     @Nested
@@ -186,6 +194,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123def456");
+            // The MR title + description are the only inputs for the process practices
+            // (mr-description-quality, commit-discipline); a regression here makes them silently un-evaluable.
+            assertThat(metadata.get("title").asString()).isEqualTo("Fix authentication bug");
+            assertThat(metadata.get("body").asString()).isEqualTo("This PR fixes the login issue");
             assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123def456");
         }
 
@@ -220,7 +232,12 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class))).thenReturn(
                 new LinkedHashMap<>(Map.of("context/target/metadata.json", metadataBytes))
             );
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                )
+            ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
@@ -265,9 +282,12 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void rejectsMalformedSlug() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
-                List.of(createPractice("../etc/passwd", "bad", "c"))
-            );
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                )
+            ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
@@ -277,11 +297,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenNoActivePractices() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of());
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                )
+            ).thenReturn(List.of());
 
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active practices");
+                .hasMessageContaining("No active PULL_REQUEST practices");
         }
 
         @Test
@@ -300,7 +325,12 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("context/target/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
             providerFiles.put("context/target/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.build(any())).thenReturn(providerFiles);
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+            when(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                    WORKSPACE_ID,
+                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                )
+            ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 

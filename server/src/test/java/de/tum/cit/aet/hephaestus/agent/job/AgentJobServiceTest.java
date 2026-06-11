@@ -63,6 +63,12 @@ class AgentJobServiceTest extends BaseUnitTest {
     private PullRequestRepository pullRequestRepository;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
+
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+
+    @Mock
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
@@ -88,6 +94,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             agentConfigRepository,
             workspaceRepository,
             pullRequestRepository,
+            issueRepository,
+            connectionService,
             handlerRegistry,
             objectMapper,
             eventPublisher,
@@ -137,6 +145,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldReturnEmptyWhenNoEnabledConfig() {
             AgentConfig disabledConfig = new AgentConfig();
             disabledConfig.setEnabled(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(disabledConfig));
 
             Optional<AgentJob> result = service.submit(
@@ -151,6 +160,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenNoConfigs() {
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             Optional<AgentJob> result = service.submit(
@@ -160,6 +170,75 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        void shouldSubmitOnlyBoundConfigAndSuppressFanOut() {
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(enabledConfig));
+
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            when(handler.createSubmission(any())).thenReturn(createSubmission());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
+                Optional.empty()
+            );
+            when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isPresent();
+            // Fan-out is suppressed when a config is bound: the all-enabled lookup is never consulted.
+            verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
+            verify(agentJobRepository).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldSubmitNothingWhenBoundConfigDisabled() {
+            AgentConfig disabled = new AgentConfig();
+            disabled.setId(10L);
+            disabled.setEnabled(false);
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(disabled));
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+        }
+
+        @Test
+        void shouldSubmitNothingWhenBoundConfigIsForeign() {
+            // Stale/foreign binding: config 10 is not in this workspace. The scoped finder returns
+            // empty — we must pause (no job), NOT silently fall back to fan-out, and never touch the
+            // all-enabled lookup. This pins the tenancy boundary the scalar FK relies on.
+            workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.empty());
+
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
+
+            assertThat(result).isEmpty();
+            verify(agentJobRepository, never()).saveAndFlush(any());
+            verify(agentConfigRepository, never()).findByWorkspaceId(anyLong());
         }
 
         @Test
@@ -317,8 +396,8 @@ class AgentJobServiceTest extends BaseUnitTest {
                 new DataIntegrityViolationException("uk_agent_job_idempotency")
             );
 
-            // Production code now catches DataIntegrityViolationException and returns null
-            // from submitForConfig, which results in Optional.empty() from submit()
+            // submitForConfig catches DataIntegrityViolationException and returns null,
+            // which results in Optional.empty() from submit()
             Optional<AgentJob> result = service.submit(
                 1L,
                 AgentJobType.PULL_REQUEST_REVIEW,
@@ -593,6 +672,28 @@ class AgentJobServiceTest extends BaseUnitTest {
                 eq(jobId),
                 eq(DeliveryStatus.FAILED),
                 eq(completedJob.getDeliveryCommentId())
+            );
+        }
+    }
+
+    @Nested
+    class CooldownKeyPrefix {
+
+        @Test
+        void prKeyStripsCommitSha() {
+            // PR key trailing segment is a disposable SHA → cooldown scopes per-PR.
+            assertThat(AgentJobService.extractCooldownKeyPrefix("pr_review:owner/repo:42:abc123")).isEqualTo(
+                "pr_review:owner/repo:42:"
+            );
+        }
+
+        @Test
+        void issueKeyScopesPerIssueNotPerRepo() {
+            // Issue key trailing segment is the disposable updatedAt → prefix keeps the issue NUMBER,
+            // so cooldown is per-issue. A regression that drops the 4th segment would collapse this to
+            // "issue_review:owner/repo:" and block every other issue in the repo.
+            assertThat(AgentJobService.extractCooldownKeyPrefix("issue_review:owner/repo:12:1700000000000")).isEqualTo(
+                "issue_review:owner/repo:12:"
             );
         }
     }

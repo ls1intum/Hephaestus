@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -161,6 +162,20 @@ public class WorkspaceContextFilter implements Filter {
             // signed in via one provider keeps access to workspaces they belong to under another.
             var currentUsers = currentAccountUsers.resolve();
             Set<WorkspaceRole> roles = fetchUserRoles(workspace, currentUsers);
+
+            // Instance super-admin elevation: an APP_ADMIN reaches ANY active workspace as ADMIN even
+            // without an explicit membership or an SCM identity at all (the GitLab admin model; closes
+            // the gap where WorkspaceAccessService elevates APP_ADMIN but this filter blocked them
+            // first). Deliberately ADMIN, never OWNER — ownership is an explicit, member-granted role.
+            // Logged as elevated access; formal AuthEvent elevation-tagging is tracked in issue #1323.
+            if (roles.isEmpty() && SecurityUtils.isSuperAdmin()) {
+                log.info(
+                    "Granted workspace access via instance-admin elevation: accountId={}, workspaceSlug={}",
+                    SecurityUtils.getCurrentAccountId().orElse(null),
+                    safeSlug
+                );
+                roles = Set.of(WorkspaceRole.ADMIN);
+            }
 
             boolean isPublicRead = Boolean.TRUE.equals(workspace.getIsPubliclyViewable()) && isReadRequest;
 

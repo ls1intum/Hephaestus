@@ -9,6 +9,7 @@ export const mockPractices: Practice[] = [
 		triggerEvents: ["PullRequestCreated", "PullRequestReady"],
 		criteria:
 			"## PR Description Quality\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required Elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
+		focusArtifact: "PULL_REQUEST",
 		active: true,
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-15"),
@@ -21,6 +22,7 @@ export const mockPractices: Practice[] = [
 		triggerEvents: ["ReviewSubmitted"],
 		criteria:
 			"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
+		focusArtifact: "PULL_REQUEST",
 		active: true,
 		createdAt: new Date("2025-06-02"),
 		updatedAt: new Date("2025-06-14"),
@@ -32,6 +34,7 @@ export const mockPractices: Practice[] = [
 		triggerEvents: ["PullRequestCreated", "PullRequestSynchronized"],
 		criteria:
 			"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
+		focusArtifact: "PULL_REQUEST",
 		active: false,
 		createdAt: new Date("2025-06-03"),
 		updatedAt: new Date("2025-06-10"),
@@ -46,6 +49,7 @@ export const mockPracticeNoCategory: Practice = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria:
 		"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
+	focusArtifact: "PULL_REQUEST",
 	active: true,
 	createdAt: new Date("2025-06-05"),
 	updatedAt: new Date("2025-06-17"),
@@ -65,6 +69,7 @@ export const mockPracticeLongText: Practice = {
 	],
 	criteria:
 		"## Very Long Criteria\n\nThis is a multi-paragraph criteria block designed to test the line-clamp behavior on the card preview.\n\n### Section 1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n### Section 2\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n### Section 3\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+	focusArtifact: "PULL_REQUEST",
 	active: true,
 	createdAt: new Date("2025-06-06"),
 	updatedAt: new Date("2025-06-18"),
@@ -99,7 +104,31 @@ export const mockPracticeWithAllTriggers: Practice = {
 		"",
 		"export default { findings };",
 	].join("\n"),
+	focusArtifact: "PULL_REQUEST",
 	active: true,
 	createdAt: new Date("2025-06-04"),
 	updatedAt: new Date("2025-06-16"),
 };
+
+export const mockGoals: import("@/api/types.gen").PracticeGoal[] = [
+	{
+		id: 1,
+		slug: "review-ready-work",
+		name: "Submitting review-ready work",
+		description: "Make each change easy and fast to review.",
+		active: true,
+		displayOrder: 1,
+		createdAt: new Date("2025-06-01"),
+		updatedAt: new Date("2025-06-01"),
+	},
+	{
+		id: 2,
+		slug: "actionable-issue-authoring",
+		name: "Writing issues a maintainer can act on",
+		description: "Give a maintainer enough to start work.",
+		active: true,
+		displayOrder: 3,
+		createdAt: new Date("2025-06-01"),
+		updatedAt: new Date("2025-06-01"),
+	},
+];

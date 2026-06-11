@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -22,6 +24,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
 
@@ -44,7 +48,11 @@ import tools.jackson.databind.JsonNode;
         name = "uk_practice_workspace_slug",
         columnNames = { "workspace_id", "slug" }
     ),
-    indexes = @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active")
+    indexes = {
+        @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
+        // Goal-scoped reads (Reflection/Facilitator dashboards) join finding→practice→goal; index the FK.
+        @Index(name = "idx_practice_practice_goal", columnList = "practice_goal_id"),
+    }
 )
 @Getter
 @Setter
@@ -71,6 +79,27 @@ public class Practice {
 
     @Column(name = "category", length = 64)
     private String category;
+
+    /**
+     * The artifact this practice targets (PR vs ISSUE). The discriminator that routes the trigger
+     * gate, the case-context builder, the {@code AgentJobType}/handler, and the delivery surface.
+     * NOT NULL; defaults to {@code PULL_REQUEST} for backward compatibility.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "focus_artifact", nullable = false, length = 32)
+    private FocusArtifact focusArtifact = FocusArtifact.PULL_REQUEST;
+
+    /**
+     * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
+     * many practices; a practice belongs to at most one goal): the single owning bucket keeps the
+     * per-goal acted-on/total progress denominator unambiguous. Do not loosen to a join table without
+     * also switching progress math to per-(goal, practice) rows. Orthogonal to {@link #category}.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "practice_goal_id", foreignKey = @ForeignKey(name = "fk_practice_goal"))
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    @ToString.Exclude
+    private PracticeGoal goal;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)

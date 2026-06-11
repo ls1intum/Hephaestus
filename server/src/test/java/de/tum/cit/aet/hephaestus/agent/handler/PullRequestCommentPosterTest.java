@@ -394,9 +394,11 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
         void throwsWhenIntegrationKindMissing() {
             AgentJob job = createTestJob(null);
 
+            // Integrity failure (not an NPE): the agent ran but the job has no provider to deliver
+            // against. Surfaces as JobDeliveryException so the executor marks the job FAILED loudly.
             assertThatThrownBy(() -> poster.postComment(job, "Review body", "Summary"))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("AgentJob.integrationKind must not be null");
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("integrationKind is null");
         }
 
         @Test

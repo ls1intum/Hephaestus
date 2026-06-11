@@ -14,6 +14,7 @@ public record MentorLlmConfig(
     CredentialMode credentialMode,
     @Nullable String llmApiKey,
     @Nullable String modelName,
+    @Nullable String llmBaseUrl,
     int timeoutSeconds
 ) {
     public static MentorLlmConfig fromAgentConfig(AgentConfig config) {
@@ -22,6 +23,7 @@ public record MentorLlmConfig(
             config.getCredentialMode(),
             config.getLlmApiKey(),
             config.getModelName(),
+            config.getLlmBaseUrl(),
             config.getTimeoutSeconds()
         );
     }

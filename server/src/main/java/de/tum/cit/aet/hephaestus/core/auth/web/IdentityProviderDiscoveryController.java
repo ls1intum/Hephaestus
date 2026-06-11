@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
+import de.tum.cit.aet.hephaestus.core.auth.dev.DevLoginService;
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,10 +25,19 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Auth discovery", description = "Identity provider discovery (public)")
 public class IdentityProviderDiscoveryController {
 
-    private final IdentityProviderCatalog identityProviderCatalog;
+    /** Synthetic registration id + provider type for the optional passwordless dev sign-in row. */
+    private static final String DEV_REGISTRATION_ID = "dev";
+    private static final String DEV_PROVIDER_TYPE = "DEV";
 
-    public IdentityProviderDiscoveryController(IdentityProviderCatalog identityProviderCatalog) {
+    private final IdentityProviderCatalog identityProviderCatalog;
+    private final DevLoginService devLoginService;
+
+    public IdentityProviderDiscoveryController(
+        IdentityProviderCatalog identityProviderCatalog,
+        DevLoginService devLoginService
+    ) {
         this.identityProviderCatalog = identityProviderCatalog;
+        this.devLoginService = devLoginService;
     }
 
     /**
@@ -55,6 +65,12 @@ public class IdentityProviderDiscoveryController {
                     baseUrlOf(reg)
                 )
             );
+        }
+        // Optional passwordless dev sign-in. Advertised ONLY when enabled (never in prod), so the SPA
+        // login page renders a "Dev sign-in" affordance (username field → POST /auth/dev-login) instead
+        // of an OAuth redirect. The SPA routes on providerType === "DEV" / registrationId === "dev".
+        if (devLoginService.isEnabled()) {
+            views.add(new IdentityProviderViewDTO(DEV_REGISTRATION_ID, "Dev sign-in", DEV_PROVIDER_TYPE, ""));
         }
         return ResponseEntity.ok(views);
     }

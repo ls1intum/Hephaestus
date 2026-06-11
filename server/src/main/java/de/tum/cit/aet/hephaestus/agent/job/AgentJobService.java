@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -14,6 +15,8 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -47,6 +50,8 @@ public class AgentJobService {
     private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceRepository workspaceRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final IssueRepository issueRepository;
+    private final de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -60,6 +65,8 @@ public class AgentJobService {
         AgentConfigRepository agentConfigRepository,
         WorkspaceRepository workspaceRepository,
         PullRequestRepository pullRequestRepository,
+        IssueRepository issueRepository,
+        de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
@@ -72,6 +79,8 @@ public class AgentJobService {
         this.agentConfigRepository = agentConfigRepository;
         this.workspaceRepository = workspaceRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.issueRepository = issueRepository;
+        this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
@@ -138,6 +147,35 @@ public class AgentJobService {
     }
 
     /**
+     * Dev/manual trigger: submit an issue-detection review for a single issue. Mirrors
+     * {@link #submitReviewForPullRequest} on the issue artifact.
+     */
+    public String submitDetectionForIssue(Long workspaceId, Long issueId) {
+        Issue issue = issueRepository.findByIdWithRepository(issueId).orElse(null);
+        if (issue == null) {
+            return "Issue not found: " + issueId;
+        }
+        if (issue.getRepository() == null) {
+            return "Issue missing repository: issueId=" + issueId;
+        }
+        IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
+            issue.getId(),
+            issue.getNumber(),
+            issue.getRepository().getId(),
+            issue.getRepository().getNameWithOwner(),
+            issue.getTitle(),
+            issue.getBody() != null ? issue.getBody() : "",
+            issue.getState() != null ? issue.getState().name() : "OPEN",
+            issue.getUpdatedAt()
+        );
+
+        log.info("Dev trigger: submitting issue detection for issue {} ({})", issueId, issue.getHtmlUrl());
+
+        Optional<AgentJob> job = submit(workspaceId, AgentJobType.ISSUE_REVIEW, request);
+        return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
+    }
+
+    /**
      * Submit agent jobs for the given workspace — one per enabled config.
      *
      * <p>Creates a job for EACH enabled agent config, with config-scoped idempotency keys.
@@ -156,14 +194,14 @@ public class AgentJobService {
      * @return the first created (or existing deduplicated) job, or empty if no enabled config found
      */
     public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
-        // 1. Find ALL enabled configs for workspace
-        List<AgentConfig> enabledConfigs = agentConfigRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .filter(AgentConfig::isEnabled)
-            .toList();
-        if (enabledConfigs.isEmpty()) {
-            log.debug("No enabled agent config for workspace: workspaceId={}", workspaceId);
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+
+        // 1. Resolve which config(s) run (see resolvePracticeConfigs).
+        List<AgentConfig> configs = resolvePracticeConfigs(workspace);
+        if (configs.isEmpty()) {
+            log.debug("No agent config to run practice detection: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
@@ -171,13 +209,9 @@ public class AgentJobService {
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
-
-        // 3. Submit a job for EACH enabled config (each in its own transaction)
+        // 3. Submit a job for each resolved config (each in its own transaction)
         AgentJob firstJob = null;
-        for (AgentConfig config : enabledConfigs) {
+        for (AgentConfig config : configs) {
             AgentJob job = submitForConfig(workspace, config, jobType, submission);
             if (job != null && firstJob == null) {
                 firstJob = job;
@@ -185,6 +219,33 @@ public class AgentJobService {
         }
 
         return Optional.ofNullable(firstJob);
+    }
+
+    /**
+     * Resolve the configs to submit for practice detection. If the workspace has an explicit
+     * {@code practiceConfigId} binding, return only that config when it exists and is enabled
+     * (bound-but-disabled = <strong>paused, returns empty</strong>); otherwise return all enabled configs
+     * (legacy fan-out). The bound id is loaded via the workspace-scoped finder for tenancy safety.
+     *
+     * <p>Note the deliberate asymmetry with the mentor ({@code MentorChatService.resolveLlmConfig}): a
+     * disabled <em>practice</em> binding PAUSES detection (it is opt-in automation — silence is the safe
+     * outcome), whereas a disabled <em>mentor</em> binding FALLS BACK to the oldest enabled config (the
+     * mentor must stay answerable to a user who is mid-conversation).
+     */
+    private List<AgentConfig> resolvePracticeConfigs(Workspace workspace) {
+        Long boundConfigId = workspace.getPracticeConfigId();
+        if (boundConfigId != null) {
+            return agentConfigRepository
+                .findByIdAndWorkspaceId(boundConfigId, workspace.getId())
+                .filter(AgentConfig::isEnabled)
+                .map(List::of)
+                .orElseGet(List::of);
+        }
+        return agentConfigRepository
+            .findByWorkspaceId(workspace.getId())
+            .stream()
+            .filter(AgentConfig::isEnabled)
+            .toList();
     }
 
     private @Nullable AgentJob submitForConfig(
@@ -213,7 +274,7 @@ public class AgentJobService {
 
             // Cooldown check — prevent rapid re-triggering for the same PR/config.
             // Strips the commit-SHA segment from the idempotency key to match any SHA.
-            int cooldown = reviewProperties.cooldownMinutes();
+            int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
                 // Escape SQL LIKE wildcards in the prefix to prevent unintended pattern matching
@@ -244,10 +305,26 @@ public class AgentJobService {
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
             job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
+            // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
+            // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
+            // a null integrationKind made the comment poster NPE and silently drop delivery. We log
+            // loudly when it can't be resolved: the job will still run (LLM cost) but delivery will
+            // fail at the poster, so surfacing it here makes the misconfiguration diagnosable up front.
+            var resolvedKind = connectionService.findActiveProviderKind(workspace.getId());
+            if (resolvedKind.isPresent()) {
+                job.setIntegrationKind(resolvedKind.get());
+            } else {
+                log.warn(
+                    "No active SCM connection for workspace {} — agent job will run but feedback delivery " +
+                        "will fail (no integrationKind). Configure a provider connection to enable delivery. jobType={}",
+                    workspace.getId(),
+                    jobType
+                );
+            }
 
             // Copy LLM API key — needed for all credential modes:
             // PROXY mode: proxy controller reads it to forward to upstream provider
-            // API_KEY/OAUTH mode: adapter injects it as env var into the container
+            // API_KEY mode: adapter injects it as env var into the container
             if (config.getLlmApiKey() != null) {
                 job.setLlmApiKey(config.getLlmApiKey());
             }

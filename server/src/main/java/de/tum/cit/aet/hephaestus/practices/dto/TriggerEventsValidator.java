@@ -18,7 +18,9 @@ public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerE
         TriggerEventNames.PULL_REQUEST_CREATED,
         TriggerEventNames.PULL_REQUEST_READY,
         TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-        TriggerEventNames.REVIEW_SUBMITTED
+        TriggerEventNames.REVIEW_SUBMITTED,
+        TriggerEventNames.ISSUE_CREATED,
+        TriggerEventNames.ISSUE_LABELED
     );
 
     @Override

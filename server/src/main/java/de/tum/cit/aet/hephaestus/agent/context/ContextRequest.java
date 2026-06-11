@@ -12,13 +12,25 @@ import java.util.UUID;
  * was removed because synchronous mentor chat ({@link MentorChatRequest}) has no
  * {@link AgentJob}. Per-variant accessors carry the variant-specific identity.
  */
-public sealed interface ContextRequest permits ContextRequest.PracticeReviewRequest, ContextRequest.MentorChatRequest {
+public sealed interface ContextRequest
+    permits ContextRequest.PracticeReviewRequest, ContextRequest.IssueReviewRequest, ContextRequest.MentorChatRequest
+{
     /**
      * Build the materialised PR-review context: metadata, comments, diff, contributor history.
      * Carries the {@link AgentJob} the practice runner will execute.
      */
     record PracticeReviewRequest(AgentJob job) implements ContextRequest {
         public PracticeReviewRequest {
+            Objects.requireNonNull(job, "job must not be null");
+        }
+    }
+
+    /**
+     * Build the materialised issue-detection context: issue metadata, the comment thread, and the
+     * state-transition timeline — NO diff. Carries the {@link AgentJob} the practice runner executes.
+     */
+    record IssueReviewRequest(AgentJob job) implements ContextRequest {
+        public IssueReviewRequest {
             Objects.requireNonNull(job, "job must not be null");
         }
     }

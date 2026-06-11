@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { AdminPracticesPage } from "./AdminPracticesPage";
-import { mockPractices } from "./storyMockData";
+import { mockGoals, mockPractices } from "./storyMockData";
 
 /**
  * Full admin page for managing practice definitions.
@@ -9,17 +9,25 @@ import { mockPractices } from "./storyMockData";
  */
 const meta = {
 	component: AdminPracticesPage,
-	parameters: { layout: "fullscreen" },
+	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
 		practices: mockPractices,
+		goals: mockGoals,
 		isLoading: false,
 		isDeleting: false,
 		togglingPractices: new Set<string>(),
 		onDeletePractice: fn().mockResolvedValue(undefined),
 		onSetActive: fn(),
 	},
+	decorators: [
+		(Story) => (
+			<div className="mx-auto max-w-3xl">
+				<Story />
+			</div>
+		),
+	],
 } satisfies Meta<typeof AdminPracticesPage>;
 
 export default meta;
@@ -40,5 +48,14 @@ export const Loading: Story = {
 export const Empty: Story = {
 	args: {
 		practices: [],
+	},
+};
+
+/** Error state when the catalog fails to load. */
+export const LoadError: Story = {
+	args: {
+		practices: [],
+		isError: true,
+		onRetry: fn(),
 	},
 };

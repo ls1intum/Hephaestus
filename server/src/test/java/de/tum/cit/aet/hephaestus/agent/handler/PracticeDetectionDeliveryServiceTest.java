@@ -57,6 +57,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private PullRequestRepository pullRequestRepository;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Captor
@@ -75,6 +78,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             practiceRepository,
             practiceFindingRepository,
             pullRequestRepository,
+            issueRepository,
             eventPublisher,
             objectMapper
         );
@@ -253,7 +257,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Missing pull_request_id");
+                .hasMessageContaining("Missing job metadata");
         }
 
         @Test
@@ -437,6 +441,49 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(event.contributorId()).isEqualTo(789L);
             assertThat(event.targetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
             assertThat(event.targetId()).isEqualTo(456L);
+        }
+    }
+
+    @Nested
+    class IssueRouting {
+
+        @Test
+        void routesToIssueTargetAndAuthorWhenTargetTypeIsIssue() {
+            // Job carries target_type=ISSUE + issue_id → resolve the Issue (TYPE-filtered) + its author.
+            var issue = new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
+            ReflectionTestUtils.setField(issue, "id", 999L);
+            issue.setAuthor(testAuthor);
+            when(issueRepository.findByIdWithRepository(999L)).thenReturn(Optional.of(issue));
+
+            ObjectNode meta = new ObjectMapper().createObjectNode();
+            meta.put("target_type", "ISSUE");
+            meta.put("issue_id", 999L);
+            testJob.setMetadata(meta);
+
+            var findings = List.of(validFinding("pr-description-quality", Verdict.NEGATIVE));
+            var result = service.deliver(testJob, findings);
+
+            assertThat(result.inserted()).isEqualTo(1);
+            verify(practiceFindingRepository).insertIfAbsent(
+                any(),
+                eq("pr-description-quality:0:ISSUE:999:" + testJob.getId()),
+                eq(testJob.getId()),
+                anyLong(),
+                eq("ISSUE"),
+                eq(999L),
+                eq(789L),
+                anyString(),
+                eq("NEGATIVE"),
+                anyString(),
+                anyFloat(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+            assertThat(eventCaptor.getValue().targetType()).isEqualTo(PracticeFindingTargetType.ISSUE);
+            assertThat(eventCaptor.getValue().targetId()).isEqualTo(999L);
         }
     }
 }

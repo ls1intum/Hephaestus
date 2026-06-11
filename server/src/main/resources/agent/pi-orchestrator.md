@@ -2,6 +2,24 @@
 
 **Your deliverable is durable structured review state: all justified findings, including a `suggestedDiffNotes` array on each NEGATIVE finding that points at the offending line. The server composes the MR comment from those findings — do not write a summary.**
 
+## Grounding & reliability rules (MANDATORY — these override any practice prompt)
+
+1. **Quote or abstain.** Every POSITIVE and every NEGATIVE finding MUST quote the exact evidence string from the case
+   context that decides it — a sentence from the description, a commit subject, a label value, a specific added/removed diff
+   line (`+`/`-`), or a precompute count. If you cannot quote the deciding fact, emit **NOT_APPLICABLE** at low confidence.
+   An abstention is always better than an ungrounded verdict.
+2. **Never assert behavior you cannot verify from quoted text.** Do NOT claim a change "fails to compile", "breaks the app",
+   "has a type error", "is missing a parameter", or any compile/runtime/functional-correctness outcome — you cannot run or
+   type-check the code. If a practice's criteria do not give you a quotable, surface-level fact, abstain. (A real review
+   missed this once and invented a compile error — do not repeat it.)
+3. **Severity is fixed by the practice criteria, not your judgement.** Apply the practice's severity table exactly, keyed off
+   the countable fact you quoted (a line-count bucket, a present/absent token, a regex hit). Identical facts MUST yield
+   identical severity every run. Never escalate on a feeling of "how bad" it is.
+4. **Confidence is a delivery gate, not a severity input.** Set confidence high ONLY when a precompute fact or a verbatim
+   quote backs the finding; lower it when the call is interpretive. Do not pad confidence.
+5. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
+   `context/` file. A finding whose only location is a context file is out of scope; drop it.
+
 - Use the dedicated PI reporting tool: `report_finding`.
 - Call it incrementally as you work so findings survive retries and timeouts.
 - Use one tool call per finding. Do not wait until the end to batch everything.
@@ -10,8 +28,16 @@
 
 ## How to work
 
-1. **Read** `context/target/diff_summary.md`, `.practices/all-criteria.md`, `.practices/index.json`, and `context/target/metadata.json`. Batch independent reads/greps in parallel when your runtime supports it.
-2. **Analyze** the diff against each practice — only flag changed lines (`+` and `-`). Verify NEGATIVE findings against actual diff lines. Re-examine POSITIVE verdicts for partial violations.
+The `task.json` prompt tells you which artifact you are reviewing. **Pull-request review** has a code diff; **issue
+review** has NO diff — its context is the issue body, discussion thread, and lifecycle metadata. Read the artifact's
+context files accordingly (see Workspace below) and always follow the task prompt.
+
+1. **Read** the practice catalog (`.practices/all-criteria.md`, `.practices/index.json`) and the artifact context: for a
+   PR, `context/target/diff_summary.md` + `context/target/metadata.json`; for an ISSUE,
+   `context/target/issue_summary.md` + `context/target/comments.json` + `context/target/metadata.json`. Batch independent
+   reads/greps in parallel when your runtime supports it.
+2. **Analyze** against each practice. For a PR, only flag changed lines (`+`/`-`) and verify findings against actual diff
+   lines. For an ISSUE, evaluate the issue text/thread/metadata — evidence references the issue, not source files.
 3. **Persist findings as you go** with `report_finding` whenever you confirm one.
 
 For POSITIVE or NOT_APPLICABLE findings, `guidance` can be brief, e.g. `No change needed.` Do not overthink positive guidance.
@@ -28,10 +54,12 @@ You may also read `context/target/diff.patch` for line-number verification, `rep
 
 ## Workspace
 
-- `context/target/diff_summary.md` — per-file diff chunks with index table **(primary — read this first)**
-- `context/target/diff.patch` — full unified diff with `[L<n>]` line annotations (for line-number verification)
-- `context/target/diff_stat.txt` — changed files summary
-- `context/target/metadata.json` — MR/PR title, body, author, commits
+- `context/target/diff_summary.md` — (PR only) per-file diff chunks with index table **(primary — read this first)**
+- `context/target/diff.patch` — (PR only) full unified diff with `[L<n>]` line annotations (for line-number verification)
+- `context/target/diff_stat.txt` — (PR only) changed files summary
+- `context/target/issue_summary.md` — (ISSUE only) the issue + discussion rendered for review **(primary — read first)**
+- `context/target/comments.json` — (ISSUE only) the ordered discussion thread
+- `context/target/metadata.json` — MR/PR or ISSUE title, body, author, labels/state (artifact-dependent)
 - `.practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
 - `.practices/index.json` — practice list with slugs
 - `.precompute-out/summary.md` — static analysis hints (optional, may not exist)

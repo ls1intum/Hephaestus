@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcess
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import java.time.Instant;
@@ -126,6 +127,36 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             issue = issueRepository.save(issue);
         }
 
+        return issue;
+    }
+
+    /**
+     * Handles an {@code action=update} issue event. Persists the issue via {@link #process} (which
+     * overwrites the label set to the new state), then emits one {@link ScmDomainEvent.IssueLabeled}
+     * per newly-added label — GitLab has no native "labeled" action, so this is how the IssueLabeled
+     * trigger reaches parity with GitHub. The added-label delta is read from the webhook's
+     * {@code changes.labels} diff, so a plain title/description edit emits nothing.
+     */
+    @Nullable
+    public Issue processUpdated(GitLabIssueEventDTO event, ProcessingContext context) {
+        // Capture the delta from the payload (independent of the entity's label set, which process() rewrites).
+        List<GitLabWebhookLabel> addedLabels = event.addedLabels();
+        Issue issue = process(event, context);
+        if (issue == null || addedLabels.isEmpty()) {
+            return issue;
+        }
+        for (GitLabWebhookLabel labelDto : addedLabels) {
+            Label label = findOrCreateLabel(labelDto, context.repository());
+            if (label != null) {
+                eventPublisher.publishEvent(
+                    new ScmDomainEvent.IssueLabeled(
+                        ScmEventPayload.IssueData.from(issue),
+                        ScmEventPayload.LabelData.from(label),
+                        EventContext.from(context)
+                    )
+                );
+            }
+        }
         return issue;
     }
 
