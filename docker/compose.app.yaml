@@ -300,9 +300,9 @@ services:
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
     # No container healthcheck: the distroless image can't run a wget/shell probe, and the worker fronts
-    # no Traefik router for an LB probe (its actuator listens on :8080, but nothing routes to it). It
-    # serves no user traffic, so liveness rests on ExitOnOutOfMemoryError + restart:unless-stopped — a
-    # hung-but-alive JVM is an accepted residual.
+    # no Traefik router for an LB probe (its actuator listens on :8080, but nothing routes to it). It serves
+    # no user traffic, so liveness rests on restart:unless-stopped — Paketo's runtime JAVA_TOOL_OPTIONS sets
+    # -XX:+ExitOnOutOfMemoryError, so a heap OOM exits and restarts; a hung-but-alive JVM is an accepted residual.
     logging:
       driver: "json-file"
       options:
