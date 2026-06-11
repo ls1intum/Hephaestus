@@ -16,9 +16,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -49,8 +47,7 @@ public class AgentJobService {
     private final AgentJobRepository agentJobRepository;
     private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final PullRequestRepository pullRequestRepository;
-    private final IssueRepository issueRepository;
+    private final ReviewableArtifactLoader artifactLoader;
     private final de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
@@ -64,8 +61,7 @@ public class AgentJobService {
         AgentJobRepository agentJobRepository,
         AgentConfigRepository agentConfigRepository,
         WorkspaceRepository workspaceRepository,
-        PullRequestRepository pullRequestRepository,
-        IssueRepository issueRepository,
+        ReviewableArtifactLoader artifactLoader,
         de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
@@ -78,8 +74,7 @@ public class AgentJobService {
         this.agentJobRepository = agentJobRepository;
         this.agentConfigRepository = agentConfigRepository;
         this.workspaceRepository = workspaceRepository;
-        this.pullRequestRepository = pullRequestRepository;
-        this.issueRepository = issueRepository;
+        this.artifactLoader = artifactLoader;
         this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
@@ -124,7 +119,7 @@ public class AgentJobService {
      * @return description of result (job ID or error message)
      */
     public String submitReviewForPullRequest(Long workspaceId, Long prId) {
-        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prId).orElse(null);
+        PullRequest pr = artifactLoader.findPullRequestForGate(prId).orElse(null);
         if (pr == null) {
             return "PR not found: " + prId;
         }
@@ -151,7 +146,7 @@ public class AgentJobService {
      * {@link #submitReviewForPullRequest} on the issue artifact.
      */
     public String submitDetectionForIssue(Long workspaceId, Long issueId) {
-        Issue issue = issueRepository.findByIdWithRepository(issueId).orElse(null);
+        Issue issue = artifactLoader.findIssueWithRepository(issueId).orElse(null);
         if (issue == null) {
             return "Issue not found: " + issueId;
         }

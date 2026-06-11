@@ -650,6 +650,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             "AgentJobSubmitter",
             // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
             "AgentJobEventListener",
+            // IssueAgentJobEventListener handles ScmDomainEvent.Issue{Created,Labeled} whose EventContext
+            // carries the originating repository → workspaceId is resolved per-event (mirrors the PR listener)
+            "IssueAgentJobEventListener",
             // MentorContextInvalidator handles ScmDomainEvent.{PullRequest,Issue,Review}* whose
             // EventContext carries the originating repository → workspaceId is resolved per-event
             "MentorContextInvalidator",
