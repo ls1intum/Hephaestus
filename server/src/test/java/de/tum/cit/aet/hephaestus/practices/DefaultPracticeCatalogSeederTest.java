@@ -87,6 +87,22 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
                 .filter(f -> f == FocusArtifact.ISSUE)
                 .count()
         ).isEqualTo(3);
+
+        // Every seeded practice's criteria is the per-focus evidence-contract preamble composed onto the
+        // practice-specific criteria with a "\n\n---\n\n" fence — so the shared contract is authored once
+        // and inherited, while the validated practice text is preserved verbatim after the fence.
+        for (var request : practiceCaptor.getAllValues()) {
+            assertThat(request.criteria()).contains("\n\n---\n\n");
+            if (request.focusArtifact() == FocusArtifact.ISSUE) {
+                assertThat(request.criteria()).startsWith(
+                    "You are a formative-feedback reviewer assessing a single software-practice habit from an issue."
+                );
+            } else {
+                assertThat(request.criteria()).startsWith(
+                    "You are a formative-feedback reviewer assessing a single software-practice habit from a pull request."
+                );
+            }
+        }
     }
 
     @Test

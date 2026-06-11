@@ -95,7 +95,7 @@ class DefaultPracticeCatalogSeeder {
 
             for (JsonNode practiceNode : goalNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
-                practiceService.createPractice(ctx, toCreateRequest(practiceNode));
+                practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));
                 goalService.bindPractice(ctx, practiceSlug, goalSlug);
                 seededPractices++;
             }
@@ -110,7 +110,7 @@ class DefaultPracticeCatalogSeeder {
         }
     }
 
-    private CreatePracticeRequestDTO toCreateRequest(JsonNode practiceNode) {
+    private CreatePracticeRequestDTO toCreateRequest(JsonNode catalog, JsonNode practiceNode) {
         List<String> triggerEvents = new ArrayList<>();
         practiceNode.path("triggerEvents").forEach(t -> triggerEvents.add(t.asString()));
         FocusArtifact focus = FocusArtifact.valueOf(practiceNode.path("focusArtifact").asString());
@@ -119,10 +119,27 @@ class DefaultPracticeCatalogSeeder {
             practiceNode.path("name").asString(),
             null,
             triggerEvents,
-            practiceNode.path("criteria").asString(),
+            composeCriteria(catalog, focus, practiceNode.path("criteria").asString()),
             null,
             focus
         );
+    }
+
+    /**
+     * Prepends the shared per-focus evidence-contract preamble (authored once in
+     * {@code criteriaPreambles.<FOCUS>}) to the practice-specific criteria, so every seeded practice —
+     * and any future one of that focus — inherits the same artifact contract without restating it. The
+     * preamble is reinforcing and explicitly subordinate to the inline criteria (it ends by deferring to
+     * the practice-specific contract), so composition never weakens the validated detection logic. When
+     * no preamble is configured for the focus the criteria is stored verbatim, keeping older catalogs and
+     * already-seeded workspaces byte-for-byte unchanged.
+     */
+    private static String composeCriteria(JsonNode catalog, FocusArtifact focus, String criteria) {
+        String preamble = text(catalog.path("criteriaPreambles"), focus.name());
+        if (preamble == null || preamble.isBlank()) {
+            return criteria;
+        }
+        return preamble + "\n\n---\n\n" + criteria;
     }
 
     private JsonNode readCatalog() {
