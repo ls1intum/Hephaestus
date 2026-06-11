@@ -551,4 +551,87 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(mrNote).contains("2 suggestions for improvement");
         assertThat(mrNote).doesNotContain("before merging");
     }
+
+    @Test
+    void compose_suggestionsOnlyWithPositives_prependsTaskLevelAcknowledgement() {
+        List<ValidatedFinding> findings = new ArrayList<>();
+        findings.add(positiveFinding("scope-one-reviewable-change"));
+        findings.add(positiveFinding("ready-and-traceable-handoff"));
+        findings.add(
+            negativeFinding(
+                "describe-what-and-why",
+                "PR description lacks a rationale sentence",
+                Severity.MINOR,
+                List.of(),
+                List.of(),
+                "The body lists what changed but not why.",
+                "Add a sentence explaining the motivation."
+            )
+        );
+
+        String mrNote = DeliveryComposer.compose(findings).mrNote();
+
+        // Strengths named in task language, then the improvement — never deficit-only.
+        assertThat(mrNote).startsWith("Nice work ");
+        assertThat(mrNote).contains("keeping the change focused and reviewable");
+        assertThat(mrNote).contains("linking the change to its issue");
+        assertThat(mrNote).contains("to tighten:");
+        assertThat(mrNote).contains("1 suggestion for improvement");
+    }
+
+    @Test
+    void compose_blockingIssue_suppressesAcknowledgement() {
+        List<ValidatedFinding> findings = new ArrayList<>();
+        findings.add(positiveFinding("scope-one-reviewable-change"));
+        findings.add(
+            negativeFinding(
+                "hardcoded-secrets",
+                "Hardcoded API key",
+                Severity.CRITICAL,
+                List.of(new LocationSpec("Config/Keys.swift", 5)),
+                List.of("let key = \"abc\""),
+                "A secret is committed.",
+                "Move it to the environment."
+            )
+        );
+
+        String mrNote = DeliveryComposer.compose(findings).mrNote();
+
+        // Front-loading praise ahead of a blocking issue would read as a hollow feedback sandwich.
+        assertThat(mrNote).doesNotContain("Nice work");
+        assertThat(mrNote).contains("to fix before merging");
+    }
+
+    @Test
+    void sanitizeStudentText_stripsInternalGradingVocabulary() {
+        // The exact grading-mechanics phrasing observed leaking into live student notes.
+        String leaked1 = "The body has no rationale, which results in a NEGATIVE finding with MINOR severity.";
+        String leaked2 =
+            "This exceeds the ≤200 line threshold for a POSITIVE finding, placing it in the INFO severity band.";
+        String leaked3 = "The title is generic, violating the practice that requires an imperative summary.";
+
+        // The exact mid-paragraph leak observed on MR !13 (two sentences, second is pure rubric meta).
+        String leaked4 =
+            "The title is descriptive but the body only lists what was done without a quoted sentence " +
+            "that explains why. The practice requires a specific 'why' sentence to be present for a " +
+            "POSITIVE verdict; its absence leads to this point at the MINOR severity level.";
+
+        for (String s : List.of(leaked1, leaked2, leaked3, leaked4)) {
+            String clean = DeliveryComposer.sanitizeStudentText(s);
+            assertThat(clean).doesNotContainIgnoringCase("NEGATIVE finding");
+            assertThat(clean).doesNotContainIgnoringCase("POSITIVE finding");
+            assertThat(clean).doesNotContainIgnoringCase("POSITIVE verdict");
+            assertThat(clean).doesNotContainIgnoringCase("severity band");
+            assertThat(clean).doesNotContainIgnoringCase("severity level");
+            assertThat(clean).doesNotContainIgnoringCase("MINOR severity");
+            assertThat(clean).doesNotContainIgnoringCase("the practice requires");
+            assertThat(clean).doesNotContainIgnoringCase("line threshold");
+        }
+        // The useful, non-grading sentence survives the scrub.
+        assertThat(DeliveryComposer.sanitizeStudentText(leaked4)).contains("only lists what was done");
+
+        // Domain vocabulary in legitimate guidance must survive untouched.
+        String secretGuidance = "Move the hardcoded secret/credential out of source into the environment.";
+        assertThat(DeliveryComposer.sanitizeStudentText(secretGuidance)).isEqualTo(secretGuidance);
+    }
 }

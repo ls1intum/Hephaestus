@@ -18,6 +18,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -117,8 +118,15 @@ class DeliveryComposer {
             }
         }
 
+        // POSITIVE findings the same job produced — surfaced as a brief strengths line before the
+        // critiques so the note acknowledges effort (task-level, not person-level praise).
+        List<ValidatedFinding> positives = findings
+            .stream()
+            .filter(f -> f.verdict() == Verdict.POSITIVE)
+            .toList();
+
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview
-        String mrNote = composeMrNote(negatives, nonInlinable, inlinable, artifact);
+        String mrNote = composeMrNote(positives, negatives, nonInlinable, inlinable, artifact);
 
         // Diff notes: ALL inlinable negatives get inline comments
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
@@ -150,12 +158,123 @@ class DeliveryComposer {
         for (ValidatedFinding f : withReasoning) {
             if (shown >= 4) break; // Cap at 4 to avoid a wall of text
             String label = capitalize(f.practiceSlug().replace('-', ' '));
-            String summary = truncateToFirstSentence(f.reasoning().strip(), 200);
+            String summary = truncateToFirstSentence(sanitizeStudentText(f.reasoning()).strip(), 200);
             sb.append("- **").append(label).append(":** ").append(summary).append("\n");
             shown++;
         }
         sb.append("\n");
         return sb.toString();
+    }
+
+    /**
+     * Short, task-level strength phrases keyed by practice slug — used to acknowledge what the work
+     * already does well before listing improvements. Task/process-level by design (never person-level
+     * praise). Unknown slugs (custom practices) fall back to a humanised practice name.
+     */
+    private static final Map<String, String> STRENGTH_PHRASES = Map.ofEntries(
+        Map.entry("scope-one-reviewable-change", "keeping the change focused and reviewable"),
+        Map.entry("describe-what-and-why", "explaining what changed"),
+        Map.entry("ready-and-traceable-handoff", "linking the change to its issue"),
+        Map.entry("engaging-with-inline-review-comments", "engaging with the review feedback"),
+        Map.entry("issue-states-an-actionable-problem", "stating the problem clearly"),
+        Map.entry("issue-scoped-to-single-concern", "keeping the issue scoped to one concern"),
+        Map.entry("issue-has-checkable-outcome", "defining a clear, checkable outcome")
+    );
+
+    /**
+     * Builds a one-sentence strengths acknowledgement from up to two POSITIVE findings, e.g.
+     * "Nice work keeping the change focused and reviewable and linking the change to its issue — a
+     * couple of things to tighten:". Returns "" when there are no positives. Strictly task-level: it
+     * names what the work does, never grades the author.
+     */
+    static String composeAcknowledgement(List<ValidatedFinding> positives) {
+        if (positives == null || positives.isEmpty()) {
+            return "";
+        }
+        List<String> phrases = positives
+            .stream()
+            .map(f -> STRENGTH_PHRASES.getOrDefault(f.practiceSlug(), humanisePracticeSlug(f.practiceSlug())))
+            .filter(p -> p != null && !p.isBlank())
+            .distinct()
+            .limit(2)
+            .toList();
+        if (phrases.isEmpty()) {
+            return "";
+        }
+        String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
+        String tail = positives.size() > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
+        return "Nice work " + strengths + tail;
+    }
+
+    /** Humanises a slug ("issue-has-checkable-outcome" → "handling issue has checkable outcome"); fallback only. */
+    @Nullable
+    private static String humanisePracticeSlug(@Nullable String slug) {
+        if (slug == null || slug.isBlank()) {
+            return null;
+        }
+        return slug.replace('-', ' ');
+    }
+
+    /**
+     * Marks a sentence as pure grading-mechanics meta — if any of these appears, the whole sentence is
+     * the grader explaining the rubric to itself, not feedback to the student, so it is dropped wholesale.
+     * Catches the phrasings observed leaking from gpt-oss-120b: "the practice requires…", "for a POSITIVE
+     * verdict", "MINOR severity level/band", "according to/violating the practice", "…line threshold".
+     */
+    private static final Pattern GRADING_SENTENCE = Pattern.compile(
+        "(?i)(" +
+            "\\bthe\\s+practice\\s+(?:requires|defines|expects|mandates|deems|treats|considers|states)\\b|" +
+            "\\b(?:according to|per|under|following|violat\\w+|satisf\\w+|fail\\w*)\\s+the\\s+practice\\b|" +
+            "\\b(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
+            "\\b(?:for|to|a|an|the)\\s+(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
+            "\\b(?:MINOR|MAJOR|INFO|CRITICAL)\\s+severity\\b|" +
+            "\\bseverity\\s+(?:level|band|bucket|rating)\\b|" +
+            "\\b[≤<=>]*\\s*\\d+[\\s-]*(?:line|file)s?\\s+threshold\\b|" +
+            "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b" +
+            ")"
+    );
+
+    /** Residual bare-phrase replacements applied after sentence-dropping (defence in depth). */
+    private static final List<Map.Entry<Pattern, String>> RESIDUAL_SCRUBS = List.of(
+        Map.entry(
+            Pattern.compile("(?i)[≤<=>]*\\s*\\d+[\\s-]*line\\s+threshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)"),
+            "the size that stays easy to review in one pass"
+        ),
+        Map.entry(Pattern.compile("(?i)\\b(?:the\\s+)?\\w+\\s+severity\\s+(?:band|level|bucket)\\b"), ""),
+        Map.entry(
+            Pattern.compile("(?i)\\ba\\s+(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:finding|verdict)\\b"),
+            "this point"
+        )
+    );
+
+    /**
+     * Strips internal grading vocabulary from text headed to a student. Two passes: drop any sentence
+     * that is pure rubric meta ({@link #GRADING_SENTENCE}), then scrub residual bare phrases, then tidy
+     * the whitespace the removals leave behind. Idempotent and locale-safe (no naked case folding).
+     */
+    static String sanitizeStudentText(@Nullable String text) {
+        if (text == null || text.isBlank()) {
+            return text == null ? "" : text;
+        }
+        // Pass 1: split into sentences and drop any that is grading meta. Split on sentence-ending
+        // punctuation followed by whitespace so mid-paragraph rubric sentences are removed wholesale.
+        StringBuilder kept = new StringBuilder(text.length());
+        for (String sentence : text.split("(?<=[.!?])\\s+")) {
+            if (!GRADING_SENTENCE.matcher(sentence).find()) {
+                if (kept.length() > 0) {
+                    kept.append(' ');
+                }
+                kept.append(sentence);
+            }
+        }
+        String out = kept.toString();
+        // Pass 2: residual bare phrases that survived inside an otherwise-useful sentence.
+        for (Map.Entry<Pattern, String> rule : RESIDUAL_SCRUBS) {
+            out = rule.getKey().matcher(out).replaceAll(rule.getValue());
+        }
+        // Tidy the gaps the drops leave: doubled spaces, space-before-punctuation, blank lines.
+        out = out.replaceAll("[ \\t]{2,}", " ").replaceAll("\\s+([.,;])", "$1").replaceAll("\\n{3,}", "\n\n");
+        return out.strip();
     }
 
     /** Truncate text to the first sentence or maxLen chars, whichever is shorter. */
@@ -212,12 +331,28 @@ class DeliveryComposer {
      * 3. Brief overview of inline findings (just title + severity, no full content)
      */
     static String composeMrNote(
+        List<ValidatedFinding> positives,
         List<ValidatedFinding> allNegatives,
         List<ValidatedFinding> nonInlinable,
         List<ValidatedFinding> inlinable,
         FocusArtifact artifact
     ) {
         var sb = new StringBuilder(4096);
+
+        // Strengths first: name 1-2 things the work already does well (task-level acknowledgement)
+        // before the critiques, so a suggestions-only note is never deficit-only when the job also
+        // found strengths. Suppressed when there is a blocking (CRITICAL/MAJOR) issue: front-loading
+        // praise ahead of a serious problem reads as a hollow "feedback sandwich" and dilutes the
+        // message. Task/process-level only (Hattie & Timperley) — never person-level praise.
+        boolean hasBlocking = allNegatives
+            .stream()
+            .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
+        if (!hasBlocking) {
+            String acknowledgement = composeAcknowledgement(positives);
+            if (!acknowledgement.isEmpty()) {
+                sb.append(acknowledgement).append("\n\n");
+            }
+        }
 
         // Opening: evidence-anchored issue summary (no self-level praise)
         composeOpening(sb, allNegatives, artifact);
@@ -299,26 +434,49 @@ class DeliveryComposer {
         if (f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR) {
             String snippet = extractPrimarySnippet(f);
             if (snippet != null) {
-                sb.append("You wrote:\n");
-                sb.append("```").append(lang).append("\n").append(snippet).append("\n```\n\n");
+                boolean hasCodeLocation = location != null && !isInternalPath(location);
+                if (hasCodeLocation) {
+                    // Real code reference → fenced code block.
+                    sb.append("You wrote:\n");
+                    sb.append("```").append(lang).append("\n").append(snippet).append("\n```\n\n");
+                } else {
+                    // Metadata field (e.g. a title/body span) → plain inline quote, never a ```json fence.
+                    sb.append("You wrote: “").append(metadataSnippetText(snippet)).append("”\n\n");
+                }
             }
 
-            if (f.reasoning() != null && !f.reasoning().isBlank()) {
-                sb.append(f.reasoning()).append("\n\n");
-            }
-
-            if (f.guidance() != null && !f.guidance().isBlank()) {
-                sb.append(f.guidance()).append("\n\n");
-            }
+            appendStudentText(sb, f.reasoning());
+            appendStudentText(sb, f.guidance());
         } else {
             // MINOR/INFO: combine reasoning + guidance naturally
-            if (f.reasoning() != null && !f.reasoning().isBlank()) {
-                sb.append(f.reasoning()).append("\n\n");
-            }
-            if (f.guidance() != null && !f.guidance().isBlank()) {
-                sb.append(f.guidance()).append("\n\n");
-            }
+            appendStudentText(sb, f.reasoning());
+            appendStudentText(sb, f.guidance());
         }
+    }
+
+    /** Appends sanitised student-facing text (reasoning/guidance) if non-blank after the scrub. */
+    private static void appendStudentText(StringBuilder sb, @Nullable String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        String clean = sanitizeStudentText(text);
+        if (!clean.isBlank()) {
+            sb.append(clean).append("\n\n");
+        }
+    }
+
+    /**
+     * Renders a metadata snippet as plain inline text: unwraps a {@code "field" : "value"} JSON span to
+     * just the value, collapses whitespace, and caps the length so the quote stays readable.
+     */
+    private static String metadataSnippetText(String snippet) {
+        String s = snippet.strip();
+        var m = Pattern.compile("\"[^\"]+\"\\s*:\\s*\"(.*)\"\\s*$", Pattern.DOTALL).matcher(s);
+        if (m.find()) {
+            s = m.group(1);
+        }
+        s = s.replace("\\n", " ").replace("\\\"", "\"").replaceAll("\\s+", " ").strip();
+        return s.length() > 160 ? s.substring(0, 157) + "..." : s;
     }
 
     /** Check if a path is an internal workspace artifact (not student code). */
@@ -467,12 +625,8 @@ class DeliveryComposer {
         var sb = new StringBuilder();
         sb.append("**").append(severityEmoji(f.severity())).append(" ").append(f.title()).append("**\n\n");
 
-        if (f.reasoning() != null && !f.reasoning().isBlank()) {
-            sb.append(f.reasoning()).append("\n\n");
-        }
-        if (f.guidance() != null && !f.guidance().isBlank()) {
-            sb.append(f.guidance()).append("\n\n");
-        }
+        appendStudentText(sb, f.reasoning());
+        appendStudentText(sb, f.guidance());
 
         String body = sb.toString().strip();
         if (body.length() > PracticeDetectionResultParser.MAX_DIFF_NOTE_BODY_LENGTH) {
