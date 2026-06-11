@@ -34,8 +34,7 @@ services:
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       # AgentImagePinGuard loads in any prod pod; set false for non-release deploys that skip the pin.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
-      # Target for the /workspace/health-check (thc) container HEALTHCHECK below — readiness, so the pod
-      # reports unhealthy while NATS/JetStream is still draining/unavailable.
+      # thc healthcheck target: readiness (reports unhealthy while NATS/JetStream is unavailable).
       THC_PORT: "8080"
       THC_PATH: /actuator/health/readiness
     depends_on:
@@ -64,12 +63,11 @@ services:
       - "traefik.http.routers.http-webhook-server.priority=100"
       - "traefik.http.routers.https-webhook-server.priority=100"
       - "traefik.http.services.https-webhook-server.loadbalancer.server.port=8080"
-      # Routing-layer health: Traefik's HTTP probe drops a non-ready backend from the LB pool. The
-      # container-layer readiness probe (healthcheck below) is the separate `docker compose ps` signal.
+      # Routing-layer probe (drops a bad backend from the LB pool); the container healthcheck below is separate.
       - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.path=/actuator/health/readiness"
       - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.interval=15s"
       - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.timeout=5s"
-    # Shell-free container healthcheck via the static thc binary (see docker/compose.app.yaml + server/pom.xml).
+    # thc healthcheck (see docker/compose.app.yaml).
     healthcheck:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s

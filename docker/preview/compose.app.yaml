@@ -236,7 +236,7 @@ services:
       # GitLabWebhookService appends /webhooks/gitlab itself.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       WEBHOOK_EXTERNAL_URL: https://${PREVIEW_DOMAIN:?Required}
-      # Target for the /workspace/health-check (thc) container HEALTHCHECK below (actuator liveness on 8080).
+      # thc healthcheck target: actuator liveness on the management port.
       THC_PORT: "8080"
       THC_PATH: /actuator/health/liveness
     depends_on:
@@ -244,8 +244,7 @@ services:
         condition: service_healthy
       seed-loader:
         condition: service_completed_successfully
-    # Shell-free container healthcheck via the static thc binary (see server/pom.xml). Restores a real
-    # readiness signal so the webapp can gate on service_healthy below.
+    # thc healthcheck (see docker/compose.app.yaml) — lets the webapp gate on service_healthy below.
     healthcheck:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s
@@ -286,8 +285,7 @@ services:
       POSTHOG_ENABLED: "false"
     depends_on:
       application-server:
-        # Gate on readiness: the app-server now has a real container healthcheck (thc), so the SPA
-        # isn't served before the API can answer — no cold-start 502 window.
+        # Gate on app-server readiness (a real healthcheck now exists) — no cold-start 502 window.
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
