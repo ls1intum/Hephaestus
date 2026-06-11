@@ -1,7 +1,22 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
+import environment from "@/environment";
 import { safeReturnTo } from "@/integrations/auth/guard";
 import { refreshAccessToken } from "@/integrations/auth/sessionRefresh";
+
+/**
+ * Path the API client prefixes onto every request (`environment.serverUrl`, e.g. `/api` in prod where
+ * Traefik strips it before the app, empty in local dev). Strip it so endpoint exemptions below match
+ * regardless of the deploy's base path — otherwise the logged-out `GET /api/user` probe on a public
+ * page never matches `/user` and loops to /login.
+ */
+function apiBasePath(): string {
+	try {
+		return new URL(environment.serverUrl, window.location.origin).pathname.replace(/\/$/, "");
+	} catch {
+		return "";
+	}
+}
 
 /**
  * Paths whose own 401 must NOT trigger a redirect-to-login. The `GET /user` identity probe
@@ -17,6 +32,11 @@ function isExemptFromSessionExpiry(pathname: string, url: string): boolean {
 		requestPath = new URL(url, window.location.origin).pathname;
 	} catch {
 		// Leave requestPath as-is for an unparseable URL.
+	}
+	// Strip the API base path so `/api/user` (prod) matches the same exemptions as `/user` (local dev).
+	const base = apiBasePath();
+	if (base && requestPath.startsWith(`${base}/`)) {
+		requestPath = requestPath.slice(base.length);
 	}
 	if (requestPath === "/user") return true;
 	if (requestPath.startsWith("/auth/")) return true;

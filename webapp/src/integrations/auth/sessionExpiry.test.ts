@@ -7,6 +7,10 @@ import { refreshAccessToken } from "./sessionRefresh";
 vi.mock("./sessionRefresh", () => ({ refreshAccessToken: vi.fn() }));
 const refreshMock = vi.mocked(refreshAccessToken);
 
+// Prod serves the API under /api (Traefik strips it); pin a base path so the exemptions are exercised
+// the way they run in prod — the GET /api/user probe must be exempt exactly like /user is locally.
+vi.mock("@/environment", () => ({ default: { serverUrl: "http://localhost/api" } }));
+
 // jsdom's window.location is not directly assignable; replace it with a stub exposing `assign` plus
 // the pathname/search/origin the handler reads.
 function stubLocation(pathname: string, search = ""): { assigned: string[] } {
@@ -123,6 +127,30 @@ describe("handlePossibleSessionExpiry", () => {
 		const { assigned } = stubLocation("/");
 		const handled = handlePossibleSessionExpiry(
 			res(401, "http://localhost:8080/user"),
+			makeQueryClient(),
+		);
+		expect(handled).toBe(false);
+		expect(refreshMock).not.toHaveBeenCalled();
+		expect(assigned).toHaveLength(0);
+	});
+
+	it("does NOT handle a 401 from the GET /api/user probe (prod /api base path)", () => {
+		// The landing page at / probes the session; under the /api base path the bare-/user exemption
+		// missed and looped logged-out visitors to /login. Regression for that.
+		const { assigned } = stubLocation("/");
+		const handled = handlePossibleSessionExpiry(
+			res(401, "http://localhost/api/user"),
+			makeQueryClient(),
+		);
+		expect(handled).toBe(false);
+		expect(refreshMock).not.toHaveBeenCalled();
+		expect(assigned).toHaveLength(0);
+	});
+
+	it("does NOT handle a 401 from /api/auth/* endpoints (prod /api base path)", () => {
+		const { assigned } = stubLocation("/");
+		const handled = handlePossibleSessionExpiry(
+			res(401, "http://localhost/api/auth/refresh"),
 			makeQueryClient(),
 		);
 		expect(handled).toBe(false);
