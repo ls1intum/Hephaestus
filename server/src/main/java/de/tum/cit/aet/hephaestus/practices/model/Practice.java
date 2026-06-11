@@ -87,7 +87,7 @@ public class Practice {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "focus_artifact", nullable = false, length = 32)
-    private FocusArtifact focusArtifact = FocusArtifact.PULL_REQUEST;
+    private WorkArtifact focusArtifact = WorkArtifact.PULL_REQUEST;
 
     /**
      * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns

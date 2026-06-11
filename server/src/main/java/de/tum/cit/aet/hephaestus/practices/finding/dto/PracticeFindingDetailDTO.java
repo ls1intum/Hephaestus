@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
@@ -25,7 +25,7 @@ public record PracticeFindingDetailDTO(
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
     @Nullable @Schema(description = "Practice category") String category,
-    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") FocusArtifact targetType,
+    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact targetType,
     @NonNull @Schema(description = "Target entity ID") Long targetId,
     @NonNull @Schema(description = "Finding title") String title,
     @NonNull @Schema(description = "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE") Verdict verdict,

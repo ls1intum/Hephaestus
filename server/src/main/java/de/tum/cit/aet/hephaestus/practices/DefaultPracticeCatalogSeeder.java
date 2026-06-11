@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -113,7 +113,7 @@ class DefaultPracticeCatalogSeeder {
     private CreatePracticeRequestDTO toCreateRequest(JsonNode catalog, JsonNode practiceNode) {
         List<String> triggerEvents = new ArrayList<>();
         practiceNode.path("triggerEvents").forEach(t -> triggerEvents.add(t.asString()));
-        FocusArtifact focus = FocusArtifact.valueOf(practiceNode.path("focusArtifact").asString());
+        WorkArtifact focus = WorkArtifact.valueOf(practiceNode.path("focusArtifact").asString());
         return new CreatePracticeRequestDTO(
             practiceNode.path("slug").asString(),
             practiceNode.path("name").asString(),
@@ -134,7 +134,7 @@ class DefaultPracticeCatalogSeeder {
      * no preamble is configured for the focus the criteria is stored verbatim, keeping older catalogs and
      * already-seeded workspaces byte-for-byte unchanged.
      */
-    private static String composeCriteria(JsonNode catalog, FocusArtifact focus, String criteria) {
+    private static String composeCriteria(JsonNode catalog, WorkArtifact focus, String criteria) {
         String preamble = text(catalog.path("criteriaPreambles"), focus.name());
         if (preamble == null || preamble.isBlank()) {
             return criteria;

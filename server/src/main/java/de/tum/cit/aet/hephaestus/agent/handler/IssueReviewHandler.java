@@ -13,7 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
@@ -29,9 +29,9 @@ import tools.jackson.databind.node.ObjectNode;
  * comment thread, and the lifecycle metadata, materialised by {@code IssueContentProvider} under
  * {@code context/target/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
  *
- * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE) and
- * composes the student-facing feedback; posting that feedback as an issue comment is a follow-up
- * (the existing {@code FeedbackDeliveryService} is PR-coupled). Detection quality is the goal here.
+ * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE),
+ * composes the student-facing feedback, and posts it as an issue comment via
+ * {@link PullRequestCommentPoster#postIssueFormattedBody} (best-effort, suppressed on closed issues).
  */
 public class IssueReviewHandler implements JobTypeHandler {
 
@@ -104,7 +104,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             workspaceContextBuilder.build(new ContextRequest.IssueReviewRequest(job))
         );
         files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
-        practiceCatalogInjector.inject(files, job, FocusArtifact.ISSUE);
+        practiceCatalogInjector.inject(files, job, WorkArtifact.ISSUE);
         log.info(
             "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
             files.size(),
@@ -166,7 +166,7 @@ public class IssueReviewHandler implements JobTypeHandler {
 
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             parsed.validFindings(),
-            FocusArtifact.ISSUE
+            WorkArtifact.ISSUE
         );
         postIssueNote(job, delivery);
     }

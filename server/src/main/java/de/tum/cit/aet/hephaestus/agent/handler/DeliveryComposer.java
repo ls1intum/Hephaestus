@@ -10,9 +10,9 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PR
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -61,7 +61,7 @@ class DeliveryComposer {
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
-        return compose(findings, FocusArtifact.PULL_REQUEST);
+        return compose(findings, WorkArtifact.PULL_REQUEST);
     }
 
     /**
@@ -69,7 +69,7 @@ class DeliveryComposer {
      * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged).
      */
     @Nullable
-    static DeliveryContent compose(List<ValidatedFinding> findings, FocusArtifact artifact) {
+    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
@@ -300,7 +300,7 @@ class DeliveryComposer {
         List<ValidatedFinding> allNegatives,
         List<ValidatedFinding> nonInlinable,
         List<ValidatedFinding> inlinable,
-        FocusArtifact artifact
+        WorkArtifact artifact
     ) {
         var sb = new StringBuilder(4096);
 
@@ -350,9 +350,9 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, FocusArtifact artifact) {
+    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, WorkArtifact artifact) {
         // PRs are merged → "to fix before merging"; issues are not → "to fix".
-        String blockingCta = artifact == FocusArtifact.PULL_REQUEST ? " to fix before merging" : " to fix";
+        String blockingCta = artifact == WorkArtifact.PULL_REQUEST ? " to fix before merging" : " to fix";
         long blockingCount = negatives
             .stream()
             .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)

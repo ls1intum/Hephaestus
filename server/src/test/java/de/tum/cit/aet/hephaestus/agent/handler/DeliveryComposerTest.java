@@ -163,7 +163,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         // Issues are not merged: the blocking CTA must read "to fix", never "to fix before merging".
         DeliveryContent result = DeliveryComposer.compose(
             mixedFindings(),
-            de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.ISSUE
+            de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE
         );
 
         assertThat(result).isNotNull();

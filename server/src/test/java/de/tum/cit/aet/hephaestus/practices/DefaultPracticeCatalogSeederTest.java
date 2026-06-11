@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -77,14 +77,14 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(practiceService, times(7)).createPractice(any(), practiceCaptor.capture());
         verify(goalService, times(7)).bindPractice(any(), any(), any());
 
-        // Issue-focused practices are seeded with FocusArtifact.ISSUE — only possible because the
+        // Issue-focused practices are seeded with WorkArtifact.ISSUE — only possible because the
         // create DTO now carries focusArtifact (the configurability gap this PR closes).
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::focusArtifact).toList();
-        assertThat(foci).contains(FocusArtifact.ISSUE, FocusArtifact.PULL_REQUEST);
+        assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
         assertThat(
             foci
                 .stream()
-                .filter(f -> f == FocusArtifact.ISSUE)
+                .filter(f -> f == WorkArtifact.ISSUE)
                 .count()
         ).isEqualTo(3);
 
@@ -93,7 +93,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         // and inherited, while the validated practice text is preserved verbatim after the fence.
         for (var request : practiceCaptor.getAllValues()) {
             assertThat(request.criteria()).contains("\n\n---\n\n");
-            if (request.focusArtifact() == FocusArtifact.ISSUE) {
+            if (request.focusArtifact() == WorkArtifact.ISSUE) {
                 assertThat(request.criteria()).startsWith(
                     "You are a formative-feedback reviewer assessing a single software-practice habit from an issue."
                 );

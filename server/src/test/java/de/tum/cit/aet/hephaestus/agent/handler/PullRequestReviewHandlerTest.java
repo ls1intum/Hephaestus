@@ -167,7 +167,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
             )
             .thenReturn(samplePractices());
@@ -235,7 +235,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
 
@@ -285,7 +285,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(List.of(createPractice("../etc/passwd", "bad", "c")));
 
@@ -300,7 +300,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(List.of());
 
@@ -328,7 +328,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
                     WORKSPACE_ID,
-                    de.tum.cit.aet.hephaestus.practices.model.FocusArtifact.PULL_REQUEST
+                    de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
             ).thenReturn(samplePractices());
 

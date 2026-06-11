@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -24,7 +24,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
-    List<Practice> findByWorkspaceIdAndActiveTrueAndFocusArtifact(Long workspaceId, FocusArtifact focusArtifact);
+    List<Practice> findByWorkspaceIdAndActiveTrueAndFocusArtifact(Long workspaceId, WorkArtifact focusArtifact);
 
     // Fetches the bound goal eagerly so PracticeDTO.from (which reads goal.slug) is safe to map
     // outside the transaction — open-in-view is disabled.

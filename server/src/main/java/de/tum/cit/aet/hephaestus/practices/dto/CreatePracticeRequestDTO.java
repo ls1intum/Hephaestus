@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -56,5 +56,5 @@ public record CreatePracticeRequestDTO(
         example = "PULL_REQUEST"
     )
     @Nullable
-    FocusArtifact focusArtifact
+    WorkArtifact focusArtifact
 ) {}

@@ -22,10 +22,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -439,7 +439,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(event.findingsDiscarded()).isEqualTo(1); // unknown slug
             assertThat(event.hasNegative()).isTrue(); // error-handling finding is NEGATIVE
             assertThat(event.contributorId()).isEqualTo(789L);
-            assertThat(event.targetType()).isEqualTo(FocusArtifact.PULL_REQUEST);
+            assertThat(event.targetType()).isEqualTo(WorkArtifact.PULL_REQUEST);
             assertThat(event.targetId()).isEqualTo(456L);
         }
     }
@@ -482,7 +482,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any()
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
-            assertThat(eventCaptor.getValue().targetType()).isEqualTo(FocusArtifact.ISSUE);
+            assertThat(eventCaptor.getValue().targetType()).isEqualTo(WorkArtifact.ISSUE);
             assertThat(eventCaptor.getValue().targetId()).isEqualTo(999L);
         }
     }

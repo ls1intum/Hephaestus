@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.Set;
 
 /**
@@ -9,7 +9,7 @@ import java.util.Set;
  *
  * <p>This is the single source of truth that keeps the configurable trigger surface honest: an event
  * belongs here only once a listener actually consumes it for that focus, and a practice can only
- * subscribe to events compatible with its {@link FocusArtifact} — a PR practice cannot listen for an
+ * subscribe to events compatible with its {@link WorkArtifact} — a PR practice cannot listen for an
  * issue event (and vice versa), because the detection gate routes by entity type and the mismatch
  * would silently never fire. The webapp mirrors these sets to present focus-appropriate toggles.
  */
@@ -34,7 +34,7 @@ public final class TriggerEventCatalog {
     private TriggerEventCatalog() {}
 
     /** The events a practice with the given focus is allowed to subscribe to. */
-    public static Set<String> eligibleFor(FocusArtifact focus) {
-        return focus == FocusArtifact.ISSUE ? ISSUE_EVENTS : PULL_REQUEST_EVENTS;
+    public static Set<String> eligibleFor(WorkArtifact focus) {
+        return focus == WorkArtifact.ISSUE ? ISSUE_EVENTS : PULL_REQUEST_EVENTS;
     }
 }

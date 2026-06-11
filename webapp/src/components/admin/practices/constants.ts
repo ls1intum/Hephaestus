@@ -4,7 +4,7 @@
 
 import type { Practice } from "@/api/types.gen";
 
-type FocusArtifact = Practice["focusArtifact"];
+type WorkArtifact = Practice["focusArtifact"];
 
 /**
  * Trigger events a practice can fire on, grouped by the focus artifact they belong to. Mirrors the
@@ -13,7 +13,7 @@ type FocusArtifact = Practice["focusArtifact"];
  * plain-language so the admin reads "fires when…", not a raw event name.
  */
 export const TRIGGER_EVENTS_BY_FOCUS: Record<
-	FocusArtifact,
+	WorkArtifact,
 	ReadonlyArray<{ value: string; label: string }>
 > = {
 	PULL_REQUEST: [
@@ -29,7 +29,7 @@ export const TRIGGER_EVENTS_BY_FOCUS: Record<
 };
 
 /** The set of event values valid for a given focus (used to prune incompatible selections). */
-export function triggerEventsForFocus(focus: FocusArtifact): string[] {
+export function triggerEventsForFocus(focus: WorkArtifact): string[] {
 	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
 }
 
@@ -43,7 +43,7 @@ export const TRIGGER_EVENT_SHORT_LABELS: Record<string, string> = {
 	IssueLabeled: "Issue labeled",
 };
 
-/** The artifact a practice evaluates. Mirrors the server's FocusArtifact enum. */
+/** The artifact a practice evaluates. Mirrors the server's WorkArtifact enum. */
 export const FOCUS_ARTIFACT_OPTIONS = [
 	{
 		value: "PULL_REQUEST",

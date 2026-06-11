@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.practices.finding;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -186,7 +186,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         """
     )
     List<PracticeFinding> findByPullRequestAndWorkspace(
-        @Param("targetType") FocusArtifact targetType,
+        @Param("targetType") WorkArtifact targetType,
         @Param("pullRequestId") Long pullRequestId,
         @Param("workspaceId") Long workspaceId
     );

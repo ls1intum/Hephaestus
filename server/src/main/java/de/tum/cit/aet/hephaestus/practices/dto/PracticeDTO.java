@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -22,7 +22,7 @@ public record PracticeDTO(
     @Nullable
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
-    @NonNull @Schema(description = "Artifact this practice evaluates") FocusArtifact focusArtifact,
+    @NonNull @Schema(description = "Artifact this practice evaluates") WorkArtifact focusArtifact,
     @Nullable @Schema(description = "Slug of the practice goal this practice is bound to, if any") String goalSlug,
     @NonNull @Schema(description = "Whether this practice is actively being detected") Boolean active,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,

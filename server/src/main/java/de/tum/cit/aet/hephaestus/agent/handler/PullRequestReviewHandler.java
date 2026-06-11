@@ -17,8 +17,8 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -170,7 +170,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // Task envelope replaces the legacy /workspace/.prompt file.
         files.put(WorkspaceAbi.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
-        practiceCatalogInjector.inject(files, job, FocusArtifact.PULL_REQUEST);
+        practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(

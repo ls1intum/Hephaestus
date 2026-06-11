@@ -4,8 +4,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +20,7 @@ import tools.jackson.databind.json.JsonMapper;
  * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
  * so it does not live behind the {@code ContentProvider} SPI.
  *
- * <p>Filters by {@link FocusArtifact}: a PR job injects only PR-focus practices, an issue job only
+ * <p>Filters by {@link WorkArtifact}: a PR job injects only PR-focus practices, an issue job only
  * issue-focus practices — so a diff-anchored practice never reaches an issue (and vice-versa).
  *
  * <p>Package-private; instantiated as a {@code @Bean} in {@link JobTypeHandlerConfiguration}.
@@ -44,7 +44,7 @@ class PracticeCatalogInjector {
      * @throws JobPreparationException if the job has no workspace, no matching active practices, or a
      *     slug violates the workspace ABI pattern.
      */
-    void inject(Map<String, byte[]> files, AgentJob job, FocusArtifact focus) {
+    void inject(Map<String, byte[]> files, AgentJob job, WorkArtifact focus) {
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }

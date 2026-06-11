@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -98,7 +98,7 @@ public class PracticeFindingService {
     @Transactional(readOnly = true)
     public List<PracticeFinding> getFindingsForPullRequest(Long workspaceId, Long pullRequestId) {
         return practiceFindingRepository.findByPullRequestAndWorkspace(
-            FocusArtifact.PULL_REQUEST,
+            WorkArtifact.PULL_REQUEST,
             pullRequestId,
             workspaceId
         );

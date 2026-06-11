@@ -32,7 +32,7 @@ import {
 /** Sentinel for the "not bound to any goal" option (shadcn SelectItem cannot use an empty value). */
 const NO_GOAL = "__none__";
 
-type FocusArtifact = NonNullable<CreatePracticeRequest["focusArtifact"]>;
+type WorkArtifact = NonNullable<CreatePracticeRequest["focusArtifact"]>;
 
 interface PracticeFormCreateProps {
 	mode: "create";
@@ -59,7 +59,7 @@ interface FormState {
 	name: string;
 	slug: string;
 	category: string;
-	focusArtifact: FocusArtifact;
+	focusArtifact: WorkArtifact;
 	goalSlug: string;
 	triggerEvents: string[];
 	criteria: string;
@@ -285,7 +285,7 @@ export function PracticeForm({
 											value={form.focusArtifact}
 											onValueChange={(value) =>
 												setForm((prev) => {
-													const focusArtifact = value as FocusArtifact;
+													const focusArtifact = value as WorkArtifact;
 													// Drop any selected triggers that don't belong to the new focus —
 													// the server rejects cross-focus combinations.
 													const allowed = triggerEventsForFocus(focusArtifact);
