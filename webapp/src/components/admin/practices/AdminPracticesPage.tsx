@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertCircle, Plus } from "lucide-react";
 import { useState } from "react";
-import type { Practice } from "@/api/types.gen";
+import type { Practice, PracticeGoal } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -20,6 +20,7 @@ import { PracticeCardList } from "./PracticeCardList";
 interface AdminPracticesPageProps {
 	workspaceSlug: string;
 	practices: Practice[];
+	goals: PracticeGoal[];
 	isLoading: boolean;
 	isError?: boolean;
 	isDeleting: boolean;
@@ -29,9 +30,17 @@ interface AdminPracticesPageProps {
 	onRetry?: () => void;
 }
 
+type FocusFilter = "ALL" | "PULL_REQUEST" | "ISSUE";
+const FOCUS_FILTERS: ReadonlyArray<{ value: FocusFilter; label: string }> = [
+	{ value: "ALL", label: "All" },
+	{ value: "PULL_REQUEST", label: "Pull requests" },
+	{ value: "ISSUE", label: "Issues" },
+];
+
 export function AdminPracticesPage({
 	workspaceSlug,
 	practices,
+	goals,
 	isLoading,
 	isError = false,
 	isDeleting,
@@ -41,6 +50,10 @@ export function AdminPracticesPage({
 	onRetry,
 }: AdminPracticesPageProps) {
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
+	const [focusFilter, setFocusFilter] = useState<FocusFilter>("ALL");
+
+	const visiblePractices =
+		focusFilter === "ALL" ? practices : practices.filter((p) => p.focusArtifact === focusFilter);
 
 	const handleDeleteConfirm = () => {
 		if (deletingPractice) {
@@ -52,7 +65,25 @@ export function AdminPracticesPage({
 
 	return (
 		<div>
-			<div className="mb-6 flex justify-end">
+			<div className="mb-6 flex items-center justify-between gap-3">
+				<div
+					className="inline-flex rounded-lg border p-0.5"
+					role="group"
+					aria-label="Filter by focus"
+				>
+					{FOCUS_FILTERS.map((filter) => (
+						<Button
+							key={filter.value}
+							type="button"
+							size="sm"
+							variant={focusFilter === filter.value ? "secondary" : "ghost"}
+							aria-pressed={focusFilter === filter.value}
+							onClick={() => setFocusFilter(filter.value)}
+						>
+							{filter.label}
+						</Button>
+					))}
+				</div>
 				<Button
 					render={
 						<Link
@@ -82,7 +113,8 @@ export function AdminPracticesPage({
 			) : (
 				<PracticeCardList
 					workspaceSlug={workspaceSlug}
-					practices={practices}
+					practices={visiblePractices}
+					goals={goals}
 					isLoading={isLoading}
 					togglingPractices={togglingPractices}
 					onDelete={setDeletingPractice}

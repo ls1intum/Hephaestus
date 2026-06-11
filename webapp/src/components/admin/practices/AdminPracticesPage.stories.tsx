@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { AdminPracticesPage } from "./AdminPracticesPage";
-import { mockPractices } from "./storyMockData";
+import { mockGoals, mockPractices } from "./storyMockData";
 
 /**
  * Full admin page for managing practice definitions.
@@ -14,6 +14,7 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		practices: mockPractices,
+		goals: mockGoals,
 		isLoading: false,
 		isDeleting: false,
 		togglingPractices: new Set<string>(),

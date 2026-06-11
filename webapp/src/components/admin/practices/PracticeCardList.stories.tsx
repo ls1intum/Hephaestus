@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { PracticeCardList } from "./PracticeCardList";
-import { mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
+import { mockGoals, mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
 
 const meta = {
 	component: PracticeCardList,
@@ -10,6 +10,7 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		practices: mockPractices,
+		goals: mockGoals,
 		isLoading: false,
 		togglingPractices: new Set<string>(),
 		onDelete: fn(),

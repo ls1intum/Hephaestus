@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
 	deletePracticeMutation,
+	listGoalsOptions,
 	listPracticesOptions,
 	listPracticesQueryKey,
 	setActiveMutation,
@@ -26,6 +27,15 @@ function PracticesListContainer() {
 	} = useActiveWorkspaceSlug();
 
 	const [togglingPractices, setTogglingPractices] = useState<Set<string>>(new Set());
+
+	// Goals drive the catalog's section grouping (active only — inactive goals are managed in the Goals tab).
+	const goalsQuery = useQuery({
+		...listGoalsOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+			query: { activeOnly: true },
+		}),
+		enabled: Boolean(workspaceSlug),
+	});
 
 	const practicesQueryOptions = listPracticesOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
@@ -94,6 +104,7 @@ function PracticesListContainer() {
 		<AdminPracticesPage
 			workspaceSlug={workspaceSlug ?? ""}
 			practices={practices ?? []}
+			goals={goalsQuery.data ?? []}
 			isLoading={isWorkspaceLoading || isPracticesLoading || !workspaceSlug}
 			isError={Boolean(workspaceError || practicesError)}
 			isDeleting={deletePractice.isPending}

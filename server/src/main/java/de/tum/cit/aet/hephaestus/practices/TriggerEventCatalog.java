@@ -23,8 +23,9 @@ public final class TriggerEventCatalog {
         TriggerEventNames.REVIEW_SUBMITTED
     );
 
-    /** Issue lifecycle events. NOTE: issue-event-driven detection is not yet wired (follow-up); these
-     *  are valid to configure and seed, but only fire via the dev trigger today. */
+    /** Issue lifecycle events. Consumed by {@code IssueAgentJobEventListener} → {@code evaluateIssue}.
+     *  IssueCreated fires on both GitHub and GitLab; IssueLabeled fires on GitHub natively and on GitLab
+     *  via the {@code action=update} {@code changes.labels} diff. */
     private static final Set<String> ISSUE_EVENTS = Set.of(
         TriggerEventNames.ISSUE_CREATED,
         TriggerEventNames.ISSUE_LABELED

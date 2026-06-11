@@ -49,6 +49,17 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Optional<Issue> findByIdWithRepository(@Param("id") long id);
 
     /**
+     * Fetches an issue with the associations {@code PracticeReviewDetectionGate.evaluateIssue} needs:
+     * repository (workspace resolution) and assignees (role check). Restricted to {@code TYPE(i) = Issue}
+     * so a pull-request row never enters the issue-detection path.
+     */
+    @Query(
+        "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.assignees " +
+            "WHERE TYPE(i) = Issue AND i.id = :id"
+    )
+    Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
+
+    /**
      * Finds all issues belonging to a repository.
      *
      * @param repositoryId the repository ID

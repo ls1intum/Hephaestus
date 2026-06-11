@@ -1,4 +1,4 @@
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type {
 	CreatePracticeRequest,
@@ -101,6 +101,9 @@ export function PracticeForm({
 }: PracticeFormProps) {
 	const [form, setForm] = useState<FormState>(() => getInitialState(mode, initialData));
 	const [submitted, setSubmitted] = useState(false);
+	// Precompute is optional support — the LLM does the heavy lifting — so it stays collapsed unless the
+	// practice already has a script, keeping the criteria (the product) the focus of the form.
+	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 
 	const handleNameChange = (name: string) => {
 		setForm((prev) => {
@@ -418,21 +421,39 @@ export function PracticeForm({
 
 						<Separator />
 
-						{/* Section: Precompute Script */}
+						{/* Section: Advanced — precompute script (optional support; the LLM does the heavy lifting) */}
 						<section className="space-y-4">
-							<div>
-								<h2 className="text-lg font-semibold">Precompute Script</h2>
-								<p className="text-sm text-muted-foreground">
-									TypeScript/Bun script that runs static analysis before the AI review. Produces
-									structured hints from diff and file inspection.
-								</p>
-							</div>
-							<CodeEditor
-								value={form.precomputeScript}
-								onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
-								language="typescript"
-								className="h-[400px]"
-							/>
+							<button
+								type="button"
+								onClick={() => setShowAdvanced((open) => !open)}
+								className="flex items-center gap-1.5 text-lg font-semibold"
+								aria-expanded={showAdvanced}
+							>
+								{showAdvanced ? (
+									<ChevronDown className="h-4 w-4" />
+								) : (
+									<ChevronRight className="h-4 w-4" />
+								)}
+								Advanced
+								<span className="text-sm font-normal text-muted-foreground">
+									— precompute script (optional)
+								</span>
+							</button>
+							{showAdvanced && (
+								<>
+									<p className="text-sm text-muted-foreground">
+										An optional TypeScript/Bun script that runs static analysis before the AI review
+										and feeds it structured hints. Most practices need none — the AI evaluates the
+										criteria directly.
+									</p>
+									<CodeEditor
+										value={form.precomputeScript}
+										onChange={(val) => setForm((prev) => ({ ...prev, precomputeScript: val }))}
+										language="typescript"
+										className="h-[400px]"
+									/>
+								</>
+							)}
 						</section>
 					</div>
 				</div>
