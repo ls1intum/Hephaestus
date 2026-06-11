@@ -79,18 +79,24 @@ services:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
       # prod runs forward-headers=native → ProxyTrustGuard aborts the boot unless set (Coolify ingress regex).
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
+      # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
+      # thc healthcheck target: actuator readiness on the management port.
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/readiness
     depends_on:
       nats-server:
         condition: service_healthy
     # Spring drains HTTP (20s) THEN WebhookGracefulShutdown drains NATS (up to 15s).
     # Docker must allow ≥35s before SIGKILL, or the JVM is cut mid-drain.
     stop_grace_period: 40s
+    # thc healthcheck (see docker/compose.app.yaml).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health/readiness"]
+      test: ["CMD", "/workspace/health-check"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 3
+      start_period: 90s
     logging:
       driver: "json-file"
       options:

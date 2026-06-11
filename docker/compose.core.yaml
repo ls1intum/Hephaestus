@@ -32,6 +32,11 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       # forward-headers=native (application-prod.yml) → ProxyTrustGuard fails the boot unless pinned.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
+      # AgentImagePinGuard loads in any prod pod; set false for non-release deploys that skip the pin.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
+      # thc healthcheck target: readiness (reports unhealthy while NATS/JetStream is unavailable).
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/readiness
     depends_on:
       nats-server:
         condition: service_healthy
@@ -58,12 +63,17 @@ services:
       - "traefik.http.routers.http-webhook-server.priority=100"
       - "traefik.http.routers.https-webhook-server.priority=100"
       - "traefik.http.services.https-webhook-server.loadbalancer.server.port=8080"
+      # Routing-layer probe: drops a bad backend from the LB pool.
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.path=/actuator/health/readiness"
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.interval=15s"
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.timeout=5s"
+    # thc healthcheck (see docker/compose.app.yaml).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      test: ["CMD", "/workspace/health-check"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 3
+      start_period: 90s
     logging:
       driver: "json-file"
       options:
