@@ -69,6 +69,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ContentProvider.OUTPUT_PREFIX + "metadata.json"
     );
 
+    /**
+     * Process/metadata-level PR practices whose evidence is the PR metadata, the commit subjects, or the
+     * review thread — NOT a diff line. {@code filterByDiffScope} is a guard for CODE-defect findings whose
+     * location must sit inside the diff; applied to these process practices it would wrongly drop a valid
+     * finding the moment the agent attaches a stray (non-diff) location to it (observed: a commit-subject
+     * finding citing a commit ref). These slugs therefore bypass the diff-scope filter.
+     */
+    private static final Set<String> METADATA_LEVEL_PRACTICES = Set.of(
+        "scope-one-reviewable-change",
+        "describe-what-and-why",
+        "ready-and-traceable-handoff",
+        "commit-subjects-explain-each-change",
+        "engaging-with-inline-review-comments",
+        "mr-description-quality",
+        "commit-discipline"
+    );
+
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 
     private final JsonMapper objectMapper;
@@ -533,6 +550,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (diffFiles.isEmpty()) return findings;
         List<PracticeDetectionResultParser.ValidatedFinding> filtered = new ArrayList<>();
         for (var finding : findings) {
+            // Process/metadata-level practices are not diff-anchored — never drop them on a location mismatch.
+            if (METADATA_LEVEL_PRACTICES.contains(finding.practiceSlug())) {
+                filtered.add(finding);
+                continue;
+            }
             JsonNode evidence = finding.evidence();
             if (evidence == null || evidence.isNull() || evidence.isMissingNode()) {
                 filtered.add(finding);

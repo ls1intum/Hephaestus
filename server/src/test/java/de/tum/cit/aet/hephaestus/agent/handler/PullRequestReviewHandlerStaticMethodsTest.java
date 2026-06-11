@@ -168,5 +168,14 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
+
+        @Test
+        void keepsMetadataLevelPracticeEvenWithOutOfDiffLocation() {
+            // A process/metadata-level practice (evidence = commit subjects, not a diff line) must survive
+            // even when the agent attaches a stray non-diff location, or its finding is silently dropped.
+            var finding = makeFinding("commit-subjects-explain-each-change", List.of("some-commit-ref"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            assertThat(result).hasSize(1);
+        }
     }
 }
