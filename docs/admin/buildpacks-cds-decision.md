@@ -27,14 +27,28 @@ AOT processing evaluates `@Conditional` at **build time**, baking the build-time
 
 ## Builder pinning
 
-`pom.xml` pins `builder-noble-java-tiny` + `ubuntu-noble-run-tiny` by sha256 digest. Refresh:
+`pom.xml` pins `builder-noble-java-tiny` + `ubuntu-noble-run-tiny` + the `health-checker` buildpack by
+sha256 digest. Refresh:
 
 ```
 docker buildx imagetools inspect paketobuildpacks/builder-noble-java-tiny:latest --format '{{.Manifest.Digest}}'
 docker buildx imagetools inspect paketobuildpacks/ubuntu-noble-run-tiny:latest    --format '{{.Manifest.Digest}}'
+docker buildx imagetools inspect paketobuildpacks/health-checker:latest           --format '{{.Manifest.Digest}}'
 ```
 
 Bump as part of release cycles; the digest is the source of truth.
+
+## Container healthcheck on the distroless run image
+
+`run-tiny` has no shell/wget, and `builder-noble-java-tiny` does not bundle a probe, so a container
+`HEALTHCHECK` is impossible out of the box. Rather than drop it (the only container-level health signal
+on Docker Compose — `service_healthy` gating + `docker compose ps` depend on it), `pom.xml` adds an
+explicit `<buildpacks>` order. That **replaces** the builder's default order, so the `java` composite
+must be re-listed (`urn:cnb:builder:paketo-buildpacks/java`) before appending
+`docker://paketobuildpacks/health-checker`; `BP_HEALTH_CHECKER_ENABLED=true` opts it in. It contributes
+the static, shell-free `thc` binary at `/workspace/health-check`, which the compose services invoke as an
+exec-form `HEALTHCHECK` (`THC_PORT`/`THC_PATH` → actuator liveness/readiness). No `health-check` process
+type is added, so the JVM-spawn-per-probe issue (health-checker#87) does not apply.
 
 ## git CLI in the runtime image
 

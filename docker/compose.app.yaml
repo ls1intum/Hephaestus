@@ -18,7 +18,10 @@ services:
     ports:
       - "80"
     depends_on:
-      - application-server
+      # Gate on readiness now that app-server has a real container healthcheck — the SPA isn't served
+      # before the API can answer, closing the cold-start 502 window (matches the preview stack).
+      application-server:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - shared-network

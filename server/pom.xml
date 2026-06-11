@@ -928,7 +928,7 @@
                              See docs/admin/buildpacks-cds-decision.md and docker/compose.app.yaml. -->
                         <buildpacks>
                             <buildpack>urn:cnb:builder:paketo-buildpacks/java</buildpack>
-                            <buildpack>docker://paketobuildpacks/health-checker</buildpack>
+                            <buildpack>docker://paketobuildpacks/health-checker@sha256:c95183658c32d47d8902bc59b9950f5bfa57cd4b7f655d2d5ba4d902051a0964</buildpack>
                         </buildpacks>
                         <env>
                             <BP_JVM_VERSION>21</BP_JVM_VERSION>
