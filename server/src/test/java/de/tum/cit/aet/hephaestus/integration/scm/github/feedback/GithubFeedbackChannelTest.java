@@ -128,4 +128,15 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         lenient().when(response.getErrors()).thenReturn(List.of());
         return response;
     }
+
+    @Test
+    void issueAndPrSubjectIds_useOwnerRepoHashNumber_andRejectMalformedRepos() {
+        assertThat(channel.formatIssueSubjectId("owner/repo", 7)).isEqualTo("owner/repo#7");
+        assertThat(channel.formatPullRequestSubjectId("owner/repo", 7)).isEqualTo("owner/repo#7");
+        // GitHub requires a two-segment owner/repo — fail fast, not late in node-id resolution.
+        assertThatThrownBy(() -> channel.formatIssueSubjectId("nope", 7))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("owner/repo");
+        assertThatThrownBy(() -> channel.formatIssueSubjectId("a/b/c", 7)).isInstanceOf(IllegalArgumentException.class);
+    }
 }

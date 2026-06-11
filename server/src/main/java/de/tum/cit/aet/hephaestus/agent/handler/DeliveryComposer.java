@@ -201,7 +201,8 @@ class DeliveryComposer {
      * Marks a sentence as pure grading-mechanics meta — if any of these appears, the whole sentence is
      * the grader explaining the rubric to itself, not feedback to the student, so it is dropped wholesale.
      * Catches the phrasings observed leaking from gpt-oss-120b: "the practice requires…", "for a POSITIVE
-     * verdict", "MINOR severity level/band", "according to/violating the practice", "…line threshold".
+     * verdict", "MINOR severity level/band", "acceptable upper band", "according to/violating the
+     * practice", "…line threshold".
      */
     private static final Pattern GRADING_SENTENCE = Pattern.compile(
         "(?i)(" +
@@ -209,8 +210,9 @@ class DeliveryComposer {
             "\\b(?:according to|per|under|following|violat\\w+|satisf\\w+|fail\\w*)\\s+the\\s+practice\\b|" +
             "\\b(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
             "\\b(?:for|to|a|an|the)\\s+(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
-            "\\b(?:MINOR|MAJOR|INFO|CRITICAL)\\s+severity\\b|" +
+            "\\b(?:MINOR|MAJOR|INFO|CRITICAL)\\s+(?:severity|band|bucket|tier)\\b|" +
             "\\bseverity\\s+(?:level|band|bucket|rating)\\b|" +
+            "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
             "\\b[≤<=>]*\\s*\\d+[\\s-]*(?:line|file)s?\\s+threshold\\b|" +
             "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b" +
             ")"

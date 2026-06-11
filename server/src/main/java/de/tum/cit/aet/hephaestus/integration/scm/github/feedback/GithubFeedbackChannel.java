@@ -41,13 +41,24 @@ public class GithubFeedbackChannel implements FeedbackChannel {
 
     @Override
     public String formatPullRequestSubjectId(String repoFullName, int prNumber) {
+        return requireOwnerRepo(repoFullName) + "#" + prNumber;
+    }
+
+    @Override
+    public String formatIssueSubjectId(String repoFullName, int issueNumber) {
+        // GitHub addresses PRs and issues identically as owner/repo#number — apply the same two-segment
+        // guard so a malformed repo fails fast here, not late in GraphQL node-id resolution.
+        return requireOwnerRepo(repoFullName) + "#" + issueNumber;
+    }
+
+    private static String requireOwnerRepo(String repoFullName) {
         if (repoFullName == null || repoFullName.isBlank()) {
             throw new IllegalArgumentException("repoFullName is required");
         }
         if (repoFullName.split("/", 3).length != 2) {
             throw new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': " + repoFullName);
         }
-        return repoFullName + "#" + prNumber;
+        return repoFullName;
     }
 
     @Override

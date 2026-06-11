@@ -623,6 +623,14 @@ class DeliveryComposerTest extends BaseUnitTest {
         // The useful, non-grading sentence survives the scrub.
         assertThat(DeliveryComposer.sanitizeStudentText(leaked4)).contains("only lists what was done");
 
+        // Bare band/bucket phrasings (no "severity" prefix) the scrubber also catches.
+        String banded =
+            "Your change is fine. The 201-400 range is the acceptable upper band, so this lands in the INFO bucket.";
+        String cleanBanded = DeliveryComposer.sanitizeStudentText(banded);
+        assertThat(cleanBanded).doesNotContainIgnoringCase("upper band");
+        assertThat(cleanBanded).doesNotContainIgnoringCase("INFO bucket");
+        assertThat(cleanBanded).contains("Your change is fine.");
+
         // Domain vocabulary in legitimate guidance must survive untouched.
         String secretGuidance = "Move the hardcoded secret/credential out of source into the environment.";
         assertThat(DeliveryComposer.sanitizeStudentText(secretGuidance)).isEqualTo(secretGuidance);
