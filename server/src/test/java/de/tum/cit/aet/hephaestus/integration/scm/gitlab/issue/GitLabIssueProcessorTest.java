@@ -422,6 +422,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 createProject(),
                 attrs,
                 null,
+                null,
                 null
             );
 
@@ -469,6 +470,50 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             assertThat(eventCaptor.getValue()).isInstanceOf(ScmDomainEvent.IssueReopened.class);
+        }
+    }
+
+    @Nested
+    class ProcessUpdated {
+
+        @Test
+        void publishesIssueLabeledForEachAddedLabel() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                .thenReturn(Optional.of(issue))
+                .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
+                createUserEntity()
+            );
+            when(issueRepository.save(any(Issue.class))).thenReturn(issue);
+            Label bug = new Label();
+            bug.setName("bug");
+            when(labelRepository.findByRepositoryIdAndName(REPO_ID, "bug")).thenReturn(Optional.of(bug));
+
+            processor.processUpdated(
+                createUpdateEventWithAddedLabel(new GitLabWebhookLabel(99L, "bug", "#ff0000")),
+                createContext()
+            );
+
+            ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(captor.capture());
+            assertThat(captor.getAllValues()).anyMatch(e -> e instanceof ScmDomainEvent.IssueLabeled);
+        }
+
+        @Test
+        void noLabelChangePublishesNoIssueLabeled() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                .thenReturn(Optional.of(issue))
+                .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
+                createUserEntity()
+            );
+
+            // An ordinary title/description edit (no changes.labels) must not trigger label-based detection.
+            processor.processUpdated(createUpdateEventWithAddedLabel(null), createContext());
+
+            verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueLabeled.class));
         }
     }
 
@@ -1058,7 +1103,42 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             createProject(),
             attrs,
             List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+            null,
             null
+        );
+    }
+
+    /** An {@code action=update} event whose {@code changes.labels} diff adds the given label (null = none). */
+    private GitLabIssueEventDTO createUpdateEventWithAddedLabel(GitLabWebhookLabel addedLabel) {
+        var attrs = new GitLabIssueEventDTO.ObjectAttributes(
+            RAW_ISSUE_ID,
+            ISSUE_IID,
+            "Feature: Add user authentication",
+            "Implement OAuth2 authentication flow",
+            "opened",
+            "update",
+            false,
+            RAW_USER_ID,
+            null,
+            null,
+            "2026-01-31 19:03:35 +0100",
+            "2026-01-31 19:03:35 +0100",
+            null,
+            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
+        );
+        var changes =
+            addedLabel == null
+                ? null
+                : new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(List.of(), List.of(addedLabel)));
+        return new GitLabIssueEventDTO(
+            "issue",
+            "issue",
+            createUser(),
+            createProject(),
+            attrs,
+            addedLabel == null ? List.of() : List.of(addedLabel),
+            null,
+            changes
         );
     }
 

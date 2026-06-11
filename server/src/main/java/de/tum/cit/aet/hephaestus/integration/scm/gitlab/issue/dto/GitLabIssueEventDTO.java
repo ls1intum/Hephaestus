@@ -7,6 +7,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhook
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookProject;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,8 +34,44 @@ public record GitLabIssueEventDTO(
     GitLabWebhookProject project,
     @JsonProperty("object_attributes") ObjectAttributes objectAttributes,
     @Nullable List<GitLabWebhookLabel> labels,
-    @Nullable List<GitLabWebhookUser> assignees
+    @Nullable List<GitLabWebhookUser> assignees,
+    @JsonProperty("changes") @Nullable Changes changes
 ) {
+    /**
+     * The {@code changes} diff GitLab sends on an {@code action=update} event. We only care about the
+     * label delta — GitLab has no dedicated "labeled" action, so label changes arrive here.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Changes(@Nullable LabelsChange labels) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record LabelsChange(
+        @Nullable List<GitLabWebhookLabel> previous,
+        @Nullable List<GitLabWebhookLabel> current
+    ) {}
+
+    /**
+     * Labels newly added in this update (current minus previous, keyed by id). Empty when the update
+     * carried no label change — so an ordinary title/description edit never spuriously triggers
+     * label-based detection.
+     */
+    public List<GitLabWebhookLabel> addedLabels() {
+        if (changes == null || changes.labels() == null || changes.labels().current() == null) {
+            return List.of();
+        }
+        List<GitLabWebhookLabel> previous = changes.labels().previous();
+        Set<Long> previousIds =
+            previous == null
+                ? Set.of()
+                : previous.stream().map(GitLabWebhookLabel::id).filter(Objects::nonNull).collect(Collectors.toSet());
+        return changes
+            .labels()
+            .current()
+            .stream()
+            .filter(label -> label.id() == null || !previousIds.contains(label.id()))
+            .toList();
+    }
+
     /**
      * The issue details within the webhook payload.
      */
