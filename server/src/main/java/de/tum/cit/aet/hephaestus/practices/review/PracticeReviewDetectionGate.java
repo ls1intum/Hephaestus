@@ -173,14 +173,16 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("manual trigger disabled for workspace");
         }
 
-        // 3. Agent config gate: at least one enabled agent config must exist
-        if (!agentConfigChecker.hasEnabledConfig(workspace.getId())) {
+        // 3. Agent config gate: a config that will ACTUALLY run for detection must exist. Binding-aware
+        // (mirrors AgentJobService.resolvePracticeConfigs) so a bound-but-disabled practice config skips
+        // here instead of detecting (LLM cost) only for submission to resolve to zero jobs.
+        if (!agentConfigChecker.hasRunnablePracticeConfig(workspace.getId(), workspace.getPracticeConfigId())) {
             log.debug(
-                "Practice review gate: SKIP, reason=noEnabledAgentConfig, prId={}, workspaceId={}",
+                "Practice review gate: SKIP, reason=noRunnablePracticeConfig, prId={}, workspaceId={}",
                 reviewable.getId(),
                 workspace.getId()
             );
-            return new GateDecision.Skip("no enabled agent config");
+            return new GateDecision.Skip("no runnable practice config");
         }
 
         // 4. Practice matching: at least one active practice must match the trigger event

@@ -86,6 +86,12 @@ class DeliveryComposer {
                 .stream()
                 .filter(f -> f.verdict() == Verdict.POSITIVE)
                 .toList();
+            if (observed.isEmpty()) {
+                // Every finding abstained (all NOT_APPLICABLE): the artifact could not be assessed against
+                // any active practice, so deliver nothing rather than a misleading "nothing to change here"
+                // all-clear on work that was never actually evaluated.
+                return null;
+            }
             return new DeliveryContent(composeNoIssuesNote(observed), List.of());
         }
 

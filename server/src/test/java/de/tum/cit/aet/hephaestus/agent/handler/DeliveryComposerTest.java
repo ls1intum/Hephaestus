@@ -756,6 +756,19 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
+    void compose_allFindingsNotApplicable_returnsNullNoSpuriousAllClear() {
+        // Every practice abstained: the artifact could not be assessed, so we must deliver NOTHING —
+        // never a "nothing to change here" all-clear on work that was never actually evaluated.
+        ValidatedFinding na1 = new ValidatedFinding(
+            "issue-scoped-to-single-concern", "n/a", Verdict.NOT_APPLICABLE, Severity.INFO, 0.9f, null, "", null, List.of());
+        ValidatedFinding na2 = new ValidatedFinding(
+            "issue-has-checkable-outcome", "n/a", Verdict.NOT_APPLICABLE, Severity.INFO, 0.9f, null, "", null, List.of());
+
+        assertThat(DeliveryComposer.compose(List.of(na1, na2), WorkArtifact.ISSUE)).isNull();
+        assertThat(DeliveryComposer.compose(List.of(na1, na2), WorkArtifact.PULL_REQUEST)).isNull();
+    }
+
+    @Test
     void compose_youWrote_stripsJsonEnvelopeLeakFromMetadataSnippet() {
         // The agent sometimes quotes a raw span of metadata.json, dragging JSON field syntax into the
         // "You wrote:" quote. The composed note must show the prose, never the "body": key/quotes.
