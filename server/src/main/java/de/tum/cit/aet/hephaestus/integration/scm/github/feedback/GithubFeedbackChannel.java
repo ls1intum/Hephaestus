@@ -46,9 +46,11 @@ public class GithubFeedbackChannel implements FeedbackChannel {
 
     @Override
     public String formatIssueSubjectId(String repoFullName, int issueNumber) {
-        // GitHub addresses PRs and issues identically as owner/repo#number — apply the same two-segment
-        // guard so a malformed repo fails fast here, not late in GraphQL node-id resolution.
-        return requireOwnerRepo(repoFullName) + "#" + issueNumber;
+        // GitHub addresses PRs AND issues identically as owner/repo#number, so the channel cannot tell an
+        // issue from a PR by a shared "#" subject (unlike GitLab's '!' vs '#'). The internal subject is
+        // ours to define, so issues get a distinct "owner/repo/issues/N" form that postSummary routes to
+        // the issue node-id resolver — otherwise an issue would hit the PR resolver and fail to deliver.
+        return requireOwnerRepo(repoFullName) + "/issues/" + issueNumber;
     }
 
     private static String requireOwnerRepo(String repoFullName) {
@@ -70,7 +72,21 @@ public class GithubFeedbackChannel implements FeedbackChannel {
             );
         }
 
-        PrCoordinates pr = parseSubjectExternalId(target.subjectExternalId());
+        String subject = target.subjectExternalId();
+        if (isIssueSubject(subject)) {
+            IssueCoordinates issue = parseIssueSubjectExternalId(subject);
+            String issueNodeId = prNodeIdResolver.resolveIssue(scopeId, issue.owner(), issue.name(), issue.number());
+            String commentNodeId = createComment(scopeId, issueNodeId, content.body());
+            log.info(
+                "Posted GitHub issue comment: workspaceId={}, issueNodeId={}, commentId={}",
+                scopeId,
+                issueNodeId,
+                commentNodeId
+            );
+            return new SummaryHandle(commentNodeId);
+        }
+
+        PrCoordinates pr = parseSubjectExternalId(subject);
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
         String commentNodeId = createComment(scopeId, prNodeId, content.body());
         log.info(
@@ -81,6 +97,32 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         );
         return new SummaryHandle(commentNodeId);
     }
+
+    /** A GitHub issue subject is the distinct {@code owner/repo/issues/N} form (see formatIssueSubjectId). */
+    static boolean isIssueSubject(String subjectExternalId) {
+        return subjectExternalId != null && subjectExternalId.matches(".+/issues/\\d+");
+    }
+
+    /** Splits {@code "owner/repo/issues/42"} into the components the issue node-id query needs. */
+    static IssueCoordinates parseIssueSubjectExternalId(String subjectExternalId) {
+        if (subjectExternalId == null || !subjectExternalId.matches(".+/issues/\\d+")) {
+            throw new FeedbackDeliveryException(
+                "Invalid GitHub issue subjectExternalId (expected owner/repo/issues/number): " + subjectExternalId
+            );
+        }
+        int marker = subjectExternalId.lastIndexOf("/issues/");
+        String repoFullName = subjectExternalId.substring(0, marker);
+        int number = Integer.parseInt(subjectExternalId.substring(marker + "/issues/".length()));
+        String[] parts = repoFullName.split("/", 2);
+        if (parts.length != 2) {
+            throw new FeedbackDeliveryException(
+                "Invalid GitHub issue subjectExternalId (expected owner/repo/issues/number): " + subjectExternalId
+            );
+        }
+        return new IssueCoordinates(parts[0], parts[1], number);
+    }
+
+    record IssueCoordinates(String owner, String name, int number) {}
 
     private String createComment(long scopeId, String subjectId, String body) {
         ClientGraphQlResponse response = gitHubProvider

@@ -3,8 +3,12 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
@@ -130,13 +134,43 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void issueAndPrSubjectIds_useOwnerRepoHashNumber_andRejectMalformedRepos() {
-        assertThat(channel.formatIssueSubjectId("owner/repo", 7)).isEqualTo("owner/repo#7");
+    void issueAndPrSubjectIds_diverge_soTheChannelCanRouteThem_andRejectMalformedRepos() {
+        // PRs and issues share owner/repo#N on GitHub, so the internal issue subject MUST diverge or the
+        // channel cannot tell them apart and an issue would be sent to the PR resolver (and fail to post).
+        assertThat(channel.formatIssueSubjectId("owner/repo", 7)).isEqualTo("owner/repo/issues/7");
         assertThat(channel.formatPullRequestSubjectId("owner/repo", 7)).isEqualTo("owner/repo#7");
         // GitHub requires a two-segment owner/repo — fail fast, not late in node-id resolution.
         assertThatThrownBy(() -> channel.formatIssueSubjectId("nope", 7))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("owner/repo");
         assertThatThrownBy(() -> channel.formatIssueSubjectId("a/b/c", 7)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void postSummary_forAnIssueSubject_resolvesViaIssueNodeId_notThePrResolver() {
+        // Regression: an ISSUE subject must route to resolveIssue (repository.issue), never resolve
+        // (repository.pullRequest) which returns null for an issue and fails the whole delivery.
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo/issues/42",
+            null
+        );
+
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(prNodeIdResolver.resolveIssue(1L, "owner", "repo", 42)).thenReturn("I_node789");
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = mockGraphQlResponse("addComment.commentEdge.node.id", "IC_issuecmt");
+        when(spec.execute()).thenReturn(Mono.just(response));
+
+        SummaryHandle handle = channel.postSummary(target, new FeedbackContent("body", "marker"));
+
+        assertThat(handle.externalId()).isEqualTo("IC_issuecmt");
+        verify(prNodeIdResolver).resolveIssue(1L, "owner", "repo", 42);
+        verify(prNodeIdResolver, never()).resolve(anyLong(), any(), any(), anyInt());
     }
 }

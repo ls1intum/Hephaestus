@@ -61,4 +61,42 @@ class GithubPrNodeIdResolver {
         }
         return nodeId;
     }
+
+    /**
+     * Resolves a GitHub issue's node ID via {@code GetIssueNodeId}. Needed because GitHub addresses PRs
+     * and issues identically as {@code owner/repo#N}, so the PR resolver's {@code repository.pullRequest}
+     * field is null for a real issue — the issue must be resolved through {@code repository.issue} instead.
+     */
+    String resolveIssue(long scopeId, String owner, String name, int number) {
+        ClientGraphQlResponse response = gitHubProvider
+            .forScope(scopeId)
+            .documentName("GetIssueNodeId")
+            .variable("owner", owner)
+            .variable("name", name)
+            .variable("number", number)
+            .execute()
+            .block(GRAPHQL_TIMEOUT);
+
+        if (response == null) {
+            throw new FeedbackDeliveryException(
+                "Null response resolving issue node ID: " + owner + "/" + name + "#" + number
+            );
+        }
+        gitHubProvider.trackRateLimit(scopeId, response);
+
+        String nodeId = response.field("repository.issue.id").getValue();
+        if (nodeId == null) {
+            List<?> errors = response.getErrors();
+            throw new FeedbackDeliveryException(
+                "Issue not found via GraphQL: " +
+                    owner +
+                    "/" +
+                    name +
+                    "#" +
+                    number +
+                    (errors.isEmpty() ? "" : ", errors=" + errors)
+            );
+        }
+        return nodeId;
+    }
 }
