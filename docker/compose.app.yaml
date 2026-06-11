@@ -200,6 +200,10 @@ services:
       LLM_PROXY_AZURE_OPENAI_USE_BEARER: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:-false}
       # Worker control channel: same env var feeds the worker pod's registration-token claim.
       HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
+      # Target for the /workspace/health-check (thc) container HEALTHCHECK below — the actuator
+      # liveness probe on the management port (management.server.port=8080, probes enabled).
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/liveness
     depends_on:
       postgres:
         condition: service_started
@@ -247,10 +251,17 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/liveness"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
-    # No container healthcheck: the distroless run image has no shell/wget so a wget probe can never
-    # pass (it would pin the container "unhealthy" and Traefik v3 drops unhealthy backends). Routing
-    # health is owned by Traefik's loadbalancer.healthcheck above (/actuator/health/liveness).
-
+    # Shell-free container healthcheck: the distroless run image has no shell/wget, so the probe is the
+    # static `thc` binary the health-checker buildpack installs at /workspace/health-check (see server/pom.xml).
+    # It GETs localhost:${THC_PORT}${THC_PATH} and exits non-zero on failure. start_period covers the JVM+CDS
+    # boot so early failures don't count; this restores `docker compose ps` health + service_healthy gating
+    # (Traefik's loadbalancer.healthcheck above is a separate routing-layer signal).
+    healthcheck:
+      test: ["CMD", "/workspace/health-check"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
     # to drain in-flight requests before Docker SIGKILLs the launcher.
     stop_grace_period: 30s
@@ -285,6 +296,10 @@ services:
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
       SENTRY_DSN: ${SENTRY_DSN}
+      # The worker runs no application HTTP connector (server.port=-1) but the actuator stays on the
+      # management port (8080); thc probes its liveness so the otherwise-unrouted worker is observable.
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/liveness
     depends_on:
       application-server:
         condition: service_started
@@ -299,10 +314,17 @@ services:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
-    # No container healthcheck: the distroless image can't run a wget/shell probe, and the worker fronts
-    # no Traefik router for an LB probe (its actuator listens on :8080, but nothing routes to it). It serves
-    # no user traffic, so liveness rests on restart:unless-stopped — Paketo's runtime JAVA_TOOL_OPTIONS sets
-    # -XX:+ExitOnOutOfMemoryError, so a heap OOM exits and restarts; a hung-but-alive JVM is an accepted residual.
+    # Shell-free container healthcheck via the static thc binary (see application-server) against the
+    # worker's actuator liveness on :8080 — the worker fronts no Traefik router, so this is its ONLY health
+    # signal. It makes a wedged worker visible in `docker compose ps`; recovery still relies on the
+    # Paketo-injected -XX:+ExitOnOutOfMemoryError (heap OOM exits → restart:unless-stopped). A hung-but-alive
+    # JVM now surfaces as unhealthy instead of being entirely silent.
+    healthcheck:
+      test: ["CMD", "/workspace/health-check"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     logging:
       driver: "json-file"
       options:
