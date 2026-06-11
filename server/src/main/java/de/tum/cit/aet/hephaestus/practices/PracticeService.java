@@ -67,6 +67,7 @@ public class PracticeService {
         if (request.focusArtifact() != null) {
             practice.setFocusArtifact(request.focusArtifact());
         }
+        validateTriggerEventsForFocus(practice);
 
         try {
             practice = practiceRepository.save(practice);
@@ -80,6 +81,28 @@ public class PracticeService {
 
         log.info("Created practice '{}' (slug={}) in workspace {}", practice.getName(), practice.getSlug(), ctx.slug());
         return practice;
+    }
+
+    /**
+     * Reject trigger events incompatible with the practice's focus — a PR practice listening for an
+     * issue event (or vice versa) can never fire, so it is a configuration error rather than dead config.
+     */
+    private void validateTriggerEventsForFocus(Practice practice) {
+        var allowed = TriggerEventCatalog.eligibleFor(practice.getFocusArtifact());
+        List<String> incompatible = TriggerEventsConverter.toList(practice.getTriggerEvents())
+            .stream()
+            .filter(event -> !allowed.contains(event))
+            .toList();
+        if (!incompatible.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Trigger events " +
+                    incompatible +
+                    " are not valid for a " +
+                    practice.getFocusArtifact() +
+                    " practice. Allowed events for this focus: " +
+                    allowed
+            );
+        }
     }
 
     @Transactional
@@ -118,6 +141,7 @@ public class PracticeService {
             return practice;
         }
 
+        validateTriggerEventsForFocus(practice);
         practice = practiceRepository.save(practice);
         log.info("Updated practice '{}' (slug={}) in workspace {}", practice.getName(), slug, ctx.slug());
         return practice;

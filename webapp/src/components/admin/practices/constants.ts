@@ -2,26 +2,45 @@
  * Constants and helpers for the practice catalog admin UI.
  */
 
-/** All domain events that can trigger practice detection. */
-export const TRIGGER_EVENT_OPTIONS = [
-	{ value: "PullRequestCreated", label: "Pull Request Created" },
-	{ value: "PullRequestReady", label: "Pull Request Ready" },
-	{ value: "PullRequestSynchronized", label: "Pull Request Synchronized" },
-	{ value: "ReviewSubmitted", label: "Review Submitted" },
-	{ value: "IssueCreated", label: "Issue Created" },
-	{ value: "IssueLabeled", label: "Issue Labeled" },
-] as const;
+import type { Practice } from "@/api/types.gen";
 
-type TriggerEventValue = (typeof TRIGGER_EVENT_OPTIONS)[number]["value"];
+type FocusArtifact = Practice["focusArtifact"];
+
+/**
+ * Trigger events a practice can fire on, grouped by the focus artifact they belong to. Mirrors the
+ * server's TriggerEventCatalog: a practice may only subscribe to events for its own focus (a PR
+ * practice can't listen for issue events — the detection gate routes by entity type). Labels are
+ * plain-language so the admin reads "fires when…", not a raw event name.
+ */
+export const TRIGGER_EVENTS_BY_FOCUS: Record<
+	FocusArtifact,
+	ReadonlyArray<{ value: string; label: string }>
+> = {
+	PULL_REQUEST: [
+		{ value: "PullRequestCreated", label: "Pull request is opened" },
+		{ value: "PullRequestReady", label: "Marked ready for review" },
+		{ value: "PullRequestSynchronized", label: "New commits are pushed" },
+		{ value: "ReviewSubmitted", label: "A review is submitted" },
+	],
+	ISSUE: [
+		{ value: "IssueCreated", label: "Issue is opened" },
+		{ value: "IssueLabeled", label: "Issue is labeled" },
+	],
+};
+
+/** The set of event values valid for a given focus (used to prune incompatible selections). */
+export function triggerEventsForFocus(focus: FocusArtifact): string[] {
+	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
+}
 
 /** Short labels for inline badge display. */
-export const TRIGGER_EVENT_SHORT_LABELS: Record<TriggerEventValue, string> = {
-	PullRequestCreated: "PR Created",
-	PullRequestReady: "PR Ready",
-	PullRequestSynchronized: "PR Synced",
+export const TRIGGER_EVENT_SHORT_LABELS: Record<string, string> = {
+	PullRequestCreated: "PR opened",
+	PullRequestReady: "PR ready",
+	PullRequestSynchronized: "PR pushed",
 	ReviewSubmitted: "Review",
-	IssueCreated: "Issue Created",
-	IssueLabeled: "Issue Labeled",
+	IssueCreated: "Issue opened",
+	IssueLabeled: "Issue labeled",
 };
 
 /** The artifact a practice evaluates. Mirrors the server's FocusArtifact enum. */

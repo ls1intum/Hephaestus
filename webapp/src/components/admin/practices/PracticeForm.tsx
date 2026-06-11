@@ -25,7 +25,8 @@ import {
 	FOCUS_ARTIFACT_OPTIONS,
 	generateSlug,
 	isValidSlug,
-	TRIGGER_EVENT_OPTIONS,
+	TRIGGER_EVENTS_BY_FOCUS,
+	triggerEventsForFocus,
 } from "./constants";
 
 /** Sentinel for the "not bound to any goal" option (shadcn SelectItem cannot use an empty value). */
@@ -280,7 +281,17 @@ export function PracticeForm({
 										<Select
 											value={form.focusArtifact}
 											onValueChange={(value) =>
-												setForm((prev) => ({ ...prev, focusArtifact: value as FocusArtifact }))
+												setForm((prev) => {
+													const focusArtifact = value as FocusArtifact;
+													// Drop any selected triggers that don't belong to the new focus —
+													// the server rejects cross-focus combinations.
+													const allowed = triggerEventsForFocus(focusArtifact);
+													return {
+														...prev,
+														focusArtifact,
+														triggerEvents: prev.triggerEvents.filter((e) => allowed.includes(e)),
+													};
+												})
 											}
 										>
 											<SelectTrigger id="practice-focus">
@@ -346,13 +357,14 @@ export function PracticeForm({
 								aria-describedby={triggerError ? "trigger-error" : undefined}
 							>
 								<div>
-									<legend className="text-lg font-semibold">Trigger Events *</legend>
+									<legend className="text-lg font-semibold">Run this practice when… *</legend>
 									<p className="text-sm text-muted-foreground">
-										Domain events that trigger this practice's evaluation.
+										Pick the {form.focusArtifact === "ISSUE" ? "issue" : "pull request"} activity
+										that should trigger an evaluation.
 									</p>
 								</div>
 								<div className="grid grid-cols-2 gap-3">
-									{TRIGGER_EVENT_OPTIONS.map((option) => (
+									{TRIGGER_EVENTS_BY_FOCUS[form.focusArtifact].map((option) => (
 										<Label
 											key={option.value}
 											htmlFor={`trigger-${option.value}`}
