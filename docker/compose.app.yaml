@@ -247,9 +247,10 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/liveness"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
-    # No container healthcheck: the Paketo run image is distroless (no shell/wget), so a wget probe
-    # can never succeed → the container would be permanently "unhealthy" and Traefik v3 drops unhealthy
-    # backends. Routing health is owned by Traefik's loadbalancer.healthcheck above (/actuator/health/liveness).
+    # No container healthcheck: the distroless run image has no shell/wget so a wget probe can never
+    # pass (it would pin the container "unhealthy" and Traefik v3 drops unhealthy backends). Routing
+    # health is owned by Traefik's loadbalancer.healthcheck above (/actuator/health/liveness).
+
     # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
     # to drain in-flight requests before Docker SIGKILLs the launcher.
     stop_grace_period: 30s
@@ -298,7 +299,10 @@ services:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
-    # No container healthcheck: distroless run image has no shell/wget (see application-server).
+    # No healthcheck and (unlike application-server/webhook-server) no Traefik probe to fall back on:
+    # the worker runs no HTTP connector (WSS-only) so nothing can probe it, and the distroless image
+    # can't run a shell probe anyway. Liveness rests on the JVM's ExitOnOutOfMemoryError + restart:
+    # unless-stopped; a hung-but-alive JVM is an accepted residual (it carries no user traffic).
     logging:
       driver: "json-file"
       options:
