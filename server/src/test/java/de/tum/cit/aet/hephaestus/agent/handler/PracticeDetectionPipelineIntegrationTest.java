@@ -314,6 +314,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                   ]
                 }""";
             setJobOutput(output);
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-approval");
 
             handler.deliver(agentJob);
 
