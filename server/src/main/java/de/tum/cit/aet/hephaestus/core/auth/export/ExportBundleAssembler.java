@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -40,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * blobs, JWT signing keys, password-equivalents (there are none in this system), and any other
  * account's data are structurally excluded — there is no code path here that reads them.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("GDPR export aggregates an account's own data across workspaces; not workspace-scoped")
 public class ExportBundleAssembler {

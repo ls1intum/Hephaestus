@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.IdentityProviderCatalog;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Lists every enabled instance-scoped {@code login_provider} (GitHub, GitLab.com, self-hosted
  * GitLab) — one shared registration per provider, reused across all workspaces.
  */
+@ConditionalOnServerRole
 @RestController
 @Tag(name = "Auth discovery", description = "Identity provider discovery (public)")
 public class IdentityProviderDiscoveryController {

@@ -77,6 +77,11 @@ services:
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:?Required}
+      # EncryptedStringConverter / CredentialBundleConverter are eager prod-fail-fast @Component
+      # converters that load on this server-off pod too; they need the key at construction.
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY:?Required}
+      # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; :?Required pins it.
+      APPLICATION_HOST_URL: ${APPLICATION_HOST_URL:?Required}
       # prod runs forward-headers=native → ProxyTrustGuard aborts the boot unless set (Coolify ingress regex).
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
       # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.

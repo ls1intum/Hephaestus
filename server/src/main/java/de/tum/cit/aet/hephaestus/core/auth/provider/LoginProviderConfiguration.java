@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
  * (Spring Security's {@code oauth2Login}), {@code IdentityProviderCatalog} (the discovery controller),
  * and {@code Iterable<ClientRegistration>}.
  */
+@ConditionalOnServerRole
 @Configuration
 public class LoginProviderConfiguration {
 

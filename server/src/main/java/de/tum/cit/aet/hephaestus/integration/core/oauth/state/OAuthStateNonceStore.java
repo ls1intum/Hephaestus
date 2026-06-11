@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link HmacOAuthStateService}) so the store can be unit-tested with mock
  * repositories without dragging in the HMAC machinery and vice-versa.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Operates on a global pre-workspace nonce table")
 public class OAuthStateNonceStore {

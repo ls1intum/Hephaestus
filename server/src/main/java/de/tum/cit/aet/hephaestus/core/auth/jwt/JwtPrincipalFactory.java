@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.HashSet;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
  * discovery doc and {@code SecurityUtils.isSuperAdmin}) — deliberately distinct from the
  * per-workspace "admin" role, which is membership-derived and never appears in this token.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("JWT principal assembly is account-scoped")
 public class JwtPrincipalFactory {

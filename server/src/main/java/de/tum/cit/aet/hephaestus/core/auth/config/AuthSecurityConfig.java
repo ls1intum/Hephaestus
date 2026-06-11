@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.oauth.GitHubEmailOAuth2UserService;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthFailureHandler;
 import de.tum.cit.aet.hephaestus.core.auth.oauth.HephaestusAuthSuccessHandler;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitFilter;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityHeaders;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -57,6 +58,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
  * validates our own ES256 JWTs via {@code RevocationAwareJwtDecoder} (replaces the former
  * Keycloak setup; ADR 0017).
  */
+@ConditionalOnServerRole
 @Configuration
 public class AuthSecurityConfig {
 

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.metrics;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
 import org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
  * bearer-token filter — yields exactly the login-only success/failure signal with zero extra wiring
  * on the existing 6-dependency auth beans.
  */
+@ConditionalOnServerRole
 @Component
 public class AuthLoginEventMetrics {
 

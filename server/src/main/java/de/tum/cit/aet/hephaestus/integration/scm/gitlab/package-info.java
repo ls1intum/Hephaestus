@@ -22,6 +22,8 @@
         "integration.core::webhook",
         "integration.scm",
         "core",
+        // Runtime-role gate (@ConditionalOnServerRole) on the connection-OAuth strategy.
+        "core::runtime",
         // GitLabWebhookService uses WebhookProperties; GitLabPreflightService validates URLs.
         "core::webhook",
         "core::security",

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ import org.springframework.web.servlet.view.RedirectView;
  * to the IdP and is read by the success handler (later commit) to decide where to land
  * the user post-login.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
 public class AuthBeginController {

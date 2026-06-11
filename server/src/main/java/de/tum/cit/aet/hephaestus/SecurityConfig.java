@@ -145,7 +145,7 @@ public class SecurityConfig {
         ObjectProvider<BearerTokenResolver> bearerTokenResolverProvider,
         ObjectProvider<StaleAuthCookieFilter> staleAuthCookieFilterProvider,
         Converter<Jwt, AbstractAuthenticationToken> authenticationConverter,
-        AuthRateLimitFilter authRateLimitFilter,
+        ObjectProvider<AuthRateLimitFilter> authRateLimitFilterProvider,
         tools.jackson.databind.ObjectMapper objectMapper
     ) throws Exception {
         http
@@ -233,8 +233,12 @@ public class SecurityConfig {
         // Token-bucket rate limiting on the hot auth endpoints (/auth/refresh, /auth/impersonate,
         // DELETE /user). Registered after authentication so the account principal is resolvable;
         // it no-ops on every other path. /oauth2/authorization/* is rate-limited on the oauth2Login
-        // chain (AuthSecurityConfig), which owns that path.
-        http.addFilterBefore(authRateLimitFilter, AuthorizationFilter.class);
+        // chain (AuthSecurityConfig), which owns that path. Resolved via ObjectProvider: the filter
+        // is server-role-gated, so a non-server pod refreshes this chain without it.
+        AuthRateLimitFilter authRateLimitFilter = authRateLimitFilterProvider.getIfAvailable();
+        if (authRateLimitFilter != null) {
+            http.addFilterBefore(authRateLimitFilter, AuthorizationFilter.class);
+        }
 
         // Read-only-by-default enforcement for impersonation sessions (JWT carries an `act`
         // claim). Registered AFTER the AuthorizationFilter so the SecurityContext already holds

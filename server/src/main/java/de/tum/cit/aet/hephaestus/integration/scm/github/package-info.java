@@ -28,6 +28,8 @@
         // a NamedInterface so ProjectIntegrityService can subscribe.
         "integration.scm::events",
         "core",
+        // Runtime-role gate (@ConditionalOnServerRole) on the connection-OAuth strategy.
+        "core::runtime",
         "core::webhook",
         "workspace",
         // Activity ledger write path consumed by the Projects v2 listener under

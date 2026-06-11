@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
  * {@code @Scheduled} (via {@code ServerSchedulingConfig}) + ShedLock so one replica runs it. Replaces
  * the bespoke {@code AuthEventPartitionManager} (ADR 0018).
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("auth_event is account/system-scoped; partition maintenance is global, not tenant data")
 public class AuthEventPartitionMaintenance {

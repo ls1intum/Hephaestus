@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.export.dto.ExportStatusDTO;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * request returns 202 immediately; the client polls {@link #status}. The post-commit handoff
  * guarantees the worker (a new transaction) sees the committed row.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("GDPR exports are account-scoped, spanning a principal's data across workspaces")
 public class AccountExportService {
