@@ -11,9 +11,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -570,7 +570,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     class TargetTypeTests {
 
         @Test
-        @DisplayName("persisted 'PULL_REQUEST' maps to PracticeFindingTargetType.PULL_REQUEST on read")
+        @DisplayName("persisted 'PULL_REQUEST' maps to FocusArtifact.PULL_REQUEST on read")
         void enumRoundTrip() {
             UUID id = UUID.randomUUID();
             practiceFindingRepository.insertIfAbsent(
@@ -592,7 +592,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             );
 
             PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
-            assertThat(found.getTargetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
+            assertThat(found.getTargetType()).isEqualTo(FocusArtifact.PULL_REQUEST);
         }
     }
 }

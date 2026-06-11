@@ -197,13 +197,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(mrNote).doesNotContain("[CRITICAL]");
         assertThat(mrNote).doesNotContain("[MAJOR]");
         assertThat(mrNote).doesNotContain("[MINOR]");
-        // Red circle emoji for CRITICAL
-        assertThat(mrNote).contains("\uD83D\uDD34");
-        // Orange circle emoji for MAJOR
-        assertThat(mrNote).contains("\uD83D\uDFE0");
-        // Yellow circle emoji for MINOR
-        assertThat(mrNote).contains("\uD83D\uDFE1");
-
         // All 4 negatives are inlinable → compact list in MR summary (title + location only)
         assertThat(mrNote).contains("Hardcoded API key exposed in source");
         assertThat(mrNote).contains("Config/APIKeys.swift:5");

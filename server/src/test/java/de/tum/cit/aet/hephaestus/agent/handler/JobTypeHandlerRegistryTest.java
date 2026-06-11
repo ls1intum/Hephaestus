@@ -39,6 +39,9 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     @Mock
     private FeedbackDeliveryService feedbackService;
 
+    @Mock
+    private PullRequestCommentPoster commentPoster;
+
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
     private JobTypeHandler prReviewHandler() {
@@ -67,7 +70,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             envelopeWriter,
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             parser,
-            deliveryService
+            deliveryService,
+            commentPoster
         );
     }
 

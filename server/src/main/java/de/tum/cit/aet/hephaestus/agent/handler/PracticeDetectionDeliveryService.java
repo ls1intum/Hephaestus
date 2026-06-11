@@ -10,8 +10,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.util.List;
@@ -62,7 +62,7 @@ public class PracticeDetectionDeliveryService {
     }
 
     /** Resolved delivery target: who the finding is about + the typed (kind, id) reference. */
-    private record Target(PracticeFindingTargetType type, Long id, Long contributorId) {}
+    private record Target(FocusArtifact type, Long id, Long contributorId) {}
 
     /**
      * Persist validated findings and publish completion event.
@@ -99,7 +99,7 @@ public class PracticeDetectionDeliveryService {
         // Resolve the typed target + the contributor the finding is about, routing on the artifact.
         Target target = resolveTarget(job, metadata);
         Long contributorId = target.contributorId();
-        PracticeFindingTargetType targetType = target.type();
+        FocusArtifact targetType = target.type();
         Long targetId = target.id();
 
         // Persist findings
@@ -203,7 +203,7 @@ public class PracticeDetectionDeliveryService {
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String targetType = metadata.has("target_type") ? metadata.get("target_type").asString() : "PULL_REQUEST";
-        if (PracticeFindingTargetType.ISSUE.name().equals(targetType)) {
+        if (FocusArtifact.ISSUE.name().equals(targetType)) {
             if (!metadata.has("issue_id")) {
                 throw new JobDeliveryException("Missing issue_id in job metadata: jobId=" + job.getId());
             }
@@ -217,7 +217,7 @@ public class PracticeDetectionDeliveryService {
             if (issue.getAuthor() == null) {
                 throw new JobDeliveryException("Issue has no author: issueId=" + issueId + ", jobId=" + job.getId());
             }
-            return new Target(PracticeFindingTargetType.ISSUE, issueId, issue.getAuthor().getId());
+            return new Target(FocusArtifact.ISSUE, issueId, issue.getAuthor().getId());
         }
         if (!metadata.has("pull_request_id")) {
             throw new JobDeliveryException("Missing pull_request_id in job metadata: jobId=" + job.getId());
@@ -235,7 +235,7 @@ public class PracticeDetectionDeliveryService {
                 "Pull request has no author: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
             );
         }
-        return new Target(PracticeFindingTargetType.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
+        return new Target(FocusArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
     }
 
     public record DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {}

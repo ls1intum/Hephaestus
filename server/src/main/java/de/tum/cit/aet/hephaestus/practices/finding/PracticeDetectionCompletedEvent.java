@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFindingTargetType;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import java.util.UUID;
 
 /**
@@ -11,7 +11,7 @@ import java.util.UUID;
  *
  * @param agentJobId      the agent job that produced these findings
  * @param workspaceId     the workspace context
- * @param targetType      the target entity type (e.g., {@link PracticeFindingTargetType#PULL_REQUEST})
+ * @param targetType      the target entity type (e.g., {@link FocusArtifact#PULL_REQUEST})
  * @param targetId        the target entity ID
  * @param contributorId   the contributor whose work was evaluated
  * @param findingsInserted number of new findings persisted
@@ -21,7 +21,7 @@ import java.util.UUID;
 public record PracticeDetectionCompletedEvent(
     UUID agentJobId,
     Long workspaceId,
-    PracticeFindingTargetType targetType,
+    FocusArtifact targetType,
     Long targetId,
     Long contributorId,
     int findingsInserted,

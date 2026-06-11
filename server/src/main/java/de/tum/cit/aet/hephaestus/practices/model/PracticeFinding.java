@@ -95,7 +95,7 @@ public class PracticeFinding {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "target_type", length = 32, nullable = false)
-    private PracticeFindingTargetType targetType;
+    private FocusArtifact targetType;
 
     @NotNull
     @Column(name = "target_id", nullable = false)

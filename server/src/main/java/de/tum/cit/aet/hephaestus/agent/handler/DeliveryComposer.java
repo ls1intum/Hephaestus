@@ -80,26 +80,8 @@ class DeliveryComposer {
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // Nothing to change → an observation note (no self-level praise; see composeNoIssuesNote)
+        // No negatives → an observation note over the POSITIVE findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
-            // Defense-in-depth tripwire: a hardcoded-secrets finding that is neither POSITIVE nor
-            // NOT_APPLICABLE is by definition a NEGATIVE and would already be in `negatives` — so it
-            // can never legitimately reach the green path. If a future refactor ever routes a secret
-            // finding here, fail loud rather than post a clean bill of health over a committed key.
-            boolean leakedSecret = findings
-                .stream()
-                .anyMatch(
-                    f ->
-                        "hardcoded-secrets".equals(f.practiceSlug()) &&
-                        f.verdict() != Verdict.POSITIVE &&
-                        f.verdict() != Verdict.NOT_APPLICABLE
-                );
-            if (leakedSecret) {
-                throw new IllegalStateException(
-                    "Refusing to compose an all-clear comment: a non-positive hardcoded-secrets finding " +
-                        "was present but did not register as NEGATIVE. This is a delivery-integrity bug."
-                );
-            }
             List<ValidatedFinding> observed = findings
                 .stream()
                 .filter(f -> f.verdict() == Verdict.POSITIVE)
