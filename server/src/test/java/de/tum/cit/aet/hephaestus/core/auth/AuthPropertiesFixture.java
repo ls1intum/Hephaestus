@@ -34,7 +34,7 @@ public final class AuthPropertiesFixture {
             apiBasePath,
             "hephaestus-spa",
             Duration.ofMinutes(15),
-            "__Host-HEPHAESTUS_AT",
+            AuthProperties.DEFAULT_COOKIE_NAME,
             "",
             Duration.ofHours(48),
             providers,
