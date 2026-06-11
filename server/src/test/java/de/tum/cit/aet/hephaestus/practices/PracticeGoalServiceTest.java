@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -127,5 +128,34 @@ class PracticeGoalServiceTest extends BaseUnitTest {
             service.bindPractice(CTX, "p", "foreign")
         );
         verify(practiceRepository, never()).save(any());
+    }
+
+    @Test
+    void reorder_setsDisplayOrderByListIndex() {
+        PracticeGoal a = new PracticeGoal();
+        a.setSlug("a");
+        PracticeGoal b = new PracticeGoal();
+        b.setSlug("b");
+        PracticeGoal c = new PracticeGoal();
+        c.setSlug("c");
+        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "c")).thenReturn(Optional.of(c));
+        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "a")).thenReturn(Optional.of(a));
+        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "b")).thenReturn(Optional.of(b));
+
+        service.reorder(CTX, List.of("c", "a", "b"));
+
+        assertThat(c.getDisplayOrder()).isEqualTo(0);
+        assertThat(a.getDisplayOrder()).isEqualTo(1);
+        assertThat(b.getDisplayOrder()).isEqualTo(2);
+        verify(practiceGoalRepository, org.mockito.Mockito.times(3)).save(any());
+    }
+
+    @Test
+    void reorder_unknownSlug_throws() {
+        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "ghost")).thenReturn(Optional.empty());
+
+        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
+            service.reorder(CTX, List.of("ghost"))
+        );
     }
 }

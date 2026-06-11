@@ -2104,6 +2104,39 @@ paths:
       summary: Create a new practice goal
       tags:
       - Practice Goals
+  /workspaces/{workspaceSlug}/practice-goals/reorder:
+    patch:
+      description: Sets each goal's display order to its index in the provided slug
+        list (one atomic write)
+      operationId: reorderGoals
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPracticeGoalsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeGoal"
+          description: Goals reordered; the full ordered list is returned
+        "404":
+          description: A slug is unknown
+      summary: Reorder practice goals
+      tags:
+      - Practice Goals
   /workspaces/{workspaceSlug}/practice-goals/{goalSlug}:
     delete:
       description: "Bound practices are unbound (their goal link is cleared), not\
@@ -5820,6 +5853,21 @@ components:
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
+    ReorderPracticeGoalsRequest:
+      type: object
+      description: Reorder practice goals — displayOrder follows the list index
+      properties:
+        orderedSlugs:
+          type: array
+          description: Goal slugs in the desired display order
+          example:
+          - review-ready-work
+          - acting-on-review-feedback
+          items:
+            type: string
+          minItems: 1
+      required:
+      - orderedSlugs
     RepositoryInfo:
       type: object
       description: Information about a git repository

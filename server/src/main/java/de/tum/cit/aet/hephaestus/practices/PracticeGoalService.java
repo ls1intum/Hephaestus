@@ -40,6 +40,23 @@ public class PracticeGoalService {
             : practiceGoalRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
     }
 
+    /**
+     * Sets each goal's {@code displayOrder} to its index in the given list — one atomic write of the
+     * whole ordering, so a mid-list failure can't leave duplicate/garbled order values. Every slug must
+     * belong to the workspace (a stale/foreign slug is a 404).
+     */
+    @Transactional
+    public void reorder(WorkspaceContext ctx, List<String> orderedSlugs) {
+        int order = 0;
+        for (String slug : orderedSlugs) {
+            PracticeGoal goal = practiceGoalRepository
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("PracticeGoal", slug));
+            goal.setDisplayOrder(order++);
+            practiceGoalRepository.save(goal);
+        }
+    }
+
     @Transactional(readOnly = true)
     public PracticeGoal getGoal(WorkspaceContext ctx, String slug) {
         return practiceGoalRepository

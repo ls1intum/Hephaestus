@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeGoalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGoalDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGoalsRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeGoalRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
@@ -145,6 +146,35 @@ public class PracticeGoalController {
             goal = goalService.setActive(workspaceContext, goalSlug, request.active());
         }
         return ResponseEntity.ok(PracticeGoalDTO.from(goal));
+    }
+
+    @PatchMapping("/reorder")
+    @Operation(
+        summary = "Reorder practice goals",
+        description = "Sets each goal's display order to its index in the provided slug list (one atomic write)"
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Goals reordered; the full ordered list is returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeGoalDTO.class)))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "A slug is unknown",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<List<PracticeGoalDTO>> reorderGoals(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody ReorderPracticeGoalsRequestDTO request
+    ) {
+        goalService.reorder(workspaceContext, request.orderedSlugs());
+        List<PracticeGoalDTO> goals = goalService
+            .listGoals(workspaceContext, null)
+            .stream()
+            .map(PracticeGoalDTO::from)
+            .toList();
+        return ResponseEntity.ok(goals);
     }
 
     @DeleteMapping("/{goalSlug}")

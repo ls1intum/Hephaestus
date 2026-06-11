@@ -8,6 +8,7 @@ import {
 	listGoalsQueryKey,
 	listPracticesOptions,
 	listPracticesQueryKey,
+	reorderGoalsMutation,
 	updateGoalMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { generateSlug } from "@/components/admin/practices/constants";
@@ -74,6 +75,11 @@ function PracticeGoalsContainer() {
 		},
 		onError: () => toast.error("Failed to delete goal"),
 	});
+	const reorderGoals = useMutation({
+		...reorderGoalsMutation(),
+		onSuccess: () => invalidate(),
+		onError: () => toast.error("Failed to reorder goals"),
+	});
 
 	if (!workspaceSlug || goalsQuery.isLoading || practicesQuery.isLoading) {
 		return (
@@ -83,7 +89,8 @@ function PracticeGoalsContainer() {
 		);
 	}
 
-	const isMutating = createGoal.isPending || updateGoal.isPending || deleteGoal.isPending;
+	const isMutating =
+		createGoal.isPending || updateGoal.isPending || deleteGoal.isPending || reorderGoals.isPending;
 
 	return (
 		<PracticeGoalsPanel
@@ -103,6 +110,9 @@ function PracticeGoalsContainer() {
 				updateGoal.mutate({ path: { workspaceSlug: slug, goalSlug }, body: { active } })
 			}
 			onDelete={(goalSlug) => deleteGoal.mutate({ path: { workspaceSlug: slug, goalSlug } })}
+			onReorder={(orderedSlugs) =>
+				reorderGoals.mutate({ path: { workspaceSlug: slug }, body: { orderedSlugs } })
+			}
 		/>
 	);
 }

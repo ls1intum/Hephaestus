@@ -868,6 +868,16 @@ export type RevokeSessionsResult = {
 };
 
 /**
+ * Reorder practice goals — displayOrder follows the list index
+ */
+export type ReorderPracticeGoalsRequest = {
+    /**
+     * Goal slugs in the desired display order
+     */
+    orderedSlugs: Array<string>;
+};
+
+/**
  * Request to rename a workspace's URL slug
  */
 export type RenameWorkspaceSlugRequest = {
@@ -4212,6 +4222,34 @@ export type CreateGoalResponses = {
 };
 
 export type CreateGoalResponse = CreateGoalResponses[keyof CreateGoalResponses];
+
+export type ReorderGoalsData = {
+    body: ReorderPracticeGoalsRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/reorder';
+};
+
+export type ReorderGoalsErrors = {
+    /**
+     * A slug is unknown
+     */
+    404: unknown;
+};
+
+export type ReorderGoalsResponses = {
+    /**
+     * Goals reordered; the full ordered list is returned
+     */
+    200: Array<PracticeGoal>;
+};
+
+export type ReorderGoalsResponse = ReorderGoalsResponses[keyof ReorderGoalsResponses];
 
 export type DeleteGoalData = {
     body?: never;

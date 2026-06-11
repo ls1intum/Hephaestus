@@ -1,4 +1,4 @@
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import type { Practice, PracticeGoal } from "@/api/types.gen";
 import {
@@ -24,6 +24,8 @@ interface PracticeGoalsPanelProps {
 	onRename: (slug: string, name: string) => void;
 	onToggleActive: (slug: string, active: boolean) => void;
 	onDelete: (slug: string) => void;
+	/** Persist a new top-to-bottom ordering of all goal slugs. */
+	onReorder: (orderedSlugs: string[]) => void;
 	isMutating: boolean;
 }
 
@@ -39,6 +41,7 @@ export function PracticeGoalsPanel({
 	onRename,
 	onToggleActive,
 	onDelete,
+	onReorder,
 	isMutating,
 }: PracticeGoalsPanelProps) {
 	const [newName, setNewName] = useState("");
@@ -46,6 +49,15 @@ export function PracticeGoalsPanel({
 	const [editDraft, setEditDraft] = useState("");
 
 	const countFor = (slug: string) => practices.filter((p) => p.goalSlug === slug).length;
+
+	/** Swap the goal at `index` with its neighbour and persist the whole new ordering. */
+	const move = (index: number, direction: -1 | 1) => {
+		const target = index + direction;
+		if (target < 0 || target >= goals.length) return;
+		const slugs = goals.map((g) => g.slug);
+		[slugs[index], slugs[target]] = [slugs[target], slugs[index]];
+		onReorder(slugs);
+	};
 
 	const submitNew = () => {
 		const name = newName.trim();
@@ -94,8 +106,31 @@ export function PracticeGoalsPanel({
 						No goals yet. Add one above to start grouping practices.
 					</li>
 				)}
-				{goals.map((goal) => (
+				{goals.map((goal, index) => (
 					<li key={goal.slug} className="flex items-center gap-3 px-4 py-3">
+						{/* Reorder controls — drive the seeded catalog grouping order on the dashboards. */}
+						<div className="flex flex-col">
+							<Button
+								size="icon-sm"
+								variant="ghost"
+								className="h-5 w-5"
+								onClick={() => move(index, -1)}
+								disabled={index === 0 || isMutating}
+								aria-label={`Move ${goal.name} up`}
+							>
+								<ArrowUp className="h-3.5 w-3.5" />
+							</Button>
+							<Button
+								size="icon-sm"
+								variant="ghost"
+								className="h-5 w-5"
+								onClick={() => move(index, 1)}
+								disabled={index === goals.length - 1 || isMutating}
+								aria-label={`Move ${goal.name} down`}
+							>
+								<ArrowDown className="h-3.5 w-3.5" />
+							</Button>
+						</div>
 						<div className="flex-1 min-w-0">
 							{editingSlug === goal.slug ? (
 								<div className="flex items-center gap-1.5">
