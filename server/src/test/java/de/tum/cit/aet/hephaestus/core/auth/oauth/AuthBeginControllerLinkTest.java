@@ -6,14 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
-import java.net.URI;
 import java.security.SecureRandom;
-import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -55,24 +53,7 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
             authIntentCookie,
             bearerTokenResolver,
             jwtDecoder,
-            authProperties(apiBasePath)
-        );
-    }
-
-    private static AuthProperties authProperties(String apiBasePath) {
-        return new AuthProperties(
-            URI.create("http://localhost:8080"),
-            apiBasePath,
-            "hephaestus-spa",
-            Duration.ofMinutes(15),
-            "__Host-HEPHAESTUS_AT",
-            "",
-            Duration.ofHours(48),
-            java.util.Map.of(),
-            java.util.List.of(),
-            "",
-            Duration.ofHours(1),
-            Duration.ofHours(12)
+            AuthPropertiesFixture.withApiBasePath(apiBasePath)
         );
     }
 

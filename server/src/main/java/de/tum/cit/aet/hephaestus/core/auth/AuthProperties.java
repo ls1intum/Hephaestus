@@ -24,7 +24,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *                        from the request: prod runs {@code forward-headers-strategy: native} (Tomcat
  *                        {@code RemoteIpValve}, kept for the pre-auth IP rate-limit trust model — see
  *                        {@code ProxyTrustGuard}), which restores forwarded host/proto but NOT
- *                        {@code X-Forwarded-Prefix}. Contract: leading slash, no trailing slash.
+ *                        {@code X-Forwarded-Prefix}. Normalized to leading-slash / no-trailing-slash.
  * @param audience        Default {@code aud} claim for SPA cookies.
  * @param accessTtl       Cookie-JWT lifetime.
  * @param cookieName      Access-token cookie name (the {@code __Host-} prefix is
@@ -97,6 +97,23 @@ public record AuthProperties(
      */
     public AuthProperties {
         loginProviders = loginProviders == null ? Map.of() : loginProviders;
+        apiBasePath = normalizeApiBasePath(apiBasePath);
+    }
+
+    /**
+     * Coerce {@code apiBasePath} to the leading-slash / no-trailing-slash form the OAuth-URL builders
+     * concatenate, so {@code api}, {@code /api} and {@code /api/} are equivalent and {@code /} or blank
+     * mean root — a misconfigured value can't silently produce {@code hostapi/…} or a double slash.
+     */
+    private static String normalizeApiBasePath(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim().replaceAll("/+$", "");
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        return trimmed.startsWith("/") ? trimmed : "/" + trimmed;
     }
 
     /**

@@ -9,10 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.net.URI;
-import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,21 +30,11 @@ class LoginProviderServiceTest extends BaseUnitTest {
     );
 
     private LoginProviderService service(Map<String, AuthProperties.LoginProviderSeed> providers) {
-        AuthProperties props = new AuthProperties(
-            URI.create("http://localhost:8080"),
-            "",
-            "hephaestus-spa",
-            Duration.ofMinutes(15),
-            "__Host-HEPHAESTUS_AT",
-            "",
-            Duration.ofHours(48),
-            providers,
-            List.of(),
-            "",
-            Duration.ofHours(1),
-            Duration.ofHours(12)
+        return new LoginProviderService(
+            repository,
+            registrationCache,
+            AuthPropertiesFixture.withLoginProviders(providers)
         );
-        return new LoginProviderService(repository, registrationCache, props);
     }
 
     private LoginProviderService adminService() {
