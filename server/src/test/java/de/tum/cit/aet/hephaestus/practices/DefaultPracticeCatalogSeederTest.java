@@ -89,19 +89,15 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         ).isEqualTo(3);
 
         // Every seeded practice's criteria is the per-focus evidence-contract preamble composed onto the
-        // practice-specific criteria with a "\n\n---\n\n" fence — so the shared contract is authored once
-        // and inherited, while the validated practice text is preserved verbatim after the fence.
+        // practice-specific criteria with a "\n\n---\n\n" fence: a non-empty preamble before the fence,
+        // naming the practice's focus. Structural (not exact-prose) so rewording a preamble can't break it.
         for (var request : practiceCaptor.getAllValues()) {
-            assertThat(request.criteria()).contains("\n\n---\n\n");
-            if (request.focusArtifact() == WorkArtifact.ISSUE) {
-                assertThat(request.criteria()).startsWith(
-                    "You are a formative-feedback reviewer assessing a single software-practice habit from an issue."
-                );
-            } else {
-                assertThat(request.criteria()).startsWith(
-                    "You are a formative-feedback reviewer assessing a single software-practice habit from a pull request."
-                );
-            }
+            int fence = request.criteria().indexOf("\n\n---\n\n");
+            assertThat(fence).as("preamble fenced ahead of the practice criteria").isGreaterThan(40);
+            String preamble = request.criteria().substring(0, fence);
+            assertThat(preamble).containsIgnoringCase(
+                request.focusArtifact() == WorkArtifact.ISSUE ? "issue" : "pull request"
+            );
         }
     }
 
