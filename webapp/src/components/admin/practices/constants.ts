@@ -4,7 +4,8 @@
 
 import type { Practice } from "@/api/types.gen";
 
-type WorkArtifact = Practice["focusArtifact"];
+/** The work artifact a practice targets (PR or Issue). Mirrors the server's WorkArtifact enum. */
+export type WorkArtifact = NonNullable<Practice["focusArtifact"]>;
 
 /**
  * Trigger events a practice can fire on, grouped by the focus artifact they belong to. Mirrors the

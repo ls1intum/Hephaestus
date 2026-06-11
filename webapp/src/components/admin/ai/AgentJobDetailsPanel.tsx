@@ -96,7 +96,7 @@ export function AgentJobDetailsPanel({
 											}
 										/>
 										<Row label="Model" value={configLabel(job)} />
-										<Row label="Model" value={job.llmModel ?? job.llmModelVersion ?? "—"} />
+										<Row label="Model name" value={job.llmModel ?? job.llmModelVersion ?? "—"} />
 										<Row
 											label="Created"
 											value={formatDistanceToNow(new Date(job.createdAt), { addSuffix: true })}

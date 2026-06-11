@@ -27,12 +27,11 @@ import {
 	isValidSlug,
 	TRIGGER_EVENTS_BY_FOCUS,
 	triggerEventsForFocus,
+	type WorkArtifact,
 } from "./constants";
 
 /** Sentinel for the "not bound to any goal" option (shadcn SelectItem cannot use an empty value). */
 const NO_GOAL = "__none__";
-
-type WorkArtifact = NonNullable<CreatePracticeRequest["focusArtifact"]>;
 
 interface PracticeFormCreateProps {
 	mode: "create";

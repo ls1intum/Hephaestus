@@ -1,20 +1,31 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Unit tests for the issue-detection handler's pure submission logic. */
 class IssueReviewHandlerTest extends BaseUnitTest {
@@ -104,4 +115,63 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     }
 
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
+
+    /**
+     * The issue-delivery path mirrors the MR path's suppression + soft-failure contract (tested for PRs
+     * in {@code FeedbackDeliveryServiceTest}). These lock the issue-side equivalents so flipping the
+     * suppression sense (post to closed issues) or letting the swallow propagate (mark good jobs FAILED)
+     * cannot ship green.
+     */
+    @Nested
+    class DeliverIssueFeedback {
+
+        private AgentJob issueJob(String state) {
+            var job = new AgentJob();
+            var workspace = new Workspace();
+            workspace.setId(1L);
+            job.setWorkspace(workspace);
+            ObjectNode metadata = objectMapper.createObjectNode();
+            metadata.put("repository_full_name", "owner/repo");
+            metadata.put("issue_number", 12);
+            metadata.put("state", state);
+            job.setMetadata(metadata);
+            return job;
+        }
+
+        private DeliveryContent note() {
+            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of());
+        }
+
+        @Test
+        void closedIssue_isSuppressed_neverPosts() {
+            handler.postIssueNote(issueJob("closed"), note());
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+        }
+
+        @Test
+        void openIssue_postsAndRecordsCommentId() {
+            AgentJob job = issueJob("OPEN");
+            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenReturn("gid://gitlab/Note/9");
+
+            handler.postIssueNote(job, note());
+
+            verify(commentPoster).postIssueFormattedBody(eq(job), any());
+            assertThat(job.getDeliveryCommentId()).isEqualTo("gid://gitlab/Note/9");
+        }
+
+        @Test
+        void posterFailure_isSwallowed_doesNotPropagate() {
+            AgentJob job = issueJob("OPEN");
+            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenThrow(new RuntimeException("gitlab down"));
+
+            assertThatCode(() -> handler.postIssueNote(job, note())).doesNotThrowAnyException();
+            assertThat(job.getDeliveryCommentId()).isNull();
+        }
+
+        @Test
+        void noDeliveryContent_isNoop() {
+            handler.postIssueNote(issueJob("OPEN"), null);
+            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
+        }
+    }
 }

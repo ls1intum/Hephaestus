@@ -177,7 +177,9 @@ public class IssueReviewHandler implements JobTypeHandler {
      * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
      * already persisted above, so the formative loop is intact even if the comment does not land.
      */
-    private void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+    // Package-private for direct testing of the suppression + soft-failure contract (mirrors how
+    // FeedbackDeliveryService.deliverFeedback is tested), without driving the real result parser.
+    void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
         if (delivery == null || delivery.mrNote() == null) {
             return;
         }
