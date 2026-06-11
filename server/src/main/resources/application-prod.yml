@@ -125,6 +125,9 @@ hephaestus:
     auth:
         issuer: ${HEPHAESTUS_AUTH_ISSUER}
         state-cookie-key: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
+        # Traefik strips /api before the request reaches the app (see docker/compose.app.yaml), and
+        # native forward-headers can't restore the prefix — re-add it to the browser-facing OAuth URLs.
+        api-base-path: /api
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITLAB INTEGRATION (Production)

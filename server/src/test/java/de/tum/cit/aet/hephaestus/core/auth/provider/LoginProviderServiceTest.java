@@ -34,6 +34,7 @@ class LoginProviderServiceTest extends BaseUnitTest {
     private LoginProviderService service(Map<String, AuthProperties.LoginProviderSeed> providers) {
         AuthProperties props = new AuthProperties(
             URI.create("http://localhost:8080"),
+            "",
             "hephaestus-spa",
             Duration.ofMinutes(15),
             "__Host-HEPHAESTUS_AT",

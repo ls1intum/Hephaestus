@@ -6,11 +6,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
+import java.net.URI;
 import java.security.SecureRandom;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -28,6 +31,7 @@ import org.springframework.web.servlet.view.RedirectView;
  */
 class AuthBeginControllerLinkTest extends BaseUnitTest {
 
+    private ClientRegistrationRepository registrations;
     private CookieBearerTokenResolver bearerTokenResolver;
     private RevocationAwareJwtDecoder jwtDecoder;
     private AuthIntentCookie authIntentCookie;
@@ -35,14 +39,41 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        ClientRegistrationRepository registrations = mock(ClientRegistrationRepository.class);
+        registrations = mock(ClientRegistrationRepository.class);
         when(registrations.findByRegistrationId(any())).thenReturn(githubRegistration());
         bearerTokenResolver = mock(CookieBearerTokenResolver.class);
         jwtDecoder = mock(RevocationAwareJwtDecoder.class);
         byte[] key = new byte[32];
         new SecureRandom().nextBytes(key);
         authIntentCookie = new AuthIntentCookie(key);
-        controller = new AuthBeginController(registrations, authIntentCookie, bearerTokenResolver, jwtDecoder);
+        controller = buildController("");
+    }
+
+    private AuthBeginController buildController(String apiBasePath) {
+        return new AuthBeginController(
+            registrations,
+            authIntentCookie,
+            bearerTokenResolver,
+            jwtDecoder,
+            authProperties(apiBasePath)
+        );
+    }
+
+    private static AuthProperties authProperties(String apiBasePath) {
+        return new AuthProperties(
+            URI.create("http://localhost:8080"),
+            apiBasePath,
+            "hephaestus-spa",
+            Duration.ofMinutes(15),
+            "__Host-HEPHAESTUS_AT",
+            "",
+            Duration.ofHours(48),
+            java.util.Map.of(),
+            java.util.List.of(),
+            "",
+            Duration.ofHours(1),
+            Duration.ofHours(12)
+        );
     }
 
     private static ClientRegistration githubRegistration() {
@@ -117,5 +148,19 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
         AuthIntentCookie.Intent intent = readIntent(res);
         assertThat(intent.mode()).isEqualTo(AuthIntentCookie.Intent.Mode.LOGIN);
         verifyNoInteractions(jwtDecoder);
+    }
+
+    @Test
+    void initRedirect_carriesApiBasePath_soItLandsOnTheProxiedEndpointNotTheSpa() {
+        RedirectView view = buildController("/api").begin(
+            "github",
+            "ws",
+            "/",
+            "login",
+            new MockHttpServletRequest(),
+            new MockHttpServletResponse()
+        );
+
+        assertThat(view.getUrl()).isEqualTo("/api/oauth2/authorization/github");
     }
 }

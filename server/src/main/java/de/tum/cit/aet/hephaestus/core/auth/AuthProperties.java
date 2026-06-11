@@ -15,6 +15,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * integration tests override via {@code @TestPropertySource}.
  *
  * @param issuer          Canonical issuer URI; populates the {@code iss} claim.
+ * @param apiBasePath     Public path prefix the reverse proxy strips before requests reach this app
+ *                        (e.g. {@code /api} when Traefik strips {@code /api}); empty when the app is
+ *                        served at the origin root (local dev). Prepended when building the absolute,
+ *                        browser-reachable OAuth URLs — the authorization-request {@code redirect_uri}
+ *                        and the {@code /oauth2/authorization} init redirect — so the IdP and the
+ *                        callback land back on the proxied API path, not the SPA. It cannot be inferred
+ *                        from the request: prod runs {@code forward-headers-strategy: native} (Tomcat
+ *                        {@code RemoteIpValve}, kept for the pre-auth IP rate-limit trust model — see
+ *                        {@code ProxyTrustGuard}), which restores forwarded host/proto but NOT
+ *                        {@code X-Forwarded-Prefix}. Contract: leading slash, no trailing slash.
  * @param audience        Default {@code aud} claim for SPA cookies.
  * @param accessTtl       Cookie-JWT lifetime.
  * @param cookieName      Access-token cookie name (the {@code __Host-} prefix is
@@ -69,6 +79,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties(prefix = "hephaestus.auth")
 public record AuthProperties(
     @DefaultValue("http://localhost:8080") URI issuer,
+    @DefaultValue("") String apiBasePath,
     @DefaultValue("hephaestus-spa") String audience,
     @DefaultValue("15m") Duration accessTtl,
     @DefaultValue(DEFAULT_COOKIE_NAME) String cookieName,
