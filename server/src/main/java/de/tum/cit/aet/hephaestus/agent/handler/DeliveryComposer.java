@@ -10,6 +10,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PR
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.util.ArrayList;
@@ -56,8 +57,18 @@ class DeliveryComposer {
      * @param findings validated findings (may include POSITIVE, NEGATIVE, and NOT_APPLICABLE)
      * @return delivery content with mrNote and diffNotes, or null if findings list is empty
      */
+    /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
+        return compose(findings, FocusArtifact.PULL_REQUEST);
+    }
+
+    /**
+     * Compose feedback for a specific artifact. The blocking call-to-action is artifact-aware: a PR
+     * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged).
+     */
+    @Nullable
+    static DeliveryContent compose(List<ValidatedFinding> findings, FocusArtifact artifact) {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
@@ -70,6 +81,24 @@ class DeliveryComposer {
 
         // Nothing to change → an observation note (no self-level praise; see composeNoIssuesNote)
         if (negatives.isEmpty()) {
+            // Defense-in-depth tripwire: a hardcoded-secrets finding that is neither POSITIVE nor
+            // NOT_APPLICABLE is by definition a NEGATIVE and would already be in `negatives` — so it
+            // can never legitimately reach the green path. If a future refactor ever routes a secret
+            // finding here, fail loud rather than post a clean bill of health over a committed key.
+            boolean leakedSecret = findings
+                .stream()
+                .anyMatch(
+                    f ->
+                        "hardcoded-secrets".equals(f.practiceSlug()) &&
+                        f.verdict() != Verdict.POSITIVE &&
+                        f.verdict() != Verdict.NOT_APPLICABLE
+                );
+            if (leakedSecret) {
+                throw new IllegalStateException(
+                    "Refusing to compose an all-clear comment: a non-positive hardcoded-secrets finding " +
+                        "was present but did not register as NEGATIVE. This is a delivery-integrity bug."
+                );
+            }
             List<ValidatedFinding> observed = findings
                 .stream()
                 .filter(f -> f.verdict() == Verdict.POSITIVE)
@@ -89,7 +118,7 @@ class DeliveryComposer {
         }
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview
-        String mrNote = composeMrNote(negatives, nonInlinable, inlinable);
+        String mrNote = composeMrNote(negatives, nonInlinable, inlinable, artifact);
 
         // Diff notes: ALL inlinable negatives get inline comments
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
@@ -185,12 +214,13 @@ class DeliveryComposer {
     static String composeMrNote(
         List<ValidatedFinding> allNegatives,
         List<ValidatedFinding> nonInlinable,
-        List<ValidatedFinding> inlinable
+        List<ValidatedFinding> inlinable,
+        FocusArtifact artifact
     ) {
         var sb = new StringBuilder(4096);
 
         // Opening: evidence-anchored issue summary (no self-level praise)
-        composeOpening(sb, allNegatives);
+        composeOpening(sb, allNegatives, artifact);
 
         // Non-inlinable findings (full detail) — these only exist in the summary
         for (int i = 0; i < nonInlinable.size(); i++) {
@@ -220,7 +250,9 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives) {
+    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, FocusArtifact artifact) {
+        // PRs are merged → "to fix before merging"; issues are not → "to fix".
+        String blockingCta = artifact == FocusArtifact.PULL_REQUEST ? " to fix before merging" : " to fix";
         long blockingCount = negatives
             .stream()
             .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
@@ -231,7 +263,8 @@ class DeliveryComposer {
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
-                .append(" to fix before merging, plus ")
+                .append(blockingCta)
+                .append(", plus ")
                 .append(improvementCount)
                 .append(improvementCount == 1 ? " suggestion" : " suggestions")
                 .append(" for improvement:\n\n");
@@ -239,7 +272,8 @@ class DeliveryComposer {
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
-                .append(" to fix before merging:\n\n");
+                .append(blockingCta)
+                .append(":\n\n");
         } else {
             sb
                 .append(improvementCount)

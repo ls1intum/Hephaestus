@@ -26,9 +26,6 @@ public interface PracticeGoalRepository extends JpaRepository<PracticeGoal, Long
 
     Optional<PracticeGoal> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    /** Tenancy-scoped resolve used when binding a practice to a goal (guards cross-workspace leaks). */
-    Optional<PracticeGoal> findByIdAndWorkspaceId(Long id, Long workspaceId);
-
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     /** Deletes all goals for the workspace. Practices' {@code practice_goal_id} is SET NULL by the FK. */

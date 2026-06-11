@@ -8,6 +8,8 @@ export const TRIGGER_EVENT_OPTIONS = [
 	{ value: "PullRequestReady", label: "Pull Request Ready" },
 	{ value: "PullRequestSynchronized", label: "Pull Request Synchronized" },
 	{ value: "ReviewSubmitted", label: "Review Submitted" },
+	{ value: "IssueCreated", label: "Issue Created" },
+	{ value: "IssueLabeled", label: "Issue Labeled" },
 ] as const;
 
 type TriggerEventValue = (typeof TRIGGER_EVENT_OPTIONS)[number]["value"];
@@ -18,7 +20,19 @@ export const TRIGGER_EVENT_SHORT_LABELS: Record<TriggerEventValue, string> = {
 	PullRequestReady: "PR Ready",
 	PullRequestSynchronized: "PR Synced",
 	ReviewSubmitted: "Review",
+	IssueCreated: "Issue Created",
+	IssueLabeled: "Issue Labeled",
 };
+
+/** The artifact a practice evaluates. Mirrors the server's FocusArtifact enum. */
+export const FOCUS_ARTIFACT_OPTIONS = [
+	{
+		value: "PULL_REQUEST",
+		label: "Pull request",
+		hint: "Evaluates the diff, commits, and review thread",
+	},
+	{ value: "ISSUE", label: "Issue", hint: "Evaluates the issue title, body, labels, and comments" },
+] as const;
 
 /** Generate a URL-safe slug from a human-readable name. */
 export function generateSlug(name: string): string {

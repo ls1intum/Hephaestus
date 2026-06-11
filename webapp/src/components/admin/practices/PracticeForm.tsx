@@ -1,19 +1,43 @@
 import { ArrowLeft, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
+import type {
+	CreatePracticeRequest,
+	Practice,
+	PracticeGoal,
+	UpdatePracticeRequest,
+} from "@/api/types.gen";
 import { CodeEditor } from "@/components/shared/CodeEditor";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { generateSlug, isValidSlug, TRIGGER_EVENT_OPTIONS } from "./constants";
+import {
+	FOCUS_ARTIFACT_OPTIONS,
+	generateSlug,
+	isValidSlug,
+	TRIGGER_EVENT_OPTIONS,
+} from "./constants";
+
+/** Sentinel for the "not bound to any goal" option (shadcn SelectItem cannot use an empty value). */
+const NO_GOAL = "__none__";
+
+type FocusArtifact = NonNullable<CreatePracticeRequest["focusArtifact"]>;
 
 interface PracticeFormCreateProps {
 	mode: "create";
-	onSubmit: (data: CreatePracticeRequest) => void;
+	/** Goals offered in the binding picker. Binding is a separate mutation the container runs after create. */
+	goals: PracticeGoal[];
+	onSubmit: (data: CreatePracticeRequest, goalSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
 	initialData?: never;
@@ -22,7 +46,8 @@ interface PracticeFormCreateProps {
 interface PracticeFormEditProps {
 	mode: "edit";
 	initialData: Practice;
-	onSubmit: (slug: string, data: UpdatePracticeRequest) => void;
+	goals: PracticeGoal[];
+	onSubmit: (slug: string, data: UpdatePracticeRequest, goalSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
 }
@@ -33,6 +58,8 @@ interface FormState {
 	name: string;
 	slug: string;
 	category: string;
+	focusArtifact: FocusArtifact;
+	goalSlug: string;
 	triggerEvents: string[];
 	criteria: string;
 	precomputeScript: string;
@@ -44,6 +71,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 			name: initialData.name,
 			slug: initialData.slug,
 			category: initialData.category ?? "",
+			focusArtifact: initialData.focusArtifact,
+			goalSlug: initialData.goalSlug ?? NO_GOAL,
 			triggerEvents: [...initialData.triggerEvents],
 			criteria: initialData.criteria,
 			precomputeScript: initialData.precomputeScript ?? "",
@@ -53,6 +82,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 		name: "",
 		slug: "",
 		category: "",
+		focusArtifact: "PULL_REQUEST",
+		goalSlug: NO_GOAL,
 		triggerEvents: [],
 		criteria: "",
 		precomputeScript: "",
@@ -61,6 +92,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 
 export function PracticeForm({
 	mode,
+	goals,
 	onSubmit,
 	onCancel,
 	isPending,
@@ -115,25 +147,29 @@ export function PracticeForm({
 		setSubmitted(true);
 		if (!isValid) return;
 
+		const goalSlug = form.goalSlug === NO_GOAL ? null : form.goalSlug;
+
 		if (mode === "create") {
 			const data: CreatePracticeRequest = {
 				name: form.name,
 				slug: form.slug,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
+				focusArtifact: form.focusArtifact,
 				...(form.category.trim() ? { category: form.category.trim() } : {}),
 				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
 			};
-			onSubmit(data);
+			onSubmit(data, goalSlug);
 		} else {
 			const data: UpdatePracticeRequest = {
 				name: form.name,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
+				focusArtifact: form.focusArtifact,
 				category: form.category.trim() || undefined,
 				precomputeScript: form.precomputeScript.trim() || undefined,
 			};
-			onSubmit(initialData.slug, data);
+			onSubmit(initialData.slug, data, goalSlug);
 		}
 	};
 
@@ -236,6 +272,66 @@ export function PracticeForm({
 										onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
 										maxLength={64}
 									/>
+								</div>
+
+								<div className="grid gap-4 sm:grid-cols-2">
+									<div className="grid gap-2">
+										<Label htmlFor="practice-focus">Evaluates</Label>
+										<Select
+											value={form.focusArtifact}
+											onValueChange={(value) =>
+												setForm((prev) => ({ ...prev, focusArtifact: value as FocusArtifact }))
+											}
+										>
+											<SelectTrigger id="practice-focus">
+												<SelectValue>
+													{
+														FOCUS_ARTIFACT_OPTIONS.find((o) => o.value === form.focusArtifact)
+															?.label
+													}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												{FOCUS_ARTIFACT_OPTIONS.map((option) => (
+													<SelectItem key={option.value} value={option.value}>
+														{option.label}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<p className="text-xs text-muted-foreground">
+											{FOCUS_ARTIFACT_OPTIONS.find((o) => o.value === form.focusArtifact)?.hint}
+										</p>
+									</div>
+
+									<div className="grid gap-2">
+										<Label htmlFor="practice-goal">Goal</Label>
+										<Select
+											value={form.goalSlug}
+											onValueChange={(value) =>
+												setForm((prev) => ({ ...prev, goalSlug: value ?? NO_GOAL }))
+											}
+										>
+											<SelectTrigger id="practice-goal">
+												<SelectValue placeholder="Not assigned">
+													{form.goalSlug === NO_GOAL
+														? undefined
+														: goals.find((g) => g.slug === form.goalSlug)?.name}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value={NO_GOAL}>Not assigned</SelectItem>
+												{goals.map((goal) => (
+													<SelectItem key={goal.slug} value={goal.slug}>
+														{goal.name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<p className="text-xs text-muted-foreground">
+											The learning objective this practice rolls up to.
+										</p>
+									</div>
 								</div>
 							</div>
 						</section>

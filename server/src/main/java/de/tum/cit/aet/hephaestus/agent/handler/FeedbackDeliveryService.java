@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -53,11 +54,21 @@ class FeedbackDeliveryService {
     }
 
     /**
-     * Delivers feedback to the PR/MR. Best-effort: failures are logged but never thrown.
+     * Delivers feedback to the PR/MR.
+     *
+     * <p>Two failure classes are treated differently. An <em>integrity</em> failure — null
+     * {@code integrationKind}, no {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel}
+     * wired, or the summary post returning no id — means the contributor sees <em>nothing</em> despite
+     * the agent having run (LLM cost incurred). Those surface as a {@link JobDeliveryException} so the
+     * executor marks the job FAILED instead of silently reporting "DELIVERED". <em>Cosmetic</em>
+     * failures (e.g. one diff note that fell outside a hunk) stay soft and are only logged.
      */
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
         try {
             doDeliver(job, delivery);
+        } catch (JobDeliveryException e) {
+            // Integrity failure — propagate so the job is marked FAILED, not silently DELIVERED.
+            throw e;
         } catch (Exception e) {
             log.warn("Feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
@@ -131,10 +142,15 @@ class FeedbackDeliveryService {
         }
         String formatted = formatPracticeNote(sanitized, job);
         String commentId = commentPoster.postFormattedBody(job, formatted);
-        if (commentId != null) {
-            job.setDeliveryCommentId(commentId);
-            log.info("Practice summary note posted: jobId={}, commentId={}", job.getId(), commentId);
+        if (commentId == null) {
+            // We had a real, non-blank summary to post but the provider returned no comment id —
+            // the contributor sees nothing. Treat as an integrity failure so the job is marked FAILED.
+            throw new JobDeliveryException(
+                "Summary note post returned no comment id despite a non-empty body: jobId=" + job.getId()
+            );
         }
+        job.setDeliveryCommentId(commentId);
+        log.info("Practice summary note posted: jobId={}, commentId={}", job.getId(), commentId);
     }
 
     private void postDiffNotes(AgentJob job, DeliveryContent delivery) {

@@ -135,7 +135,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     void insertOnScopedTableIsAllowed() {
         // INSERTs cannot leak existing data across workspaces. The workspace_id (or FK
         // chain) is placed into the row by application code, not enforced by the inspector.
-        // Regression: practice_finding/finding_feedback inserts emitted at Hibernate flush
+        // Regression: practice_finding/finding_reaction inserts emitted at Hibernate flush
         // time triggered TenancyViolationException despite being safe by construction.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
         inspector.inspect("insert into practice_finding (id, title, practice_id) values (?, ?, ?)");

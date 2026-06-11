@@ -63,6 +63,12 @@ class AgentJobServiceTest extends BaseUnitTest {
     private PullRequestRepository pullRequestRepository;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository issueRepository;
+
+    @Mock
+    private de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+
+    @Mock
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
@@ -88,6 +94,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             agentConfigRepository,
             workspaceRepository,
             pullRequestRepository,
+            issueRepository,
+            connectionService,
             handlerRegistry,
             objectMapper,
             eventPublisher,
@@ -664,6 +672,28 @@ class AgentJobServiceTest extends BaseUnitTest {
                 eq(jobId),
                 eq(DeliveryStatus.FAILED),
                 eq(completedJob.getDeliveryCommentId())
+            );
+        }
+    }
+
+    @Nested
+    class CooldownKeyPrefix {
+
+        @Test
+        void prKeyStripsCommitSha() {
+            // PR key trailing segment is a disposable SHA → cooldown scopes per-PR.
+            assertThat(AgentJobService.extractCooldownKeyPrefix("pr_review:owner/repo:42:abc123")).isEqualTo(
+                "pr_review:owner/repo:42:"
+            );
+        }
+
+        @Test
+        void issueKeyScopesPerIssueNotPerRepo() {
+            // Issue key trailing segment is the disposable updatedAt → prefix keeps the issue NUMBER,
+            // so cooldown is per-issue. A regression that drops the 4th segment would collapse this to
+            // "issue_review:owner/repo:" and block every other issue in the repo.
+            assertThat(AgentJobService.extractCooldownKeyPrefix("issue_review:owner/repo:12:1700000000000")).isEqualTo(
+                "issue_review:owner/repo:12:"
             );
         }
     }

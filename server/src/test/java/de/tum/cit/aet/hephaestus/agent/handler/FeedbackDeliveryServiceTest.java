@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -180,6 +181,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             ws.setId(WORKSPACE_ID);
             ws.getReviewSettings().setDeliverToMerged(true);
             when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment789");
 
             service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of()));
 
@@ -225,14 +227,18 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void doesNotSetDeliveryStatusWhenNoteNull() {
+        void throwsWhenSummaryPostReturnsNoId() {
+            // Integrity failure: a real, non-blank summary body was submitted but the provider
+            // returned no comment id — the contributor sees nothing, so the job must fail loud.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
 
-            var delivery = new DeliveryContent("Empty after sanitization.", List.of());
-            service.deliverFeedback(job, delivery);
+            var delivery = new DeliveryContent("A real, non-blank summary body.", List.of());
 
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
+                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
+            );
             assertThat(job.getDeliveryCommentId()).isNull();
         }
 

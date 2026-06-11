@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -77,6 +79,15 @@ public class Practice {
 
     @Column(name = "category", length = 64)
     private String category;
+
+    /**
+     * The artifact this practice targets (PR vs ISSUE). The discriminator that routes the trigger
+     * gate, the case-context builder, the {@code AgentJobType}/handler, and the delivery surface.
+     * NOT NULL; defaults to {@code PULL_REQUEST} for backward compatibility.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "focus_artifact", nullable = false, length = 32)
+    private FocusArtifact focusArtifact = FocusArtifact.PULL_REQUEST;
 
     /**
      * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns

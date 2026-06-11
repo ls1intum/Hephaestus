@@ -24,7 +24,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -54,7 +53,6 @@ import tools.jackson.databind.JsonNode;
     }
 )
 @Getter
-@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

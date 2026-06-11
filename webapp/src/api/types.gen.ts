@@ -555,6 +555,10 @@ export type UpdatePracticeRequest = {
      */
     criteria?: string;
     /**
+     * Artifact this practice evaluates
+     */
+    focusArtifact?: 'PULL_REQUEST' | 'ISSUE';
+    /**
      * Human-readable name
      */
     name?: string;
@@ -566,6 +570,28 @@ export type UpdatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents?: Array<string>;
+};
+
+/**
+ * Request to update an existing practice goal (PATCH — only non-null fields applied)
+ */
+export type UpdatePracticeGoalRequest = {
+    /**
+     * Whether this goal is active
+     */
+    active?: boolean;
+    /**
+     * What this goal develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace
+     */
+    displayOrder?: number;
+    /**
+     * Human-readable name
+     */
+    name?: string;
 };
 
 /**
@@ -1142,6 +1168,44 @@ export type Profile = {
 };
 
 /**
+ * A practice goal grouping related practices into a learning objective
+ */
+export type PracticeGoal = {
+    /**
+     * Whether this goal is active
+     */
+    active: boolean;
+    /**
+     * Timestamp when the goal was created
+     */
+    createdAt: Date;
+    /**
+     * What this goal develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace
+     */
+    displayOrder: number;
+    /**
+     * Goal ID
+     */
+    id: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
+    /**
+     * Timestamp when the goal was last updated
+     */
+    updatedAt?: Date;
+};
+
+/**
  * Practice finding summary for list views
  */
 export type PracticeFindingList = {
@@ -1180,7 +1244,7 @@ export type PracticeFindingList = {
     /**
      * Target type (e.g. PULL_REQUEST)
      */
-    targetType: 'PULL_REQUEST';
+    targetType: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Finding title
      */
@@ -1244,7 +1308,7 @@ export type PracticeFindingDetail = {
     /**
      * Target type (e.g. PULL_REQUEST)
      */
-    targetType: 'PULL_REQUEST';
+    targetType: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Finding title
      */
@@ -1275,6 +1339,14 @@ export type Practice = {
      * Practice evaluation criteria
      */
     criteria: string;
+    /**
+     * Artifact this practice evaluates
+     */
+    focusArtifact: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Slug of the practice goal this practice is bound to, if any
+     */
+    goalSlug?: string;
     /**
      * Practice ID
      */
@@ -1431,7 +1503,7 @@ export type AgentJob = {
     /**
      * Job type
      */
-    jobType: 'PULL_REQUEST_REVIEW';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW';
     /**
      * Tokens read from prompt cache
      */
@@ -1912,6 +1984,10 @@ export type CreatePracticeRequest = {
      */
     criteria: string;
     /**
+     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
+     */
+    focusArtifact?: 'PULL_REQUEST' | 'ISSUE';
+    /**
      * Human-readable name
      */
     name: string;
@@ -1927,6 +2003,28 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+};
+
+/**
+ * Request to create a new practice goal
+ */
+export type CreatePracticeGoalRequest = {
+    /**
+     * What this goal develops
+     */
+    description?: string;
+    /**
+     * Sort order within the workspace. Defaults to 0 when omitted.
+     */
+    displayOrder?: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
 };
 
 export type CreateLoginProviderRequest = {
@@ -2194,6 +2292,16 @@ export type ChatMessageVote = {
     isUpvoted?: boolean;
     messageId?: string;
     updatedAt?: Date;
+};
+
+/**
+ * Request to bind a practice to a goal, or unbind it when goalSlug is null
+ */
+export type BindPracticeGoalRequest = {
+    /**
+     * Slug of the goal to bind to, or null to unbind
+     */
+    goalSlug?: string;
 };
 
 /**
@@ -4051,6 +4159,147 @@ export type UpdateNotificationsResponses = {
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
 
+export type ListGoalsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Return only active goals
+         */
+        activeOnly?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-goals';
+};
+
+export type ListGoalsResponses = {
+    /**
+     * Goals returned
+     */
+    200: Array<PracticeGoal>;
+};
+
+export type ListGoalsResponse = ListGoalsResponses[keyof ListGoalsResponses];
+
+export type CreateGoalData = {
+    body: CreatePracticeGoalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals';
+};
+
+export type CreateGoalErrors = {
+    /**
+     * Goal slug already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateGoalResponses = {
+    /**
+     * Goal created
+     */
+    201: PracticeGoal;
+};
+
+export type CreateGoalResponse = CreateGoalResponses[keyof CreateGoalResponses];
+
+export type DeleteGoalData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        goalSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+};
+
+export type DeleteGoalErrors = {
+    /**
+     * Goal not found
+     */
+    404: unknown;
+};
+
+export type DeleteGoalResponses = {
+    /**
+     * Goal deleted
+     */
+    204: void;
+};
+
+export type DeleteGoalResponse = DeleteGoalResponses[keyof DeleteGoalResponses];
+
+export type GetGoalData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        goalSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+};
+
+export type GetGoalErrors = {
+    /**
+     * Goal not found
+     */
+    404: unknown;
+};
+
+export type GetGoalResponses = {
+    /**
+     * Goal returned
+     */
+    200: PracticeGoal;
+};
+
+export type GetGoalResponse = GetGoalResponses[keyof GetGoalResponses];
+
+export type UpdateGoalData = {
+    body: UpdatePracticeGoalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        goalSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+};
+
+export type UpdateGoalErrors = {
+    /**
+     * Goal not found
+     */
+    404: unknown;
+};
+
+export type UpdateGoalResponses = {
+    /**
+     * Goal updated
+     */
+    200: PracticeGoal;
+};
+
+export type UpdateGoalResponse = UpdateGoalResponses[keyof UpdateGoalResponses];
+
 export type ListPracticesData = {
     body?: never;
     path: {
@@ -4419,6 +4668,35 @@ export type SetActiveResponses = {
 };
 
 export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
+
+export type BindGoalData = {
+    body: BindPracticeGoalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/goal';
+};
+
+export type BindGoalErrors = {
+    /**
+     * Practice or goal not found
+     */
+    404: unknown;
+};
+
+export type BindGoalResponses = {
+    /**
+     * Binding updated
+     */
+    200: Practice;
+};
+
+export type BindGoalResponse = BindGoalResponses[keyof BindGoalResponses];
 
 export type GetUserProfileData = {
     body?: never;

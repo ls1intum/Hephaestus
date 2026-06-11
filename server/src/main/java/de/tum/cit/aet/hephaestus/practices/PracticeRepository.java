@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +23,12 @@ import org.springframework.transaction.annotation.Transactional;
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
+    /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
+    List<Practice> findByWorkspaceIdAndActiveTrueAndFocusArtifact(Long workspaceId, FocusArtifact focusArtifact);
+
+    // Fetches the bound goal eagerly so PracticeDTO.from (which reads goal.slug) is safe to map
+    // outside the transaction — open-in-view is disabled.
+    @EntityGraph(attributePaths = "goal")
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     /** Practices bound to a goal (the per-goal dashboard aggregation key). */
@@ -34,6 +42,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Lists practices for a workspace with optional category and active filters.
      * Null filter values are ignored (match all).
      */
+    @EntityGraph(attributePaths = "goal")
     @Query(
         """
         SELECT p FROM Practice p

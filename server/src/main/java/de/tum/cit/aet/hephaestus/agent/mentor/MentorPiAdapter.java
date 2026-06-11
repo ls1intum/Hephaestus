@@ -59,7 +59,14 @@ public class MentorPiAdapter {
             extraInputs.put(SESSIONS_DIR_PREFIX + sessionRestore.threadId() + ".jsonl", sessionRestore.bytes());
         }
 
-        String baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
+        // Honor the bound mentor config's base URL first (per-workspace LLM gateway, e.g. a TUM GPU
+        // endpoint that activates the hephaestus provider); fall back to the global mentor property.
+        String baseUrl;
+        if (llmConfig.llmBaseUrl() != null && !llmConfig.llmBaseUrl().isBlank()) {
+            baseUrl = llmConfig.llmBaseUrl();
+        } else {
+            baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
+        }
 
         PiPlanSpec planSpec = new PiPlanSpec(
             llmConfig.llmProvider(),

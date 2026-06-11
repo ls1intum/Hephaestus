@@ -14,4 +14,6 @@ package de.tum.cit.aet.hephaestus.practices.model;
 public enum PracticeFindingTargetType {
     /** Target is a pull request. */
     PULL_REQUEST,
+    /** Target is an issue. */
+    ISSUE,
 }

@@ -257,4 +257,46 @@
         <rollback><dropIndex indexName="idx_practice_practice_goal" tableName="practice"/></rollback>
     </changeSet>
 
+    <!--
+        Issues as first-class detection targets (not just PRs). focus_artifact is the discriminator that
+        routes a practice to the PR vs ISSUE pipeline (trigger gate → context builder → handler →
+        delivery). Defaults to PULL_REQUEST so every existing practice keeps its behavior. The
+        practice_finding target_type CHECK is widened to admit ISSUE findings.
+    -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-13">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.focus_artifact already present">
+            <not><columnExists tableName="practice" columnName="focus_artifact"/></not>
+        </preConditions>
+        <comment>Artifact discriminator on practice (PULL_REQUEST | ISSUE); defaults to PULL_REQUEST.</comment>
+        <addColumn tableName="practice">
+            <column name="focus_artifact" type="VARCHAR(32)" defaultValue="PULL_REQUEST">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="focus_artifact"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-14">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding target_type CHECK already admits ISSUE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_practice_finding_target_type'
+                AND pg_get_constraintdef(oid) LIKE '%ISSUE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Widen the practice_finding target_type CHECK to admit ISSUE findings.</comment>
+        <sql>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_target_type;
+            ALTER TABLE practice_finding
+            ADD CONSTRAINT chk_practice_finding_target_type
+            CHECK (target_type IN ('PULL_REQUEST', 'ISSUE'));
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_target_type;
+            ALTER TABLE practice_finding
+            ADD CONSTRAINT chk_practice_finding_target_type
+            CHECK (target_type IN ('PULL_REQUEST'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

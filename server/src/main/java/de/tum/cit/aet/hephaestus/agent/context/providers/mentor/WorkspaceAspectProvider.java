@@ -20,11 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -44,6 +45,8 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 @RequiredArgsConstructor
 public class WorkspaceAspectProvider implements ContentProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceAspectProvider.class);
 
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "workspace.json";
@@ -104,14 +107,58 @@ public class WorkspaceAspectProvider implements ContentProvider {
         workspaceNode.put("slug", workspace.getWorkspaceSlug());
         workspaceNode.put("displayName", workspace.getDisplayName());
 
-        addRecentSessions(root, workspaceId, contributorId);
-        List<PullRequest> reviewPrs = queryRepository.findPendingReviewRequestPrs(workspaceId, contributorId);
-        List<Issue> assigned = queryRepository.findAssignedOpenIssues(workspaceId, contributorId);
-        addAssignedIssues(root, assigned);
-        addPendingReviewRequests(root, reviewPrs);
-        addFocusSuggestions(root, assigned, reviewPrs);
+        // Each sub-aspect is independent and best-effort: one failing query must degrade only its own
+        // section, not blank the entire workspace aspect (which previously stripped ALL project-state
+        // context from every mentor turn). The real cause is logged here instead of being swallowed by
+        // the cache loader's generic "could not be loaded" wrapper.
+        guarded(
+            "recentSessions",
+            () -> addRecentSessions(root, workspaceId, contributorId),
+            () -> root.putArray("recentSessions")
+        );
+        List<PullRequest> reviewPrs = guardedQuery("pendingReviewRequests", () ->
+            queryRepository.findPendingReviewRequestPrs(workspaceId, contributorId)
+        );
+        List<Issue> assigned = guardedQuery("assignedIssues", () ->
+            queryRepository.findAssignedOpenIssues(workspaceId, contributorId)
+        );
+        guarded("assignedIssues", () -> addAssignedIssues(root, assigned), () -> root.putArray("assignedIssues"));
+        guarded(
+            "pendingReviewRequests",
+            () -> addPendingReviewRequests(root, reviewPrs),
+            () -> root.putArray("pendingReviewRequests")
+        );
+        guarded(
+            "focusSuggestions",
+            () -> addFocusSuggestions(root, assigned, reviewPrs),
+            () -> root.putArray("focusSuggestions")
+        );
 
         return root;
+    }
+
+    /** Run a best-effort aspect step; on failure log the real cause and apply the empty-fallback. */
+    private void guarded(String aspect, Runnable step, Runnable fallback) {
+        try {
+            step.run();
+        } catch (RuntimeException e) {
+            log.warn("Mentor workspace sub-aspect '{}' failed, degrading to empty: {}", aspect, e.toString(), e);
+            try {
+                fallback.run();
+            } catch (RuntimeException ignored) {
+                // fallback is a pure putArray; nothing further to do
+            }
+        }
+    }
+
+    /** Best-effort query; on failure log the real cause and return an empty list. */
+    private <T> List<T> guardedQuery(String aspect, java.util.function.Supplier<List<T>> query) {
+        try {
+            return query.get();
+        } catch (RuntimeException e) {
+            log.warn("Mentor workspace query '{}' failed, degrading to empty: {}", aspect, e.toString(), e);
+            return List.of();
+        }
     }
 
     private void addRecentSessions(ObjectNode root, Long workspaceId, Long contributorId) {

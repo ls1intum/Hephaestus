@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfig;
 import de.tum.cit.aet.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.handler.IssueReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
@@ -14,6 +15,8 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -47,6 +50,8 @@ public class AgentJobService {
     private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceRepository workspaceRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final IssueRepository issueRepository;
+    private final de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -60,6 +65,8 @@ public class AgentJobService {
         AgentConfigRepository agentConfigRepository,
         WorkspaceRepository workspaceRepository,
         PullRequestRepository pullRequestRepository,
+        IssueRepository issueRepository,
+        de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
@@ -72,6 +79,8 @@ public class AgentJobService {
         this.agentConfigRepository = agentConfigRepository;
         this.workspaceRepository = workspaceRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.issueRepository = issueRepository;
+        this.connectionService = connectionService;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
@@ -134,6 +143,35 @@ public class AgentJobService {
         log.info("Dev trigger: submitting review for PR {} ({})", prId, pr.getHtmlUrl());
 
         Optional<AgentJob> job = submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
+        return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
+    }
+
+    /**
+     * Dev/manual trigger: submit an issue-detection review for a single issue. Mirrors
+     * {@link #submitReviewForPullRequest} on the issue artifact.
+     */
+    public String submitDetectionForIssue(Long workspaceId, Long issueId) {
+        Issue issue = issueRepository.findByIdWithRepository(issueId).orElse(null);
+        if (issue == null) {
+            return "Issue not found: " + issueId;
+        }
+        if (issue.getRepository() == null) {
+            return "Issue missing repository: issueId=" + issueId;
+        }
+        IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
+            issue.getId(),
+            issue.getNumber(),
+            issue.getRepository().getId(),
+            issue.getRepository().getNameWithOwner(),
+            issue.getTitle(),
+            issue.getBody() != null ? issue.getBody() : "",
+            issue.getState() != null ? issue.getState().name() : "OPEN",
+            issue.getUpdatedAt()
+        );
+
+        log.info("Dev trigger: submitting issue detection for issue {} ({})", issueId, issue.getHtmlUrl());
+
+        Optional<AgentJob> job = submit(workspaceId, AgentJobType.ISSUE_REVIEW, request);
         return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
     }
 
@@ -267,6 +305,22 @@ public class AgentJobService {
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(configScopedKey);
             job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
+            // The SCM kind drives delivery (which channel posts the comment/diff notes). Resolve it
+            // from the workspace's active connection so EVERY path (events + dev-trigger) sets it —
+            // a null integrationKind made the comment poster NPE and silently drop delivery. We log
+            // loudly when it can't be resolved: the job will still run (LLM cost) but delivery will
+            // fail at the poster, so surfacing it here makes the misconfiguration diagnosable up front.
+            var resolvedKind = connectionService.findActiveProviderKind(workspace.getId());
+            if (resolvedKind.isPresent()) {
+                job.setIntegrationKind(resolvedKind.get());
+            } else {
+                log.warn(
+                    "No active SCM connection for workspace {} — agent job will run but feedback delivery " +
+                        "will fail (no integrationKind). Configure a provider connection to enable delivery. jobType={}",
+                    workspace.getId(),
+                    jobType
+                );
+            }
 
             // Copy LLM API key — needed for all credential modes:
             // PROXY mode: proxy controller reads it to forward to upstream provider

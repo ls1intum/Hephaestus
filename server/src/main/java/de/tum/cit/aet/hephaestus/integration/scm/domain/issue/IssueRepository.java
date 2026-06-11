@@ -44,6 +44,10 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Optional<Issue> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
 
+    /** Fetches an issue with its repository eagerly — used to build an issue-detection job submission. */
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
+    Optional<Issue> findByIdWithRepository(@Param("id") long id);
+
     /**
      * Finds all issues belonging to a repository.
      *

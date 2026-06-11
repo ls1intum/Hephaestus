@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -39,6 +41,7 @@ public class PracticeDetectionDeliveryService {
     private final PracticeRepository practiceRepository;
     private final PracticeFindingRepository practiceFindingRepository;
     private final PullRequestRepository pullRequestRepository;
+    private final IssueRepository issueRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
 
@@ -46,15 +49,20 @@ public class PracticeDetectionDeliveryService {
         PracticeRepository practiceRepository,
         PracticeFindingRepository practiceFindingRepository,
         PullRequestRepository pullRequestRepository,
+        IssueRepository issueRepository,
         ApplicationEventPublisher eventPublisher,
         ObjectMapper objectMapper
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceFindingRepository = practiceFindingRepository;
         this.pullRequestRepository = pullRequestRepository;
+        this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
     }
+
+    /** Resolved delivery target: who the finding is about + the typed (kind, id) reference. */
+    private record Target(PracticeFindingTargetType type, Long id, Long contributorId) {}
 
     /**
      * Persist validated findings and publish completion event.
@@ -69,10 +77,9 @@ public class PracticeDetectionDeliveryService {
         // Extract IDs from job metadata
         Long workspaceId = job.getWorkspace().getId(); // Safe: Hibernate proxy returns FK without init
         JsonNode metadata = job.getMetadata();
-        if (metadata == null || !metadata.has("pull_request_id")) {
-            throw new JobDeliveryException("Missing pull_request_id in job metadata: jobId=" + job.getId());
+        if (metadata == null) {
+            throw new JobDeliveryException("Missing job metadata: jobId=" + job.getId());
         }
-        Long pullRequestId = metadata.get("pull_request_id").asLong();
 
         // Load practice catalog for this workspace
         Map<String, Practice> practicesBySlug = practiceRepository
@@ -89,22 +96,11 @@ public class PracticeDetectionDeliveryService {
             return new DeliveryResult(0, validFindings.size(), 0, false);
         }
 
-        // Resolve target PR and author
-        PullRequest pullRequest = pullRequestRepository
-            .findByIdWithAuthor(pullRequestId)
-            .orElseThrow(() ->
-                new JobDeliveryException(
-                    "Pull request not found: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
-                )
-            );
-        if (pullRequest.getAuthor() == null) {
-            throw new JobDeliveryException(
-                "Pull request has no author: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
-            );
-        }
-        Long contributorId = pullRequest.getAuthor().getId();
-        PracticeFindingTargetType targetType = PracticeFindingTargetType.PULL_REQUEST;
-        Long targetId = pullRequestId;
+        // Resolve the typed target + the contributor the finding is about, routing on the artifact.
+        Target target = resolveTarget(job, metadata);
+        Long contributorId = target.contributorId();
+        PracticeFindingTargetType targetType = target.type();
+        Long targetId = target.id();
 
         // Persist findings
         int inserted = 0;
@@ -198,6 +194,48 @@ public class PracticeDetectionDeliveryService {
         );
 
         return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative);
+    }
+
+    /**
+     * Route the delivery target on the job's artifact. Issue jobs carry {@code target_type=ISSUE} +
+     * {@code issue_id}; PR jobs carry {@code pull_request_id} (no {@code target_type} → defaults to PR,
+     * keeping existing PR jobs and replays working).
+     */
+    private Target resolveTarget(AgentJob job, JsonNode metadata) {
+        String targetType = metadata.has("target_type") ? metadata.get("target_type").asString() : "PULL_REQUEST";
+        if (PracticeFindingTargetType.ISSUE.name().equals(targetType)) {
+            if (!metadata.has("issue_id")) {
+                throw new JobDeliveryException("Missing issue_id in job metadata: jobId=" + job.getId());
+            }
+            Long issueId = metadata.get("issue_id").asLong();
+            // TYPE(i)=Issue finder: never resolve a PullRequest under an ISSUE target_type (shared table/id space).
+            Issue issue = issueRepository
+                .findByIdWithRepository(issueId)
+                .orElseThrow(() ->
+                    new JobDeliveryException("Issue not found: issueId=" + issueId + ", jobId=" + job.getId())
+                );
+            if (issue.getAuthor() == null) {
+                throw new JobDeliveryException("Issue has no author: issueId=" + issueId + ", jobId=" + job.getId());
+            }
+            return new Target(PracticeFindingTargetType.ISSUE, issueId, issue.getAuthor().getId());
+        }
+        if (!metadata.has("pull_request_id")) {
+            throw new JobDeliveryException("Missing pull_request_id in job metadata: jobId=" + job.getId());
+        }
+        Long pullRequestId = metadata.get("pull_request_id").asLong();
+        PullRequest pullRequest = pullRequestRepository
+            .findByIdWithAuthor(pullRequestId)
+            .orElseThrow(() ->
+                new JobDeliveryException(
+                    "Pull request not found: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
+                )
+            );
+        if (pullRequest.getAuthor() == null) {
+            throw new JobDeliveryException(
+                "Pull request has no author: pullRequestId=" + pullRequestId + ", jobId=" + job.getId()
+            );
+        }
+        return new Target(PracticeFindingTargetType.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
     }
 
     public record DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {}

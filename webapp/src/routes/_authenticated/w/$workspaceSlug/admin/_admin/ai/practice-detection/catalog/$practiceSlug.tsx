@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+	bindGoalMutation,
 	getPracticeOptions,
+	getPracticeQueryKey,
+	listGoalsOptions,
 	listPracticesQueryKey,
 	updatePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -31,33 +34,52 @@ function EditPracticeContainer() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	const updatePractice = useMutation({
-		...updatePracticeMutation(),
-		onSuccess: () => {
+	const goalsQuery = useQuery({
+		...listGoalsOptions({
+			path: { workspaceSlug: workspaceSlug ?? "" },
+			query: { activeOnly: true },
+		}),
+		enabled: Boolean(workspaceSlug),
+	});
+
+	const updatePractice = useMutation(updatePracticeMutation());
+	const bindGoal = useMutation(bindGoalMutation());
+
+	const handleSubmit = async (
+		slug: string,
+		data: UpdatePracticeRequest,
+		goalSlug: string | null,
+	) => {
+		if (!workspaceSlug) return;
+		try {
+			await updatePractice.mutateAsync({ path: { workspaceSlug, practiceSlug: slug }, body: data });
+			// Only re-bind when the selection actually changed (binding is a distinct endpoint).
+			if ((practice?.goalSlug ?? null) !== goalSlug) {
+				await bindGoal.mutateAsync({
+					path: { workspaceSlug, practiceSlug: slug },
+					body: { goalSlug: goalSlug ?? undefined },
+				});
+			}
 			queryClient.invalidateQueries({
-				queryKey: listPracticesQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
+			});
+			queryClient.invalidateQueries({
+				queryKey: getPracticeQueryKey({ path: { workspaceSlug, practiceSlug: slug } }),
 			});
 			toast.success("Practice updated successfully");
 			navigate({ to: ".." });
-		},
-		onError: () => {
+		} catch {
 			toast.error("Failed to update practice");
-		},
-	});
-
-	const handleSubmit = (slug: string, data: UpdatePracticeRequest) => {
-		if (!workspaceSlug) return;
-		updatePractice.mutate({
-			path: { workspaceSlug, practiceSlug: slug },
-			body: data,
-		});
+		}
 	};
 
 	const handleCancel = () => {
 		navigate({ to: ".." });
 	};
 
-	if (isLoading || !practice) {
+	// Wait for goals too: the goal <Select> resolves its display label from the matching option, so
+	// the options must exist before the bound value is set (otherwise it falls back to the raw slug).
+	if (isLoading || !practice || !goalsQuery.data) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<Spinner className="h-8 w-8" />
@@ -69,9 +91,10 @@ function EditPracticeContainer() {
 		<PracticeForm
 			mode="edit"
 			initialData={practice}
+			goals={goalsQuery.data}
 			onSubmit={handleSubmit}
 			onCancel={handleCancel}
-			isPending={updatePractice.isPending}
+			isPending={updatePractice.isPending || bindGoal.isPending}
 		/>
 	);
 }

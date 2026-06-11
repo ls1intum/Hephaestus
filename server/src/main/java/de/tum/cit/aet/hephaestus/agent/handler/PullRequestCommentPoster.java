@@ -14,7 +14,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -198,10 +197,15 @@ class PullRequestCommentPoster {
     @Nullable
     String postFormattedBody(AgentJob job, String formattedBody) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = Objects.requireNonNull(
-            job.getIntegrationKind(),
-            "AgentJob.integrationKind must not be null"
-        );
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            // Integrity failure, not a cosmetic one: the agent ran (LLM cost incurred) but the job
+            // was never given a provider to deliver against. Fail LOUD so the executor marks the job
+            // FAILED instead of silently reporting "DELIVERED" with nothing posted.
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
         FeedbackChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {

@@ -85,23 +85,51 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
+    PracticeCatalogInjector practiceCatalogInjector(PracticeRepository practiceRepository) {
+        return new PracticeCatalogInjector(objectMapper, practiceRepository);
+    }
+
+    @Bean
+    SecretDiffScanner secretDiffScanner() {
+        return new SecretDiffScanner();
+    }
+
+    @Bean
     public JobTypeHandler pullRequestReviewHandler(
-        PracticeRepository practiceRepository,
+        PracticeCatalogInjector practiceCatalogInjector,
         GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService
+        FeedbackDeliveryService feedbackService,
+        SecretDiffScanner secretDiffScanner
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
-            practiceRepository,
+            practiceCatalogInjector,
             workspaceContextBuilder,
             taskEnvelopeWriter,
             gitDiffOperations,
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            secretDiffScanner
+        );
+    }
+
+    @Bean
+    public JobTypeHandler issueReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService
+    ) {
+        return new IssueReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            practiceCatalogInjector,
+            resultParser,
+            deliveryService
         );
     }
 
