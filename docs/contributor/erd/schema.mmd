@@ -276,42 +276,6 @@ erDiagram
         BIGINT label_id PK,FK
     }
 
-    FeedbackDelivery {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
-        VARCHAR(32) channel "NOT NULL"
-        BIGINT recipient_id FK "NOT NULL"
-        TEXT rendered_body "NOT NULL"
-        VARCHAR(64) composer_version
-        VARCHAR(255) external_ref
-        UUID supersedes_id FK
-        VARCHAR(255) idempotency_key UK "NOT NULL"
-        TIMESTAMPTZ delivered_at
-        TIMESTAMPTZ created_at "NOT NULL"
-    }
-
-    FeedbackDeliveryFinding {
-        UUID id PK
-        UUID delivery_id FK,UK "NOT NULL"
-        UUID finding_id FK,UK "NOT NULL"
-        VARCHAR(16) display_role "NOT NULL"
-        INTEGER ordinal "NOT NULL"
-    }
-
-    FeedbackInteraction {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
-        BIGINT actor_id FK "NOT NULL"
-        VARCHAR(32) channel "NOT NULL"
-        VARCHAR(24) verb "NOT NULL"
-        VARCHAR(24) target_type "NOT NULL"
-        UUID finding_id FK
-        UUID delivery_id FK
-        VARCHAR(64) target_ref
-        JSONB metadata
-        TIMESTAMPTZ occurred_at "NOT NULL"
-    }
-
     FeedbackPost {
         BIGINT id PK
         BIGINT connection_id FK,UK "NOT NULL"
@@ -588,6 +552,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         TEXT precompute_script
         BIGINT practice_goal_id FK
+        VARCHAR(32) focus_artifact "NOT NULL"
     }
 
     PracticeFinding {
@@ -987,8 +952,6 @@ erDiagram
     GitProvider ||--|| Discussion : references
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
-    FeedbackDelivery ||--|| FeedbackDeliveryFinding : has
-    PracticeFinding ||--|| FeedbackDeliveryFinding : has
     Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
@@ -1045,13 +1008,6 @@ erDiagram
     Discussion ||--o{ DiscussionComment : commented_on
     User ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    Workspace ||--o{ FeedbackDelivery : has
-    User ||--o{ FeedbackDelivery : references
-    FeedbackDelivery ||--o{ FeedbackDelivery : references
-    Workspace ||--o{ FeedbackInteraction : has
-    User ||--o{ FeedbackInteraction : references
-    PracticeFinding ||--o{ FeedbackInteraction : references
-    FeedbackDelivery ||--o{ FeedbackInteraction : references
     PracticeFinding ||--o{ FindingReaction : has
     User ||--o{ FindingReaction : references
     User ||--o{ GitCommit : authored_by

@@ -115,12 +115,8 @@
     </changeSet>
 
     <!--
-        Feedback model (two-phase: detection→findings, composition→feedback; reception is separate).
-        (1) Rename the mis-named reception table finding_feedback → finding_reaction (it records a
-        contributor's verdict on a finding, not feedback we sent). (2) feedback_delivery: immutable
-        snapshot of a composed message PUSHED to a channel (PR now), with the M:N join
-        feedback_delivery_finding. (3) feedback_interaction: append-only engagement log (xAPI/Caliper
-        actor-verb-object) for all channels. Column types mirror Hibernate ddl-auto (db:draft-changelog).
+        Rename the mis-named reception table finding_feedback → finding_reaction (it records a
+        contributor's verdict on a finding, not feedback we sent), and its constraints/indexes.
     -->
 
     <changeSet author="hephaestus-feedback" id="1781092589259-7">
@@ -158,95 +154,6 @@
     </changeSet>
 
     <changeSet author="hephaestus-feedback" id="1781092589259-9">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_delivery already present">
-            <not><tableExists tableName="feedback_delivery"/></not>
-        </preConditions>
-        <comment>Immutable push-feedback delivery ledger: the as-shown snapshot of what we sent.</comment>
-        <createTable tableName="feedback_delivery">
-            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="feedback_deliveryPK"/></column>
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="channel" type="VARCHAR(32)"><constraints nullable="false"/></column>
-            <column name="recipient_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="rendered_body" type="TEXT"><constraints nullable="false"/></column>
-            <column name="composer_version" type="VARCHAR(64)"/>
-            <column name="external_ref" type="VARCHAR(255)"/>
-            <column name="supersedes_id" type="UUID"/>
-            <column name="idempotency_key" type="VARCHAR(255)"><constraints nullable="false"/></column>
-            <column name="delivered_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
-            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
-        </createTable>
-        <addUniqueConstraint tableName="feedback_delivery" columnNames="idempotency_key" constraintName="uk_feedback_delivery_idempotency"/>
-        <createIndex indexName="idx_feedback_delivery_recipient_delivered" tableName="feedback_delivery">
-            <column name="recipient_id"/><column name="delivered_at" descending="true"/>
-        </createIndex>
-        <createIndex indexName="idx_feedback_delivery_workspace_channel" tableName="feedback_delivery">
-            <column name="workspace_id"/><column name="channel"/>
-        </createIndex>
-        <addForeignKeyConstraint baseTableName="feedback_delivery" baseColumnNames="workspace_id"
-            constraintName="fk_feedback_delivery_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_delivery" baseColumnNames="recipient_id"
-            constraintName="fk_feedback_delivery_recipient" referencedTableName="user" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_delivery" baseColumnNames="supersedes_id"
-            constraintName="fk_feedback_delivery_supersedes" referencedTableName="feedback_delivery" referencedColumnNames="id" validate="true"/>
-        <rollback><dropTable tableName="feedback_delivery"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-feedback" id="1781092589259-10">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_delivery_finding already present">
-            <not><tableExists tableName="feedback_delivery_finding"/></not>
-        </preConditions>
-        <comment>M:N join: which findings a delivery bundled + how each was shown (inline/summary/overview).</comment>
-        <createTable tableName="feedback_delivery_finding">
-            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="feedback_delivery_findingPK"/></column>
-            <column name="delivery_id" type="UUID"><constraints nullable="false"/></column>
-            <column name="finding_id" type="UUID"><constraints nullable="false"/></column>
-            <column name="display_role" type="VARCHAR(16)"><constraints nullable="false"/></column>
-            <column name="ordinal" type="INTEGER"><constraints nullable="false"/></column>
-        </createTable>
-        <addUniqueConstraint tableName="feedback_delivery_finding" columnNames="delivery_id, finding_id" constraintName="uk_feedback_delivery_finding"/>
-        <addForeignKeyConstraint baseTableName="feedback_delivery_finding" baseColumnNames="delivery_id"
-            constraintName="fk_feedback_delivery_finding_delivery" referencedTableName="feedback_delivery" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_delivery_finding" baseColumnNames="finding_id"
-            constraintName="fk_feedback_delivery_finding_finding" referencedTableName="practice_finding" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
-        <rollback><dropTable tableName="feedback_delivery_finding"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-feedback" id="1781092589259-11">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_interaction already present">
-            <not><tableExists tableName="feedback_interaction"/></not>
-        </preConditions>
-        <comment>Append-only engagement log (xAPI/Caliper actor-verb-object) for all channels.</comment>
-        <createTable tableName="feedback_interaction">
-            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="feedback_interactionPK"/></column>
-            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="actor_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="channel" type="VARCHAR(32)"><constraints nullable="false"/></column>
-            <column name="verb" type="VARCHAR(24)"><constraints nullable="false"/></column>
-            <column name="target_type" type="VARCHAR(24)"><constraints nullable="false"/></column>
-            <column name="finding_id" type="UUID"/>
-            <column name="delivery_id" type="UUID"/>
-            <column name="target_ref" type="VARCHAR(64)"/>
-            <column name="metadata" type="JSONB"/>
-            <column name="occurred_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
-        </createTable>
-        <createIndex indexName="idx_feedback_interaction_actor_occurred" tableName="feedback_interaction">
-            <column name="actor_id"/><column name="occurred_at" descending="true"/>
-        </createIndex>
-        <createIndex indexName="idx_feedback_interaction_workspace_channel" tableName="feedback_interaction">
-            <column name="workspace_id"/><column name="channel"/>
-        </createIndex>
-        <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="workspace_id"
-            constraintName="fk_feedback_interaction_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="actor_id"
-            constraintName="fk_feedback_interaction_actor" referencedTableName="user" referencedColumnNames="id" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="finding_id"
-            constraintName="fk_feedback_interaction_finding" referencedTableName="practice_finding" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
-        <addForeignKeyConstraint baseTableName="feedback_interaction" baseColumnNames="delivery_id"
-            constraintName="fk_feedback_interaction_delivery" referencedTableName="feedback_delivery" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
-        <rollback><dropTable tableName="feedback_interaction"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-feedback" id="1781092589259-12">
         <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_practice_goal already present">
             <not><indexExists indexName="idx_practice_practice_goal"/></not>
         </preConditions>
@@ -263,7 +170,7 @@
         delivery). Defaults to PULL_REQUEST so every existing practice keeps its behavior. The
         practice_finding target_type CHECK is widened to admit ISSUE findings.
     -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-13">
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-10">
         <preConditions onFail="MARK_RAN" onFailMessage="practice.focus_artifact already present">
             <not><columnExists tableName="practice" columnName="focus_artifact"/></not>
         </preConditions>
@@ -276,7 +183,7 @@
         <rollback><dropColumn tableName="practice" columnName="focus_artifact"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-14">
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-11">
         <preConditions onFail="MARK_RAN" onFailMessage="practice_finding target_type CHECK already admits ISSUE">
             <sqlCheck expectedResult="0">
                 SELECT count(*) FROM pg_constraint
@@ -296,6 +203,23 @@
             ALTER TABLE practice_finding
             ADD CONSTRAINT chk_practice_finding_target_type
             CHECK (target_type IN ('PULL_REQUEST'));
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-12">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding confidence CHECK already present">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint WHERE conname = 'chk_practice_finding_confidence'
+            </sqlCheck>
+        </preConditions>
+        <comment>Bound confidence to its advertised [0,1] range so a native insert / agent bug cannot store an out-of-range value.</comment>
+        <sql>
+            ALTER TABLE practice_finding
+            ADD CONSTRAINT chk_practice_finding_confidence
+            CHECK (confidence &gt;= 0 AND confidence &lt;= 1);
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_confidence;
         </rollback>
     </changeSet>
 
