@@ -25,6 +25,19 @@ public interface FeedbackChannel {
      */
     String formatPullRequestSubjectId(String repoFullName, int prNumber);
 
+    /**
+     * Format the vendor's external identifier for an issue. Both GitHub and GitLab address issues as
+     * {@code repoFullName#issueNumber}; the GitLab channel routes a {@code #}-suffixed subject to the
+     * issue note path (vs {@code !} for a merge request). Default mirrors that convention; a vendor with
+     * a different scheme overrides.
+     */
+    default String formatIssueSubjectId(String repoFullName, int issueNumber) {
+        if (repoFullName == null || repoFullName.isBlank()) {
+            throw new IllegalArgumentException("repoFullName is required");
+        }
+        return repoFullName + "#" + issueNumber;
+    }
+
     /** Hephaestus's typed reference to the subject the feedback attaches to. */
     record FeedbackTarget(IntegrationRef ref, String subjectExternalId, String resourceUrl) {}
 

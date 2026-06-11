@@ -124,6 +124,32 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
             .hasMessageContaining("createNote failed");
     }
 
+    @Test
+    void postSummaryRoutesIssueSubjectToIssueGid() {
+        // An issue subject ("path#iid") resolves the issue gid (not the MR path) and posts via createNote.
+        FeedbackTarget issueTarget = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
+            "group/project#7",
+            null
+        );
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(mrResolver.resolveIssueGid(1L, "group/project", 7)).thenReturn("gid://gitlab/Issue/7");
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = mockGitlabResponse("gid://gitlab/Note/555");
+        when(spec.execute()).thenReturn(Mono.just(response));
+
+        SummaryHandle handle = channel.postSummary(issueTarget, new FeedbackContent("hi", "marker"));
+
+        assertThat(handle.externalId()).isEqualTo("gid://gitlab/Note/555");
+        verify(mrResolver).resolveIssueGid(1L, "group/project", 7);
+        verify(spec).variable(eq("noteableId"), eq("gid://gitlab/Issue/7"));
+    }
+
     private static FeedbackTarget gitlabTarget() {
         return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
     }

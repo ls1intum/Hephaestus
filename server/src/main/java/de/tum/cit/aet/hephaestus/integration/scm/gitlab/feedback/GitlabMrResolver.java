@@ -91,6 +91,60 @@ class GitlabMrResolver {
         return new MrCoordinates(projectPath, iid);
     }
 
+    /**
+     * Resolves an issue's GraphQL global gid ({@code GetIssueGlobalId}). GitLab's {@code createNote}
+     * mutation takes any {@code NoteableID}, so the same note-posting path serves issues once the gid
+     * is resolved — only this lookup differs from the MR path.
+     */
+    String resolveIssueGid(long scopeId, String projectPath, int issueIid) {
+        ClientGraphQlResponse response = gitLabProvider
+            .forScope(scopeId)
+            .documentName("GetIssueGlobalId")
+            .variable("fullPath", projectPath)
+            .variable("iid", String.valueOf(issueIid))
+            .execute()
+            .block(GRAPHQL_TIMEOUT);
+
+        if (response == null) {
+            throw new FeedbackDeliveryException("Null response resolving issue gid: " + projectPath + "#" + issueIid);
+        }
+        String gid = response.field("project.issue.id").getValue();
+        if (gid == null) {
+            List<?> errors = response.getErrors();
+            throw new FeedbackDeliveryException(
+                "Issue not found via GraphQL: " +
+                    projectPath +
+                    "#" +
+                    issueIid +
+                    (errors.isEmpty() ? "" : ", errors=" + errors)
+            );
+        }
+        return gid;
+    }
+
+    /** Splits {@code "project/full/path#42"} (GitLab issue external-id convention) into path + iid. */
+    static MrCoordinates parseIssueSubjectExternalId(String subjectExternalId) {
+        if (subjectExternalId == null || subjectExternalId.isBlank()) {
+            throw new FeedbackDeliveryException("subjectExternalId is required for GitLab issue feedback");
+        }
+        int hashIdx = subjectExternalId.lastIndexOf('#');
+        if (hashIdx <= 0 || hashIdx == subjectExternalId.length() - 1) {
+            throw new FeedbackDeliveryException(
+                "Invalid GitLab issue subjectExternalId (expected project/path#iid): " + subjectExternalId
+            );
+        }
+        try {
+            return new MrCoordinates(
+                subjectExternalId.substring(0, hashIdx),
+                Integer.parseInt(subjectExternalId.substring(hashIdx + 1))
+            );
+        } catch (NumberFormatException e) {
+            throw new FeedbackDeliveryException(
+                "Invalid GitLab issue subjectExternalId — iid must be integer: " + subjectExternalId
+            );
+        }
+    }
+
     record MrInfo(String globalId, @Nullable String baseSha, @Nullable String headSha, @Nullable String startSha) {}
 
     record MrCoordinates(String projectPath, int iid) {}

@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.practices.model.FocusArtifact;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -42,6 +43,7 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final PracticeCatalogInjector practiceCatalogInjector;
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
+    private final PullRequestCommentPoster commentPoster;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -49,7 +51,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         TaskEnvelopeWriter taskEnvelopeWriter,
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
-        PracticeDetectionDeliveryService deliveryService
+        PracticeDetectionDeliveryService deliveryService,
+        PullRequestCommentPoster commentPoster
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -57,6 +60,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.practiceCatalogInjector = practiceCatalogInjector;
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
+        this.commentPoster = commentPoster;
     }
 
     @Override
@@ -164,10 +168,38 @@ public class IssueReviewHandler implements JobTypeHandler {
             parsed.validFindings(),
             FocusArtifact.ISSUE
         );
-        if (delivery != null && delivery.mrNote() != null) {
-            // Issue-comment posting is a follow-up (FeedbackDeliveryService is PR-coupled). Log the
-            // composed student-facing feedback so it is inspectable.
-            log.info("Issue feedback composed (not yet posted): jobId={}, note=\n{}", job.getId(), delivery.mrNote());
+        postIssueNote(job, delivery);
+    }
+
+    /**
+     * Posts the composed student-facing note as a comment on the GitLab issue. Best-effort: a posting
+     * failure is logged, not thrown, so a transient delivery error never marks an otherwise-successful
+     * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
+     * already persisted above, so the formative loop is intact even if the comment does not land.
+     */
+    private void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+        if (delivery == null || delivery.mrNote() == null) {
+            return;
+        }
+        JsonNode metadata = job.getMetadata();
+        if (metadata != null && "closed".equalsIgnoreCase(metadata.path("state").asString(""))) {
+            log.info("Issue delivery suppressed: issue closed, jobId={}", job.getId());
+            return;
+        }
+        String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
+        if (sanitized.isBlank()) {
+            log.debug("Issue note empty after sanitization, skipping post: jobId={}", job.getId());
+            return;
+        }
+        try {
+            String formatted = FeedbackDeliveryService.formatPracticeNote(sanitized, job);
+            String commentId = commentPoster.postIssueFormattedBody(job, formatted);
+            if (commentId != null) {
+                job.setDeliveryCommentId(commentId);
+                log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
     }
 

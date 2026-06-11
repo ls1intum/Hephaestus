@@ -30,6 +30,9 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     @Mock
     private PracticeDetectionDeliveryService deliveryService;
 
+    @Mock
+    private PullRequestCommentPoster commentPoster;
+
     private IssueReviewHandler handler;
 
     @BeforeEach
@@ -40,7 +43,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new TaskEnvelopeWriter(objectMapper),
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             new PracticeDetectionResultParser(objectMapper),
-            deliveryService
+            deliveryService,
+            commentPoster
         );
     }
 

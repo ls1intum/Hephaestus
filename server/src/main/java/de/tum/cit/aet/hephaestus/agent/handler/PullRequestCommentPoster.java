@@ -225,6 +225,54 @@ class PullRequestCommentPoster {
         }
     }
 
+    /**
+     * Posts an already-formatted body as a comment on the job's ISSUE (vs the MR path above). Reuses the
+     * same {@link FeedbackChannel#postSummary} call — only the subject is an issue ({@code path#iid})
+     * rather than a merge request. Returns the external comment id, or throws {@link JobDeliveryException}
+     * on an integrity failure (no channel / no id) so an undelivered issue review is not reported as
+     * "DELIVERED".
+     */
+    @Nullable
+    String postIssueFormattedBody(AgentJob job, String formattedBody) {
+        long workspaceId = job.getWorkspace().getId();
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
+        FeedbackChannel channel = requireChannel(kind);
+        JsonNode metadata = job.getMetadata();
+        String repoFullName = requireMetadataText(metadata, "repository_full_name");
+        int issueNumber = requireMetadataInt(metadata, "issue_number");
+        String subjectExternalId;
+        try {
+            subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.getMessage());
+        }
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(kind, workspaceId, /* instanceKey */ null),
+            subjectExternalId,
+            /* resourceUrl */ null
+        );
+        try {
+            SummaryHandle handle = channel.postSummary(
+                target,
+                new FeedbackContent(formattedBody, summaryMarkerFor(job))
+            );
+            log.info(
+                "Posted issue feedback comment: jobId={}, kind={}, commentId={}",
+                job.getId(),
+                kind,
+                handle.externalId()
+            );
+            return handle.externalId();
+        } catch (FeedbackDeliveryException e) {
+            throw new JobDeliveryException(e.getMessage(), e);
+        }
+    }
+
     // Vendor dispatch
 
     private FeedbackChannel requireChannel(IntegrationKind kind) {

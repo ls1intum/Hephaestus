@@ -121,7 +121,8 @@ public class JobTypeHandlerConfiguration {
     public JobTypeHandler issueReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
-        PracticeDetectionDeliveryService deliveryService
+        PracticeDetectionDeliveryService deliveryService,
+        PullRequestCommentPoster commentPoster
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -129,7 +130,8 @@ public class JobTypeHandlerConfiguration {
             taskEnvelopeWriter,
             practiceCatalogInjector,
             resultParser,
-            deliveryService
+            deliveryService,
+            commentPoster
         );
     }
 

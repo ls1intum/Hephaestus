@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -82,20 +81,29 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
             );
         }
 
-        MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(target.subjectExternalId());
-        MrInfo info = mrResolver.resolve(scopeId, mr.projectPath(), mr.iid());
+        // The subject is a merge request ("path!iid") or an issue ("path#iid"); both post via the same
+        // generic createNote mutation — only the noteable gid resolution differs.
+        String subject = target.subjectExternalId();
+        String noteableGid;
+        if (subject != null && subject.lastIndexOf('#') > subject.lastIndexOf('!')) {
+            MrCoordinates issue = GitlabMrResolver.parseIssueSubjectExternalId(subject);
+            noteableGid = mrResolver.resolveIssueGid(scopeId, issue.projectPath(), issue.iid());
+        } else {
+            MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(subject);
+            noteableGid = mrResolver.resolve(scopeId, mr.projectPath(), mr.iid()).globalId();
+        }
         String body = escapeSlashCommands(content.body());
 
         ClientGraphQlResponse response = gitLabProvider
             .forScope(scopeId)
             .documentName("CreateMergeRequestNote")
-            .variable("noteableId", info.globalId())
+            .variable("noteableId", noteableGid)
             .variable("body", body)
             .execute()
             .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
-            throw new FeedbackDeliveryException("Null response from CreateMergeRequestNote mutation");
+            throw new FeedbackDeliveryException("Null response from createNote mutation");
         }
 
         List<String> mutationErrors = response.field("createNote.errors").getValue();
@@ -105,9 +113,9 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
 
         String noteId = response.field("createNote.note.id").getValue();
         if (noteId == null) {
-            throw new FeedbackDeliveryException("No note ID in CreateMergeRequestNote response");
+            throw new FeedbackDeliveryException("No note ID in createNote response");
         }
-        log.info("Posted GitLab MR note: workspaceId={}, mrGid={}, noteId={}", scopeId, info.globalId(), noteId);
+        log.info("Posted GitLab note: workspaceId={}, noteableGid={}, noteId={}", scopeId, noteableGid, noteId);
         return new SummaryHandle(noteId);
     }
 
