@@ -5,10 +5,9 @@ import { safeReturnTo } from "@/integrations/auth/guard";
 import { refreshAccessToken } from "@/integrations/auth/sessionRefresh";
 
 /**
- * Path the API client prefixes onto every request (`environment.serverUrl`, e.g. `/api` in prod where
- * Traefik strips it before the app, empty in local dev). Strip it so endpoint exemptions below match
- * regardless of the deploy's base path — otherwise the logged-out `GET /api/user` probe on a public
- * page never matches `/user` and loops to /login.
+ * The API client prefixes every request with `environment.serverUrl` (`/api` in prod where Traefik
+ * strips it, empty in local dev). Returns that base path so the endpoint exemptions below match across
+ * deploys, not just the local unprefixed shape.
  */
 function apiBasePath(): string {
 	try {

@@ -135,8 +135,8 @@ describe("handlePossibleSessionExpiry", () => {
 	});
 
 	it("does NOT handle a 401 from the GET /api/user probe (prod /api base path)", () => {
-		// The landing page at / probes the session; under the /api base path the bare-/user exemption
-		// missed and looped logged-out visitors to /login. Regression for that.
+		// A logged-out visitor on the public landing (pathname "/") probes the session; the /api-prefixed
+		// probe must be exempt, not drive the login redirect.
 		const { assigned } = stubLocation("/");
 		const handled = handlePossibleSessionExpiry(
 			res(401, "http://localhost/api/user"),
