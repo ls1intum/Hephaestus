@@ -23,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
@@ -87,6 +88,7 @@ public class Practice {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "focus_artifact", nullable = false, length = 32)
+    @ColumnDefault("'PULL_REQUEST'")
     private WorkArtifact focusArtifact = WorkArtifact.PULL_REQUEST;
 
     /**
