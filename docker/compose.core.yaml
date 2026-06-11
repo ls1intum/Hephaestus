@@ -31,8 +31,8 @@ services:
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
-      # application-prod.yml sets host-url=${APPLICATION_HOST_URL} (no default), so a blank value fails
-      # ApplicationProperties' @URL check at boot.
+      # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
+      # supplies it (an unset var fails the boot at placeholder resolution).
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
       SENTRY_DSN: ${SENTRY_DSN}
       # forward-headers=native (application-prod.yml) → ProxyTrustGuard fails the boot unless pinned.
