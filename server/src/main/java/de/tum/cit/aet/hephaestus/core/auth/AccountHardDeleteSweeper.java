@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -41,6 +42,7 @@ import org.springframework.stereotype.Component;
  * row is no longer {@code DELETING}, and the child deletes are unconditional {@code DELETE ... WHERE
  * account_id = ?}.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Account hard-delete is account-scoped; the sweep is global, not tenant data")
 public class AccountHardDeleteSweeper {

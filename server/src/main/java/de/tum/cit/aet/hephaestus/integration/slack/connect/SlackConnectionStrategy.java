@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.connect;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Component;
  * Slack OAuth v2 connection strategy. Token-rotation apps are rejected at finalize because
  * token refresh is not yet implemented.
  */
+@ConditionalOnServerRole
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackConnectionStrategy implements ConnectionStrategy {

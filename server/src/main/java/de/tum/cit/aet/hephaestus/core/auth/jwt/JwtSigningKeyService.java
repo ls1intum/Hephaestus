@@ -10,6 +10,7 @@ import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.security.KeyFactory;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
@@ -56,6 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
  * encode/decode. We resolve from an {@link AtomicReference}-cached {@link JWKSet}, refreshed from DB
  * on TTL expiry ({@value #CACHE_TTL_MILLIS} ms).
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("JWT signing keys are system-wide; get() returns the global JWK set, not tenant data")
 public class JwtSigningKeyService implements JWKSource<SecurityContext> {

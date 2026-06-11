@@ -24,11 +24,15 @@ services:
       # WEBHOOK_EXTERNAL_URL is only used by auto-registration (server role) and is intentionally
       # not set on the webhook-server pod.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-      # DataSource kept until the workspace-context filter is made optional on this profile —
-      # the receiver itself never writes to the DB. Tracked as residual debt in ADR 0008.
+      # DataSource for the JPA layer (the connection-credential AttributeConverter that the HMAC
+      # path reads); the auth web layer and workspace-context filter are gated off this role.
       DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
+      # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      # ApplicationProperties.hostUrl validates on every role.
+      APPLICATION_HOST_URL: https://${APP_HOSTNAME}
       SENTRY_DSN: ${SENTRY_DSN}
       # forward-headers=native (application-prod.yml) → ProxyTrustGuard fails the boot unless pinned.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}

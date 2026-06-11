@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAudit;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionAuditRepository;
@@ -40,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * orchestration (list, lookup, audit projection, inline-credentials Connection
  * creation) and is only called from the REST surface.
  */
+@ConditionalOnServerRole
 @Service
 public class ConnectionAdminService {
 

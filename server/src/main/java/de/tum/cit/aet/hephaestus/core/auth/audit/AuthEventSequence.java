@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code (id, occurred_at)} means Hibernate can't auto-generate the id, so we pull from the
  * sequence explicitly and assign client-side.
  */
+@ConditionalOnServerRole
 @Component
 public class AuthEventSequence {
 

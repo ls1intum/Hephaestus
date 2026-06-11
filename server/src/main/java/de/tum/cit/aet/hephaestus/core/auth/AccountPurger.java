@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  * reason {@code AuthEventWriter} is split from {@code AuthEventLogger}). Each account purges in its own
  * transaction so one bad row never blocks the rest of the GDPR erasure backlog.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Account hard-delete is account-scoped; the sweep is global, not tenant data")
 public class AccountPurger {

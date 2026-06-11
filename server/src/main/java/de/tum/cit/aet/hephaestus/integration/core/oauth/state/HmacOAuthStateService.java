@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.nio.charset.StandardCharsets;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Component;
  * <p>{@link OAuthStateNonceStore} is optional in the constructor so the
  * unit-test overloads (no DB) still work; production wiring always supplies it.
  */
+@ConditionalOnServerRole
 @Component
 public class HmacOAuthStateService implements OAuthStateService {
 

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.AccountBootstrapService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * OpenAPI spec — it is an operator lever, not part of the public client surface.
  */
 @Hidden
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
 public class AccountBootstrapController {

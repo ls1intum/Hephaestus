@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection.api;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.TransitionRequest;
@@ -52,6 +53,7 @@ import tools.jackson.databind.ObjectMapper;
  * {@link RequireAtLeastWorkspaceAdmin} runs. The resolved {@link WorkspaceContext} supplies
  * the numeric workspace id to the service layer.
  */
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/connections")
 @RequireAtLeastWorkspaceAdmin

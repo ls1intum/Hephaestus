@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * adapter over {@link AccountService}. Access JWTs are short-lived (~15m) and refresh re-derives
  * roles from the DB, so no legacy-authority grace is carried in code.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/admin/users")
 @Tag(name = "Admin", description = "Instance-admin account management")

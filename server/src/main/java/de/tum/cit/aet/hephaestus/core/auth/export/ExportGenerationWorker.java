@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  * waits for in-flight DB work on shutdown — see {@code SpringAsyncConfig}); under
  * {@code spring.threads.virtual.enabled} each task still runs on a managed thread.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("GDPR export generation operates on a single account's data; not workspace-scoped")
 public class ExportGenerationWorker {

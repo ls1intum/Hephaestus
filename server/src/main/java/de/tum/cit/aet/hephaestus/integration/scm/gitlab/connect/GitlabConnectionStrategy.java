@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.connect;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.CredentialBundle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
  * tokens the user issued themselves. Local state transitions are handled by the
  * caller via {@code ConnectionService.transition()}.
  */
+@ConditionalOnServerRole
 @Component
 public class GitlabConnectionStrategy implements ConnectionStrategy {
 

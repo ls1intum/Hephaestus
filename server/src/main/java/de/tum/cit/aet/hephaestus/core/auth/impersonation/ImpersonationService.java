@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -35,6 +36,7 @@ import tools.jackson.databind.ObjectMapper;
  * acting_account_id=operator)} pair so every action taken under impersonation is
  * attributable to the operator.
  */
+@ConditionalOnServerRole
 @Service
 public class ImpersonationService {
 

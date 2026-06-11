@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthAuditService;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Guarded by the namespaced {@code app_admin} authority. Surfaces the {@code (account_id,
  * acting_account_id)} pair so impersonated actions stay attributable to their operator.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/admin/audit")
 @Tag(name = "Admin", description = "Instance-admin account management")

@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -43,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
  * same transaction. The {@code jti} is committed before the cookie is set on the response —
  * if the DB write fails, no JWT escapes.
  */
+@ConditionalOnServerRole
 @Service
 public class HephaestusJwtIssuer {
 

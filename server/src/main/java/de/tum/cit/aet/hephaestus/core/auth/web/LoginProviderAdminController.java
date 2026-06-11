@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +36,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * {@code redirectUri} the admin must register on the upstream OAuth app — the single most error-prone
  * step when wiring a self-hosted GitLab.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/admin/login-providers")
 @Tag(name = "Admin", description = "Instance-admin login provider management")
