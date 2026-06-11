@@ -299,10 +299,10 @@ services:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
-    # No healthcheck and (unlike application-server/webhook-server) no Traefik probe to fall back on:
-    # the worker runs no HTTP connector (WSS-only) so nothing can probe it, and the distroless image
-    # can't run a shell probe anyway. Liveness rests on the JVM's ExitOnOutOfMemoryError + restart:
-    # unless-stopped; a hung-but-alive JVM is an accepted residual (it carries no user traffic).
+    # No container healthcheck: the distroless image can't run a wget/shell probe, and the worker fronts
+    # no Traefik router for an LB probe (its actuator listens on :8080, but nothing routes to it). It
+    # serves no user traffic, so liveness rests on ExitOnOutOfMemoryError + restart:unless-stopped — a
+    # hung-but-alive JVM is an accepted residual.
     logging:
       driver: "json-file"
       options:
