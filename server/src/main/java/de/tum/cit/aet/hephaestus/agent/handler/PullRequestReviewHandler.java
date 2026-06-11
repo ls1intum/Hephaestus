@@ -381,12 +381,31 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         List<SecretDiffScanner.SecretHit> hits = secretDiffScanner.scan(diff);
         if (hits.isEmpty()) return List.of();
 
-        // Tokens an LLM finding already quotes — don't re-post the same credential.
+        // De-dup synthetic hits against credentials an LLM finding already flagged, keyed by IN-DIFF
+        // POSITION (path:line). Position is stable regardless of how the LLM worded its evidence or which
+        // canonical token the scanner emitted — e.g. the scanner's "-----BEGIN PRIVATE KEY-----" token
+        // never appears verbatim when the line is the "-----BEGIN RSA PRIVATE KEY-----" variant, so a
+        // token-substring check alone would re-post the same secret. The token check stays only as a
+        // fallback for LLM findings that carry no parseable location.
+        Set<String> llmPositions = new HashSet<>();
         Set<String> llmQuoted = new HashSet<>();
         for (var f : existing) {
-            if (
-                "hardcoded-secrets".equals(f.practiceSlug()) && f.verdict() == Verdict.NEGATIVE && f.evidence() != null
-            ) {
+            if (!"hardcoded-secrets".equals(f.practiceSlug()) || f.verdict() != Verdict.NEGATIVE || f.evidence() == null) {
+                continue;
+            }
+            boolean hadLocation = false;
+            JsonNode locations = f.evidence().get("locations");
+            if (locations != null && locations.isArray()) {
+                for (JsonNode loc : locations) {
+                    JsonNode pathNode = loc.get("path");
+                    JsonNode lineNode = loc.get("startLine");
+                    if (pathNode != null && !pathNode.isNull() && lineNode != null && lineNode.isNumber()) {
+                        llmPositions.add(pathNode.asString() + ":" + lineNode.asInt());
+                        hadLocation = true;
+                    }
+                }
+            }
+            if (!hadLocation) {
                 llmQuoted.add(f.evidence().toString());
             }
         }
@@ -396,6 +415,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (SecretDiffScanner.SecretHit hit : hits) {
             String key = hit.path() + ":" + hit.newLine() + ":" + hit.ruleId();
             if (!seen.add(key)) continue;
+            if (llmPositions.contains(hit.path() + ":" + hit.newLine())) continue;
             if (llmQuoted.stream().anyMatch(q -> q.contains(hit.matchedToken()))) continue;
             out.add(toSecretFinding(hit));
         }

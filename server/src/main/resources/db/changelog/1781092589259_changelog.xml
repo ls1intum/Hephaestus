@@ -290,4 +290,19 @@
         </rollback>
     </changeSet>
 
+    <!--
+        CredentialMode.OAUTH was removed from the enum. credential_mode is persisted as EnumType.STRING
+        into a free-form VARCHAR with no CHECK, so any existing row with credential_mode='OAUTH' would
+        now throw IllegalArgumentException on read. Re-map it to API_KEY — semantically the same direct
+        provider call with the token in llm_api_key. Idempotent no-op when no such rows exist.
+    -->
+    <changeSet author="hephaestus-1011" id="1781092589259-16">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_config.credential_mode absent">
+            <columnExists tableName="agent_config" columnName="credential_mode"/>
+        </preConditions>
+        <comment>Re-map removed credential_mode 'OAUTH' to 'API_KEY' so persisted rows still deserialize.</comment>
+        <sql>UPDATE agent_config SET credential_mode = 'API_KEY' WHERE credential_mode = 'OAUTH';</sql>
+        <rollback/>
+    </changeSet>
+
 </databaseChangeLog>
