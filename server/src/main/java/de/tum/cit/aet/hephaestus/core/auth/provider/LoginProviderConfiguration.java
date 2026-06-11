@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.provider;
 
+import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,8 +15,9 @@ public class LoginProviderConfiguration {
 
     @Bean
     public LoginProviderClientRegistrationRepository loginProviderClientRegistrationRepository(
-        LoginProviderRepository loginProviderRepository
+        LoginProviderRepository loginProviderRepository,
+        AuthProperties authProperties
     ) {
-        return new LoginProviderClientRegistrationRepository(loginProviderRepository);
+        return new LoginProviderClientRegistrationRepository(loginProviderRepository, authProperties.apiBasePath());
     }
 }
