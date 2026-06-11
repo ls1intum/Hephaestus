@@ -301,7 +301,8 @@ services:
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
-      # ApplicationProperties.hostUrl (link building in agent context) validates on every role.
+      # application-prod.yml sets host-url=${APPLICATION_HOST_URL} (no default), so a blank value fails
+      # ApplicationProperties' @URL check at boot; the agent context also builds links from it.
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
       # thc healthcheck target: actuator liveness on the management port (still :8080 though server.port=-1).
       THC_PORT: "8080"
