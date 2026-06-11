@@ -89,14 +89,18 @@ class DeliveryComposer {
             return new DeliveryContent(composeNoIssuesNote(observed), List.of());
         }
 
-        // Partition negatives: inlinable (has valid file location) vs non-inlinable
+        // Partition negatives: inlinable (a diff note) vs non-inlinable (expanded in the summary).
+        // Issues carry no diff, so a positional note can never be posted on them — every issue finding
+        // must be expanded in full in the issue note itself rather than demoted to a diff note that
+        // silently vanishes, leaving the student a bare title with no reasoning or guidance.
+        boolean inlineSupported = artifact == WorkArtifact.PULL_REQUEST;
         List<ValidatedFinding> inlinable = new ArrayList<>();
         List<ValidatedFinding> nonInlinable = new ArrayList<>();
         for (ValidatedFinding f : negatives) {
-            if (isNonInlinable(f)) {
-                nonInlinable.add(f);
-            } else {
+            if (inlineSupported && !isNonInlinable(f)) {
                 inlinable.add(f);
+            } else {
+                nonInlinable.add(f);
             }
         }
 
@@ -134,18 +138,24 @@ class DeliveryComposer {
             return "Reviewed against the active practices \u2014 nothing to change here.\n";
         }
 
-        var sb = new StringBuilder(1024);
-        sb.append("Reviewed against the active practices. What I observed:\n\n");
+        var bullets = new StringBuilder(1024);
         int shown = 0;
         for (ValidatedFinding f : withReasoning) {
             if (shown >= 4) break; // Cap at 4 to avoid a wall of text
-            String label = capitalize(f.practiceSlug().replace('-', ' '));
             String summary = truncateToFirstSentence(sanitizeStudentText(f.reasoning()).strip(), 200);
-            sb.append("- **").append(label).append(":** ").append(summary).append("\n");
+            if (summary.isBlank()) {
+                // The reasoning was entirely grading-meta and scrubbed to nothing — skip it rather than
+                // emit a bare "- **Practice:** " bullet with no observation behind it.
+                continue;
+            }
+            String label = capitalize(f.practiceSlug().replace('-', ' '));
+            bullets.append("- **").append(label).append(":** ").append(summary).append("\n");
             shown++;
         }
-        sb.append("\n");
-        return sb.toString();
+        if (shown == 0) {
+            return "Reviewed against the active practices \u2014 nothing to change here.\n";
+        }
+        return "Reviewed against the active practices. What I observed:\n\n" + bullets + "\n";
     }
 
     /**
@@ -169,7 +179,7 @@ class DeliveryComposer {
      * couple of things to tighten:". Returns "" when there are no positives. Strictly task-level: it
      * names what the work does, never grades the author.
      */
-    static String composeAcknowledgement(List<ValidatedFinding> positives) {
+    static String composeAcknowledgement(List<ValidatedFinding> positives, int improvementCount) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
@@ -184,7 +194,9 @@ class DeliveryComposer {
             return "";
         }
         String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
-        String tail = positives.size() > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
+        // The lead-in counts the IMPROVEMENTS that follow, not the strengths named — otherwise a single
+        // strength in front of two suggestions reads "one thing to tighten:" above a list of two.
+        String tail = improvementCount > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
         return "Nice work " + strengths + tail;
     }
 
@@ -315,7 +327,7 @@ class DeliveryComposer {
             .stream()
             .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
         if (!hasBlocking) {
-            String acknowledgement = composeAcknowledgement(positives);
+            String acknowledgement = composeAcknowledgement(positives, allNegatives.size());
             if (!acknowledgement.isEmpty()) {
                 sb.append(acknowledgement).append("\n\n");
             }
@@ -438,11 +450,22 @@ class DeliveryComposer {
      */
     private static String metadataSnippetText(String snippet) {
         String s = snippet.strip();
-        var m = Pattern.compile("\"[^\"]+\"\\s*:\\s*\"(.*)\"\\s*$", Pattern.DOTALL).matcher(s);
-        if (m.find()) {
-            s = m.group(1);
+        // The agent sometimes quotes a raw span of the metadata.json envelope, dragging JSON field
+        // syntax ("title": "...", "body": "...") into the quote. Peel it off: keep only the text after
+        // the LAST `"<key>":` separator (the field the finding is actually about). This also handles a
+        // cleanly terminated single field, which the prior trailing-anchored regex required.
+        var field = Pattern.compile("\"[A-Za-z_][A-Za-z0-9_]*\"\\s*:\\s*\"").matcher(s);
+        int valueStart = -1;
+        while (field.find()) {
+            valueStart = field.end();
         }
-        s = s.replace("\\n", " ").replace("\\\"", "\"").replaceAll("\\s+", " ").strip();
+        if (valueStart >= 0) {
+            s = s.substring(valueStart);
+            // Drop whatever follows this value's closing quote (the next "," field or a "} brace) and
+            // any bare trailing quote a fully-terminated value leaves behind.
+            s = s.replaceAll("\"\\s*[,}].*$", "").replaceAll("\"\\s*$", "");
+        }
+        s = s.replace("\\n", " ").replace("\\t", " ").replace("\\\"", "\"").replaceAll("\\s+", " ").strip();
         return s.length() > 160 ? s.substring(0, 157) + "..." : s;
     }
 
@@ -450,6 +473,13 @@ class DeliveryComposer {
     private static boolean isInternalPath(String location) {
         // Strip line number suffix for comparison
         String path = location.contains(":") ? location.substring(0, location.lastIndexOf(':')) : location;
+        // The synthetic context envelope is cited both as the full context/target/metadata.json (caught
+        // by the prefix) and, once the agent strips the prefix, as a bare "metadata.json". Neither is a
+        // real repo file a student should see referenced — issue findings in particular only ever point
+        // here, so this also clears the meaningless "metadata.json:2" location off issue notes.
+        if (path.equals("metadata.json") || path.endsWith("/metadata.json")) {
+            return true;
+        }
         return INTERNAL_PATH_PREFIXES.stream().anyMatch(path::startsWith);
     }
 

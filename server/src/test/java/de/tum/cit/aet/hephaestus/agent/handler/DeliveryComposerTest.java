@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -634,5 +635,149 @@ class DeliveryComposerTest extends BaseUnitTest {
         // Domain vocabulary in legitimate guidance must survive untouched.
         String secretGuidance = "Move the hardcoded secret/credential out of source into the environment.";
         assertThat(DeliveryComposer.sanitizeStudentText(secretGuidance)).isEqualTo(secretGuidance);
+    }
+
+    // --- Live-E2E regression fixes (go98weh batch, 2026-06-11) ---
+
+    @Test
+    void compose_forIssue_negativeFindingsExpandedInFull_neverDemotedToVanishingDiffNote() {
+        // An issue finding with an ordinary location would be "inlinable" on a PR — but issues carry no
+        // diff, so it must be expanded in full in the note, not demoted to a diff note that never posts.
+        ValidatedFinding f = negativeFinding(
+            "issue-has-checkable-outcome",
+            "Missing checkable outcome",
+            Severity.MINOR,
+            List.of(new LocationSpec("metadata.json", 2)),
+            null,
+            "The issue does not state any acceptance criteria a maintainer could verify against.",
+            "Add a short checklist of done conditions, e.g. a `- [ ]` list of observable outcomes."
+        );
+
+        DeliveryContent issue = DeliveryComposer.compose(List.of(f), WorkArtifact.ISSUE);
+
+        assertThat(issue).isNotNull();
+        // Full reasoning + guidance reach the student inside the issue note itself.
+        assertThat(issue.mrNote()).contains("acceptance criteria");
+        assertThat(issue.mrNote()).contains("checklist of done conditions");
+        // No positional notes are produced for an artifact that cannot carry them.
+        assertThat(issue.diffNotes()).isEmpty();
+        // The synthetic metadata.json envelope is never surfaced as a student-facing location.
+        assertThat(issue.mrNote()).doesNotContain("metadata.json");
+    }
+
+    @Test
+    void compose_noIssuesNote_skipsFindingWhoseReasoningScrubsToBlank() {
+        // First positive: reasoning is ENTIRELY grading-meta → sanitises to blank → must not emit a bare
+        // "- **...:**" bullet with nothing after it. Second positive carries a real observation.
+        ValidatedFinding scrubbed = new ValidatedFinding(
+            "issue-has-checkable-outcome",
+            "Checkable outcome",
+            Verdict.POSITIVE,
+            Severity.INFO,
+            0.9f,
+            null,
+            "The practice requires a checkable outcome for a POSITIVE verdict.",
+            null,
+            List.of()
+        );
+        ValidatedFinding real = new ValidatedFinding(
+            "issue-scoped-to-single-concern",
+            "Single concern",
+            Verdict.POSITIVE,
+            Severity.INFO,
+            0.9f,
+            null,
+            "The issue describes one deliverable and stays within that single concern.",
+            null,
+            List.of()
+        );
+
+        DeliveryContent dc = DeliveryComposer.compose(List.of(scrubbed, real), WorkArtifact.ISSUE);
+
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).contains("one deliverable");
+        // No dangling empty bullet for the scrubbed finding.
+        assertThat(dc.mrNote()).doesNotContain(":** \n");
+        assertThat(dc.mrNote()).doesNotContain("Checkable outcome:**\n");
+    }
+
+    @Test
+    void compose_noIssuesNote_allReasoningScrubbed_fallsBackToNothingToChange() {
+        ValidatedFinding scrubbed = new ValidatedFinding(
+            "issue-has-checkable-outcome",
+            "Checkable outcome",
+            Verdict.POSITIVE,
+            Severity.INFO,
+            0.9f,
+            null,
+            "The practice requires a checkable outcome for a POSITIVE verdict.",
+            null,
+            List.of()
+        );
+
+        DeliveryContent dc = DeliveryComposer.compose(List.of(scrubbed), WorkArtifact.ISSUE);
+
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).contains("nothing to change here");
+        assertThat(dc.mrNote()).doesNotContain("What I observed");
+    }
+
+    @Test
+    void compose_acknowledgementCount_reflectsImprovementsNotStrengths() {
+        // One strength in front of TWO suggestions must read "a couple of things to tighten:", never
+        // "one thing to tighten:" (the lead-in counts the improvements that follow).
+        List<ValidatedFinding> findings = List.of(
+            positiveFinding("issue-scoped-to-single-concern"),
+            negativeFinding(
+                "issue-has-checkable-outcome",
+                "Missing checkable outcome",
+                Severity.MINOR,
+                List.of(new LocationSpec("metadata.json", 2)),
+                null,
+                "No acceptance criteria are stated.",
+                "Add a done checklist."
+            ),
+            negativeFinding(
+                "issue-states-an-actionable-problem",
+                "Missing actionable problem",
+                Severity.MINOR,
+                List.of(new LocationSpec("metadata.json", 2)),
+                null,
+                "The description does not frame a concrete problem.",
+                "State the who/what/why."
+            )
+        );
+
+        DeliveryContent dc = DeliveryComposer.compose(findings, WorkArtifact.ISSUE);
+
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).contains("a couple of things to tighten:");
+        assertThat(dc.mrNote()).doesNotContain("one thing to tighten:");
+    }
+
+    @Test
+    void compose_youWrote_stripsJsonEnvelopeLeakFromMetadataSnippet() {
+        // The agent sometimes quotes a raw span of metadata.json, dragging JSON field syntax into the
+        // "You wrote:" quote. The composed note must show the prose, never the "body": key/quotes.
+        ValidatedFinding f = negativeFinding(
+            "mr-description-quality",
+            "PR description lacks clear motivation",
+            Severity.MAJOR,
+            List.of(new LocationSpec("metadata.json", 2)),
+            List.of(
+                "#39: use Logger and package\", \"body\" : \"#39: use Logger and package ## Description - use logger"
+            ),
+            "The body does not explain why the change is needed.",
+            "Add a short Why paragraph."
+        );
+
+        DeliveryContent dc = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST);
+
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).contains("You wrote:");
+        assertThat(dc.mrNote()).contains("## Description");
+        // No JSON envelope artifacts leak into the student-facing quote.
+        assertThat(dc.mrNote()).doesNotContain("\"body\"");
+        assertThat(dc.mrNote()).doesNotContain("\" : \"");
     }
 }
