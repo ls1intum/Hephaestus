@@ -67,15 +67,15 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         seeder(true).seed();
 
         // The shipped catalog is three goals (review-ready-work, acting-on-review-feedback,
-        // actionable-issue-authoring) with seven practices total, each bound to its goal.
+        // actionable-issue-authoring) with eight practices total, each bound to its goal.
         verify(goalService).createGoal(any(), eq("review-ready-work"), any(), any());
         verify(goalService).createGoal(any(), eq("acting-on-review-feedback"), any(), any());
         verify(goalService).createGoal(any(), eq("actionable-issue-authoring"), any(), any());
         verify(goalService, times(3)).createGoal(any(), any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
-        verify(practiceService, times(7)).createPractice(any(), practiceCaptor.capture());
-        verify(goalService, times(7)).bindPractice(any(), any(), any());
+        verify(practiceService, times(8)).createPractice(any(), practiceCaptor.capture());
+        verify(goalService, times(8)).bindPractice(any(), any(), any());
 
         // Issue-focused practices are seeded with WorkArtifact.ISSUE — only possible because the
         // create DTO now carries focusArtifact (the configurability gap this PR closes).
