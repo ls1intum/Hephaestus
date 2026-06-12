@@ -198,8 +198,9 @@ services:
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
-      # Internal docker-network DB: skip TLS. Postgres' self-signed cert offers no real protection
-      # here, and the SSL handshake's per-connection NIO direct buffers OOM the JVM's small off-heap default.
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
       DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
