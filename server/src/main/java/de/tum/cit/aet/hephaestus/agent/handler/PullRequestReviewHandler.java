@@ -64,9 +64,19 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 
-    /** Allowed internal paths that survive the post-agent {@code filterByDiffScope} pass. */
+    /**
+     * Materialized context files a finding may legitimately cite that survive the post-agent
+     * {@code filterByDiffScope} pass. metadata.json carries the PR fields; diff.patch / diff_summary.md
+     * ARE the change under review (so a finding anchored there is in-scope by definition — the
+     * code-judging practices quote a {@code [L<n>]} span in diff.patch); comments.json is the review
+     * thread the reviewer-side practices read. These resolve as internal paths in DeliveryComposer, so
+     * such findings render as non-inlinable summary items rather than diff-anchored inline notes.
+     */
     private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(
-        ContentProvider.OUTPUT_PREFIX + "metadata.json"
+        ContentProvider.OUTPUT_PREFIX + "metadata.json",
+        ContentProvider.OUTPUT_PREFIX + "diff.patch",
+        ContentProvider.OUTPUT_PREFIX + "diff_summary.md",
+        ContentProvider.OUTPUT_PREFIX + "comments.json"
     );
 
     /**
