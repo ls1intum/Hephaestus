@@ -313,7 +313,19 @@ class DeliveryComposer {
             "\\bseverity\\s+(?:level|band|bucket|rating)\\b|" +
             "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
             "\\b[≤<=>]*\\s*\\d+[\\s-]*(?:line|file)s?\\s+threshold\\b|" +
-            "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b" +
+            "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b|" +
+            // Rubric-mechanics / criteria-computation leaks observed reaching students (deepseek echoes the
+            // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
+            "\\braw\\s+bucket\\b|" +
+            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\b|" +
+            "\\b(?:DEFECT-DETECTOR|POSITIVE\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +
+            "\\benriched\\s*[=:]|" +
+            "\\b[AUDFNST]\\s*[+]?\\s*[AUDFNST]?\\s*==?\\s*\\d|" + // A=4094, A+D=4420, U == 0, F=28, N/T counts
+            "\\b(?:additions?|deletions?|changed[_ ]files?)\\s*[=:]\\s*\\d|" +
+            "\\bgenerated/vendored\\s+(?:check|exclusion|dominance)\\b|" +
+            "\\bpartition\\s+after\\b|" +
+            "\\bnoiseFraction\\b|" +
+            "\\b[A-Z]\\s*=\\s*(?:true|false)\\b" + // P=true, etc.
             ")"
     );
 

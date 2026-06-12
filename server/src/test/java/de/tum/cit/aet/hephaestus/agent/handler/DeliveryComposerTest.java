@@ -629,6 +629,26 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
+    void sanitizeStudentText_stripsRubricComputationLeaks() {
+        // Live regression (obsphera 582, deepseek): the model echoed the criteria's internal bucket maths
+        // and preamble tags verbatim into student-facing reasoning. These must never reach the student.
+        String leak =
+            "This change is large. enriched=true. Metadata: A=4094, D=326, A+D=4420, F=28. " +
+            "Raw bucket: 4420 > 800 -> MAJOR; also 28 > 20 -> MAJOR. Generated/vendored check: none. " +
+            "DEFECT-DETECTOR: only NEGATIVE or NOT_APPLICABLE. Consider splitting the change.";
+        String clean = DeliveryComposer.sanitizeStudentText(leak);
+        assertThat(clean).doesNotContain("Raw bucket");
+        assertThat(clean).doesNotContain("-> MAJOR");
+        assertThat(clean).doesNotContain("A+D=4420");
+        assertThat(clean).doesNotContain("DEFECT-DETECTOR");
+        assertThat(clean).doesNotContain("enriched=true");
+        assertThat(clean).doesNotContain("Generated/vendored check");
+        // The legitimate student-facing sentences survive.
+        assertThat(clean).contains("This change is large.");
+        assertThat(clean).contains("Consider splitting the change.");
+    }
+
+    @Test
     void sanitizeStudentText_preservesMarkdownListAndHeadingNewlines() {
         // Live regression (obsphera CR2, 2026-06-12): a bulleted acceptance-criteria block whose items
         // each end in '.' was collapsed onto one run-on line ("session. - Users can create") because the
