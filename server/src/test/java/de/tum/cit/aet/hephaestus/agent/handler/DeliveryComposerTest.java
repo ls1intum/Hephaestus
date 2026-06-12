@@ -628,6 +628,31 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(DeliveryComposer.sanitizeStudentText(secretGuidance)).isEqualTo(secretGuidance);
     }
 
+    @Test
+    void sanitizeStudentText_preservesMarkdownListAndHeadingNewlines() {
+        // Live regression (obsphera CR2, 2026-06-12): a bulleted acceptance-criteria block whose items
+        // each end in '.' was collapsed onto one run-on line ("session. - Users can create") because the
+        // sentence-split rejoined every sentence with a blank space, eating the list newlines.
+        String guidance =
+            "Add an acceptance-criteria section, for example:\n\n" +
+            "### Acceptance Criteria\n" +
+            "- The workspace lists all capture sessions.\n" +
+            "- Users can create, rename, and delete sessions.\n" +
+            "- Sessions can be searched and filtered.\n\n" +
+            "These criteria give a clear definition of done.";
+        String clean = DeliveryComposer.sanitizeStudentText(guidance);
+        // Every list item stays on its own line (the newline before "- " survives).
+        assertThat(clean).contains("\n- The workspace lists all capture sessions.");
+        assertThat(clean).contains("\n- Users can create, rename, and delete sessions.");
+        assertThat(clean).contains("\n- Sessions can be searched and filtered.");
+        // The heading stays on its own line, not folded into the preceding sentence.
+        assertThat(clean).contains("\n### Acceptance Criteria");
+        // No two list items run together on one line.
+        assertThat(clean).doesNotContain("sessions. - Users");
+        // Paragraph breaks are preserved (capped at one blank line).
+        assertThat(clean).doesNotContain("\n\n\n");
+    }
+
     // --- Live-E2E regression fixes (go98weh batch, 2026-06-11) ---
 
     @Test

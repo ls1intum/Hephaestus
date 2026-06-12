@@ -231,6 +231,13 @@ class DeliveryComposer {
     );
 
     /**
+     * Matches the whitespace run that separates two sentences (a sentence-ending [.!?] then whitespace).
+     * Used to tokenise student text while preserving the original separator, so Markdown lists and
+     * headings (whose items end in '.') keep their newlines instead of being folded onto one line.
+     */
+    private static final Pattern SENTENCE_SEPARATOR = Pattern.compile("(?<=[.!?])\\s+");
+
+    /**
      * Strips internal grading vocabulary from text headed to a student: split into sentences, drop any
      * that is pure rubric meta ({@link #GRADING_SENTENCE}), then tidy the whitespace the drops leave
      * behind. Idempotent and locale-safe (no naked case folding).
@@ -242,20 +249,28 @@ class DeliveryComposer {
         // Unescape literal \n / \t the agent sometimes emits in reasoning/guidance (a JSON escape that
         // should render as a real line break, e.g. "e.g.:\n- ..."), so it reads as Markdown not raw text.
         text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "    ");
-        // Split on sentence-ending punctuation followed by whitespace so a mid-paragraph rubric sentence
-        // is removed wholesale.
+        // Walk sentence-ending punctuation followed by whitespace so a mid-paragraph rubric sentence is
+        // removed wholesale. Preserve the ORIGINAL inter-sentence separator (notably newlines that form
+        // Markdown lists/headings) for every sentence we keep — rejoining with a blanket space would
+        // collapse a bulleted acceptance-criteria block into one run-on line.
         StringBuilder kept = new StringBuilder(text.length());
-        for (String sentence : text.split("(?<=[.!?])\\s+")) {
+        java.util.regex.Matcher sep = SENTENCE_SEPARATOR.matcher(text);
+        int pos = 0;
+        while (sep.find()) {
+            String sentence = text.substring(pos, sep.start());
             if (!GRADING_SENTENCE.matcher(sentence).find()) {
-                if (kept.length() > 0) {
-                    kept.append(' ');
-                }
-                kept.append(sentence);
+                kept.append(sentence).append(text, sep.start(), sep.end());
             }
+            pos = sep.end();
+        }
+        String tail = text.substring(pos);
+        if (!GRADING_SENTENCE.matcher(tail).find()) {
+            kept.append(tail);
         }
         String out = kept.toString();
-        // Tidy the gaps the drops leave: doubled spaces, space-before-punctuation, blank lines.
-        out = out.replaceAll("[ \\t]{2,}", " ").replaceAll("\\s+([.,;])", "$1").replaceAll("\\n{3,}", "\n\n");
+        // Tidy the gaps the drops leave: doubled spaces, space-before-punctuation, blank lines. Use
+        // [ \t] (not \s) so list/heading newlines are never folded away.
+        out = out.replaceAll("[ \\t]{2,}", " ").replaceAll("[ \\t]+([.,;])", "$1").replaceAll("\\n{3,}", "\n\n");
         return out.strip();
     }
 
