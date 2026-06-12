@@ -190,6 +190,9 @@ services:
     hostname: application-server
     restart: unless-stopped
     environment:
+      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
+      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       SPRING_PROFILES_ACTIVE: prod
       # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
       # Coolify fronts previews with its own proxy — set its ingress regex, not staging's range.

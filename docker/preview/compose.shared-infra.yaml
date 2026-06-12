@@ -69,6 +69,9 @@ services:
     expose:
       - "8080"
     environment:
+      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
+      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       SPRING_PROFILES_ACTIVE: "prod,webhook"
       HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
       HEPHAESTUS_RUNTIME_SERVER_ENABLED: "false"

@@ -96,6 +96,9 @@ services:
     ports:
       - "8080"
     environment:
+      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
+      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
@@ -273,6 +276,9 @@ services:
   application-worker:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     environment:
+      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
+      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
+      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
