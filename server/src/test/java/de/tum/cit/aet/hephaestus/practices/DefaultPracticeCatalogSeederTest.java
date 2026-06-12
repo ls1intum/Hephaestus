@@ -66,18 +66,19 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         seeder(true).seed();
 
-        // The shipped catalog is three goals (review-ready-work, acting-on-review-feedback,
-        // actionable-issue-authoring) with eight practices total, each bound to its goal.
+        // The shipped catalog is eleven goals with twenty-eight practices total, each bound to its goal.
         verify(goalService).createGoal(any(), eq("review-ready-work"), any(), any());
         verify(goalService).createGoal(any(), eq("acting-on-review-feedback"), any(), any());
         verify(goalService).createGoal(any(), eq("actionable-issue-authoring"), any(), any());
-        verify(goalService, times(3)).createGoal(any(), any(), any(), any());
+        verify(goalService).createGoal(any(), eq("constructive-code-review"), any(), any());
+        verify(goalService).createGoal(any(), eq("testing-discipline"), any(), any());
+        verify(goalService, times(11)).createGoal(any(), any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
-        verify(practiceService, times(8)).createPractice(any(), practiceCaptor.capture());
-        verify(goalService, times(8)).bindPractice(any(), any(), any());
+        verify(practiceService, times(28)).createPractice(any(), practiceCaptor.capture());
+        verify(goalService, times(28)).bindPractice(any(), any(), any());
 
-        // 3 of the 8 practices are issue-focused and must seed with WorkArtifact.ISSUE.
+        // 5 of the 28 practices are issue-focused and must seed with WorkArtifact.ISSUE.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::focusArtifact).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
         assertThat(
@@ -85,7 +86,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
                 .stream()
                 .filter(f -> f == WorkArtifact.ISSUE)
                 .count()
-        ).isEqualTo(3);
+        ).isEqualTo(5);
 
         // Every seeded practice's criteria is the per-focus evidence-contract preamble composed onto the
         // practice-specific criteria with a "\n\n---\n\n" fence: a non-empty preamble before the fence,

@@ -114,12 +114,18 @@ class DefaultPracticeCatalogSeeder {
         List<String> triggerEvents = new ArrayList<>();
         practiceNode.path("triggerEvents").forEach(t -> triggerEvents.add(t.asString()));
         WorkArtifact focus = WorkArtifact.valueOf(practiceNode.path("focusArtifact").asString());
+        // A practice may opt into a non-default preamble (e.g. the code-judging PULL_REQUEST_CODE contract
+        // for practices that read the diff) via a "preamble" key; otherwise the focus name is the key.
+        String preambleKey = text(practiceNode, "preamble");
+        if (preambleKey == null) {
+            preambleKey = focus.name();
+        }
         return new CreatePracticeRequestDTO(
             practiceNode.path("slug").asString(),
             practiceNode.path("name").asString(),
             null,
             triggerEvents,
-            composeCriteria(catalog, focus, practiceNode.path("criteria").asString()),
+            composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
             null,
             focus
         );
@@ -131,11 +137,11 @@ class DefaultPracticeCatalogSeeder {
      * and any future one of that focus — inherits the same artifact contract without restating it. The
      * preamble is reinforcing and explicitly subordinate to the inline criteria (it ends by deferring to
      * the practice-specific contract), so composition never weakens the validated detection logic. When
-     * no preamble is configured for the focus the criteria is stored verbatim, keeping older catalogs and
+     * no preamble is configured for the key the criteria is stored verbatim, keeping older catalogs and
      * already-seeded workspaces byte-for-byte unchanged.
      */
-    private static String composeCriteria(JsonNode catalog, WorkArtifact focus, String criteria) {
-        String preamble = text(catalog.path("criteriaPreambles"), focus.name());
+    private static String composeCriteria(JsonNode catalog, String preambleKey, String criteria) {
+        String preamble = text(catalog.path("criteriaPreambles"), preambleKey);
         if (preamble == null || preamble.isBlank()) {
             return criteria;
         }
