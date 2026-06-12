@@ -15,20 +15,28 @@ import java.util.Set;
  */
 public final class TriggerEventCatalog {
 
-    /** PR/review lifecycle events that drive pull-request detection (see {@code AgentJobEventListener}). */
+    /** PR/review lifecycle events that drive pull-request detection (see {@code AgentJobEventListener}).
+     *  {@code PullRequestMerged} is the RETROSPECTIVE trigger: it fires at-merge for feed-forward,
+     *  loop-closure detection and — unlike the create/ready/sync events — its listener must NOT skip a
+     *  merged PR, because MERGED is its expected state. */
     private static final Set<String> PULL_REQUEST_EVENTS = Set.of(
         TriggerEventNames.PULL_REQUEST_CREATED,
         TriggerEventNames.PULL_REQUEST_READY,
         TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-        TriggerEventNames.REVIEW_SUBMITTED
+        TriggerEventNames.REVIEW_SUBMITTED,
+        TriggerEventNames.PULL_REQUEST_MERGED,
+        TriggerEventNames.PULL_REQUEST_CLOSED
     );
 
     /** Issue lifecycle events. Consumed by {@code IssueAgentJobEventListener} → {@code evaluateIssue}.
      *  IssueCreated fires on both GitHub and GitLab; IssueLabeled fires on GitHub natively and on GitLab
-     *  via the {@code action=update} {@code changes.labels} diff. */
+     *  via the {@code action=update} {@code changes.labels} diff. {@code IssueClosed} is the RETROSPECTIVE
+     *  trigger: it fires at-close for feed-forward, outcome-confirmation detection and its listener must
+     *  NOT skip a closed issue, because CLOSED is its expected state. */
     private static final Set<String> ISSUE_EVENTS = Set.of(
         TriggerEventNames.ISSUE_CREATED,
-        TriggerEventNames.ISSUE_LABELED
+        TriggerEventNames.ISSUE_LABELED,
+        TriggerEventNames.ISSUE_CLOSED
     );
 
     private TriggerEventCatalog() {}

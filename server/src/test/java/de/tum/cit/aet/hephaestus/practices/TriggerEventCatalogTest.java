@@ -21,9 +21,21 @@ class TriggerEventCatalogTest extends BaseUnitTest {
     }
 
     @Test
+    void pullRequestFocus_carriesRetrospectiveMergedEvent() {
+        var pr = TriggerEventCatalog.eligibleFor(WorkArtifact.PULL_REQUEST);
+        assertThat(pr).contains(TriggerEventNames.PULL_REQUEST_MERGED);
+    }
+
+    @Test
     void issueFocus_carriesIssueEvents() {
         var issue = TriggerEventCatalog.eligibleFor(WorkArtifact.ISSUE);
         assertThat(issue).contains(TriggerEventNames.ISSUE_CREATED, TriggerEventNames.ISSUE_LABELED);
+    }
+
+    @Test
+    void issueFocus_carriesRetrospectiveClosedEvent() {
+        var issue = TriggerEventCatalog.eligibleFor(WorkArtifact.ISSUE);
+        assertThat(issue).contains(TriggerEventNames.ISSUE_CLOSED);
     }
 
     @Test

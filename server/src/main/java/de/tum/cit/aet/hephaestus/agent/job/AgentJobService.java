@@ -123,8 +123,20 @@ public class AgentJobService {
         if (pr == null) {
             return "PR not found: " + prId;
         }
+        return submitReviewForLoadedPullRequest(workspaceId, pr);
+    }
+
+    /**
+     * Build a PR review submission from an already-loaded entity and submit it. Shared by the
+     * gate-bypassing dev path ({@link #submitReviewForPullRequest}) and the gate-routed dev path
+     * ({@code DevTriggerController} with a {@code triggerEvent} param), so request construction lives in
+     * one place. The caller is responsible for any gate evaluation; this method only validates that the
+     * branch refs needed to clone/diff are present (a merged PR retains them, and the handler resolves the
+     * diff from the merge commit's parent).
+     */
+    String submitReviewForLoadedPullRequest(Long workspaceId, PullRequest pr) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-            return "PR missing branch info: prId=" + prId;
+            return "PR missing branch info: prId=" + pr.getId();
         }
 
         ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
@@ -135,7 +147,7 @@ public class AgentJobService {
             pr.getBaseRefName()
         );
 
-        log.info("Dev trigger: submitting review for PR {} ({})", prId, pr.getHtmlUrl());
+        log.info("Dev trigger: submitting review for PR {} ({})", pr.getId(), pr.getHtmlUrl());
 
         Optional<AgentJob> job = submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
         return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
@@ -150,8 +162,17 @@ public class AgentJobService {
         if (issue == null) {
             return "Issue not found: " + issueId;
         }
+        return submitDetectionForLoadedIssue(workspaceId, issue);
+    }
+
+    /**
+     * Build an issue-detection submission from an already-loaded entity and submit it. Shared by the
+     * gate-bypassing dev path ({@link #submitDetectionForIssue}) and the gate-routed dev path
+     * ({@code DevTriggerController} with a {@code triggerEvent} param) so request construction has one home.
+     */
+    String submitDetectionForLoadedIssue(Long workspaceId, Issue issue) {
         if (issue.getRepository() == null) {
-            return "Issue missing repository: issueId=" + issueId;
+            return "Issue missing repository: issueId=" + issue.getId();
         }
         IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
             issue.getId(),
@@ -164,7 +185,7 @@ public class AgentJobService {
             issue.getUpdatedAt()
         );
 
-        log.info("Dev trigger: submitting issue detection for issue {} ({})", issueId, issue.getHtmlUrl());
+        log.info("Dev trigger: submitting issue detection for issue {} ({})", issue.getId(), issue.getHtmlUrl());
 
         Optional<AgentJob> job = submit(workspaceId, AgentJobType.ISSUE_REVIEW, request);
         return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");

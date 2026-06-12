@@ -66,6 +66,20 @@ public class IssueAgentJobEventListener {
         handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_LABELED);
     }
 
+    /**
+     * RETROSPECTIVE trigger: an issue was closed. Unlike {@link #onIssueCreated}/{@link #onIssueLabeled},
+     * this handler runs <em>because</em> the issue is closed — CLOSED is its expected terminal state — so it
+     * routes through {@link #handleRetrospectiveIssueEvent}, which omits the closed-skip. Only
+     * ISSUE-focused practices carrying {@code IssueClosed} match in the gate, so PR-only / non-opted
+     * workspaces short-circuit at no cost.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onIssueClosed(ScmDomainEvent.IssueClosed event) {
+        handleRetrospectiveIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_CLOSED);
+    }
+
     private void handleIssueEvent(ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
         // 1. Skip sync events — agent reviews are for real-time activity only.
         if (context.isSync()) {
@@ -75,6 +89,28 @@ public class IssueAgentJobEventListener {
         if (issueData.state() == Issue.State.CLOSED) {
             return;
         }
+        dispatchIssueEvent(issueData, triggerEventName);
+    }
+
+    /**
+     * Retrospective counterpart of {@link #handleIssueEvent}: routes a closed issue through the gate
+     * WITHOUT the closed-skip (CLOSED is this trigger's reason to run). Sync is still skipped so a history
+     * replay does not fire a retrospective review for every issue the repository ever closed; validate this
+     * path on a synced mirror via the dev-trigger {@code triggerEvent} param, which calls the gate directly.
+     */
+    private void handleRetrospectiveIssueEvent(
+        ScmEventPayload.IssueData issueData,
+        EventContext context,
+        String triggerEventName
+    ) {
+        if (context.isSync()) {
+            return;
+        }
+        // NOTE: intentionally NO closed-state skip — the closed state is this trigger's reason to run.
+        dispatchIssueEvent(issueData, triggerEventName);
+    }
+
+    private void dispatchIssueEvent(ScmEventPayload.IssueData issueData, String triggerEventName) {
         try {
             // 3. Fetch the entity with the associations the gate needs (repository + assignees).
             Issue issue = issueRepository.findByIdWithRepositoryAndAssignees(issueData.id()).orElse(null);
