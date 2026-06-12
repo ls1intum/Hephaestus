@@ -13,6 +13,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.stereotype.Component;
 
 /**
  * Pins two invariants for {@code hephaestus.runtime.*} gates:
@@ -42,31 +43,82 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     private static final String CONDITIONAL_ON_EXPRESSION =
         "org.springframework.boot.autoconfigure.condition.ConditionalOnExpression";
 
+    /** Composed server-role gate; resolved to its meta {@code @ConditionalOnProperty} when scanning. */
+    private static final String CONDITIONAL_ON_SERVER_ROLE =
+        "de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole";
+
     /**
      * Single property-gated config per role. Controllers inside {@code integration.webhook} are
      * implicitly gated via {@code @ConditionalOnBean(JetStreamPublisher.class)} — they auto-load
      * iff {@link de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration} loads, so
      * listing them here would just duplicate the WebhookConfiguration gate.
      */
-    private static final Map<String, String> EXPECTED_GATES = Map.of(
-        "de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration",
-        RuntimeRole.WEBHOOK_PROPERTY,
-        "de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig",
-        RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer",
-        RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener",
-        RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerConfiguration",
-        RuntimeRole.WORKER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.agent.sandbox.docker.DockerSandboxConfiguration",
-        RuntimeRole.WORKER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.agent.sandbox.docker.AgentImagePullBootstrapper",
-        RuntimeRole.WORKER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration",
-        RuntimeRole.SERVER_PROPERTY,
-        "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
-        RuntimeRole.SERVER_PROPERTY
+    private static final Map<String, String> EXPECTED_GATES = Map.ofEntries(
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration",
+            RuntimeRole.WEBHOOK_PROPERTY
+        ),
+        Map.entry("de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig", RuntimeRole.SERVER_PROPERTY),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry("de.tum.cit.aet.hephaestus.workspace.WorkspaceStartupListener", RuntimeRole.SERVER_PROPERTY),
+        Map.entry("de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerConfiguration", RuntimeRole.WORKER_PROPERTY),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.agent.sandbox.docker.DockerSandboxConfiguration",
+            RuntimeRole.WORKER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.agent.sandbox.docker.AgentImagePullBootstrapper",
+            RuntimeRole.WORKER_PROPERTY
+        ),
+        Map.entry("de.tum.cit.aet.hephaestus.core.runtime.hub.HubConfiguration", RuntimeRole.SERVER_PROPERTY),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenExchangeController",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        // WorkspaceContextFilter lives outside core.auth, so allAuthStereotypeBeansAreServerGated()
+        // doesn't cover it — pin it here. (The core.auth beans are covered by that structural test.)
+        Map.entry("de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextFilter", RuntimeRole.SERVER_PROPERTY),
+        // Connection-management OAuth surface — server-only (the worker/webhook never run the OAuth
+        // connect dance). Gating these is what unblocks those pods past HmacOAuthStateService.
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateService",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateNonceStore",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateNonceCleanupJob",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.oauth.OAuthCallbackController",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionController",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionAdminService",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.scm.github.connect.GithubConnectionStrategy",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.scm.gitlab.connect.GitlabConnectionStrategy",
+            RuntimeRole.SERVER_PROPERTY
+        ),
+        Map.entry(
+            "de.tum.cit.aet.hephaestus.integration.slack.connect.SlackConnectionStrategy",
+            RuntimeRole.SERVER_PROPERTY
+        )
     );
 
     /**
@@ -176,6 +228,45 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
         });
     }
 
+    /**
+     * The two {@code core.auth.spi} read-only query impls are the cross-role data-access part of auth
+     * (account identity/role lookups), consumed by the connection-identity service and the workspace /
+     * notification modules on every role. They carry no hard prod env and must stay ungated — unlike the
+     * web/OAuth/issuance layer.
+     */
+    private static final List<String> CROSS_ROLE_AUTH_SPI_IMPLS = List.of(
+        "de.tum.cit.aet.hephaestus.core.auth.AccountIdentityQueryService",
+        "de.tum.cit.aet.hephaestus.core.auth.AccountRoleQueryService"
+    );
+
+    @Test
+    void allAuthStereotypeBeansAreServerGated() {
+        // The whole core.auth module is the user-facing web/auth surface — server-role only, EXCEPT the
+        // cross-role SPI query impls (see CROSS_ROLE_AUTH_SPI_IMPLS). This is the real drift guard: any new
+        // auth stereotype bean added without @ConditionalOnServerRole would re-break the worker/webhook
+        // pods (server.enabled=false). Repositories (interfaces, JPA-only) and @ConfigurationProperties
+        // records are not stereotypes.
+        List<String> ungated = classes
+            .stream()
+            .filter(c -> c.getPackageName().startsWith("de.tum.cit.aet.hephaestus.core.auth"))
+            .filter(c -> !c.isInterface())
+            .filter(c -> !CROSS_ROLE_AUTH_SPI_IMPLS.contains(c.getFullName()))
+            .filter(c -> c.isMetaAnnotatedWith(Component.class))
+            .filter(clazz ->
+                conditionalOnPropertyAnnotations(clazz)
+                    .map(ann -> new ConditionalRef(clazz, ann))
+                    .noneMatch(ref -> ref.propertyNames().anyMatch(name -> name.equals(RuntimeRole.SERVER_PROPERTY)))
+            )
+            .map(JavaClass::getFullName)
+            .collect(Collectors.toList());
+
+        assertThat(ungated)
+            .as(
+                "Every core.auth stereotype bean must carry @ConditionalOnServerRole — the auth web/auth surface is server-role only"
+            )
+            .isEmpty();
+    }
+
     @Test
     void mentorBeansWireUnconditionally() {
         List<String> stillGated = UNCONDITIONAL_MENTOR_BEANS.stream()
@@ -237,6 +328,15 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             .flatMap(ann -> {
                 if (ann.getRawType().isEquivalentTo(ConditionalOnProperty.class)) {
                     return Stream.of(ann);
+                }
+                // @ConditionalOnServerRole composes @ConditionalOnProperty(SERVER_PROPERTY, matchIfMissing=true);
+                // ArchUnit sees only the direct meta-annotation, so resolve its own @ConditionalOnProperty.
+                if (ann.getRawType().getFullName().equals(CONDITIONAL_ON_SERVER_ROLE)) {
+                    return ann
+                        .getRawType()
+                        .getAnnotations()
+                        .stream()
+                        .filter(meta -> meta.getRawType().isEquivalentTo(ConditionalOnProperty.class));
                 }
                 if (ann.getRawType().getFullName().equals(CONDITIONAL_CONTAINER)) {
                     Object value = ann.getProperties().get("value");

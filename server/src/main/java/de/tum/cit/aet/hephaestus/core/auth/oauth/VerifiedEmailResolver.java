@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Component;
  * @see <a href="https://openid.net/specs/openid-connect-core-1_0.html">OIDC Core §5.1</a>
  * @see <a href="https://docs.github.com/en/rest/users/emails">GitHub /user/emails</a>
  */
+@ConditionalOnServerRole
 @Component
 public class VerifiedEmailResolver {
 

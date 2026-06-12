@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.StateBinding;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
  * on both success and failure; only {@code Accept: application/json} requests get
  * 4xx JSON.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/oauth/callback")
 public class OAuthCallbackController {

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Account lookup is always {@code (provider, subject)} — never email (nOAuth defence).
  */
+@ConditionalOnServerRole
 @Component
 public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 

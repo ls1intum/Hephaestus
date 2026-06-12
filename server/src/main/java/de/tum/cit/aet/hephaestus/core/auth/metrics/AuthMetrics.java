@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.metrics;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
  * bounded tag. {@code auth.token.refresh} times the token-rotation critical section in
  * {@code AuthSessionService.refresh}.
  */
+@ConditionalOnServerRole
 @Component
 public class AuthMetrics {
 

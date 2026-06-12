@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthSessionService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Active-session inventory + revocation. Each non-revoked, non-expired issued JWT for the
  * current account is a "session". Thin adapter over {@link AuthSessionService}.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/user/sessions")
 @Tag(name = "Account", description = "Active sessions")

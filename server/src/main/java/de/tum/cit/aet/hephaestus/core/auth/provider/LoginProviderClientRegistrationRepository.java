@@ -24,16 +24,26 @@ public class LoginProviderClientRegistrationRepository
     implements ClientRegistrationRepository, Iterable<ClientRegistration>, IdentityProviderCatalog
 {
 
-    private static final String CALLBACK_TEMPLATE = "{baseUrl}/login/oauth2/code/{registrationId}";
-
     private final LoginProviderRepository loginProviderRepository;
+
+    /**
+     * {@code redirect_uri} template. {@code {baseUrl}} expands per request to the public origin (scheme
+     * + host, restored by native forward-headers); {@code apiBasePath} re-adds the proxy-stripped prefix
+     * so the IdP redirects back to the proxied API path, not the SPA — see {@code AuthProperties#apiBasePath}.
+     */
+    private final String callbackTemplate;
+
     private final Cache<String, ClientRegistration> cache = Caffeine.newBuilder()
         .expireAfterWrite(Duration.ofSeconds(60))
         .maximumSize(256)
         .build();
 
-    public LoginProviderClientRegistrationRepository(LoginProviderRepository loginProviderRepository) {
+    public LoginProviderClientRegistrationRepository(
+        LoginProviderRepository loginProviderRepository,
+        String apiBasePath
+    ) {
         this.loginProviderRepository = loginProviderRepository;
+        this.callbackTemplate = "{baseUrl}" + apiBasePath + "/login/oauth2/code/{registrationId}";
     }
 
     @Override
@@ -79,7 +89,7 @@ public class LoginProviderClientRegistrationRepository
             .clientSecret(provider.getClientSecret())
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri(CALLBACK_TEMPLATE)
+            .redirectUri(callbackTemplate)
             .scope(provider.getScopes().trim().split("\\s+"))
             .userNameAttributeName("id")
             .clientName(provider.getDisplayName());

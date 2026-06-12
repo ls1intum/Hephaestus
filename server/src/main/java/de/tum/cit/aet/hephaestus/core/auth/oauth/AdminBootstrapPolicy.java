@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +36,7 @@ import org.springframework.stereotype.Component;
  * owns the (idempotent, promote-only) mutation inside the login transaction, so the role lands before
  * the JWT is minted. Empty/unset allowlist → fail-closed (no admin path exists).
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Instance-admin bootstrap is keyed by (provider, identity); not workspace-scoped")
 public class AdminBootstrapPolicy {

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.export;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
  * server role), and wrapped in {@link SchedulerLock} so concurrent server pods don't both run the
  * sweep — the same pattern as {@code OAuthStateNonceCleanupJob}.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Pruning account-scoped, workspace-agnostic export rows")
 public class ExportRetentionSweeper {

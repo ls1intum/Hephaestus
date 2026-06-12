@@ -22,10 +22,11 @@ public final class RuntimeRole {
     /**
      * Wired property key for the server-role gate. Gates {@code ServerSchedulingConfig}
      * ({@code @EnableScheduling}), {@code IntegrationNatsConsumer} (the unified
-     * integration-framework NATS pull consumer), and {@code WorkspaceStartupListener}.
-     * Authoritative list lives in
-     * {@code RuntimeRoleBoundaryTest}; setting this flag {@code false} removes those bean
-     * clusters from this JVM while the rest of the monolith continues to load. See ADR 0008.
+     * integration-framework NATS pull consumer), {@code WorkspaceStartupListener}, the entire
+     * user-facing {@code core.auth} web/auth surface and {@code WorkspaceContextFilter} (both via
+     * {@link ConditionalOnServerRole}). Authoritative list lives in {@code RuntimeRoleBoundaryTest};
+     * setting this flag {@code false} removes those bean clusters from this JVM while the rest of the
+     * monolith continues to load. See ADR 0008.
      */
     public static final String SERVER_PROPERTY = PROPERTY_PREFIX + ".server.enabled";
 

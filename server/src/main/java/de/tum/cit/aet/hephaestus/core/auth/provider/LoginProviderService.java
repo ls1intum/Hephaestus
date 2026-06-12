@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
  * edit/enable/disable takes effect immediately rather than after the 60s TTL.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Login providers are instance-global, not workspace-scoped")
 public class LoginProviderService {

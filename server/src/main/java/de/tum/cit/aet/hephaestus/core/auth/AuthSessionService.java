@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt.RevokedReason;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Timer;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * set/clear of the {@code __Host-} cookie. Extracted from {@code AuthLifecycleController}
  * so the controller stays thin (≤5 deps) and the cookie/JWT mechanics live in one place.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Session lifecycle is account-scoped, not workspace-scoped")
 public class AuthSessionService {

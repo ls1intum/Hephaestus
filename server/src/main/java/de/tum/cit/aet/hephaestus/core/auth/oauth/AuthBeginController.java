@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ import org.springframework.web.servlet.view.RedirectView;
  * to the IdP and is read by the success handler (later commit) to decide where to land
  * the user post-login.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
 public class AuthBeginController {
@@ -39,16 +41,21 @@ public class AuthBeginController {
     private final de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver bearerTokenResolver;
     private final org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
 
+    /** Proxy-stripped API prefix re-added to the init redirect — see {@code AuthProperties#apiBasePath}. */
+    private final String apiBasePath;
+
     public AuthBeginController(
         ClientRegistrationRepository clientRegistrationRepository,
         AuthIntentCookie authIntentCookie,
         de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver bearerTokenResolver,
-        de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder jwtDecoder
+        de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder jwtDecoder,
+        de.tum.cit.aet.hephaestus.core.auth.AuthProperties authProperties
     ) {
         this.clientRegistrationRepository = clientRegistrationRepository;
         this.authIntentCookie = authIntentCookie;
         this.bearerTokenResolver = bearerTokenResolver;
         this.jwtDecoder = jwtDecoder;
+        this.apiBasePath = authProperties.apiBasePath();
     }
 
     @GetMapping("/login")
@@ -89,8 +96,10 @@ public class AuthBeginController {
         authIntentCookie.write(response, intent);
         // 302 to Spring's standard initiation endpoint; the OAuth2AuthorizationRequestRedirectFilter
         // takes over from here, building the upstream redirect with state + PKCE (see AuthSecurityConfig).
+        // apiBasePath re-adds the proxy-stripped prefix so the browser lands on the proxied init endpoint,
+        // not the SPA. (The /auth/error targets above are SPA routes at the origin root, so they keep none.)
         String urlEncodedRegistration = URLEncoder.encode(registrationId, StandardCharsets.UTF_8);
-        return new RedirectView(OAUTH_INIT_PATH + urlEncodedRegistration, false);
+        return new RedirectView(apiBasePath + OAUTH_INIT_PATH + urlEncodedRegistration, false);
     }
 
     /**

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * DELETE — same pattern as {@code OAuthStateNonceCleanupJob}. The {@code ix_issued_jwt_expires_at}
  * index backs the range delete.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("The revocation list is account-scoped, not workspace-scoped")
 public class IssuedJwtCleanupJob {

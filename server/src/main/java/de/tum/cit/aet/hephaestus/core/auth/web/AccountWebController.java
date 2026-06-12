@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
  * The current-user singleton: identity, linked accounts, and GDPR account deletion.
  * Thin HTTP adapter — all data access lives in {@link AccountService}.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/user")
 @Tag(name = "Account", description = "Current user identity, linked accounts, deletion")

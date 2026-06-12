@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthSessionService;
 import de.tum.cit.aet.hephaestus.core.auth.impersonation.ImpersonationService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
  * session control — identity reads live on {@code /user}. Cookie + JWT mechanics are
  * delegated to {@link AuthSessionService} so this controller stays thin.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
 @Tag(name = "Auth", description = "Session lifecycle")

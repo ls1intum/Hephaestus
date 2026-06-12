@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.audit;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * so the viewer shows names/emails rather than bare primary keys. Audit rows outlive accounts (deletion,
  * GDPR redaction), so a missing account resolves to {@code null} and the UI falls back to the id.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Auth audit events are account/system-scoped, not workspace-scoped")
 public class AuthAuditService {

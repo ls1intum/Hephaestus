@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.auth.export.AccountExport;
 import de.tum.cit.aet.hephaestus.core.auth.export.AccountExportService;
 import de.tum.cit.aet.hephaestus.core.auth.export.dto.ExportCreatedDTO;
 import de.tum.cit.aet.hephaestus.core.auth.export.dto.ExportStatusDTO;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.net.URI;
@@ -29,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
  * read is scoped to that account, and a foreign export id yields 404 (never 403) to avoid
  * enumeration.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/user/exports")
 @Tag(name = "Account", description = "GDPR Art. 20 self-service data export")
