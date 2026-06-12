@@ -675,6 +675,38 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(clean).doesNotContain("\n\n\n");
     }
 
+    @Test
+    void sanitizeStudentText_repairsLeakedJsonEnvelopeCorruption() {
+        // Live regression (obsphera MR575, 2026-06-13): deepseek terminated the describe-what-and-why
+        // guidance with a leaked serialized-object boundary ('"}") after echoing the final clause, so the
+        // student received garbled text ("…optimal scan quality'\"ws to adjust…quality'\"}\"").
+        String corrupt =
+            "Add a single sentence under ## Description that states the motivation — for example: " +
+            "\"## Why\nAdd a sentence: the problem this change solves, e.g. 'so the user knows to adjust " +
+            "camera position for optimal scan quality'\"ws to adjust camera position for optimal scan quality'\"}\"";
+        String clean = DeliveryComposer.sanitizeStudentText(corrupt);
+        // The leaked envelope boundary is gone and the duplicated trailing clause is collapsed.
+        assertThat(clean).doesNotContain("}\"");
+        assertThat(clean).doesNotContain("'\"ws");
+        assertThat(clean).doesNotContain("scan quality'\"ws to adjust camera position for optimal scan quality");
+        // The salvageable guidance survives intact up to the corruption point.
+        assertThat(clean).startsWith("Add a single sentence under ## Description that states the motivation");
+        assertThat(clean).contains("so the user knows to adjust camera position for optimal scan quality");
+    }
+
+    @Test
+    void sanitizeStudentText_leavesLegitimateBraceAndRepeatedPhraseGuidanceUntouched() {
+        // The envelope-corruption repair must be scoped to the leak signature only: guidance that ends in a
+        // real JSON/code example (closing AT a brace, no trailing outer quote) or that legitimately repeats a
+        // phrase must pass through byte-for-byte.
+        String jsonExample = "Pin the dependency, e.g. add a lockfile entry: {\"fastlane\": \"2.235.0\"}";
+        assertThat(DeliveryComposer.sanitizeStudentText(jsonExample)).isEqualTo(jsonExample);
+        String repeatedPhrase =
+            "Add a Definition of Done section so the work is verifiable; the Definition of Done lists the " +
+            "checkable outcomes.";
+        assertThat(DeliveryComposer.sanitizeStudentText(repeatedPhrase)).isEqualTo(repeatedPhrase);
+    }
+
     // --- Live-E2E regression fixes (go98weh batch, 2026-06-11) ---
 
     @Test

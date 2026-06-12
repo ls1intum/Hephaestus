@@ -437,7 +437,55 @@ class DeliveryComposer {
         // Tidy the gaps the drops leave: doubled spaces, space-before-punctuation, blank lines. Use
         // [ \t] (not \s) so list/heading newlines are never folded away.
         out = out.replaceAll("[ \\t]{2,}", " ").replaceAll("[ \\t]+([.,;])", "$1").replaceAll("\\n{3,}", "\n\n");
-        return out.strip();
+        return stripEnvelopeCorruption(out.strip());
+    }
+
+    /**
+     * A closing brace/bracket immediately followed by ≥1 quote/backslash at the very end of the text:
+     * the serialized-object boundary the agent occasionally leaks INTO a guidance value (observed as a
+     * {@code '"}"} tail on deepseek output). A legitimate inline JSON example ends AT the brace
+     * ({@code {"k":"v"}}) with nothing after it — the trailing outer quote is the discriminator, so this
+     * never fires on a real code/JSON snippet that simply closes with a brace.
+     */
+    private static final Pattern ENVELOPE_TAIL = Pattern.compile("[\"'\\\\]*[}\\]][\"'\\\\]+\\s*$");
+
+    /**
+     * Repairs the JSON-envelope corruption that occasionally reaches student text: the model terminates a
+     * guidance string with a leaked object boundary ({@code …quality'"}"}), often after echoing the final
+     * clause ({@code …quality'"ws to adjust…quality}). Only runs when the unmistakable {@link #ENVELOPE_TAIL}
+     * signature is present, so well-formed guidance — even guidance that legitimately repeats a phrase or
+     * ends in a brace — is never touched. On match: drop the artifact, undo the duplicated trailing run, and
+     * trim the dangling quote/space the cut leaves. Idempotent.
+     */
+    static String stripEnvelopeCorruption(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        java.util.regex.Matcher m = ENVELOPE_TAIL.matcher(text);
+        if (!m.find()) {
+            return text;
+        }
+        String head = dropDuplicatedTail(text.substring(0, m.start()), 12);
+        // Trim the dangling quote/backslash/space the splice leaves (e.g. a now-unbalanced opening quote).
+        return head.replaceAll("[\"'\\\\\\s]+$", "").stripTrailing();
+    }
+
+    /**
+     * If {@code s} ends with a run of ≥{@code minLen} chars that also occurs earlier, cut back to the end of
+     * that earlier occurrence — removing the duplicate and any splice junk between the two copies. Scoped to
+     * the corruption path ({@link #stripEnvelopeCorruption}) only, so a legitimately repeated phrase in
+     * normal guidance is never trimmed.
+     */
+    private static String dropDuplicatedTail(String s, int minLen) {
+        int n = s.length();
+        for (int len = n / 2; len >= minLen; len--) {
+            String suffix = s.substring(n - len);
+            int earlier = s.lastIndexOf(suffix, n - len - 1);
+            if (earlier >= 0) {
+                return s.substring(0, earlier + len);
+            }
+        }
+        return s;
     }
 
     /** Truncate text to the first sentence or maxLen chars, whichever is shorter. */
