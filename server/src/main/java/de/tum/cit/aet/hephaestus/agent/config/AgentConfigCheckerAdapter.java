@@ -16,11 +16,6 @@ public class AgentConfigCheckerAdapter implements AgentConfigChecker {
     }
 
     @Override
-    public boolean hasEnabledConfig(Long workspaceId) {
-        return agentConfigRepository.existsByWorkspaceIdAndEnabledTrue(workspaceId);
-    }
-
-    @Override
     public boolean hasRunnablePracticeConfig(Long workspaceId, Long boundConfigId) {
         if (boundConfigId != null) {
             // Bound: only that specific config runs, and a bound-but-disabled binding pauses detection.

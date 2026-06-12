@@ -52,12 +52,6 @@ class DeliveryComposer {
         PRECOMPUTE_OUT_PREFIX
     );
 
-    /**
-     * Compose delivery content from validated findings.
-     *
-     * @param findings validated findings (may include POSITIVE, NEGATIVE, and NOT_APPLICABLE)
-     * @return delivery content with mrNote and diffNotes, or null if findings list is empty
-     */
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {

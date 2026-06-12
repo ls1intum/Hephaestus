@@ -30,36 +30,7 @@ class GithubPrNodeIdResolver {
     }
 
     String resolve(long scopeId, String owner, String name, int number) {
-        ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("GetPullRequestNodeId")
-            .variable("owner", owner)
-            .variable("name", name)
-            .variable("number", number)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new FeedbackDeliveryException(
-                "Null response resolving PR node ID: " + owner + "/" + name + "#" + number
-            );
-        }
-        gitHubProvider.trackRateLimit(scopeId, response);
-
-        String nodeId = response.field("repository.pullRequest.id").getValue();
-        if (nodeId == null) {
-            List<?> errors = response.getErrors();
-            throw new FeedbackDeliveryException(
-                "PR not found via GraphQL: " +
-                    owner +
-                    "/" +
-                    name +
-                    "#" +
-                    number +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
-        }
-        return nodeId;
+        return resolveNodeId(scopeId, owner, name, number, "GetPullRequestNodeId", "repository.pullRequest.id", "PR");
     }
 
     /**
@@ -68,9 +39,22 @@ class GithubPrNodeIdResolver {
      * field is null for a real issue — the issue must be resolved through {@code repository.issue} instead.
      */
     String resolveIssue(long scopeId, String owner, String name, int number) {
+        return resolveNodeId(scopeId, owner, name, number, "GetIssueNodeId", "repository.issue.id", "Issue");
+    }
+
+    private String resolveNodeId(
+        long scopeId,
+        String owner,
+        String name,
+        int number,
+        String documentName,
+        String idField,
+        String kind
+    ) {
+        String ref = owner + "/" + name + "#" + number;
         ClientGraphQlResponse response = gitHubProvider
             .forScope(scopeId)
-            .documentName("GetIssueNodeId")
+            .documentName(documentName)
             .variable("owner", owner)
             .variable("name", name)
             .variable("number", number)
@@ -78,23 +62,15 @@ class GithubPrNodeIdResolver {
             .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
-            throw new FeedbackDeliveryException(
-                "Null response resolving issue node ID: " + owner + "/" + name + "#" + number
-            );
+            throw new FeedbackDeliveryException("Null response resolving " + kind + " node ID: " + ref);
         }
         gitHubProvider.trackRateLimit(scopeId, response);
 
-        String nodeId = response.field("repository.issue.id").getValue();
+        String nodeId = response.field(idField).getValue();
         if (nodeId == null) {
             List<?> errors = response.getErrors();
             throw new FeedbackDeliveryException(
-                "Issue not found via GraphQL: " +
-                    owner +
-                    "/" +
-                    name +
-                    "#" +
-                    number +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
+                kind + " not found via GraphQL: " + ref + (errors.isEmpty() ? "" : ", errors=" + errors)
             );
         }
         return nodeId;

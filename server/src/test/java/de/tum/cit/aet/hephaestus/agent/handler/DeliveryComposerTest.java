@@ -213,16 +213,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(mrNote).doesNotContain("ProcessInfo.processInfo.environment");
         assertThat(mrNote).doesNotContain("guard let url");
         assertThat(mrNote).doesNotContain("hardcoded directly in source code");
-
-        // All 4 negatives get diff notes with full content
-        assertThat(result.diffNotes()).hasSize(4);
-        DiffNote secretsNote = result
-            .diffNotes()
-            .stream()
-            .filter(n -> n.filePath().equals("Config/APIKeys.swift"))
-            .findFirst()
-            .orElseThrow();
-        assertThat(secretsNote.body()).contains("ProcessInfo.processInfo.environment");
+        // Diff-note content is asserted by compose_diffNotes_allNegativesGetInlineComments.
     }
 
     // Test 2: All positive findings produce an approval comment
@@ -760,9 +751,27 @@ class DeliveryComposerTest extends BaseUnitTest {
         // Every practice abstained: the artifact could not be assessed, so we must deliver NOTHING —
         // never a "nothing to change here" all-clear on work that was never actually evaluated.
         ValidatedFinding na1 = new ValidatedFinding(
-            "issue-scoped-to-single-concern", "n/a", Verdict.NOT_APPLICABLE, Severity.INFO, 0.9f, null, "", null, List.of());
+            "issue-scoped-to-single-concern",
+            "n/a",
+            Verdict.NOT_APPLICABLE,
+            Severity.INFO,
+            0.9f,
+            null,
+            "",
+            null,
+            List.of()
+        );
         ValidatedFinding na2 = new ValidatedFinding(
-            "issue-has-checkable-outcome", "n/a", Verdict.NOT_APPLICABLE, Severity.INFO, 0.9f, null, "", null, List.of());
+            "issue-has-checkable-outcome",
+            "n/a",
+            Verdict.NOT_APPLICABLE,
+            Severity.INFO,
+            0.9f,
+            null,
+            "",
+            null,
+            List.of()
+        );
 
         assertThat(DeliveryComposer.compose(List.of(na1, na2), WorkArtifact.ISSUE)).isNull();
         assertThat(DeliveryComposer.compose(List.of(na1, na2), WorkArtifact.PULL_REQUEST)).isNull();

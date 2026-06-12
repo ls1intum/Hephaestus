@@ -77,8 +77,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(practiceService, times(8)).createPractice(any(), practiceCaptor.capture());
         verify(goalService, times(8)).bindPractice(any(), any(), any());
 
-        // Issue-focused practices are seeded with WorkArtifact.ISSUE — only possible because the
-        // create DTO now carries focusArtifact (the configurability gap this PR closes).
+        // 3 of the 8 practices are issue-focused and must seed with WorkArtifact.ISSUE.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::focusArtifact).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
         assertThat(

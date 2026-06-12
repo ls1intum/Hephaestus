@@ -390,7 +390,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         Set<String> llmPositions = new HashSet<>();
         Set<String> llmQuoted = new HashSet<>();
         for (var f : existing) {
-            if (!"hardcoded-secrets".equals(f.practiceSlug()) || f.verdict() != Verdict.NEGATIVE || f.evidence() == null) {
+            if (
+                !"hardcoded-secrets".equals(f.practiceSlug()) || f.verdict() != Verdict.NEGATIVE || f.evidence() == null
+            ) {
                 continue;
             }
             boolean hadLocation = false;
