@@ -50,6 +50,40 @@ public class BranchGraphContentProvider implements ContentProvider {
     /** Single commit-subject excerpt cap — defends against a pathological multi-KB subject line. */
     static final int MAX_SUBJECT_LENGTH = 200;
 
+    /**
+     * Minimum commits-ahead before the multi-author HINT is even considered. A two- or three-commit
+     * range that two people happened to touch is ordinary collaboration, not a tell that the source
+     * branched off an in-flight feature branch — so we require a substantial range before signalling.
+     */
+    static final int BRANCH_HINT_MIN_COMMITS = 6;
+
+    /**
+     * Integration / long-lived branches that are SUPPOSED to carry many commits from many authors. A
+     * release/integration MR (e.g. {@code develop -> main}) legitimately has a large multi-author range,
+     * so the "branched off an in-flight feature branch" hint must never fire when the SOURCE is one of
+     * these — otherwise every release MR is a false positive.
+     */
+    private static final java.util.Set<String> INTEGRATION_BRANCHES = java.util.Set.of(
+        "main",
+        "master",
+        "develop",
+        "development",
+        "trunk",
+        "integration",
+        "release"
+    );
+
+    /** True when the branch name is an integration branch (bare name or a release/* style prefix). */
+    private static boolean isIntegrationBranch(String branch) {
+        if (branch == null) {
+            return false;
+        }
+        String b = branch.toLowerCase(java.util.Locale.ROOT);
+        int slash = b.lastIndexOf('/');
+        String leaf = slash >= 0 ? b.substring(slash + 1) : b;
+        return INTEGRATION_BRANCHES.contains(leaf) || b.startsWith("release/") || b.startsWith("hotfix/");
+    }
+
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final GitDiffOperations gitDiffOperations;
@@ -136,10 +170,15 @@ public class BranchGraphContentProvider implements ContentProvider {
             }
             int distinctAuthorsInRange = distinctAuthors.size();
 
-            // HINT only (not a verdict): a range carrying many commits authored by more than one
-            // person signals the source likely branched off an in-flight feature branch rather than
-            // the integration branch. The agent decides; we only surface the topology fact.
-            boolean looksBranchedOffFeatureBranch = commitsAhead > 1 && distinctAuthorsInRange > 1;
+            // HINT only (not a verdict, and a deliberately WEAK proxy): a SUBSTANTIAL range carrying
+            // commits from more than one author *may* indicate the source branched off an in-flight
+            // feature branch rather than the integration branch. We cannot observe the merge-base's
+            // branch membership here, so we gate on a commit floor to suppress ordinary two-person
+            // collaboration. The agent decides; we only surface the topology fact + this caveat.
+            boolean looksBranchedOffFeatureBranch =
+                commitsAhead >= BRANCH_HINT_MIN_COMMITS &&
+                distinctAuthorsInRange > 1 &&
+                !isIntegrationBranch(sourceBranch);
 
             ObjectNode out = objectMapper.createObjectNode();
             out.put("sourceBranch", sourceBranch);

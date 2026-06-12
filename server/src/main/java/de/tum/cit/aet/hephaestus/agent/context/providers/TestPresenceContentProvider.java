@@ -180,15 +180,19 @@ public class TestPresenceContentProvider implements ContentProvider {
                     break;
                 }
                 Path path = it.next();
-                visited++;
                 String rel = toRelativePosix(repoPath, path);
                 if (rel == null || rel.isEmpty()) {
                     continue;
                 }
                 // Skip the git database entirely (matches the "/.git/" segment, case-sensitive on purpose).
+                // NOTE: do this BEFORE charging the scan budget — Files.walk cannot prune a subtree, and
+                // the lazily-walked ".git" directory (leading dot sorts early) on a real clone can hold far
+                // more than MAX_FILES_SCANNED loose objects. If ".git" entries counted toward the cap they
+                // would exhaust it before any source file is seen, falsely yielding repoHasTestTarget=false.
                 if (rel.contains("/.git/") || rel.startsWith(".git/") || rel.equals(".git")) {
                     continue;
                 }
+                visited++;
                 if (!Files.isRegularFile(path)) {
                     continue;
                 }

@@ -121,11 +121,15 @@ class BranchGraphContentProviderTest extends BaseUnitTest {
             when(
                 gitDiffOperations.resolveDiffRange(eq(REPO_PATH), eq("main"), eq("feature/auth-fix"), eq("headsha000"))
             ).thenReturn(new String[] { "mergebase111", "headsha000" });
+            // A SUBSTANTIAL range (>= BRANCH_HINT_MIN_COMMITS) spanning two authors trips the hint.
             when(gitRepositoryManager.walkCommits(REPO_ID, "mergebase111", "headsha000")).thenReturn(
                 List.of(
                     commit("c1", "Add login", "alice@example.com"),
                     commit("c2", "Fix token refresh", "bob@example.com"),
-                    commit("c3", "Tidy imports", "alice@example.com")
+                    commit("c3", "Tidy imports", "alice@example.com"),
+                    commit("c4", "Wire keychain", "bob@example.com"),
+                    commit("c5", "Add account view", "alice@example.com"),
+                    commit("c6", "Handle 401", "bob@example.com")
                 )
             );
 
@@ -137,11 +141,36 @@ class BranchGraphContentProviderTest extends BaseUnitTest {
             assertThat(json.get("sourceBranch").asString()).isEqualTo("feature/auth-fix");
             assertThat(json.get("targetBranch").asString()).isEqualTo("main");
             assertThat(json.get("mergeBaseSha").asString()).isEqualTo("mergebase111");
-            assertThat(json.get("commitsAhead").asInt()).isEqualTo(3);
+            assertThat(json.get("commitsAhead").asInt()).isEqualTo(6);
             assertThat(json.get("distinctAuthorsInRange").asInt()).isEqualTo(2);
-            assertThat(json.get("sampleSubjects")).hasSize(3);
             assertThat(json.get("sampleSubjects").get(0).asString()).isEqualTo("Add login");
             assertThat(json.get("looksBranchedOffFeatureBranch").asBoolean()).isTrue();
+        }
+
+        @Test
+        void releaseBranchSourceIsNeverFlagged() throws Exception {
+            // A release/integration MR (develop -> main) legitimately carries a large multi-author range;
+            // it must NOT trip the "branched off a feature branch" hint (MR578 false-positive).
+            ObjectNode md = sampleMetadata();
+            md.put("source_branch", "develop");
+            md.put("target_branch", "main");
+            stubGitAvailable();
+            when(
+                gitDiffOperations.resolveDiffRange(eq(REPO_PATH), eq("main"), eq("develop"), eq("headsha000"))
+            ).thenReturn(new String[] { "mergebase111", "headsha000" });
+            var commits = new java.util.ArrayList<CommitInfo>();
+            for (int i = 0; i < 12; i++) {
+                commits.add(commit("c" + i, "Release commit " + i, (i % 3 == 0 ? "alice" : "bob") + "@example.com"));
+            }
+            when(gitRepositoryManager.walkCommits(REPO_ID, "mergebase111", "headsha000")).thenReturn(commits);
+
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.contribute(request(md), files);
+
+            JsonNode json = objectMapper.readTree(files.get(FILE_KEY));
+            assertThat(json.get("commitsAhead").asInt()).isEqualTo(12);
+            assertThat(json.get("distinctAuthorsInRange").asInt()).isGreaterThan(1);
+            assertThat(json.get("looksBranchedOffFeatureBranch").asBoolean()).isFalse();
         }
 
         @Test

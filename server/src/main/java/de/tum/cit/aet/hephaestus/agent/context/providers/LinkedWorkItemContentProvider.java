@@ -77,8 +77,14 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
         "(?i)\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\b\\s*:?\\s*#(\\d+)"
     );
 
-    /** Bare {@code #N} mention. Group 1 captures the issue number. */
-    private static final Pattern BARE_REF = Pattern.compile("#(\\d+)");
+    /**
+     * Bare {@code #N} mention. Group 1 captures the issue number. A trailing boundary
+     * {@code (?![\w.])} rejects false positives that look like {@code #N} but are not issue refs:
+     * a hex colour ({@code #1a2b}), a version ({@code #1.2}), or a unit ({@code #42px}). The DB
+     * lookup is only a partial safety net here because low numbers (#1–#9) usually DO resolve to a
+     * real issue row, so the wrong work-item would otherwise be materialised.
+     */
+    private static final Pattern BARE_REF = Pattern.compile("#(\\d+)(?![\\w.])");
 
     /**
      * Issue id embedded at the start of a branch-slug segment, e.g. {@code 18-foo} or the
