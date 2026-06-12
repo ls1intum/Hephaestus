@@ -66,7 +66,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         seeder(true).seed();
 
-        // The shipped catalog is eleven goals with twenty-eight practices total, each bound to its goal.
+        // The shipped catalog is eleven goals with thirty-two practices total, each bound to its goal.
         verify(goalService).createGoal(any(), eq("review-ready-work"), any(), any());
         verify(goalService).createGoal(any(), eq("acting-on-review-feedback"), any(), any());
         verify(goalService).createGoal(any(), eq("actionable-issue-authoring"), any(), any());
@@ -75,10 +75,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(goalService, times(11)).createGoal(any(), any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
-        verify(practiceService, times(30)).createPractice(any(), practiceCaptor.capture());
-        verify(goalService, times(30)).bindPractice(any(), any(), any());
+        verify(practiceService, times(32)).createPractice(any(), practiceCaptor.capture());
+        verify(goalService, times(32)).bindPractice(any(), any(), any());
 
-        // 5 of the 30 practices are issue-focused and must seed with WorkArtifact.ISSUE.
+        // 6 of the 32 practices are issue-focused and must seed with WorkArtifact.ISSUE.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::focusArtifact).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
         assertThat(
@@ -86,7 +86,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
                 .stream()
                 .filter(f -> f == WorkArtifact.ISSUE)
                 .count()
-        ).isEqualTo(5);
+        ).isEqualTo(6);
 
         // Every seeded practice's criteria is the per-focus evidence-contract preamble composed onto the
         // practice-specific criteria with a "\n\n---\n\n" fence: a non-empty preamble before the fence,

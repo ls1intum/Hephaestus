@@ -22,10 +22,12 @@ export const TRIGGER_EVENTS_BY_FOCUS: Record<
 		{ value: "PullRequestReady", label: "Marked ready for review" },
 		{ value: "PullRequestSynchronized", label: "New commits are pushed" },
 		{ value: "ReviewSubmitted", label: "A review is submitted" },
+		{ value: "PullRequestMerged", label: "Pull request is merged" },
 	],
 	ISSUE: [
 		{ value: "IssueCreated", label: "Issue is opened" },
 		{ value: "IssueLabeled", label: "Issue is labeled" },
+		{ value: "IssueClosed", label: "Issue is closed" },
 	],
 };
 
@@ -40,8 +42,10 @@ export const TRIGGER_EVENT_SHORT_LABELS: Record<string, string> = {
 	PullRequestReady: "PR ready",
 	PullRequestSynchronized: "PR pushed",
 	ReviewSubmitted: "Review",
+	PullRequestMerged: "PR merged",
 	IssueCreated: "Issue opened",
 	IssueLabeled: "Issue labeled",
+	IssueClosed: "Issue closed",
 };
 
 /** The artifact a practice evaluates. Mirrors the server's WorkArtifact enum. */
