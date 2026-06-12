@@ -81,7 +81,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // materialised neighbourhood files must survive the diff-scope filter.
         ContentProvider.OUTPUT_PREFIX + "linked_work_items.json",
         ContentProvider.OUTPUT_PREFIX + "branch_graph.json",
-        ContentProvider.OUTPUT_PREFIX + "test_presence.json"
+        ContentProvider.OUTPUT_PREFIX + "test_presence.json",
+        ContentProvider.OUTPUT_PREFIX + "review_threads.json"
     );
 
     /**
@@ -97,6 +98,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         "ready-and-traceable-handoff",
         "commit-subjects-explain-each-change",
         "engaging-with-inline-review-comments",
+        // Reviewer-side review practices ground in the review-decision/thread-state context file
+        // (review_threads.json) or comments.json — never a diff line of the change under review.
+        "reviews-substantively-with-understanding",
+        "leaves-useful-specific-review-comments",
+        "reviews-respectfully-asks-rather-than-demands",
         "mr-description-quality",
         "commit-discipline",
         // Cross-context practices: grounded in a neighbourhood context file, not a diff line.

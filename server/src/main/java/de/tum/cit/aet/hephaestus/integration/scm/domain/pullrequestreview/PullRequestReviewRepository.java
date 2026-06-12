@@ -38,6 +38,24 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
     List<PullRequestReview> findAllByPullRequestIdAndProviderId(Long pullRequestId, Long providerId);
 
     /**
+     * All review DECISIONS for a pull request, with the review author eagerly fetched.
+     *
+     * <p>Used by the cross-context {@code ReviewThreadContentProvider} to surface review-decision
+     * state (CHANGES_REQUESTED / APPROVED) — the signal a "merged past unresolved request-changes"
+     * lesson is grounded in, which neither inline comments nor the diff carry. Read-only context
+     * materialisation; the caller establishes workspace scope.
+     */
+    @Query(
+        """
+        SELECT prr
+        FROM PullRequestReview prr
+        LEFT JOIN FETCH prr.author
+        WHERE prr.pullRequest.id = :pullRequestId
+        """
+    )
+    List<PullRequestReview> findAllByPullRequestIdWithAuthor(@Param("pullRequestId") Long pullRequestId);
+
+    /**
      * Batch fetch reviews by IDs with all related entities eagerly loaded.
      *
      * <p>Used by the profile module to hydrate ActivityEvent target entities.
