@@ -11,9 +11,6 @@ services:
     expose:
       - "8080"
     environment:
-      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
-      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
-      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: "prod,webhook"
       HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "true"
@@ -29,7 +26,9 @@ services:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       # DataSource for the JPA layer (the connection-credential AttributeConverter that the HMAC
       # path reads); the auth web layer and workspace-context filter are gated off this role.
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal docker-network DB: skip TLS. Postgres' self-signed cert offers no real protection
+      # here, and the SSL handshake's per-connection NIO direct buffers OOM the JVM's small off-heap default.
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.

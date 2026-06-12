@@ -96,9 +96,6 @@ services:
     ports:
       - "8080"
     environment:
-      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
-      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
-      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
@@ -110,7 +107,9 @@ services:
       # + docker/compose.core.yaml). Disable it here so the receiver beans don't load
       # in application-server (saves RAM; prevents accidental localhost traffic).
       HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal docker-network DB: skip TLS. Postgres' self-signed cert offers no real protection
+      # here, and the SSL handshake's per-connection NIO direct buffers OOM the JVM's small off-heap default.
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       NATS_SERVER: nats://nats-server:4222
@@ -276,9 +275,6 @@ services:
   application-worker:
     image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
     environment:
-      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
-      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
-      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
@@ -302,7 +298,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       # Persistence for the JPA layer the worker shares (connection-credential AttributeConverter,
       # workspace/agent context). The auth web layer is gated off this role, so no auth env is needed.
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal docker-network DB: skip TLS. Postgres' self-signed cert offers no real protection
+      # here, and the SSL handshake's per-connection NIO direct buffers OOM the JVM's small off-heap default.
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.

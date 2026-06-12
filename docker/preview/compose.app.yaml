@@ -190,9 +190,6 @@ services:
     hostname: application-server
     restart: unless-stopped
     environment:
-      # Paketo defaults MaxDirectMemorySize to 10M — too small for the Postgres JDBC SSL pool's
-      # NIO direct buffers, which exhaust and stall DB connections. Container memory is unmanaged.
-      JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=256M"
       SPRING_PROFILES_ACTIVE: prod
       # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
       # Coolify fronts previews with its own proxy — set its ingress regex, not staging's range.
@@ -201,7 +198,9 @@ services:
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal docker-network DB: skip TLS. Postgres' self-signed cert offers no real protection
+      # here, and the SSL handshake's per-connection NIO direct buffers OOM the JVM's small off-heap default.
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       # Shared infrastructure (must match shared-infra service names with UUID suffix)
