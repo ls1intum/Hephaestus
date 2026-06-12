@@ -73,6 +73,9 @@ class PracticeCatalogInjector {
         for (int i = 0; i < practices.size(); i++) {
             Practice p = practices.get(i);
             if (i > 0) indexJson.append(",\n");
+            // goal groups practices for the runner's per-goal evaluation; falls back to the slug so an
+            // ungrouped practice still forms its own one-practice group.
+            String goalSlug = p.getGoal() != null ? p.getGoal().getSlug() : p.getSlug();
             indexJson
                 .append("  {\"slug\": \"")
                 .append(escapeJson(p.getSlug()))
@@ -80,6 +83,8 @@ class PracticeCatalogInjector {
                 .append(escapeJson(p.getName()))
                 .append("\", \"category\": \"")
                 .append(escapeJson(p.getCategory() != null ? p.getCategory() : ""))
+                .append("\", \"goal\": \"")
+                .append(escapeJson(goalSlug))
                 .append("\"}");
         }
         indexJson.append("\n]");

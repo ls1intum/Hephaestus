@@ -437,6 +437,27 @@ function chunkArray(arr, size) {
     return out;
 }
 
+// Group practice slugs by their goal (from index.json), preserving order. A goal forms one coherent,
+// focused evaluation; ungrouped practices fall back to their own one-practice group.
+function loadPracticeGroups() {
+    try {
+        const indexPath = `${CWD}/.practices/index.json`;
+        if (!existsSync(indexPath)) return [];
+        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+        if (!Array.isArray(index)) return [];
+        const byGoal = new Map();
+        for (const p of index) {
+            if (!p.slug) continue;
+            const goal = p.goal || p.slug;
+            if (!byGoal.has(goal)) byGoal.set(goal, []);
+            byGoal.get(goal).push(p.slug);
+        }
+        return [...byGoal.entries()].map(([goal, slugs]) => ({ goal, slugs }));
+    } catch {
+        return [];
+    }
+}
+
 function loadPracticeSlugs() {
     try {
         const indexPath = `${CWD}/.practices/index.json`;
@@ -549,6 +570,10 @@ async function main() {
                     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
                     contextWindow: 131072,
                     maxTokens: 4096,
+                    // Opt into Anthropic-style cache_control markers so the large stable prefix (system
+                    // prompt + the diff/context the agent reads once) is cached across the per-goal turns.
+                    // A no-op if the gateway ignores the markers; verify via usage.cacheRead before relying on it.
+                    compat: { cacheControlFormat: "anthropic", supportsLongCacheRetention: true },
                 },
             ],
         });
@@ -627,36 +652,74 @@ async function main() {
     console.error(`[pi-runner] Starting initial analysis`);
     const startMs = Date.now();
 
-    // Fan-out: a single agent session cannot reliably evaluate many practices in one turn — on a large
-    // diff it runs out of budget and silently skips most. Instead we keep ONE session (it reads the diff
-    // once) and drive it through the practices in focused batches, one prompt per batch. The agent stays
-    // in context across turns and report_finding accumulates, so coverage is reliable and the diff is read
-    // once. The overall hard timeout + watchdog still bound total time; batches stop when it aborts.
+    // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
+    // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
+    // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER GOAL
+    // (a coherent 2-4 practice group); each turn reads only that goal's per-practice criteria. report_finding
+    // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
+    // practice gets a verdict. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
-    const batches = allSlugs.length > batchSize ? chunkArray(allSlugs, batchSize) : [allSlugs];
+    const groups = loadPracticeGroups();
+    const batches = [];
+    if (groups.length > 0) {
+        // One batch per goal; sub-chunk a goal that exceeds batchSize so context stays bounded.
+        for (const g of groups) {
+            for (const chunk of chunkArray(g.slugs, batchSize)) batches.push(chunk);
+        }
+    } else {
+        batches.push(...(allSlugs.length > batchSize ? chunkArray(allSlugs, batchSize) : [allSlugs]));
+    }
     console.error(
-        `[pi-runner] Fan-out: ${allSlugs.length} practices -> ${batches.length} focused batch(es) of <=${batchSize}`,
+        `[pi-runner] Fan-out: ${allSlugs.length} practices in ${groups.length || "?"} goals -> ${batches.length} focused turn(s)`,
     );
 
     try {
         for (let bi = 0; bi < batches.length; bi++) {
             if (hardAborted) {
-                console.error(`[pi-runner] Hard abort fired — stopping batch loop at ${bi}/${batches.length}`);
+                console.error(`[pi-runner] Hard abort fired — stopping turn loop at ${bi}/${batches.length}`);
                 break;
             }
             const batch = batches[bi];
+            const readHint = `Read .practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
             const batchPrompt =
-                bi === 0 || batches.length === 1
-                    ? `${prompt}\n\n## Scope for this turn\nEvaluate ONLY these practices now and persist each with report_finding (one call per finding): ${batch.join(", ")}.`
-                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read files), now evaluate ONLY these practices and persist each with report_finding (one call per finding): ${batch.join(", ")}.`;
+                bi === 0
+                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`
+                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`;
             try {
                 await session.prompt(batchPrompt);
             } catch (err) {
-                console.error(`[pi-runner] batch ${bi + 1}/${batches.length} prompt error: ${err.message}`);
+                console.error(`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${err.message}`);
                 if (hardAborted) break;
             }
-            console.error(`[pi-runner] batch ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
+            console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
+        }
+
+        // Coverage gate: every active practice must get a verdict. Re-prompt the ones no turn reported.
+        if (!hardAborted && allSlugs.length > 0) {
+            const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
+            const missing = allSlugs.filter((s) => !covered.has(s));
+            if (missing.length > 0) {
+                console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
+                const gatePrompt =
+                    `Coverage check. You have NOT yet reported a verdict for these practices: ${missing.join(", ")}. ` +
+                    `Read .practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
+                    `(do NOT re-read the diff). Persist a finding (POSITIVE, NEGATIVE, or NOT_APPLICABLE) for EVERY one ` +
+                    `with report_finding, one call per finding.`;
+                try {
+                    await session.prompt(gatePrompt);
+                } catch (err) {
+                    console.error(`[pi-runner] coverage-gate prompt error: ${err.message}`);
+                }
+                const stillMissing = allSlugs.filter(
+                    (s) => !new Set(reviewState.findings.map((f) => f.practiceSlug)).has(s),
+                );
+                console.error(
+                    `[pi-runner] Coverage gate done: ${allSlugs.length - stillMissing.length}/${allSlugs.length} practices covered`,
+                );
+            } else {
+                console.error(`[pi-runner] Coverage gate: all ${allSlugs.length} practices already reported`);
+            }
         }
     } finally {
         clearTimeout(softTimer);
