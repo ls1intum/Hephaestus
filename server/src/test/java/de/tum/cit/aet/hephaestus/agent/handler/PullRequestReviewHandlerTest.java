@@ -198,7 +198,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // (mr-description-quality, commit-discipline); a regression here makes them silently un-evaluable.
             assertThat(metadata.get("title").asString()).isEqualTo("Fix authentication bug");
             assertThat(metadata.get("body").asString()).isEqualTo("This PR fixes the login issue");
-            assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123def456");
+            // No triggerEvent in sampleRequest() → phase segment is "manual"; head SHA stays the trailing
+            // freshness slot so extractCooldownKeyPrefix scopes cooldown per (pr, phase), not per push.
+            assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:manual:abc123def456");
         }
 
         @Test

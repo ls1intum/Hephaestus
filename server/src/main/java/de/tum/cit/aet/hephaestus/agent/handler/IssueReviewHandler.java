@@ -95,7 +95,11 @@ public class IssueReviewHandler implements JobTypeHandler {
         // per-repo. Without a 4th segment the prefix would collapse to "issue_review:repo:" and block
         // every other issue in the repo.
         String version = r.updatedAt() != null ? String.valueOf(r.updatedAt().toEpochMilli()) : "0";
-        String idempotencyKey = "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + version;
+        // Phase before the version segment: an authoring pass (IssueCreated/Labeled) and a retrospective
+        // (IssueClosed) of the same issue are different reviews and must not dedup against each other.
+        String phase = r.triggerEvent() != null ? r.triggerEvent() : "manual";
+        String idempotencyKey =
+            "issue_review:" + r.repositoryFullName() + ":" + r.issueNumber() + ":" + phase + ":" + version;
         return new JobSubmission(metadata, idempotencyKey);
     }
 

@@ -184,11 +184,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             metadata.put("trigger_event", submissionRequest.triggerEvent());
         }
 
+        // The trigger-event PHASE is part of the key: an authoring review (Created/Ready), a push
+        // re-scan (Synchronized), a reviewer pass (ReviewSubmitted) and a retrospective (Merged) of the
+        // SAME head SHA are DIFFERENT reviews over different practice sets — a retrospective must never be
+        // deduped/cooled-down against an earlier authoring job for the same commit. Phase sits BEFORE the
+        // SHA so extractCooldownKeyPrefix scopes cooldown per (pr, phase).
+        String phase = submissionRequest.triggerEvent() != null ? submissionRequest.triggerEvent() : "manual";
         String idempotencyKey =
             "pr_review:" +
             pullRequestData.repository().nameWithOwner() +
             ":" +
             pullRequestData.number() +
+            ":" +
+            phase +
             ":" +
             submissionRequest.headRefOid();
 

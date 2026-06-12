@@ -100,10 +100,11 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void idempotencyKeyHasDisposableFreshnessSegment() {
-            // Key ends in a 4th (updatedAt) segment so extractCooldownKeyPrefix strips it and cooldown
-            // scopes per-issue, NOT per-repo. An edited issue (new updatedAt) re-reviews.
+            // Key ends in a trailing (updatedAt) freshness segment so extractCooldownKeyPrefix strips it and
+            // cooldown scopes per-issue, NOT per-repo. An edited issue (new updatedAt) re-reviews. The "manual"
+            // phase segment (no triggerEvent here) keeps an authoring pass distinct from an IssueClosed pass.
             JobSubmission submission = handler.createSubmission(sampleRequest());
-            assertThat(submission.idempotencyKey()).isEqualTo("issue_review:owner/repo:12:1700000000000");
+            assertThat(submission.idempotencyKey()).isEqualTo("issue_review:owner/repo:12:manual:1700000000000");
         }
 
         @Test

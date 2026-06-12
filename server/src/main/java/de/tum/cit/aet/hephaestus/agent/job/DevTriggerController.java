@@ -57,6 +57,10 @@ public class DevTriggerController {
     }
 
     @PostMapping("/api/dev/trigger-review")
+    // The gate touches the lazy Workspace.reviewSettings proxy off the loaded PR/Issue (exactly as the
+    // production @Transactional listeners do); without an open session the gate-routed path throws
+    // LazyInitializationException. Keep the whole entry transactional so both the gate and submission share it.
+    @org.springframework.transaction.annotation.Transactional
     public String triggerReview(
         @RequestParam @Nullable Long prId,
         @RequestParam @Nullable Long issueId,
