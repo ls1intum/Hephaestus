@@ -107,7 +107,10 @@ services:
       # + docker/compose.core.yaml). Disable it here so the receiver beans don't load
       # in application-server (saves RAM; prevents accidental localhost traffic).
       HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       NATS_SERVER: nats://nats-server:4222
@@ -296,7 +299,10 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       # Persistence for the JPA layer the worker shares (connection-credential AttributeConverter,
       # workspace/agent context). The auth web layer is gated off this role, so no auth env is needed.
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
