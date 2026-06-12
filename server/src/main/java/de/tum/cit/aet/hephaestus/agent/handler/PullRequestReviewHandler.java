@@ -176,6 +176,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // metadata.body. Without these the practices silently can't evaluate.
         metadata.put("title", pullRequestData.title());
         metadata.put("body", pullRequestData.body());
+        // The lifecycle event that triggered this job. When present, the catalog injector materialises
+        // ONLY the practices whose triggerEvents include it — so an authoring practice is not re-litigated
+        // on a fixup push and a retrospective practice runs only at merge. Null = run the full focus set
+        // (the gate-bypass dev path / bot command).
+        if (submissionRequest.triggerEvent() != null) {
+            metadata.put("trigger_event", submissionRequest.triggerEvent());
+        }
 
         String idempotencyKey =
             "pr_review:" +

@@ -325,7 +325,8 @@ public class AgentJobEventListener {
             prData,
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
-            pr.getBaseRefName()
+            pr.getBaseRefName(),
+            triggerEventName
         );
 
         try {

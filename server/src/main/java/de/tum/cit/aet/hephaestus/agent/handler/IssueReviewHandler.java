@@ -84,6 +84,11 @@ public class IssueReviewHandler implements JobTypeHandler {
         metadata.put("title", r.title());
         metadata.put("body", r.body());
         metadata.put("state", r.state());
+        // Lifecycle event that triggered this job; the injector materialises only the matching practices
+        // (e.g. IssueClosed runs the retrospective set). Null = full focus set (gate-bypass dev path).
+        if (r.triggerEvent() != null) {
+            metadata.put("trigger_event", r.triggerEvent());
+        }
 
         // Trailing freshness segment (mirrors the PR head-SHA slot): an edited issue gets a new key
         // and re-reviews, while extractCooldownKeyPrefix strips it so cooldown scopes per-issue — NOT

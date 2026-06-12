@@ -12,6 +12,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -53,6 +54,23 @@ class PracticeCatalogInjector {
             workspaceId,
             focus
         );
+        // Lifecycle phase-correctness: when the job carries the trigger event that spawned it, materialise
+        // ONLY the practices whose triggerEvents include that event — so an authoring practice is not
+        // re-litigated on a fixup push (PullRequestSynchronized), a reviewer practice runs only after a
+        // review exists, and a retrospective practice runs only at merge/close. A job with no trigger_event
+        // (the gate-bypass dev path / bot command) keeps the full focus set, preserving legacy behaviour.
+        String triggerEvent = triggerEventOf(job);
+        if (triggerEvent != null) {
+            List<Practice> matched = practices
+                .stream()
+                .filter(p -> containsTriggerEvent(p.getTriggerEvents(), triggerEvent))
+                .toList();
+            if (!matched.isEmpty()) {
+                practices = matched;
+            }
+            // If nothing matched (mis-seeded triggerEvents), fall through to the full set rather than fail
+            // the job — the gate already confirmed at least one practice matched before submission.
+        }
         if (practices.isEmpty()) {
             throw new JobPreparationException(
                 "No active " + focus + " practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
@@ -133,5 +151,36 @@ class PracticeCatalogInjector {
         } catch (JacksonException e) {
             return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
         }
+    }
+
+    /** The lifecycle trigger event stored on the job by the handler, or {@code null} if absent. */
+    @org.jspecify.annotations.Nullable
+    private static String triggerEventOf(AgentJob job) {
+        JsonNode metadata = job.getMetadata();
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            return null;
+        }
+        JsonNode node = metadata.get("trigger_event");
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        String event = node.asString();
+        return (event == null || event.isBlank()) ? null : event;
+    }
+
+    /** True iff the practice's {@code triggerEvents} JSONB array contains {@code event} (gate semantics). */
+    private static boolean containsTriggerEvent(
+        @org.jspecify.annotations.Nullable JsonNode triggerEvents,
+        String event
+    ) {
+        if (triggerEvents == null || !triggerEvents.isArray()) {
+            return false;
+        }
+        for (JsonNode n : triggerEvents) {
+            if (event.equals(n.asString())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -135,6 +135,14 @@ public class AgentJobService {
      * diff from the merge commit's parent).
      */
     String submitReviewForLoadedPullRequest(Long workspaceId, PullRequest pr) {
+        return submitReviewForLoadedPullRequest(workspaceId, pr, null);
+    }
+
+    String submitReviewForLoadedPullRequest(
+        Long workspaceId,
+        PullRequest pr,
+        @org.jspecify.annotations.Nullable String triggerEvent
+    ) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
             return "PR missing branch info: prId=" + pr.getId();
         }
@@ -144,7 +152,8 @@ public class AgentJobService {
             prData,
             pr.getHeadRefName(),
             pr.getHeadRefOid(),
-            pr.getBaseRefName()
+            pr.getBaseRefName(),
+            triggerEvent
         );
 
         log.info("Dev trigger: submitting review for PR {} ({})", pr.getId(), pr.getHtmlUrl());
@@ -171,6 +180,14 @@ public class AgentJobService {
      * ({@code DevTriggerController} with a {@code triggerEvent} param) so request construction has one home.
      */
     String submitDetectionForLoadedIssue(Long workspaceId, Issue issue) {
+        return submitDetectionForLoadedIssue(workspaceId, issue, null);
+    }
+
+    String submitDetectionForLoadedIssue(
+        Long workspaceId,
+        Issue issue,
+        @org.jspecify.annotations.Nullable String triggerEvent
+    ) {
         if (issue.getRepository() == null) {
             return "Issue missing repository: issueId=" + issue.getId();
         }
@@ -182,7 +199,8 @@ public class AgentJobService {
             issue.getTitle(),
             issue.getBody() != null ? issue.getBody() : "",
             issue.getState() != null ? issue.getState().name() : "OPEN",
-            issue.getUpdatedAt()
+            issue.getUpdatedAt(),
+            triggerEvent
         );
 
         log.info("Dev trigger: submitting issue detection for issue {} ({})", issue.getId(), issue.getHtmlUrl());

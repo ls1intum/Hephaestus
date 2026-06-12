@@ -30,7 +30,8 @@ public record IssueReviewSubmissionRequest(
     String title,
     String body,
     String state,
-    @Nullable Instant updatedAt
+    @Nullable Instant updatedAt,
+    @Nullable String triggerEvent
 ) implements JobSubmissionRequest {
     public IssueReviewSubmissionRequest {
         Objects.requireNonNull(repositoryFullName, "repositoryFullName must not be null");
@@ -42,5 +43,19 @@ public record IssueReviewSubmissionRequest(
         if (issueNumber <= 0) {
             throw new IllegalArgumentException("issueNumber must be positive, got " + issueNumber);
         }
+    }
+
+    /** Back-compat constructor for callers without a trigger event (gate-bypass dev path). */
+    public IssueReviewSubmissionRequest(
+        long issueId,
+        int issueNumber,
+        long repositoryId,
+        String repositoryFullName,
+        String title,
+        String body,
+        String state,
+        @Nullable Instant updatedAt
+    ) {
+        this(issueId, issueNumber, repositoryId, repositoryFullName, title, body, state, updatedAt, null);
     }
 }

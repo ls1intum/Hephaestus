@@ -146,7 +146,8 @@ public class IssueAgentJobEventListener {
             issue.getTitle(),
             issue.getBody() != null ? issue.getBody() : "",
             issue.getState() != null ? issue.getState().name() : "OPEN",
-            issue.getUpdatedAt()
+            issue.getUpdatedAt(),
+            triggerEventName
         );
         agentJobService
             .submit(detect.workspace().getId(), AgentJobType.ISSUE_REVIEW, request)

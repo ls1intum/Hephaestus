@@ -361,7 +361,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void filtersFindingBackedByNonWhitelistedInternal() {
-            var finding = finding("review-noise", Verdict.NEGATIVE, "context/target/comments.json");
+            // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
+            // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
+            var finding = finding("review-noise", Verdict.NEGATIVE, "context/target/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }

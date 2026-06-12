@@ -97,7 +97,7 @@ public class DevTriggerController {
             " practice(s) for " +
             triggerEvent +
             " -> " +
-            agentJobService.submitReviewForLoadedPullRequest(workspaceId, pr);
+            agentJobService.submitReviewForLoadedPullRequest(workspaceId, pr, triggerEvent);
         };
     }
 
@@ -115,7 +115,7 @@ public class DevTriggerController {
             " practice(s) for " +
             triggerEvent +
             " -> " +
-            agentJobService.submitDetectionForLoadedIssue(workspaceId, issue);
+            agentJobService.submitDetectionForLoadedIssue(workspaceId, issue, triggerEvent);
         };
     }
 }

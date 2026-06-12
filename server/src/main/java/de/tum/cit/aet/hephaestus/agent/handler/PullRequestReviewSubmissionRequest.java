@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#PULL_REQUEST_REVIEW}
@@ -21,7 +22,8 @@ public record PullRequestReviewSubmissionRequest(
     ScmEventPayload.PullRequestData pullRequest,
     String headRefName,
     String headRefOid,
-    String baseRefName
+    String baseRefName,
+    @Nullable String triggerEvent
 ) implements JobSubmissionRequest {
     public PullRequestReviewSubmissionRequest {
         Objects.requireNonNull(pullRequest, "pullRequest must not be null");
@@ -38,5 +40,18 @@ public record PullRequestReviewSubmissionRequest(
         if (baseRefName.isBlank()) {
             throw new IllegalArgumentException("baseRefName must not be blank");
         }
+    }
+
+    /**
+     * Back-compat constructor for callers that do not carry a trigger event (the gate-bypass dev path
+     * and the bot-command path); the job then runs the full focus-active practice set as before.
+     */
+    public PullRequestReviewSubmissionRequest(
+        ScmEventPayload.PullRequestData pullRequest,
+        String headRefName,
+        String headRefOid,
+        String baseRefName
+    ) {
+        this(pullRequest, headRefName, headRefOid, baseRefName, null);
     }
 }
