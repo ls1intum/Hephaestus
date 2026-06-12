@@ -429,6 +429,14 @@ function tryRescueFromTextResponse(sessionState) {
 }
 
 
+function chunkArray(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) {
+        out.push(arr.slice(i, i + size));
+    }
+    return out;
+}
+
 function loadPracticeSlugs() {
     try {
         const indexPath = `${CWD}/.practices/index.json`;
@@ -619,11 +627,36 @@ async function main() {
     console.error(`[pi-runner] Starting initial analysis`);
     const startMs = Date.now();
 
+    // Fan-out: a single agent session cannot reliably evaluate many practices in one turn — on a large
+    // diff it runs out of budget and silently skips most. Instead we keep ONE session (it reads the diff
+    // once) and drive it through the practices in focused batches, one prompt per batch. The agent stays
+    // in context across turns and report_finding accumulates, so coverage is reliable and the diff is read
+    // once. The overall hard timeout + watchdog still bound total time; batches stop when it aborts.
+    const allSlugs = loadPracticeSlugs();
+    const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
+    const batches = allSlugs.length > batchSize ? chunkArray(allSlugs, batchSize) : [allSlugs];
+    console.error(
+        `[pi-runner] Fan-out: ${allSlugs.length} practices -> ${batches.length} focused batch(es) of <=${batchSize}`,
+    );
+
     try {
-        try {
-            await session.prompt(prompt);
-        } catch (err) {
-            console.error(`[pi-runner] Initial prompt error: ${err.message}`);
+        for (let bi = 0; bi < batches.length; bi++) {
+            if (hardAborted) {
+                console.error(`[pi-runner] Hard abort fired — stopping batch loop at ${bi}/${batches.length}`);
+                break;
+            }
+            const batch = batches[bi];
+            const batchPrompt =
+                bi === 0 || batches.length === 1
+                    ? `${prompt}\n\n## Scope for this turn\nEvaluate ONLY these practices now and persist each with report_finding (one call per finding): ${batch.join(", ")}.`
+                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read files), now evaluate ONLY these practices and persist each with report_finding (one call per finding): ${batch.join(", ")}.`;
+            try {
+                await session.prompt(batchPrompt);
+            } catch (err) {
+                console.error(`[pi-runner] batch ${bi + 1}/${batches.length} prompt error: ${err.message}`);
+                if (hardAborted) break;
+            }
+            console.error(`[pi-runner] batch ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
     } finally {
         clearTimeout(softTimer);
