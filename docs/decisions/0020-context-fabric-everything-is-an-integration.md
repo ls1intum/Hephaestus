@@ -34,6 +34,12 @@ the **Context Fabric**.
 This ADR records the target architecture *and* is honest that this PR ships only the
 first, smallest slice of it on the existing seam.
 
+## Considered options
+
+1. Build the full Connector SPI plus CAS plus node/edge graph now. Rejected: pays the whole migration cost before the reframe has delivered one lesson.
+2. Keep adding ad-hoc ContentProviders forever. Rejected: a non-SCM connector would have no seam; naming the Fabric now makes the Connector promotion a forcing function, not a rewrite.
+3. Ship the slice on the existing seam, target staged-additive (chosen). Reframe proven for one PR, zero schema change.
+
 ## Decision register
 
 The Context Fabric is defined by the following decisions. Most are **target state**
@@ -51,7 +57,7 @@ The Context Fabric is defined by the following decisions. Most are **target stat
    implies bronze is *raw landed truth*; here SQL is truth and the CAS is a derived
    cache, so importing "bronze" would invert the trust direction. See Evidence §Iceberg/
    Databricks for why the rename is load-bearing, not cosmetic.
-3. **One `Connector` SPI, a superset of `ContentProvider`.** The target SPI is a single
+3. **One `Connector` SPI, a superset of `ContentProvider` (target state).** The target SPI is a single
    `Connector` interface that subsumes today's `ContentProvider`: `supports(request)`,
    `required()`, and a `contribute`/`project` step, plus capability declaration and a
    fetch step against the upstream. SCM becomes a *peer* connector of Slack/Outline, not
@@ -86,7 +92,7 @@ The Context Fabric is defined by the following decisions. Most are **target stat
    silently mixed with a fresh one. The delivery path keeps the existing **leak-guard**
    (internal `context/target/*` paths and metadata-only practices are filtered out of
    author-visible diff notes unless explicitly allow-listed).
-9. **Fail-CLOSED tenancy.** The Fabric does not relax ADR 0004; it hardens it. Target
+9. **Fail-CLOSED tenancy (target state).** The Fabric does not relax ADR 0004; it hardens it. Target
    state pairs a **THROW-mode statement inspector** with **Postgres Row-Level Security
    (RLS)** so a projection query that lacks a `workspace_id` predicate *fails the request*
    rather than falling open. (ADR 0004 ships `log` mode today with a `throw`-in-prod
