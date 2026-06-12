@@ -170,6 +170,15 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         }
 
         @Test
+        void keepsCodeFindingWhenLocationCarriesTheRepoMountPrefix() {
+            // The agent cites files it read as "repo/<path>"; diff-stat paths are repo-relative. The
+            // prefix must be normalised or a valid code finding on a changed file is dropped.
+            var finding = makeFinding("ships-tests-with-the-change", List.of("repo/src/Main.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            assertThat(result).hasSize(1);
+        }
+
+        @Test
         void keepsMetadataLevelPracticeEvenWithOutOfDiffLocation() {
             // A process/metadata-level practice (evidence = commit subjects, not a diff line) must survive
             // even when the agent attaches a stray non-diff location, or its finding is silently dropped.

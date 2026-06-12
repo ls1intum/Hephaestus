@@ -607,7 +607,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
-                if (diffFiles.contains(path) || isInternalContextPath(path)) {
+                // The agent cites files it read under the repo mount as "repo/<path>", but diff-stat
+                // paths are repo-relative ("<path>"). Strip the mount prefix so a code finding on a
+                // genuinely-changed file is not dropped on a cosmetic path mismatch.
+                String repoRelative = path.startsWith("repo/") ? path.substring("repo/".length()) : path;
+                if (diffFiles.contains(path) || diffFiles.contains(repoRelative) || isInternalContextPath(path)) {
                     hasInScopeLocation = true;
                     break;
                 }
