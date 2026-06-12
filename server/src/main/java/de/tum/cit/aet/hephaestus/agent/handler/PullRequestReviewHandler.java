@@ -76,7 +76,12 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ContentProvider.OUTPUT_PREFIX + "metadata.json",
         ContentProvider.OUTPUT_PREFIX + "diff.patch",
         ContentProvider.OUTPUT_PREFIX + "diff_summary.md",
-        ContentProvider.OUTPUT_PREFIX + "comments.json"
+        ContentProvider.OUTPUT_PREFIX + "comments.json",
+        // Cross-context providers (telescope, not cage): a finding grounded in one of these
+        // materialised neighbourhood files must survive the diff-scope filter.
+        ContentProvider.OUTPUT_PREFIX + "linked_work_items.json",
+        ContentProvider.OUTPUT_PREFIX + "branch_graph.json",
+        ContentProvider.OUTPUT_PREFIX + "test_presence.json"
     );
 
     /**
@@ -93,7 +98,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         "commit-subjects-explain-each-change",
         "engaging-with-inline-review-comments",
         "mr-description-quality",
-        "commit-discipline"
+        "commit-discipline",
+        // Cross-context practices: grounded in a neighbourhood context file, not a diff line.
+        "honours-linked-issue-acceptance-criteria",
+        "branches-from-the-integration-branch"
     );
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);

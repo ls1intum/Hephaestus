@@ -75,10 +75,10 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(goalService, times(11)).createGoal(any(), any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
-        verify(practiceService, times(28)).createPractice(any(), practiceCaptor.capture());
-        verify(goalService, times(28)).bindPractice(any(), any(), any());
+        verify(practiceService, times(30)).createPractice(any(), practiceCaptor.capture());
+        verify(goalService, times(30)).bindPractice(any(), any(), any());
 
-        // 5 of the 28 practices are issue-focused and must seed with WorkArtifact.ISSUE.
+        // 5 of the 30 practices are issue-focused and must seed with WorkArtifact.ISSUE.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::focusArtifact).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
         assertThat(
