@@ -239,6 +239,9 @@ class DeliveryComposer {
         if (text == null || text.isBlank()) {
             return text == null ? "" : text;
         }
+        // Unescape literal \n / \t the agent sometimes emits in reasoning/guidance (a JSON escape that
+        // should render as a real line break, e.g. "e.g.:\n- ..."), so it reads as Markdown not raw text.
+        text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "    ");
         // Split on sentence-ending punctuation followed by whitespace so a mid-paragraph rubric sentence
         // is removed wholesale.
         StringBuilder kept = new StringBuilder(text.length());
@@ -420,7 +423,11 @@ class DeliveryComposer {
                     sb.append("```").append(lang).append("\n").append(snippet).append("\n```\n\n");
                 } else {
                     // Metadata field (e.g. a title/body span) → plain inline quote, never a ```json fence.
-                    sb.append("You wrote: “").append(metadataSnippetText(snippet)).append("”\n\n");
+                    // Skipped entirely when the field cleans to a bare number / JSON punctuation.
+                    String quoted = metadataSnippetText(snippet);
+                    if (!quoted.isBlank()) {
+                        sb.append("You wrote: “").append(quoted).append("”\n\n");
+                    }
                 }
             }
 
@@ -454,18 +461,25 @@ class DeliveryComposer {
         // syntax ("title": "...", "body": "...") into the quote. Peel it off: keep only the text after
         // the LAST `"<key>":` separator (the field the finding is actually about). This also handles a
         // cleanly terminated single field, which the prior trailing-anchored regex required.
-        var field = Pattern.compile("\"[A-Za-z_][A-Za-z0-9_]*\"\\s*:\\s*\"").matcher(s);
+        // The leading "<key>": may carry a quoted value ("body": "...") or a bare one ("additions": 2306,
+        // "commits": [ {) — make the opening quote optional so numeric/array fields are peeled too.
+        var field = Pattern.compile("\"[A-Za-z_][A-Za-z0-9_]*\"\\s*:\\s*\"?").matcher(s);
         int valueStart = -1;
         while (field.find()) {
             valueStart = field.end();
         }
         if (valueStart >= 0) {
             s = s.substring(valueStart);
-            // Drop whatever follows this value's closing quote (the next "," field or a "} brace) and
-            // any bare trailing quote a fully-terminated value leaves behind.
-            s = s.replaceAll("\"\\s*[,}].*$", "").replaceAll("\"\\s*$", "");
+            // Drop whatever follows this value (the next "," field, a closing }/] brace) and a bare
+            // trailing quote a fully-terminated value leaves behind.
+            s = s.replaceAll("\"?\\s*[,}\\]].*$", "").replaceAll("\"\\s*$", "");
         }
         s = s.replace("\\n", " ").replace("\\t", " ").replace("\\\"", "\"").replaceAll("\\s+", " ").strip();
+        // A metadata value that is just a number or JSON punctuation is not worth quoting back to the
+        // developer ("You wrote: 2306" / "You wrote: [ {") — return blank so the caller drops the line.
+        if (s.isBlank() || s.matches("[\\d\\s.,:{}\\[\\]\"]+")) {
+            return "";
+        }
         return s.length() > 160 ? s.substring(0, 157) + "..." : s;
     }
 
