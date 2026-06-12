@@ -39,6 +39,15 @@ import tools.jackson.databind.JsonNode;
  */
 class DeliveryComposer {
 
+    /**
+     * How many non-blocking (MINOR/INFO) improvement suggestions we surface in full before collapsing
+     * the rest into an honest overflow line. The mentor usefulness bar is ~1-3 highest-leverage lessons
+     * per artifact; every blocking (CRITICAL/MAJOR) issue is ALWAYS kept on top of this, so a PR with two
+     * blockers plus this cap still lands the few things that actually change the next MR rather than a
+     * 10-item pile-on. Tuned so blocking + cap stays within the small-handful bar. NEVER caps blocking.
+     */
+    static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
+
     /** Practices that are inherently non-inlinable (no file-level location). */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
 
@@ -113,6 +122,25 @@ class DeliveryComposer {
             negatives = dedupEpicStructure(negatives);
         }
 
+        // PRIORITISE + CAP THE LONG TAIL. Detection legitimately fires many low-value MINOR/INFO nudges;
+        // surfacing all of them buries the 1-3 highest-leverage lessons under a pile-on. Keep EVERY
+        // blocking (CRITICAL/MAJOR) finding — those must never be silently dropped — then keep only the
+        // top MAX_IMPROVEMENT_SUGGESTIONS non-blocking ones (already severity-sorted; ties broken by
+        // confidence so the most-certain nudge wins), and remember how many we collapsed so the opening
+        // can own it honestly with a "+N more minor suggestions" line. The capped list — not the raw one —
+        // is what flows into the inline/summary partition and the diff notes below, so a dropped nudge
+        // leaves no inline comment either.
+        int improvementOverflow = 0;
+        long blockingTotal = negatives
+            .stream()
+            .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
+            .count();
+        long improvementTotal = negatives.size() - blockingTotal;
+        if (improvementTotal > MAX_IMPROVEMENT_SUGGESTIONS) {
+            negatives = capImprovementTail(negatives);
+            improvementOverflow = (int) (improvementTotal - MAX_IMPROVEMENT_SUGGESTIONS);
+        }
+
         // No negatives → an observation note over the POSITIVE findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings
@@ -151,7 +179,7 @@ class DeliveryComposer {
             .toList();
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview
-        String mrNote = composeMrNote(positives, negatives, nonInlinable, inlinable, artifact);
+        String mrNote = composeMrNote(positives, negatives, nonInlinable, inlinable, artifact, improvementOverflow);
 
         // Diff notes: ALL inlinable negatives get inline comments
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
@@ -183,6 +211,45 @@ class DeliveryComposer {
                 epicKept = true;
             }
             kept.add(f);
+        }
+        return kept;
+    }
+
+    /**
+     * Caps the non-blocking (MINOR/INFO) improvement tail to {@link #MAX_IMPROVEMENT_SUGGESTIONS}. EVERY
+     * blocking (CRITICAL/MAJOR) finding is kept — blocking is never capped. Among the non-blocking
+     * findings the kept ones are the highest-severity, then highest-confidence (most certain nudge wins a
+     * tie); the rest are collapsed into the overflow count the caller renders. The returned list preserves
+     * the incoming severity ordering so the existing lead-with-blocking layout is untouched. Caller only
+     * invokes this when the non-blocking count actually exceeds the cap.
+     */
+    private static List<ValidatedFinding> capImprovementTail(List<ValidatedFinding> negatives) {
+        List<ValidatedFinding> blocking = new ArrayList<>();
+        List<ValidatedFinding> improvements = new ArrayList<>();
+        for (ValidatedFinding f : negatives) {
+            if (f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR) {
+                blocking.add(f);
+            } else {
+                improvements.add(f);
+            }
+        }
+        // Pick the few highest-leverage improvements: severity (MINOR before INFO) then confidence desc.
+        Set<ValidatedFinding> keptImprovements = improvements
+            .stream()
+            .sorted(
+                Comparator.comparingInt((ValidatedFinding f) -> f.severity().ordinal()).thenComparing(
+                    Comparator.comparingDouble(ValidatedFinding::confidence).reversed()
+                )
+            )
+            .limit(MAX_IMPROVEMENT_SUGGESTIONS)
+            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+
+        // Re-emit in the original (severity-sorted) order, dropping the improvements that did not survive.
+        List<ValidatedFinding> kept = new ArrayList<>(blocking.size() + keptImprovements.size());
+        for (ValidatedFinding f : negatives) {
+            if (blocking.contains(f) || keptImprovements.contains(f)) {
+                kept.add(f);
+            }
         }
         return kept;
     }
@@ -431,7 +498,8 @@ class DeliveryComposer {
         List<ValidatedFinding> allNegatives,
         List<ValidatedFinding> nonInlinable,
         List<ValidatedFinding> inlinable,
-        WorkArtifact artifact
+        WorkArtifact artifact,
+        int improvementOverflow
     ) {
         var sb = new StringBuilder(4096);
 
@@ -450,8 +518,9 @@ class DeliveryComposer {
             }
         }
 
-        // Opening: evidence-anchored issue summary (no self-level praise)
-        composeOpening(sb, allNegatives, artifact);
+        // Opening: evidence-anchored issue summary (no self-level praise). The overflow count is owned
+        // here so the student is told honestly that lower-value nudges were collapsed, not hidden.
+        composeOpening(sb, allNegatives, artifact, improvementOverflow);
 
         // F5: when blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
         // a WARRANTED, specific PROCESS-level positive (a named good act — engaging with review, revealing
@@ -493,14 +562,27 @@ class DeliveryComposer {
         return sb.toString();
     }
 
-    private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, WorkArtifact artifact) {
+    private static void composeOpening(
+        StringBuilder sb,
+        List<ValidatedFinding> negatives,
+        WorkArtifact artifact,
+        int improvementOverflow
+    ) {
         // PRs are merged → "to fix before merging"; issues are not → "to fix".
         String blockingCta = artifact == WorkArtifact.PULL_REQUEST ? " to fix before merging" : " to fix";
         long blockingCount = negatives
             .stream()
             .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
             .count();
+        // negatives is the CAPPED list, so this is the count we actually expand below. The collapsed
+        // remainder is carried separately in improvementOverflow and disclosed via the overflow tail.
         long improvementCount = negatives.size() - blockingCount;
+        // "+N more minor suggestions" — honest disclosure that lower-value nudges were folded away so the
+        // student is never silently shorted, while the note still leads with the few that matter.
+        String overflowTail =
+            improvementOverflow > 0
+                ? " (+" + improvementOverflow + " more minor suggestion" + (improvementOverflow == 1 ? "" : "s") + ")"
+                : "";
 
         if (blockingCount > 0 && improvementCount > 0) {
             sb
@@ -510,8 +592,13 @@ class DeliveryComposer {
                 .append(", plus ")
                 .append(improvementCount)
                 .append(improvementCount == 1 ? " suggestion" : " suggestions")
-                .append(" for improvement:\n\n");
+                .append(" for improvement")
+                .append(overflowTail)
+                .append(":\n\n");
         } else if (blockingCount > 0) {
+            // No surviving improvements (improvementCount == 0). Overflow is impossible here: the cap keeps
+            // MAX_IMPROVEMENT_SUGGESTIONS improvements whenever it collapses any, so overflow > 0 always
+            // leaves improvementCount > 0 (the branch above). Plain blocking-only opener.
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
@@ -521,7 +608,9 @@ class DeliveryComposer {
             sb
                 .append(improvementCount)
                 .append(improvementCount == 1 ? " suggestion" : " suggestions")
-                .append(" for improvement:\n\n");
+                .append(" for improvement")
+                .append(overflowTail)
+                .append(":\n\n");
         }
     }
 

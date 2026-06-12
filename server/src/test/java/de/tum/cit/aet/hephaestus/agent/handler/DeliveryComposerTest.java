@@ -352,10 +352,10 @@ class DeliveryComposerTest extends BaseUnitTest {
         String mrNote = result.mrNote();
         assertThat(mrNote).isNotNull();
 
-        // All inlinable → compact list, no overflow message
+        // 2 blocking ALWAYS kept; the 5 non-blocking (4 MINOR + 1 INFO) tail is capped to 3, with the
+        // remaining 2 disclosed honestly as overflow. The INFO and the lowest MINOR are the ones folded.
         assertThat(mrNote).contains("2 issues to fix before merging");
-        assertThat(mrNote).contains("5 suggestions for improvement");
-        assertThat(mrNote).doesNotContain("Plus");
+        assertThat(mrNote).contains("3 suggestions for improvement (+2 more minor suggestions):");
 
         // Severity ordering in compact list: CRITICAL first (🔴), then MAJOR (🟠)
         int criticalIdx = mrNote.indexOf("\uD83D\uDD34");
@@ -363,8 +363,10 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(criticalIdx).isGreaterThanOrEqualTo(0);
         assertThat(majorIdx).isGreaterThan(criticalIdx);
 
-        // All 7 negatives get diff notes
-        assertThat(result.diffNotes()).hasSize(7);
+        // Only the kept findings get diff notes: 2 blocking + 3 improvements = 5 (not the raw 7). A
+        // capped/dropped nudge leaves no inline comment behind.
+        assertThat(result.diffNotes()).hasSize(5);
+        assertThat(mrNote).doesNotContain("Missing labels");
     }
 
     // Test 4: All negatives get inline diff notes
@@ -992,5 +994,124 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).doesNotContain("Worth keeping");
         assertThat(dc.mrNote()).doesNotContain("Nice work");
+    }
+
+    // ----- Improvement-tail prioritisation + cap (the proportionality fix) -----
+
+    private ValidatedFinding negativeWithConfidence(String slug, String title, Severity severity, float confidence) {
+        return new ValidatedFinding(
+            slug,
+            title,
+            Verdict.NEGATIVE,
+            severity,
+            confidence,
+            buildEvidence(List.of(new LocationSpec(slug + ".swift", 10)), null),
+            title + " reasoning.",
+            null,
+            List.of()
+        );
+    }
+
+    @Test
+    void compose_capsMinorTail_keepsThreeAndDisclosesOverflowHonestly() {
+        // 6 MINOR improvements, zero blocking — the long-tail pile-on the bar rejects. Cap to 3 + "+3 more".
+        List<ValidatedFinding> findings = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            findings.add(negativeWithConfidence("nudge-" + i, "Minor nudge " + i, Severity.MINOR, 0.90f));
+        }
+
+        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        String mrNote = result.mrNote();
+        // Only 3 surfaced; the remaining 3 are disclosed, never silently dropped.
+        assertThat(mrNote).contains("3 suggestions for improvement (+3 more minor suggestions):");
+        // Cap also caps the inline diff notes — collapsed nudges leave no comment behind.
+        assertThat(result.diffNotes()).hasSize(3);
+    }
+
+    @Test
+    void compose_neverCapsBlocking_evenWithManyBlockers() {
+        // 5 blocking (CRITICAL/MAJOR) + 4 MINOR. Blocking must ALL survive; only the MINOR tail is capped.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        findings.add(negativeWithConfidence("sec-1", "Secret 1", Severity.CRITICAL, 0.95f));
+        findings.add(negativeWithConfidence("sec-2", "Secret 2", Severity.CRITICAL, 0.95f));
+        findings.add(negativeWithConfidence("crash-1", "Crash 1", Severity.MAJOR, 0.9f));
+        findings.add(negativeWithConfidence("crash-2", "Crash 2", Severity.MAJOR, 0.9f));
+        findings.add(negativeWithConfidence("crash-3", "Crash 3", Severity.MAJOR, 0.9f));
+        for (int i = 1; i <= 4; i++) {
+            findings.add(negativeWithConfidence("minor-" + i, "Minor " + i, Severity.MINOR, 0.9f));
+        }
+
+        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        String mrNote = result.mrNote();
+        // All 5 blockers kept, MINOR tail capped 4→3, one collapsed.
+        assertThat(mrNote).contains(
+            "5 issues to fix before merging, plus 3 suggestions for improvement (+1 more minor suggestion):"
+        );
+        // 5 blocking + 3 improvements = 8 diff notes (raw was 9).
+        assertThat(result.diffNotes()).hasSize(8);
+    }
+
+    @Test
+    void compose_underTheCap_noOverflowTail() {
+        // Exactly 3 improvements: at the cap, nothing collapses, no overflow tail.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        for (int i = 1; i <= 3; i++) {
+            findings.add(negativeWithConfidence("nudge-" + i, "Minor nudge " + i, Severity.MINOR, 0.9f));
+        }
+
+        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        assertThat(result.mrNote()).contains("3 suggestions for improvement:");
+        assertThat(result.mrNote()).doesNotContain("more minor suggestion");
+        assertThat(result.diffNotes()).hasSize(3);
+    }
+
+    @Test
+    void compose_tieBreaksByConfidence_keepsMostCertainNudges() {
+        // 4 MINORs, distinct confidences. Cap keeps the 3 highest-confidence; the lowest is collapsed.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        findings.add(negativeWithConfidence("low", "Low confidence nudge", Severity.MINOR, 0.50f));
+        findings.add(negativeWithConfidence("high-a", "High A nudge", Severity.MINOR, 0.95f));
+        findings.add(negativeWithConfidence("high-b", "High B nudge", Severity.MINOR, 0.92f));
+        findings.add(negativeWithConfidence("high-c", "High C nudge", Severity.MINOR, 0.90f));
+
+        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        String mrNote = result.mrNote();
+        assertThat(mrNote).contains("3 suggestions for improvement (+1 more minor suggestion):");
+        // The three certain nudges survive; the least-certain one is the collapsed overflow.
+        assertThat(mrNote).contains("High A nudge");
+        assertThat(mrNote).contains("High B nudge");
+        assertThat(mrNote).contains("High C nudge");
+        assertThat(mrNote).doesNotContain("Low confidence nudge");
+    }
+
+    @Test
+    void compose_keepsMinorOverInfo_infoIsTheFirstToCollapse() {
+        // 3 MINOR + 2 INFO, cap 3. Severity beats confidence: the two INFO collapse first regardless of conf.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        findings.add(negativeWithConfidence("minor-1", "Minor one", Severity.MINOR, 0.60f));
+        findings.add(negativeWithConfidence("minor-2", "Minor two", Severity.MINOR, 0.60f));
+        findings.add(negativeWithConfidence("minor-3", "Minor three", Severity.MINOR, 0.60f));
+        findings.add(negativeWithConfidence("info-1", "Info one", Severity.INFO, 0.99f));
+        findings.add(negativeWithConfidence("info-2", "Info two", Severity.INFO, 0.99f));
+
+        DeliveryContent result = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        String mrNote = result.mrNote();
+        assertThat(mrNote).contains("3 suggestions for improvement (+2 more minor suggestions):");
+        assertThat(mrNote).contains("Minor one");
+        assertThat(mrNote).contains("Minor two");
+        assertThat(mrNote).contains("Minor three");
+        // High-confidence INFO still collapses — proportionality favours the more-severe lesson.
+        assertThat(mrNote).doesNotContain("Info one");
+        assertThat(mrNote).doesNotContain("Info two");
     }
 }
