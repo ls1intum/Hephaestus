@@ -42,6 +42,35 @@ class DeliveryComposer {
     /** Practices that are inherently non-inlinable (no file-level location). */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
 
+    /**
+     * Issue-structure practices that all express the same underlying lesson on an epic — "give this
+     * large issue trackable structure". When two or more fire NEGATIVE on the SAME issue they stack
+     * near-duplicate "this epic needs structure" bullets, so on an ISSUE artifact we keep only the
+     * highest-severity one (F4). Scoped narrowly to this set so distinct lessons are never collapsed.
+     */
+    private static final Set<String> EPIC_STRUCTURE_PRACTICES = Set.of(
+        "issue-scoped-to-single-concern",
+        "issue-has-checkable-outcome",
+        "breaks-large-work-into-trackable-subtasks"
+    );
+
+    /**
+     * Process-level practices whose POSITIVE is a named good ACT (engaging with review, revealing
+     * intent) rather than a code-correctness claim. Only these may surface as the single subordinate
+     * reinforcement line when blocking issues exist (F5) — so a correctness positive can never leak
+     * into a blocking note.
+     */
+    private static final Set<String> PROCESS_POSITIVE_PRACTICES = Set.of(
+        "engaging-with-inline-review-comments",
+        "acting-on-review-feedback",
+        "intent-revealing-comments"
+    );
+
+    /** Strips a leading "repo/" path segment so a student-facing location stays repo-relative (F3). */
+    private static String repoRelative(String path) {
+        return path.startsWith("repo/") ? path.substring("repo/".length()) : path;
+    }
+
     /** Paths that are internal workspace artifacts, not student code. */
     private static final List<String> INTERNAL_PATH_PREFIXES = List.of(
         CONTEXT_TARGET_PREFIX,
@@ -73,6 +102,16 @@ class DeliveryComposer {
             .filter(f -> f.verdict() == Verdict.NEGATIVE)
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
+
+        // F4: on an epic ISSUE the issue-structure detectors (scoped/checkable/subtasks) all say the
+        // same thing — "this epic needs trackable structure". Collapse them to the single highest-
+        // severity one so the student gets one clear lesson, not 3-4 stacked near-duplicate bullets.
+        // Severity-sorted above (CRITICAL ordinal 0 first), so the first epic-structure finding seen is
+        // the lead we keep; later ones are the redundant siblings we drop. Conservative: ISSUE-only,
+        // and only within EPIC_STRUCTURE_PRACTICES, so distinct lessons are never merged.
+        if (artifact == WorkArtifact.ISSUE) {
+            negatives = dedupEpicStructure(negatives);
+        }
 
         // No negatives → an observation note over the POSITIVE findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
@@ -118,6 +157,34 @@ class DeliveryComposer {
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
 
         return new DeliveryContent(mrNote, diffNotes);
+    }
+
+    /**
+     * Collapses overlapping epic issue-structure NEGATIVE findings (F4). Keeps the FIRST
+     * {@link #EPIC_STRUCTURE_PRACTICES} finding encountered (the list is severity-sorted, so that is the
+     * highest-severity lead) and drops the rest; every non-epic-structure finding passes through
+     * untouched and in order. No-op when fewer than two epic-structure findings are present.
+     */
+    private static List<ValidatedFinding> dedupEpicStructure(List<ValidatedFinding> negatives) {
+        long epicCount = negatives
+            .stream()
+            .filter(f -> EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug()))
+            .count();
+        if (epicCount < 2) {
+            return negatives;
+        }
+        List<ValidatedFinding> kept = new ArrayList<>(negatives.size());
+        boolean epicKept = false;
+        for (ValidatedFinding f : negatives) {
+            if (EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug())) {
+                if (epicKept) {
+                    continue; // redundant sibling — same epic-structure lesson as the lead already kept
+                }
+                epicKept = true;
+            }
+            kept.add(f);
+        }
+        return kept;
     }
 
     /**
@@ -198,6 +265,26 @@ class DeliveryComposer {
         // strength in front of two suggestions reads "one thing to tighten:" above a list of two.
         String tail = improvementCount > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
         return "Nice work " + strengths + tail;
+    }
+
+    /**
+     * Builds the single subordinate process-positive line allowed alongside blocking issues (F5).
+     * Picks the first POSITIVE whose practice is in {@link #PROCESS_POSITIVE_PRACTICES} (a named good
+     * process act, never code-correctness) and renders it as one short subordinate line. Returns "" when
+     * no eligible process positive exists — keeping the blocking note free of any hollow reinforcement.
+     */
+    static String composeSubordinateProcessPositive(List<ValidatedFinding> positives) {
+        if (positives == null || positives.isEmpty()) {
+            return "";
+        }
+        return positives
+            .stream()
+            .filter(f -> PROCESS_POSITIVE_PRACTICES.contains(f.practiceSlug()))
+            .map(f -> STRENGTH_PHRASES.getOrDefault(f.practiceSlug(), humanisePracticeSlug(f.practiceSlug())))
+            .filter(p -> p != null && !p.isBlank())
+            .findFirst()
+            .map(p -> "Worth keeping: you're " + p + ".")
+            .orElse("");
     }
 
     /** Fallback strength phrase for a practice not in {@link #STRENGTH_PHRASES}: the slug with dashes as spaces. */
@@ -353,6 +440,18 @@ class DeliveryComposer {
 
         // Opening: evidence-anchored issue summary (no self-level praise)
         composeOpening(sb, allNegatives, artifact);
+
+        // F5: when blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
+        // a WARRANTED, specific PROCESS-level positive (a named good act — engaging with review, revealing
+        // intent) should still land. Surface AT MOST ONE, subordinate: a short single line AFTER the issue
+        // count, never a sandwich opener, and only from PROCESS_POSITIVE_PRACTICES so a code-correctness
+        // positive can never leak into a blocking note.
+        if (hasBlocking) {
+            String reinforcement = composeSubordinateProcessPositive(positives);
+            if (!reinforcement.isEmpty()) {
+                sb.append(reinforcement).append("\n\n");
+            }
+        }
 
         // Non-inlinable findings (full detail) — these only exist in the summary
         for (int i = 0; i < nonInlinable.size(); i++) {
@@ -572,7 +671,7 @@ class DeliveryComposer {
         if (!first.isObject()) return null;
         JsonNode pathNode = first.get("path");
         if (pathNode == null || !pathNode.isString()) return null;
-        String path = pathNode.asString();
+        String path = repoRelative(pathNode.asString());
         JsonNode startLineNode = first.get("startLine");
         if (startLineNode != null && startLineNode.isNumber()) {
             return path + ":" + startLineNode.asInt();

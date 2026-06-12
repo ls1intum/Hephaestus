@@ -827,4 +827,150 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(dc.mrNote()).doesNotContain("\"body\"");
         assertThat(dc.mrNote()).doesNotContain("\" : \"");
     }
+
+    // --- Cross-context follow-up fixes (F3 repo-strip, F4 epic dedup, F5 subordinate positive) ---
+
+    @Test
+    void compose_stripsLeadingRepoPrefixFromStudentLocation() {
+        // F3: the agent sees the repo mounted at /workspace/repo and sometimes cites "repo/<path>";
+        // the student-facing location must be repo-relative.
+        var findings = List.of(
+            negativeFinding(
+                "ships-tests-with-the-change",
+                "Production logic without a test",
+                Severity.MINOR,
+                List.of(new LocationSpec("repo/client/Obsphera/Services/APIClient.swift", 12)),
+                null,
+                "New logic added without a test.",
+                "Add a unit test."
+            )
+        );
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).contains("client/Obsphera/Services/APIClient.swift");
+        assertThat(dc.mrNote()).doesNotContain("repo/client/");
+    }
+
+    @Test
+    void compose_epicIssue_collapsesOverlappingStructureFindings() {
+        // F4: on an epic ISSUE the three structure detectors say the same thing — keep the highest-
+        // severity lead, drop the redundant siblings, but never drop a DISTINCT lesson.
+        var findings = List.of(
+            negativeFinding(
+                "issue-scoped-to-single-concern",
+                "Bundles concerns",
+                Severity.MAJOR,
+                null,
+                null,
+                "This epic mixes capture and export concerns.",
+                "Split it."
+            ),
+            negativeFinding(
+                "issue-has-checkable-outcome",
+                "No checkable outcome",
+                Severity.MINOR,
+                null,
+                null,
+                "No acceptance criteria are stated.",
+                "Add criteria."
+            ),
+            negativeFinding(
+                "breaks-large-work-into-trackable-subtasks",
+                "No subtasks",
+                Severity.MINOR,
+                null,
+                null,
+                "No subtask checklist exists.",
+                "Add a checklist."
+            ),
+            negativeFinding(
+                "issue-states-an-actionable-problem",
+                "Missing beneficiary",
+                Severity.MINOR,
+                null,
+                null,
+                "No who/why is stated.",
+                "State the beneficiary."
+            )
+        );
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.ISSUE);
+        assertThat(dc).isNotNull();
+        // The MAJOR structure lead survives; the distinct lesson survives; one redundant sibling is dropped.
+        assertThat(dc.mrNote()).contains("mixes capture and export");
+        assertThat(dc.mrNote()).contains("No who/why is stated");
+        boolean checkableKept = dc.mrNote().contains("No acceptance criteria are stated");
+        boolean subtasksKept = dc.mrNote().contains("No subtask checklist exists");
+        assertThat(checkableKept && subtasksKept).as("at least one redundant sibling dropped").isFalse();
+    }
+
+    @Test
+    void compose_pullRequest_doesNotDedupStructureFindings() {
+        // F4 guard: dedup is ISSUE-only — a PR keeps every finding.
+        var findings = List.of(
+            negativeFinding(
+                "issue-has-checkable-outcome",
+                "x",
+                Severity.MINOR,
+                List.of(new LocationSpec("a.swift", 1)),
+                null,
+                "No acceptance criteria are stated.",
+                "g"
+            ),
+            negativeFinding(
+                "breaks-large-work-into-trackable-subtasks",
+                "y",
+                Severity.MINOR,
+                List.of(new LocationSpec("b.swift", 1)),
+                null,
+                "No subtask checklist exists.",
+                "g"
+            )
+        );
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        assertThat(dc).isNotNull();
+    }
+
+    @Test
+    void compose_blockingIssue_allowsSingleSubordinateProcessPositive() {
+        // F5: under a blocking issue, suppress the cheerful opener but allow ONE subordinate process
+        // positive — and only a process act, never a code-correctness positive.
+        var findings = List.of(
+            positiveFinding("engaging-with-inline-review-comments"),
+            negativeFinding(
+                "hardcoded-secrets",
+                "Hardcoded secret",
+                Severity.CRITICAL,
+                List.of(new LocationSpec("Keys.swift", 1)),
+                List.of("let k=\"s\""),
+                "Secret exposed.",
+                "Use env."
+            )
+        );
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).doesNotContain("Nice work");
+        assertThat(dc.mrNote()).contains("Worth keeping");
+        assertThat(dc.mrNote().indexOf("to fix before merging")).isLessThan(dc.mrNote().indexOf("Worth keeping"));
+    }
+
+    @Test
+    void compose_blockingIssue_codeCorrectnessPositiveNeverSurfaces() {
+        // F5 guard: a non-process (code-correctness) positive never leaks into a blocking note.
+        var findings = List.of(
+            positiveFinding("handles-errors-instead-of-swallowing-them"),
+            negativeFinding(
+                "hardcoded-secrets",
+                "Hardcoded secret",
+                Severity.CRITICAL,
+                List.of(new LocationSpec("Keys.swift", 1)),
+                List.of("let k=\"s\""),
+                "Secret exposed.",
+                "Use env."
+            )
+        );
+        var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        assertThat(dc).isNotNull();
+        assertThat(dc.mrNote()).doesNotContain("Worth keeping");
+        assertThat(dc.mrNote()).doesNotContain("Nice work");
+    }
 }
