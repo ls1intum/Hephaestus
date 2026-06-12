@@ -114,6 +114,22 @@ public class AccountExportService {
             .filter(payload -> payload != null && payload.length > 0);
     }
 
+    /**
+     * Hourly retention enforcement: flips every READY export past its {@code expiresAt} to EXPIRED and
+     * nulls the payload so exported PII isn't retained beyond the download window. One bulk
+     * {@code @Modifying} UPDATE — no BYTEA blobs are loaded into the persistence context.
+     *
+     * <p>{@code @Transactional} is load-bearing: the bulk {@code @Modifying(flushAutomatically = true)}
+     * query needs an active transaction, and the scheduler ({@link ExportRetentionSweeper}) calls this
+     * across a real proxy hop with none of its own.
+     *
+     * @return the number of exports expired by this run
+     */
+    @Transactional
+    public int expireRetention() {
+        return accountExportRepository.expireReadyBefore(Instant.now(clock));
+    }
+
     private ExportStatusDTO toStatus(AccountExport e) {
         return new ExportStatusDTO(
             e.getId(),
