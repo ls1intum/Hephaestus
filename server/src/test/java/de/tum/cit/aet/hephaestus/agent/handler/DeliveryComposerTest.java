@@ -651,6 +651,30 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
+    void sanitizeStudentText_stripsCrossPracticeOrchestrationLeaks() {
+        // Live Obsphera eval (deepseek, pr1/pr6/pr7): the model narrated how findings were ROUTED between
+        // practices into student-facing reasoning — the grader talking to itself about ownership/delivery.
+        // The whole orchestration sentence must be dropped; the real student feedback around it survives.
+        String leak =
+            "test_presence.json reports zero test files. This is the sole owner (cross-practice) of this " +
+            "lesson: ready-and-traceable-handoff suppressed its DoD-honesty contradiction, and " +
+            "ships-tests-with-the-change emitted NOT_APPLICABLE, both deferring here. With zero test files, " +
+            "any Definition-of-Done claim that all tests pass is vacuous. This is a team-wide standing nudge, " +
+            "never a per-MR blocker.";
+        String clean = DeliveryComposer.sanitizeStudentText(leak);
+        assertThat(clean).doesNotContain("cross-practice");
+        assertThat(clean).doesNotContain("sole owner");
+        assertThat(clean).doesNotContain("deferring here");
+        assertThat(clean).doesNotContain("suppressed its");
+        assertThat(clean).doesNotContain("emitted NOT_APPLICABLE");
+        assertThat(clean).doesNotContain("standing nudge");
+        assertThat(clean).doesNotContain("per-MR blocker");
+        // The genuine student-facing sentences survive intact.
+        assertThat(clean).contains("zero test files");
+        assertThat(clean).contains("Definition-of-Done claim that all tests pass is vacuous");
+    }
+
+    @Test
     void sanitizeStudentText_preservesMarkdownListAndHeadingNewlines() {
         // Live regression (obsphera CR2, 2026-06-12): a bulleted acceptance-criteria block whose items
         // each end in '.' was collapsed onto one run-on line ("session. - Users can create") because the

@@ -404,7 +404,20 @@ class DeliveryComposer {
             "\\bgenerated/vendored\\s+(?:check|exclusion|dominance)\\b|" +
             "\\bpartition\\s+after\\b|" +
             "\\bnoiseFraction\\b|" +
-            "\\b[A-Z]\\s*=\\s*(?:true|false)\\b" + // P=true, etc.
+            "\\b[A-Z]\\s*=\\s*(?:true|false)\\b|" + // P=true, etc.
+            // Cross-practice ORCHESTRATION leaks: the model narrates how findings were routed between
+            // practices ("sole owner (cross-practice)", "ready-and-traceable-handoff suppressed its …",
+            // "ships-tests-with-the-change emitted NOT_APPLICABLE, both deferring here", "team-wide standing
+            // nudge, never a per-MR blocker"). This is the grader talking to itself about ownership/delivery,
+            // never feedback to the student — drop the whole sentence. (Live Obsphera eval: leaked on pr1/pr6/pr7.)
+            "\\bcross-practice\\b|" +
+            "\\bsole\\s+owner\\b|" +
+            "\\bdeferr(?:ing|ed|s)\\b|" +
+            "\\bemit(?:ted|s|ting)?\\s+NOT[_ ]APPLICABLE\\b|" +
+            "\\bsuppress(?:ed|es|ing)\\s+its\\b|" +
+            "\\b(?:team-wide\\s+)?standing\\s+nudge\\b|" +
+            "\\bper-MR\\s+blocker\\b|" +
+            "\\bReviewed\\s+against\\s+the\\s+active\\s+practices\\b" +
             ")"
     );
 
