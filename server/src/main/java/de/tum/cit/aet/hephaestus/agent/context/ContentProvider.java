@@ -28,6 +28,17 @@ public interface ContentProvider {
     }
 
     /**
+     * The integration this provider projects from (ADR 0020) — recorded per file in the context manifest
+     * so the agent sees uniform provenance regardless of which connector produced the bytes. Defaults to
+     * {@code "scm"} (the common case: diff, branch graph, linked issues all come from the SCM clone);
+     * providers projecting Hephaestus-native data (the mentor aspects) override with {@code "core"}, and
+     * a future Slack/Outline connector returns its own id.
+     */
+    default String connectorId() {
+        return "scm";
+    }
+
+    /**
      * Materialise this provider's files into {@code files}. Keys must begin with
      * {@link #OUTPUT_PREFIX}. The builder validates this after each call.
      */

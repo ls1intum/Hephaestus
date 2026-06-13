@@ -30,14 +30,14 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     private static WorkspaceContextBuilder builderOf(ContentProvider... providers) {
-        return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry());
+        return new WorkspaceContextBuilder(List.of(providers), new SimpleMeterRegistry(), null);
     }
 
     private static SimpleMeterRegistry sharedRegistry;
 
     private static WorkspaceContextBuilder builderWithSharedRegistry(ContentProvider... providers) {
         sharedRegistry = new SimpleMeterRegistry();
-        return new WorkspaceContextBuilder(List.of(providers), sharedRegistry);
+        return new WorkspaceContextBuilder(List.of(providers), sharedRegistry, null);
     }
 
     /** Helper to construct a stub provider inline. */
@@ -267,7 +267,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
             ContentProvider unboundedSecond = new LatchedProvider(null, null);
             // Two distinct concrete provider classes → injection-order semantics, not dedup.
-            var builder = new WorkspaceContextBuilder(List.of(gatedFirst, unboundedSecond), new SimpleMeterRegistry());
+            var builder = new WorkspaceContextBuilder(
+                List.of(gatedFirst, unboundedSecond),
+                new SimpleMeterRegistry(),
+                null
+            );
 
             ObjectMapper mapper = new ObjectMapper();
             AgentJob jobA = new AgentJob();

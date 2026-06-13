@@ -54,9 +54,14 @@ public class FabricLayout {
         return root.resolve(DERIVED).resolve(segment(connectorId));
     }
 
+    /** Root of the per-job replay directories: {@code {root}/jobs}. */
+    public Path jobsRoot() {
+        return root.resolve(JOBS);
+    }
+
     /** Per-job replay/reproducibility directory: {@code {root}/jobs/{jobId}}. */
     public Path jobDir(String jobId) {
-        return root.resolve(JOBS).resolve(segment(jobId));
+        return jobsRoot().resolve(segment(jobId));
     }
 
     /**
