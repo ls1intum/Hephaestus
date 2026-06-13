@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
@@ -154,7 +155,7 @@ class PracticeCatalogInjector {
     }
 
     /** The lifecycle trigger event stored on the job by the handler, or {@code null} if absent. */
-    @org.jspecify.annotations.Nullable
+    @Nullable
     private static String triggerEventOf(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
@@ -169,10 +170,7 @@ class PracticeCatalogInjector {
     }
 
     /** True iff the practice's {@code triggerEvents} JSONB array contains {@code event} (gate semantics). */
-    private static boolean containsTriggerEvent(
-        @org.jspecify.annotations.Nullable JsonNode triggerEvents,
-        String event
-    ) {
+    private static boolean containsTriggerEvent(@Nullable JsonNode triggerEvents, String event) {
         if (triggerEvents == null || !triggerEvents.isArray()) {
             return false;
         }

@@ -476,7 +476,7 @@ class DeliveryComposer {
         if (text == null || text.isEmpty()) {
             return text;
         }
-        java.util.regex.Matcher m = ENVELOPE_TAIL.matcher(text);
+        Matcher m = ENVELOPE_TAIL.matcher(text);
         if (!m.find()) {
             return text;
         }

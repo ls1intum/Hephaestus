@@ -65,11 +65,6 @@ public class PracticeGoalService {
     }
 
     @Transactional
-    public PracticeGoal createGoal(WorkspaceContext ctx, String slug, String name, @Nullable String description) {
-        return createGoal(ctx, slug, name, description, 0);
-    }
-
-    @Transactional
     public PracticeGoal createGoal(
         WorkspaceContext ctx,
         String slug,

@@ -54,7 +54,7 @@ class PracticeGoalServiceTest extends BaseUnitTest {
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(new Workspace()));
         when(practiceGoalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeGoal created = service.createGoal(CTX, "review-comms", "Effective review communication", "blurb");
+        PracticeGoal created = service.createGoal(CTX, "review-comms", "Effective review communication", "blurb", 0);
 
         assertThat(created.getSlug()).isEqualTo("review-comms");
         assertThat(created.getName()).isEqualTo("Effective review communication");
@@ -68,7 +68,7 @@ class PracticeGoalServiceTest extends BaseUnitTest {
         when(practiceGoalRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
         assertThatExceptionOfType(PracticeGoalSlugConflictException.class).isThrownBy(() ->
-            service.createGoal(CTX, "dup", "Dup", null)
+            service.createGoal(CTX, "dup", "Dup", null, 0)
         );
         verify(practiceGoalRepository, never()).save(any());
     }
@@ -121,8 +121,8 @@ class PracticeGoalServiceTest extends BaseUnitTest {
 
     @Test
     void bindPractice_unresolvedGoal_throwsNotFound() {
-        // A goal slug the workspace-scoped finder does not resolve → EntityNotFoundException. (Real
-        // cross-workspace isolation is exercised end-to-end in PracticeGoalControllerIntegrationTest.)
+        // A goal slug the workspace-scoped finder does not resolve → EntityNotFoundException. This unit
+        // covers the not-found mapping only; it stubs the scoped finder and does not prove tenant isolation.
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(new Practice()));
         when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
 

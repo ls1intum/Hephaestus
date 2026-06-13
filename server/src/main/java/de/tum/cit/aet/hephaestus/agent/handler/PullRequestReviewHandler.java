@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.file.Path;
@@ -473,9 +474,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         snippets.add(hit.addedLine());
 
         boolean lowSignal = secretDiffScanner.isLowSignalPath(hit.path());
-        de.tum.cit.aet.hephaestus.practices.model.Severity severity = (hit.isCritical() && !lowSignal)
-            ? de.tum.cit.aet.hephaestus.practices.model.Severity.CRITICAL
-            : de.tum.cit.aet.hephaestus.practices.model.Severity.MAJOR;
+        Severity severity = (hit.isCritical() && !lowSignal) ? Severity.CRITICAL : Severity.MAJOR;
 
         String reasoning =
             "A credential appears on a changed line: `" +

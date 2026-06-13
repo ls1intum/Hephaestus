@@ -20,7 +20,9 @@ final class MetaJson {
     }
 
     static @Nullable String optString(JsonNode node, String field) {
-        if (node.has(field) && !node.get(field).isNull()) {
+        // isString(), not just non-null: a numeric/boolean node would coerce to a non-null digit/"true"
+        // string and silently pass as a branch/SHA, so the "wrong type → null" contract must guard the type.
+        if (node.has(field) && node.get(field).isString()) {
             String value = node.get(field).asString();
             return (value != null && !value.isBlank()) ? value : null;
         }
