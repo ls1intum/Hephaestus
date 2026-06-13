@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -125,15 +126,37 @@ class DefaultPracticeCatalogSeeder {
         if (preambleKey == null) {
             preambleKey = focus.name();
         }
+        String slug = practiceNode.path("slug").asString();
         return new CreatePracticeRequestDTO(
-            practiceNode.path("slug").asString(),
+            slug,
             practiceNode.path("name").asString(),
             null,
             triggerEvents,
             composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
-            null,
+            loadPrecomputeScript(slug),
             focus
         );
+    }
+
+    /**
+     * Loads the optional per-practice precompute script from {@code practices/precompute/<slug>.ts} on the
+     * classpath. Returns {@code null} when a practice has no script — the common case (precompute is the
+     * downstream Transform home only for practices whose grounding genuinely benefits from pre-staging facts
+     * the runner can derive from {repo, diff, metadata}). The script emits hints/metrics/directions, never a
+     * verdict — the LLM still does the heavy lifting.
+     */
+    @Nullable
+    private String loadPrecomputeScript(String slug) {
+        var resource = new ClassPathResource("practices/precompute/" + slug + ".ts");
+        if (!resource.exists()) {
+            return null;
+        }
+        try (InputStream in = resource.getInputStream()) {
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.warn("Could not read precompute script for practice {}: {}", slug, e.getMessage());
+            return null;
+        }
     }
 
     /**

@@ -83,12 +83,19 @@ public class PracticePiAdapter {
             " && ln -sf /opt/precompute/lib " +
             precomputeOut +
             "/lib" +
-            " && bun run /opt/precompute/runner.ts" +
+            // diff.patch is the AGENT-facing view: every line carries a [L<n>] line-number annotation. The
+            // precompute diff parser expects a RAW unified diff, so strip the annotation into a clean copy the
+            // runner parses (the raw diff is the right input for static analysis; the annotation is the agent's).
+            " && sed 's/^\\[L[0-9]*\\] //' " +
+            contextTarget +
+            "diff.patch > " +
+            precomputeOut +
+            "/diff_clean.patch 2>/dev/null ; bun run /opt/precompute/runner.ts" +
             " --repo " +
             WorkspaceAbi.REPO_MOUNT +
             " --diff " +
-            contextTarget +
-            "diff.patch" +
+            precomputeOut +
+            "/diff_clean.patch" +
             " --metadata " +
             contextTarget +
             "metadata.json" +

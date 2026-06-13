@@ -153,7 +153,7 @@ for (const result of practiceResults) {
 const lines: string[] = [
   "# Precomputed Analysis Hints",
   "",
-  "> These are **verified facts and directions** from static analysis.",
+  "> These are **pattern matches and directions to investigate** from static analysis — starting points, not verdicts.",
   "> Use them as starting points — investigate further for things the scripts may have missed.",
   "",
 ];
