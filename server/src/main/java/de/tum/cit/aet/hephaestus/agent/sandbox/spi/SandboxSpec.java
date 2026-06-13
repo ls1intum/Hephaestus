@@ -61,7 +61,7 @@ public record SandboxSpec(
         symlinks = symlinks != null ? symlinks : Map.of();
     }
 
-    /** Back-compat constructor (no symlinks) so existing call sites need no change. */
+    /** Convenience overload for the common case of a spec with no symlinks (defaults them to empty). */
     public SandboxSpec(
         UUID jobId,
         String image,

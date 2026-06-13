@@ -21,9 +21,11 @@ import tools.jackson.databind.node.ObjectNode;
  * materialise {@code context/target/*}, this records one uniform index entry per projected file
  * ({@code path}, producing {@code connector}, size, and a content-addressed {@code sha256}) so the agent
  * — and any future connector — sees a single entry point regardless of which integration produced the
- * bytes. Every byte is also written to the {@link ContentAddressedStore}, which both deduplicates context
- * across jobs and gives each entry a verifiable provenance hash (an agent cannot cite a source whose sha
- * is not in the manifest). The same manifest is persisted under {@code jobs/{jobId}/} for replay.
+ * bytes. Every byte is also written to the {@link ContentAddressedStore}, which deduplicates identical
+ * context across jobs and records a content-addressed provenance hash per entry. (A reader that validates
+ * agent citations against these hashes — "you cannot cite a source whose sha is absent" — is a follow-up;
+ * today the sha is recorded but not yet enforced.) The same manifest is persisted under
+ * {@code jobs/{jobId}/} for replay.
  *
  * <p>Best-effort: a manifest failure is logged, never thrown — context building must not break on it.
  */

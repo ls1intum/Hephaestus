@@ -59,10 +59,52 @@ public class FabricGarbageCollector {
     public void collect() {
         Instant cutoff = Instant.now().minus(retention);
         int prunedJobs = pruneExpiredJobs(cutoff);
-        int sweptBlobs = cas.sweep(referencedShas());
-        if (prunedJobs > 0 || sweptBlobs > 0) {
-            log.info("Fabric GC: pruned {} expired job dir(s), swept {} orphaned CAS blob(s)", prunedJobs, sweptBlobs);
+        int prunedLegacy = pruneLegacyClones();
+        Set<String> live = referencedShas();
+        // Safety net: this GC runs under the SERVER role's scheduler, while jobs/manifests are written on
+        // the job-execution path. In a split deployment that does NOT share hephaestus.fabric.root, an
+        // EMPTY live set here means "manifests are not visible on this volume", NOT "every blob is
+        // garbage" — so never mass-sweep the CAS on zero references. (When server+worker share the volume,
+        // a genuinely-idle root has no blobs either, so the guard costs nothing.)
+        int sweptBlobs = live.isEmpty() ? 0 : cas.sweep(live);
+        if (prunedJobs > 0 || prunedLegacy > 0 || sweptBlobs > 0) {
+            log.info(
+                "Fabric GC: pruned {} expired job dir(s), {} legacy clone(s), swept {} orphaned CAS blob(s)",
+                prunedJobs,
+                prunedLegacy,
+                sweptBlobs
+            );
         }
+    }
+
+    /**
+     * Reclaim git clones left at the pre-Fabric layout ({@code {root}/{repoId}}, all-digit names directly
+     * under the root) after {@code GitRepositoryManager.getRepositoryPath} moved them to
+     * {@code bulk/scm/{repoId}}. Idempotent — once removed, later runs find none. The current regions
+     * ({@code bulk/}, {@code cas/}, {@code derived/}, {@code jobs/}) are never all-digit, so they are safe.
+     */
+    int pruneLegacyClones() {
+        Path root = layout.root();
+        if (!Files.isDirectory(root)) {
+            return 0;
+        }
+        int pruned = 0;
+        try (Stream<Path> children = Files.list(root)) {
+            for (Path child : children.filter(Files::isDirectory).toList()) {
+                String name = child.getFileName().toString();
+                if (!name.isEmpty() && name.chars().allMatch(Character::isDigit)) {
+                    try {
+                        deleteRecursively(child);
+                        pruned++;
+                    } catch (IOException e) {
+                        log.warn("Fabric GC could not prune legacy clone {}: {}", child, e.getMessage());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Fabric GC could not list fabric root {}: {}", root, e.getMessage());
+        }
+        return pruned;
     }
 
     /** Delete {@code jobs/{jobId}} directories last modified before {@code cutoff}. Returns the count removed. */
@@ -103,8 +145,8 @@ public class FabricGarbageCollector {
                     try {
                         JsonNode root = objectMapper.readTree(Files.readAllBytes(manifest));
                         for (JsonNode entry : root.path("entries")) {
-                            String sha = entry.path("sha256").asString();
-                            if (sha != null && !sha.isBlank()) {
+                            String sha = entry.path("sha256").asString("");
+                            if (!sha.isBlank()) {
                                 shas.add(sha);
                             }
                         }

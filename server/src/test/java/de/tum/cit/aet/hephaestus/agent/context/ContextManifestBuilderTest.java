@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -80,6 +79,22 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         Path jobManifest = layout.jobDir("job-99").resolve("manifest.json");
         assertThat(jobManifest).exists();
-        assertThat(Files.exists(jobManifest)).isTrue();
+    }
+
+    @Test
+    void augment_indexesOnlyContextTargetFiles_andNeverItself() {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        files.put("context/target/diff.patch", "d".getBytes(StandardCharsets.UTF_8));
+        // A non-context/target file (e.g. an internal catalog file) must be ignored by the manifest.
+        files.put(".practices/index.json", "[]".getBytes(StandardCharsets.UTF_8));
+        // A pre-seeded manifest must not index itself, and must be overwritten exactly once.
+        files.put("context/target/manifest.json", "stale".getBytes(StandardCharsets.UTF_8));
+
+        builder.augment(files, Map.of("context/target/diff.patch", "scm"), "job-1", 1L);
+
+        JsonNode manifest = mapper.readTree(files.get("context/target/manifest.json"));
+        assertThat(manifest.path("entries")).hasSize(1);
+        assertThat(manifest.path("entries").get(0).path("path").asString()).isEqualTo("diff.patch");
+        assertThat(files).containsKey(".practices/index.json"); // untouched, still present
     }
 }

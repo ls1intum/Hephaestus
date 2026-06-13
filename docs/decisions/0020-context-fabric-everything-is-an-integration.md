@@ -188,8 +188,9 @@ future connector slots in with no restructuring:
   symlink (`SandboxSpec.symlinks` + `SandboxWorkspaceManager.injectSymlinks`), so the agent surface
   and the `repo/` strippers are unchanged. `context/target/manifest.json` (`ContextManifestBuilder`)
   is the integration-agnostic index: one entry per projected file with `{path, connector, bytes,
-  sha256}`. Every projected blob is stored in the CAS, so the manifest is verifiable provenance (an
-  agent cannot cite a source whose sha is absent) and context deduplicates across jobs.
+  sha256}`. Every projected blob is stored in the CAS, so identical context deduplicates across jobs and
+  each entry carries a content-addressed provenance hash. (Enforcing it — rejecting an agent citation
+  whose sha is absent — is a follow-up; today the sha is recorded, not yet validated.)
 - **Toward the `Connector` superset (§3).** `ContentProvider` gained `connectorId()` (additive
   default `"scm"`) so each file's producing integration is recorded in the manifest. The full
   `Connector` SPI rename + capability registry remain follow-ups.

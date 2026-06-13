@@ -120,8 +120,13 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        void skipsWhenEmptyOrNull() {
+        void skipsWhenEmpty() {
             manager.injectSymlinks(CONTAINER_ID, Map.of());
+            verify(fileOps, never()).copyArchiveToContainer(any(), any(), any());
+        }
+
+        @Test
+        void skipsWhenNull() {
             manager.injectSymlinks(CONTAINER_ID, null);
             verify(fileOps, never()).copyArchiveToContainer(any(), any(), any());
         }
@@ -129,6 +134,16 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         void rejectsUnsafeLinkPath() {
             assertThatThrownBy(() -> manager.injectSymlinks(CONTAINER_ID, Map.of("../escape", "target"))).isInstanceOf(
+                SandboxException.class
+            );
+        }
+
+        @Test
+        void rejectsUnsafeTarget() {
+            assertThatThrownBy(() -> manager.injectSymlinks(CONTAINER_ID, Map.of("repo", "../../etc"))).isInstanceOf(
+                SandboxException.class
+            );
+            assertThatThrownBy(() -> manager.injectSymlinks(CONTAINER_ID, Map.of("repo", "/etc/passwd"))).isInstanceOf(
                 SandboxException.class
             );
         }

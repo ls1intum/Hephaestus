@@ -19,7 +19,6 @@ public class FabricLayout {
 
     private static final String BULK = "bulk";
     private static final String CAS = "cas";
-    private static final String DERIVED = "derived";
     private static final String JOBS = "jobs";
 
     private final Path root;
@@ -47,11 +46,6 @@ public class FabricLayout {
     /** Root of the content-addressed blob store (sha-256, two-char fan-out): {@code {root}/cas}. */
     public Path casRoot() {
         return root.resolve(CAS);
-    }
-
-    /** Content-hash-keyed rebuildable views for a connector: {@code {root}/derived/{connectorId}}. */
-    public Path derived(String connectorId) {
-        return root.resolve(DERIVED).resolve(segment(connectorId));
     }
 
     /** Root of the per-job replay directories: {@code {root}/jobs}. */

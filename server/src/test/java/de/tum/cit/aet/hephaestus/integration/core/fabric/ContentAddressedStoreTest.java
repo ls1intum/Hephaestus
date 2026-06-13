@@ -45,13 +45,15 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
-    void put_isIdempotent_doesNotRewrite() {
+    void put_isIdempotent_doesNotRewrite() throws Exception {
         String sha = cas.put("immutable".getBytes(StandardCharsets.UTF_8));
         Path blob = cas.pathFor(sha);
-        assertThat(blob).exists();
-        // Second put of identical bytes returns the same sha and leaves the blob untouched.
+        var firstWrite = java.nio.file.Files.getLastModifiedTime(blob);
+
+        // Second put of identical bytes returns the same sha and must NOT rewrite the blob — the
+        // mtime stays put, which would change if build-on-miss were lost.
         assertThat(cas.put("immutable".getBytes(StandardCharsets.UTF_8))).isEqualTo(sha);
-        assertThat(blob).exists();
+        assertThat(java.nio.file.Files.getLastModifiedTime(blob)).isEqualTo(firstWrite);
     }
 
     @Test
@@ -62,6 +64,22 @@ class ContentAddressedStoreTest extends BaseUnitTest {
         assertThat(removed).isEqualTo(1);
         assertThat(cas.exists(keep)).isTrue();
         assertThat(cas.exists(drop)).isFalse();
+    }
+
+    @Test
+    void sweep_leavesNonBlobFilesUntouched() throws Exception {
+        // A stray non-sha file (e.g. an in-flight ".tmp-*.blob" of a racing put) reconstructs to a
+        // non-sha key and must NOT be deleted even with an empty live set — guards the put/sweep race.
+        String real = cas.put("real".getBytes(StandardCharsets.UTF_8));
+        Path fanout = cas.pathFor(real).getParent();
+        Path temp = fanout.resolve(".tmp-123.blob");
+        java.nio.file.Files.write(temp, "in-flight".getBytes(StandardCharsets.UTF_8));
+
+        int removed = cas.sweep(Set.of()); // nothing live
+
+        assertThat(temp).as("a non-sha temp file is never swept").exists();
+        assertThat(cas.exists(real)).as("the real (unreferenced) blob is swept").isFalse();
+        assertThat(removed).isEqualTo(1);
     }
 
     @Test

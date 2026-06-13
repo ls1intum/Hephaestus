@@ -285,7 +285,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      */
     @Override
     public Map<String, String> symlinks(AgentJob job) {
-        return Map.of("repo", WorkspaceAbi.REPO_SYMLINK_TARGET);
+        return Map.of(WorkspaceAbi.REPO_SYMLINK_LINK, WorkspaceAbi.REPO_SYMLINK_TARGET);
     }
 
     private String buildPrompt(AgentJob job) {

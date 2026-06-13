@@ -67,6 +67,31 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
     }
 
     @Test
+    void pruneLegacyClones_removesAllDigitTopLevelDirsOnly() throws Exception {
+        Files.createDirectories(root.resolve("42")); // legacy {repoId} clone
+        Files.createDirectories(root.resolve("bulk")); // current region — must survive
+        Files.createDirectories(root.resolve("cas"));
+
+        int pruned = gc.pruneLegacyClones();
+
+        assertThat(pruned).isEqualTo(1);
+        assertThat(root.resolve("42")).doesNotExist();
+        assertThat(root.resolve("bulk")).exists();
+        assertThat(root.resolve("cas")).exists();
+    }
+
+    @Test
+    void collect_doesNotMassSweepWhenNoManifestsAreVisible() throws Exception {
+        // Split-deployment safety net: blobs present but zero job manifests (unshared volume) must NOT
+        // be swept — an empty live set means "not visible here", not "all garbage".
+        String blob = cas.put("worker-wrote-this".getBytes(StandardCharsets.UTF_8));
+
+        gc.collect();
+
+        assertThat(cas.exists(blob)).isTrue();
+    }
+
+    @Test
     void collect_endToEnd_keepsReferencedBlobsAndSweepsOrphans() throws Exception {
         String keep = cas.put("keep".getBytes(StandardCharsets.UTF_8));
         String expired = cas.put("expired".getBytes(StandardCharsets.UTF_8));

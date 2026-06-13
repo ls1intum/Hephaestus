@@ -116,8 +116,12 @@ public class ContentAddressedStore {
             blobs
                 .filter(Files::isRegularFile)
                 .forEach(blob -> {
-                    String sha = blob.getParent().getFileName() + blob.getFileName().toString();
-                    if (!liveShas.contains(sha)) {
+                    String candidate = blob.getParent().getFileName() + blob.getFileName().toString();
+                    // ONLY a file whose {ab}/{rest} reconstructs to a valid 64-hex sha is a blob eligible
+                    // for sweeping. An in-flight `.tmp-*.blob` (or any stray file) reconstructs to a
+                    // non-sha and is left untouched — this is what makes sweep safe to run concurrently
+                    // with a put(), whose temp lives in the same fan-out dir and is not stripe-locked here.
+                    if (isShaHex(candidate) && !liveShas.contains(candidate)) {
                         try {
                             Files.delete(blob);
                             removed[0]++;
@@ -154,12 +158,15 @@ public class ContentAddressedStore {
     }
 
     private static void validateSha(String sha) {
-        if (
-            sha == null ||
-            sha.length() != 64 ||
-            !sha.chars().allMatch(c -> (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
-        ) {
+        if (!isShaHex(sha)) {
             throw new IllegalArgumentException("Not a sha-256 hex digest: " + sha);
         }
+    }
+
+    /** True iff {@code s} is a 64-character lowercase-hex string (a sha-256 digest). */
+    private static boolean isShaHex(String s) {
+        return (
+            s != null && s.length() == 64 && s.chars().allMatch(c -> (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
+        );
     }
 }

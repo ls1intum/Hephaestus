@@ -119,8 +119,15 @@ public class SandboxWorkspaceManager {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             for (Map.Entry<String, String> entry : symlinks.entrySet()) {
                 String link = validatePath(entry.getKey());
+                String target = entry.getValue();
+                // Constrain the target too (not just the link name): a workspace-relative path that does
+                // not climb out of /workspace, so this general Map-driven API cannot create an escaping
+                // link even if a future caller passes attacker-influenced data.
+                if (target == null || target.startsWith("/") || target.contains("..")) {
+                    throw new SandboxException("Unsafe symlink target: " + target);
+                }
                 TarArchiveEntry symlinkEntry = new TarArchiveEntry(link, TarArchiveEntry.LF_SYMLINK);
-                symlinkEntry.setLinkName(entry.getValue());
+                symlinkEntry.setLinkName(target);
                 symlinkEntry.setModTime(System.currentTimeMillis());
                 symlinkEntry.setUserId(1000);
                 symlinkEntry.setGroupId(1000);
