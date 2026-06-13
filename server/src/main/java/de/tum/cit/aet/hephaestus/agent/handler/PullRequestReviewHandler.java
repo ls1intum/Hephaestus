@@ -82,11 +82,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ContentProvider.OUTPUT_PREFIX + "diff.patch",
         ContentProvider.OUTPUT_PREFIX + "diff_summary.md",
         ContentProvider.OUTPUT_PREFIX + "comments.json",
-        // Cross-context providers (telescope, not cage): a finding grounded in one of these
-        // materialised neighbourhood files must survive the diff-scope filter.
+        // Raw SQL-only integration objects (the agent cannot get these from the mounted worktree): a finding
+        // grounded in one of these must survive the diff-scope filter. test_presence/branch_graph were removed
+        // here in lockstep with deleting those providers — they were worktree-derived Transform, not content.
         ContentProvider.OUTPUT_PREFIX + "linked_work_items.json",
-        ContentProvider.OUTPUT_PREFIX + "branch_graph.json",
-        ContentProvider.OUTPUT_PREFIX + "test_presence.json",
         ContentProvider.OUTPUT_PREFIX + "review_threads.json"
     );
 

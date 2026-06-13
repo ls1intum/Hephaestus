@@ -60,11 +60,9 @@ You may also read `inputs/context/diff.patch` for line-number verification, `inp
 - `inputs/context/issue_summary.md` — (ISSUE only) the issue + discussion rendered for review **(primary — read first)**
 - `inputs/context/comments.json` — (ISSUE only) the ordered discussion thread
 - `inputs/context/metadata.json` — MR/PR or ISSUE title, body, author, labels/state (artifact-dependent)
-- `inputs/context/test_presence.json` — (PR only) whether the repo has a test target and whether this change touches tests **(read before judging ships-tests / keeps-the-test-suite-honest)**
-- `inputs/context/acceptance_criteria.json` — (PR only) the linked issue's acceptance criteria (checkbox items, Given-When-Then) and the PR's own Definition-of-Done checklist **(read before judging honours-linked-issue-acceptance-criteria / ready-and-traceable-handoff)**
-- `inputs/context/linked_work_items.json` — (PR only) issues this PR closes/links, with body excerpts
-- `inputs/context/branch_graph.json` — (PR only) source/target branch, ahead-count, authors **(read before judging branches-from-the-integration-branch)**
-- `inputs/context/review_threads.json` — (PR only) the review-decision/thread state **(read before judging reviewer-craft / engaging / merged-past-unresolved practices)**
+- `inputs/context/linked_work_items.json` — (PR only) the full bodies of issues this PR closes/links (resolved from SQL — not derivable from the worktree)
+- `inputs/context/review_threads.json` — (PR only) the raw review-decision + thread-resolution rows (from SQL — not derivable from the worktree) **(read before judging reviewer-craft / engaging / merged-past-unresolved practices)**
+- the mounted repo at `inputs/sources/scm/repo` IS the substrate for everything else — to judge test-presence, branch origin, or any code question, search/read the repo and the diff directly rather than expecting a pre-computed file.
 - `inputs/manifest.json` — the authoritative index of EVERY context file actually materialised this run. **Before concluding a practice is NOT_APPLICABLE for lack of context, consult the manifest: if the file it needs is listed there, open it — do not assume it is missing.**
 - `inputs/practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
 - `inputs/practices/index.json` — practice list with slugs

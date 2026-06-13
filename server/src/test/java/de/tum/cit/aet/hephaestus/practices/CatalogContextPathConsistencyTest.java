@@ -33,12 +33,11 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         "diff_stat.txt",
         "contributor_history.json",
         "issue_summary.md",
-        // Enrichment providers (the ones the keystone fix re-pathed):
-        "test_presence.json", // TestPresenceContentProvider.OUTPUT_FILE
-        "linked_work_items.json", // LinkedWorkItemContentProvider.OUTPUT_FILE
-        "branch_graph.json", // BranchGraphContentProvider.FILE_NAME
-        "review_threads.json", // ReviewThreadContentProvider.FILE_NAME
-        "acceptance_criteria.json" // AcceptanceCriteriaContentProvider.OUTPUT_FILE
+        // The two raw SQL-only graph projections (the agent cannot get these from the mounted worktree):
+        "linked_work_items.json", // LinkedWorkItemContentProvider.OUTPUT_FILE — resolved linked-issue rows
+        "review_threads.json" // ReviewThreadContentProvider — review-decision/thread rows
+        // NOTE: test_presence.json + branch_graph.json were deleted (worktree-derived Transform, not content);
+        // acceptance_criteria.json was a phantom (no provider ever emitted it). None may reappear.
     );
 
     private static final Pattern CONTEXT_PATH = Pattern.compile("inputs/context/([a-z_]+\\.[a-z]+)");

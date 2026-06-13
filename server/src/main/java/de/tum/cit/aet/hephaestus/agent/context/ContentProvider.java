@@ -4,15 +4,31 @@ import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import java.util.Map;
 
 /**
- * SPI for contributors to the workspace context. Each implementation narrows on a
- * {@link ContextRequest} variant via {@link #supports} and materialises its files under
- * {@link #OUTPUT_PREFIX} into the supplied map.
+ * SPI for an integration's content into the agent workspace. A ContentProvider is an
+ * <strong>EXTRACT+LOAD connector and nothing else</strong> — it materialises the integration's RAW NATIVE
+ * OBJECTS under {@link #OUTPUT_PREFIX} and stops there.
  *
- * <p>Provider order at {@link WorkspaceContextBuilder} is governed by Spring's
- * {@code @Order} (or {@code Ordered.getOrder()}); a {@link #required()} provider whose
- * {@link #contribute} throws aborts the build, optional providers degrade quietly.
+ * <p><strong>The admission test is PROVENANCE, not usefulness.</strong> A byte qualifies as integration
+ * content iff it (a) lives in SQL / the integration's API object graph (for SCM: the PR/issue object, its
+ * comments, the computed two-ref diff, review-decision + thread rows, resolved linked-issue rows, contributor
+ * history) AND (b) is absent from the read-only worktree the sandbox already mounts at
+ * {@code inputs/sources/scm/repo}. If a grep / JGit walk over that mount, or a parse of {@code diff.patch},
+ * reproduces it, it is NOT integration content — it is downstream Transform.
  *
- * <p>Implementations must reside under {@code agent.context.providers.*} — enforced by
+ * <p><strong>A provider MUST NOT</strong> compute a practice-shaped feature, emit a verdict/note sentence,
+ * carry a tuned threshold, or name a practice anywhere (field, file, javadoc). Such derivation is
+ * practice-dependent TRANSFORM and belongs downstream — in the per-practice precompute script or the agent
+ * (which has the mounted worktree). The single permitted in-connector transform is a practice-AGNOSTIC,
+ * lossless structural reshape reused identically by every practice — the staging band: {@code diff_summary.md}
+ * is a lossless re-chunking of {@code diff.patch} (passes the rule); a {@code test_presence.json} feature
+ * file scanned from the worktree does not (it is Transform — deleted, ELT boundary). {@link #connectorId()}
+ * is the enforcement seam: a provider stamped {@code "scm"} that emits a practice verdict is, by definition,
+ * code in the wrong layer. The SPI generalises verbatim to Slack/Outline/Jira — each LOADS its native
+ * message/doc/ticket object, none pre-judges it.
+ *
+ * <p>Provider order at {@link WorkspaceContextBuilder} is governed by Spring's {@code @Order}; a
+ * {@link #required()} provider whose {@link #contribute} throws aborts the build, optional providers degrade
+ * quietly. Implementations must reside under {@code agent.context.providers.*} — enforced by
  * {@code AgentRuntimeBoundaryTest}.
  */
 public interface ContentProvider {
