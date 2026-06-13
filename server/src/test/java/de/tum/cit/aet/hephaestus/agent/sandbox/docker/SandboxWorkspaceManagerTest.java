@@ -55,6 +55,46 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("emits work/ ancestor dirs as uid-1000 (writable) and leaves inputs/ to root auto-create")
+        void shouldMakeWorkRegionWritableButNotInputs() throws IOException {
+            // ADR 0020: read-only vs writable by LOCATION. The agent + precompute write under work/ as the
+            // container uid (1000); a root-owned work/ (Docker's default for auto-created intermediate dirs)
+            // would deny `mkdir -p work/precompute-out` and scratch writes. inputs/ must stay root (RO).
+            Map<String, byte[]> files = new HashMap<>();
+            files.put("inputs/context/diff.patch", "d".getBytes());
+            files.put("work/analysis/practices/.gitkeep", new byte[0]);
+            files.put("work/precompute/practices/foo.ts", "x".getBytes());
+
+            manager.injectFiles(CONTAINER_ID, files);
+
+            org.mockito.ArgumentCaptor<InputStream> tar = org.mockito.ArgumentCaptor.forClass(InputStream.class);
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), tar.capture());
+
+            Map<String, Long> dirUid = new HashMap<>();
+            try (var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(tar.getValue())) {
+                TarArchiveEntry e;
+                while ((e = tis.getNextEntry()) != null) {
+                    if (e.isDirectory()) {
+                        dirUid.put(e.getName(), e.getLongUserId());
+                    }
+                }
+            }
+
+            // Every work/ ancestor is pre-created and owned by the container uid.
+            assertThat(dirUid).containsKeys(
+                "work/",
+                "work/analysis/",
+                "work/analysis/practices/",
+                "work/precompute/",
+                "work/precompute/practices/"
+            );
+            assertThat(dirUid.values()).allMatch(uid -> uid == 1000L);
+            // inputs/ dirs are deliberately NOT emitted — Docker auto-creates them as root, which IS the
+            // read-only guarantee (uid 1000 cannot create files in a root-owned directory).
+            assertThat(dirUid).doesNotContainKey("inputs/").doesNotContainKey("inputs/context/");
+        }
+
+        @Test
         void shouldSkipWhenEmpty() {
             manager.injectFiles(CONTAINER_ID, Map.of());
 

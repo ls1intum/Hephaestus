@@ -61,14 +61,21 @@ public final class WorkspaceAbi {
     /** Workspace-relative prefix for per-practice catalog files (index, criteria). */
     public static final String PRACTICES_PREFIX = INPUTS_PREFIX + "practices/";
 
+    /**
+     * Workspace-relative prefix for the writable scratch region (ADR 0020). Everything the agent +
+     * precompute write during a run lives here; the sandbox makes this subtree writable by the
+     * container uid while {@link #INPUTS_PREFIX} stays read-only. Never collected back into SQL.
+     */
+    public static final String WORK_PREFIX = "work/";
+
     /** Workspace-relative prefix for per-practice precompute scripts injected from the database. */
-    public static final String PRECOMPUTE_PREFIX = "work/precompute/";
+    public static final String PRECOMPUTE_PREFIX = WORK_PREFIX + "precompute/";
 
     /** Workspace-relative prefix for runtime precompute output (logs, structured hints). */
-    public static final String PRECOMPUTE_OUT_PREFIX = "work/precompute-out/";
+    public static final String PRECOMPUTE_OUT_PREFIX = WORK_PREFIX + "precompute-out/";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
-    public static final String ANALYSIS_PREFIX = "work/analysis/";
+    public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";
 
     /** Workspace-relative path of the practices-analysis marker directory. */
     public static final String ANALYSIS_PRACTICES_PREFIX = ANALYSIS_PREFIX + "practices/";
