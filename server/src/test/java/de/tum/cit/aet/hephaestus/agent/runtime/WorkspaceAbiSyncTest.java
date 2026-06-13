@@ -47,6 +47,23 @@ class WorkspaceAbiSyncTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("pi-orchestrator.md cites the repo mount at WorkspaceAbi.REPO_MOUNT_RELATIVE (prompt↔ABI pin)")
+    void orchestratorPromptCitesRepoMountFromAbi() throws IOException {
+        // The orchestrator prompt tells the LIVE agent where to read the repo checkout. That path is NOT
+        // pinned by the runner sync above, so a rename of the sandbox source region (e.g. worktrees→sources)
+        // could silently rot the prompt — shipping CI-green while pointing the agent at a dead path and
+        // losing all surrounding-code context on every real SCM review. Pin it to the ABI constant so the
+        // next rename must update both in lockstep or this test fails.
+        Path orchestrator = resolveResource("agent/pi-orchestrator.md");
+        assertThat(orchestrator).isRegularFile();
+        String body = Files.readString(orchestrator, StandardCharsets.UTF_8);
+
+        assertThat(body)
+            .as("orchestrator prompt references the repo mount at WorkspaceAbi.REPO_MOUNT_RELATIVE")
+            .contains(WorkspaceAbi.REPO_MOUNT_RELATIVE);
+    }
+
+    @Test
     @DisplayName(
         "pi-mentor-runner.mjs pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR_PREFIX, PI_AGENT_DIR, and the envelope exit"
     )

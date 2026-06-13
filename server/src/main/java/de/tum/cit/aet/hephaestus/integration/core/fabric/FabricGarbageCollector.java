@@ -80,8 +80,8 @@ public class FabricGarbageCollector {
     /**
      * Reclaim git clones left at the pre-Fabric layout ({@code {root}/{repoId}}, all-digit names directly
      * under the root) after {@code GitRepositoryManager.getRepositoryPath} moved them to
-     * {@code worktrees/scm/{repoId}}. Idempotent — once removed, later runs find none. The current regions
-     * ({@code worktrees/}, {@code cas/}, {@code jobs/}) are never all-digit, so they are safe.
+     * {@code sources/scm/{repoId}}. Idempotent — once removed, later runs find none. The current regions
+     * ({@code sources/}, {@code cas/}, {@code jobs/}) are never all-digit, so they are safe.
      */
     int pruneLegacyClones() {
         Path root = layout.root();

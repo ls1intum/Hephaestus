@@ -82,7 +82,7 @@ class DeliveryComposer {
 
     /**
      * Strips the leading repo-mount prefix so a student-facing location stays repo-relative (F3). The
-     * repo mounts at the integration-namespaced {@code inputs/worktrees/scm/repo/} (ADR 0020).
+     * repo mounts at the integration-namespaced {@code inputs/sources/scm/repo/} (ADR 0020).
      */
     private static String repoRelative(String path) {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;

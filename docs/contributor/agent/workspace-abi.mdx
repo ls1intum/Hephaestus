@@ -22,9 +22,9 @@ precompute scratch; never collected), and `out/` (the only directory collected b
 ├── inputs/                          # READ-ONLY. The path-guard whitelists exactly this subtree.
 │   ├── manifest.json                #   Telescope: the integration-agnostic index (path/connector/
 │   │                                #   sha256 per file). Sits above the per-connector context it indexes.
-│   ├── worktrees/                   #   Integration-namespaced worktree mounts (ADR 0020). One namespace
+│   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020). One namespace
 │   │   └── scm/repo/                #   per connector — the SCM git working tree (READ-ONLY mount) lives
-│   │                                #   here; a future export would be worktrees/slack/…, worktrees/outline/…
+│   │                                #   here; a future export would be sources/slack/…, sources/outline/…
 │   ├── context/                     #   System-written, AI-readable. Populated by the ContentProvider SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
 │   │                                #   contributor_history.json, linked_work_items.json, …
@@ -55,8 +55,8 @@ layout (`context/target/`, `context/user/`, `scratch/`) driven by
   `agent.context.providers.*`. Path prefix is enforced by `WorkspaceContextBuilder`.
 * **`inputs/manifest.json`** — the telescope index, written by `ContextManifestBuilder` *above*
   `inputs/context/` (it indexes the context files but is not itself one of them).
-* **`inputs/worktrees/scm/repo/`** — the read-only SCM checkout, bind-mounted from the host
-  Context Fabric (`{fabric.root}/worktrees/scm/{repositoryId}`).
+* **`inputs/sources/scm/repo/`** — the read-only SCM checkout, bind-mounted from the host
+  Context Fabric (`{fabric.root}/sources/scm/{repositoryId}`).
 * **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
   collects it.
 * **`out/`** — the *only* directory the sandbox collects after the run.

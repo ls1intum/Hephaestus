@@ -49,7 +49,7 @@ import tools.jackson.databind.node.ObjectNode;
  * /workspace/
  * ├── inputs/                            # read-only — the path-guard whitelists exactly this subtree
  * │   ├── manifest.json                  #   telescope: integration-agnostic index (path/connector/sha256)
- * │   ├── worktrees/scm/repo/            #   git checkout — the SCM connector's worktree (RO mount)
+ * │   ├── sources/scm/repo/            #   the SCM connector's source — git checkout (RO mount)
  * │   ├── context/                       #   workspace context (this handler populates via WorkspaceContextBuilder)
  * │   │   ├── metadata.json              #     PR metadata + commits
  * │   │   ├── comments.json              #     review comments
@@ -235,7 +235,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Pre-create blobs/scm/ so the repo can mount under it (the directory mount needs its parent
         // to exist before docker cp extracts into it).
-        files.put(WorkspaceAbi.SCM_WORKTREE_KEEP, new byte[0]);
+        files.put(WorkspaceAbi.SCM_SOURCE_KEEP, new byte[0]);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -643,7 +643,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
-                // The agent cites files it read under the repo mount as "inputs/worktrees/scm/repo/<path>" (ADR 0020),
+                // The agent cites files it read under the repo mount as "inputs/sources/scm/repo/<path>" (ADR 0020),
                 // but diff-stat paths are repo-relative ("<path>"). Strip the mount prefix so a code finding
                 // on a genuinely-changed file is not dropped on a cosmetic path mismatch.
                 String repoRelative = path.startsWith(WorkspaceAbi.REPO_MOUNT_RELATIVE)

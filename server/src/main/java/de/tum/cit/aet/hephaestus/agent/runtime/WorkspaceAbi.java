@@ -26,20 +26,30 @@ public final class WorkspaceAbi {
     public static final String INPUTS_PREFIX = "inputs/";
 
     /**
-     * Workspace-relative prefix for entitled connector worktree mounts (ADR 0020): the SCM checkout is
-     * {@code inputs/worktrees/scm/repo}, a future Slack/Outline export is {@code inputs/worktrees/slack/...}
-     * — the repo is one mount among peers, not a privileged root. Named to match the host {@code worktrees/}.
+     * Workspace-relative prefix for per-connector source materialisations (ADR 0020): the SCM checkout
+     * mounts at {@code inputs/sources/scm/repo}, a future Slack/Outline export at {@code inputs/sources/slack/...}
+     * — each connector owns one namespace, none is privileged. Connector-agnostic noun ("source") matching
+     * the {@code ContentProvider#connectorId()} SPI and the host fabric {@code sources/} region; no connector's
+     * native vocabulary (git "worktree", Slack "export") leaks into the shared wire contract.
      */
-    public static final String WORKTREES_PREFIX = INPUTS_PREFIX + "worktrees/";
+    public static final String SOURCES_PREFIX = INPUTS_PREFIX + "sources/";
 
-    /** Workspace-relative {@code .keep} that pre-creates {@code inputs/worktrees/scm/} so the repo can mount under it. */
-    public static final String SCM_WORKTREE_KEEP = WORKTREES_PREFIX + "scm/.keep";
+    /**
+     * Generic primitive: the workspace-relative mount prefix for a connector's source ({@code inputs/sources/<id>/}).
+     * The SCM-specific repo paths below are the one concrete instance; a future connector composes its own from this.
+     */
+    public static String sourceMount(String connectorId) {
+        return SOURCES_PREFIX + connectorId + "/";
+    }
 
-    /** Bind-mount point for the read-only git checkout — the SCM connector's worktree. */
-    public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + WORKTREES_PREFIX + "scm/repo";
+    /** Workspace-relative {@code .keep} that pre-creates {@code inputs/sources/scm/} so the repo can mount under it. */
+    public static final String SCM_SOURCE_KEEP = sourceMount("scm") + ".keep";
 
-    /** Workspace-relative prefix the agent cites for repo files ({@code inputs/worktrees/scm/repo/<path>}). */
-    public static final String REPO_MOUNT_RELATIVE = WORKTREES_PREFIX + "scm/repo/";
+    /** Bind-mount point for the read-only git checkout — the SCM connector's source materialisation. */
+    public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + sourceMount("scm") + "repo";
+
+    /** Workspace-relative prefix the agent cites for repo files ({@code inputs/sources/scm/repo/<path>}). */
+    public static final String REPO_MOUNT_RELATIVE = sourceMount("scm") + "repo/";
 
     /** Output directory the sandbox collects after the run. */
     public static final String OUTPUT_PATH = WORKSPACE_ROOT + "/out";

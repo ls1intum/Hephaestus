@@ -101,7 +101,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             manager = createManager(false);
             Path path = manager.getRepositoryPath(42L);
 
-            assertThat(path).isEqualTo(storagePath.resolve("worktrees").resolve("scm").resolve("42"));
+            assertThat(path).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("42"));
         }
     }
 
@@ -142,7 +142,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(result).isEqualTo(storagePath.resolve("worktrees").resolve("scm").resolve("1"));
+                assertThat(result).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
                 assertThat(Files.exists(result.resolve(".git").resolve("HEAD"))).isTrue();
             }
         }
@@ -169,7 +169,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 // Second call - fetches
                 Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(result).isEqualTo(storagePath.resolve("worktrees").resolve("scm").resolve("1"));
+                assertThat(result).isEqualTo(storagePath.resolve("sources").resolve("scm").resolve("1"));
                 // Verify the new commit is available
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, null, newSha);
                 assertThat(commits).hasSize(2);

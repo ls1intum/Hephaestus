@@ -13,21 +13,21 @@ import org.springframework.stereotype.Component;
  * proven content store — Git objects-vs-refs, Bazel cas-vs-ac, OCI blobs-vs-index — keeps physical):
  * <ul>
  *   <li>{@code cas/} — IMMUTABLE content-addressed blobs (the only hash-keyed region); GC by mark-and-sweep.
- *   <li>{@code worktrees/{connector}/{externalId}} — MUTABLE name-keyed materialisations (the git checkout);
- *       regenerable, GC by re-clone-on-miss.
+ *   <li>{@code sources/{connector}/{externalId}} — MUTABLE name-keyed per-connector materialisations (the SCM
+ *       git checkout, a future Slack/Outline export); regenerable, GC by re-materialise-on-miss.
  *   <li>{@code jobs/{jobId}/manifest.json} — the MUTABLE provenance index (name+provenance → digests, the
  *       analogue of Git refs / Bazel ActionCache); recoverable from SQL, GC by retention window.
  * </ul>
  *
  * <p>The root defaults to the existing {@code hephaestus.git.storage-path} so a deployment that only set
  * the git path keeps working — the checkout simply moves from {@code {root}/{repoId}} to
- * {@code {root}/worktrees/scm/{repoId}}. Because it is a rebuildable cache, no data migration is needed:
- * a job re-clones at the new path on first miss.
+ * {@code {root}/sources/scm/{repoId}}. Because it is a rebuildable cache, no data migration is needed:
+ * a job re-materialises at the new path on first miss.
  */
 @Component
 public class FabricLayout {
 
-    private static final String WORKTREES = "worktrees";
+    private static final String SOURCES = "sources";
     private static final String CAS = "cas";
     private static final String JOBS = "jobs";
 
@@ -45,14 +45,15 @@ public class FabricLayout {
     }
 
     /**
-     * The mutable working-tree materialisation for a connector:
-     * {@code {root}/worktrees/{connectorId}/{externalId}}. The git checkout lives at
-     * {@code worktrees/scm/{repositoryId}} (one namespace among future {@code worktrees/slack/...},
-     * {@code worktrees/outline/...}). Named after Git's term for exactly this — a checked-out, path-keyed,
-     * churning view that is NOT addressed by its content (so it is a sibling of {@code cas/}, never nested).
+     * The mutable per-connector source materialisation:
+     * {@code {root}/sources/{connectorId}/{externalId}}. The SCM git checkout lives at
+     * {@code sources/scm/{repositoryId}} (one namespace among future {@code sources/slack/...},
+     * {@code sources/outline/...}). Connector-agnostic noun — "source" subsumes a git checkout, a Slack
+     * export, and a docs snapshot alike; it is a name-keyed, churning view NOT addressed by its content
+     * (so it is a sibling of {@code cas/}, never nested).
      */
-    public Path worktree(String connectorId, String externalId) {
-        return root.resolve(WORKTREES).resolve(segment(connectorId)).resolve(segment(externalId));
+    public Path source(String connectorId, String externalId) {
+        return root.resolve(SOURCES).resolve(segment(connectorId)).resolve(segment(externalId));
     }
 
     /** Root of the content-addressed blob store ({@code cas/sha256/{ab}/{rest}}): {@code {root}/cas}. */

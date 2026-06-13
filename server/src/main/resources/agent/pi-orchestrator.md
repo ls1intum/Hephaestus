@@ -50,7 +50,7 @@ Default to a high-signal review:
 - Prefer one precise finding about user-visible breakage over a second lower-value finding about logging or style around the same defect.
 - There is no target number of findings and no quota. Never plan around a number like five.
 
-You may also read `inputs/context/diff.patch` for line-number verification, `inputs/worktrees/scm/repo/` for surrounding code context, and `work/precompute-out/summary.md` for static analysis hints.
+You may also read `inputs/context/diff.patch` for line-number verification, `inputs/sources/scm/repo/` for surrounding code context, and `work/precompute-out/summary.md` for static analysis hints.
 
 ## Workspace
 
@@ -63,7 +63,7 @@ You may also read `inputs/context/diff.patch` for line-number verification, `inp
 - `inputs/practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
 - `inputs/practices/index.json` — practice list with slugs
 - `work/precompute-out/summary.md` — static analysis hints (optional, may not exist)
-- `inputs/worktrees/scm/repo/` — full repository checkout for exploring context around changed code
+- `inputs/sources/scm/repo/` — full repository checkout for exploring context around changed code
 
 ## Rules
 
