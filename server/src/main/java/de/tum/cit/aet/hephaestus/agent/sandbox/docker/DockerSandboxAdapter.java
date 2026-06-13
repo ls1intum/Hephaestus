@@ -239,12 +239,6 @@ public class DockerSandboxAdapter implements SandboxManager {
                 log.debug("Injected {} directories into container", spec.volumeMounts().size());
             }
 
-            // Create back-compat / namespace symlinks after mounts exist (e.g. repo → blobs/scm/repo)
-            if (spec.symlinks() != null && !spec.symlinks().isEmpty()) {
-                workspaceManager.injectSymlinks(containerId, spec.symlinks());
-                log.debug("Injected {} symlink(s) into container", spec.symlinks().size());
-            }
-
             // PHASE 2: EXECUTE
             containerManager.startContainer(containerId);
             log.info("Container started");

@@ -29,11 +29,8 @@ public final class WorkspaceAbi {
     /** Bind-mount point for the read-only git checkout — the SCM connector's bulk artifact. */
     public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + BLOBS_PREFIX + "scm/repo";
 
-    /** Workspace-relative name of the back-compat repo symlink ({@code repo} → {@link #REPO_SYMLINK_TARGET}). */
-    public static final String REPO_SYMLINK_LINK = "repo";
-
-    /** Relative target of the {@code repo} back-compat symlink, so {@code repo/} keeps resolving. */
-    public static final String REPO_SYMLINK_TARGET = BLOBS_PREFIX + "scm/repo";
+    /** Workspace-relative prefix the agent cites for repo files ({@code blobs/scm/repo/<path>}). */
+    public static final String REPO_MOUNT_RELATIVE = BLOBS_PREFIX + "scm/repo/";
 
     /** Output directory the sandbox collects after the run. */
     public static final String OUTPUT_PATH = WORKSPACE_ROOT + "/.output";

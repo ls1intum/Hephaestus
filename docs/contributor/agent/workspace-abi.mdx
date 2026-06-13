@@ -17,7 +17,6 @@ lands (#1071) and beyond.
 ├── blobs/                 # Integration-namespaced bulk artifacts (ADR 0020). One namespace per
 │   └── scm/repo/          #   connector — the SCM git working tree (READ-ONLY mount) lives here;
 │                          #   a future Slack/Outline export would be blobs/slack/…, blobs/outline/…
-├── repo -> blobs/scm/repo # Back-compat symlink, so "repo/" keeps resolving after the namespacing.
 ├── context/
 │   ├── target/            # System-written, AI-readable. Populated by ContentProvider SPI.
 │   │                      # Files: manifest.json (the integration-agnostic telescope index:

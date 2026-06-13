@@ -93,55 +93,6 @@ public class SandboxWorkspaceManager {
     }
 
     /**
-     * Create workspace-relative symlinks inside the container (e.g. the back-compat {@code repo} →
-     * {@code blobs/scm/repo} link so the integration-namespaced mount keeps the familiar {@code repo/}
-     * path resolving). Each entry maps a workspace-relative link path to its (relative) target; the link
-     * is materialised by streaming a one-entry symlink tar to {@code /workspace}.
-     */
-    public void injectSymlinks(String containerId, Map<String, String> symlinks) {
-        if (symlinks == null || symlinks.isEmpty()) {
-            return;
-        }
-        byte[] tarBytes = createSymlinkArchive(symlinks);
-        try (InputStream tarStream = new ByteArrayInputStream(tarBytes)) {
-            fileOps.copyArchiveToContainer(containerId, "/workspace", tarStream);
-            log.debug("Injected {} symlink(s) into container {}", symlinks.size(), containerId);
-        } catch (IOException e) {
-            throw new SandboxException("Failed to inject symlinks into container: " + containerId, e);
-        }
-    }
-
-    private byte[] createSymlinkArchive(Map<String, String> symlinks) {
-        try (
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            TarArchiveOutputStream tar = new TarArchiveOutputStream(baos)
-        ) {
-            tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-            for (Map.Entry<String, String> entry : symlinks.entrySet()) {
-                String link = validatePath(entry.getKey());
-                String target = entry.getValue();
-                // Constrain the target too (not just the link name): a workspace-relative path that does
-                // not climb out of /workspace, so this general Map-driven API cannot create an escaping
-                // link even if a future caller passes attacker-influenced data.
-                if (target == null || target.startsWith("/") || target.contains("..")) {
-                    throw new SandboxException("Unsafe symlink target: " + target);
-                }
-                TarArchiveEntry symlinkEntry = new TarArchiveEntry(link, TarArchiveEntry.LF_SYMLINK);
-                symlinkEntry.setLinkName(target);
-                symlinkEntry.setModTime(System.currentTimeMillis());
-                symlinkEntry.setUserId(1000);
-                symlinkEntry.setGroupId(1000);
-                tar.putArchiveEntry(symlinkEntry);
-                tar.closeArchiveEntry();
-            }
-            tar.finish();
-            return baos.toByteArray();
-        } catch (IOException e) {
-            throw new SandboxException("Failed to build symlink archive", e);
-        }
-    }
-
-    /**
      * Inject host directories into a container via {@code docker cp}.
      *
      * <p>Manually creates a tar archive from the host directory and streams it via the Docker API.

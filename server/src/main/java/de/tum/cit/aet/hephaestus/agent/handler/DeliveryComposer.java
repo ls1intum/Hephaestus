@@ -6,6 +6,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PI_AGENT_PREF
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.REPO_MOUNT_RELATIVE;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
@@ -80,15 +81,11 @@ class DeliveryComposer {
     );
 
     /**
-     * Strips a leading repo-mount path segment so a student-facing location stays repo-relative (F3).
-     * Handles both the back-compat {@code repo/} alias and the integration-namespaced
-     * {@code blobs/scm/repo/} mount (ADR 0020), in case the agent cites either.
+     * Strips the leading repo-mount prefix so a student-facing location stays repo-relative (F3). The
+     * repo mounts at the integration-namespaced {@code blobs/scm/repo/} (ADR 0020).
      */
     private static String repoRelative(String path) {
-        if (path.startsWith("blobs/scm/repo/")) {
-            return path.substring("blobs/scm/repo/".length());
-        }
-        return path.startsWith("repo/") ? path.substring("repo/".length()) : path;
+        return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
     }
 
     /** Paths that are internal workspace artifacts, not student code. */

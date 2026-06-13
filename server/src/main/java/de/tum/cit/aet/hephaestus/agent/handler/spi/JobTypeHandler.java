@@ -82,17 +82,4 @@ public interface JobTypeHandler {
     default Map<String, String> volumeMounts(AgentJob job) {
         return Map.of();
     }
-
-    /**
-     * Workspace-relative symlinks to create inside the container after files and mounts are injected
-     * (link path → relative target). The default is none; the PR-review handler uses it for the
-     * back-compat {@code repo} → {@code blobs/scm/repo} alias so the integration-namespaced mount keeps
-     * the familiar {@code repo/} path resolving.
-     *
-     * @param job the persisted job
-     * @return symlinks (workspace-relative link → relative target)
-     */
-    default Map<String, String> symlinks(AgentJob job) {
-        return Map.of();
-    }
 }
