@@ -95,10 +95,15 @@ public class ContentAddressedStore {
         return Files.exists(pathFor(sha));
     }
 
-    /** The on-disk path a blob occupies (whether or not it currently exists). */
+    /**
+     * The on-disk path a blob occupies (whether or not it currently exists):
+     * {@code cas/sha256/{first-2-hex}/{remaining-hex}}. The {@code sha256/} segment pins the digest
+     * algorithm in the path (OCI image-layout / Bazel REAPI convention) so a future hash migration
+     * (BLAKE3, …) is non-breaking and self-describing — the one thing Git's layout got wrong.
+     */
     public Path pathFor(String sha) {
         validateSha(sha);
-        return layout.casRoot().resolve(sha.substring(0, 2)).resolve(sha.substring(2));
+        return layout.casRoot().resolve("sha256").resolve(sha.substring(0, 2)).resolve(sha.substring(2));
     }
 
     /**

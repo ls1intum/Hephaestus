@@ -9,15 +9,25 @@ import org.springframework.stereotype.Component;
  * regions under one configurable root so the layout is integration-namespaced and a new connector
  * needs no path plumbing of its own.
  *
- * <p>The root defaults to the existing {@code hephaestus.git.storage-path} so a deployment that only
- * set the git path keeps working — the git clone simply moves from {@code {root}/{repoId}} to
- * {@code {root}/bulk/scm/{repoId}}. Because a clone is a rebuildable cache, no data migration is
- * needed: a job re-clones at the new path on first miss.
+ * <p>Three regions, three lifecycles, visible in one {@code ls} (the immutable/mutable split that every
+ * proven content store — Git objects-vs-refs, Bazel cas-vs-ac, OCI blobs-vs-index — keeps physical):
+ * <ul>
+ *   <li>{@code cas/} — IMMUTABLE content-addressed blobs (the only hash-keyed region); GC by mark-and-sweep.
+ *   <li>{@code worktrees/{connector}/{externalId}} — MUTABLE name-keyed materialisations (the git checkout);
+ *       regenerable, GC by re-clone-on-miss.
+ *   <li>{@code jobs/{jobId}/manifest.json} — the MUTABLE provenance index (name+provenance → digests, the
+ *       analogue of Git refs / Bazel ActionCache); recoverable from SQL, GC by retention window.
+ * </ul>
+ *
+ * <p>The root defaults to the existing {@code hephaestus.git.storage-path} so a deployment that only set
+ * the git path keeps working — the checkout simply moves from {@code {root}/{repoId}} to
+ * {@code {root}/worktrees/scm/{repoId}}. Because it is a rebuildable cache, no data migration is needed:
+ * a job re-clones at the new path on first miss.
  */
 @Component
 public class FabricLayout {
 
-    private static final String BULK = "bulk";
+    private static final String WORKTREES = "worktrees";
     private static final String CAS = "cas";
     private static final String JOBS = "jobs";
 
@@ -35,15 +45,17 @@ public class FabricLayout {
     }
 
     /**
-     * A bulk, working-tree-shaped artifact for a connector: {@code {root}/bulk/{connectorId}/{externalId}}.
-     * The git clone lives at {@code bulk/scm/{repositoryId}} (one namespace among future
-     * {@code bulk/slack/...}, {@code bulk/outline/...}).
+     * The mutable working-tree materialisation for a connector:
+     * {@code {root}/worktrees/{connectorId}/{externalId}}. The git checkout lives at
+     * {@code worktrees/scm/{repositoryId}} (one namespace among future {@code worktrees/slack/...},
+     * {@code worktrees/outline/...}). Named after Git's term for exactly this — a checked-out, path-keyed,
+     * churning view that is NOT addressed by its content (so it is a sibling of {@code cas/}, never nested).
      */
-    public Path bulkArtifact(String connectorId, String externalId) {
-        return root.resolve(BULK).resolve(segment(connectorId)).resolve(segment(externalId));
+    public Path worktree(String connectorId, String externalId) {
+        return root.resolve(WORKTREES).resolve(segment(connectorId)).resolve(segment(externalId));
     }
 
-    /** Root of the content-addressed blob store (sha-256, two-char fan-out): {@code {root}/cas}. */
+    /** Root of the content-addressed blob store ({@code cas/sha256/{ab}/{rest}}): {@code {root}/cas}. */
     public Path casRoot() {
         return root.resolve(CAS);
     }

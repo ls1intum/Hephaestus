@@ -54,7 +54,7 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
-    /** Connector namespace for SCM clones in the fabric {@code bulk/} tree (one among future slack/, outline/). */
+    /** Connector namespace for SCM checkouts in the fabric {@code worktrees/} tree (one among future slack/, outline/). */
     private static final String SCM_CONNECTOR = "scm";
 
     private final GitRepositoryProperties properties;
@@ -90,12 +90,12 @@ public class GitRepositoryManager {
 
     /**
      * Get the local path for a repository clone — the SCM connector's bulk artifact in the Context
-     * Fabric (ADR 0020). Path format: {@code {fabric.root}/bulk/scm/{repositoryId}}. A clone is a
+     * Fabric (ADR 0020). Path format: {@code {fabric.root}/worktrees/scm/{repositoryId}}. A clone is a
      * rebuildable cache, so the move from the legacy {@code {root}/{repositoryId}} layout needs no
      * data migration: a stale-or-absent clone is simply re-fetched at this path on first use.
      */
     public Path getRepositoryPath(Long repositoryId) {
-        return fabricLayout.bulkArtifact(SCM_CONNECTOR, repositoryId.toString());
+        return fabricLayout.worktree(SCM_CONNECTOR, repositoryId.toString());
     }
 
     /**
