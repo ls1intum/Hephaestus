@@ -470,6 +470,15 @@ function loadPracticeSlugs() {
     }
 }
 
+// Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
+// cannot drift between the five sites that previously copy-pasted it.
+const PERSIST_DISCIPLINE =
+    `There is no target count and no quota. ` +
+    `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
+    `Only keep POSITIVE findings that add real review value. ` +
+    `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+    `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
+
 function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
     return (
@@ -609,19 +618,14 @@ async function main() {
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft nudge: persist before hard timeout (4/4 success in prod).
+    // Soft nudge: steer the agent to persist findings before the hard timeout aborts.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
         const steerMessage =
             `Stop analyzing and persist output now. ` +
             `Use report_finding immediately for any finding you already have, one finding per call. ` +
-            `There is no target count and no quota. ` +
-            `When reading files for initial context, batch independent reads and greps in parallel when the runtime supports it. ` +
-            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
+            PERSIST_DISCIPLINE;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
 
@@ -809,31 +813,19 @@ async function main() {
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Do NOT read more files. ` +
             `Persist every remaining justified finding with report_finding immediately, one finding per call. ` +
-            `There is no target count and no quota. ` +
-            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
+            PERSIST_DISCIPLINE + ` ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
             `Do NOT read any more files. Persist the remaining findings with report_finding NOW, one finding per call. ` +
-            `There is no target count and no quota. ` +
-            `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be \"No change needed.\" ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
+            PERSIST_DISCIPLINE + ` ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
-            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call, ` +
-            `with no target count or quota, ` +
-            `using \"No change needed.\" as guidance for POSITIVE or NOT_APPLICABLE findings when needed. ` +
-            `Only keep POSITIVE findings that add real review value. ` +
-            `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-            `Use tools only from this point onward. Do not write planning prose or plain-text commentary. ` +
+            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call. ` +
+            PERSIST_DISCIPLINE + ` ` +
             scaffold;
     }
 
@@ -887,7 +879,7 @@ async function main() {
         process.exit(0);
     }
 
-    console.error(`[pi-runner] FAILED: no complete persisted review output after initial + format retry`);
+    console.error(`[pi-runner] FAILED: no complete persisted review output after initial attempt + recovery retry`);
     process.exit(1);
 }
 

@@ -4,20 +4,39 @@
 
 ## Grounding & reliability rules (MANDATORY — these override any practice prompt)
 
-1. **Quote or abstain.** Every POSITIVE and every NEGATIVE finding MUST quote the exact evidence string from the case
-   context that decides it — a sentence from the description, a commit subject, a label value, a specific added/removed diff
-   line (`+`/`-`), or a precompute count. If you cannot quote the deciding fact, emit **NOT_APPLICABLE** at low confidence.
-   An abstention is always better than an ungrounded verdict.
-2. **Never assert behavior you cannot verify from quoted text.** Do NOT claim a change "fails to compile", "breaks the app",
+1. **Quote or abstain — but READ FIRST.** Every POSITIVE and every NEGATIVE finding MUST quote the exact evidence string
+   that decides it — a sentence from the description, a commit subject, a label value, a specific added/removed diff line
+   (`+`/`-`), or a precompute count. Abstention is better than an ungrounded *verdict* — but abstention is NOT a substitute
+   for reading. "I did not read the file/hunk" is NEVER a valid basis for NOT_APPLICABLE: read it, then decide.
+
+2. **READ-BEFORE-NA gate (MANDATORY for code-level practices).** Before you may emit NOT_APPLICABLE on a code-level practice
+   (testing-discipline, code-craftsmanship, robust-error-handling, secure-by-default, decisions-and-documentation,
+   delivery-and-version-control), you MUST have actually examined the change: read `inputs/context/diff.patch` (every changed
+   *code* file's hunks) — open the underlying file in `inputs/sources/scm/repo` when the hunk alone is ambiguous. NA is valid
+   ONLY when, having READ the changed code, the practice's subject genuinely does not occur in it (e.g. no error-handling site
+   in the diff at all). NA "for insufficient coverage / I have not read the diff" is a BUG — you have a multi-minute budget;
+   spend it reading. If a precompute hint OR a prior review note names a specific `file:line`, you MUST open that exact hunk
+   and evaluate it before deciding — quoting a hint and then abstaining for not reading it is forbidden.
+3. **Verdict trichotomy — a present, well-handled surface is POSITIVE, never NA.** For a practice whose subject IS present in
+   the change, the verdict is POSITIVE (handled in an exemplary, above-bar way) or NEGATIVE (a defect) — NOT NOT_APPLICABLE.
+   NA is reserved for a surface that is genuinely ABSENT (no error-handling site in the diff, no security/untrusted-input
+   surface, nothing testable). Reading the changed code and finding it *well done* is a POSITIVE you MUST emit — it is the
+   affirmation half of mentoring, not a courtesy: a student who built graceful-degradation guards on every flaky subsystem,
+   swept `var`→`let` for immutability, removed real duplication, or wrote decision-grade rationale (a citation, a struct-layout
+   contract, a "why this default" note) must hear that it is the bar, with one concrete forward nudge. **False-praise guard
+   (unchanged):** emit POSITIVE only when you have READ the surface, found NO defect in it for THAT practice, and can quote the
+   specific evidence (a `+` line, a named type/function) that makes it exemplary — never praise a surface you did not read,
+   never praise the person, and never emit a POSITIVE for a practice on which you are also emitting a NEGATIVE. One POSITIVE
+   per practice; if several co-located positives fit one practice, keep the single highest-value one with its forward nudge.
+4. **Never assert behavior you cannot verify from quoted text.** Do NOT claim a change "fails to compile", "breaks the app",
    "has a type error", "is missing a parameter", or any compile/runtime/functional-correctness outcome — you cannot run or
-   type-check the code. If a practice's criteria do not give you a quotable, surface-level fact, abstain. (A real review
-   missed this once and invented a compile error — do not repeat it.)
-3. **Severity is fixed by the practice criteria, not your judgement.** Apply the practice's severity table exactly, keyed off
+   type-check the code. If a practice's criteria do not give you a quotable, surface-level fact, abstain.
+5. **Severity is fixed by the practice criteria, not your judgement.** Apply the practice's severity table exactly, keyed off
    the countable fact you quoted (a line-count bucket, a present/absent token, a regex hit). Identical facts MUST yield
    identical severity every run. Never escalate on a feeling of "how bad" it is.
-4. **Confidence is a delivery gate, not a severity input.** Set confidence high ONLY when a precompute fact or a verbatim
+6. **Confidence is a delivery gate, not a severity input.** Set confidence high ONLY when a precompute fact or a verbatim
    quote backs the finding; lower it when the call is interpretive. Do not pad confidence.
-5. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
+7. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
    `context/` file. A finding whose only location is a context file is out of scope; drop it.
 
 - Use the dedicated PI reporting tool: `report_finding`.
@@ -36,7 +55,9 @@ context files accordingly (see Workspace below) and always follow the task promp
    PR, `inputs/context/diff_summary.md` + `inputs/context/metadata.json`; for an ISSUE,
    `inputs/context/issue_summary.md` + `inputs/context/comments.json` + `inputs/context/metadata.json`. Batch independent
    reads/greps in parallel when your runtime supports it.
-2. **Analyze** against each practice. For a PR, only flag changed lines (`+`/`-`) and verify findings against actual diff
+2. **Analyze** against each practice. For a PR, you MUST read `inputs/context/diff.patch` covering EVERY changed code file
+   before judging the code-level practices (per the READ-BEFORE-NA gate) — `diff_summary.md` is the index, `diff.patch` is the
+   evidence; do not stop at a handful of files. Only flag changed lines (`+`/`-`) and verify findings against actual diff
    lines. For an ISSUE, evaluate the issue text/thread/metadata — evidence references the issue, not source files.
 3. **Persist findings as you go** with `report_finding` whenever you confirm one.
 
@@ -45,7 +66,9 @@ For a **NOT_APPLICABLE** finding, `guidance` can be brief (e.g. `No change neede
 Default to a high-signal review:
 
 - Report all justified NEGATIVE findings.
-- Only report POSITIVE findings when they add real review value. Skip courtesy positives that merely say something is present or acceptable unless that positive is genuinely worth calling out to the author.
+- Report a POSITIVE when a practice's surface is present and handled in a genuinely exemplary, above-bar way (per the verdict
+  trichotomy, rule 3) — that IS real review value and must be surfaced with one forward nudge, not silently collapsed to NA.
+  Skip only *courtesy* positives that merely say something is present or acceptable with nothing transferable to teach.
 - If two candidate findings say almost the same thing, keep the stronger, more actionable one and drop the weaker or derivative one.
 - Prefer one precise finding about user-visible breakage over a second lower-value finding about logging or style around the same defect.
 - There is no target number of findings and no quota. Never plan around a number like five.
