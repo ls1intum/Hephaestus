@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.fabric;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,10 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Mirrors the established {@code @Scheduled} sweepers (ExportRetentionSweeper, AccountHardDeleteSweeper).
  */
 @Component
+@WorkspaceAgnostic(
+    "The fabric cache (content-addressed blob store + job-replay dirs) is shared across all workspaces " +
+        "by design — like the git clone it generalises — so GC operates globally with no per-workspace iteration."
+)
 public class FabricGarbageCollector {
 
     private static final Logger log = LoggerFactory.getLogger(FabricGarbageCollector.class);
