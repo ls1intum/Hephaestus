@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -200,7 +201,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         PullRequest pr = new PullRequest();
         pr.setBody(body.toString());
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-        when(issueRepository.findByRepositoryIdAndNumber(eq(REPO_ID), anyLongAsInt())).thenAnswer(inv -> {
+        when(issueRepository.findByRepositoryIdAndNumber(eq(REPO_ID), anyInt())).thenAnswer(inv -> {
             int n = inv.getArgument(1);
             return Optional.of(issue(n, "Issue " + n, "criteria " + n));
         });
@@ -324,10 +325,5 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         assertThat(root.get("workItems").get(0).get("number").asInt()).isEqualTo(77);
         assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean()).isTrue();
         assertThat(root.get("resolvedFrom").toString()).contains("commits");
-    }
-
-    /** Mockito {@code anyInt()} via a named helper for readability where the repo takes an int number. */
-    private static int anyLongAsInt() {
-        return org.mockito.ArgumentMatchers.anyInt();
     }
 }

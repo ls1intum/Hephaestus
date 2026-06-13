@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryMan
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -63,7 +64,7 @@ public class BranchGraphContentProvider implements ContentProvider {
      * so the "branched off an in-flight feature branch" hint must never fire when the SOURCE is one of
      * these — otherwise every release MR is a false positive.
      */
-    private static final java.util.Set<String> INTEGRATION_BRANCHES = java.util.Set.of(
+    private static final Set<String> INTEGRATION_BRANCHES = Set.of(
         "main",
         "master",
         "develop",
@@ -78,7 +79,7 @@ public class BranchGraphContentProvider implements ContentProvider {
         if (branch == null) {
             return false;
         }
-        String b = branch.toLowerCase(java.util.Locale.ROOT);
+        String b = branch.toLowerCase(Locale.ROOT);
         int slash = b.lastIndexOf('/');
         String leaf = slash >= 0 ? b.substring(slash + 1) : b;
         return INTEGRATION_BRANCHES.contains(leaf) || b.startsWith("release/") || b.startsWith("hotfix/");
@@ -121,10 +122,10 @@ public class BranchGraphContentProvider implements ContentProvider {
             return;
         }
 
-        Long repositoryId = optLong(m, "repository_id");
-        String sourceBranch = optText(m, "source_branch");
-        String targetBranch = optText(m, "target_branch");
-        String headSha = optText(m, "commit_sha");
+        Long repositoryId = MetaJson.optLong(m, "repository_id");
+        String sourceBranch = MetaJson.optString(m, "source_branch");
+        String targetBranch = MetaJson.optString(m, "target_branch");
+        String headSha = MetaJson.optString(m, "commit_sha");
 
         // Every field is guarded: enriched may be false. Emit nothing rather than throw.
         if (repositoryId == null || sourceBranch == null || targetBranch == null) {
@@ -162,7 +163,7 @@ public class BranchGraphContentProvider implements ContentProvider {
             ArrayNode sampleSubjects = objectMapper.createArrayNode();
             for (GitRepositoryManager.CommitInfo c : ahead) {
                 if (c.authorEmail() != null && !c.authorEmail().isBlank()) {
-                    distinctAuthors.add(c.authorEmail().toLowerCase(java.util.Locale.ROOT));
+                    distinctAuthors.add(c.authorEmail().toLowerCase(Locale.ROOT));
                 }
                 if (sampleSubjects.size() < MAX_SAMPLE_SUBJECTS) {
                     sampleSubjects.add(excerpt(c.message()));
@@ -213,20 +214,5 @@ public class BranchGraphContentProvider implements ContentProvider {
             return single;
         }
         return single.substring(0, MAX_SUBJECT_LENGTH) + "…";
-    }
-
-    private static Long optLong(JsonNode node, String field) {
-        if (node.has(field) && !node.get(field).isNull() && node.get(field).isNumber()) {
-            return node.get(field).asLong();
-        }
-        return null;
-    }
-
-    private static String optText(JsonNode node, String field) {
-        if (node.has(field) && !node.get(field).isNull()) {
-            String v = node.get(field).asString();
-            return (v == null || v.isBlank()) ? null : v;
-        }
-        return null;
     }
 }

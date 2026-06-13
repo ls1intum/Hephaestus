@@ -15,7 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
@@ -83,7 +82,6 @@ class TestPresenceContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class Supports {
 
         @Test
@@ -98,7 +96,6 @@ class TestPresenceContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class HappyPath {
 
         @Test
@@ -193,7 +190,6 @@ class TestPresenceContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class BestEffortAbstention {
 
         @Test
@@ -260,7 +256,6 @@ class TestPresenceContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class PathConvention {
 
         @Test

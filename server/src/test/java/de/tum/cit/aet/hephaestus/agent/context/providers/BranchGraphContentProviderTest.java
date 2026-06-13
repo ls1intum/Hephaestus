@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
@@ -97,7 +96,6 @@ class BranchGraphContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class Contract {
 
         @Test
@@ -112,7 +110,6 @@ class BranchGraphContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class HappyPath {
 
         @Test
@@ -213,7 +210,6 @@ class BranchGraphContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    @Tag("unit")
     class BestEffortAbstention {
 
         @Test

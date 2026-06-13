@@ -14,11 +14,15 @@ import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -234,6 +238,10 @@ class DeliveryComposer {
             }
         }
         // Pick the few highest-leverage improvements: severity (MINOR before INFO) then confidence desc.
+        // Collect by reference IDENTITY (not value-equality): ValidatedFinding is a record, so two findings
+        // with identical content are equal — a value-set would collapse them into one slot, letting the
+        // order-preserving re-emit below match BOTH and overshoot the cap. Identity keeps exactly the
+        // limit()-selected instances.
         Set<ValidatedFinding> keptImprovements = improvements
             .stream()
             .sorted(
@@ -242,7 +250,7 @@ class DeliveryComposer {
                 )
             )
             .limit(MAX_IMPROVEMENT_SUGGESTIONS)
-            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+            .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
 
         // Re-emit in the original (severity-sorted) order, dropping the improvements that did not survive.
         List<ValidatedFinding> kept = new ArrayList<>(blocking.size() + keptImprovements.size());
@@ -420,7 +428,7 @@ class DeliveryComposer {
         // Markdown lists/headings) for every sentence we keep — rejoining with a blanket space would
         // collapse a bulleted acceptance-criteria block into one run-on line.
         StringBuilder kept = new StringBuilder(text.length());
-        java.util.regex.Matcher sep = SENTENCE_SEPARATOR.matcher(text);
+        Matcher sep = SENTENCE_SEPARATOR.matcher(text);
         int pos = 0;
         while (sep.find()) {
             String sentence = text.substring(pos, sep.start());
@@ -448,6 +456,13 @@ class DeliveryComposer {
      * never fires on a real code/JSON snippet that simply closes with a brace.
      */
     private static final Pattern ENVELOPE_TAIL = Pattern.compile("[\"'\\\\]*[}\\]][\"'\\\\]+\\s*$");
+
+    /**
+     * Peels a leading {@code "<key>":} (optionally-quoted value) off a metadata-envelope span the agent
+     * sometimes quotes raw. Hoisted to a static field — like the other patterns here — so it is compiled
+     * once rather than per {@link #metadataSnippetText} call.
+     */
+    private static final Pattern METADATA_FIELD = Pattern.compile("\"[A-Za-z_][A-Za-z0-9_]*\"\\s*:\\s*\"?");
 
     /**
      * Repairs the JSON-envelope corruption that occasionally reaches student text: the model terminates a
@@ -726,7 +741,7 @@ class DeliveryComposer {
         // cleanly terminated single field, which the prior trailing-anchored regex required.
         // The leading "<key>": may carry a quoted value ("body": "...") or a bare one ("additions": 2306,
         // "commits": [ {) — make the opening quote optional so numeric/array fields are peeled too.
-        var field = Pattern.compile("\"[A-Za-z_][A-Za-z0-9_]*\"\\s*:\\s*\"?").matcher(s);
+        Matcher field = METADATA_FIELD.matcher(s);
         int valueStart = -1;
         while (field.find()) {
             valueStart = field.end();

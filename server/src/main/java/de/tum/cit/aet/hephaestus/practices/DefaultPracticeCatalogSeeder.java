@@ -89,8 +89,13 @@ class DefaultPracticeCatalogSeeder {
                 // Already present — respect any admin edits and do not overwrite.
                 continue;
             }
-            goalService.createGoal(ctx, goalSlug, goalNode.path("name").asString(), text(goalNode, "description"));
-            goalService.updateGoal(ctx, goalSlug, null, null, goalNode.path("displayOrder").asInt());
+            goalService.createGoal(
+                ctx,
+                goalSlug,
+                goalNode.path("name").asString(),
+                text(goalNode, "description"),
+                goalNode.path("displayOrder").asInt()
+            );
             seededGoals++;
 
             for (JsonNode practiceNode : goalNode.path("practices")) {

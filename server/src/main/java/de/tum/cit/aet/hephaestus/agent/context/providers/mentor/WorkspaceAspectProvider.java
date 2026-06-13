@@ -19,6 +19,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,7 +153,7 @@ public class WorkspaceAspectProvider implements ContentProvider {
     }
 
     /** Best-effort query; on failure log the real cause and return an empty list. */
-    private <T> List<T> guardedQuery(String aspect, java.util.function.Supplier<List<T>> query) {
+    private <T> List<T> guardedQuery(String aspect, Supplier<List<T>> query) {
         try {
             return query.get();
         } catch (RuntimeException e) {

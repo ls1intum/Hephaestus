@@ -119,7 +119,7 @@ public class ReviewThreadContentProvider implements ContentProvider {
                 return;
             }
 
-            Long pullRequestId = optLong(m, "pull_request_id");
+            Long pullRequestId = MetaJson.optLong(m, "pull_request_id");
             if (pullRequestId == null) {
                 return;
             }
@@ -292,12 +292,5 @@ public class ReviewThreadContentProvider implements ContentProvider {
         }
         String login = user.getLogin();
         return (login != null && !login.isBlank()) ? login : null;
-    }
-
-    private static Long optLong(JsonNode node, String field) {
-        if (node.has(field) && !node.get(field).isNull() && node.get(field).isNumber()) {
-            return node.get(field).asLong();
-        }
-        return null;
     }
 }

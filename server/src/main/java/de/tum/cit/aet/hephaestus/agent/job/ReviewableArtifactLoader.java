@@ -28,8 +28,17 @@ class ReviewableArtifactLoader {
         return pullRequestRepository.findByIdWithAllForGate(pullRequestId);
     }
 
-    /** Loads an issue with its repository eagerly fetched. */
+    /** Loads an issue with its repository eagerly fetched (gate-bypass path; no role check). */
     Optional<Issue> findIssueWithRepository(long issueId) {
         return issueRepository.findByIdWithRepository(issueId);
+    }
+
+    /**
+     * Loads an issue with the association graph the detection gate needs — repository AND assignees, since
+     * the gate's role check iterates {@code getAssignees()}. Mirrors what the production issue listener
+     * loads, so the dev gate-routed path exercises the same eager-fetch precondition.
+     */
+    Optional<Issue> findIssueForGate(long issueId) {
+        return issueRepository.findByIdWithRepositoryAndAssignees(issueId);
     }
 }

@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -110,7 +111,7 @@ public class TestPresenceContentProvider implements ContentProvider {
             log.debug("No metadata, skipping test-presence scan");
             return;
         }
-        Long repositoryId = optLong(metadata, "repository_id");
+        Long repositoryId = MetaJson.optLong(metadata, "repository_id");
         if (repositoryId == null) {
             log.debug("No repository_id, skipping test-presence scan");
             return;
@@ -256,10 +257,10 @@ public class TestPresenceContentProvider implements ContentProvider {
      * metadata and inspects the changed-file name list. Returns {@code null} when the range or the
      * branch metadata is unavailable (so the JSON carries {@code null}, not a misleading {@code false}).
      */
-    private Boolean computeChangeTouchesTests(Path repoPath, tools.jackson.databind.JsonNode metadata) {
-        String sourceBranch = optString(metadata, "source_branch");
-        String targetBranch = optString(metadata, "target_branch");
-        String headSha = optString(metadata, "commit_sha");
+    private Boolean computeChangeTouchesTests(Path repoPath, JsonNode metadata) {
+        String sourceBranch = MetaJson.optString(metadata, "source_branch");
+        String targetBranch = MetaJson.optString(metadata, "target_branch");
+        String headSha = MetaJson.optString(metadata, "commit_sha");
         if (sourceBranch == null || targetBranch == null || headSha == null) {
             return null;
         }
@@ -291,20 +292,6 @@ public class TestPresenceContentProvider implements ContentProvider {
         } catch (IllegalArgumentException e) {
             return null;
         }
-    }
-
-    private static Long optLong(tools.jackson.databind.JsonNode metadata, String field) {
-        return metadata.has(field) && !metadata.get(field).isNull() && metadata.get(field).isNumber()
-            ? metadata.get(field).asLong()
-            : null;
-    }
-
-    private static String optString(tools.jackson.databind.JsonNode metadata, String field) {
-        if (!metadata.has(field) || metadata.get(field).isNull()) {
-            return null;
-        }
-        String value = metadata.get(field).asString();
-        return value == null || value.isBlank() ? null : value;
     }
 
     /** Compact result of the worktree walk. */

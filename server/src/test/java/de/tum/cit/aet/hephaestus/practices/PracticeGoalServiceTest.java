@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -119,8 +120,9 @@ class PracticeGoalServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void bindPractice_goalInAnotherWorkspace_throwsNotFound() {
-        // The goal is resolved scoped to CTX's workspace; a foreign goal slug returns empty → not found.
+    void bindPractice_unresolvedGoal_throwsNotFound() {
+        // A goal slug the workspace-scoped finder does not resolve → EntityNotFoundException. (Real
+        // cross-workspace isolation is exercised end-to-end in PracticeGoalControllerIntegrationTest.)
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(new Practice()));
         when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
 
@@ -147,7 +149,7 @@ class PracticeGoalServiceTest extends BaseUnitTest {
         assertThat(c.getDisplayOrder()).isEqualTo(0);
         assertThat(a.getDisplayOrder()).isEqualTo(1);
         assertThat(b.getDisplayOrder()).isEqualTo(2);
-        verify(practiceGoalRepository, org.mockito.Mockito.times(3)).save(any());
+        verify(practiceGoalRepository, times(3)).save(any());
     }
 
     @Test

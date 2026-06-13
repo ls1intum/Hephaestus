@@ -35,13 +35,13 @@ import tools.jackson.databind.JsonNode;
  *
  * <h2>Gate checks (in order)</h2>
  * <ol>
- *   <li>Draft PR + {@code skipDrafts} config → SKIP</li>
- *   <li>Workspace resolution → SKIP if not found</li>
+ *   <li>Workspace resolution → SKIP if not found (first, so per-workspace settings drive the gates below)</li>
+ *   <li>Draft PR + {@code skipDrafts} setting → SKIP</li>
  *   <li>Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
  *   <li>Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
- *   <li>No enabled agent config for workspace → SKIP</li>
+ *   <li>No runnable practice config for workspace → SKIP</li>
  *   <li>No active practices match trigger event → SKIP</li>
- *   <li>{@code runForAllUsers} config → DETECT (bypass role check)</li>
+ *   <li>{@code runForAllUsers} setting → DETECT (bypass role check)</li>
  *   <li>No assignee → SKIP</li>
  *   <li>Role checker unhealthy → SKIP</li>
  *   <li>Assignee has {@code run_practice_review} role → DETECT / SKIP</li>

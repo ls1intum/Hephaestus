@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -19,6 +20,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
@@ -56,7 +58,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void noWorkspace_skips() {
         when(workspaceRepository.findAll()).thenReturn(List.of());
         seeder(true).seed();
-        verify(goalService, never()).createGoal(any(), any(), any(), any());
+        verify(goalService, never()).createGoal(any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -67,12 +69,12 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         seeder(true).seed();
 
         // The shipped catalog is eleven goals with thirty-two practices total, each bound to its goal.
-        verify(goalService).createGoal(any(), eq("review-ready-work"), any(), any());
-        verify(goalService).createGoal(any(), eq("acting-on-review-feedback"), any(), any());
-        verify(goalService).createGoal(any(), eq("actionable-issue-authoring"), any(), any());
-        verify(goalService).createGoal(any(), eq("constructive-code-review"), any(), any());
-        verify(goalService).createGoal(any(), eq("testing-discipline"), any(), any());
-        verify(goalService, times(11)).createGoal(any(), any(), any(), any());
+        verify(goalService).createGoal(any(), eq("review-ready-work"), any(), any(), anyInt());
+        verify(goalService).createGoal(any(), eq("acting-on-review-feedback"), any(), any(), anyInt());
+        verify(goalService).createGoal(any(), eq("actionable-issue-authoring"), any(), any(), anyInt());
+        verify(goalService).createGoal(any(), eq("constructive-code-review"), any(), any(), anyInt());
+        verify(goalService).createGoal(any(), eq("testing-discipline"), any(), any(), anyInt());
+        verify(goalService, times(11)).createGoal(any(), any(), any(), any(), anyInt());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
         verify(practiceService, times(32)).createPractice(any(), practiceCaptor.capture());
@@ -108,7 +110,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         seeder(true).seed();
 
-        verify(goalService, never()).createGoal(any(), any(), any(), any());
+        verify(goalService, never()).createGoal(any(), any(), any(), any(), anyInt());
         verify(practiceService, never()).createPractice(any(), any());
     }
 
@@ -116,8 +118,28 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(goalRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
-        when(goalService.createGoal(any(), any(), any(), any())).thenThrow(new RuntimeException("boom"));
+        when(goalService.createGoal(any(), any(), any(), any(), anyInt())).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+    }
+
+    @Test
+    void shippedCatalogCriteria_useRealNewlinesNotLiteralEscapes() {
+        // Regression guard (2026-06-13): 21/32 criteria once shipped with a literal two-char "\n" instead of
+        // a real newline, collapsing every "## Section" of the judge prompt onto one line. The injector
+        // writes criteria verbatim into the judge's context, so this must be caught at the source.
+        JsonNode catalog = JsonMapper.builder()
+            .build()
+            .readTree(getClass().getClassLoader().getResourceAsStream("practices/default-catalog.json"));
+        for (JsonNode goal : catalog.path("goals")) {
+            for (JsonNode practice : goal.path("practices")) {
+                assertThat(practice.path("criteria").asString())
+                    .as(
+                        "criteria for '%s' must use real newlines, not a literal backslash-n",
+                        practice.path("slug").asString()
+                    )
+                    .doesNotContain("\\n");
+            }
+        }
     }
 }

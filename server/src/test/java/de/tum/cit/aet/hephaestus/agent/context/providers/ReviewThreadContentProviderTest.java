@@ -22,14 +22,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-@Tag("unit")
 class ReviewThreadContentProviderTest extends BaseUnitTest {
 
     private static final String FILE_KEY = "context/target/review_threads.json";

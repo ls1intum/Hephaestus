@@ -981,7 +981,13 @@ class DeliveryComposerTest extends BaseUnitTest {
             )
         );
         var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
+        // Both structure findings carry locations, so on a PR they become inline diff notes — and BOTH
+        // survive: dropping the `artifact == ISSUE` guard on dedupEpicStructure would collapse them to one.
         assertThat(dc).isNotNull();
+        assertThat(dc.diffNotes()).hasSize(2);
+        assertThat(dc.diffNotes())
+            .extracting(PracticeDetectionResultParser.DiffNote::filePath)
+            .containsExactlyInAnyOrder("a.swift", "b.swift");
     }
 
     @Test

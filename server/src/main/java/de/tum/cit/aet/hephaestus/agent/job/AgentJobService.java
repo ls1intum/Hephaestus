@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -48,7 +49,7 @@ public class AgentJobService {
     private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ReviewableArtifactLoader artifactLoader;
-    private final de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService;
+    private final ConnectionService connectionService;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -62,7 +63,7 @@ public class AgentJobService {
         AgentConfigRepository agentConfigRepository,
         WorkspaceRepository workspaceRepository,
         ReviewableArtifactLoader artifactLoader,
-        de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService connectionService,
+        ConnectionService connectionService,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
@@ -138,11 +139,7 @@ public class AgentJobService {
         return submitReviewForLoadedPullRequest(workspaceId, pr, null);
     }
 
-    String submitReviewForLoadedPullRequest(
-        Long workspaceId,
-        PullRequest pr,
-        @org.jspecify.annotations.Nullable String triggerEvent
-    ) {
+    String submitReviewForLoadedPullRequest(Long workspaceId, PullRequest pr, @Nullable String triggerEvent) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
             return "PR missing branch info: prId=" + pr.getId();
         }
@@ -183,11 +180,7 @@ public class AgentJobService {
         return submitDetectionForLoadedIssue(workspaceId, issue, null);
     }
 
-    String submitDetectionForLoadedIssue(
-        Long workspaceId,
-        Issue issue,
-        @org.jspecify.annotations.Nullable String triggerEvent
-    ) {
+    String submitDetectionForLoadedIssue(Long workspaceId, Issue issue, @Nullable String triggerEvent) {
         if (issue.getRepository() == null) {
             return "Issue missing repository: issueId=" + issue.getId();
         }

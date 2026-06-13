@@ -105,11 +105,13 @@ public class PracticeGoalController {
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeGoalRequestDTO request
     ) {
-        goalService.createGoal(workspaceContext, request.slug(), request.name(), request.description());
-        PracticeGoal goal =
-            request.displayOrder() != null
-                ? goalService.updateGoal(workspaceContext, request.slug(), null, null, request.displayOrder())
-                : goalService.getGoal(workspaceContext, request.slug());
+        PracticeGoal goal = goalService.createGoal(
+            workspaceContext,
+            request.slug(),
+            request.name(),
+            request.description(),
+            request.displayOrder() != null ? request.displayOrder() : 0
+        );
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{slug}")
             .buildAndExpand(goal.getSlug())

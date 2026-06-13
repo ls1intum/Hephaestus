@@ -135,8 +135,8 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
                 return;
             }
 
-            Long repositoryId = optLong(m, "repository_id");
-            Long pullRequestId = optLong(m, "pull_request_id");
+            Long repositoryId = MetaJson.optLong(m, "repository_id");
+            Long pullRequestId = MetaJson.optLong(m, "pull_request_id");
             if (repositoryId == null) {
                 return;
             }
@@ -147,7 +147,7 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
 
             String body = pullRequest != null ? pullRequest.getBody() : null;
             String sourceBranch = firstNonBlank(
-                optString(m, "source_branch"),
+                MetaJson.optString(m, "source_branch"),
                 pullRequest != null ? pullRequest.getHeadRefName() : null
             );
 
@@ -292,9 +292,9 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
         if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             return;
         }
-        String sourceBranch = optString(metadata, "source_branch");
-        String targetBranch = optString(metadata, "target_branch");
-        String headSha = optString(metadata, "commit_sha");
+        String sourceBranch = MetaJson.optString(metadata, "source_branch");
+        String targetBranch = MetaJson.optString(metadata, "target_branch");
+        String headSha = MetaJson.optString(metadata, "commit_sha");
         if (sourceBranch == null || targetBranch == null || headSha == null) {
             return;
         }
@@ -320,13 +320,8 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
                 if (subject == null || subject.isBlank()) {
                     continue;
                 }
-                Set<Integer> before = new LinkedHashSet<>(refs.numbers.keySet());
+                // collectFromText records any matched number and tags resolvedFrom("commits") itself.
                 collectFromText(subject, refs, "commits");
-                // collectFromText already adds "commits" to resolvedFrom when it matched; nothing else to do.
-                if (!refs.numbers.keySet().equals(before)) {
-                    // a new number appeared — resolvedFrom("commits") already recorded by collectFromText
-                    log.debug("Linked work item ref found in commit subject");
-                }
             }
         } catch (Exception e) {
             log.debug("Commit-subject scan for linked work items skipped: {}", e.getMessage());
@@ -352,21 +347,6 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
             return a;
         }
         return (b != null && !b.isBlank()) ? b : null;
-    }
-
-    private static Long optLong(JsonNode node, String field) {
-        if (node.has(field) && !node.get(field).isNull() && node.get(field).isNumber()) {
-            return node.get(field).asLong();
-        }
-        return null;
-    }
-
-    private static String optString(JsonNode node, String field) {
-        if (node.has(field) && !node.get(field).isNull()) {
-            String value = node.get(field).asString();
-            return (value != null && !value.isBlank()) ? value : null;
-        }
-        return null;
     }
 
     /**

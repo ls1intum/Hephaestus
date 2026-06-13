@@ -66,6 +66,17 @@ public class PracticeGoalService {
 
     @Transactional
     public PracticeGoal createGoal(WorkspaceContext ctx, String slug, String name, @Nullable String description) {
+        return createGoal(ctx, slug, name, description, 0);
+    }
+
+    @Transactional
+    public PracticeGoal createGoal(
+        WorkspaceContext ctx,
+        String slug,
+        String name,
+        @Nullable String description,
+        int displayOrder
+    ) {
         if (practiceGoalRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeGoalSlugConflictException(
                 "A practice goal with slug '" + slug + "' already exists in this workspace."
@@ -80,6 +91,7 @@ public class PracticeGoalService {
         goal.setSlug(slug);
         goal.setName(name);
         goal.setDescription(description);
+        goal.setDisplayOrder(displayOrder);
 
         try {
             goal = practiceGoalRepository.save(goal);

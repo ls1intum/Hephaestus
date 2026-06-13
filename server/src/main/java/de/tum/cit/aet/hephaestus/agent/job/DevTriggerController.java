@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,7 +61,7 @@ public class DevTriggerController {
     // The gate touches the lazy Workspace.reviewSettings proxy off the loaded PR/Issue (exactly as the
     // production @Transactional listeners do); without an open session the gate-routed path throws
     // LazyInitializationException. Keep the whole entry transactional so both the gate and submission share it.
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public String triggerReview(
         @RequestParam @Nullable Long prId,
         @RequestParam @Nullable Long issueId,
@@ -107,7 +108,7 @@ public class DevTriggerController {
 
     /** Issue-side counterpart of {@link #triggerPullRequestThroughGate}. */
     private String triggerIssueThroughGate(Long workspaceId, Long issueId, String triggerEvent) {
-        Issue issue = artifactLoader.findIssueWithRepository(issueId).orElse(null);
+        Issue issue = artifactLoader.findIssueForGate(issueId).orElse(null);
         if (issue == null) {
             return "Issue not found: " + issueId;
         }
