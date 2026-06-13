@@ -79,8 +79,15 @@ class DeliveryComposer {
         "intent-revealing-comments"
     );
 
-    /** Strips a leading "repo/" path segment so a student-facing location stays repo-relative (F3). */
+    /**
+     * Strips a leading repo-mount path segment so a student-facing location stays repo-relative (F3).
+     * Handles both the back-compat {@code repo/} alias and the integration-namespaced
+     * {@code blobs/scm/repo/} mount (ADR 0020), in case the agent cites either.
+     */
     private static String repoRelative(String path) {
+        if (path.startsWith("blobs/scm/repo/")) {
+            return path.substring("blobs/scm/repo/".length());
+        }
         return path.startsWith("repo/") ? path.substring("repo/".length()) : path;
     }
 

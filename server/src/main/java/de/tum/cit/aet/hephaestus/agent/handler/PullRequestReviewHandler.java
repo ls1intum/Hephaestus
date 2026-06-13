@@ -229,6 +229,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST);
 
+        // Pre-create blobs/scm/ so the repo can mount under it (the directory mount needs its parent
+        // to exist before docker cp extracts into it).
+        files.put(WorkspaceAbi.SCM_BLOB_KEEP, new byte[0]);
+
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
             "Context preparation complete: {} files, {} ms, repoId={}, pullRequestId={}",
@@ -270,6 +274,16 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         log.info("Mounting real repo: repoId={}, path={}", repositoryId, repoPath);
         return Map.of(repoPath.toAbsolutePath().toString(), WorkspaceAbi.REPO_MOUNT);
+    }
+
+    /**
+     * Back-compat alias {@code /workspace/repo} → {@code blobs/scm/repo}, so the integration-namespaced
+     * mount (ADR 0020) keeps the familiar {@code repo/} path resolving for the agent and the
+     * {@code repo/}-prefix strippers — no agent-surface change despite the physical move.
+     */
+    @Override
+    public Map<String, String> symlinks(AgentJob job) {
+        return Map.of("repo", WorkspaceAbi.REPO_SYMLINK_TARGET);
     }
 
     private String buildPrompt(AgentJob job) {
@@ -635,10 +649,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
-                // The agent cites files it read under the repo mount as "repo/<path>", but diff-stat
-                // paths are repo-relative ("<path>"). Strip the mount prefix so a code finding on a
-                // genuinely-changed file is not dropped on a cosmetic path mismatch.
-                String repoRelative = path.startsWith("repo/") ? path.substring("repo/".length()) : path;
+                // The agent cites files it read under the repo mount as "repo/<path>" or the namespaced
+                // "blobs/scm/repo/<path>" (ADR 0020), but diff-stat paths are repo-relative ("<path>").
+                // Strip either mount prefix so a code finding on a genuinely-changed file is not dropped
+                // on a cosmetic path mismatch.
+                String repoRelative;
+                if (path.startsWith("blobs/scm/repo/")) {
+                    repoRelative = path.substring("blobs/scm/repo/".length());
+                } else if (path.startsWith("repo/")) {
+                    repoRelative = path.substring("repo/".length());
+                } else {
+                    repoRelative = path;
+                }
                 if (diffFiles.contains(path) || diffFiles.contains(repoRelative) || isInternalContextPath(path)) {
                     hasInScopeLocation = true;
                     break;

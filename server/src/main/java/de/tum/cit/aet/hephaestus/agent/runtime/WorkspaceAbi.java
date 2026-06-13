@@ -16,8 +16,24 @@ public final class WorkspaceAbi {
     /** Container workspace root. */
     public static final String WORKSPACE_ROOT = "/workspace";
 
-    /** Bind-mount point for the read-only git repository checkout. */
-    public static final String REPO_MOUNT = WORKSPACE_ROOT + "/repo";
+    /**
+     * Workspace-relative prefix for entitled connector bulk artifacts (ADR 0020): the SCM clone is
+     * {@code blobs/scm/repo}, a future Slack/Outline export is {@code blobs/slack/...} — the repo is one
+     * mount among peers, not a privileged root.
+     */
+    public static final String BLOBS_PREFIX = "blobs/";
+
+    /** Workspace-relative {@code .keep} that pre-creates {@code blobs/scm/} so the repo can mount under it. */
+    public static final String SCM_BLOB_KEEP = BLOBS_PREFIX + "scm/.keep";
+
+    /** Bind-mount point for the read-only git checkout — the SCM connector's bulk artifact. */
+    public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + BLOBS_PREFIX + "scm/repo";
+
+    /** Back-compat symlink {@code /workspace/repo} → {@link #REPO_SYMLINK_TARGET}, so {@code repo/} keeps resolving. */
+    public static final String REPO_SYMLINK = WORKSPACE_ROOT + "/repo";
+
+    /** Relative target of {@link #REPO_SYMLINK} (resolved from {@code /workspace}). */
+    public static final String REPO_SYMLINK_TARGET = BLOBS_PREFIX + "scm/repo";
 
     /** Output directory the sandbox collects after the run. */
     public static final String OUTPUT_PATH = WORKSPACE_ROOT + "/.output";
@@ -27,6 +43,13 @@ public final class WorkspaceAbi {
 
     /** Workspace-relative prefix every {@link de.tum.cit.aet.hephaestus.agent.context.ContentProvider} must write under. */
     public static final String CONTEXT_TARGET_PREFIX = "context/target/";
+
+    /**
+     * Workspace-relative path of the integration-agnostic context manifest (the "telescope"): a small
+     * index of every projected context file with its connector + provenance, so the agent — and a future
+     * connector — sees one uniform entry point regardless of which integration produced the bytes.
+     */
+    public static final String MANIFEST_PATH = CONTEXT_TARGET_PREFIX + "manifest.json";
 
     /** Workspace-relative prefix for per-practice catalog files (index, criteria). */
     public static final String PRACTICES_PREFIX = ".practices/";

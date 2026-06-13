@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -58,7 +59,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
     private GitRepositoryManager createManager(boolean enabled) {
         GitRepositoryProperties properties = new GitRepositoryProperties(storagePath.toString(), enabled);
-        return new GitRepositoryManager(properties, lockManager);
+        return new GitRepositoryManager(properties, lockManager, new FabricLayout(storagePath.toString()));
     }
 
     private Git createSourceRepo() throws GitAPIException, IOException {
@@ -100,7 +101,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             manager = createManager(false);
             Path path = manager.getRepositoryPath(42L);
 
-            assertThat(path).isEqualTo(storagePath.resolve("42"));
+            assertThat(path).isEqualTo(storagePath.resolve("bulk").resolve("scm").resolve("42"));
         }
     }
 
@@ -141,7 +142,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (Git sourceGit = createSourceRepo()) {
                 Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(result).isEqualTo(storagePath.resolve("1"));
+                assertThat(result).isEqualTo(storagePath.resolve("bulk").resolve("scm").resolve("1"));
                 assertThat(Files.exists(result.resolve(".git").resolve("HEAD"))).isTrue();
             }
         }
@@ -168,7 +169,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 // Second call - fetches
                 Path result = manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                assertThat(result).isEqualTo(storagePath.resolve("1"));
+                assertThat(result).isEqualTo(storagePath.resolve("bulk").resolve("scm").resolve("1"));
                 // Verify the new commit is available
                 List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(1L, null, newSha);
                 assertThat(commits).hasSize(2);

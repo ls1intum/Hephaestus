@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -53,21 +54,28 @@ import org.springframework.stereotype.Service;
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
+    /** Connector namespace for SCM clones in the fabric {@code bulk/} tree (one among future slack/, outline/). */
+    private static final String SCM_CONNECTOR = "scm";
+
     private final GitRepositoryProperties properties;
     private final GitRepositoryLockManager lockManager;
-    private final Path baseStoragePath;
+    private final FabricLayout fabricLayout;
 
-    public GitRepositoryManager(GitRepositoryProperties properties, GitRepositoryLockManager lockManager) {
+    public GitRepositoryManager(
+        GitRepositoryProperties properties,
+        GitRepositoryLockManager lockManager,
+        FabricLayout fabricLayout
+    ) {
         this.properties = properties;
         this.lockManager = lockManager;
-        this.baseStoragePath = Path.of(properties.storagePath());
+        this.fabricLayout = fabricLayout;
 
         if (properties.enabled()) {
             try {
-                Files.createDirectories(baseStoragePath);
-                log.info("Git repository storage initialized at: {}", baseStoragePath);
+                Files.createDirectories(fabricLayout.root());
+                log.info("Git repository storage initialized under fabric root: {}", fabricLayout.root());
             } catch (IOException e) {
-                log.error("Failed to create git storage directory: {}", baseStoragePath, e);
+                log.error("Failed to create fabric storage root: {}", fabricLayout.root(), e);
                 throw new IllegalStateException("Cannot initialize git storage", e);
             }
         }
@@ -81,11 +89,13 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Get the local path for a repository clone.
-     * Path format: {baseStoragePath}/{repositoryId}
+     * Get the local path for a repository clone — the SCM connector's bulk artifact in the Context
+     * Fabric (ADR 0020). Path format: {@code {fabric.root}/bulk/scm/{repositoryId}}. A clone is a
+     * rebuildable cache, so the move from the legacy {@code {root}/{repositoryId}} layout needs no
+     * data migration: a stale-or-absent clone is simply re-fetched at this path on first use.
      */
     public Path getRepositoryPath(Long repositoryId) {
-        return baseStoragePath.resolve(repositoryId.toString());
+        return fabricLayout.bulkArtifact(SCM_CONNECTOR, repositoryId.toString());
     }
 
     /**

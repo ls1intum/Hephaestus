@@ -19,12 +19,14 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 class SandboxWorkspaceManagerTest extends BaseUnitTest {
@@ -94,6 +96,41 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             assertThatThrownBy(() -> manager.injectFiles(CONTAINER_ID, files))
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("maximum size limit");
+        }
+    }
+
+    @Nested
+    class InjectSymlinks {
+
+        @Test
+        void writesASymbolicLinkEntryToWorkspace() throws Exception {
+            ArgumentCaptor<InputStream> tarCaptor = ArgumentCaptor.forClass(InputStream.class);
+
+            manager.injectSymlinks(CONTAINER_ID, Map.of("repo", "blobs/scm/repo"));
+
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), tarCaptor.capture());
+            try (TarArchiveInputStream tar = new TarArchiveInputStream(tarCaptor.getValue())) {
+                TarArchiveEntry entry = tar.getNextTarEntry();
+                assertThat(entry).isNotNull();
+                assertThat(entry.getName()).isEqualTo("repo");
+                assertThat(entry.isSymbolicLink()).isTrue();
+                assertThat(entry.getLinkName()).isEqualTo("blobs/scm/repo");
+                assertThat(tar.getNextTarEntry()).isNull();
+            }
+        }
+
+        @Test
+        void skipsWhenEmptyOrNull() {
+            manager.injectSymlinks(CONTAINER_ID, Map.of());
+            manager.injectSymlinks(CONTAINER_ID, null);
+            verify(fileOps, never()).copyArchiveToContainer(any(), any(), any());
+        }
+
+        @Test
+        void rejectsUnsafeLinkPath() {
+            assertThatThrownBy(() -> manager.injectSymlinks(CONTAINER_ID, Map.of("../escape", "target"))).isInstanceOf(
+                SandboxException.class
+            );
         }
     }
 

@@ -497,12 +497,17 @@ public class AgentJobExecutor {
         // (the original job object is detached from the claim transaction).
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
-        record PrepareResult(Map<String, byte[]> files, Map<String, String> volumeMounts) {}
+        record PrepareResult(
+            Map<String, byte[]> files,
+            Map<String, String> volumeMounts,
+            Map<String, String> symlinks
+        ) {}
         PrepareResult prepared = readOnlyTx.execute(status -> {
             AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
             Map<String, byte[]> files = handler.prepareInputFiles(managedJob);
             Map<String, String> volumes = handler.volumeMounts(managedJob);
-            return new PrepareResult(files, volumes);
+            Map<String, String> symlinks = handler.symlinks(managedJob);
+            return new PrepareResult(files, volumes, symlinks);
         });
 
         // BYO worker pod: when the operator configures hephaestus.worker.llm.{base-url,api-key},
@@ -533,6 +538,7 @@ public class AgentJobExecutor {
             jobId,
             prepared.files(),
             prepared.volumeMounts(),
+            prepared.symlinks(),
             agentSpec,
             snapshot
         );
@@ -544,6 +550,7 @@ public class AgentJobExecutor {
         UUID jobId,
         Map<String, byte[]> handlerFiles,
         Map<String, String> handlerVolumeMounts,
+        Map<String, String> handlerSymlinks,
         PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
@@ -587,7 +594,8 @@ public class AgentJobExecutor {
             agentSpec.securityProfile(),
             allInputFiles,
             agentSpec.outputPath(),
-            allVolumeMounts
+            allVolumeMounts,
+            handlerSymlinks
         );
     }
 
