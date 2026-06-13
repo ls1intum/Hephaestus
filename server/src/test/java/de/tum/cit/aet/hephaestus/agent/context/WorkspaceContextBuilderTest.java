@@ -49,6 +49,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     ) {
         return new ContentProvider() {
             @Override
+            public String connectorId() {
+                return "test";
+            }
+
+            @Override
             public boolean supports(ContextRequest request) {
                 return true;
             }
@@ -123,6 +128,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var supports = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
             var skips = new ContentProvider() {
                 @Override
+                public String connectorId() {
+                    return "test";
+                }
+
+                @Override
                 public boolean supports(ContextRequest request) {
                     return false;
                 }
@@ -161,6 +171,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void jpePassThrough() {
             var bad = new ContentProvider() {
                 @Override
+                public String connectorId() {
+                    return "test";
+                }
+
+                @Override
                 public boolean supports(ContextRequest request) {
                     return true;
                 }
@@ -193,6 +208,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         private final class ProviderA implements ContentProvider {
 
             @Override
+            public String connectorId() {
+                return "test";
+            }
+
+            @Override
             public boolean supports(ContextRequest request) {
                 return true;
             }
@@ -204,6 +224,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         private final class ProviderB implements ContentProvider {
+
+            @Override
+            public String connectorId() {
+                return "test";
+            }
 
             @Override
             public boolean supports(ContextRequest request) {
@@ -224,6 +249,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("rejects providers that write outside inputs/context/")
         void rejectsBadPrefix() {
             var wrong = new ContentProvider() {
+                @Override
+                public String connectorId() {
+                    return "test";
+                }
+
                 @Override
                 public boolean supports(ContextRequest request) {
                     return true;
@@ -327,6 +357,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
      */
     private static final class LatchedProvider implements ContentProvider {
 
+        @Override
+        public String connectorId() {
+            return "test";
+        }
+
         private final java.util.concurrent.CountDownLatch entered;
         private final java.util.concurrent.CountDownLatch mayFinish;
 
@@ -358,6 +393,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
     /** Ordered provider: writes a single file; reports a fixed precedence. */
     private static final class OrderedStubProvider implements ContentProvider, Ordered {
+
+        @Override
+        public String connectorId() {
+            return "test";
+        }
 
         private final int order;
         private final String pathSuffix;

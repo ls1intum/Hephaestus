@@ -29,14 +29,13 @@ public interface ContentProvider {
 
     /**
      * The integration this provider projects from (ADR 0020) — recorded per file in the context manifest
-     * so the agent sees uniform provenance regardless of which connector produced the bytes. Defaults to
-     * {@code "scm"} (the common case: diff, branch graph, linked issues all come from the SCM clone);
-     * providers projecting Hephaestus-native data (the mentor aspects) override with {@code "core"}, and
-     * a future Slack/Outline connector returns its own id.
+     * so the agent sees uniform provenance regardless of which connector produced the bytes. No default:
+     * every provider MUST state its own provenance ({@code "scm"} for SCM-derived context, {@code "core"}
+     * for Hephaestus-native data such as the mentor aspects, a future Slack/Outline connector its own id).
+     * Abstract on purpose — a silent default would mislabel a non-SCM provider's files as {@code "scm"} in
+     * the telescope, corrupting the one thing the manifest exists to provide; the compiler now forbids that.
      */
-    default String connectorId() {
-        return "scm";
-    }
+    String connectorId();
 
     /**
      * Materialise this provider's files into {@code files}. Keys must begin with

@@ -68,6 +68,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Order(200)
 public class ReviewThreadContentProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "scm";
+    }
+
     private static final Logger log = LoggerFactory.getLogger(ReviewThreadContentProvider.class);
 
     /** Output filename under {@link ContentProvider#OUTPUT_PREFIX}. */

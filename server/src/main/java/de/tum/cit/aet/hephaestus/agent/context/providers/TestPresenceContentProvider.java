@@ -52,6 +52,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Order(600)
 public class TestPresenceContentProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "scm";
+    }
+
     private static final Logger log = LoggerFactory.getLogger(TestPresenceContentProvider.class);
 
     /** Output file name (under {@link ContentProvider#OUTPUT_PREFIX}). */

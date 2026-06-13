@@ -46,6 +46,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class PullRequestContentProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "scm";
+    }
+
     private static final Logger log = LoggerFactory.getLogger(PullRequestContentProvider.class);
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */

@@ -47,6 +47,11 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class WorkspaceAspectProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "core";
+    }
+
     private static final Logger log = LoggerFactory.getLogger(WorkspaceAspectProvider.class);
 
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */

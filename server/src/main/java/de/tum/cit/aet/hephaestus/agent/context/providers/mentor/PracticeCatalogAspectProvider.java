@@ -32,6 +32,11 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class PracticeCatalogAspectProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "core";
+    }
+
     /** Workspace-relative output key. Whitelisted in {@code MentorAspects#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";
 

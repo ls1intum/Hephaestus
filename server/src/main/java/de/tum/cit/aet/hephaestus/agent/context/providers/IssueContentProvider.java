@@ -34,6 +34,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class IssueContentProvider implements ContentProvider {
 
+    @Override
+    public String connectorId() {
+        return "scm";
+    }
+
     private static final Logger log = LoggerFactory.getLogger(IssueContentProvider.class);
 
     /** Cap the thread included in context; most recent kept on truncation. */

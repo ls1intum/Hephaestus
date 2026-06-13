@@ -72,7 +72,10 @@ public class ContextManifestBuilder {
                 byte[] bytes = files.get(key);
                 ObjectNode entry = entries.addObject();
                 entry.put("path", key.substring(ContentProvider.OUTPUT_PREFIX.length()));
-                entry.put("connector", keyConnector.getOrDefault(key, "scm"));
+                // Never default to a connector name — that is exactly the mislabel the manifest exists to
+                // prevent. connectorId() is abstract so every provider-written key is present; "unknown" is
+                // the fail-loud marker for the impossible case rather than a silent attribution to SCM.
+                entry.put("connector", keyConnector.getOrDefault(key, "unknown"));
                 entry.put("bytes", bytes.length);
                 entry.put("sha256", cas.put(bytes));
             }

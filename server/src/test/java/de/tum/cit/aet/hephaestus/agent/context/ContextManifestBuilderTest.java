@@ -97,4 +97,19 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(manifest.path("entries").get(0).path("path").asString()).isEqualTo("diff.patch");
         assertThat(files).containsKey("inputs/practices/index.json"); // untouched, still present
     }
+
+    @Test
+    void augment_neverDefaultsAnUnmappedKeyToAConnectorName() {
+        // Provenance integrity: a context file whose connector is (impossibly) absent from keyConnector must
+        // NOT be silently attributed to "scm" — that is exactly the mislabel the telescope exists to prevent.
+        // It is recorded as the fail-loud "unknown" marker instead. (connectorId() is abstract, so in practice
+        // every provider-written key is mapped; this guards the regression where the default named a connector.)
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        files.put("inputs/context/core_aspect.json", "{}".getBytes(StandardCharsets.UTF_8));
+
+        builder.augment(files, Map.of(), "job-7", 1L);
+
+        JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
+        assertThat(manifest.path("entries").get(0).path("connector").asString()).isEqualTo("unknown");
+    }
 }
