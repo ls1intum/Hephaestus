@@ -130,7 +130,7 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_mergedPastUnaddressedChangesRequested_surfacesSignal() throws Exception {
+    void contribute_changesRequestedReview_emittedAsRawDecisionRow() throws Exception {
         when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(
             List.of(
                 review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer-a", Instant.parse("2025-06-01T10:00:00Z"))
@@ -143,14 +143,16 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
 
         assertThat(files).containsKey(FILE_KEY);
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        assertThat(out.get("changesRequestedUnaddressed").asInt()).isEqualTo(1);
         assertThat(out.get("mergeState").asString()).isEqualTo("MERGED");
-        assertThat(out.get("reviewDecisions").get(0).get("state").asString()).isEqualTo("CHANGES_REQUESTED");
-        assertThat(out.get("reviewDecisions").get(0).get("author").asString()).isEqualTo("reviewer-a");
+        JsonNode decision = out.get("reviewDecisions").get(0);
+        assertThat(decision.get("state").asString()).isEqualTo("CHANGES_REQUESTED");
+        assertThat(decision.get("author").asString()).isEqualTo("reviewer-a");
+        // submittedAt is emitted raw so the agent (not this connector) can compute supersession.
+        assertThat(decision.get("submittedAt").asString()).isEqualTo("2025-06-01T10:00:00Z");
     }
 
     @Test
-    void contribute_changesRequestedThenSameReviewerApproved_notCounted() throws Exception {
+    void contribute_changesRequestedThenApproved_emitsBothRowsWithTimestamps() throws Exception {
         when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(
             List.of(
                 review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer-a", Instant.parse("2025-06-01T10:00:00Z")),
@@ -163,8 +165,16 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // Later APPROVED by the same reviewer supersedes the earlier CHANGES_REQUESTED.
-        assertThat(out.get("changesRequestedUnaddressed").asInt()).isEqualTo(0);
+        // Both decisions are emitted losslessly with timestamps; supersession is the agent's to compute.
+        JsonNode decisions = out.get("reviewDecisions");
+        assertThat(decisions).hasSize(2);
+        assertThat(decisions.get(0).get("submittedAt").asString()).isEqualTo("2025-06-01T10:00:00Z");
+        assertThat(decisions.get(1).get("state").asString()).isEqualTo("APPROVED");
+        assertThat(decisions.get(1).get("submittedAt").asString()).isEqualTo("2025-06-01T12:00:00Z");
+        // ELT contract: this connector must NOT pre-compute the supersession verdict — no derived aggregate,
+        // no per-row "effective"/"superseded" flag. Raw rows only; the agent judges.
+        assertThat(out.has("changesRequestedUnaddressed")).isFalse();
+        assertThat(decisions.get(0).has("superseded")).isFalse();
     }
 
     @Test

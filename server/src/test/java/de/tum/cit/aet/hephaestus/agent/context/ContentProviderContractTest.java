@@ -69,6 +69,26 @@ class ContentProviderContractTest extends BaseUnitTest {
         }
     }
 
+    @Test
+    @DisplayName("no SCM provider re-introduces a practice-shaped derived aggregate (supersession is the agent's job)")
+    void noProviderEmitsADerivedAggregate() throws IOException {
+        // ReviewThreadContentProvider once pre-computed a lossy supersession gate inside an EXTRACT+LOAD
+        // connector (changesRequestedUnaddressed). It was removed in favour of raw rows + submittedAt so the
+        // agent computes supersession. This guards the surviving providers against the aggregate creeping back.
+        for (Path provider : scmProviderSources()) {
+            String src = Files.readString(provider, StandardCharsets.UTF_8);
+            for (String bannedAggregate : List.of("changesRequestedUnaddressed", "countUnaddressedChangesRequested")) {
+                assertThat(src)
+                    .as(
+                        "%s re-introduces the derived '%s' aggregate — emit raw rows, let the agent judge",
+                        provider.getFileName(),
+                        bannedAggregate
+                    )
+                    .doesNotContain(bannedAggregate);
+            }
+        }
+    }
+
     private static List<Path> scmProviderSources() throws IOException {
         try (Stream<Path> walk = Files.list(PROVIDERS_DIR)) {
             return walk.filter(p -> p.getFileName().toString().endsWith("ContentProvider.java")).toList();

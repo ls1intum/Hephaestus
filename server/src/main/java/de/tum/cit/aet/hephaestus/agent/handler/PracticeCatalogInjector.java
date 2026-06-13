@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Injects the practice registry, criteria, and precompute scripts into a job's workspace under
@@ -88,26 +90,22 @@ class PracticeCatalogInjector {
             }
         }
 
-        StringBuilder indexJson = new StringBuilder("[\n");
-        for (int i = 0; i < practices.size(); i++) {
-            Practice p = practices.get(i);
-            if (i > 0) indexJson.append(",\n");
+        ArrayNode index = objectMapper.createArrayNode();
+        for (Practice p : practices) {
             // goal groups practices for the runner's per-goal evaluation; falls back to the slug so an
             // ungrouped practice still forms its own one-practice group.
             String goalSlug = p.getGoal() != null ? p.getGoal().getSlug() : p.getSlug();
-            indexJson
-                .append("  {\"slug\": \"")
-                .append(escapeJson(p.getSlug()))
-                .append("\", \"name\": \"")
-                .append(escapeJson(p.getName()))
-                .append("\", \"category\": \"")
-                .append(escapeJson(p.getCategory() != null ? p.getCategory() : ""))
-                .append("\", \"goal\": \"")
-                .append(escapeJson(goalSlug))
-                .append("\"}");
+            ObjectNode entry = index.addObject();
+            entry.put("slug", p.getSlug());
+            entry.put("name", p.getName());
+            entry.put("category", p.getCategory() != null ? p.getCategory() : "");
+            entry.put("goal", goalSlug);
         }
-        indexJson.append("\n]");
-        files.put(WorkspaceAbi.PRACTICES_PREFIX + "index.json", indexJson.toString().getBytes(StandardCharsets.UTF_8));
+        try {
+            files.put(WorkspaceAbi.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
+        } catch (JacksonException e) {
+            throw new JobPreparationException("Failed to serialize practice index.json: " + e.getMessage());
+        }
 
         StringBuilder bundle = new StringBuilder();
         for (Practice p : practices) {
@@ -142,16 +140,6 @@ class PracticeCatalogInjector {
             workspaceId,
             job.getId()
         );
-    }
-
-    /** JSON string escaping via Jackson (handles all control characters correctly). */
-    private String escapeJson(String s) {
-        try {
-            String quoted = objectMapper.writeValueAsString(s);
-            return quoted.substring(1, quoted.length() - 1);
-        } catch (JacksonException e) {
-            return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
-        }
     }
 
     /** The lifecycle trigger event stored on the job by the handler, or {@code null} if absent. */

@@ -414,9 +414,11 @@ class DeliveryComposerTest extends BaseUnitTest {
             .orElseThrow();
         assertThat(namingNote.startLine()).isEqualTo(8);
 
-        // Diff note bodies include emoji severity + bold title header
+        // Header is the canonical emoji-INSIDE-bold form (**<emoji> <title>**): the body opens with "**"
+        // BEFORE the emoji. Pins appendFindingHeader against the old MR-list drift where the emoji sat
+        // outside the bold (`<emoji> **title**`).
         for (DiffNote dn : diffNotes) {
-            assertThat(dn.body()).contains("**");
+            assertThat(dn.body()).startsWith("**");
         }
     }
 

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireInt;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
+
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
@@ -212,21 +215,5 @@ public class IssueReviewHandler implements JobTypeHandler {
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
-    }
-
-    private static String requireText(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asString().isBlank()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        return node.asString();
-    }
-
-    private static int requireInt(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || !node.isNumber()) {
-            throw new JobPreparationException("Missing/invalid numeric metadata field: " + field);
-        }
-        return node.asInt();
     }
 }

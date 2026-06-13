@@ -1,5 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireInt;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireLong;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
+
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
@@ -580,34 +584,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Parse diff stat paths, handling renames like {@code dir/{old => new}/file.ext}.
-     */
-    static Set<String> parseDiffStatPaths(String diffStat) {
-        Set<String> paths = new HashSet<>();
-        for (String line : diffStat.split("\n")) {
-            String trimmed = line.trim();
-            if (trimmed.isEmpty() || trimmed.startsWith("---") || !trimmed.contains("|")) {
-                continue;
-            }
-            String path = trimmed.split("\\|")[0].trim();
-            if (path.contains("{") && path.contains(" => ") && path.contains("}")) {
-                int braceStart = path.indexOf('{');
-                int braceEnd = path.indexOf('}');
-                String arrowPart = path.substring(braceStart + 1, braceEnd);
-                String newPart = arrowPart.substring(arrowPart.indexOf(" => ") + 4);
-                path = path.substring(0, braceStart) + newPart + path.substring(braceEnd + 1);
-                path = path.replace("//", "/");
-            } else if (path.contains(" => ")) {
-                path = path.substring(path.indexOf(" => ") + 4).trim();
-            }
-            if (!path.isEmpty()) {
-                paths.add(path);
-            }
-        }
-        return paths;
-    }
-
-    /**
      * Filter findings to only include those whose evidence locations reference files in the diff.
      */
     static List<PracticeDetectionResultParser.ValidatedFinding> filterByDiffScope(
@@ -664,41 +640,5 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     private static boolean isInternalContextPath(String path) {
         return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
-    }
-
-    // Metadata field helpers
-
-    private static String requireText(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asString().isBlank()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        return node.asString();
-    }
-
-    private static int requireInt(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        if (!node.isNumber()) {
-            throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
-        }
-        return node.asInt();
-    }
-
-    private static long requireLong(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        if (!node.isNumber()) {
-            throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
-        }
-        return node.asLong();
     }
 }

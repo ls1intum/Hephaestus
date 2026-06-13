@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -85,19 +84,14 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         when(client.documentName(any())).thenReturn(spec);
         when(spec.variable(any(), any())).thenReturn(spec);
 
-        // First exec call: dedup (GetMergeRequestNotes) — empty notes list
-        ClientGraphQlResponse dedupResponse = mock(ClientGraphQlResponse.class);
-        ClientResponseField nodesField = mock(ClientResponseField.class);
-        lenient().when(dedupResponse.field("project.mergeRequest.notes.nodes")).thenReturn(nodesField);
-        lenient().when(nodesField.getValue()).thenReturn(List.of());
-
-        // Second exec call: CreateDiffNote — success (no errors)
+        // postInlineFindings is now pure-append (stale-note clearing moved to clearStaleFindings), so the only
+        // GraphQL call is CreateDiffNote — success (no errors).
         ClientGraphQlResponse createResponse = mock(ClientGraphQlResponse.class);
         ClientResponseField errorsField = mock(ClientResponseField.class);
         when(createResponse.field("createDiffNote.errors")).thenReturn(errorsField);
         when(errorsField.getValue()).thenReturn(List.of());
 
-        when(spec.execute()).thenReturn(Mono.just(dedupResponse)).thenReturn(Mono.just(createResponse));
+        when(spec.execute()).thenReturn(Mono.just(createResponse));
 
         InlineResult result = channel.postInlineFindings(
             gitlabTarget(),

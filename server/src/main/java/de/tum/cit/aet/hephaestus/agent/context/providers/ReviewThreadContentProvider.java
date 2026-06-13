@@ -48,9 +48,7 @@ import tools.jackson.databind.node.ObjectNode;
  * {
  *   "threads":[{"path":..,"line":..,"state":"UNRESOLVED|RESOLVED","resolvedBy":..,"author":..,"outdated":..}],
  *   "unresolvedCount": N,
- *   "reviewDecisions":[{"state":"CHANGES_REQUESTED","author":..}],
- *   "changesRequestedUnaddressed": M,   // CHANGES_REQUESTED reviews not later superseded by the same
- *                                       // reviewer's APPROVED — a SIGNAL the gate may have been bypassed
+ *   "reviewDecisions":[{"state":"CHANGES_REQUESTED","author":..,"submittedAt":..,"dismissed":..}],
  *   "mergeState": "MERGED|CLOSED|OPEN"
  * }
  * </pre>
@@ -167,9 +165,8 @@ public class ReviewThreadContentProvider implements ContentProvider {
             root.set("threads", threadArray);
             root.put("unresolvedCount", unresolved);
 
-            // --- Review decisions ---
+            // --- Review decisions (raw rows; supersession is computed by the agent, not here) ---
             ArrayNode decisionArray = objectMapper.createArrayNode();
-            int changesRequestedUnaddressed = countUnaddressedChangesRequested(reviews);
             if (reviews != null) {
                 int emitted = 0;
                 for (PullRequestReview review : reviews) {
@@ -184,19 +181,17 @@ public class ReviewThreadContentProvider implements ContentProvider {
                 }
             }
             root.set("reviewDecisions", decisionArray);
-            root.put("changesRequestedUnaddressed", changesRequestedUnaddressed);
 
             // --- Merge state (observable fact, no judgement) ---
             root.put("mergeState", mergeState(pullRequest));
 
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
             log.info(
-                "ReviewThreads: prId={} threads={} unresolved={} decisions={} changesRequestedUnaddressed={} mergeState={}",
+                "ReviewThreads: prId={} threads={} unresolved={} decisions={} mergeState={}",
                 pullRequestId,
                 emittedThreads,
                 unresolved,
                 decisionArray.size(),
-                changesRequestedUnaddressed,
                 root.get("mergeState").asString()
             );
         } catch (Exception e) {
@@ -234,47 +229,12 @@ public class ReviewThreadContentProvider implements ContentProvider {
         if (author != null) {
             node.put("author", author);
         }
+        // Raw timestamp so the agent can compute supersession (a later APPROVE by the same reviewer
+        // overriding an earlier CHANGES_REQUESTED) downstream — this connector loads facts, it does not judge.
+        if (review.getSubmittedAt() != null) {
+            node.put("submittedAt", review.getSubmittedAt().toString());
+        }
         return node;
-    }
-
-    /**
-     * Counts CHANGES_REQUESTED reviews that no later APPROVED review by the SAME reviewer supersedes
-     * — an observable SIGNAL that the change-request gate was still standing. This is a heuristic
-     * hint, not a verdict: a maintainer may have dismissed the review out-of-band (captured
-     * separately by {@code dismissed}). The agent decides; we only surface the count.
-     */
-    private static int countUnaddressedChangesRequested(List<PullRequestReview> reviews) {
-        if (reviews == null || reviews.isEmpty()) {
-            return 0;
-        }
-        // Latest decision per reviewer wins; a reviewer who later APPROVED no longer blocks.
-        java.util.Map<String, PullRequestReview> latestByReviewer = new java.util.LinkedHashMap<>();
-        for (PullRequestReview review : reviews) {
-            if (review == null || review.getState() == null || review.getSubmittedAt() == null) {
-                continue;
-            }
-            if (
-                review.getState() != PullRequestReview.State.CHANGES_REQUESTED &&
-                review.getState() != PullRequestReview.State.APPROVED
-            ) {
-                continue;
-            }
-            String key = login(review.getAuthor());
-            if (key == null) {
-                key = "review#" + review.getId();
-            }
-            PullRequestReview prev = latestByReviewer.get(key);
-            if (prev == null || review.getSubmittedAt().isAfter(prev.getSubmittedAt())) {
-                latestByReviewer.put(key, review);
-            }
-        }
-        int count = 0;
-        for (PullRequestReview review : latestByReviewer.values()) {
-            if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED && !review.isDismissed()) {
-                count++;
-            }
-        }
-        return count;
     }
 
     private static String mergeState(PullRequest pullRequest) {

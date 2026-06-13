@@ -159,8 +159,7 @@ public class GitDiffOperations {
     /**
      * Per-file diff statistics shaped like {@code git diff --stat}: {@code  path | N} for text
      * files, {@code  path | Bin} for binaries, renamed files as {@code old => new}. No summary
-     * footer; {@link de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewHandler#parseDiffStatPaths}
-     * tolerates either shape.
+     * footer — emitted verbatim as {@code diff_stat.txt} for the agent to read.
      */
     @Nullable
     public String diffStat(Path repoPath, String baseRef, String headRef) {

@@ -44,27 +44,17 @@ import tools.jackson.databind.JsonNode;
  */
 class DeliveryComposer {
 
-    /**
-     * How many non-blocking (MINOR/INFO) improvement suggestions we surface in full before collapsing
-     * the rest into an honest overflow line. The mentor usefulness bar is ~1-3 highest-leverage lessons
-     * per artifact; every blocking (CRITICAL/MAJOR) issue is ALWAYS kept on top of this, so a PR with two
-     * blockers plus this cap still lands the few things that actually change the next MR rather than a
-     * 10-item pile-on. Tuned so blocking + cap stays within the small-handful bar. NEVER caps blocking.
-     */
+    /** Non-blocking (MINOR/INFO) suggestions surfaced in full before the rest collapse into an overflow line; blocking findings are never capped. */
     static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
 
     /** Practices that are inherently non-inlinable (no file-level location). */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
 
     /**
-     * The genuine "is this single issue well-formed?" near-duplicate pair: scoped-to-one-concern and
-     * has-a-checkable-outcome both critique the SAME framing of one issue, so when both fire NEGATIVE on the
-     * same issue they stack near-identical bullets and we keep only the highest-severity one (F4).
-     *
-     * <p>{@code breaks-large-work-into-trackable-subtasks} is DELIBERATELY EXCLUDED: "decompose this epic
-     * into tracked children" is a distinct, independently-actionable lesson — not a restatement of "this
-     * issue is well-formed" — so it must always survive on its own, even at MINOR alongside a higher-severity
-     * scoped/checkable finding. (Live eval G3: it was being collapsed away by a MAJOR sibling.)
+     * The "is this single issue well-formed?" near-duplicate pair — scoped-to-one-concern and
+     * has-a-checkable-outcome critique the SAME framing, so when both fire NEGATIVE we keep only the
+     * highest-severity one. {@code breaks-large-work-into-trackable-subtasks} is excluded on purpose:
+     * "decompose this epic" is a distinct, independently-actionable lesson that must survive on its own.
      */
     private static final Set<String> EPIC_STRUCTURE_PRACTICES = Set.of(
         "issue-scoped-to-single-concern",
@@ -72,10 +62,9 @@ class DeliveryComposer {
     );
 
     /**
-     * Process-level practices whose POSITIVE is a named good ACT (engaging with review, revealing
-     * intent) rather than a code-correctness claim. Only these may surface as the single subordinate
-     * reinforcement line when blocking issues exist (F5) — so a correctness positive can never leak
-     * into a blocking note.
+     * Process-level practices whose POSITIVE is a named good ACT (engaging with review, revealing intent),
+     * not a correctness claim — only these may surface as the subordinate reinforcement line alongside
+     * blocking issues, so a correctness positive can never leak into a blocking note.
      */
     private static final Set<String> PROCESS_POSITIVE_PRACTICES = Set.of(
         "engaging-with-inline-review-comments",
@@ -84,8 +73,8 @@ class DeliveryComposer {
     );
 
     /**
-     * Strips the leading repo-mount prefix so a student-facing location stays repo-relative (F3). The
-     * repo mounts at the integration-namespaced {@code inputs/sources/scm/repo/} (ADR 0020).
+     * Strips the leading repo-mount prefix so a student-facing location stays repo-relative. The repo
+     * mounts at the integration-namespaced {@code inputs/sources/scm/repo/} (ADR 0020).
      */
     private static String repoRelative(String path) {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
@@ -123,7 +112,7 @@ class DeliveryComposer {
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // F4: on an ISSUE the two "is this single issue well-formed?" detectors (scoped + checkable) say the
+        // On an ISSUE the two "is this single issue well-formed?" detectors (scoped + checkable) say the
         // same thing about the same framing, so collapse them to the single highest-severity one — one clear
         // lesson, not two stacked near-duplicate bullets. breaks-large-work is NOT in the set (it is a
         // distinct "decompose this epic" lesson that must always survive — see EPIC_STRUCTURE_PRACTICES).
@@ -200,7 +189,7 @@ class DeliveryComposer {
     }
 
     /**
-     * Collapses overlapping epic issue-structure NEGATIVE findings (F4). Keeps the FIRST
+     * Collapses overlapping epic issue-structure NEGATIVE findings. Keeps the FIRST
      * {@link #EPIC_STRUCTURE_PRACTICES} finding encountered (the list is severity-sorted, so that is the
      * highest-severity lead) and drops the rest; every non-epic-structure finding passes through
      * untouched and in order. No-op when fewer than two epic-structure findings are present.
@@ -270,22 +259,20 @@ class DeliveryComposer {
         return kept;
     }
 
-    /**
-     * Compose the note posted when no issues were found. Reports what was reviewed and, where the
-     * agent recorded reasoning, what it observed against each practice — evidence-anchored, on the
-     * work. Deliberately carries NO self-level praise: person-directed praise is the least effective
-     * feedback level (Hattie &amp; Timperley, The Power of Feedback), so the mentoring stance keeps
-     * feedback at the task/process level.
-     */
-    /** Positives a learner can act on at once — deliberate practice keeps the focus to 1-3 (F: was 4). */
+    /** Positives a learner can act on at once — kept to 1-3 (deliberate practice). */
     private static final int MAX_POSITIVE_REINFORCEMENTS = 3;
 
     /** Whole-sentence budget for a positive observation/forward-prompt — generous enough not to clip an enumeration. */
     private static final int POSITIVE_BUDGET = 280;
 
+    /**
+     * Compose the note posted when no issues were found — reports what was reviewed and, where the agent
+     * recorded reasoning, what it observed against each practice. Carries NO self-level praise: person-directed
+     * praise is the least effective feedback level (Hattie &amp; Timperley), so feedback stays task/process level.
+     */
     private static String composeNoIssuesNote(List<ValidatedFinding> observed) {
         // Findings whose reasoning lets us cite a concrete observation, ranked most-certain first so the
-        // highest-confidence reinforcements survive the cap (F: was arrival order).
+        // highest-confidence reinforcements survive the cap.
         List<ValidatedFinding> withReasoning = observed
             .stream()
             .filter(f -> f.reasoning() != null && !f.reasoning().isBlank())
@@ -300,7 +287,7 @@ class DeliveryComposer {
         int shown = 0;
         for (ValidatedFinding f : withReasoning) {
             if (shown >= MAX_POSITIVE_REINFORCEMENTS) break;
-            // Whole-sentence budget clamp (G5): never clip a multi-clause observation mid-enumeration.
+            // Whole-sentence budget clamp: never clip a multi-clause observation mid-enumeration.
             String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), POSITIVE_BUDGET);
             if (summary.isBlank()) {
                 // The reasoning was entirely grading-meta and scrubbed to nothing — skip it rather than
@@ -309,7 +296,7 @@ class DeliveryComposer {
             }
             String label = capitalize(f.practiceSlug().replace('-', ' '));
             bullets.append("- **").append(label).append(":** ").append(summary);
-            // Feed-forward (G7): a surfaced positive answers Hattie's "Where to next?" \u2014 append the grounded
+            // Feed-forward: a surfaced positive answers Hattie's "Where to next?" \u2014 append the grounded
             // guidance (transferable principle + one forward prompt). Bare/empty/"No change needed." guidance
             // (pre-feed-forward criteria) degrades gracefully to just the observation.
             String forward = clampToSentenceBudget(
@@ -333,7 +320,7 @@ class DeliveryComposer {
      * Clamps {@code text} to whole sentences within {@code maxLen}: appends sentences (split on
      * {@link #SENTENCE_SEPARATOR}) until the next would exceed the budget, stopping at the last whole one.
      * Only when even the first sentence overruns does it fall back to {@link #truncateToFirstSentence}'s
-     * word-boundary cut \u2014 so a multi-clause enumeration is never clipped mid-thought (G5).
+     * word-boundary cut \u2014 so a multi-clause enumeration is never clipped mid-thought.
      */
     static String clampToSentenceBudget(String text, int maxLen) {
         if (text == null || text.isBlank() || text.length() <= maxLen) {
@@ -406,7 +393,7 @@ class DeliveryComposer {
     }
 
     /**
-     * Builds the single subordinate process-positive line allowed alongside blocking issues (F5).
+     * Builds the single subordinate process-positive line allowed alongside blocking issues.
      * Picks the first POSITIVE whose practice is in {@link #PROCESS_POSITIVE_PRACTICES} (a named good
      * process act, never code-correctness) and renders it as one short subordinate line. Returns "" when
      * no eligible process positive exists — keeping the blocking note free of any hollow reinforcement.
@@ -458,12 +445,12 @@ class DeliveryComposer {
             "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\b|" +
             "\\b(?:DEFECT-DETECTOR|POSITIVE\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +
             "\\benriched\\s*[=:]|" +
-            "\\b[AUDFNST]\\s*[+]?\\s*[AUDFNST]?\\s*==?\\s*\\d|" + // A=4094, A+D=4420, U == 0, F=28, N/T counts
+            "\\b[AUDFN]\\s*\\+\\s*[AUDFN]\\s*==?\\s*\\d|" + // grader bucket arithmetic e.g. A+D=4420 (two-operand)
+            "\\b[ADF]\\s*=\\s*\\d{2,}|" + // single multi-digit metric e.g. A=4094, F=28, D=326 (not prose "N = 3")
             "\\b(?:additions?|deletions?|changed[_ ]files?)\\s*[=:]\\s*\\d|" +
             "\\bgenerated/vendored\\s+(?:check|exclusion|dominance)\\b|" +
             "\\bpartition\\s+after\\b|" +
             "\\bnoiseFraction\\b|" +
-            "\\b[A-Z]\\s*=\\s*(?:true|false)\\b|" + // P=true, etc.
             // Cross-practice ORCHESTRATION leaks: the model narrates how findings were routed between
             // practices ("sole owner (cross-practice)", "ready-and-traceable-handoff suppressed its …",
             // "ships-tests-with-the-change emitted NOT_APPLICABLE, both deferring here", "team-wide standing
@@ -475,8 +462,7 @@ class DeliveryComposer {
             "\\bemit(?:ted|s|ting)?\\s+NOT[_ ]APPLICABLE\\b|" +
             "\\bsuppress(?:ed|es|ing)\\s+its\\b|" +
             "\\b(?:team-wide\\s+)?standing\\s+nudge\\b|" +
-            "\\bper-MR\\s+blocker\\b|" +
-            "\\bReviewed\\s+against\\s+the\\s+active\\s+practices\\b" +
+            "\\bper-MR\\s+blocker\\b" +
             ")"
     );
 
@@ -661,7 +647,7 @@ class DeliveryComposer {
         // here so the student is told honestly that lower-value nudges were collapsed, not hidden.
         composeOpening(sb, allNegatives, artifact, improvementOverflow);
 
-        // F5: when blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
+        // When blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
         // a WARRANTED, specific PROCESS-level positive (a named good act — engaging with review, revealing
         // intent) should still land. Surface AT MOST ONE, subordinate: a short single line AFTER the issue
         // count, never a sandwich opener, and only from PROCESS_POSITIVE_PRACTICES so a code-correctness
@@ -687,12 +673,7 @@ class DeliveryComposer {
                 sb.append("**Inline comments on the diff:**\n\n");
             }
             for (ValidatedFinding f : inlinable) {
-                String emoji = severityEmoji(f.severity());
-                sb.append(emoji).append(" **").append(f.title()).append("**");
-                String location = extractPrimaryLocation(f);
-                if (location != null && !isInternalPath(location)) {
-                    sb.append(" · `").append(location).append("`");
-                }
+                appendFindingHeader(sb, f, true);
                 sb.append("\n");
             }
             sb.append("\n");
@@ -735,9 +716,8 @@ class DeliveryComposer {
                 .append(overflowTail)
                 .append(":\n\n");
         } else if (blockingCount > 0) {
-            // No surviving improvements (improvementCount == 0). Overflow is impossible here: the cap keeps
-            // MAX_IMPROVEMENT_SUGGESTIONS improvements whenever it collapses any, so overflow > 0 always
-            // leaves improvementCount > 0 (the branch above). Plain blocking-only opener.
+            // Blocking-only opener: overflow can't reach this branch — it always co-occurs with surviving
+            // improvements (the branch above), since the cap keeps MAX_IMPROVEMENT_SUGGESTIONS when it collapses any.
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
@@ -753,17 +733,25 @@ class DeliveryComposer {
         }
     }
 
-    private static void composeFinding(StringBuilder sb, ValidatedFinding f) {
-        String emoji = severityEmoji(f.severity());
-
-        // Title with location (no [SEVERITY] bracket — emoji is enough)
-        sb.append("**").append(emoji).append(" ").append(f.title()).append("**");
-        String location = extractPrimaryLocation(f);
-        if (location != null && !isInternalPath(location)) {
-            sb.append(" · `").append(location).append("`");
+    /**
+     * Renders the canonical finding header — emoji inside the bold, optional {@code · `location`} — used by
+     * every surface (MR summary list, full finding, diff note) so the format cannot drift between them.
+     */
+    private static void appendFindingHeader(StringBuilder sb, ValidatedFinding f, boolean withLocation) {
+        sb.append("**").append(severityEmoji(f.severity())).append(" ").append(f.title()).append("**");
+        if (withLocation) {
+            String location = extractPrimaryLocation(f);
+            if (location != null && !isInternalPath(location)) {
+                sb.append(" · `").append(location).append("`");
+            }
         }
+    }
+
+    private static void composeFinding(StringBuilder sb, ValidatedFinding f) {
+        appendFindingHeader(sb, f, true);
         sb.append("\n\n");
 
+        String location = extractPrimaryLocation(f);
         String lang = detectLanguage(f);
 
         // For CRITICAL/MAJOR: "You wrote:" → reasoning → "Instead:" with fix
@@ -988,7 +976,8 @@ class DeliveryComposer {
     @Nullable
     private static String composeDiffNoteBody(ValidatedFinding f) {
         var sb = new StringBuilder();
-        sb.append("**").append(severityEmoji(f.severity())).append(" ").append(f.title()).append("**\n\n");
+        appendFindingHeader(sb, f, false);
+        sb.append("\n\n");
 
         appendStudentText(sb, f.reasoning());
         appendStudentText(sb, f.guidance());

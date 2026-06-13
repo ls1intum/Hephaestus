@@ -1,5 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireInt;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireLong;
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
+
 import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -526,41 +530,5 @@ public class PullRequestContentProvider implements ContentProvider {
             }
         }
         return count;
-    }
-
-    // Metadata field helpers (mirrored from former PullRequestReviewHandler helpers)
-
-    private static String requireText(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull() || node.asString().isBlank()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        return node.asString();
-    }
-
-    private static int requireInt(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        if (!node.isNumber()) {
-            throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
-        }
-        return node.asInt();
-    }
-
-    private static long requireLong(JsonNode metadata, String field) {
-        JsonNode node = metadata.get(field);
-        if (node == null || node.isNull()) {
-            throw new JobPreparationException("Missing required metadata field: " + field);
-        }
-        if (!node.isNumber()) {
-            throw new JobPreparationException(
-                "Expected numeric metadata field: " + field + ", got: " + node.getNodeType()
-            );
-        }
-        return node.asLong();
     }
 }
