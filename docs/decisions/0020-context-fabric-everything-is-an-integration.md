@@ -166,8 +166,39 @@ reframe end-to-end before paying for the migration:
   slugs to `METADATA_LEVEL_PRACTICES`, so a finding grounded in a cross-context file
   survives `filterByDiffScope` instead of being dropped as out-of-diff-scope.
 
-The audience tag, `consistencyToken`, split-confidence edges, CAS, RLS, and the
-`Connector` superset are **not** in this PR. They are the staged follow-ups below.
+The audience tag, `consistencyToken`, split-confidence edges, RLS, and the
+`Connector` superset are **not** in the original slice. They are the staged follow-ups below.
+
+## Update (2026-06-13): CAS + final filesystem layout shipped
+
+The on-disk substrate is no longer SCM-special. The following decisions are now **realized**
+(additive, no schema change), so the layout is in its final, integration-namespaced shape and a
+future connector slots in with no restructuring:
+
+- **§1 SQL-truth / disk-is-cache, §2 CAS (no "bronze").** `FabricLayout`
+  (`integration.core.fabric`) is the single source of every cache path under one configurable
+  `hephaestus.fabric.root` (defaults to the old `git.storage-path`):
+  `bulk/{connectorId}/{externalId}` (the git clone is `bulk/scm/{repoId}`), `cas/{ab}/{rest}`
+  (`ContentAddressedStore` — sha-256, two-char fan-out, build-on-miss, atomic writes, striped
+  locks, mark-and-sweep GC), `derived/`, and `jobs/{jobId}/` for replay. `GitRepositoryManager`
+  now routes its clone path through `FabricLayout.bulkArtifact`; a clone is a rebuildable cache so
+  the move needs no data migration.
+- **Sandbox view = the telescope (§7).** The repo mounts at `/workspace/blobs/scm/repo` (one
+  namespace among future `blobs/slack`, `blobs/outline`) with a back-compat `repo → blobs/scm/repo`
+  symlink (`SandboxSpec.symlinks` + `SandboxWorkspaceManager.injectSymlinks`), so the agent surface
+  and the `repo/` strippers are unchanged. `context/target/manifest.json` (`ContextManifestBuilder`)
+  is the integration-agnostic index: one entry per projected file with `{path, connector, bytes,
+  sha256}`. Every projected blob is stored in the CAS, so the manifest is verifiable provenance (an
+  agent cannot cite a source whose sha is absent) and context deduplicates across jobs.
+- **Toward the `Connector` superset (§3).** `ContentProvider` gained `connectorId()` (additive
+  default `"scm"`) so each file's producing integration is recorded in the manifest. The full
+  `Connector` SPI rename + capability registry remain follow-ups.
+- **Cache GC.** `FabricGarbageCollector` (`@Scheduled`, mirrors the existing retention sweepers)
+  prunes expired `jobs/` dirs then mark-and-sweeps unreferenced CAS blobs.
+
+**Still open** (unchanged from the staged list): `entity_node`/`entity_edge` + split confidence,
+the five-Kind PROV-O vocabulary, audience + `consistencyToken`, fail-CLOSED tenancy (THROW + RLS),
+`workspace_binding` de-spine, and the `Connector` SPI rename itself.
 
 ## Consequences
 

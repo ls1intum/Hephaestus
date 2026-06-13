@@ -14,11 +14,15 @@ lands (#1071) and beyond.
 
 ```
 /workspace/
-├── repo/                  # Bind-mounted git working tree — READ-ONLY. The real cloned repo.
+├── blobs/                 # Integration-namespaced bulk artifacts (ADR 0020). One namespace per
+│   └── scm/repo/          #   connector — the SCM git working tree (READ-ONLY mount) lives here;
+│                          #   a future Slack/Outline export would be blobs/slack/…, blobs/outline/…
+├── repo -> blobs/scm/repo # Back-compat symlink, so "repo/" keeps resolving after the namespacing.
 ├── context/
 │   ├── target/            # System-written, AI-readable. Populated by ContentProvider SPI.
-│   │                      # Files: metadata.json, comments.json, diff.patch, diff_stat.txt,
-│   │                      # diff_summary.md, contributor_history.json
+│   │                      # Files: manifest.json (the integration-agnostic telescope index:
+│   │                      # path/connector/sha256 per file), metadata.json, comments.json,
+│   │                      # diff.patch, diff_summary.md, contributor_history.json
 │   └── user/              # RESERVED (#1071). Mentor-pinned content — user uploads / pins
 │                          # surfaced from the chat. AI-readable; mentor-writable.
 ├── scratch/               # RESERVED (#1071). AI-writable scratch area. Survives Pi turns,

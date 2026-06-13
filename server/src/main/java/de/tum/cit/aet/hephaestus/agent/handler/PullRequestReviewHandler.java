@@ -43,15 +43,17 @@ import tools.jackson.databind.node.ObjectNode;
  * task envelope to {@link TaskEnvelopeWriter}. Retains practice catalog injection ({@code .practices/})
  * and delivery-phase post-processing here — catalog injection is per-job and not provider-shaped.
  *
- * <p>Container workspace layout (see {@code resources/agent/WORKSPACE_ABI.md} for the full ABI):
+ * <p>Container workspace layout — integration-namespaced per ADR 0020 (see
+ * {@code docs/contributor/agent/workspace-abi.mdx} for the full ABI):
  * <pre>
  * /workspace/
- * ├── repo/                              # git repo (read-only bind mount)
+ * ├── blobs/scm/repo/                    # git checkout — the SCM connector's bulk artifact (RO mount)
+ * ├── repo -&gt; blobs/scm/repo             # back-compat symlink so "repo/" keeps resolving
  * ├── context/target/                    # workspace context (this handler populates via WorkspaceContextBuilder)
+ * │   ├── manifest.json                  #   telescope: integration-agnostic index (path/connector/sha256)
  * │   ├── metadata.json                  #   PR metadata + commits
  * │   ├── comments.json                  #   review comments
  * │   ├── diff.patch                     #   diff with [L&lt;n&gt;] annotations
- * │   ├── diff_stat.txt                  #   changed files
  * │   ├── diff_summary.md                #   per-file diff chunks
  * │   └── contributor_history.json       #   prior findings (optional)
  * ├── task.json                          # Task envelope (TaskEnvelope around Task.PracticeReview)
