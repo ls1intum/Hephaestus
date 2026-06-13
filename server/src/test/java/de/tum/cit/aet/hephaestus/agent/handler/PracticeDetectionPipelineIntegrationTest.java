@@ -260,7 +260,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
-            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             handler.deliver(agentJob);
 
@@ -283,7 +283,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
 
             // Verify diff notes posted (has negative findings + first analysis)
-            verify(diffNotePoster).postDiffNotes(eq(agentJob), any());
+            verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), any());
 
             // Verify delivery status set on in-memory object
             // (DB persistence happens in AgentJobExecutor, not in handler.deliver())
@@ -323,7 +323,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             // Approval comment posted (no negatives → approval summary), no diff notes
             verify(commentPoster).postFormattedBody(any(), any());
-            verify(diffNotePoster, never()).postDiffNotes(any(), any());
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
         }
     }
 
@@ -436,7 +436,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             // Comment NOT posted (FeedbackDeliveryService skips closed PRs)
             verify(commentPoster, never()).postFormattedBody(any(), any());
-            verify(diffNotePoster, never()).postDiffNotes(any(), any());
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
 
             // Delivery status not set (feedback was skipped)
             assertThat(agentJob.getDeliveryCommentId()).isNull();
@@ -452,7 +452,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
-            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             // First delivery
             handler.deliver(agentJob);

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -71,6 +72,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             workspaceRepository,
             reviewProperties
         );
+        // Inline reconciliation now runs on every OPEN-PR delivery — even with zero diff notes — to clear an
+        // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
+        org.mockito.Mockito.lenient()
+            .when(
+                diffNotePoster.reconcileInlineNotes(
+                    org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any()
+                )
+            )
+            .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0));
     }
 
     private AgentJob createJob() {
@@ -111,14 +122,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment123");
-            when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0)
+            );
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Fix the tests.", diffNotes);
             service.deliverFeedback(job, delivery);
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
-            verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes));
+            verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment123");
         }
 
@@ -274,7 +287,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void postsDiffNotesWhenMrNoteNull() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(2, 0));
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(2, 0)
+            );
 
             var diffNotes = List.of(
                 new DiffNote("src/Foo.java", 10, null, "Fix this"),
@@ -283,7 +298,35 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             var delivery = new DeliveryContent(null, diffNotes);
             service.deliverFeedback(job, delivery);
 
-            verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes));
+            verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
+        }
+
+        @Test
+        void emptyDiffNotesStillReconcilesToClearStaleNotesOnOpenPr() {
+            // G1 regression: a re-review that now produces ZERO inline notes must STILL reconcile so an
+            // earlier run's stale line-numbered notes are cleared (the empty-diff pathology). Reconciliation
+            // runs with an empty list — the clear half of clear-then-post.
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
+
+            service.deliverFeedback(job, new DeliveryContent("Summary only, nothing inline.", List.of()));
+
+            verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(List.of()));
+        }
+
+        @Test
+        void suppressedPrNeverReconciles_noDataLoss() {
+            // Symmetric guard: a CLOSED PR is suppressed upstream and must NEVER reach reconciliation —
+            // otherwise a re-run on a closed PR would wipe the delivered review (data loss).
+            AgentJob job = createJob();
+            var pr = createOpenPr();
+            pr.setState(Issue.State.CLOSED);
+            when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+
+            service.deliverFeedback(job, new DeliveryContent("Summary.", List.of()));
+
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
         }
 
         @Test

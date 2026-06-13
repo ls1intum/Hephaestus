@@ -55,6 +55,25 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         return IntegrationKind.GITLAB;
     }
 
+    /**
+     * Deletes every marker-bearing inline note on the MR without posting new ones — the clear half of
+     * clear-then-post (SPI {@link InlineFindingChannel#clearStaleFindings}). Called on a zero-note re-run so
+     * a PR re-reviewed into nothing-inline doesn't keep line-numbered notes on code no longer in the diff.
+     */
+    @Override
+    public void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {
+        if (marker == null || marker.isBlank()) {
+            return;
+        }
+        long scopeId = target.ref().workspaceId();
+        if (gitLabProvider.isRateLimitCritical(scopeId)) {
+            log.warn("GitLab rate limit critical — skipping stale inline-note clear: workspaceId={}", scopeId);
+            return;
+        }
+        MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(target.subjectExternalId());
+        deleteOldMarkedNotes(scopeId, mr.projectPath(), mr.iid(), marker);
+    }
+
     @Override
     public InlineResult postInlineFindings(FeedbackChannel.FeedbackTarget target, List<InlineFinding> findings) {
         if (findings == null || findings.isEmpty()) {
@@ -81,8 +100,9 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             return new InlineResult(0, findings.size());
         }
 
-        // Dedup old marker-bearing notes — best effort.
-        deleteOldMarkedNotes(scopeId, mr.projectPath(), mr.iid(), markerFor(findings));
+        // Stale marker-bearing notes are cleared by clearStaleFindings (called first by the reconcile path),
+        // so this post is pure-append — no delete here, which also makes a zero-note run still clear (it goes
+        // through clearStaleFindings, never this method).
 
         int posted = 0;
         int failed = 0;
@@ -313,10 +333,6 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     /** Returns the marker shared by all findings in the batch (they originate from one parser pass). */
-    private static String markerFor(List<InlineFinding> findings) {
-        return findings.isEmpty() ? null : findings.get(0).marker();
-    }
-
     private static String appendMarker(String body, String marker) {
         if (marker == null || marker.isBlank()) {
             return body;

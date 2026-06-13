@@ -154,12 +154,13 @@ class FeedbackDeliveryService {
     }
 
     private void postDiffNotes(AgentJob job, DeliveryContent delivery) {
-        if (delivery.diffNotes().isEmpty()) {
-            return;
-        }
-        DiffNotePoster.DiffNoteResult diffResult = diffNotePoster.postDiffNotes(job, delivery.diffNotes());
+        // NO empty-guard: a run that now produces zero inline notes must still RECONCILE — clearing this
+        // run's stale notes from an earlier review (the empty-diff pathology). reconcileInlineNotes clears
+        // first, then posts the (possibly empty) fresh set. Reached only AFTER the suppression guards above,
+        // so a closed/merged/draft/opted-out PR is never wiped.
+        DiffNotePoster.DiffNoteResult diffResult = diffNotePoster.reconcileInlineNotes(job, delivery.diffNotes());
         log.info(
-            "Diff notes delivery: posted={}, failed={}, total={}, jobId={}",
+            "Diff notes reconciled: posted={}, failed={}, total={}, jobId={}",
             diffResult.posted(),
             diffResult.failed(),
             delivery.diffNotes().size(),

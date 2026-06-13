@@ -59,11 +59,7 @@ class DiffNotePoster {
      * @param diffNotes the sanitized diff notes to post
      * @return result with posted/failed counts
      */
-    DiffNoteResult postDiffNotes(AgentJob job, List<DiffNote> diffNotes) {
-        if (diffNotes == null || diffNotes.isEmpty()) {
-            return new DiffNoteResult(0, 0);
-        }
-
+    DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes) {
         IntegrationKind kind = Objects.requireNonNull(
             job.getIntegrationKind(),
             "AgentJob.integrationKind must not be null"
@@ -78,7 +74,22 @@ class DiffNotePoster {
         }
 
         FeedbackChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
-        List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes);
+
+        // Clear this run's prior inline notes FIRST (best-effort) so a re-review that now produces ZERO inline
+        // notes still removes stale ones — the empty-diff pathology where a re-reviewed PR keeps line-numbered
+        // notes on code no longer in the diff. No-op on append-only vendors (GitHub). Never throws into delivery.
+        try {
+            channel.clearStaleFindings(target, HEPHAESTUS_MARKER);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
+                kind,
+                job.getId(),
+                e.getMessage()
+            );
+        }
+
+        List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes == null ? List.of() : diffNotes);
         if (findings.isEmpty()) {
             return new DiffNoteResult(0, 0);
         }

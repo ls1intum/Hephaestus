@@ -253,7 +253,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(result).isNotNull();
         assertThat(result.mrNote())
-            .contains("What I observed")
+            .contains("What's working well here")
             .contains("Error state handling")
             .contains("Network errors are surfaced")
             .doesNotContain("Nice work")
@@ -973,12 +973,17 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(findings, WorkArtifact.ISSUE);
         assertThat(dc).isNotNull();
-        // The MAJOR structure lead survives; the distinct lesson survives; one redundant sibling is dropped.
-        assertThat(dc.mrNote()).contains("mixes capture and export");
-        assertThat(dc.mrNote()).contains("No who/why is stated");
-        boolean checkableKept = dc.mrNote().contains("No acceptance criteria are stated");
-        boolean subtasksKept = dc.mrNote().contains("No subtask checklist exists");
-        assertThat(checkableKept && subtasksKept).as("at least one redundant sibling dropped").isFalse();
+        // The MAJOR "is this issue well-formed?" lead (scoped) survives; its near-duplicate sibling
+        // (checkable) is collapsed away. The DISTINCT lessons — breaks-large-work and states-actionable —
+        // ALWAYS survive (G3: breaks-large-work is no longer in EPIC_STRUCTURE_PRACTICES).
+        assertThat(dc.mrNote()).contains("mixes capture and export"); // scoped lead kept
+        assertThat(dc.mrNote()).contains("No who/why is stated"); // states-actionable: distinct, survives
+        assertThat(dc.mrNote())
+            .as("breaks-large-work is a distinct lesson and must NEVER be deduped away (G3)")
+            .contains("No subtask checklist exists");
+        assertThat(dc.mrNote())
+            .as("the genuine near-duplicate sibling (checkable) is collapsed into the scoped lead")
+            .doesNotContain("No acceptance criteria are stated");
     }
 
     @Test

@@ -57,15 +57,18 @@ class DeliveryComposer {
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
 
     /**
-     * Issue-structure practices that all express the same underlying lesson on an epic — "give this
-     * large issue trackable structure". When two or more fire NEGATIVE on the SAME issue they stack
-     * near-duplicate "this epic needs structure" bullets, so on an ISSUE artifact we keep only the
-     * highest-severity one (F4). Scoped narrowly to this set so distinct lessons are never collapsed.
+     * The genuine "is this single issue well-formed?" near-duplicate pair: scoped-to-one-concern and
+     * has-a-checkable-outcome both critique the SAME framing of one issue, so when both fire NEGATIVE on the
+     * same issue they stack near-identical bullets and we keep only the highest-severity one (F4).
+     *
+     * <p>{@code breaks-large-work-into-trackable-subtasks} is DELIBERATELY EXCLUDED: "decompose this epic
+     * into tracked children" is a distinct, independently-actionable lesson — not a restatement of "this
+     * issue is well-formed" — so it must always survive on its own, even at MINOR alongside a higher-severity
+     * scoped/checkable finding. (Live eval G3: it was being collapsed away by a MAJOR sibling.)
      */
     private static final Set<String> EPIC_STRUCTURE_PRACTICES = Set.of(
         "issue-scoped-to-single-concern",
-        "issue-has-checkable-outcome",
-        "breaks-large-work-into-trackable-subtasks"
+        "issue-has-checkable-outcome"
     );
 
     /**
@@ -120,9 +123,10 @@ class DeliveryComposer {
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // F4: on an epic ISSUE the issue-structure detectors (scoped/checkable/subtasks) all say the
-        // same thing — "this epic needs trackable structure". Collapse them to the single highest-
-        // severity one so the student gets one clear lesson, not 3-4 stacked near-duplicate bullets.
+        // F4: on an ISSUE the two "is this single issue well-formed?" detectors (scoped + checkable) say the
+        // same thing about the same framing, so collapse them to the single highest-severity one — one clear
+        // lesson, not two stacked near-duplicate bullets. breaks-large-work is NOT in the set (it is a
+        // distinct "decompose this epic" lesson that must always survive — see EPIC_STRUCTURE_PRACTICES).
         // Severity-sorted above (CRITICAL ordinal 0 first), so the first epic-structure finding seen is
         // the lead we keep; later ones are the redundant siblings we drop. Conservative: ISSUE-only,
         // and only within EPIC_STRUCTURE_PRACTICES, so distinct lessons are never merged.
@@ -273,11 +277,19 @@ class DeliveryComposer {
      * feedback level (Hattie &amp; Timperley, The Power of Feedback), so the mentoring stance keeps
      * feedback at the task/process level.
      */
+    /** Positives a learner can act on at once — deliberate practice keeps the focus to 1-3 (F: was 4). */
+    private static final int MAX_POSITIVE_REINFORCEMENTS = 3;
+
+    /** Whole-sentence budget for a positive observation/forward-prompt — generous enough not to clip an enumeration. */
+    private static final int POSITIVE_BUDGET = 280;
+
     private static String composeNoIssuesNote(List<ValidatedFinding> observed) {
-        // Findings whose reasoning lets us cite a concrete observation rather than a bare pass.
+        // Findings whose reasoning lets us cite a concrete observation, ranked most-certain first so the
+        // highest-confidence reinforcements survive the cap (F: was arrival order).
         List<ValidatedFinding> withReasoning = observed
             .stream()
             .filter(f -> f.reasoning() != null && !f.reasoning().isBlank())
+            .sorted(Comparator.comparingDouble((ValidatedFinding f) -> f.confidence()).reversed())
             .toList();
 
         if (withReasoning.isEmpty()) {
@@ -287,21 +299,68 @@ class DeliveryComposer {
         var bullets = new StringBuilder(1024);
         int shown = 0;
         for (ValidatedFinding f : withReasoning) {
-            if (shown >= 4) break; // Cap at 4 to avoid a wall of text
-            String summary = truncateToFirstSentence(sanitizeStudentText(f.reasoning()).strip(), 200);
+            if (shown >= MAX_POSITIVE_REINFORCEMENTS) break;
+            // Whole-sentence budget clamp (G5): never clip a multi-clause observation mid-enumeration.
+            String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), POSITIVE_BUDGET);
             if (summary.isBlank()) {
                 // The reasoning was entirely grading-meta and scrubbed to nothing — skip it rather than
                 // emit a bare "- **Practice:** " bullet with no observation behind it.
                 continue;
             }
             String label = capitalize(f.practiceSlug().replace('-', ' '));
-            bullets.append("- **").append(label).append(":** ").append(summary).append("\n");
+            bullets.append("- **").append(label).append(":** ").append(summary);
+            // Feed-forward (G7): a surfaced positive answers Hattie's "Where to next?" \u2014 append the grounded
+            // guidance (transferable principle + one forward prompt). Bare/empty/"No change needed." guidance
+            // (pre-feed-forward criteria) degrades gracefully to just the observation.
+            String forward = clampToSentenceBudget(
+                sanitizeStudentText(f.guidance() == null ? "" : f.guidance()).strip(),
+                POSITIVE_BUDGET
+            );
+            if (!forward.isBlank() && !forward.replace(".", "").equalsIgnoreCase("No change needed")) {
+                bullets.append(' ').append(forward);
+            }
+            bullets.append("\n");
             shown++;
         }
         if (shown == 0) {
             return "Reviewed against the active practices \u2014 nothing to change here.\n";
         }
-        return "Reviewed against the active practices. What I observed:\n\n" + bullets + "\n";
+        // Build-on framing (mentoring, not audit) \u2014 task/process level, never person-level praise.
+        return "What's working well here, and how to keep building on it:\n\n" + bullets + "\n";
+    }
+
+    /**
+     * Clamps {@code text} to whole sentences within {@code maxLen}: appends sentences (split on
+     * {@link #SENTENCE_SEPARATOR}) until the next would exceed the budget, stopping at the last whole one.
+     * Only when even the first sentence overruns does it fall back to {@link #truncateToFirstSentence}'s
+     * word-boundary cut \u2014 so a multi-clause enumeration is never clipped mid-thought (G5).
+     */
+    static String clampToSentenceBudget(String text, int maxLen) {
+        if (text == null || text.isBlank() || text.length() <= maxLen) {
+            return text == null ? "" : text;
+        }
+        StringBuilder out = new StringBuilder(maxLen);
+        Matcher sep = SENTENCE_SEPARATOR.matcher(text);
+        int pos = 0;
+        while (sep.find()) {
+            String sentence = text.substring(pos, sep.end());
+            if (out.length() + sentence.length() > maxLen) {
+                break;
+            }
+            out.append(sentence);
+            pos = sep.end();
+        }
+        if (pos < text.length()) {
+            String tail = text.substring(pos);
+            if (out.length() + tail.length() <= maxLen) {
+                out.append(tail);
+            }
+        }
+        if (out.length() == 0) {
+            // Even the first sentence overruns \u2014 fall back to the word-boundary cut.
+            return truncateToFirstSentence(text, maxLen);
+        }
+        return out.toString().strip();
     }
 
     /**
