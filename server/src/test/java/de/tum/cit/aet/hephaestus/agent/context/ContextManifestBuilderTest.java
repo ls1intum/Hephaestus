@@ -56,7 +56,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         JsonNode entries = manifest.path("entries");
         assertThat(entries).hasSize(2);
         // Entry order is deterministic (sorted by key): diff.patch before linked_work_items.json.
-        assertThat(entries.get(0).path("path").asString()).isEqualTo("diff.patch");
+        assertThat(entries.get(0).path("path").asString()).isEqualTo("inputs/context/diff.patch");
         assertThat(entries.get(0).path("connector").asString()).isEqualTo("scm");
         assertThat(entries.get(0).path("bytes").asInt()).isEqualTo(diff.length);
 
@@ -94,7 +94,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
         assertThat(manifest.path("entries")).hasSize(1);
-        assertThat(manifest.path("entries").get(0).path("path").asString()).isEqualTo("diff.patch");
+        assertThat(manifest.path("entries").get(0).path("path").asString()).isEqualTo("inputs/context/diff.patch");
         assertThat(files).containsKey("inputs/practices/index.json"); // untouched, still present
     }
 

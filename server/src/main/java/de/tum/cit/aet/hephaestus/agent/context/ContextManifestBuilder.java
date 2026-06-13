@@ -71,7 +71,11 @@ public class ContextManifestBuilder {
                 }
                 byte[] bytes = files.get(key);
                 ObjectNode entry = entries.addObject();
-                entry.put("path", key.substring(ContentProvider.OUTPUT_PREFIX.length()));
+                // Emit the FULL workspace-relative key (e.g. "inputs/context/test_presence.json"), not a bare
+                // filename. The criteria + orchestrator prompt cite the full path, so the manifest — the agent's
+                // authoritative index of available context — must speak the SAME path vocabulary, else a bare
+                // name there reads as a different file and the enrichment context stays unopened.
+                entry.put("path", key);
                 // Never default to a connector name — that is exactly the mislabel the manifest exists to
                 // prevent. connectorId() is abstract so every provider-written key is present; "unknown" is
                 // the fail-loud marker for the impossible case rather than a silent attribution to SCM.
