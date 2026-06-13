@@ -321,9 +321,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             // Findings still persisted
             assertThat(practiceFindingRepository.findAll()).hasSize(2);
 
-            // Approval comment posted (no negatives → approval summary), no diff notes
+            // Approval comment posted (no negatives → approval summary). Inline notes are reconciled
+            // unconditionally on an OPEN PR (bb92f0010) with an EMPTY list — clearing any prior run's stale
+            // line-numbered notes while posting no new ones.
             verify(commentPoster).postFormattedBody(any(), any());
-            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
+            verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(java.util.List.of()));
         }
     }
 

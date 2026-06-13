@@ -261,7 +261,8 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("agent config");
+            // binding-aware config gate (#1011): no runnable practice config → skip before detection
+            assertThat(((GateDecision.Skip) decision).reason()).contains("no runnable practice config");
         }
 
         @Test
