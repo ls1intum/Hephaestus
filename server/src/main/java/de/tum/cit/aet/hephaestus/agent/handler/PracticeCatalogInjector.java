@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Injects the practice registry, criteria, and precompute scripts into a job's workspace under
- * {@code .practices/} and {@code .precompute/}. Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
+ * {@code inputs/practices/} and {@code work/precompute/}. Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
  * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
  * so it does not live behind the {@code ContentProvider} SPI.
  *
@@ -78,7 +78,7 @@ class PracticeCatalogInjector {
             );
         }
         // Defense in depth: slugs are interpolated into filesystem paths below; reject any value that
-        // doesn't match the ABI pattern before it can escape ".practices/" / ".precompute/".
+        // doesn't match the ABI pattern before it can escape "inputs/practices/" / "work/precompute/".
         for (Practice p : practices) {
             String slug = p.getSlug();
             if (slug == null || !WorkspaceAbi.PRACTICE_SLUG.matcher(slug).matches()) {

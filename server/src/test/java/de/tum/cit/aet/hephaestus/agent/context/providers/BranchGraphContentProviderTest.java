@@ -28,7 +28,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 class BranchGraphContentProviderTest extends BaseUnitTest {
 
-    private static final String FILE_KEY = "context/target/branch_graph.json";
+    private static final String FILE_KEY = "inputs/context/branch_graph.json";
     private static final Long REPO_ID = 123L;
     private static final Path REPO_PATH = Path.of("/tmp/hephaestus-git-repos/123");
 

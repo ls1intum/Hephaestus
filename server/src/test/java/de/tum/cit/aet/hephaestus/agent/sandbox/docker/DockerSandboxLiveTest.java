@@ -137,7 +137,7 @@ class DockerSandboxLiveTest {
 
             // Create a script that writes output
             String script =
-                "#!/bin/sh\nmkdir -p /workspace/.output\necho '{\"status\":\"ok\"}' > /workspace/.output/result.json\necho 'done'";
+                "#!/bin/sh\nmkdir -p /workspace/out\necho '{\"status\":\"ok\"}' > /workspace/out/result.json\necho 'done'";
 
             SandboxSpec spec = new SandboxSpec(
                 jobId,
@@ -148,7 +148,7 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(512 * 1024 * 1024, 1.0, 128, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -174,7 +174,7 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -201,7 +201,7 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofSeconds(3)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -223,17 +223,13 @@ class DockerSandboxLiveTest {
             SandboxSpec spec = new SandboxSpec(
                 jobId,
                 "alpine:latest",
-                List.of(
-                    "sh",
-                    "-c",
-                    "mkdir -p /workspace/.output && cat /workspace/.prompt > /workspace/.output/echo.txt"
-                ),
+                List.of("sh", "-c", "mkdir -p /workspace/out && cat /workspace/.prompt > /workspace/out/echo.txt"),
                 Map.of(),
                 new NetworkPolicy(true, null, null, null),
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(".prompt", "injected content".getBytes()),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -261,7 +257,7 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 

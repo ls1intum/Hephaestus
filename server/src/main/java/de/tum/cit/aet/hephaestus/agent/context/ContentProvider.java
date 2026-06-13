@@ -16,8 +16,8 @@ import java.util.Map;
  * {@code AgentRuntimeBoundaryTest}.
  */
 public interface ContentProvider {
-    /** Workspace-relative prefix every provider must write under (see {@link WorkspaceAbi#CONTEXT_TARGET_PREFIX}). */
-    String OUTPUT_PREFIX = WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+    /** Workspace-relative prefix every provider must write under (see {@link WorkspaceAbi#CONTEXT_PREFIX}). */
+    String OUTPUT_PREFIX = WorkspaceAbi.CONTEXT_PREFIX;
 
     /** @return {@code true} iff this provider can produce content for the given request variant. */
     boolean supports(ContextRequest request);

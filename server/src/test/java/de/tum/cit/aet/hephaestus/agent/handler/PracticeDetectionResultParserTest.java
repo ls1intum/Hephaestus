@@ -512,7 +512,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "error-handling",
                 "NEGATIVE",
                 "MAJOR",
-                suggestedNote("context/target/foo.json", 1, "should be rejected"),
+                suggestedNote("inputs/context/foo.json", 1, "should be rejected"),
                 suggestedNote("src/Real.java", 5, "should be kept")
             );
             String raw = "{\"findings\": [%s]}".formatted(finding.toString());

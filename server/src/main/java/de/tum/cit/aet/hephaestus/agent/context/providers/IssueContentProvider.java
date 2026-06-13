@@ -20,7 +20,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises the ISSUE detection context under {@code context/target/} — the no-diff counterpart of
+ * Materialises the ISSUE detection context under {@code inputs/context/} — the no-diff counterpart of
  * {@link PullRequestContentProvider}:
  * <ul>
  *   <li>{@code metadata.json} — issue metadata (state, labels, assignees, milestone, sub-issue rollup)</li>

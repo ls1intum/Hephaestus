@@ -37,20 +37,20 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         byte[] diff = "diff --git a b".getBytes(StandardCharsets.UTF_8);
         byte[] linked = "{\"workItems\":[]}".getBytes(StandardCharsets.UTF_8);
-        files.put("context/target/diff.patch", diff);
-        files.put("context/target/linked_work_items.json", linked);
+        files.put("inputs/context/diff.patch", diff);
+        files.put("inputs/context/linked_work_items.json", linked);
         Map<String, String> keyConnector = Map.of(
-            "context/target/diff.patch",
+            "inputs/context/diff.patch",
             "scm",
-            "context/target/linked_work_items.json",
+            "inputs/context/linked_work_items.json",
             "scm"
         );
 
         builder.augment(files, keyConnector, "job-42", 7L);
 
-        // The manifest is added to the context and indexes the two files (not itself).
-        assertThat(files).containsKey("context/target/manifest.json");
-        JsonNode manifest = mapper.readTree(files.get("context/target/manifest.json"));
+        // The manifest sits at inputs/manifest.json (above the per-connector context) and indexes the two files.
+        assertThat(files).containsKey("inputs/manifest.json");
+        JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
         assertThat(manifest.path("jobId").asString()).isEqualTo("job-42");
         assertThat(manifest.path("workspaceId").asLong()).isEqualTo(7L);
         JsonNode entries = manifest.path("entries");
@@ -73,28 +73,28 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     @Test
     void augment_persistsJobManifestForReplay() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        files.put("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
+        files.put("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
 
-        builder.augment(files, Map.of("context/target/metadata.json", "scm"), "job-99", 1L);
+        builder.augment(files, Map.of("inputs/context/metadata.json", "scm"), "job-99", 1L);
 
         Path jobManifest = layout.jobDir("job-99").resolve("manifest.json");
         assertThat(jobManifest).exists();
     }
 
     @Test
-    void augment_indexesOnlyContextTargetFiles_andNeverItself() {
+    void augment_indexesOnlyContextFiles_andNeverItself() {
         Map<String, byte[]> files = new LinkedHashMap<>();
-        files.put("context/target/diff.patch", "d".getBytes(StandardCharsets.UTF_8));
-        // A non-context/target file (e.g. an internal catalog file) must be ignored by the manifest.
-        files.put(".practices/index.json", "[]".getBytes(StandardCharsets.UTF_8));
+        files.put("inputs/context/diff.patch", "d".getBytes(StandardCharsets.UTF_8));
+        // A non-context file (e.g. an internal catalog file) must be ignored by the manifest.
+        files.put("inputs/practices/index.json", "[]".getBytes(StandardCharsets.UTF_8));
         // A pre-seeded manifest must not index itself, and must be overwritten exactly once.
-        files.put("context/target/manifest.json", "stale".getBytes(StandardCharsets.UTF_8));
+        files.put("inputs/manifest.json", "stale".getBytes(StandardCharsets.UTF_8));
 
-        builder.augment(files, Map.of("context/target/diff.patch", "scm"), "job-1", 1L);
+        builder.augment(files, Map.of("inputs/context/diff.patch", "scm"), "job-1", 1L);
 
-        JsonNode manifest = mapper.readTree(files.get("context/target/manifest.json"));
+        JsonNode manifest = mapper.readTree(files.get("inputs/manifest.json"));
         assertThat(manifest.path("entries")).hasSize(1);
         assertThat(manifest.path("entries").get(0).path("path").asString()).isEqualTo("diff.patch");
-        assertThat(files).containsKey(".practices/index.json"); // untouched, still present
+        assertThat(files).containsKey("inputs/practices/index.json"); // untouched, still present
     }
 }

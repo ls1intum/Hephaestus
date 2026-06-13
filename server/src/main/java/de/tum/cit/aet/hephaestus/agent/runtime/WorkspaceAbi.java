@@ -16,49 +16,59 @@ public final class WorkspaceAbi {
     /** Container workspace root. */
     public static final String WORKSPACE_ROOT = "/workspace";
 
+    // ── Layout (ADR 0020): read-only vs writable by LOCATION, not lore ──────────────────────────────
+    //   inputs/  — EVERYTHING the agent may only read (the path-guard whitelists exactly this subtree)
+    //   work/    — scratch the agent + precompute write during the run; NEVER collected
+    //   out/     — the ONLY directory collected back into SQL
+    //   .pi/     — the Pi SDK runtime home (vendor dir; left as-is for now)
+
+    /** Workspace-relative prefix for the read-only input subtree (the only region the path-guard whitelists). */
+    public static final String INPUTS_PREFIX = "inputs/";
+
     /**
-     * Workspace-relative prefix for entitled connector bulk artifacts (ADR 0020): the SCM clone is
-     * {@code blobs/scm/repo}, a future Slack/Outline export is {@code blobs/slack/...} — the repo is one
-     * mount among peers, not a privileged root.
+     * Workspace-relative prefix for entitled connector worktree mounts (ADR 0020): the SCM checkout is
+     * {@code inputs/worktrees/scm/repo}, a future Slack/Outline export is {@code inputs/worktrees/slack/...}
+     * — the repo is one mount among peers, not a privileged root. Named to match the host {@code worktrees/}.
      */
-    public static final String BLOBS_PREFIX = "blobs/";
+    public static final String WORKTREES_PREFIX = INPUTS_PREFIX + "worktrees/";
 
-    /** Workspace-relative {@code .keep} that pre-creates {@code blobs/scm/} so the repo can mount under it. */
-    public static final String SCM_BLOB_KEEP = BLOBS_PREFIX + "scm/.keep";
+    /** Workspace-relative {@code .keep} that pre-creates {@code inputs/worktrees/scm/} so the repo can mount under it. */
+    public static final String SCM_WORKTREE_KEEP = WORKTREES_PREFIX + "scm/.keep";
 
-    /** Bind-mount point for the read-only git checkout — the SCM connector's bulk artifact. */
-    public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + BLOBS_PREFIX + "scm/repo";
+    /** Bind-mount point for the read-only git checkout — the SCM connector's worktree. */
+    public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + WORKTREES_PREFIX + "scm/repo";
 
-    /** Workspace-relative prefix the agent cites for repo files ({@code blobs/scm/repo/<path>}). */
-    public static final String REPO_MOUNT_RELATIVE = BLOBS_PREFIX + "scm/repo/";
+    /** Workspace-relative prefix the agent cites for repo files ({@code inputs/worktrees/scm/repo/<path>}). */
+    public static final String REPO_MOUNT_RELATIVE = WORKTREES_PREFIX + "scm/repo/";
 
     /** Output directory the sandbox collects after the run. */
-    public static final String OUTPUT_PATH = WORKSPACE_ROOT + "/.output";
+    public static final String OUTPUT_PATH = WORKSPACE_ROOT + "/out";
 
     /** Workspace-relative filename of the task envelope ({@code task.json}). */
     public static final String TASK_ENVELOPE_FILENAME = "task.json";
 
     /** Workspace-relative prefix every {@link de.tum.cit.aet.hephaestus.agent.context.ContentProvider} must write under. */
-    public static final String CONTEXT_TARGET_PREFIX = "context/target/";
+    public static final String CONTEXT_PREFIX = INPUTS_PREFIX + "context/";
 
     /**
      * Workspace-relative path of the integration-agnostic context manifest (the "telescope"): a small
      * index of every projected context file with its connector + provenance, so the agent — and a future
-     * connector — sees one uniform entry point regardless of which integration produced the bytes.
+     * connector — sees one uniform entry point regardless of which integration produced the bytes. Sits
+     * directly under {@code inputs/}, above the per-connector context it indexes.
      */
-    public static final String MANIFEST_PATH = CONTEXT_TARGET_PREFIX + "manifest.json";
+    public static final String MANIFEST_PATH = INPUTS_PREFIX + "manifest.json";
 
     /** Workspace-relative prefix for per-practice catalog files (index, criteria). */
-    public static final String PRACTICES_PREFIX = ".practices/";
+    public static final String PRACTICES_PREFIX = INPUTS_PREFIX + "practices/";
 
     /** Workspace-relative prefix for per-practice precompute scripts injected from the database. */
-    public static final String PRECOMPUTE_PREFIX = ".precompute/";
+    public static final String PRECOMPUTE_PREFIX = "work/precompute/";
 
     /** Workspace-relative prefix for runtime precompute output (logs, structured hints). */
-    public static final String PRECOMPUTE_OUT_PREFIX = ".precompute-out/";
+    public static final String PRECOMPUTE_OUT_PREFIX = "work/precompute-out/";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
-    public static final String ANALYSIS_PREFIX = ".analysis/";
+    public static final String ANALYSIS_PREFIX = "work/analysis/";
 
     /** Workspace-relative path of the practices-analysis marker directory. */
     public static final String ANALYSIS_PRACTICES_PREFIX = ANALYSIS_PREFIX + "practices/";
@@ -100,6 +110,6 @@ public final class WorkspaceAbi {
 
     /** Workspace-path prefixes accepted by {@link PiPlanSpec#extraInputs()} for dynamic-suffix paths. */
     public static Set<String> allowedExtraInputPrefixes() {
-        return Set.of(CONTEXT_TARGET_PREFIX, SESSIONS_DIR_PREFIX);
+        return Set.of(CONTEXT_PREFIX, SESSIONS_DIR_PREFIX);
     }
 }

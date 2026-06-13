@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 public class MentorPiAdapter {
 
     public static final String SYSTEM_PROMPT_PATH = WorkspaceAbi.MENTOR_SYSTEM_PROMPT_PATH;
-    public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+    public static final String ASPECT_INPUT_PREFIX = WorkspaceAbi.CONTEXT_PREFIX;
     public static final String SESSIONS_DIR_PREFIX = WorkspaceAbi.SESSIONS_DIR_PREFIX;
 
     private static final MentorRunnerProfile PROFILE = new MentorRunnerProfile();

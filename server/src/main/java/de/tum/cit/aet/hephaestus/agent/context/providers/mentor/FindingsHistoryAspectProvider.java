@@ -29,7 +29,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/findings_history.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/findings_history.json} for {@link MentorChatRequest}.
  *
  * <p>Combines per-practice findings (the practice-detection agent's output for this
  * contributor over the last 90 days) and reviews received in the same window. Lets the

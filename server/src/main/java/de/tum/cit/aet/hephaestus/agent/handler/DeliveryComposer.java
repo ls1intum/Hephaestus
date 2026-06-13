@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX;
-import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PI_AGENT_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX;
@@ -82,7 +82,7 @@ class DeliveryComposer {
 
     /**
      * Strips the leading repo-mount prefix so a student-facing location stays repo-relative (F3). The
-     * repo mounts at the integration-namespaced {@code blobs/scm/repo/} (ADR 0020).
+     * repo mounts at the integration-namespaced {@code inputs/worktrees/scm/repo/} (ADR 0020).
      */
     private static String repoRelative(String path) {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
@@ -90,7 +90,7 @@ class DeliveryComposer {
 
     /** Paths that are internal workspace artifacts, not student code. */
     private static final List<String> INTERNAL_PATH_PREFIXES = List.of(
-        CONTEXT_TARGET_PREFIX,
+        CONTEXT_PREFIX,
         PRACTICES_PREFIX,
         ANALYSIS_PREFIX,
         PI_AGENT_PREFIX,
@@ -769,7 +769,7 @@ class DeliveryComposer {
     private static boolean isInternalPath(String location) {
         // Strip line number suffix for comparison
         String path = location.contains(":") ? location.substring(0, location.lastIndexOf(':')) : location;
-        // The synthetic context envelope is cited both as the full context/target/metadata.json (caught
+        // The synthetic context envelope is cited both as the full inputs/context/metadata.json (caught
         // by the prefix) and, once the agent strips the prefix, as a bare "metadata.json". Neither is a
         // real repo file a student should see referenced — issue findings in particular only ever point
         // here, so this also clears the meaningless "metadata.json:2" location off issue notes.

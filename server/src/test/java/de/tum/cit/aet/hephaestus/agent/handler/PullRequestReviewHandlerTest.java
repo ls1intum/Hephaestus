@@ -161,7 +161,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         lenient()
             .when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class)))
             .thenReturn(
-                new LinkedHashMap<>(Map.of("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
+                new LinkedHashMap<>(Map.of("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8)))
             );
         lenient()
             .when(
@@ -232,7 +232,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void mergesProviderFiles() {
             byte[] metadataBytes = "{\"pr_number\":42}".getBytes(StandardCharsets.UTF_8);
             when(workspaceContextBuilder.build(any(ContextRequest.PracticeReviewRequest.class))).thenReturn(
-                new LinkedHashMap<>(Map.of("context/target/metadata.json", metadataBytes))
+                new LinkedHashMap<>(Map.of("inputs/context/metadata.json", metadataBytes))
             );
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
@@ -243,7 +243,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            assertThat(files.get("context/target/metadata.json")).isEqualTo(metadataBytes);
+            assertThat(files.get("inputs/context/metadata.json")).isEqualTo(metadataBytes);
         }
 
         @Test
@@ -267,11 +267,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             stubDefaults();
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            assertThat(files).containsKey(".practices/index.json");
-            assertThat(files).containsKey(".practices/all-criteria.md");
-            assertThat(files).containsKey(".practices/pr-description-quality.md");
-            assertThat(files).containsKey(".practices/error-handling.md");
-            assertThat(files).containsKey(".analysis/practices/.gitkeep");
+            assertThat(files).containsKey("inputs/practices/index.json");
+            assertThat(files).containsKey("inputs/practices/all-criteria.md");
+            assertThat(files).containsKey("inputs/practices/pr-description-quality.md");
+            assertThat(files).containsKey("inputs/practices/error-handling.md");
+            assertThat(files).containsKey("work/analysis/practices/.gitkeep");
         }
 
         @Test
@@ -323,9 +323,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void preservesProviderOrder() {
             var providerFiles = new LinkedHashMap<String, byte[]>();
-            providerFiles.put("context/target/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
-            providerFiles.put("context/target/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
-            providerFiles.put("context/target/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("inputs/context/metadata.json", "{}".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("inputs/context/diff.patch", "diff".getBytes(StandardCharsets.UTF_8));
+            providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.build(any())).thenReturn(providerFiles);
             when(
                 practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
@@ -338,9 +338,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             // First three entries must be the provider files in their original order
             var keys = files.keySet().iterator();
-            assertThat(keys.next()).isEqualTo("context/target/metadata.json");
-            assertThat(keys.next()).isEqualTo("context/target/diff.patch");
-            assertThat(keys.next()).isEqualTo("context/target/comments.json");
+            assertThat(keys.next()).isEqualTo("inputs/context/metadata.json");
+            assertThat(keys.next()).isEqualTo("inputs/context/diff.patch");
+            assertThat(keys.next()).isEqualTo("inputs/context/comments.json");
         }
     }
 
@@ -356,7 +356,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Verdict.NEGATIVE, "context/target/metadata.json");
+            var finding = finding("mr-description-quality", Verdict.NEGATIVE, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
@@ -365,7 +365,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void filtersFindingBackedByNonWhitelistedInternal() {
             // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
             // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
-            var finding = finding("review-noise", Verdict.NEGATIVE, "context/target/contributor_history.json");
+            var finding = finding("review-noise", Verdict.NEGATIVE, "inputs/context/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }

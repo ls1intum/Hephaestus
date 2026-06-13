@@ -54,8 +54,8 @@ class PracticePiAdapterTest extends BaseUnitTest {
     void precomputeReferencesContextTarget() {
         String step = PracticePiAdapter.buildPrecomputeStep();
         assertThat(step)
-            .contains("/workspace/" + WorkspaceAbi.CONTEXT_TARGET_PREFIX + "diff.patch")
-            .contains("/workspace/" + WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json")
+            .contains("/workspace/" + WorkspaceAbi.CONTEXT_PREFIX + "diff.patch")
+            .contains("/workspace/" + WorkspaceAbi.CONTEXT_PREFIX + "metadata.json")
             .doesNotContain("/workspace/.context/");
     }
 

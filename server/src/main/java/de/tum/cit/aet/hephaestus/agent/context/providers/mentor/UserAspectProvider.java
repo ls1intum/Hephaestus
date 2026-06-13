@@ -22,7 +22,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/user.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/user.json} for {@link MentorChatRequest}.
  *
  * <p>Replaces the legacy intelligence-service {@code activity-summary} tool: same
  * fields, same heuristics for {@code insights} and {@code suggestedReflectionTopics}. The

@@ -175,12 +175,12 @@ public class PracticeDetectionResultParser {
         }
         String filePath = filePathNode.asString();
 
-        // Reject internal workspace paths — agent sometimes hallucinates context/target/ or .analysis/ paths
+        // Reject internal workspace paths — agent sometimes hallucinates inputs/context/ or work/analysis/ paths
         if (
-            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_TARGET_PREFIX) ||
+            filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX) ||
-            filePath.startsWith(".output/") ||
+            filePath.startsWith("out/") ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX)
         ) {

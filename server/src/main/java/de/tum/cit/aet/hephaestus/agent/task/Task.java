@@ -14,7 +14,7 @@ import java.util.Objects;
 public sealed interface Task {
     /**
      * Practice-review task: the Pi agent reads workspace context (PR diff, metadata, practice
-     * catalog) and emits structured findings. PR-specific data lives in {@code context/target/}
+     * catalog) and emits structured findings. PR-specific data lives in {@code inputs/context/}
      * files materialised by the content providers — this record only carries the prompt and
      * routing hints needed by the runner.
      */

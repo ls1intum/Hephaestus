@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Handler for {@link AgentJobType#ISSUE_REVIEW} jobs — the issue counterpart of
  * {@link PullRequestReviewHandler}. Issues have NO diff: the case context is the issue body, the
  * comment thread, and the lifecycle metadata, materialised by {@code IssueContentProvider} under
- * {@code context/target/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
+ * {@code inputs/context/}. There is no repo mount, no diff-scope filter, and no inline diff notes.
  *
  * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (target type ISSUE),
  * composes the student-facing feedback, and posts it as an issue comment via
@@ -130,7 +130,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         int issueNumber = requireInt(metadata, "issue_number");
         String repoName = requireText(metadata, "repository_full_name");
         // Reuse the PracticeReview task kind — the agent is artifact-agnostic; the prompt + the
-        // issue context files (context/target/issue_summary.md, metadata.json, comments.json) drive it.
+        // issue context files (inputs/context/issue_summary.md, metadata.json, comments.json) drive it.
         Task task = new Task.PracticeReview(buildPrompt(issueNumber, repoName, job), issueNumber, repoName);
         return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
     }
@@ -142,8 +142,8 @@ public class IssueReviewHandler implements JobTypeHandler {
             " in " +
             repoName +
             ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files " +
-            "(context/target/issue_summary.md, context/target/metadata.json, context/target/comments.json), then " +
-            "evaluate each practice in .practices/ against the issue and persist every justified finding via the " +
+            "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json), then " +
+            "evaluate each practice in inputs/practices/ against the issue and persist every justified finding via the " +
             "report_finding tool. Evidence locations should reference the issue thread/metadata, not source files. " +
             "Follow " +
             WorkspaceAbi.ORCHESTRATOR_PATH +

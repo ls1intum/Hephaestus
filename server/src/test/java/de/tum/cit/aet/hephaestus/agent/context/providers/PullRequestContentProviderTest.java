@@ -129,8 +129,8 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files).containsKey("context/target/metadata.json");
-            JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
+            assertThat(files).containsKey("inputs/context/metadata.json");
+            JsonNode metadataJson = objectMapper.readTree(files.get("inputs/context/metadata.json"));
             assertThat(metadataJson.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadataJson.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadataJson.get("enriched").asBoolean()).isFalse();
@@ -154,7 +154,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            JsonNode metadataJson = objectMapper.readTree(files.get("context/target/metadata.json"));
+            JsonNode metadataJson = objectMapper.readTree(files.get("inputs/context/metadata.json"));
             assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
             assertThat(metadataJson.get("title").asString()).isEqualTo("Fix authentication bug");
             assertThat(metadataJson.get("author").asString()).isEqualTo("testuser");
@@ -186,7 +186,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            JsonNode comments = objectMapper.readTree(files.get("context/target/comments.json"));
+            JsonNode comments = objectMapper.readTree(files.get("inputs/context/comments.json"));
             assertThat(comments).hasSize(2);
             assertThat(comments.get(0).get("created_at").asString()).isEqualTo("2025-06-01T12:00:00Z");
             assertThat(comments.get(0).get("author").asString()).isEqualTo("reviewer");
@@ -211,7 +211,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            JsonNode commentsJson = objectMapper.readTree(files.get("context/target/comments.json"));
+            JsonNode commentsJson = objectMapper.readTree(files.get("inputs/context/comments.json"));
             assertThat(commentsJson).hasSize(PullRequestContentProvider.MAX_COMMENTS);
             assertThat(commentsJson.get(0).get("body").asString()).isEqualTo("Comment 100");
         }
@@ -239,7 +239,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files.get("context/target/contributor_history.json")).isEqualTo(historyJson);
+            assertThat(files.get("inputs/context/contributor_history.json")).isEqualTo(historyJson);
         }
 
         @Test
@@ -259,7 +259,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files).doesNotContainKey("context/target/contributor_history.json");
+            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
         }
 
         @Test
@@ -281,8 +281,8 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            assertThat(files).doesNotContainKey("context/target/contributor_history.json");
-            assertThat(files).containsKey("context/target/metadata.json");
+            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
+            assertThat(files).containsKey("inputs/context/metadata.json");
         }
 
         @Test
@@ -298,7 +298,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             provider.contribute(request(sampleMetadata()), files);
 
             verifyNoInteractions(contributorHistoryProvider);
-            assertThat(files).doesNotContainKey("context/target/contributor_history.json");
+            assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
         }
     }
 

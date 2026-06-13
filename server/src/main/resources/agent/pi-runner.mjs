@@ -11,7 +11,7 @@ import {
     defineTool,
 } from "@earendil-works/pi-coding-agent";
 
-const OUTPUT = "/workspace/.output";
+const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
@@ -441,7 +441,7 @@ function chunkArray(arr, size) {
 // focused evaluation; ungrouped practices fall back to their own one-practice group.
 function loadPracticeGroups() {
     try {
-        const indexPath = `${CWD}/.practices/index.json`;
+        const indexPath = `${CWD}/inputs/practices/index.json`;
         if (!existsSync(indexPath)) return [];
         const index = JSON.parse(readFileSync(indexPath, "utf-8"));
         if (!Array.isArray(index)) return [];
@@ -460,7 +460,7 @@ function loadPracticeGroups() {
 
 function loadPracticeSlugs() {
     try {
-        const indexPath = `${CWD}/.practices/index.json`;
+        const indexPath = `${CWD}/inputs/practices/index.json`;
         if (!existsSync(indexPath)) return [];
         const index = JSON.parse(readFileSync(indexPath, "utf-8"));
         if (!Array.isArray(index)) return [];
@@ -681,7 +681,7 @@ async function main() {
                 break;
             }
             const batch = batches[bi];
-            const readHint = `Read .practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
+            const readHint = `Read inputs/practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
             const batchPrompt =
                 bi === 0
                     ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`
@@ -703,7 +703,7 @@ async function main() {
                 console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
                 const gatePrompt =
                     `Coverage check. You have NOT yet reported a verdict for these practices: ${missing.join(", ")}. ` +
-                    `Read .practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
+                    `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
                     `(do NOT re-read the diff). Persist a finding (POSITIVE, NEGATIVE, or NOT_APPLICABLE) for EVERY one ` +
                     `with report_finding, one call per finding.`;
                 try {

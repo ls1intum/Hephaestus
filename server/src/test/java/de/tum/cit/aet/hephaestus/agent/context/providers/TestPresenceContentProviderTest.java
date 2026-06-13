@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 class TestPresenceContentProviderTest extends BaseUnitTest {
 
-    private static final String OUTPUT_KEY = "context/target/test_presence.json";
+    private static final String OUTPUT_KEY = "inputs/context/test_presence.json";
     private static final Long REPO_ID = 123L;
     private static final Long WORKSPACE_ID = 99L;
 

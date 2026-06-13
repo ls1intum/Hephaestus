@@ -123,7 +123,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             ResourceLimits.DEFAULT,
             SecurityProfile.DEFAULT,
             Map.of(".prompt", "test prompt".getBytes()),
-            "/workspace/.output",
+            "/workspace/out",
             volumeMounts
         );
     }
@@ -167,7 +167,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(workspaceManager).injectFiles(eq(CONTAINER_ID), any());
             verify(containerManager).startContainer(CONTAINER_ID);
             verify(containerManager).waitForCompletion(eq(CONTAINER_ID), any());
-            verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/.output");
+            verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/out");
             verify(containerManager).getLogs(CONTAINER_ID, 500);
 
             // Verify cleanup
@@ -189,7 +189,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -241,7 +241,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -271,7 +271,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -298,7 +298,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -356,7 +356,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -407,7 +407,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -438,7 +438,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 
@@ -517,7 +517,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             SandboxResult result = sandboxAdapter.execute(createSpec());
 
             assertThat(result.outputFiles()).containsKey("partial.json");
-            verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/.output");
+            verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/out");
         }
     }
 
@@ -607,7 +607,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 null,
                 Map.of(),
-                "/workspace/.output",
+                "/workspace/out",
                 null
             );
 

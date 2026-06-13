@@ -18,7 +18,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Builds the integration-agnostic context manifest — the "telescope" of ADR 0020. After the providers
- * materialise {@code context/target/*}, this records one uniform index entry per projected file
+ * materialise {@code inputs/context/*}, this records one uniform index entry per projected file
  * ({@code path}, producing {@code connector}, size, and a content-addressed {@code sha256}) so the agent
  * — and any future connector — sees a single entry point regardless of which integration produced the
  * bytes. Every byte is also written to the {@link ContentAddressedStore}, which deduplicates identical
@@ -46,7 +46,7 @@ public class ContextManifestBuilder {
     }
 
     /**
-     * Add {@code context/target/manifest.json} to {@code files} indexing every other context file, storing
+     * Add {@code inputs/manifest.json} to {@code files} indexing every context file under {@code inputs/context/}, storing
      * each blob in the CAS, and persisting the manifest to {@code jobs/{jobId}/}. {@code keyConnector} maps
      * each workspace key to the connector id of the provider that wrote it.
      */

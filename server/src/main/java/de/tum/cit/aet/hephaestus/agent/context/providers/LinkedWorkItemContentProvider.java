@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Cross-context, best-effort provider that de-blinds a PR review by materialising the linked
- * work-item(s) — issue body + acceptance criteria — into {@code context/target/linked_work_items.json}.
+ * work-item(s) — issue body + acceptance criteria — into {@code inputs/context/linked_work_items.json}.
  *
  * <p>The battle-test found that ~1/3 of mentor-lesson misses were <em>context-blind</em>: the signal
  * lived in another artifact. The biggest payoff was the change → linked-issue link (MR 581/582): the

@@ -32,9 +32,9 @@ The `task.json` prompt tells you which artifact you are reviewing. **Pull-reques
 review** has NO diff — its context is the issue body, discussion thread, and lifecycle metadata. Read the artifact's
 context files accordingly (see Workspace below) and always follow the task prompt.
 
-1. **Read** the practice catalog (`.practices/all-criteria.md`, `.practices/index.json`) and the artifact context: for a
-   PR, `context/target/diff_summary.md` + `context/target/metadata.json`; for an ISSUE,
-   `context/target/issue_summary.md` + `context/target/comments.json` + `context/target/metadata.json`. Batch independent
+1. **Read** the practice catalog (`inputs/practices/all-criteria.md`, `inputs/practices/index.json`) and the artifact context: for a
+   PR, `inputs/context/diff_summary.md` + `inputs/context/metadata.json`; for an ISSUE,
+   `inputs/context/issue_summary.md` + `inputs/context/comments.json` + `inputs/context/metadata.json`. Batch independent
    reads/greps in parallel when your runtime supports it.
 2. **Analyze** against each practice. For a PR, only flag changed lines (`+`/`-`) and verify findings against actual diff
    lines. For an ISSUE, evaluate the issue text/thread/metadata — evidence references the issue, not source files.
@@ -50,20 +50,20 @@ Default to a high-signal review:
 - Prefer one precise finding about user-visible breakage over a second lower-value finding about logging or style around the same defect.
 - There is no target number of findings and no quota. Never plan around a number like five.
 
-You may also read `context/target/diff.patch` for line-number verification, `blobs/scm/repo/` for surrounding code context, and `.precompute-out/summary.md` for static analysis hints.
+You may also read `inputs/context/diff.patch` for line-number verification, `inputs/worktrees/scm/repo/` for surrounding code context, and `work/precompute-out/summary.md` for static analysis hints.
 
 ## Workspace
 
-- `context/target/diff_summary.md` — (PR only) per-file diff chunks with index table **(primary — read this first)**
-- `context/target/diff.patch` — (PR only) full unified diff with `[L<n>]` line annotations (for line-number verification)
-- `context/target/diff_stat.txt` — (PR only) changed files summary
-- `context/target/issue_summary.md` — (ISSUE only) the issue + discussion rendered for review **(primary — read first)**
-- `context/target/comments.json` — (ISSUE only) the ordered discussion thread
-- `context/target/metadata.json` — MR/PR or ISSUE title, body, author, labels/state (artifact-dependent)
-- `.practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
-- `.practices/index.json` — practice list with slugs
-- `.precompute-out/summary.md` — static analysis hints (optional, may not exist)
-- `blobs/scm/repo/` — full repository checkout for exploring context around changed code
+- `inputs/context/diff_summary.md` — (PR only) per-file diff chunks with index table **(primary — read this first)**
+- `inputs/context/diff.patch` — (PR only) full unified diff with `[L<n>]` line annotations (for line-number verification)
+- `inputs/context/diff_stat.txt` — (PR only) changed files summary
+- `inputs/context/issue_summary.md` — (ISSUE only) the issue + discussion rendered for review **(primary — read first)**
+- `inputs/context/comments.json` — (ISSUE only) the ordered discussion thread
+- `inputs/context/metadata.json` — MR/PR or ISSUE title, body, author, labels/state (artifact-dependent)
+- `inputs/practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
+- `inputs/practices/index.json` — practice list with slugs
+- `work/precompute-out/summary.md` — static analysis hints (optional, may not exist)
+- `inputs/worktrees/scm/repo/` — full repository checkout for exploring context around changed code
 
 ## Rules
 

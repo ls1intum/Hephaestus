@@ -32,9 +32,9 @@ import tools.jackson.databind.node.ObjectNode;
 class IssueContentProviderTest extends BaseUnitTest {
 
     private static final long ISSUE_ID = 777L;
-    private static final String METADATA_KEY = "context/target/metadata.json";
-    private static final String COMMENTS_KEY = "context/target/comments.json";
-    private static final String SUMMARY_KEY = "context/target/issue_summary.md";
+    private static final String METADATA_KEY = "inputs/context/metadata.json";
+    private static final String COMMENTS_KEY = "inputs/context/comments.json";
+    private static final String SUMMARY_KEY = "inputs/context/issue_summary.md";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

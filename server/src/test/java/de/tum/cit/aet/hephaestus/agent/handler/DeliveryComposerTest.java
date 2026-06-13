@@ -886,14 +886,14 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void compose_stripsLeadingRepoPrefixFromStudentLocation() {
-        // F3: the agent sees the repo mounted at /workspace/blobs/scm/repo and sometimes cites
-        // "blobs/scm/repo/<path>"; the student-facing location must be repo-relative.
+        // F3: the agent sees the repo mounted at /workspace/inputs/worktrees/scm/repo and sometimes cites
+        // "inputs/worktrees/scm/repo/<path>"; the student-facing location must be repo-relative.
         var findings = List.of(
             negativeFinding(
                 "ships-tests-with-the-change",
                 "Production logic without a test",
                 Severity.MINOR,
-                List.of(new LocationSpec("blobs/scm/repo/client/Obsphera/Services/APIClient.swift", 12)),
+                List.of(new LocationSpec("inputs/worktrees/scm/repo/client/Obsphera/Services/APIClient.swift", 12)),
                 null,
                 "New logic added without a test.",
                 "Add a unit test."
@@ -902,7 +902,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
         assertThat(dc).isNotNull();
         assertThat(dc.mrNote()).contains("client/Obsphera/Services/APIClient.swift");
-        assertThat(dc.mrNote()).doesNotContain("blobs/scm/repo/client/");
+        assertThat(dc.mrNote()).doesNotContain("inputs/worktrees/scm/repo/client/");
     }
 
     @Test

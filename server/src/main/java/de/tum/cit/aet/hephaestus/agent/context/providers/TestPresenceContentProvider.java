@@ -21,7 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Cross-context provider that materialises a COMPACT repo-wide test-presence index under
- * {@code context/target/test_presence.json}. It grounds two battle-test misses that were
+ * {@code inputs/context/test_presence.json}. It grounds two battle-test misses that were
  * context-blind because the signal lives outside the diff:
  *
  * <ul>

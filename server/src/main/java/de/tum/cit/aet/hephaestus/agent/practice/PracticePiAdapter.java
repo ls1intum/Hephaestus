@@ -61,14 +61,14 @@ public class PracticePiAdapter {
 
     /**
      * Run precompute scripts via Bun before the agent. Failure is non-fatal. Paths reference the
-     * workspace ABI ({@link WorkspaceAbi#CONTEXT_TARGET_PREFIX}).
+     * workspace ABI ({@link WorkspaceAbi#CONTEXT_PREFIX}).
      *
      * <p><b>Trust boundary:</b> the returned string is interpolated verbatim into the container's
      * {@code sh -c} command line. Do not derive any part of this output from untrusted input.
      */
     static String buildPrecomputeStep() {
         String root = WorkspaceAbi.WORKSPACE_ROOT;
-        String contextTarget = root + "/" + WorkspaceAbi.CONTEXT_TARGET_PREFIX;
+        String contextTarget = root + "/" + WorkspaceAbi.CONTEXT_PREFIX;
         String precomputeIn = root + "/" + WorkspaceAbi.PRECOMPUTE_PREFIX + "practices";
         String precomputeOut = root + "/" + WorkspaceAbi.PRECOMPUTE_OUT_PREFIX.replaceFirst("/$", "");
         return (

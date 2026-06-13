@@ -72,7 +72,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
-        byte[] bytes = files.get("context/target/findings_history.json");
+        byte[] bytes = files.get("inputs/context/findings_history.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
@@ -118,7 +118,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
-        JsonNode root = objectMapper.readTree(files.get("context/target/findings_history.json"));
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/findings_history.json"));
         assertThat(root.get("summary").get("byVerdict").get("POSITIVE").asLong()).isEqualTo(3L);
         assertThat(root.get("summary").get("byVerdict").get("NEGATIVE").asLong()).isEqualTo(1L);
         assertThat(root.get("summary").get("byVerdict").get("NOT_APPLICABLE").asLong()).isEqualTo(0L);

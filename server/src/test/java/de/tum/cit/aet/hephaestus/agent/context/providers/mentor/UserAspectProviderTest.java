@@ -68,7 +68,7 @@ class UserAspectProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
-        byte[] bytes = files.get("context/target/user.json");
+        byte[] bytes = files.get("inputs/context/user.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("user").get("login").asString()).isEqualTo("octo");

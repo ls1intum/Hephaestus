@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Cross-context, best-effort provider that de-blinds a PR review by materialising the
  * <em>review-decision and thread-resolution state</em> into {@code
- * context/target/review_threads.json}.
+ * inputs/context/review_threads.json}.
  *
  * <p>The battle-test found two costly CONTEXT-BLIND misses where the signal lives in the review
  * decision + merge state, never in the diff and never in the inline comments:

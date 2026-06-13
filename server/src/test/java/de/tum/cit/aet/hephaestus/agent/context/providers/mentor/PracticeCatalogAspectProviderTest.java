@@ -55,7 +55,7 @@ class PracticeCatalogAspectProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
-        byte[] bytes = files.get("context/target/practice_catalog.json");
+        byte[] bytes = files.get("inputs/context/practice_catalog.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");

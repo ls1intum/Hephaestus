@@ -119,8 +119,8 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
-        assertThat(files).containsKey("context/target/linked_work_items.json");
-        JsonNode root = objectMapper.readTree(files.get("context/target/linked_work_items.json"));
+        assertThat(files).containsKey("inputs/context/linked_work_items.json");
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         JsonNode items = root.get("workItems");
         assertThat(items).hasSize(1);
         JsonNode item = items.get(0);
@@ -150,7 +150,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
-        JsonNode root = objectMapper.readTree(files.get("context/target/linked_work_items.json"));
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean()).isFalse();
     }
 
@@ -170,7 +170,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(metadata), files);
 
-        JsonNode root = objectMapper.readTree(files.get("context/target/linked_work_items.json"));
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         assertThat(root.get("workItems").get(0).get("number").asInt()).isEqualTo(18);
         assertThat(root.get("resolvedFrom").toString()).contains("branch");
     }
@@ -188,7 +188,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
-        JsonNode root = objectMapper.readTree(files.get("context/target/linked_work_items.json"));
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         assertThat(root.get("workItems").get(0).get("bodyExcerpt").asString()).hasSize(600);
     }
 
@@ -209,7 +209,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
-        JsonNode root = objectMapper.readTree(files.get("context/target/linked_work_items.json"));
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         assertThat(root.get("workItems")).hasSize(LinkedWorkItemContentProvider.MAX_ITEMS);
     }
 
@@ -226,7 +226,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(metadata), files);
 
-        assertThat(files).doesNotContainKey("context/target/linked_work_items.json");
+        assertThat(files).doesNotContainKey("inputs/context/linked_work_items.json");
     }
 
     @Test
@@ -239,7 +239,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(sampleMetadata()), files);
 
-        assertThat(files).doesNotContainKey("context/target/linked_work_items.json");
+        assertThat(files).doesNotContainKey("inputs/context/linked_work_items.json");
     }
 
     @Test
@@ -260,7 +260,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(metadata), files);
 
-        assertThat(files).doesNotContainKey("context/target/linked_work_items.json");
+        assertThat(files).doesNotContainKey("inputs/context/linked_work_items.json");
     }
 
     @Test
@@ -321,7 +321,7 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(request(metadata), files);
 
-        JsonNode root = objectMapper.readTree(files.get("context/target/linked_work_items.json"));
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
         assertThat(root.get("workItems").get(0).get("number").asInt()).isEqualTo(77);
         assertThat(root.get("workItems").get(0).get("closingKeyword").asBoolean()).isTrue();
         assertThat(root.get("resolvedFrom").toString()).contains("commits");

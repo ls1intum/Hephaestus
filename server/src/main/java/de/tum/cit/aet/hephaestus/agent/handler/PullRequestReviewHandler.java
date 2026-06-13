@@ -39,29 +39,32 @@ import tools.jackson.databind.node.ObjectNode;
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
  * <p>Delegates workspace-context materialisation to {@link WorkspaceContextBuilder} (which
- * orchestrates {@code PullRequestContentProvider} → {@code context/target/...} files) and the
- * task envelope to {@link TaskEnvelopeWriter}. Retains practice catalog injection ({@code .practices/})
+ * orchestrates {@code PullRequestContentProvider} → {@code inputs/context/...} files) and the
+ * task envelope to {@link TaskEnvelopeWriter}. Retains practice catalog injection ({@code inputs/practices/})
  * and delivery-phase post-processing here — catalog injection is per-job and not provider-shaped.
  *
- * <p>Container workspace layout — integration-namespaced per ADR 0020 (see
+ * <p>Container workspace layout — read-only vs writable by LOCATION per ADR 0020 (see
  * {@code docs/contributor/agent/workspace-abi.mdx} for the full ABI):
  * <pre>
  * /workspace/
- * ├── blobs/scm/repo/                    # git checkout — the SCM connector's bulk artifact (RO mount)
- * ├── context/target/                    # workspace context (this handler populates via WorkspaceContextBuilder)
+ * ├── inputs/                            # read-only — the path-guard whitelists exactly this subtree
  * │   ├── manifest.json                  #   telescope: integration-agnostic index (path/connector/sha256)
- * │   ├── metadata.json                  #   PR metadata + commits
- * │   ├── comments.json                  #   review comments
- * │   ├── diff.patch                     #   diff with [L&lt;n&gt;] annotations
- * │   ├── diff_summary.md                #   per-file diff chunks
- * │   └── contributor_history.json       #   prior findings (optional)
+ * │   ├── worktrees/scm/repo/            #   git checkout — the SCM connector's worktree (RO mount)
+ * │   ├── context/                       #   workspace context (this handler populates via WorkspaceContextBuilder)
+ * │   │   ├── metadata.json              #     PR metadata + commits
+ * │   │   ├── comments.json              #     review comments
+ * │   │   ├── diff.patch                 #     diff with [L&lt;n&gt;] annotations
+ * │   │   ├── diff_summary.md            #     per-file diff chunks
+ * │   │   └── contributor_history.json   #     prior findings (optional)
+ * │   └── practices/{index.json, {slug}.md, all-criteria.md}
+ * ├── work/                              # scratch the agent + precompute write; NEVER collected
+ * │   ├── precompute/practices/{slug}.ts
+ * │   ├── precompute-out/
+ * │   └── analysis/
+ * ├── out/                               # the ONLY directory collected back into SQL
  * ├── task.json                          # Task envelope (TaskEnvelope around Task.PracticeReview)
- * ├── .practices/{index.json, {slug}.md, all-criteria.md}
- * ├── .precompute/practices/{slug}.ts
- * ├── .precompute-out/
  * ├── .pi/{AGENTS.md, settings.json, extensions/} # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
- * ├── .run-pi.mjs                          # runner entry point
- * └── .output/
+ * └── .run-pi.mjs                          # runner entry point
  * </pre>
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
@@ -232,7 +235,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Pre-create blobs/scm/ so the repo can mount under it (the directory mount needs its parent
         // to exist before docker cp extracts into it).
-        files.put(WorkspaceAbi.SCM_BLOB_KEEP, new byte[0]);
+        files.put(WorkspaceAbi.SCM_WORKTREE_KEEP, new byte[0]);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -640,7 +643,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
-                // The agent cites files it read under the repo mount as "blobs/scm/repo/<path>" (ADR 0020),
+                // The agent cites files it read under the repo mount as "inputs/worktrees/scm/repo/<path>" (ADR 0020),
                 // but diff-stat paths are repo-relative ("<path>"). Strip the mount prefix so a code finding
                 // on a genuinely-changed file is not dropped on a cosmetic path mismatch.
                 String repoRelative = path.startsWith(WorkspaceAbi.REPO_MOUNT_RELATIVE)

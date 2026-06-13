@@ -19,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Orchestrates {@link ContentProvider}s to materialise the AI-readable workspace context under
- * {@code context/target/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
+ * {@code inputs/context/...}. Order is resolved via {@link AnnotationAwareOrderComparator}
  * ({@code @Order} / {@code Ordered}); a per-repository {@link ReentrantLock} serialises
  * concurrent builds against the same on-disk git working tree.
  *

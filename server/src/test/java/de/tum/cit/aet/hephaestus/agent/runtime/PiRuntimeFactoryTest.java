@@ -108,12 +108,10 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 true,
                 600,
                 PRACTICE,
-                Map.of(WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json", payload),
+                Map.of(WorkspaceAbi.CONTEXT_PREFIX + "metadata.json", payload),
                 ""
             );
-            assertThat(factory.build(spec).inputFiles()).containsKey(
-                WorkspaceAbi.CONTEXT_TARGET_PREFIX + "metadata.json"
-            );
+            assertThat(factory.build(spec).inputFiles()).containsKey(WorkspaceAbi.CONTEXT_PREFIX + "metadata.json");
         }
     }
 

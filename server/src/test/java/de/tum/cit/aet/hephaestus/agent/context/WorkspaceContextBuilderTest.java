@@ -107,8 +107,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Map<String, byte[]> files = builderOf(a, b).build(reviewRequest());
 
             assertThat(files).hasSize(2);
-            assertThat(files.get("context/target/a.txt")).asString(StandardCharsets.UTF_8).isEqualTo("A");
-            assertThat(files.get("context/target/b.txt")).asString(StandardCharsets.UTF_8).isEqualTo("B");
+            assertThat(files.get("inputs/context/a.txt")).asString(StandardCharsets.UTF_8).isEqualTo("A");
+            assertThat(files.get("inputs/context/b.txt")).asString(StandardCharsets.UTF_8).isEqualTo("B");
         }
 
         @Test
@@ -129,11 +129,11 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
                 @Override
                 public void contribute(ContextRequest request, Map<String, byte[]> files) {
-                    files.put("context/target/should-not-appear.txt", new byte[0]);
+                    files.put("inputs/context/should-not-appear.txt", new byte[0]);
                 }
             };
             Map<String, byte[]> files = builderOf(skips, supports).build(reviewRequest());
-            assertThat(files).containsOnlyKeys("context/target/a.txt");
+            assertThat(files).containsOnlyKeys("inputs/context/a.txt");
         }
     }
 
@@ -153,7 +153,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             var bad = stubProvider(false, "x.txt", new byte[0], true);
             var good = stubProvider(true, "y.txt", "Y".getBytes(StandardCharsets.UTF_8), false);
             Map<String, byte[]> files = builderOf(bad, good).build(reviewRequest());
-            assertThat(files).containsOnlyKeys("context/target/y.txt");
+            assertThat(files).containsOnlyKeys("inputs/context/y.txt");
         }
 
         @Test
@@ -221,7 +221,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     class PrefixEnforcement {
 
         @Test
-        @DisplayName("rejects providers that write outside context/target/")
+        @DisplayName("rejects providers that write outside inputs/context/")
         void rejectsBadPrefix() {
             var wrong = new ContentProvider() {
                 @Override
@@ -251,8 +251,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             // Inject in reverse — sort should pick {first, second}.
             Map<String, byte[]> files = builderOf(second, first).build(reviewRequest());
             var iter = files.keySet().iterator();
-            assertThat(iter.next()).isEqualTo("context/target/first.txt");
-            assertThat(iter.next()).isEqualTo("context/target/second.txt");
+            assertThat(iter.next()).isEqualTo("inputs/context/first.txt");
+            assertThat(iter.next()).isEqualTo("inputs/context/second.txt");
         }
     }
 

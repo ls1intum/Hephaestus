@@ -20,7 +20,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Best-effort cross-context provider that materialises {@code context/target/branch_graph.json}:
+ * Best-effort cross-context provider that materialises {@code inputs/context/branch_graph.json}:
  * the observable branch topology FACTS of the change under review (no judgement).
  *
  * <p>This kills a CONTEXT-BLIND miss the battle-test found (MR 575): a change "branched off an

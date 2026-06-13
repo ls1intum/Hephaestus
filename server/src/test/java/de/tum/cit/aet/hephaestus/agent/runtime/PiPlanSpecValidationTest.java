@@ -36,7 +36,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(
         strings = {
-            "context/target/diff.patch", // CONTEXT_TARGET_PREFIX
+            "inputs/context/diff.patch", // CONTEXT_PREFIX
             "agent/mentor/system.md", // MENTOR_SYSTEM_PROMPT_PATH
             ".sessions/abc-123.jsonl", // SESSIONS_DIR_PREFIX
         }

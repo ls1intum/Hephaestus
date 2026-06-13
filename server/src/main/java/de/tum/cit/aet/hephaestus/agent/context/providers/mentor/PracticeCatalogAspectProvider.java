@@ -21,7 +21,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/practice_catalog.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/practice_catalog.json} for {@link MentorChatRequest}.
  *
  * <p>Lists workspace practices with criteria so the mentor agent can talk about specific
  * coding standards that apply to the user's contributions. Independent of {@code contributorId}

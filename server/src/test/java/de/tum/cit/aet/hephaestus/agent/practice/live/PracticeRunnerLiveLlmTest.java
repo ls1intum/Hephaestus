@@ -297,7 +297,7 @@ class PracticeRunnerLiveLlmTest {
         Files.write(piHome.resolve("settings.json"), buildSettingsJson(creds.model()));
         Files.write(piHome.resolve("models.json"), buildModelsJson(creds));
 
-        // Practice catalog under /workspace/.practices/ — the agent reads index.json (slug list)
+        // Practice catalog under /workspace/inputs/practices/ — the agent reads index.json (slug list)
         // and all-criteria.md (per-practice rules) per the orchestrator instructions.
         Path practicesDir = WORKSPACE.resolve(WorkspaceAbi.PRACTICES_PREFIX);
         Files.createDirectories(practicesDir);
@@ -307,7 +307,7 @@ class PracticeRunnerLiveLlmTest {
 
         // Context fixture — diff, metadata, comments, diff_summary. Mirrors what
         // PullRequestContentProvider materialises in production.
-        Path contextDir = WORKSPACE.resolve(WorkspaceAbi.CONTEXT_TARGET_PREFIX);
+        Path contextDir = WORKSPACE.resolve(WorkspaceAbi.CONTEXT_PREFIX);
         Files.createDirectories(contextDir);
         copyFixture("diff.patch", contextDir.resolve("diff.patch"));
         copyFixture("metadata.json", contextDir.resolve("metadata.json"));
@@ -329,9 +329,9 @@ class PracticeRunnerLiveLlmTest {
             UUID.randomUUID(),
             1L,
             new Task.PracticeReview(
-                "Review merge request #1 in test/fixture. Read context/target/diff_summary.md, " +
-                    ".practices/all-criteria.md, .practices/index.json, and context/target/metadata.json. " +
-                    "Apply the hardcoded-secrets practice to context/target/diff.patch. Persist each " +
+                "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, " +
+                    "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
+                    "Apply the hardcoded-secrets practice to inputs/context/diff.patch. Persist each " +
                     "justified finding via report_finding (one tool call per finding). Follow " +
                     WorkspaceAbi.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
@@ -440,13 +440,13 @@ class PracticeRunnerLiveLlmTest {
     }
 
     /**
-     * Build a {@link SandboxResult} from the on-disk {@code .output/} directory. Mirrors what
+     * Build a {@link SandboxResult} from the on-disk {@code out/} directory. Mirrors what
      * {@code DockerSandboxAdapter} does after a container exit so we feed the production parser
      * the exact map shape it expects.
      */
     private static SandboxResult buildSandboxResult(int exitCode) throws IOException {
         Map<String, byte[]> outputFiles = new LinkedHashMap<>();
-        Path outputDir = WORKSPACE.resolve(".output");
+        Path outputDir = WORKSPACE.resolve("out");
         if (Files.isDirectory(outputDir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(outputDir)) {
                 for (Path entry : stream) {

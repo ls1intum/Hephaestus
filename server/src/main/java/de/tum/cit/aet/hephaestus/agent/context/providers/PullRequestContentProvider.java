@@ -30,7 +30,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises the PR-review workspace context under {@code context/target/}:
+ * Materialises the PR-review workspace context under {@code inputs/context/}:
  * <ul>
  *   <li>{@code metadata.json} — PR metadata, enriched from DB, plus commit log</li>
  *   <li>{@code comments.json} — review comments (most recent 500)</li>

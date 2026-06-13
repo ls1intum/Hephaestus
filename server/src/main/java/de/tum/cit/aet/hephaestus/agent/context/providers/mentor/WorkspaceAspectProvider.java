@@ -34,7 +34,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code context/target/workspace.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/workspace.json} for {@link MentorChatRequest}.
  *
  * <p>Port of {@code session.tool.ts} (recent threads + first message preview) plus
  * {@code assigned-work.tool.ts} (open assigned issues + pending review requests with

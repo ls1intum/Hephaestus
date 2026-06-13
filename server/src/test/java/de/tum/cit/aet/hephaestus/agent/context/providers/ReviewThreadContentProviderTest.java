@@ -30,7 +30,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 class ReviewThreadContentProviderTest extends BaseUnitTest {
 
-    private static final String FILE_KEY = "context/target/review_threads.json";
+    private static final String FILE_KEY = "inputs/context/review_threads.json";
     private static final Long PR_ID = 456L;
 
     private final ObjectMapper objectMapper = new ObjectMapper();

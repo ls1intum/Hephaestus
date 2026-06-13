@@ -66,7 +66,7 @@ class WorkspaceAspectProviderTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
-        byte[] bytes = files.get("context/target/workspace.json");
+        byte[] bytes = files.get("inputs/context/workspace.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
