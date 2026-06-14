@@ -25,5 +25,6 @@ New ADRs use the next available number and link from this index.
 | [0015](0015-unified-integration-framework.md) | Unified integration framework — single SPI for SCM/messaging vendors | Accepted (amended 2026-05-27 for Phase 1-4 restructure) |
 | [0016](0016-unified-identity-keycloak-as-truth.md) | Unified identity — Keycloak `sub` as the authoritative join key | Accepted |
 | [0020](0020-context-fabric-everything-is-an-integration.md) | Context Fabric: everything is an integration | Proposed |
+| [0021](0021-findings-feedback-synthesis-seam.md) | Findings vs feedback — detection produces evidence and in-context feedback; cross-channel synthesis is separate | Proposed |
 
 Template: [0000-template.md](0000-template.md).
