@@ -90,10 +90,13 @@ public class GitDiffOperations {
 
             ObjectId branchBase = repo.resolve("refs/remotes/origin/" + targetBranch);
             ObjectId branchHead = repo.resolve("refs/remotes/origin/" + sourceBranch);
-            if (branchBase != null && branchHead != null) {
-                if (branchHead.equals(head)) {
-                    return new String[] { branchBase.getName(), branchHead.getName() };
-                }
+            // Do NOT short-circuit to [targetBranchTip, head] when the source ref matches head: that is a
+            // 2-dot range (git diff target..head) which, once the target branch has advanced past the
+            // fork point, surfaces files the target changed as phantom diffs — the contributor never
+            // touched them (live Obsphera E2E: a Gemfile change from develop appeared in a PR whose only
+            // real change was one Swift file). Always fall through to the merge-base so the range is 3-dot
+            // (git diff target...head = only what THIS branch added since it diverged).
+            if (branchBase != null && branchHead != null && !branchHead.equals(head)) {
                 log.warn(
                     "Stale branch ref: branch=origin/{}, expected={}, actual={}",
                     sourceBranch,

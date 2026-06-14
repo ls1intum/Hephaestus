@@ -144,6 +144,25 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
     }
 
     @Test
+    void resolveDiffRangeUsesMergeBaseWhenTargetAdvancedPastForkPoint() throws GitAPIException, IOException {
+        // The bug (live Obsphera E2E): feature diverged at baseSha; then the TARGET branch advanced with
+        // its own change. A 2-dot range [origin/main tip, head] would surface main's later change as a
+        // phantom diff the contributor never made. The range base MUST be the merge-base (baseSha), so the
+        // diff is exactly what THIS branch added (3-dot), never what the target branch changed afterwards.
+        git.checkout().setName("main").call();
+        write("target-only.txt", "added on the target branch after the fork\n");
+        String advancedMain = commit("target advances past the fork point");
+        git.checkout().setName("feature").call();
+
+        String[] range = ops.resolveDiffRange(repoDir, "main", "feature", headSha);
+
+        assertThat(range).isNotNull().containsExactly(baseSha, headSha);
+        assertThat(range[0]).as("base must be the merge-base, not the advanced target tip").isNotEqualTo(advancedMain);
+        // And the resulting diff must NOT contain the target-only file.
+        assertThat(ops.diffNameOnly(repoDir, range[0], range[1])).doesNotContain("target-only.txt").contains("a.txt");
+    }
+
+    @Test
     void resolveDiffRangeStrategyTwoMergeCommit() throws GitAPIException, IOException {
         // Diverge main with a commit, then merge feature into main (no-ff) so a real merge commit
         // exists. Use an unresolvable source-branch name in the call so Strategy 1 is skipped and
