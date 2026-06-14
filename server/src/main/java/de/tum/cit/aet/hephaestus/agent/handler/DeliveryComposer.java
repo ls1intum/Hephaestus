@@ -391,7 +391,8 @@ class DeliveryComposer {
         Map.entry("engaging-with-inline-review-comments", "engaging with the review feedback"),
         Map.entry("issue-states-an-actionable-problem", "stating the problem clearly"),
         Map.entry("issue-scoped-to-single-concern", "keeping the issue scoped to one concern"),
-        Map.entry("issue-has-checkable-outcome", "defining a clear, checkable outcome")
+        Map.entry("issue-has-checkable-outcome", "defining a clear, checkable outcome"),
+        Map.entry("triages-the-issue-with-labels-and-ownership", "triaging the issue with a clear type label")
     );
 
     /**
@@ -404,9 +405,12 @@ class DeliveryComposer {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
+        // Curated gerund phrases ONLY — a non-curated slug humanised to raw text ("triages the issue …")
+        // breaks the "Nice work keeping X and [Ying]" grammar, so an un-phrased strength is simply not
+        // named in the opener rather than dumped verbatim (Obsphera E2E: ungrammatical concatenation).
         List<String> phrases = positives
             .stream()
-            .map(f -> STRENGTH_PHRASES.getOrDefault(f.practiceSlug(), humanisePracticeSlug(f.practiceSlug())))
+            .map(f -> STRENGTH_PHRASES.get(f.practiceSlug()))
             .filter(p -> p != null && !p.isBlank())
             .distinct()
             .limit(2)
@@ -491,7 +495,30 @@ class DeliveryComposer {
             "\\bemit(?:ted|s|ting)?\\s+NOT[_ ]APPLICABLE\\b|" +
             "\\bsuppress(?:ed|es|ing)\\s+its\\b|" +
             "\\b(?:team-wide\\s+)?standing\\s+nudge\\b|" +
-            "\\bper-MR\\s+blocker\\b" +
+            "\\bper-MR\\s+blocker\\b|" +
+            // Live Obsphera E2E eval (deepseek-v4-flash): the model echoes the criteria's classifier flowchart
+            // into student-facing reasoning — band maths, gate predicates, catalogue names, and pipeline
+            // plumbing. Each lesson survives in the title + guidance without any of this, so drop the sentence.
+            "→\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // unicode-arrow band routing
+            "\\bPer\\s+the\\s+(?:fixed\\s+)?(?:bucketing|criteria|severity\\s+rules?)\\b|" +
+            "\\bunder\\s+the\\s+criteria\\b|" +
+            "\\b(?:largeness|coherence|spread|epic|significance)\\s+gate\\b|" +
+            "\\bsignal\\s+i{1,3}\\b|" + // "signal ii — >=3 distinct parts"
+            "\\bsignificance\\s+catalogue\\b|\\bcatalogue\\s+entry\\b|" +
+            "\\bsub-check\\b|" +
+            "\\bnon-epic\\s+body\\b|" +
+            "\\bcombined\\s+severity\\b|\\bmost\\s+severe\\s+sub-result\\b|" +
+            "\\bcarve-out\\b|" +
+            "\\bthreshold\\s+for\\s+downgrade\\b|\\b\\d+%\\s+threshold\\b|" +
+            "\\bis\\s+(?:MINOR|MAJOR|INFO|CRITICAL),?\\s+not\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "is MINOR, not MAJOR"
+            "\\brollup\\b|" +
+            // Pipeline plumbing: internal context/precompute filenames + input-reconciliation narration.
+            "\\bdiff_stat\\.txt\\b|\\bdiff_summary\\.md\\b|\\bmetadata\\.(?:body|json)\\b|" +
+            "\\bso\\s+the\\s+diff\\s+is\\s+trusted\\b|\\bmaterial\\s+disagreement\\b|" +
+            "\\bafter\\s+scanning\\b|" +
+            // Raw snake_case API field tokens reaching prose, e.g. "sub_issues_total is null".
+            "\\b[a-z]+(?:_[a-z]+)+\\s+(?:is|are)\\s+(?:null|present|set|empty)\\b|" +
+            "\\bsub_issues_total\\b" +
             ")"
     );
 
@@ -786,7 +813,11 @@ class DeliveryComposer {
         // For CRITICAL/MAJOR: "You wrote:" → reasoning → "Instead:" with fix
         if (f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR) {
             String snippet = extractPrimarySnippet(f);
-            if (snippet != null) {
+            // A "You wrote:" quote is meant to echo the STUDENT's artifact. When the agent instead drops its
+            // own pipeline plumbing / rubric mechanics into the evidence field ("diff_stat.txt lists 28 …
+            // material disagreement; trusting the diff"), the verbatim quote would leak it past the
+            // reasoning sanitizer — so suppress the quote entirely when it carries grader mechanics.
+            if (snippet != null && !containsGraderMechanics(snippet)) {
                 boolean hasCodeLocation = location != null && !isInternalPath(location);
                 if (hasCodeLocation) {
                     // Real code reference → fenced code block.
@@ -809,6 +840,11 @@ class DeliveryComposer {
             appendStudentText(sb, f.reasoning());
             appendStudentText(sb, f.guidance());
         }
+    }
+
+    /** True when {@code text} carries any internal grading-mechanics / pipeline-plumbing token. */
+    private static boolean containsGraderMechanics(@Nullable String text) {
+        return text != null && GRADING_SENTENCE.matcher(text).find();
     }
 
     /** Appends sanitised student-facing text (reasoning/guidance) if non-blank after the scrub. */
@@ -959,12 +995,12 @@ class DeliveryComposer {
         for (ValidatedFinding f : negatives) {
             if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
 
-            // Prefer agent-supplied suggestedDiffNotes
+            // Prefer the agent's suggestedDiffNotes — but at most ONE per finding (its primary anchor). A
+            // single lesson split across several near-identical inline notes (Obsphera E2E: the "add a test"
+            // lesson posted on two separate files) reads as nagging; the summary already lists the finding
+            // once, so one inline note carries the detail without the pile-on.
             if (!f.suggestedDiffNotes().isEmpty()) {
-                for (DiffNote note : f.suggestedDiffNotes()) {
-                    if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
-                    notes.add(note);
-                }
+                notes.add(f.suggestedDiffNotes().get(0));
                 continue;
             }
 

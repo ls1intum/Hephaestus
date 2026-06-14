@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -1216,5 +1217,94 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(asStrength).isNotNull();
         assertThat(asStrength.diffNotes()).as("DESIRABLE+OBSERVED is a strength → no problem diff note").isEmpty();
+    }
+
+    @Test
+    void stripsGraderMechanicsLeakFromStudentNote() {
+        // Live Obsphera E2E eval: the model echoes the criteria's classifier flowchart into student-facing
+        // reasoning. Each rubric sentence must be dropped while the title + guidance keep the lesson. This
+        // locks the leak-guard so a regression can never ship band maths / gate predicates / pipeline plumbing.
+        String leakyReasoning = String.join(
+            " ",
+            "The 28-file spread means a reviewer cannot review this as a single coherent change.",
+            "Per the fixed bucketing: >20 files → MAJOR, nowhere near the 70% threshold for downgrade.",
+            "This triggers the largeness gate (signal ii — >=3 distinct parts in prose), so this is a non-epic body.",
+            "Combined severity is MAJOR (the most severe sub-result).",
+            "This matches the significance catalogue entry 'AUTH / SECURITY MECHANISM'.",
+            "But diff_stat.txt lists 28 files and diff_summary.md shows 28 changed files — a material disagreement, so the diff is trusted.",
+            "After scanning metadata.body, no sub_issues_total rollup is present (sub_issues_total is null)."
+        );
+        ValidatedFinding leaky = negativeFinding(
+            "scope-one-reviewable-change",
+            "28 files spread degrades review effectiveness",
+            Severity.MAJOR,
+            List.of(new LocationSpec("Views/Foo.swift", 10)),
+            List.of("x"),
+            leakyReasoning,
+            "Split this MR into two stacked changes so each is reviewable on its own."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(leaky), WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        // The full student-facing surface = the MR summary + every inline diff note (inline-first puts the
+        // detail on the note). Scrub-and-substance must hold across both.
+        String note =
+            result.mrNote() + "\n" + result.diffNotes().stream().map(DiffNote::body).collect(Collectors.joining("\n"));
+        // Lesson (title + guidance + the one clean fact) survives.
+        assertThat(note).contains("28 files spread degrades review effectiveness");
+        assertThat(note).contains("Split this MR into two stacked changes");
+        assertThat(note).contains("reviewer cannot review this as a single coherent change");
+        // Every rubric-mechanics / pipeline-plumbing token is scrubbed.
+        for (String leak : new String[] {
+            "Per the fixed bucketing",
+            "→ MAJOR",
+            "70% threshold",
+            "largeness gate",
+            "signal ii",
+            "non-epic body",
+            "Combined severity",
+            "most severe sub-result",
+            "significance catalogue",
+            "diff_stat.txt",
+            "diff_summary.md",
+            "material disagreement",
+            "so the diff is trusted",
+            "After scanning",
+            "metadata.body",
+            "sub_issues_total",
+            "rollup",
+        }) {
+            assertThat(note).as("leak token must be scrubbed: %s", leak).doesNotContain(leak);
+        }
+    }
+
+    @Test
+    void suppressesYouWroteQuoteWhenEvidenceCarriesGraderMechanics() {
+        // Live Obsphera E2E: the agent dropped its own plumbing into the evidence snippet, which the
+        // "You wrote:" quote rendered verbatim past the reasoning sanitizer. A real student quote never
+        // contains pipeline tokens, so the whole quote is suppressed when it does.
+        ValidatedFinding f = negativeFinding(
+            "mr-description-quality",
+            "PR body lacks a quotable WHY",
+            Severity.MAJOR,
+            List.of(), // no code location → metadata "You wrote: “…”" path
+            List.of(
+                "diff_stat.txt lists 28 changed files — metadata.changed_files=14 is stale (material disagreement); trusting the diff"
+            ),
+            "The body enumerates what changed but never states why.",
+            "Add a '## Why' section naming the user problem this solves."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST);
+
+        assertThat(result).isNotNull();
+        String note = result.mrNote();
+        assertThat(note).doesNotContain("You wrote:");
+        assertThat(note).doesNotContain("diff_stat.txt");
+        assertThat(note).doesNotContain("material disagreement");
+        // The actual lesson still lands.
+        assertThat(note).contains("PR body lacks a quotable WHY");
+        assertThat(note).contains("Add a '## Why' section");
     }
 }
