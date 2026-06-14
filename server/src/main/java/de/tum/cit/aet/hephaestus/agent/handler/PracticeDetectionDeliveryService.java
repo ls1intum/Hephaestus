@@ -152,7 +152,6 @@ public class PracticeDetectionDeliveryService {
                 targetType.name(),
                 targetId,
                 subjectUserId != null ? subjectUserId : contributorId,
-                finding.title(),
                 firstLocationPath(finding.evidence())
             );
 

@@ -23,14 +23,19 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code subjectUserId} falling back to {@code contributorId} — the person the finding is
  *       <em>about</em>. For author-side practices this is the contributor; for reviewer-side practices
  *       the subject differs, and two reviewers on one PR must not collapse to one key.</li>
- *   <li>a <em>content anchor</em> = the finding {@code title} plus the file {@code path} of its first
- *       evidence location. The path locates the problem stably; the title disambiguates two findings of
- *       the same practice on the same file.</li>
+ *   <li>a <em>locus anchor</em> = the file {@code path} of the finding's first evidence location (empty
+ *       when the practice has no file location). The path stably locates the concern within the artifact.</li>
  * </ul>
  *
  * <p><strong>Deliberately excluded</strong> from the digest, because they are not stable across runs:
- * the agent job id (a new id every run), and any line number / column / range (edits shift lines; the
- * same logical problem must keep its key when surrounding code moves). Only the evidence <em>path</em>
+ * the agent job id (a new id every run); any line number / column / range (edits shift lines); and —
+ * critically — the finding <em>title</em>. A live two-run E2E proved the title makes identity inert: the
+ * LLM re-words the same underlying concern every run ("DoD ticks 'All tests pass' with zero tests" vs
+ * "'All tests pass' ticked but no tests exist"), so a title-anchored key never correlated across runs
+ * (0/26 shared). Identity is therefore at the <em>(practice, artifact, subject, file)</em> locus grain —
+ * the right grain for the research question "did the practice-concern at this locus persist or resolve?",
+ * not "did this exact prose recur". Two distinct findings of one practice in one file collapse to one
+ * locus; that is intentional (they are the same practice concern there). Only the evidence <em>path</em>
  * participates — callers MUST pass the path of the first location and MUST NOT fold in a line.
  *
  * <p>Output is the lowercase SHA-256 hex digest: 64 chars, matching {@code practice_finding
@@ -52,10 +57,10 @@ public final class CorrelationKey {
      * @param aboutUserId the user the finding is ABOUT — the subject for reviewer-side practices, else the
      *     contributor; the caller resolves the {@code subjectUserId ?? contributorId} coalesce so the same
      *     underlying problem keeps one identity regardless of which of the two ids carries it
-     * @param title the finding title — half of the content anchor (required)
      * @param firstLocationPath the file path of the finding's first evidence location, or {@code null}
      *     when the practice has no file location (e.g. PR-description quality). PASS THE PATH ONLY —
-     *     never a line number.
+     *     never a line number. Normalised (locale-fixed lower-case + trim) so trivial path casing/spacing
+     *     does not split identity.
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
     public static String compute(
@@ -63,16 +68,11 @@ public final class CorrelationKey {
         String targetType,
         long targetId,
         long aboutUserId,
-        String title,
         @Nullable String firstLocationPath
     ) {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
         Objects.requireNonNull(targetType, "targetType");
-        Objects.requireNonNull(title, "title");
 
-        // Title is normalised (locale-fixed lower-case + collapsed whitespace) so trivial rewording or
-        // re-spacing of the same finding keeps one identity; slug/type/path stay verbatim (they are
-        // machine values, not prose).
         String canonical = new StringBuilder()
             .append(practiceSlug)
             .append(SEP)
@@ -82,15 +82,13 @@ public final class CorrelationKey {
             .append(SEP)
             .append(aboutUserId)
             .append(SEP)
-            .append(normalizeAnchorText(title))
-            .append(SEP)
-            .append(firstLocationPath == null ? "" : firstLocationPath)
+            .append(firstLocationPath == null ? "" : normalizeAnchorText(firstLocationPath))
             .toString();
 
         return sha256Hex(canonical);
     }
 
-    /** Locale-fixed (Locale.ROOT — LocaleSafetyArchTest) lower-case + whitespace collapse for the anchor title. */
+    /** Locale-fixed (Locale.ROOT — LocaleSafetyArchTest) lower-case + whitespace collapse for the anchor. */
     private static String normalizeAnchorText(String text) {
         return text.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
