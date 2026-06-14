@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -127,6 +128,10 @@ class DefaultPracticeCatalogSeeder {
             preambleKey = focus.name();
         }
         String slug = practiceNode.path("slug").asString();
+        // Optional: a practice may declare itself an anti-pattern ("UNDESIRABLE") or context-dependent
+        // ("MIXED"); absent → null → the entity default DESIRABLE (every catalogued practice today).
+        String polarityText = text(practiceNode, "polarity");
+        Polarity polarity = polarityText == null ? null : Polarity.valueOf(polarityText);
         return new CreatePracticeRequestDTO(
             slug,
             practiceNode.path("name").asString(),
@@ -134,7 +139,8 @@ class DefaultPracticeCatalogSeeder {
             triggerEvents,
             composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
             loadPrecomputeScript(slug),
-            focus
+            focus,
+            polarity
         );
     }
 

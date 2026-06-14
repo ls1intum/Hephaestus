@@ -67,6 +67,9 @@ public class PracticeService {
         if (request.focusArtifact() != null) {
             practice.setFocusArtifact(request.focusArtifact());
         }
+        if (request.polarity() != null) {
+            practice.setPolarity(request.polarity());
+        }
         validateTriggerEventsForFocus(practice);
 
         try {
@@ -134,6 +137,10 @@ public class PracticeService {
         }
         if (request.focusArtifact() != null) {
             practice.setFocusArtifact(request.focusArtifact());
+            changed = true;
+        }
+        if (request.polarity() != null) {
+            practice.setPolarity(request.polarity());
             changed = true;
         }
 

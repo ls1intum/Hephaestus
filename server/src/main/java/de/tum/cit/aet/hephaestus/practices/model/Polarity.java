@@ -26,5 +26,29 @@ public enum Polarity {
     /** An anti-pattern stated as the bad behaviour: {@code OBSERVED} is the problem, {@code NOT_OBSERVED} is clean. */
     UNDESIRABLE,
     /** Direction depends on context; per-finding severity carries it case by case. */
-    MIXED,
+    MIXED;
+
+    /**
+     * Whether a {@code verdict} under this polarity is a <em>problem</em> the contributor should act on.
+     * This is the single source of truth for the "is this a problem?" decision so a sign-neutral verdict
+     * can mean a problem for one practice and a strength for another (ADR 0021, F-6):
+     *
+     * <ul>
+     *   <li>{@code DESIRABLE}/{@code MIXED}: {@code NOT_OBSERVED} (missed the good habit) is the problem.</li>
+     *   <li>{@code UNDESIRABLE}: {@code OBSERVED} (did the bad thing) is the problem.</li>
+     * </ul>
+     *
+     * {@code NOT_APPLICABLE} is never a problem (the practice did not apply).
+     */
+    public boolean isProblem(Verdict verdict) {
+        return this == UNDESIRABLE ? verdict == Verdict.OBSERVED : verdict == Verdict.NOT_OBSERVED;
+    }
+
+    /**
+     * Whether a {@code verdict} under this polarity is a <em>strength</em> worth acknowledging — the exact
+     * inverse of {@link #isProblem(Verdict)} over the present verdicts ({@code NOT_APPLICABLE} is neither).
+     */
+    public boolean isStrength(Verdict verdict) {
+        return this == UNDESIRABLE ? verdict == Verdict.NOT_OBSERVED : verdict == Verdict.OBSERVED;
+    }
 }

@@ -4513,6 +4513,15 @@ components:
           example: PR Description Quality
           maxLength: 128
           minLength: 3
+        polarity:
+          type: string
+          description: "Whether the practice is a desirable habit, an anti-pattern,\
+            \ or context-dependent. Defaults to DESIRABLE when omitted."
+          enum:
+          - DESIRABLE
+          - UNDESIRABLE
+          - MIXED
+          example: DESIRABLE
         precomputeScript:
           type: string
           description: TypeScript/Bun precompute script for static analysis before
@@ -5271,6 +5280,14 @@ components:
         name:
           type: string
           description: Human-readable name
+        polarity:
+          type: string
+          description: "Whether the practice is a desirable habit, an anti-pattern,\
+            \ or context-dependent"
+          enum:
+          - DESIRABLE
+          - UNDESIRABLE
+          - MIXED
         precomputeScript:
           type: string
           description: TypeScript/Bun precompute script for static analysis before
@@ -5294,6 +5311,7 @@ components:
       - focusArtifact
       - id
       - name
+      - polarity
       - slug
       - triggerEvents
       - updatedAt
@@ -6257,6 +6275,15 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
+        polarity:
+          type: string
+          description: "Whether the practice is a desirable habit, an anti-pattern,\
+            \ or context-dependent"
+          enum:
+          - DESIRABLE
+          - UNDESIRABLE
+          - MIXED
+          example: UNDESIRABLE
         precomputeScript:
           type: string
           description: TypeScript/Bun precompute script for static analysis before

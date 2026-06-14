@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,6 +24,9 @@ public record PracticeDTO(
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
     @NonNull @Schema(description = "Artifact this practice evaluates") WorkArtifact focusArtifact,
+    @NonNull
+    @Schema(description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent")
+    Polarity polarity,
     @Nullable @Schema(description = "Slug of the practice goal this practice is bound to, if any") String goalSlug,
     @NonNull @Schema(description = "Whether this practice is actively being detected") Boolean active,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
@@ -38,6 +42,7 @@ public record PracticeDTO(
             practice.getCriteria(),
             practice.getPrecomputeScript(),
             practice.getFocusArtifact(),
+            practice.getPolarity(),
             practice.getGoal() != null ? practice.getGoal().getSlug() : null,
             practice.isActive(),
             practice.getCreatedAt(),

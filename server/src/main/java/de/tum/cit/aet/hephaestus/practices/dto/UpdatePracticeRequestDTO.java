@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Pattern;
@@ -37,5 +38,12 @@ public record UpdatePracticeRequestDTO(
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
 
-    @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact focusArtifact
+    @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact focusArtifact,
+
+    @Schema(
+        description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent",
+        example = "UNDESIRABLE"
+    )
+    @Nullable
+    Polarity polarity
 ) {}

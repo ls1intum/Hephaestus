@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -56,5 +57,13 @@ public record CreatePracticeRequestDTO(
         example = "PULL_REQUEST"
     )
     @Nullable
-    WorkArtifact focusArtifact
+    WorkArtifact focusArtifact,
+
+    @Schema(
+        description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent." +
+            " Defaults to DESIRABLE when omitted.",
+        example = "DESIRABLE"
+    )
+    @Nullable
+    Polarity polarity
 ) {}

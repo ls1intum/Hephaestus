@@ -11,8 +11,8 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.REPO_MOUNT_RE
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -90,25 +90,54 @@ class DeliveryComposer {
         PRECOMPUTE_OUT_PREFIX
     );
 
+    /** A finding is a problem when its practice's polarity says so (slug absent → {@link Polarity#DESIRABLE}). */
+    private static boolean isProblem(ValidatedFinding f, Map<String, Polarity> polarityBySlug) {
+        return polarityBySlug.getOrDefault(f.practiceSlug(), Polarity.DESIRABLE).isProblem(f.verdict());
+    }
+
+    /** A finding is a strength when its practice's polarity says so (slug absent → {@link Polarity#DESIRABLE}). */
+    private static boolean isStrength(ValidatedFinding f, Map<String, Polarity> polarityBySlug) {
+        return polarityBySlug.getOrDefault(f.practiceSlug(), Polarity.DESIRABLE).isStrength(f.verdict());
+    }
+
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
-        return compose(findings, WorkArtifact.PULL_REQUEST);
+        return compose(findings, WorkArtifact.PULL_REQUEST, Map.of());
+    }
+
+    /**
+     * Compose for a specific artifact, treating every practice as {@link Polarity#DESIRABLE}. Retained for
+     * call sites and tests that do not resolve per-practice polarity.
+     */
+    @Nullable
+    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
+        return compose(findings, artifact, Map.of());
     }
 
     /**
      * Compose feedback for a specific artifact. The blocking call-to-action is artifact-aware: a PR
      * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged).
+     *
+     * <p>{@code polarityBySlug} supplies each practice's {@link Polarity} so "is this finding a problem
+     * vs a strength?" is decided sign-correctly (ADR 0021, F-6) instead of assuming every
+     * {@code NOT_OBSERVED} is a gap. A slug absent from the map defaults to {@link Polarity#DESIRABLE},
+     * which — because every catalogued practice is desirable today — keeps behaviour identical when no
+     * map is supplied.
      */
     @Nullable
-    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
+    static DeliveryContent compose(
+        List<ValidatedFinding> findings,
+        WorkArtifact artifact,
+        Map<String, Polarity> polarityBySlug
+    ) {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
 
         List<ValidatedFinding> negatives = findings
             .stream()
-            .filter(f -> f.verdict() == Verdict.NOT_OBSERVED)
+            .filter(f -> isProblem(f, polarityBySlug))
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
@@ -142,11 +171,11 @@ class DeliveryComposer {
             improvementOverflow = (int) (improvementTotal - MAX_IMPROVEMENT_SUGGESTIONS);
         }
 
-        // No negatives → an observation note over the OBSERVED findings (see composeNoIssuesNote).
+        // No problems → an observation note over the strength findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings
                 .stream()
-                .filter(f -> f.verdict() == Verdict.OBSERVED)
+                .filter(f -> isStrength(f, polarityBySlug))
                 .toList();
             if (observed.isEmpty()) {
                 // Every finding abstained (all NOT_APPLICABLE): the artifact could not be assessed against
@@ -172,11 +201,11 @@ class DeliveryComposer {
             }
         }
 
-        // OBSERVED findings the same job produced — surfaced as a brief strengths line before the
+        // Strength findings the same job produced — surfaced as a brief strengths line before the
         // critiques so the note acknowledges effort (task-level, not person-level praise).
         List<ValidatedFinding> positives = findings
             .stream()
-            .filter(f -> f.verdict() == Verdict.OBSERVED)
+            .filter(f -> isStrength(f, polarityBySlug))
             .toList();
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview

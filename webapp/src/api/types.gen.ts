@@ -563,6 +563,10 @@ export type UpdatePracticeRequest = {
      */
     name?: string;
     /**
+     * Whether the practice is a desirable habit, an anti-pattern, or context-dependent
+     */
+    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'MIXED';
+    /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
     precomputeScript?: string;
@@ -1366,6 +1370,10 @@ export type Practice = {
      */
     name: string;
     /**
+     * Whether the practice is a desirable habit, an anti-pattern, or context-dependent
+     */
+    polarity: 'DESIRABLE' | 'UNDESIRABLE' | 'MIXED';
+    /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
     precomputeScript?: string;
@@ -2001,6 +2009,10 @@ export type CreatePracticeRequest = {
      * Human-readable name
      */
     name: string;
+    /**
+     * Whether the practice is a desirable habit, an anti-pattern, or context-dependent. Defaults to DESIRABLE when omitted.
+     */
+    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'MIXED';
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */

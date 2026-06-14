@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -402,7 +403,15 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(scopedFindings);
+        Map<String, Polarity> polarityBySlug =
+            job.getWorkspace() == null
+                ? Map.of()
+                : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
+        PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
+            scopedFindings,
+            WorkArtifact.PULL_REQUEST,
+            polarityBySlug
+        );
         if (delivery != null) {
             log.info("Server-side delivery composed from {} findings: jobId={}", scopedFindings.size(), job.getId());
             if (!delivery.diffNotes().isEmpty()) {

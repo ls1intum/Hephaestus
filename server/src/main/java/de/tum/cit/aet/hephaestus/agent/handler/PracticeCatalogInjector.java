@@ -4,11 +4,13 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,19 @@ class PracticeCatalogInjector {
     PracticeCatalogInjector(JsonMapper objectMapper, PracticeRepository practiceRepository) {
         this.objectMapper = objectMapper;
         this.practiceRepository = practiceRepository;
+    }
+
+    /**
+     * Resolve {@code slug -> }{@link Polarity} for the {@code focus}-scoped active practices of a workspace,
+     * so the delivery layer can decide "is this finding a problem?" sign-correctly per practice (ADR 0021,
+     * F-6) instead of assuming every {@code NOT_OBSERVED} is a gap. A slug absent from the map is treated
+     * as {@link Polarity#DESIRABLE} by callers.
+     */
+    Map<String, Polarity> polarityBySlug(Long workspaceId, WorkArtifact focus) {
+        return practiceRepository
+            .findByWorkspaceIdAndActiveTrueAndFocusArtifact(workspaceId, focus)
+            .stream()
+            .collect(Collectors.toMap(Practice::getSlug, Practice::getPolarity, (a, b) -> a));
     }
 
     /**

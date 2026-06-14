@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -1182,5 +1184,37 @@ class DeliveryComposerTest extends BaseUnitTest {
         // High-confidence INFO still collapses — proportionality favours the more-severe lesson.
         assertThat(mrNote).doesNotContain("Info one");
         assertThat(mrNote).doesNotContain("Info two");
+    }
+
+    @Test
+    void undesirablePracticeObservedVerdictIsTreatedAsAProblem() {
+        // An anti-pattern practice (polarity UNDESIRABLE) whose bad behaviour was OBSERVED is a problem,
+        // not a strength (ADR 0021, F-6). The same finding under the default DESIRABLE reading is a
+        // strength and surfaces no diff note — proving the partition consults polarity, not raw verdict.
+        ValidatedFinding observed = new ValidatedFinding(
+            "uses-force-unwrap",
+            "Force-unwrap present in changed code",
+            Verdict.OBSERVED,
+            Severity.MAJOR,
+            0.92f,
+            buildEvidence(List.of(new LocationSpec("Views/StockView.swift", 42)), List.of("let u = URL(s)!")),
+            "Force-unwrapping crashes on nil.",
+            "Use guard-let instead.",
+            List.of()
+        );
+
+        DeliveryContent asProblem = DeliveryComposer.compose(
+            List.of(observed),
+            WorkArtifact.PULL_REQUEST,
+            Map.of("uses-force-unwrap", Polarity.UNDESIRABLE)
+        );
+        DeliveryContent asStrength = DeliveryComposer.compose(List.of(observed), WorkArtifact.PULL_REQUEST, Map.of());
+
+        assertThat(asProblem).isNotNull();
+        assertThat(asProblem.diffNotes()).as("UNDESIRABLE+OBSERVED is a problem → inline diff note").isNotEmpty();
+        assertThat(asProblem.mrNote()).contains("Force-unwrap present in changed code");
+
+        assertThat(asStrength).isNotNull();
+        assertThat(asStrength.diffNotes()).as("DESIRABLE+OBSERVED is a strength → no problem diff note").isEmpty();
     }
 }
