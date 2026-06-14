@@ -54,8 +54,8 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         void buildsSinglePracticeJson() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("pr-description-quality", Verdict.NEGATIVE, 3, Instant.parse("2026-03-20T14:30:00Z")),
-                    summary("pr-description-quality", Verdict.POSITIVE, 1, Instant.parse("2026-03-18T10:00:00Z"))
+                    summary("pr-description-quality", Verdict.NOT_OBSERVED, 3, Instant.parse("2026-03-20T14:30:00Z")),
+                    summary("pr-description-quality", Verdict.OBSERVED, 1, Instant.parse("2026-03-18T10:00:00Z"))
                 )
             );
 
@@ -76,10 +76,10 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         void aggregatesMultiplePractices() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("error-handling", Verdict.NEGATIVE, 2, Instant.parse("2026-03-18T10:15:00Z")),
-                    summary("error-handling", Verdict.NEGATIVE, 1, Instant.parse("2026-03-19T12:00:00Z")),
-                    summary("pr-description-quality", Verdict.POSITIVE, 5, Instant.parse("2026-03-20T14:30:00Z")),
-                    summary("pr-description-quality", Verdict.NEGATIVE, 1, Instant.parse("2026-03-15T08:00:00Z"))
+                    summary("error-handling", Verdict.NOT_OBSERVED, 2, Instant.parse("2026-03-18T10:15:00Z")),
+                    summary("error-handling", Verdict.NOT_OBSERVED, 1, Instant.parse("2026-03-19T12:00:00Z")),
+                    summary("pr-description-quality", Verdict.OBSERVED, 5, Instant.parse("2026-03-20T14:30:00Z")),
+                    summary("pr-description-quality", Verdict.NOT_OBSERVED, 1, Instant.parse("2026-03-15T08:00:00Z"))
                 )
             );
 
@@ -106,7 +106,7 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             // Create 25 practices (exceeds MAX_PRACTICES=20)
             for (int i = 0; i < 25; i++) {
                 String slug = String.format("practice-%02d", i);
-                summaries.add(summary(slug, Verdict.NEGATIVE, i, Instant.parse("2026-03-20T10:00:00Z")));
+                summaries.add(summary(slug, Verdict.NOT_OBSERVED, i, Instant.parse("2026-03-20T10:00:00Z")));
             }
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 summaries
@@ -129,8 +129,8 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         void alphabeticalTiebreaker() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("zebra-practice", Verdict.NEGATIVE, 2, Instant.parse("2026-03-20T10:00:00Z")),
-                    summary("alpha-practice", Verdict.NEGATIVE, 2, Instant.parse("2026-03-20T10:00:00Z"))
+                    summary("zebra-practice", Verdict.NOT_OBSERVED, 2, Instant.parse("2026-03-20T10:00:00Z")),
+                    summary("alpha-practice", Verdict.NOT_OBSERVED, 2, Instant.parse("2026-03-20T10:00:00Z"))
                 )
             );
 
@@ -145,8 +145,8 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
         void lastSeenReflectsMaxAcrossVerdicts() throws Exception {
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("commit-quality", Verdict.POSITIVE, 1, Instant.parse("2026-03-15T10:00:00Z")),
-                    summary("commit-quality", Verdict.NEGATIVE, 1, Instant.parse("2026-03-20T14:00:00Z"))
+                    summary("commit-quality", Verdict.OBSERVED, 1, Instant.parse("2026-03-15T10:00:00Z")),
+                    summary("commit-quality", Verdict.NOT_OBSERVED, 1, Instant.parse("2026-03-20T14:00:00Z"))
                 )
             );
 
@@ -172,7 +172,7 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             );
 
             when(practiceFindingRepository.findContributorPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
-                List.of(summary("test-practice", Verdict.NEGATIVE, 1, Instant.parse("2026-03-20T10:00:00Z")))
+                List.of(summary("test-practice", Verdict.NOT_OBSERVED, 1, Instant.parse("2026-03-20T10:00:00Z")))
             );
 
             Optional<byte[]> result = brokenProvider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID);

@@ -370,7 +370,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!secretFindings.isEmpty()) {
             scopedFindings.addAll(secretFindings);
             log.warn(
-                "Secret pre-pass injected {} hardcoded-secrets NEGATIVE finding(s); blocking any all-clear comment: jobId={}",
+                "Secret pre-pass injected {} hardcoded-secrets NOT_OBSERVED finding(s); blocking any all-clear comment: jobId={}",
                 secretFindings.size(),
                 job.getId()
             );
@@ -446,7 +446,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         Set<String> llmQuoted = new HashSet<>();
         for (var f : existing) {
             if (
-                !"hardcoded-secrets".equals(f.practiceSlug()) || f.verdict() != Verdict.NEGATIVE || f.evidence() == null
+                !"hardcoded-secrets".equals(f.practiceSlug()) ||
+                f.verdict() != Verdict.NOT_OBSERVED ||
+                f.evidence() == null
             ) {
                 continue;
             }
@@ -501,7 +503,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new PracticeDetectionResultParser.ValidatedFinding(
             "hardcoded-secrets",
             "Hardcoded secret on a changed line",
-            Verdict.NEGATIVE,
+            Verdict.NOT_OBSERVED,
             severity,
             1.0f,
             evidence,

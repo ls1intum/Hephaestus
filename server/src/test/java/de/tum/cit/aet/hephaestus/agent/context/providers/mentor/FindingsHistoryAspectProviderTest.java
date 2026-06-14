@@ -102,8 +102,8 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of());
-        VerdictCount positive = mockVerdictCount(Verdict.POSITIVE, 3L);
-        VerdictCount negative = mockVerdictCount(Verdict.NEGATIVE, 1L);
+        VerdictCount positive = mockVerdictCount(Verdict.OBSERVED, 3L);
+        VerdictCount negative = mockVerdictCount(Verdict.NOT_OBSERVED, 1L);
         when(findingRepository.countByVerdictForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(
             List.of(positive, negative)
         );
@@ -119,8 +119,8 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/findings_history.json"));
-        assertThat(root.get("summary").get("byVerdict").get("POSITIVE").asLong()).isEqualTo(3L);
-        assertThat(root.get("summary").get("byVerdict").get("NEGATIVE").asLong()).isEqualTo(1L);
+        assertThat(root.get("summary").get("byVerdict").get("OBSERVED").asLong()).isEqualTo(3L);
+        assertThat(root.get("summary").get("byVerdict").get("NOT_OBSERVED").asLong()).isEqualTo(1L);
         assertThat(root.get("summary").get("byVerdict").get("NOT_APPLICABLE").asLong()).isEqualTo(0L);
         assertThat(root.get("summary").get("bySeverity").get("MAJOR").asLong()).isEqualTo(2L);
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(4L);

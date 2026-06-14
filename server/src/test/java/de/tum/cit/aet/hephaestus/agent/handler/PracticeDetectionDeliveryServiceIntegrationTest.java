@@ -208,8 +208,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void validFindingsPersistedToDb() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.POSITIVE),
-                finding("error-handling", Verdict.NEGATIVE)
+                finding("pr-description-quality", Verdict.OBSERVED),
+                finding("error-handling", Verdict.NOT_OBSERVED)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -222,7 +222,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.NEGATIVE);
+                .containsExactlyInAnyOrder(Verdict.OBSERVED, Verdict.NOT_OBSERVED);
             assertThat(persisted)
                 .extracting(PracticeFinding::getConfidence)
                 .allMatch(c -> c == 0.9f);
@@ -231,7 +231,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("re-delivering same job creates no duplicates")
         void idempotentRedelivery() {
-            var findings = List.of(finding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(finding("pr-description-quality", Verdict.OBSERVED));
 
             var first = deliveryService.deliver(agentJob, findings);
             var second = deliveryService.deliver(agentJob, findings);
@@ -249,8 +249,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void unknownSlugsSkipped() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.POSITIVE),
-                finding("nonexistent-practice", Verdict.POSITIVE)
+                finding("pr-description-quality", Verdict.OBSERVED),
+                finding("nonexistent-practice", Verdict.OBSERVED)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -275,7 +275,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                     new ValidatedFinding(
                         "pr-description-quality",
                         "Negative finding " + i,
-                        Verdict.NEGATIVE,
+                        Verdict.NOT_OBSERVED,
                         Severity.MINOR,
                         0.8f,
                         null,
@@ -299,7 +299,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         @Test
         void publishesEvent() {
-            var findings = List.of(finding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(finding("pr-description-quality", Verdict.OBSERVED));
 
             deliveryService.deliver(agentJob, findings);
 
@@ -341,8 +341,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void positiveVerdictsDoNotTriggerHasNegative() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.POSITIVE),
-                finding("error-handling", Verdict.POSITIVE)
+                finding("pr-description-quality", Verdict.OBSERVED),
+                finding("error-handling", Verdict.OBSERVED)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -354,7 +354,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.POSITIVE);
+                .containsExactlyInAnyOrder(Verdict.OBSERVED, Verdict.OBSERVED);
         }
     }
 
@@ -368,7 +368,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             agentJob.setMetadata(metadata);
             agentJob = agentJobRepository.save(agentJob);
 
-            var findings = List.of(finding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(finding("pr-description-quality", Verdict.OBSERVED));
 
             assertThatThrownBy(() -> deliveryService.deliver(agentJob, findings))
                 .isInstanceOf(JobDeliveryException.class)

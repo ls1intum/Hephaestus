@@ -36,7 +36,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "Test Title",
-                Verdict.NEGATIVE,
+                Verdict.NOT_OBSERVED,
                 Severity.MINOR,
                 0.9f,
                 evidence,
@@ -50,7 +50,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "Test Title",
-                Verdict.POSITIVE,
+                Verdict.OBSERVED,
                 Severity.INFO,
                 0.9f,
                 null,

@@ -232,14 +232,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 {
                   "practiceSlug": "pr-description-quality",
                   "title": "Good PR description",
-                  "verdict": "POSITIVE",
+                  "verdict": "OBSERVED",
                   "severity": "INFO",
                   "confidence": 0.95
                 },
                 {
                   "practiceSlug": "error-handling",
                   "title": "Missing null check",
-                  "verdict": "NEGATIVE",
+                  "verdict": "NOT_OBSERVED",
                   "severity": "MAJOR",
                   "confidence": 0.85,
                   "reasoning": "The method does not check for null input.",
@@ -269,7 +269,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             assertThat(findings).hasSize(2);
             assertThat(findings)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.NEGATIVE);
+                .containsExactlyInAnyOrder(Verdict.OBSERVED, Verdict.NOT_OBSERVED);
 
             // Verify completion event
             List<PracticeDetectionCompletedEvent> events = applicationEvents
@@ -300,14 +300,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "verdict": "POSITIVE",
+                      "verdict": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Proper error handling",
-                      "verdict": "POSITIVE",
+                      "verdict": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     }
@@ -352,21 +352,21 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "verdict": "POSITIVE",
+                      "verdict": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
                       "title": "Unknown practice",
-                      "verdict": "POSITIVE",
+                      "verdict": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Good handling",
-                      "verdict": "NEGATIVE",
+                      "verdict": "NOT_OBSERVED",
                       "severity": "MINOR",
                       "confidence": 0.8
                     }

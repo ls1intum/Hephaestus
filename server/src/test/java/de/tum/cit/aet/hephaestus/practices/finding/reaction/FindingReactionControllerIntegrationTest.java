@@ -96,7 +96,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .targetId(42L)
             .contributor(adminUser)
             .title("Missing error handling")
-            .verdict(Verdict.NEGATIVE)
+            .verdict(Verdict.NOT_OBSERVED)
             .severity(Severity.MAJOR)
             .confidence(0.85f)
             .detectedAt(Instant.now())

@@ -92,6 +92,17 @@ public class Practice {
     private WorkArtifact focusArtifact = WorkArtifact.PULL_REQUEST;
 
     /**
+     * Whether this practice describes a desirable habit, an anti-pattern, or a context-dependent
+     * pattern. Supplies the good/bad direction that {@link Verdict} omits, so {@code OBSERVED} can
+     * mean "strength" for one practice and "problem" for another (see ADR 0021, F-6). NOT NULL;
+     * defaults to {@code DESIRABLE} — every catalogued practice today is a desirable habit.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "polarity", nullable = false, length = 16)
+    @ColumnDefault("'DESIRABLE'")
+    private Polarity polarity = Polarity.DESIRABLE;
+
+    /**
      * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
      * many practices; a practice belongs to at most one goal): the single owning bucket keeps the
      * per-goal acted-on/total progress denominator unambiguous. Do not loosen to a join table without

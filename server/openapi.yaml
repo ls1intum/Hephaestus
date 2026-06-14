@@ -2316,8 +2316,8 @@ paths:
         schema:
           type: string
           enum:
-          - POSITIVE
-          - NEGATIVE
+          - OBSERVED
+          - NOT_OBSERVED
           - NOT_APPLICABLE
       - in: query
         name: page
@@ -4316,11 +4316,11 @@ components:
         negativeCount:
           type: integer
           format: int64
-          description: Number of NEGATIVE findings
+          description: Number of NOT_OBSERVED findings
         positiveCount:
           type: integer
           format: int64
-          description: Number of POSITIVE findings
+          description: Number of OBSERVED findings
         practiceName:
           type: string
           description: Practice name
@@ -5356,10 +5356,10 @@ components:
           description: Finding title
         verdict:
           type: string
-          description: "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE"
+          description: "Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
           enum:
-          - POSITIVE
-          - NEGATIVE
+          - OBSERVED
+          - NOT_OBSERVED
           - NOT_APPLICABLE
       required:
       - confidence
@@ -5420,10 +5420,10 @@ components:
           description: Finding title
         verdict:
           type: string
-          description: "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE"
+          description: "Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
           enum:
-          - POSITIVE
-          - NEGATIVE
+          - OBSERVED
+          - NOT_OBSERVED
           - NOT_APPLICABLE
       required:
       - confidence

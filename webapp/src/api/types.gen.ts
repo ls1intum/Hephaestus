@@ -1260,9 +1260,9 @@ export type PracticeFindingList = {
      */
     title: string;
     /**
-     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
+     * Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
      */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
+    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1324,9 +1324,9 @@ export type PracticeFindingDetail = {
      */
     title: string;
     /**
-     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
+     * Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
      */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
+    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -2135,11 +2135,11 @@ export type ContributorPracticeSummary = {
      */
     lastFindingAt?: Date;
     /**
-     * Number of NEGATIVE findings
+     * Number of NOT_OBSERVED findings
      */
     negativeCount: number;
     /**
-     * Number of POSITIVE findings
+     * Number of OBSERVED findings
      */
     positiveCount: number;
     /**
@@ -4412,7 +4412,7 @@ export type ListFindingsData = {
         /**
          * Filter by verdict
          */
-        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
+        verdict?: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
         page?: number;
         size?: number;
     };

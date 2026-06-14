@@ -349,14 +349,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingInDiff() {
-            var finding = finding("fatal-error-crash", Verdict.NEGATIVE, "Sources/View.swift");
+            var finding = finding("fatal-error-crash", Verdict.NOT_OBSERVED, "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Verdict.NEGATIVE, "inputs/context/metadata.json");
+            var finding = finding("mr-description-quality", Verdict.NOT_OBSERVED, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
@@ -365,14 +365,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void filtersFindingBackedByNonWhitelistedInternal() {
             // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
             // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
-            var finding = finding("review-noise", Verdict.NEGATIVE, "inputs/context/contributor_history.json");
+            var finding = finding("review-noise", Verdict.NOT_OBSERVED, "inputs/context/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         @Test
         void filtersFindingOutsideDiff() {
-            var finding = finding("view-logic-separation", Verdict.NEGATIVE, "Sources/Other.swift");
+            var finding = finding("view-logic-separation", Verdict.NOT_OBSERVED, "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }

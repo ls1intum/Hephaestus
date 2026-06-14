@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  *     {
  *       "practiceSlug": "pr-description-quality",
  *       "title": "Good PR description",
- *       "verdict": "POSITIVE",
+ *       "verdict": "OBSERVED",
  *       "severity": "INFO",
  *       "confidence": 0.95,
  *       "evidence": { ... },
@@ -264,8 +264,8 @@ public class PracticeDetectionResultParser {
             title = title.substring(0, MAX_TITLE_LENGTH - 3) + "...";
         }
 
-        // Required: verdict
-        Verdict verdict = parseEnum(entry, "verdict", Verdict.class);
+        // Required: verdict (accepts the legacy POSITIVE/NEGATIVE vocabulary for in-flight agents)
+        Verdict verdict = parseVerdict(entry);
 
         // Required: severity
         Severity severity = parseEnum(entry, "severity", Severity.class);
@@ -344,6 +344,32 @@ public class PracticeDetectionResultParser {
         }
         String text = node.asString();
         return text.isBlank() ? null : text;
+    }
+
+    /**
+     * Parses the sign-neutral {@link Verdict}, tolerating the legacy POSITIVE/NEGATIVE vocabulary so an
+     * agent still emitting the old enum mid-rollout maps cleanly onto the renamed values (ADR 0021, F-6).
+     * POSITIVE → OBSERVED, NEGATIVE → NOT_OBSERVED; NOT_APPLICABLE is unchanged.
+     */
+    private static Verdict parseVerdict(JsonNode entry) {
+        JsonNode node = entry.get("verdict");
+        if (node == null || node.isNull() || !node.isString()) {
+            throw new EntryValidationException("missing or non-text field: verdict");
+        }
+        String raw = node.asString().trim().toUpperCase(Locale.ROOT);
+        switch (raw) {
+            case "POSITIVE":
+                return Verdict.OBSERVED;
+            case "NEGATIVE":
+                return Verdict.NOT_OBSERVED;
+            default:
+                break;
+        }
+        try {
+            return Verdict.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            throw new EntryValidationException("invalid verdict value: '" + node.asString() + "'");
+        }
     }
 
     private static <E extends Enum<E>> E parseEnum(JsonNode entry, String field, Class<E> enumType) {

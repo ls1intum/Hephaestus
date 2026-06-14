@@ -165,7 +165,7 @@ public class PracticeDetectionDeliveryService {
             // Track negative findings based on verdict, not insert result.
             // Critical for retry delivery: on retry, insertIfAbsent returns 0 for existing
             // findings, but we still need correct hasNegative for the delivery gate.
-            if (finding.verdict() == Verdict.NEGATIVE) {
+            if (finding.verdict() == Verdict.NOT_OBSERVED) {
                 hasNegative = true;
             }
         }

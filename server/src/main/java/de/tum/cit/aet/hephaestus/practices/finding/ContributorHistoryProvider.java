@@ -119,8 +119,8 @@ public class ContributorHistoryProvider {
 
         void add(ContributorPracticeSummary row) {
             switch (row.getVerdict()) {
-                case POSITIVE -> positive += row.getCount();
-                case NEGATIVE -> negative += row.getCount();
+                case OBSERVED -> positive += row.getCount();
+                case NOT_OBSERVED -> negative += row.getCount();
                 case NOT_APPLICABLE -> {
                     /* not counted in history */
                 }

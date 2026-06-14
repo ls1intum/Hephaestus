@@ -15,8 +15,8 @@ public record ContributorPracticeSummaryDTO(
     @NonNull @Schema(description = "Practice name") String practiceName,
     @Nullable @Schema(description = "Practice category") String category,
     @NonNull @Schema(description = "Total number of findings") Long totalFindings,
-    @NonNull @Schema(description = "Number of POSITIVE findings") Long positiveCount,
-    @NonNull @Schema(description = "Number of NEGATIVE findings") Long negativeCount,
+    @NonNull @Schema(description = "Number of OBSERVED findings") Long positiveCount,
+    @NonNull @Schema(description = "Number of NOT_OBSERVED findings") Long negativeCount,
     @Nullable @Schema(description = "Timestamp of most recent finding") Instant lastFindingAt
 ) {
     public static ContributorPracticeSummaryDTO from(ContributorPracticeSummaryProjection p) {

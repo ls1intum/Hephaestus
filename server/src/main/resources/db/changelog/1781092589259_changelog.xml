@@ -305,4 +305,50 @@
         <rollback/>
     </changeSet>
 
+    <!--
+        ADR 0021 (F-6): make Verdict sign-neutral. POSITIVE/NEGATIVE carried a "good/bad" sign that
+        broke down for anti-pattern practices; the direction now lives on practice.polarity, leaving
+        verdict to state only presence (OBSERVED / NOT_OBSERVED / NOT_APPLICABLE). Every catalogued
+        practice today is a desirable habit, so polarity defaults to DESIRABLE and the row rename is
+        behaviour-preserving: OBSERVED == old POSITIVE, NOT_OBSERVED == old NEGATIVE.
+    -->
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-17">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.polarity already present">
+            <not><columnExists tableName="practice" columnName="polarity"/></not>
+        </preConditions>
+        <comment>Good/bad direction on practice (DESIRABLE | UNDESIRABLE | MIXED); defaults to DESIRABLE.</comment>
+        <addColumn tableName="practice">
+            <column name="polarity" type="VARCHAR(16)" defaultValue="DESIRABLE">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="polarity"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-18">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding verdict already sign-neutral">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_practice_finding_verdict'
+                AND pg_get_constraintdef(oid) LIKE '%OBSERVED%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Rename verdict values POSITIVE→OBSERVED, NEGATIVE→NOT_OBSERVED and re-point the CHECK.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_verdict;
+            UPDATE practice_finding SET verdict = 'OBSERVED' WHERE verdict = 'POSITIVE';
+            UPDATE practice_finding SET verdict = 'NOT_OBSERVED' WHERE verdict = 'NEGATIVE';
+            ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_verdict
+                CHECK (verdict IN ('OBSERVED', 'NOT_OBSERVED', 'NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_verdict;
+            UPDATE practice_finding SET verdict = 'POSITIVE' WHERE verdict = 'OBSERVED';
+            UPDATE practice_finding SET verdict = 'NEGATIVE' WHERE verdict = 'NOT_OBSERVED';
+            ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_verdict
+                CHECK (verdict IN ('POSITIVE', 'NEGATIVE', 'NOT_APPLICABLE'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

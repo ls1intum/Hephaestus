@@ -159,7 +159,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding f = result.validFindings().get(0);
             assertThat(f.practiceSlug()).isEqualTo("pr-description-quality");
             assertThat(f.title()).isEqualTo("Good PR description");
-            assertThat(f.verdict()).isEqualTo(Verdict.POSITIVE);
+            assertThat(f.verdict()).isEqualTo(Verdict.OBSERVED);
             assertThat(f.severity()).isEqualTo(Severity.INFO);
             assertThat(f.confidence()).isEqualTo(0.95f);
         }
@@ -206,7 +206,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Verdict.POSITIVE);
+            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Verdict.OBSERVED);
         }
 
         @Test
@@ -660,16 +660,16 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // Verify first finding
             ValidatedFinding first = result.validFindings().get(0);
             assertThat(first.practiceSlug()).isEqualTo("pr-description-quality");
-            assertThat(first.verdict()).isEqualTo(Verdict.POSITIVE);
+            assertThat(first.verdict()).isEqualTo(Verdict.OBSERVED);
 
             // Verify negative finding
             ValidatedFinding negative = result.validFindings().get(1);
-            assertThat(negative.verdict()).isEqualTo(Verdict.NEGATIVE);
+            assertThat(negative.verdict()).isEqualTo(Verdict.NOT_OBSERVED);
             assertThat(negative.severity()).isEqualTo(Severity.MAJOR);
 
             // Verify remaining verdicts
-            assertThat(result.validFindings().get(3).verdict()).isEqualTo(Verdict.POSITIVE);
-            assertThat(result.validFindings().get(4).verdict()).isEqualTo(Verdict.NEGATIVE);
+            assertThat(result.validFindings().get(3).verdict()).isEqualTo(Verdict.OBSERVED);
+            assertThat(result.validFindings().get(4).verdict()).isEqualTo(Verdict.NOT_OBSERVED);
         }
     }
 }

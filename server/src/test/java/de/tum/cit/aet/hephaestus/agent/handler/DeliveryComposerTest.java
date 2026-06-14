@@ -58,7 +58,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             humanizeTitle(slug) + " (positive)",
-            Verdict.POSITIVE,
+            Verdict.OBSERVED,
             Severity.INFO,
             0.90f,
             null,
@@ -80,7 +80,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Verdict.NEGATIVE,
+            Verdict.NOT_OBSERVED,
             severity,
             0.92f,
             buildEvidence(locations, snippets),
@@ -240,7 +240,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding withReasoning = new ValidatedFinding(
             "error-state-handling",
             "Error state handling (positive)",
-            Verdict.POSITIVE,
+            Verdict.OBSERVED,
             Severity.INFO,
             0.95f,
             null,
@@ -768,7 +768,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Verdict.POSITIVE,
+            Verdict.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -779,7 +779,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding real = new ValidatedFinding(
             "issue-scoped-to-single-concern",
             "Single concern",
-            Verdict.POSITIVE,
+            Verdict.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -802,7 +802,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Verdict.POSITIVE,
+            Verdict.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -1071,7 +1071,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Verdict.NEGATIVE,
+            Verdict.NOT_OBSERVED,
             severity,
             confidence,
             buildEvidence(List.of(new LocationSpec(slug + ".swift", 10)), null),

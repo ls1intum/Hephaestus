@@ -108,7 +108,7 @@ class DeliveryComposer {
 
         List<ValidatedFinding> negatives = findings
             .stream()
-            .filter(f -> f.verdict() == Verdict.NEGATIVE)
+            .filter(f -> f.verdict() == Verdict.NOT_OBSERVED)
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
@@ -146,7 +146,7 @@ class DeliveryComposer {
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings
                 .stream()
-                .filter(f -> f.verdict() == Verdict.POSITIVE)
+                .filter(f -> f.verdict() == Verdict.OBSERVED)
                 .toList();
             if (observed.isEmpty()) {
                 // Every finding abstained (all NOT_APPLICABLE): the artifact could not be assessed against
@@ -176,7 +176,7 @@ class DeliveryComposer {
         // critiques so the note acknowledges effort (task-level, not person-level praise).
         List<ValidatedFinding> positives = findings
             .stream()
-            .filter(f -> f.verdict() == Verdict.POSITIVE)
+            .filter(f -> f.verdict() == Verdict.OBSERVED)
             .toList();
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview
@@ -432,8 +432,8 @@ class DeliveryComposer {
         "(?i)(" +
             "\\bthe\\s+practice\\s+(?:requires|defines|expects|mandates|deems|treats|considers|states)\\b|" +
             "\\b(?:according to|per|under|following|violat\\w+|satisf\\w+|fail\\w*)\\s+the\\s+practice\\b|" +
-            "\\b(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
-            "\\b(?:for|to|a|an|the)\\s+(?:POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
+            "\\b(?:POSITIVE|NEGATIVE|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
+            "\\b(?:for|to|a|an|the)\\s+(?:POSITIVE|NEGATIVE|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
             "\\b(?:MINOR|MAJOR|INFO|CRITICAL)\\s+(?:severity|band|bucket|tier)\\b|" +
             "\\bseverity\\s+(?:level|band|bucket|rating)\\b|" +
             "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
@@ -442,7 +442,7 @@ class DeliveryComposer {
             // Rubric-mechanics / criteria-computation leaks observed reaching students (deepseek echoes the
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
-            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|POSITIVE|NEGATIVE|NOT[_ ]APPLICABLE)\\b|" +
+            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|POSITIVE|NEGATIVE|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" +
             "\\b(?:DEFECT-DETECTOR|POSITIVE\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +
             "\\benriched\\s*[=:]|" +
             "\\b[AUDFN]\\s*\\+\\s*[AUDFN]\\s*==?\\s*\\d|" + // grader bucket arithmetic e.g. A+D=4420 (two-operand)

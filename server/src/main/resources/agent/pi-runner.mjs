@@ -59,7 +59,7 @@ const reviewState = {
     findings: [],
     findingKeys: [],
 };
-const verdictSchema = { type: "string", enum: ["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"] };
+const verdictSchema = { type: "string", enum: ["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
 const evidenceSchema = {
     type: "object",
@@ -243,7 +243,7 @@ function normalizeFinding(finding) {
     const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");
     if (!title) throw new Error("title is required");
-    if (!["POSITIVE", "NEGATIVE", "NOT_APPLICABLE"].includes(verdict)) throw new Error(`invalid verdict '${verdict}'`);
+    if (!["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"].includes(verdict)) throw new Error(`invalid verdict '${verdict}'`);
     if (!["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(severity)) throw new Error(`invalid severity '${severity}'`);
     if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
         throw new Error("confidence must be between 0 and 1");
@@ -300,7 +300,7 @@ const reportFindingTool = defineTool({
     },
     execute: async (_toolCallId, params) => {
         const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.verdict === "NEGATIVE" ? 1 : 0;
+        const negativeCount = params.finding.verdict === "NOT_OBSERVED" ? 1 : 0;
         return {
             content: [
                 {
@@ -474,8 +474,8 @@ function loadPracticeSlugs() {
 // cannot drift between the five sites that previously copy-pasted it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
-    `For POSITIVE or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
-    `Only keep POSITIVE findings that add real review value. ` +
+    `For OBSERVED or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
+    `Only keep OBSERVED findings that add real review value. ` +
     `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
 
@@ -485,7 +485,7 @@ function buildRetryScaffold(slugs) {
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
         `Persist every justified finding with report_finding, one finding per call. ` +
         `There is no target count and no quota. ` +
-        `Only report POSITIVE findings that add real review value. ` +
+        `Only report OBSERVED findings that add real review value. ` +
         `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
     );
 }
@@ -708,7 +708,7 @@ async function main() {
                 const gatePrompt =
                     `Coverage check. You have NOT yet reported a verdict for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
-                    `(do NOT re-read the diff). Persist a finding (POSITIVE, NEGATIVE, or NOT_APPLICABLE) for EVERY one ` +
+                    `(do NOT re-read the diff). Persist a finding (OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE) for EVERY one ` +
                     `with report_finding, one call per finding.`;
                 try {
                     await session.prompt(gatePrompt);

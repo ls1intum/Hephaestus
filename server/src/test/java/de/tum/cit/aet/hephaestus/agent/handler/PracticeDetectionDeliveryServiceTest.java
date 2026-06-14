@@ -142,7 +142,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void persistsValidFinding() {
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             var result = service.deliver(testJob, findings);
 
@@ -159,7 +159,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq(456L),
                 eq(789L),
                 eq("Test finding"),
-                eq("POSITIVE"),
+                eq("OBSERVED"),
                 eq("INFO"),
                 eq(0.9f),
                 isNull(),
@@ -183,7 +183,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void unknownSlug() {
-            var findings = List.of(validFinding("unknown-practice", Verdict.POSITIVE));
+            var findings = List.of(validFinding("unknown-practice", Verdict.OBSERVED));
 
             var result = service.deliver(testJob, findings);
 
@@ -212,7 +212,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("returns 0 inserted when workspace has no practices")
         void emptyPracticeCatalog() {
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(List.of());
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             var result = service.deliver(testJob, findings);
 
@@ -228,7 +228,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("throws when pull request not found")
         void prNotFound() {
             when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.empty());
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -239,7 +239,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("throws when pull request has no author")
         void prNoAuthor() {
             testPr.setAuthor(null);
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -253,7 +253,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void nullMetadata() {
             testJob.setMetadata(null);
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -263,7 +263,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void missingPullRequestId() {
             testJob.setMetadata(objectMapper.createObjectNode());
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -278,7 +278,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsAllNegativesForPractice() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
+                findings.add(validFinding("pr-description-quality", Verdict.NOT_OBSERVED));
             }
 
             var result = service.deliver(testJob, findings);
@@ -291,7 +291,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsManyPositiveFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.POSITIVE));
+                findings.add(validFinding("pr-description-quality", Verdict.OBSERVED));
             }
 
             var result = service.deliver(testJob, findings);
@@ -311,8 +311,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 5; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NEGATIVE));
-                findings.add(validFinding("error-handling", Verdict.NEGATIVE));
+                findings.add(validFinding("pr-description-quality", Verdict.NOT_OBSERVED));
+                findings.add(validFinding("error-handling", Verdict.NOT_OBSERVED));
             }
 
             var result = service.deliver(testJob, findings);
@@ -373,7 +373,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(0);
 
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             var result = service.deliver(testJob, findings);
 
@@ -383,7 +383,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void keyFormat() {
-            var findings = List.of(validFinding("pr-description-quality", Verdict.POSITIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.OBSERVED));
 
             service.deliver(testJob, findings);
 
@@ -426,9 +426,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             var findings = List.of(
-                validFinding("pr-description-quality", Verdict.POSITIVE),
-                validFinding("error-handling", Verdict.NEGATIVE),
-                validFinding("unknown-slug", Verdict.POSITIVE)
+                validFinding("pr-description-quality", Verdict.OBSERVED),
+                validFinding("error-handling", Verdict.NOT_OBSERVED),
+                validFinding("unknown-slug", Verdict.OBSERVED)
             );
 
             service.deliver(testJob, findings);
@@ -460,7 +460,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             meta.put("issue_id", 999L);
             testJob.setMetadata(meta);
 
-            var findings = List.of(validFinding("pr-description-quality", Verdict.NEGATIVE));
+            var findings = List.of(validFinding("pr-description-quality", Verdict.NOT_OBSERVED));
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(1);
@@ -473,7 +473,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq(999L),
                 eq(789L),
                 anyString(),
-                eq("NEGATIVE"),
+                eq("NOT_OBSERVED"),
                 anyString(),
                 anyFloat(),
                 any(),

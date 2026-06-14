@@ -135,8 +135,8 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
                p.name AS practiceName,
                p.category AS category,
                COUNT(f) AS totalFindings,
-               SUM(CASE WHEN f.verdict = de.tum.cit.aet.hephaestus.practices.model.Verdict.POSITIVE THEN 1L ELSE 0L END) AS positiveCount,
-               SUM(CASE WHEN f.verdict = de.tum.cit.aet.hephaestus.practices.model.Verdict.NEGATIVE THEN 1L ELSE 0L END) AS negativeCount,
+               SUM(CASE WHEN f.verdict = de.tum.cit.aet.hephaestus.practices.model.Verdict.OBSERVED THEN 1L ELSE 0L END) AS positiveCount,
+               SUM(CASE WHEN f.verdict = de.tum.cit.aet.hephaestus.practices.model.Verdict.NOT_OBSERVED THEN 1L ELSE 0L END) AS negativeCount,
                MAX(f.detectedAt) AS lastFindingAt
         FROM PracticeFinding f
         JOIN f.practice p

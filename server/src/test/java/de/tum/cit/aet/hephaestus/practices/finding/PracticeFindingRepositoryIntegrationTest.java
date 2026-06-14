@@ -101,7 +101,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 42L,
                 contributor.getId(),
                 "Good PR description",
-                "POSITIVE",
+                "OBSERVED",
                 "INFO",
                 0.95f,
                 null,
@@ -115,7 +115,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
             assertThat(found.getIdempotencyKey()).isEqualTo("key-1");
             assertThat(found.getTitle()).isEqualTo("Good PR description");
-            assertThat(found.getVerdict().name()).isEqualTo("POSITIVE");
+            assertThat(found.getVerdict().name()).isEqualTo("OBSERVED");
             assertThat(found.getSeverity().name()).isEqualTo("INFO");
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
@@ -139,7 +139,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 1L,
                 contributor.getId(),
                 "Duplicate test",
-                "POSITIVE",
+                "OBSERVED",
                 "INFO",
                 0.8f,
                 null,
@@ -157,7 +157,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 2L,
                 contributor.getId(),
                 "Should not insert",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 0.5f,
                 null,
@@ -185,7 +185,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 99L,
                 contributor.getId(),
                 "Missing error handling in Main.java",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 0.7f,
                 evidence,
@@ -219,7 +219,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 1L,
                 contributor.getId(),
                 "Purge test finding",
-                "POSITIVE",
+                "OBSERVED",
                 "INFO",
                 0.9f,
                 null,
@@ -267,7 +267,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 1L,
                 contributor.getId(),
                 "WS-A finding",
-                "POSITIVE",
+                "OBSERVED",
                 "INFO",
                 0.9f,
                 null,
@@ -285,7 +285,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 2L,
                 contributor.getId(),
                 "WS-B finding",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MINOR",
                 0.5f,
                 null,
@@ -330,7 +330,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 1L,
                 contributor.getId(),
                 "Cascade test 1",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 0.6f,
                 null,
@@ -348,7 +348,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 2L,
                 contributor.getId(),
                 "Cascade test 2",
-                "POSITIVE",
+                "OBSERVED",
                 "INFO",
                 0.9f,
                 null,
@@ -384,10 +384,10 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         void aggregatesSinglePractice() {
             // Insert 3 NEGATIVE and 1 POSITIVE for the same practice
-            insertFinding("sum-1", practice, "NEGATIVE", Instant.parse("2026-03-18T10:00:00Z"));
-            insertFinding("sum-2", practice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
-            insertFinding("sum-3", practice, "NEGATIVE", Instant.parse("2026-03-20T14:30:00Z"));
-            insertFinding("sum-4", practice, "POSITIVE", Instant.parse("2026-03-17T08:00:00Z"));
+            insertFinding("sum-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-18T10:00:00Z"));
+            insertFinding("sum-2", practice, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
+            insertFinding("sum-3", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T14:30:00Z"));
+            insertFinding("sum-4", practice, "OBSERVED", Instant.parse("2026-03-17T08:00:00Z"));
 
             List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
                 contributor.getId(),
@@ -398,7 +398,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             ContributorPracticeSummary negative = result
                 .stream()
-                .filter(s -> s.getVerdict() == Verdict.NEGATIVE)
+                .filter(s -> s.getVerdict() == Verdict.NOT_OBSERVED)
                 .findFirst()
                 .orElseThrow();
             assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
@@ -407,7 +407,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             ContributorPracticeSummary positive = result
                 .stream()
-                .filter(s -> s.getVerdict() == Verdict.POSITIVE)
+                .filter(s -> s.getVerdict() == Verdict.OBSERVED)
                 .findFirst()
                 .orElseThrow();
             assertThat(positive.getCount()).isEqualTo(1);
@@ -424,8 +424,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             secondPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             secondPractice = practiceRepository.save(secondPractice);
 
-            insertFinding("multi-1", practice, "POSITIVE", Instant.parse("2026-03-20T10:00:00Z"));
-            insertFinding("multi-2", secondPractice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
+            insertFinding("multi-1", practice, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("multi-2", secondPractice, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
 
             List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
                 contributor.getId(),
@@ -457,7 +457,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherJob = agentJobRepository.save(otherJob);
 
             // Finding in target workspace
-            insertFinding("iso-1", practice, "NEGATIVE", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("iso-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
             // Finding in other workspace (same contributor)
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -468,7 +468,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 2L,
                 contributor.getId(),
                 "Other WS finding",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 0.8f,
                 null,
@@ -493,9 +493,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             Instant latest = Instant.parse("2026-03-20T14:30:00Z");
             Instant middle = Instant.parse("2026-03-18T12:00:00Z");
 
-            insertFinding("time-1", practice, "NEGATIVE", earliest);
-            insertFinding("time-2", practice, "NEGATIVE", latest);
-            insertFinding("time-3", practice, "NEGATIVE", middle);
+            insertFinding("time-1", practice, "NOT_OBSERVED", earliest);
+            insertFinding("time-2", practice, "NOT_OBSERVED", latest);
+            insertFinding("time-3", practice, "NOT_OBSERVED", middle);
 
             List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
                 contributor.getId(),
@@ -515,7 +515,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherContributor = userRepository.save(otherContributor);
 
             // Finding for target contributor
-            insertFinding("contrib-iso-1", practice, "NEGATIVE", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("contrib-iso-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
             // Finding for other contributor (same practice, same workspace)
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -526,7 +526,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 2L,
                 otherContributor.getId(),
                 "Other contributor finding",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 0.8f,
                 null,
@@ -582,7 +582,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 1L,
                 contributor.getId(),
                 "Enum mapping test",
-                "POSITIVE",
+                "OBSERVED",
                 "INFO",
                 0.9f,
                 null,
