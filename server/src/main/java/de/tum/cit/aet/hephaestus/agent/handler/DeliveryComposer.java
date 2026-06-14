@@ -52,7 +52,7 @@ class DeliveryComposer {
 
     /**
      * The "is this single issue well-formed?" near-duplicate pair — scoped-to-one-concern and
-     * has-a-checkable-outcome critique the SAME framing, so when both fire NEGATIVE we keep only the
+     * has-a-checkable-outcome critique the SAME framing, so when both fire NOT_OBSERVED we keep only the
      * highest-severity one. {@code breaks-large-work-into-trackable-subtasks} is excluded on purpose:
      * "decompose this epic" is a distinct, independently-actionable lesson that must survive on its own.
      */
@@ -62,11 +62,11 @@ class DeliveryComposer {
     );
 
     /**
-     * Process-level practices whose POSITIVE is a named good ACT (engaging with review, revealing intent),
+     * Process-level practices whose OBSERVED is a named good ACT (engaging with review, revealing intent),
      * not a correctness claim — only these may surface as the subordinate reinforcement line alongside
      * blocking issues, so a correctness positive can never leak into a blocking note.
      */
-    private static final Set<String> PROCESS_POSITIVE_PRACTICES = Set.of(
+    private static final Set<String> PROCESS_OBSERVED_PRACTICES = Set.of(
         "engaging-with-inline-review-comments",
         "acting-on-review-feedback",
         "intent-revealing-comments"
@@ -142,7 +142,7 @@ class DeliveryComposer {
             improvementOverflow = (int) (improvementTotal - MAX_IMPROVEMENT_SUGGESTIONS);
         }
 
-        // No negatives → an observation note over the POSITIVE findings (see composeNoIssuesNote).
+        // No negatives → an observation note over the OBSERVED findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings
                 .stream()
@@ -172,7 +172,7 @@ class DeliveryComposer {
             }
         }
 
-        // POSITIVE findings the same job produced — surfaced as a brief strengths line before the
+        // OBSERVED findings the same job produced — surfaced as a brief strengths line before the
         // critiques so the note acknowledges effort (task-level, not person-level praise).
         List<ValidatedFinding> positives = findings
             .stream()
@@ -189,7 +189,7 @@ class DeliveryComposer {
     }
 
     /**
-     * Collapses overlapping epic issue-structure NEGATIVE findings. Keeps the FIRST
+     * Collapses overlapping epic issue-structure NOT_OBSERVED findings. Keeps the FIRST
      * {@link #EPIC_STRUCTURE_PRACTICES} finding encountered (the list is severity-sorted, so that is the
      * highest-severity lead) and drops the rest; every non-epic-structure finding passes through
      * untouched and in order. No-op when fewer than two epic-structure findings are present.
@@ -260,10 +260,10 @@ class DeliveryComposer {
     }
 
     /** Positives a learner can act on at once — kept to 1-3 (deliberate practice). */
-    private static final int MAX_POSITIVE_REINFORCEMENTS = 3;
+    private static final int MAX_OBSERVED_REINFORCEMENTS = 3;
 
     /** Whole-sentence budget for a positive observation/forward-prompt — generous enough not to clip an enumeration. */
-    private static final int POSITIVE_BUDGET = 280;
+    private static final int OBSERVED_BUDGET = 280;
 
     /**
      * Compose the note posted when no issues were found — reports what was reviewed and, where the agent
@@ -286,9 +286,9 @@ class DeliveryComposer {
         var bullets = new StringBuilder(1024);
         int shown = 0;
         for (ValidatedFinding f : withReasoning) {
-            if (shown >= MAX_POSITIVE_REINFORCEMENTS) break;
+            if (shown >= MAX_OBSERVED_REINFORCEMENTS) break;
             // Whole-sentence budget clamp: never clip a multi-clause observation mid-enumeration.
-            String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), POSITIVE_BUDGET);
+            String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), OBSERVED_BUDGET);
             if (summary.isBlank()) {
                 // The reasoning was entirely grading-meta and scrubbed to nothing — skip it rather than
                 // emit a bare "- **Practice:** " bullet with no observation behind it.
@@ -301,7 +301,7 @@ class DeliveryComposer {
             // (pre-feed-forward criteria) degrades gracefully to just the observation.
             String forward = clampToSentenceBudget(
                 sanitizeStudentText(f.guidance() == null ? "" : f.guidance()).strip(),
-                POSITIVE_BUDGET
+                OBSERVED_BUDGET
             );
             if (!forward.isBlank() && !forward.replace(".", "").equalsIgnoreCase("No change needed")) {
                 bullets.append(' ').append(forward);
@@ -366,7 +366,7 @@ class DeliveryComposer {
     );
 
     /**
-     * Builds a one-sentence strengths acknowledgement from up to two POSITIVE findings, e.g.
+     * Builds a one-sentence strengths acknowledgement from up to two OBSERVED findings, e.g.
      * "Nice work keeping the change focused and reviewable and linking the change to its issue — a
      * couple of things to tighten:". Returns "" when there are no positives. Strictly task-level: it
      * names what the work does, never grades the author.
@@ -394,7 +394,7 @@ class DeliveryComposer {
 
     /**
      * Builds the single subordinate process-positive line allowed alongside blocking issues.
-     * Picks the first POSITIVE whose practice is in {@link #PROCESS_POSITIVE_PRACTICES} (a named good
+     * Picks the first OBSERVED whose practice is in {@link #PROCESS_OBSERVED_PRACTICES} (a named good
      * process act, never code-correctness) and renders it as one short subordinate line. Returns "" when
      * no eligible process positive exists — keeping the blocking note free of any hollow reinforcement.
      */
@@ -404,7 +404,7 @@ class DeliveryComposer {
         }
         return positives
             .stream()
-            .filter(f -> PROCESS_POSITIVE_PRACTICES.contains(f.practiceSlug()))
+            .filter(f -> PROCESS_OBSERVED_PRACTICES.contains(f.practiceSlug()))
             .map(f -> STRENGTH_PHRASES.getOrDefault(f.practiceSlug(), humanisePracticeSlug(f.practiceSlug())))
             .filter(p -> p != null && !p.isBlank())
             .findFirst()
@@ -424,7 +424,7 @@ class DeliveryComposer {
     /**
      * Marks a sentence as pure grading-mechanics meta — if any of these appears, the whole sentence is
      * the grader explaining the rubric to itself, not feedback to the student, so it is dropped wholesale.
-     * Catches the phrasings observed leaking from gpt-oss-120b: "the practice requires…", "for a POSITIVE
+     * Catches the phrasings observed leaking from gpt-oss-120b: "the practice requires…", "for a OBSERVED
      * verdict", "MINOR severity level/band", "acceptable upper band", "according to/violating the
      * practice", "…line threshold".
      */
@@ -432,8 +432,8 @@ class DeliveryComposer {
         "(?i)(" +
             "\\bthe\\s+practice\\s+(?:requires|defines|expects|mandates|deems|treats|considers|states)\\b|" +
             "\\b(?:according to|per|under|following|violat\\w+|satisf\\w+|fail\\w*)\\s+the\\s+practice\\b|" +
-            "\\b(?:POSITIVE|NEGATIVE|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
-            "\\b(?:for|to|a|an|the)\\s+(?:POSITIVE|NEGATIVE|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
+            "\\b(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
+            "\\b(?:for|to|a|an|the)\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
             "\\b(?:MINOR|MAJOR|INFO|CRITICAL)\\s+(?:severity|band|bucket|tier)\\b|" +
             "\\bseverity\\s+(?:level|band|bucket|rating)\\b|" +
             "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
@@ -442,8 +442,8 @@ class DeliveryComposer {
             // Rubric-mechanics / criteria-computation leaks observed reaching students (deepseek echoes the
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
-            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|POSITIVE|NEGATIVE|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" +
-            "\\b(?:DEFECT-DETECTOR|POSITIVE\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +
+            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" +
+            "\\b(?:DEFECT-DETECTOR|OBSERVED\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +
             "\\benriched\\s*[=:]|" +
             "\\b[AUDFN]\\s*\\+\\s*[AUDFN]\\s*==?\\s*\\d|" + // grader bucket arithmetic e.g. A+D=4420 (two-operand)
             "\\b[ADF]\\s*=\\s*\\d{2,}|" + // single multi-digit metric e.g. A=4094, F=28, D=326 (not prose "N = 3")
@@ -650,7 +650,7 @@ class DeliveryComposer {
         // When blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
         // a WARRANTED, specific PROCESS-level positive (a named good act — engaging with review, revealing
         // intent) should still land. Surface AT MOST ONE, subordinate: a short single line AFTER the issue
-        // count, never a sandwich opener, and only from PROCESS_POSITIVE_PRACTICES so a code-correctness
+        // count, never a sandwich opener, and only from PROCESS_OBSERVED_PRACTICES so a code-correctness
         // positive can never leak into a blocking note.
         if (hasBlocking) {
             String reinforcement = composeSubordinateProcessPositive(positives);
@@ -918,7 +918,7 @@ class DeliveryComposer {
     }
 
     /**
-     * Collect inline diff notes from NEGATIVE findings.
+     * Collect inline diff notes from NOT_OBSERVED findings.
      *
      * <p>Prefer the agent's per-finding {@code suggestedDiffNotes} (richer, explicit lines/body).
      * Fall back to a synthesized note from the first evidence location + composed body when the

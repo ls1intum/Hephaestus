@@ -67,8 +67,8 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
 
             JsonNode entry = root.get(0);
             assertThat(entry.get("practice").asString()).isEqualTo("pr-description-quality");
-            assertThat(entry.get("positive").asLong()).isEqualTo(1);
-            assertThat(entry.get("negative").asLong()).isEqualTo(3);
+            assertThat(entry.get("observed").asLong()).isEqualTo(1);
+            assertThat(entry.get("notObserved").asLong()).isEqualTo(3);
             assertThat(entry.get("lastSeen").asString()).isEqualTo("2026-03-20T14:30:00Z");
         }
 
@@ -91,13 +91,13 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
             // Sorted by NEGATIVE desc: error-handling (3) before pr-description-quality (1)
             JsonNode first = root.get(0);
             assertThat(first.get("practice").asString()).isEqualTo("error-handling");
-            assertThat(first.get("negative").asLong()).isEqualTo(3);
+            assertThat(first.get("notObserved").asLong()).isEqualTo(3);
             assertThat(first.get("lastSeen").asString()).isEqualTo("2026-03-19T12:00:00Z");
 
             JsonNode second = root.get(1);
             assertThat(second.get("practice").asString()).isEqualTo("pr-description-quality");
-            assertThat(second.get("positive").asLong()).isEqualTo(5);
-            assertThat(second.get("negative").asLong()).isEqualTo(1);
+            assertThat(second.get("observed").asLong()).isEqualTo(5);
+            assertThat(second.get("notObserved").asLong()).isEqualTo(1);
         }
 
         @Test
@@ -119,7 +119,7 @@ class ContributorHistoryProviderTest extends BaseUnitTest {
 
             // First entry should be the one with most negatives (practice-24)
             assertThat(root.get(0).get("practice").asString()).isEqualTo("practice-24");
-            assertThat(root.get(0).get("negative").asLong()).isEqualTo(24);
+            assertThat(root.get(0).get("notObserved").asLong()).isEqualTo(24);
 
             // Last entry should be practice-05 (index 19 in reversed order: 24,23,...,5)
             assertThat(root.get(19).get("practice").asString()).isEqualTo("practice-05");

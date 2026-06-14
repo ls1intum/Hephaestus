@@ -42,7 +42,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         ObjectNode finding = objectMapper.createObjectNode();
         finding.put("practiceSlug", "pr-description-quality");
         finding.put("title", "Good PR description");
-        finding.put("verdict", "POSITIVE");
+        finding.put("verdict", "OBSERVED");
         finding.put("severity", "INFO");
         finding.put("confidence", 0.95);
         return finding;
@@ -201,7 +201,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         void lowercaseVerdict() {
             ObjectNode finding = validFindingNode();
-            finding.put("verdict", "positive");
+            finding.put("verdict", "observed");
 
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
@@ -218,6 +218,34 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validFindings()).isEmpty();
             assertThat(result.discarded().get(0).reason()).contains("invalid verdict");
+        }
+
+        @Test
+        void forwardVocabularyVerdicts() {
+            for (Verdict v : new Verdict[] { Verdict.OBSERVED, Verdict.NOT_OBSERVED }) {
+                ObjectNode finding = validFindingNode();
+                finding.put("verdict", v.name());
+
+                ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+                assertThat(result.validFindings()).hasSize(1);
+                assertThat(result.validFindings().get(0).verdict()).isEqualTo(v);
+            }
+        }
+
+        @Test
+        void legacyVerdictVocabularyIsRejected() {
+            // Clean break (ADR 0021, F-6): the old POSITIVE/NEGATIVE vocabulary no longer parses — it
+            // is discarded exactly like any other unknown verdict, matching the DB CHECK.
+            for (String legacy : new String[] { "POSITIVE", "NEGATIVE" }) {
+                ObjectNode finding = validFindingNode();
+                finding.put("verdict", legacy);
+
+                ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+                assertThat(result.validFindings()).isEmpty();
+                assertThat(result.discarded().get(0).reason()).contains("invalid verdict");
+            }
         }
 
         @Test
@@ -453,7 +481,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void attachesNotesToFinding() {
             ObjectNode finding = findingWithSuggestedNotes(
                 "error-handling",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 suggestedNote("src/Main.java", 42, "Add error handling here.")
             );
@@ -482,7 +510,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ObjectNode finding = objectMapper.createObjectNode();
             finding.put("practiceSlug", "error-handling");
             finding.put("title", "Issue");
-            finding.put("verdict", "NEGATIVE");
+            finding.put("verdict", "NOT_OBSERVED");
             finding.put("severity", "MAJOR");
             finding.put("confidence", 0.90);
             ArrayNode arr = finding.putArray("suggestedDiffNotes");
@@ -510,7 +538,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void rejectsInternalPaths() {
             ObjectNode finding = findingWithSuggestedNotes(
                 "error-handling",
-                "NEGATIVE",
+                "NOT_OBSERVED",
                 "MAJOR",
                 suggestedNote("inputs/context/foo.json", 1, "should be rejected"),
                 suggestedNote("src/Real.java", 5, "should be kept")
@@ -527,7 +555,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void preservesEndLine() {
             ObjectNode note = suggestedNote("src/Range.java", 10, "Multi-line issue");
             note.put("endLine", 20);
-            ObjectNode finding = findingWithSuggestedNotes("error-handling", "NEGATIVE", "MAJOR", note);
+            ObjectNode finding = findingWithSuggestedNotes("error-handling", "NOT_OBSERVED", "MAJOR", note);
             String raw = "{\"findings\": [%s]}".formatted(finding.toString());
 
             ParseResult result = parser.parse(wrapRawOutput(raw));
@@ -613,7 +641,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // Simulate agent output with Swift \(error) in code snippets
             // Jackson would fail on \( because it's not a valid JSON escape
             String rawWithSwiftEscapes = """
-                {"findings":[{"practiceSlug":"silent-failure","title":"Empty catch","verdict":"NEGATIVE","severity":"MAJOR","confidence":0.95,"guidance":"```swift\\nprint(\\"Error: \\(error)\\")\\n```"}]}
+                {"findings":[{"practiceSlug":"silent-failure","title":"Empty catch","verdict":"NOT_OBSERVED","severity":"MAJOR","confidence":0.95,"guidance":"```swift\\nprint(\\"Error: \\(error)\\")\\n```"}]}
                 """;
 
             ParseResult result = parser.parse(wrapRawOutput(rawWithSwiftEscapes));

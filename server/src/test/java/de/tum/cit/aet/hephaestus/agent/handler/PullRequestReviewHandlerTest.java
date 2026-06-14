@@ -437,7 +437,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                   "findings": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Good PR description",
-                    "verdict": "POSITIVE",
+                    "verdict": "OBSERVED",
                     "severity": "INFO",
                     "confidence": 0.95
                   }]

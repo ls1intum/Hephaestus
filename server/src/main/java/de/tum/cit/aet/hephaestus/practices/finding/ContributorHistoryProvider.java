@@ -22,7 +22,7 @@ import tools.jackson.databind.node.ObjectNode;
  * produces a compact JSON array suitable for injection into the agent sandbox as
  * {@code inputs/context/contributor_history.json}.
  *
- * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by NEGATIVE count
+ * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by NOT_OBSERVED count
  * descending so the most problematic practices are always included when truncation occurs.
  */
 @Component
@@ -68,12 +68,12 @@ public class ContributorHistoryProvider {
             return Optional.empty();
         }
 
-        // Sort by NEGATIVE count desc, then slug for deterministic ordering
+        // Sort by NOT_OBSERVED count desc, then slug for deterministic ordering
         List<Map.Entry<String, PracticeAggregate>> sorted = byPractice
             .entrySet()
             .stream()
             .sorted(
-                Comparator.<Map.Entry<String, PracticeAggregate>>comparingLong(e -> e.getValue().negative)
+                Comparator.<Map.Entry<String, PracticeAggregate>>comparingLong(e -> e.getValue().notObserved)
                     .reversed()
                     .thenComparing(Map.Entry::getKey)
             )
@@ -85,8 +85,8 @@ public class ContributorHistoryProvider {
             ObjectNode node = objectMapper.createObjectNode();
             PracticeAggregate agg = entry.getValue();
             node.put("practice", entry.getKey());
-            node.put("positive", agg.positive);
-            node.put("negative", agg.negative);
+            node.put("observed", agg.observed);
+            node.put("notObserved", agg.notObserved);
             node.put("lastSeen", agg.lastDetectedAt.toString());
             array.add(node);
         }
@@ -113,14 +113,14 @@ public class ContributorHistoryProvider {
      */
     private static final class PracticeAggregate {
 
-        long positive;
-        long negative;
+        long observed;
+        long notObserved;
         Instant lastDetectedAt;
 
         void add(ContributorPracticeSummary row) {
             switch (row.getVerdict()) {
-                case OBSERVED -> positive += row.getCount();
-                case NOT_OBSERVED -> negative += row.getCount();
+                case OBSERVED -> observed += row.getCount();
+                case NOT_OBSERVED -> notObserved += row.getCount();
                 case NOT_APPLICABLE -> {
                     /* not counted in history */
                 }

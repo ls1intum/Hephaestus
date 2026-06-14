@@ -25,15 +25,9 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
         "server/src/main/resources/practices/precompute"
     );
 
-    // Sign-neutral vocabulary (OBSERVED/NOT_OBSERVED) plus the legacy POSITIVE/NEGATIVE — a precompute
-    // script must launder neither, so both are forbidden (ADR 0021, F-6).
-    private static final List<String> VERDICT_TOKENS = List.of(
-        "NOT_APPLICABLE",
-        "OBSERVED",
-        "NOT_OBSERVED",
-        "POSITIVE",
-        "NEGATIVE"
-    );
+    // The sign-neutral verdict vocabulary (ADR 0021, F-6). A precompute script produces hints, never
+    // verdicts, so it must launder none of these.
+    private static final List<String> VERDICT_TOKENS = List.of("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
 
     @Test
     @DisplayName("no precompute script emits a verdict token outside its header comments")

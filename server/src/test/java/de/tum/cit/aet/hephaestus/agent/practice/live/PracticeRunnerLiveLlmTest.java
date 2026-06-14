@@ -215,7 +215,7 @@ class PracticeRunnerLiveLlmTest {
                 .isEqualTo("hardcoded-secrets");
             assertThat(finding.path("verdict").asString())
                 .as(tag + ".verdict")
-                .isIn("POSITIVE", "NEGATIVE", "NOT_APPLICABLE");
+                .isIn("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
             assertThat(finding.path("severity").asString())
                 .as(tag + ".severity")
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
@@ -232,7 +232,7 @@ class PracticeRunnerLiveLlmTest {
         for (JsonNode finding : findings) {
             if (
                 "hardcoded-secrets".equals(finding.path("practiceSlug").asString()) &&
-                "NEGATIVE".equals(finding.path("verdict").asString())
+                "NOT_OBSERVED".equals(finding.path("verdict").asString())
             ) {
                 foundNegative = true;
                 break;

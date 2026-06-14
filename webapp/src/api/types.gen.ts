@@ -2137,11 +2137,11 @@ export type ContributorPracticeSummary = {
     /**
      * Number of NOT_OBSERVED findings
      */
-    negativeCount: number;
+    notObservedCount: number;
     /**
      * Number of OBSERVED findings
      */
-    positiveCount: number;
+    observedCount: number;
     /**
      * Practice name
      */

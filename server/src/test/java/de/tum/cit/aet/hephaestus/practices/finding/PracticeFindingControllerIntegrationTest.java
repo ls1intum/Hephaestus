@@ -588,9 +588,9 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo("review")
                 .jsonPath("$[0].totalFindings")
                 .isEqualTo(1)
-                .jsonPath("$[0].positiveCount")
+                .jsonPath("$[0].observedCount")
                 .isEqualTo(0)
-                .jsonPath("$[0].negativeCount")
+                .jsonPath("$[0].notObservedCount")
                 .isEqualTo(1)
                 .jsonPath("$[0].lastFindingAt")
                 .isNotEmpty()
@@ -602,9 +602,9 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo("pr-quality")
                 .jsonPath("$[1].totalFindings")
                 .isEqualTo(3)
-                .jsonPath("$[1].positiveCount")
+                .jsonPath("$[1].observedCount")
                 .isEqualTo(2)
-                .jsonPath("$[1].negativeCount")
+                .jsonPath("$[1].notObservedCount")
                 .isEqualTo(1)
                 .jsonPath("$[1].lastFindingAt")
                 .isNotEmpty();
@@ -641,7 +641,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo(1)
                 .jsonPath("$[0].totalFindings")
                 .isEqualTo(1)
-                .jsonPath("$[0].positiveCount")
+                .jsonPath("$[0].observedCount")
                 .isEqualTo(1);
         }
     }

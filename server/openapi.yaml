@@ -4313,11 +4313,11 @@ components:
           type: string
           format: date-time
           description: Timestamp of most recent finding
-        negativeCount:
+        notObservedCount:
           type: integer
           format: int64
           description: Number of NOT_OBSERVED findings
-        positiveCount:
+        observedCount:
           type: integer
           format: int64
           description: Number of OBSERVED findings
@@ -4332,8 +4332,8 @@ components:
           format: int64
           description: Total number of findings
       required:
-      - negativeCount
-      - positiveCount
+      - notObservedCount
+      - observedCount
       - practiceName
       - practiceSlug
       - totalFindings

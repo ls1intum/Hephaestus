@@ -329,7 +329,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Deterministic, LLM-independent secret pre-pass over the raw diff. This catches a committed
         // credential even when the model abstains, the precompute crashes, or the clone is checked
-        // out at the merge base (so a working-tree grep finds nothing). The synthetic NEGATIVE
+        // out at the merge base (so a working-tree grep finds nothing). The synthetic NOT_OBSERVED
         // findings flow through the normal persist+compose+deliver path and force the green→red flip.
         List<PracticeDetectionResultParser.ValidatedFinding> secretFindings = scanForSecrets(
             job,
@@ -425,7 +425,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /**
      * Run the deterministic secret pre-pass over the job's raw diff and map each hit to a synthetic
-     * {@code hardcoded-secrets} NEGATIVE finding. Hits already covered by an LLM-produced
+     * {@code hardcoded-secrets} NOT_OBSERVED finding. Hits already covered by an LLM-produced
      * hardcoded-secrets finding (same matched token already quoted) are skipped to avoid double-posting.
      */
     private List<PracticeDetectionResultParser.ValidatedFinding> scanForSecrets(

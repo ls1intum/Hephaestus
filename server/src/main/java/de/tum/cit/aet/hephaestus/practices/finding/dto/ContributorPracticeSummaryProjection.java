@@ -17,9 +17,9 @@ public interface ContributorPracticeSummaryProjection {
 
     Long getTotalFindings();
 
-    Long getPositiveCount();
+    Long getObservedCount();
 
-    Long getNegativeCount();
+    Long getNotObservedCount();
 
     Instant getLastFindingAt();
 }

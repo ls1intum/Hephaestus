@@ -8,8 +8,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
  * or "bad". The good/bad direction is supplied by {@link Practice#getPolarity()}: for a
  * {@code DESIRABLE} practice {@code OBSERVED} is the strength and {@code NOT_OBSERVED} the gap; for
  * an {@code UNDESIRABLE} practice the directions invert. Keeping verdict sign-free is what lets one
- * detector schema serve both "did the good thing" and "did the bad thing" practices without the old
- * {@code NEGATIVE == bad} overload (see ADR 0021, F-6).
+ * detector schema serve both desirable practices ({@code OBSERVED} = strength) and undesirable ones
+ * ({@code NOT_OBSERVED} = strength) without overloading the verdict value (see ADR 0021, F-6).
  *
  * <p>Orthogonal to {@link Severity}: verdict captures <em>presence</em> (observed vs not), severity
  * captures <em>impact</em> (critical vs informational).
