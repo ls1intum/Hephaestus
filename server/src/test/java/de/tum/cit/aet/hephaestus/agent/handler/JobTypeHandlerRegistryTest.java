@@ -71,7 +71,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             parser,
             deliveryService,
-            commentPoster
+            commentPoster,
+            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
         );
     }
 

@@ -34,6 +34,9 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     @Query("SELECT f FROM PracticeFinding f JOIN f.practice p WHERE f.id = :id AND p.workspace.id = :workspaceId")
     Optional<PracticeFinding> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
+    /** All findings a given agent job produced — the source set the feedback ledger recorder binds to. */
+    List<PracticeFinding> findByAgentJobId(UUID agentJobId);
+
     /**
      * Atomically inserts a practice finding if absent (race-condition safe).
      *

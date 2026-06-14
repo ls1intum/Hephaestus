@@ -70,7 +70,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             userPreferencesRepository,
             pullRequestRepository,
             workspaceRepository,
-            reviewProperties
+            reviewProperties,
+            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
         );
         // Inline reconciliation now runs on every OPEN-PR delivery — even with zero diff notes — to clear an
         // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.

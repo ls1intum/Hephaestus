@@ -48,6 +48,7 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
     private final PullRequestCommentPoster commentPoster;
+    private final FeedbackLedgerRecorder feedbackLedgerRecorder;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -56,7 +57,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        PullRequestCommentPoster commentPoster
+        PullRequestCommentPoster commentPoster,
+        FeedbackLedgerRecorder feedbackLedgerRecorder
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -65,6 +67,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
         this.commentPoster = commentPoster;
+        this.feedbackLedgerRecorder = feedbackLedgerRecorder;
     }
 
     @Override
@@ -220,6 +223,18 @@ public class IssueReviewHandler implements JobTypeHandler {
             }
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
+        }
+
+        // Record the delivered-feedback ledger (ADR 0021 C6) — best-effort, REQUIRES_NEW + try/catch so it
+        // can never affect the issue note the contributor already received. Issues have no inline placements.
+        try {
+            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
         }
     }
 }

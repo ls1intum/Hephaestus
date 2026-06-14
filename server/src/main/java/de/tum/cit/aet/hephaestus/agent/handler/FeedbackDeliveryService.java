@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -36,6 +37,7 @@ class FeedbackDeliveryService {
     private final PullRequestRepository pullRequestRepository;
     private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewProperties reviewProperties;
+    private final FeedbackLedgerRecorder feedbackLedgerRecorder;
 
     FeedbackDeliveryService(
         PullRequestCommentPoster commentPoster,
@@ -43,7 +45,8 @@ class FeedbackDeliveryService {
         UserPreferencesRepository userPreferencesRepository,
         PullRequestRepository pullRequestRepository,
         WorkspaceRepository workspaceRepository,
-        PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties,
+        FeedbackLedgerRecorder feedbackLedgerRecorder
     ) {
         this.commentPoster = commentPoster;
         this.diffNotePoster = diffNotePoster;
@@ -51,6 +54,7 @@ class FeedbackDeliveryService {
         this.pullRequestRepository = pullRequestRepository;
         this.workspaceRepository = workspaceRepository;
         this.reviewProperties = reviewProperties;
+        this.feedbackLedgerRecorder = feedbackLedgerRecorder;
     }
 
     /**
@@ -129,6 +133,19 @@ class FeedbackDeliveryService {
 
         postSummaryNote(job, delivery);
         postDiffNotes(job, delivery);
+
+        // Record the delivered-feedback ledger (ADR 0021 C6) as a best-effort write-through side-effect:
+        // REQUIRES_NEW inside the recorder + this try/catch mean a ledger failure can never alter or roll
+        // back the delivery the contributor already received.
+        try {
+            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.PULL_REQUEST);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+        }
     }
 
     private void postSummaryNote(AgentJob job, DeliveryContent delivery) {

@@ -72,7 +72,8 @@ public class JobTypeHandlerConfiguration {
         DiffNotePoster diffNotePoster,
         UserPreferencesRepository userPreferencesRepository,
         PullRequestRepository pullRequestRepository,
-        WorkspaceRepository workspaceRepository
+        WorkspaceRepository workspaceRepository,
+        FeedbackLedgerRecorder feedbackLedgerRecorder
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
@@ -80,7 +81,8 @@ public class JobTypeHandlerConfiguration {
             userPreferencesRepository,
             pullRequestRepository,
             workspaceRepository,
-            reviewProperties
+            reviewProperties,
+            feedbackLedgerRecorder
         );
     }
 
@@ -122,7 +124,8 @@ public class JobTypeHandlerConfiguration {
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        PullRequestCommentPoster commentPoster
+        PullRequestCommentPoster commentPoster,
+        FeedbackLedgerRecorder feedbackLedgerRecorder
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -131,7 +134,8 @@ public class JobTypeHandlerConfiguration {
             practiceCatalogInjector,
             resultParser,
             deliveryService,
-            commentPoster
+            commentPoster,
+            feedbackLedgerRecorder
         );
     }
 

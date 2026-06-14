@@ -44,6 +44,12 @@ import tools.jackson.databind.JsonNode;
  */
 class DeliveryComposer {
 
+    /**
+     * Provenance stamp for the {@code Feedback} ledger (ADR 0021 C6): which renderer produced a delivered
+     * body. Bump explicitly when the composition changes so a delivered unit is reproducible from its row.
+     */
+    static final String COMPOSER_VERSION = "v4-inline-first";
+
     /** Non-blocking (MINOR/INFO) suggestions surfaced in full before the rest collapse into an overflow line; blocking findings are never capped. */
     static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
 

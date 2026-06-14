@@ -55,7 +55,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new PracticeCatalogInjector(objectMapper, practiceRepository),
             new PracticeDetectionResultParser(objectMapper),
             deliveryService,
-            commentPoster
+            commentPoster,
+            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
         );
     }
 
