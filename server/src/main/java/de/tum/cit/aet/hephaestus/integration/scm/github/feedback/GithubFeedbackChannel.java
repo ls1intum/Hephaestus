@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
  * {@code "owner/repo#prNumber"} — the channel parses, resolves the PR node ID
  * via {@link GithubPrNodeIdResolver}, then issues the mutation. The returned
  * {@link FeedbackChannel.SummaryHandle} carries the comment node ID so
- * {@code FeedbackPostService} can edit in place on subsequent runs.
+ * the feedback ledger records it ({@code FeedbackPlacement.external_ref}) for edit-in-place on subsequent runs.
  */
 @Component
 public class GithubFeedbackChannel implements FeedbackChannel {

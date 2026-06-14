@@ -18,7 +18,7 @@ public interface FeedbackChannel {
      * Format the vendor's external identifier for a pull request / merge request. GitHub
      * uses {@code repoFullName#prNumber}; GitLab uses {@code repoFullName!prNumber};
      * future kinds add their own. The {@code subjectExternalId} stored on the
-     * {@code FeedbackPost} aggregate is what this returns.
+     * vendor post id is recorded as a {@code FeedbackPlacement.external_ref} (ADR 0021 C6).
      *
      * @throws IllegalArgumentException if {@code repoFullName} is not well-formed for the
      *     vendor (e.g. GitHub's two-segment {@code owner/repo} requirement).
@@ -43,6 +43,6 @@ public interface FeedbackChannel {
 
     record FeedbackContent(String body, String marker) {}
 
-    /** Vendor-side post identifier used by {@code FeedbackPostService} for edit-in-place. */
+    /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021 C6). */
     record SummaryHandle(String externalId) {}
 }

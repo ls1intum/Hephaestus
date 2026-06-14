@@ -665,4 +665,22 @@
         </rollback>
     </changeSet>
 
+    <!--
+        ADR 0021 C7: drop the dead feedback_post subsystem. FeedbackPostService had zero injectors and the
+        FeedbackPost/Repository/Service were never wired — the delivered-feedback record now lives in the
+        C6 ledger (feedback / feedback_placement.external_ref). Dropping the table keeps the Hibernate-vs-
+        Liquibase drift gate clean now that the entity is deleted.
+    -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-41">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_post already dropped">
+            <tableExists tableName="feedback_post"/>
+        </preConditions>
+        <comment>Drop the dead feedback_post table (0 writers; superseded by the C6 feedback ledger).</comment>
+        <dropTable tableName="feedback_post" cascadeConstraints="true"/>
+        <rollback>
+            <!-- Dead code: a rollback intentionally does not resurrect the unused table. The C6 ledger
+                 (feedback / feedback_placement) is the supported delivered-feedback record. -->
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

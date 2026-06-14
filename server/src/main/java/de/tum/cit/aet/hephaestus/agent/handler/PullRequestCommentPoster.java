@@ -39,7 +39,7 @@ class PullRequestCommentPoster {
     /** Maximum summary length in the collapsible header (prevents total comment from exceeding provider limits). */
     static final int MAX_SUMMARY_LENGTH = 200;
 
-    /** Marker appended to summary posts so {@code FeedbackPostService} can locate and edit them. */
+    /** Marker appended to summary posts so a re-review can locate and edit the prior summary in place. */
     static final String SUMMARY_MARKER_PREFIX = "<!-- hephaestus-agent-feedback:";
 
     // Sanitization patterns
