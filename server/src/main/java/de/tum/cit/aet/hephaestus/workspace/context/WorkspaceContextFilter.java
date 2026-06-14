@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace.context;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -48,6 +49,7 @@ import tools.jackson.databind.ObjectMapper;
  * Filter order is set to -5 to ensure it runs after Spring Security filters (typically -10)
  * but before controller execution.
  */
+@ConditionalOnServerRole
 @Component
 @Order(-5)
 @Profile("!specs")

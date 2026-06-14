@@ -33,6 +33,8 @@
         "leaderboard",
         "leaderboard::spi",
         "integration.scm",
+        // Runtime-role gate (@ConditionalOnServerRole) on the connection-OAuth strategy.
+        "core::runtime",
     }
 )
 package de.tum.cit.aet.hephaestus.integration.slack;

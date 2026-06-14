@@ -194,9 +194,14 @@ services:
       # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
       # Coolify fronts previews with its own proxy — set its ingress regex, not staging's range.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:?Required}
+      # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
       # Shared infrastructure (must match shared-infra service names with UUID suffix)
@@ -234,23 +239,20 @@ services:
       # GitLabWebhookService appends /webhooks/gitlab itself.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       WEBHOOK_EXTERNAL_URL: https://${PREVIEW_DOMAIN:?Required}
+      # thc healthcheck target: actuator liveness on the management port.
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/liveness
     depends_on:
       postgres:
         condition: service_healthy
       seed-loader:
         condition: service_completed_successfully
+    # thc healthcheck (see docker/compose.app.yaml).
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--spider",
-          "--quiet",
-          "http://127.0.0.1:8080/actuator/health",
-        ]
-      interval: 10s
-      timeout: 10s
-      retries: 20
+      test: ["CMD", "/workspace/health-check"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
       start_period: 90s
     logging:
       driver: "json-file"
@@ -286,6 +288,7 @@ services:
       POSTHOG_ENABLED: "false"
     depends_on:
       application-server:
+        # Gate on app-server readiness so the SPA isn't served before the API answers.
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]

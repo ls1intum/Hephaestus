@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.connect;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.InstallationCredential;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Component;
  * side; we observe {@code installation.deleted} via the lifecycle webhook and
  * transition our row to {@code UNINSTALLED} from there.
  */
+@ConditionalOnServerRole
 @Component
 public class GithubConnectionStrategy implements ConnectionStrategy {
 

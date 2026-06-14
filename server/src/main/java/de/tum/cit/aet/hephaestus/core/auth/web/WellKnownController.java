@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import com.nimbusds.jose.jwk.JWKSet;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /.well-known/openid-configuration} discovery document will be added if/when a relying
  * party — Spring Authorization Server, a worker/CLI verifier — is actually mounted.)
  */
+@ConditionalOnServerRole
 @RestController
 @Tag(name = "Auth discovery", description = "Public JWK set for verifying Hephaestus session JWTs")
 public class WellKnownController {

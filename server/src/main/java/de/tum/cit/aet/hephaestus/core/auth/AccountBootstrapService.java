@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
  * it covers the case where the operator cannot predict an identity ahead of time, and guards against
  * zero-admin lockout.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Instance-admin bootstrap is account-scoped; not workspace-scoped")
 public class AccountBootstrapService {

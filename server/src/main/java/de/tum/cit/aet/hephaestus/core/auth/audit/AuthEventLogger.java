@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
  * authEventLogger.event(LOGIN, SUCCESS).account(accountId).gitProvider(providerId).record();
  * }</pre>
  */
+@ConditionalOnServerRole
 @Component
 public class AuthEventLogger {
 

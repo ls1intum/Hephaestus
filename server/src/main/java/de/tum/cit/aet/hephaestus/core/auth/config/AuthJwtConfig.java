@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.CookieBearerTokenResolver;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtSigningKeyService;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.RevocationAwareJwtDecoder;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
@@ -28,6 +29,7 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
  * <h2>{@link Clock} bean</h2>
  * A local {@code @Bean} so the issuer/decoder can be tested against a fixed {@link Clock}.
  */
+@ConditionalOnServerRole
 @Configuration
 @EnableConfigurationProperties(AuthProperties.class)
 public class AuthJwtConfig {

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.audit;
 
 import de.tum.cit.aet.hephaestus.core.auth.metrics.AuthMetrics;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import org.jspecify.annotations.Nullable;
@@ -20,6 +21,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>Allocates the id from the sequence, captures request IP + user agent, persists.
  * Swallows its own failures: an audit write must never break the business flow.
  */
+@ConditionalOnServerRole
 @Component
 public class AuthEventWriter {
 

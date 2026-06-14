@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.export.dto.ExportStatusDTO;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * request returns 202 immediately; the client polls {@link #status}. The post-commit handoff
  * guarantees the worker (a new transaction) sees the committed row.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("GDPR exports are account-scoped, spanning a principal's data across workspaces")
 public class AccountExportService {
@@ -112,6 +114,22 @@ public class AccountExportService {
             .filter(e -> e.getExpiresAt() == null || e.getExpiresAt().isAfter(Instant.now(clock)))
             .map(AccountExport::getPayload)
             .filter(payload -> payload != null && payload.length > 0);
+    }
+
+    /**
+     * Hourly retention enforcement: flips every READY export past its {@code expiresAt} to EXPIRED and
+     * nulls the payload so exported PII isn't retained beyond the download window. One bulk
+     * {@code @Modifying} UPDATE — no BYTEA blobs are loaded into the persistence context.
+     *
+     * <p>{@code @Transactional} is load-bearing: the bulk {@code @Modifying(flushAutomatically = true)}
+     * query needs an active transaction, and the scheduler ({@link ExportRetentionSweeper}) calls this
+     * across a real proxy hop with none of its own.
+     *
+     * @return the number of exports expired by this run
+     */
+    @Transactional
+    public int expireRetention() {
+        return accountExportRepository.expireReadyBefore(Instant.now(clock));
     }
 
     private ExportStatusDTO toStatus(AccountExport e) {

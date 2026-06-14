@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * means a vendor callback that took DAYS to arrive, which is well past every
  * sensible TTL. Shorten in tests via the property.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("Pruning a workspace-agnostic table")
 public class OAuthStateNonceCleanupJob {

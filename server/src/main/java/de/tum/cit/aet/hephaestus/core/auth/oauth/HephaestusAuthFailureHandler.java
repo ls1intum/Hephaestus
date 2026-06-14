@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
  * recorded reason is the exception TYPE only, never PII. Extracted from {@code AuthSecurityConfig}
  * (mirroring {@link HephaestusAuthSuccessHandler}) so the chain bean stays under the parameter limit.
  */
+@ConditionalOnServerRole
 @Component
 public class HephaestusAuthFailureHandler implements AuthenticationFailureHandler {
 

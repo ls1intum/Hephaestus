@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.jwt;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.EncryptionException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityProperties;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,7 @@ import org.springframework.stereotype.Component;
  * absent key disables sealing so a local boot still works (writing raw {@code v0-unsealed}
  * rows). A non-32-char key is always rejected.
  */
+@ConditionalOnServerRole
 @Component
 public class JwtSigningKeySealer {
 

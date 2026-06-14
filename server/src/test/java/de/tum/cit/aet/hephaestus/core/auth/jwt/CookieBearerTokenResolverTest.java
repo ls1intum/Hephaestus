@@ -3,10 +3,9 @@ package de.tum.cit.aet.hephaestus.core.auth.jwt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.AuthPropertiesFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.Cookie;
-import java.net.URI;
-import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -20,7 +19,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
  */
 class CookieBearerTokenResolverTest extends BaseUnitTest {
 
-    private static final String COOKIE_NAME = "__Host-HEPHAESTUS_AT";
+    private static final String COOKIE_NAME = AuthProperties.DEFAULT_COOKIE_NAME;
     private static final String COOKIE_TOKEN = "cookie-token-trusted";
     private static final String HEADER_TOKEN = "attacker-token-hostile";
 
@@ -28,22 +27,7 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        AuthProperties properties = new AuthProperties(
-            URI.create("http://localhost:8080"),
-            "hephaestus-spa",
-            Duration.ofMinutes(15),
-            COOKIE_NAME,
-            "",
-            Duration.ofHours(48),
-            java.util.Map.of(),
-            java.util.List.of(),
-            "",
-            Duration.ofHours(1),
-            Duration.ofHours(12),
-            false,
-            true
-        );
-        resolver = new CookieBearerTokenResolver(properties);
+        resolver = new CookieBearerTokenResolver(AuthPropertiesFixture.defaults());
     }
 
     @Test

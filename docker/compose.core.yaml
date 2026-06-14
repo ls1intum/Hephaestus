@@ -24,14 +24,27 @@ services:
       # WEBHOOK_EXTERNAL_URL is only used by auto-registration (server role) and is intentionally
       # not set on the webhook-server pod.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-      # DataSource kept until the workspace-context filter is made optional on this profile —
-      # the receiver itself never writes to the DB. Tracked as residual debt in ADR 0008.
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # DataSource for the JPA layer (the connection-credential AttributeConverter that the HMAC
+      # path reads); the auth web layer and workspace-context filter are gated off this role.
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
+      # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
+      # supplies it (an unset var fails the boot at placeholder resolution).
+      APPLICATION_HOST_URL: https://${APP_HOSTNAME}
       SENTRY_DSN: ${SENTRY_DSN}
       # forward-headers=native (application-prod.yml) → ProxyTrustGuard fails the boot unless pinned.
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
+      # AgentImagePinGuard loads in any prod pod; set false for non-release deploys that skip the pin.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
+      # thc healthcheck target: readiness (reports unhealthy while NATS/JetStream is unavailable).
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/readiness
     depends_on:
       nats-server:
         condition: service_healthy
@@ -58,12 +71,17 @@ services:
       - "traefik.http.routers.http-webhook-server.priority=100"
       - "traefik.http.routers.https-webhook-server.priority=100"
       - "traefik.http.services.https-webhook-server.loadbalancer.server.port=8080"
+      # Routing-layer probe: drops a bad backend from the LB pool.
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.path=/actuator/health/readiness"
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.interval=15s"
+      - "traefik.http.services.https-webhook-server.loadbalancer.healthcheck.timeout=5s"
+    # thc healthcheck (see docker/compose.app.yaml).
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      test: ["CMD", "/workspace/health-check"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 3
+      start_period: 90s
     logging:
       driver: "json-file"
       options:

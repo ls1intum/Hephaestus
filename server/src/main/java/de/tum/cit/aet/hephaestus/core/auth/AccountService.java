@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
  * controllers. Owns the data-layer access so the controllers stay thin and never touch a
  * repository directly (enforced by {@code ArchitectureTest.controllersDoNotAccessRepositories}).
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Account operations are user/system-scoped, not workspace-scoped")
 public class AccountService {

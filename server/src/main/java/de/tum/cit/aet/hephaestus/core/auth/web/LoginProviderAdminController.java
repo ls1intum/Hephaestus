@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +36,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * {@code redirectUri} the admin must register on the upstream OAuth app — the single most error-prone
  * step when wiring a self-hosted GitLab.
  */
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/admin/login-providers")
 @Tag(name = "Admin", description = "Instance-admin login provider management")
@@ -43,14 +45,30 @@ public class LoginProviderAdminController {
 
     private final LoginProviderService loginProviderService;
 
-    public LoginProviderAdminController(LoginProviderService loginProviderService) {
+    /** Proxy-stripped API prefix re-added to the displayed callback URL — see {@code AuthProperties#apiBasePath}. */
+    private final String apiBasePath;
+
+    public LoginProviderAdminController(
+        LoginProviderService loginProviderService,
+        de.tum.cit.aet.hephaestus.core.auth.AuthProperties authProperties
+    ) {
         this.loginProviderService = loginProviderService;
+        this.apiBasePath = authProperties.apiBasePath();
+    }
+
+    /**
+     * Public callback base the admin registers on the upstream OAuth app: the request origin (scheme +
+     * host, restored by native forward-headers) plus the proxy-stripped API prefix. The per-provider
+     * {@code /login/oauth2/code/{id}} segment is appended in {@link #toView}.
+     */
+    private String callbackBase() {
+        return ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString() + apiBasePath;
     }
 
     @GetMapping
     @Operation(summary = "List login providers", operationId = "adminListLoginProviders")
     public ResponseEntity<List<LoginProviderViewDTO>> list() {
-        String callbackBase = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
+        String callbackBase = callbackBase();
         return ResponseEntity.ok(
             loginProviderService
                 .listAll()
@@ -75,10 +93,7 @@ public class LoginProviderAdminController {
                 body.scopes()
             )
         );
-        LoginProviderViewDTO view = toView(
-            created,
-            ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString()
-        );
+        LoginProviderViewDTO view = toView(created, callbackBase());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{registrationId}")
             .buildAndExpand(created.getRegistrationId())
@@ -103,9 +118,7 @@ public class LoginProviderAdminController {
                 body.enabled()
             )
         );
-        return ResponseEntity.ok(
-            toView(updated, ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString())
-        );
+        return ResponseEntity.ok(toView(updated, callbackBase()));
     }
 
     @DeleteMapping("/{registrationId}")

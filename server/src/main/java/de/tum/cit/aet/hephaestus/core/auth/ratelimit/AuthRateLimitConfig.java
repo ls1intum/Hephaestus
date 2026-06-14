@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.ratelimit;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
 import io.github.bucket4j.distributed.jdbc.PrimaryKeyMapper;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -36,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
  * acceptable for those non-production contexts but would be a regression in a multi-replica
  * production deployment — production MUST run Postgres-backed. The active mode is logged at startup.
  */
+@ConditionalOnServerRole
 @Configuration
 public class AuthRateLimitConfig {
 

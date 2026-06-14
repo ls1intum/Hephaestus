@@ -51,7 +51,8 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
         );
 
         List<ClientRegistration> registrations = new LoginProviderClientRegistrationRepository(
-            repo
+            repo,
+            ""
         ).listRegistrations();
 
         assertThat(registrations).hasSize(2);
@@ -72,12 +73,34 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
             Optional.of(provider("gitlab-lrz", LoginProvider.ProviderType.GITLAB, "https://gitlab.lrz.de", "openid"))
         );
 
-        ClientRegistration reg = new LoginProviderClientRegistrationRepository(repo).findByRegistrationId("gitlab-lrz");
+        ClientRegistration reg = new LoginProviderClientRegistrationRepository(repo, "").findByRegistrationId(
+            "gitlab-lrz"
+        );
 
         assertThat(reg.getProviderDetails().getAuthorizationUri()).isEqualTo("https://gitlab.lrz.de/oauth/authorize");
         assertThat(reg.getProviderDetails().getTokenUri()).isEqualTo("https://gitlab.lrz.de/oauth/token");
         assertThat(reg.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo(
             "https://gitlab.lrz.de/api/v4/user"
         );
+    }
+
+    @Test
+    void redirectUri_carriesTheConfiguredApiBasePath() {
+        LoginProviderRepository repo = mock(LoginProviderRepository.class);
+        when(repo.findByRegistrationId("github")).thenReturn(
+            Optional.of(provider("github", LoginProvider.ProviderType.GITHUB, "https://github.com", "read:user"))
+        );
+
+        // Behind a proxy that strips /api, the redirect_uri the IdP gets must re-add it so the callback
+        // lands on the proxied API path, not the SPA. {baseUrl} is expanded by Spring at request time.
+        ClientRegistration prefixed = new LoginProviderClientRegistrationRepository(repo, "/api").findByRegistrationId(
+            "github"
+        );
+        assertThat(prefixed.getRedirectUri()).isEqualTo("{baseUrl}/api/login/oauth2/code/{registrationId}");
+
+        ClientRegistration root = new LoginProviderClientRegistrationRepository(repo, "").findByRegistrationId(
+            "github"
+        );
+        assertThat(root.getRedirectUri()).isEqualTo("{baseUrl}/login/oauth2/code/{registrationId}");
     }
 }

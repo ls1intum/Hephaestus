@@ -18,7 +18,9 @@ services:
     ports:
       - "80"
     depends_on:
-      - application-server
+      # Gate on app-server readiness so the SPA isn't served before the API answers.
+      application-server:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - shared-network
@@ -105,7 +107,10 @@ services:
       # + docker/compose.core.yaml). Disable it here so the receiver beans don't load
       # in application-server (saves RAM; prevents accidental localhost traffic).
       HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
-      DATABASE_URL: postgresql://postgres:5432/hephaestus
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       NATS_SERVER: nats://nats-server:4222
@@ -167,6 +172,10 @@ services:
       GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de}
       # Agent sandbox (practice review + Pi mentor chat). Activated by the worker role
       # (hephaestus.runtime.worker.enabled), then gated per-workspace via WorkspaceFeatures.
+      # AgentImagePinGuard requires a digest-pinned agent image in prod; the release-pin-fetcher
+      # supplies it for release tags. Set false for non-release (e.g. main/latest) deploys that skip
+      # the pin, otherwise the boot fails on agent-pi:<tag>. Keep true for release deploys.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
@@ -196,6 +205,9 @@ services:
       LLM_PROXY_AZURE_OPENAI_USE_BEARER: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:-false}
       # Worker control channel: same env var feeds the worker pod's registration-token claim.
       HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
+      # thc healthcheck target: actuator liveness on the management port.
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/liveness
     depends_on:
       postgres:
         condition: service_started
@@ -243,12 +255,14 @@ services:
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.path=/actuator/health/liveness"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.https-application-server.loadbalancer.healthcheck.timeout=3s"
+    # The distroless image has no shell for a wget probe; the probe is the static thc binary the
+    # health-checker buildpack adds at /workspace/health-check (server/pom.xml).
     healthcheck:
-      test: "wget -qO- http://localhost:8080/actuator/health || exit 1"
-      interval: 5s
-      timeout: 10s
-      retries: 10
-      start_period: 10s
+      test: ["CMD", "/workspace/health-check"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     # Matches application.yml's SHUTDOWN_TIMEOUT default (20s) plus headroom so SIGTERM has time
     # to drain in-flight requests before Docker SIGKILLs the launcher.
     stop_grace_period: 30s
@@ -265,6 +279,7 @@ services:
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
       NATS_SERVER: nats://nats-server:4222
@@ -282,6 +297,22 @@ services:
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
       SENTRY_DSN: ${SENTRY_DSN}
+      # Persistence for the JPA layer the worker shares (connection-credential AttributeConverter,
+      # workspace/agent context). The auth web layer is gated off this role, so no auth env is needed.
+      # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
+      # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
+      # default; confidentiality is fine to drop here (creds already sit in plaintext compose env).
+      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: root
+      # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
+      HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      # application-prod.yml binds host-url=${APPLICATION_HOST_URL} with no YAML default; compose always
+      # supplies it so the agent context builds links from a real origin (an unset var fails the boot).
+      APPLICATION_HOST_URL: https://${APP_HOSTNAME}
+      # thc healthcheck target: actuator liveness on the management port (still :8080 though server.port=-1).
+      THC_PORT: "8080"
+      THC_PATH: /actuator/health/liveness
     depends_on:
       application-server:
         condition: service_started
@@ -296,12 +327,14 @@ services:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
     stop_grace_period: 6m
+    # thc healthcheck (see application-server). The worker fronts no Traefik router, so this is its
+    # only health signal.
     healthcheck:
-      test: "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"
-      interval: 10s
+      test: ["CMD", "/workspace/health-check"]
+      interval: 15s
       timeout: 5s
-      retries: 6
-      start_period: 30s
+      retries: 3
+      start_period: 90s
     logging:
       driver: "json-file"
       options:

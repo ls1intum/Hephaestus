@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
  * DISTINCT bean (a self-invocation would bypass the proxy and NOT open a new tx), only the inner tx
  * rolls back; the caller's tx survives and can read-after-conflict for the winner's row.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic("JIT account creation is user-scoped, keyed by (provider, subject)")
 public class AccountJitCreator {

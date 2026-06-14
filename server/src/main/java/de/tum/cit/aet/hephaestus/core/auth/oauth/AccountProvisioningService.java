@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link IdentityLinkRepository#findActiveByProviderSubject}. Email is captured for
  * forensics only, never used to resolve an account.
  */
+@ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Account provisioning is user-scoped, keyed by (provider, subject)")
 public class AccountProvisioningService {
