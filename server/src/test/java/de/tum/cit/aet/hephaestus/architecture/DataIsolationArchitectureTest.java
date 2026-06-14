@@ -79,7 +79,12 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         // Unified integration framework
         "Connection", // has direct Workspace field
         "ConnectionAudit", // through Connection.workspace
-        "FeedbackPost" // through Connection.workspace
+        "FeedbackPost", // through Connection.workspace
+        // ADR 0021 C2 findings↔feedback synthesis seam — scoped via a raw workspace_id scalar (cross-module
+        // FK to avoid a Modulith cycle, mirrors PracticeFinding.agentJobId).
+        "Feedback", // direct workspace_id scalar column (sfk_feedback_workspace)
+        "FeedbackFinding", // through Feedback.workspace_id (and finding -> Practice.workspace)
+        "FeedbackPlacement" // through Feedback.workspace_id
     );
 
     /**

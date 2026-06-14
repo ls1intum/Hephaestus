@@ -120,6 +120,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyString(),
                     anyLong(),
                     anyLong(),
+                    any(),
                     anyString(),
                     anyString(),
                     anyString(),
@@ -127,6 +128,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     any(),
                     any(),
+                    anyString(),
                     any()
                 )
             )
@@ -158,6 +160,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("PULL_REQUEST"),
                 eq(456L),
                 eq(789L),
+                isNull(),
                 eq("Test finding"),
                 eq("OBSERVED"),
                 eq("INFO"),
@@ -165,6 +168,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 isNull(),
                 isNull(),
                 isNull(),
+                anyString(),
                 any()
             );
 
@@ -197,6 +201,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 anyLong(),
                 anyLong(),
+                any(),
                 anyString(),
                 anyString(),
                 anyString(),
@@ -204,6 +209,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                anyString(),
                 any()
             );
         }
@@ -362,6 +368,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyString(),
                     anyLong(),
                     anyLong(),
+                    any(),
                     anyString(),
                     anyString(),
                     anyString(),
@@ -369,6 +376,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     any(),
                     any(),
+                    anyString(),
                     any()
                 )
             ).thenReturn(0);
@@ -397,6 +405,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 anyLong(),
                 anyLong(),
+                any(),
                 anyString(),
                 anyString(),
                 anyString(),
@@ -404,6 +413,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                anyString(),
                 any()
             );
 
@@ -472,6 +482,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("ISSUE"),
                 eq(999L),
                 eq(789L),
+                isNull(),
                 anyString(),
                 eq("NOT_OBSERVED"),
                 anyString(),
@@ -479,6 +490,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                anyString(),
                 any()
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());

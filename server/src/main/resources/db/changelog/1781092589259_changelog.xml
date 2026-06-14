@@ -351,4 +351,318 @@
         </rollback>
     </changeSet>
 
+    <!-- ADR 0021 C2 findings/feedback synthesis seam. Names match the JPA entities EXACTLY (uk_/idx_/fk_/chk_). Timestamps use TIMESTAMP(6) WITH TIME ZONE; UUID PKs/FKs use type UUID. Each changeSet onFail=MARK_RAN + rollback, mirroring -17/-18. baseline_state DERIVED on read (no column). FindingReaction NOT reshaped here. -->
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-19">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.correlation_key already present">
+            <not><columnExists tableName="practice_finding" columnName="correlation_key"/></not>
+        </preConditions>
+        <comment>ADR 0021 C2: cross-run finding identity (stable hash; never line/jobId) + reviewer-subject. Nullable, backfill-free.</comment>
+        <addColumn tableName="practice_finding">
+            <column name="correlation_key" type="VARCHAR(64)"/>
+            <column name="subject_user_id" type="BIGINT"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="practice_finding" columnName="correlation_key"/>
+            <dropColumn tableName="practice_finding" columnName="subject_user_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-20">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_finding_correlation already present">
+            <not><indexExists indexName="idx_practice_finding_correlation"/></not>
+        </preConditions>
+        <comment>Index the cross-run correlation key (supersession lookups) + subject_user_id (reviewer-subject dashboards).</comment>
+        <createIndex indexName="idx_practice_finding_correlation" tableName="practice_finding">
+            <column name="correlation_key"/>
+        </createIndex>
+        <createIndex indexName="idx_practice_finding_subject" tableName="practice_finding">
+            <column name="subject_user_id"/>
+        </createIndex>
+        <rollback>
+            <dropIndex indexName="idx_practice_finding_subject" tableName="practice_finding"/>
+            <dropIndex indexName="idx_practice_finding_correlation" tableName="practice_finding"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-21">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_finding_subject already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_practice_finding_subject"/></not>
+        </preConditions>
+        <comment>FK practice_finding.subject_user_id to user.id, SET NULL on delete (findings survive user removal).</comment>
+        <addForeignKeyConstraint baseTableName="practice_finding" baseColumnNames="subject_user_id" constraintName="sfk_practice_finding_subject" referencedTableName="user" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice_finding" constraintName="sfk_practice_finding_subject"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-22">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.audience_role already present">
+            <not><columnExists tableName="practice" columnName="audience_role"/></not>
+        </preConditions>
+        <comment>ADR 0021 C2: practice audience role (AUTHOR | REVIEWER); defaults to AUTHOR. Drives the reviewer/author delivery firewall. No CHECK (mirrors polarity/focus_artifact; enum guarded app-side).</comment>
+        <addColumn tableName="practice">
+            <column name="audience_role" type="VARCHAR(16)" defaultValue="AUTHOR">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="audience_role"/></rollback>
+    </changeSet>
+
+    <!-- feedback (synthesized delivery unit, Immutable) -->
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-23">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback table already present">
+            <not><tableExists tableName="feedback"/></not>
+        </preConditions>
+        <comment>ADR 0021 C2: synthesized feedback unit (one composed lesson; supersedes rather than re-posts). baseline_state DERIVED on read, not a column.</comment>
+        <createTable tableName="feedback">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="feedback_pkey"/></column>
+            <column name="idempotency_key" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="agent_job_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="target_type" type="VARCHAR(32)"/>
+            <column name="target_id" type="BIGINT"/>
+            <column name="recipient_user_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="subject_user_id" type="BIGINT"/>
+            <column name="surface" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="unit_ordinal" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="state" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="suppression_reason" type="VARCHAR(32)"/>
+            <column name="rendered_body" type="TEXT"/>
+            <column name="origin" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="model_id" type="VARCHAR(255)"/>
+            <column name="composer_version" type="VARCHAR(255)"/>
+            <column name="synthesis_prompt_version" type="VARCHAR(255)"/>
+            <column name="supersedes_id" type="UUID"/>
+            <column name="continuity_key" type="VARCHAR(64)"/>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
+            <column name="delivered_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </createTable>
+        <rollback><dropTable tableName="feedback"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-24">
+        <preConditions onFail="MARK_RAN" onFailMessage="uk_feedback_idempotency already present">
+            <not><indexExists indexName="uk_feedback_idempotency"/></not>
+        </preConditions>
+        <comment>One feedback unit per (agent_job, unit_ordinal): the idempotency key the synthesizer dedups on.</comment>
+        <addUniqueConstraint tableName="feedback" columnNames="agent_job_id, unit_ordinal" constraintName="uk_feedback_idempotency"/>
+        <rollback><dropUniqueConstraint tableName="feedback" constraintName="uk_feedback_idempotency"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-25">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback CHECK constraints already present">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_state'</sqlCheck>
+        </preConditions>
+        <comment>Enum CHECKs for feedback (mirrors chk_practice_finding_* idiom). target_type uses full WorkArtifact vocabulary PULL_REQUEST/ISSUE.</comment>
+        <sql>
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_target_type CHECK (target_type IS NULL OR target_type IN ('PULL_REQUEST', 'ISSUE'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_surface CHECK (surface IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION_DASHBOARD', 'FACILITATOR'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (state IN ('PREPARED', 'DELIVERED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_origin CHECK (origin IN ('AGENT', 'POLICY_FLOOR', 'FALLBACK'));
+        </sql>
+        <rollback>
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_target_type;
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_surface;
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_state;
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_origin;
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-26">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_agent_job already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_agent_job"/></not>
+        </preConditions>
+        <comment>FK feedback.agent_job_id to agent_job.id (cross-module raw UUID; Liquibase-managed). CASCADE: purging a job removes its synthesized feedback.</comment>
+        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="agent_job_id" constraintName="sfk_feedback_agent_job" referencedTableName="agent_job" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_agent_job"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-27">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_workspace already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_workspace"/></not>
+        </preConditions>
+        <comment>Tenancy FK feedback.workspace_id to workspace.id. No DB cascade (mirrors fk_practice_workspace); workspace purge removes feedback explicitly.</comment>
+        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="workspace_id" constraintName="sfk_feedback_workspace" referencedTableName="workspace" referencedColumnNames="id" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_workspace"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-28">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_recipient already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_recipient"/></not>
+        </preConditions>
+        <comment>FK feedback.recipient_user_id to user.id. SET NULL would violate NOT NULL, so RESTRICT (no onDelete): feedback blocks deleting its recipient.</comment>
+        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="recipient_user_id" constraintName="sfk_feedback_recipient" referencedTableName="user" referencedColumnNames="id" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_recipient"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-29">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_subject already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_subject"/></not>
+        </preConditions>
+        <comment>FK feedback.subject_user_id to user.id (person the feedback is ABOUT). Nullable; SET NULL on delete.</comment>
+        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="subject_user_id" constraintName="sfk_feedback_subject" referencedTableName="user" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_subject"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-30">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_supersedes already present">
+            <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_supersedes"/></not>
+        </preConditions>
+        <comment>Self-FK feedback.supersedes_id to feedback.id (continuity chain). SET NULL on delete so pruning an old unit does not cascade-delete its successor.</comment>
+        <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="supersedes_id" constraintName="sfk_feedback_supersedes" referencedTableName="feedback" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_supersedes"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-31">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback indexes already present">
+            <not><indexExists indexName="idx_feedback_agent_job"/></not>
+        </preConditions>
+        <comment>Query indexes: agent_job + workspace + supersedes/recipient FKs (Postgres does not auto-index referencing columns), recipient-timeline, target lookup, continuity_key supersession lookup.</comment>
+        <createIndex indexName="idx_feedback_agent_job" tableName="feedback"><column name="agent_job_id"/></createIndex>
+        <createIndex indexName="idx_feedback_workspace" tableName="feedback"><column name="workspace_id"/></createIndex>
+        <createIndex indexName="idx_feedback_supersedes" tableName="feedback"><column name="supersedes_id"/></createIndex>
+        <createIndex indexName="idx_feedback_recipient_created" tableName="feedback"><column name="recipient_user_id"/><column name="created_at" descending="true"/></createIndex>
+        <createIndex indexName="idx_feedback_target" tableName="feedback"><column name="target_type"/><column name="target_id"/></createIndex>
+        <createIndex indexName="idx_feedback_continuity" tableName="feedback"><column name="continuity_key"/></createIndex>
+        <rollback>
+            <dropIndex indexName="idx_feedback_continuity" tableName="feedback"/>
+            <dropIndex indexName="idx_feedback_target" tableName="feedback"/>
+            <dropIndex indexName="idx_feedback_recipient_created" tableName="feedback"/>
+            <dropIndex indexName="idx_feedback_supersedes" tableName="feedback"/>
+            <dropIndex indexName="idx_feedback_workspace" tableName="feedback"/>
+            <dropIndex indexName="idx_feedback_agent_job" tableName="feedback"/>
+        </rollback>
+    </changeSet>
+
+    <!-- feedback_finding (M:N composition, Immutable) -->
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-32">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding table already present">
+            <not><tableExists tableName="feedback_finding"/></not>
+        </preConditions>
+        <comment>ADR 0021 C2: M:N binding of a feedback unit to the findings it was composed from. Composite PK (feedback_id, finding_id).</comment>
+        <createTable tableName="feedback_finding">
+            <column name="feedback_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="finding_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="display_role" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="ordinal" type="INTEGER"><constraints nullable="false"/></column>
+        </createTable>
+        <addPrimaryKey tableName="feedback_finding" columnNames="feedback_id, finding_id" constraintName="feedback_finding_pkey"/>
+        <rollback><dropTable tableName="feedback_finding"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-33">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding display_role CHECK already present">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_finding_display_role'</sqlCheck>
+        </preConditions>
+        <comment>Enum CHECK for feedback_finding.display_role (PRIMARY | SUPPORTING).</comment>
+        <sql>ALTER TABLE feedback_finding ADD CONSTRAINT chk_feedback_finding_display_role CHECK (display_role IN ('PRIMARY', 'SUPPORTING'));</sql>
+        <rollback>ALTER TABLE feedback_finding DROP CONSTRAINT IF EXISTS chk_feedback_finding_display_role;</rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-34">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_finding_feedback already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_feedback_finding_feedback"/></not>
+        </preConditions>
+        <comment>FK feedback_finding.feedback_id to feedback.id, CASCADE (matches OnDelete CASCADE on the entity).</comment>
+        <addForeignKeyConstraint baseTableName="feedback_finding" baseColumnNames="feedback_id" constraintName="fk_feedback_finding_feedback" referencedTableName="feedback" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback_finding" constraintName="fk_feedback_finding_feedback"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-35">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_finding_finding already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_feedback_finding_finding"/></not>
+        </preConditions>
+        <comment>FK feedback_finding.finding_id to practice_finding.id, CASCADE (matches OnDelete CASCADE on the entity).</comment>
+        <addForeignKeyConstraint baseTableName="feedback_finding" baseColumnNames="finding_id" constraintName="fk_feedback_finding_finding" referencedTableName="practice_finding" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback_finding" constraintName="fk_feedback_finding_finding"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-36">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_feedback_finding_finding already present">
+            <not><indexExists indexName="idx_feedback_finding_finding"/></not>
+        </preConditions>
+        <comment>Reverse-lookup index (finding to feedback units it fed): composite PK covers feedback_id-leading scans, this covers finding_id-leading ones + the FK ON DELETE.</comment>
+        <createIndex indexName="idx_feedback_finding_finding" tableName="feedback_finding"><column name="finding_id"/></createIndex>
+        <rollback><dropIndex indexName="idx_feedback_finding_finding" tableName="feedback_finding"/></rollback>
+    </changeSet>
+
+    <!-- feedback_placement (1:N surface placement, Immutable) -->
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-37">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement table already present">
+            <not><tableExists tableName="feedback_placement"/></not>
+        </preConditions>
+        <comment>ADR 0021 C2: one concrete placement of a feedback unit on a surface (summary / inline anchor / conversation turn) with diff-anchor coordinates + posting lifecycle.</comment>
+        <createTable tableName="feedback_placement">
+            <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="feedback_placement_pkey"/></column>
+            <column name="feedback_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="placement" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="anchor_kind" type="VARCHAR(16)"/>
+            <column name="anchor_path" type="TEXT"/>
+            <column name="anchor_old_path" type="TEXT"/>
+            <column name="anchor_start_line" type="INTEGER"/>
+            <column name="anchor_end_line" type="INTEGER"/>
+            <column name="anchor_side" type="VARCHAR(8)"/>
+            <column name="anchor_start_side" type="VARCHAR(8)"/>
+            <column name="anchor_quote" type="TEXT"/>
+            <column name="pinned_commit_sha" type="VARCHAR(64)"/>
+            <column name="external_ref" type="TEXT"/>
+            <column name="thread_external_ref" type="TEXT"/>
+            <column name="resolved" type="BOOLEAN"/>
+            <column name="resolved_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+            <column name="resolved_external_ref" type="TEXT"/>
+            <column name="posted_state" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <rollback><dropTable tableName="feedback_placement"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-38">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement CHECK constraints already present">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_placement_posted_state'</sqlCheck>
+        </preConditions>
+        <comment>Enum CHECKs for feedback_placement (placement / anchor_kind / anchor_side / anchor_start_side / posted_state).</comment>
+        <sql>
+            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_placement CHECK (placement IN ('SUMMARY', 'INLINE', 'CONVERSATION_TURN'));
+            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_anchor_kind CHECK (anchor_kind IS NULL OR anchor_kind IN ('LINE', 'RANGE', 'FILE', 'IMAGE'));
+            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_anchor_side CHECK (anchor_side IS NULL OR anchor_side IN ('OLD', 'NEW'));
+            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_anchor_start_side CHECK (anchor_start_side IS NULL OR anchor_start_side IN ('OLD', 'NEW'));
+            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_posted_state CHECK (posted_state IN ('PENDING', 'POSTED', 'SNAPPED', 'FELL_BACK', 'OUTDATED', 'ORPHANED', 'GONE', 'FAILED'));
+        </sql>
+        <rollback>
+            ALTER TABLE feedback_placement DROP CONSTRAINT IF EXISTS chk_feedback_placement_placement;
+            ALTER TABLE feedback_placement DROP CONSTRAINT IF EXISTS chk_feedback_placement_anchor_kind;
+            ALTER TABLE feedback_placement DROP CONSTRAINT IF EXISTS chk_feedback_placement_anchor_side;
+            ALTER TABLE feedback_placement DROP CONSTRAINT IF EXISTS chk_feedback_placement_anchor_start_side;
+            ALTER TABLE feedback_placement DROP CONSTRAINT IF EXISTS chk_feedback_placement_posted_state;
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-39">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_placement_feedback already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_feedback_placement_feedback"/></not>
+        </preConditions>
+        <comment>FK feedback_placement.feedback_id to feedback.id, CASCADE (matches OnDelete CASCADE on the entity).</comment>
+        <addForeignKeyConstraint baseTableName="feedback_placement" baseColumnNames="feedback_id" constraintName="fk_feedback_placement_feedback" referencedTableName="feedback" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
+        <rollback><dropForeignKeyConstraint baseTableName="feedback_placement" constraintName="fk_feedback_placement_feedback"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-40">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement indexes already present">
+            <not><indexExists indexName="idx_feedback_placement_feedback"/></not>
+        </preConditions>
+        <comment>Indexes: feedback_id (placements-of-a-unit + FK ON DELETE) and external_ref (reconcile a posted comment/note back to its placement).</comment>
+        <createIndex indexName="idx_feedback_placement_feedback" tableName="feedback_placement"><column name="feedback_id"/></createIndex>
+        <createIndex indexName="idx_feedback_placement_external_ref" tableName="feedback_placement"><column name="external_ref"/></createIndex>
+        <rollback>
+            <dropIndex indexName="idx_feedback_placement_external_ref" tableName="feedback_placement"/>
+            <dropIndex indexName="idx_feedback_placement_feedback" tableName="feedback_placement"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

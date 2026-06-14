@@ -99,6 +99,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             targetType,
             targetId,
             user.getId(),
+            null,
             title,
             verdict,
             severity,
@@ -106,6 +107,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             null,
             "Test reasoning for " + title,
             "Test guidance for " + title,
+            null,
             detectedAt
         );
         return id;
@@ -491,6 +493,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "PULL_REQUEST",
                 2L,
                 contributor.getId(),
+                null,
                 "Other WS finding",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -498,6 +501,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 "reasoning",
                 "guidance",
+                null,
                 now
             );
 
@@ -768,6 +772,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "PULL_REQUEST",
                 50L,
                 contributor.getId(),
+                null,
                 "Evidence finding",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -775,6 +780,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 evidenceJson,
                 "reasoning",
                 "guidance",
+                null,
                 Instant.now()
             );
 
@@ -1016,6 +1022,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "PULL_REQUEST",
                 100L,
                 contributor.getId(),
+                null,
                 "WS2 PR finding",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -1023,6 +1030,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 "reasoning",
                 "guidance",
+                null,
                 now
             );
 

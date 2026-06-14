@@ -103,6 +103,17 @@ public class Practice {
     private Polarity polarity = Polarity.DESIRABLE;
 
     /**
+     * Whose conduct this practice evaluates — the contribution author or its reviewer (ADR 0021, C2).
+     * Drives the {@code subject_user_id} a finding is filed against and the audience a {@code Feedback}
+     * unit is delivered to, so reviewer-craft lessons reach the reviewer and never the author. NOT NULL;
+     * defaults to {@code AUTHOR} — every catalogued practice today is author-side (zero backfill).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "audience_role", nullable = false, length = 16)
+    @ColumnDefault("'AUTHOR'")
+    private AudienceRole audienceRole = AudienceRole.AUTHOR;
+
+    /**
      * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
      * many practices; a practice belongs to at most one goal): the single owning bucket keeps the
      * per-goal acted-on/total progress denominator unambiguous. Do not loosen to a join table without

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -138,6 +139,23 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
+            // Author-side practices (the whole catalogue today) file the finding against the contributor,
+            // so subject_user_id stays null (== contributor); reviewer-audience practices will set the
+            // reviewer here once they ship (ADR 0021 C2).
+            Long subjectUserId = null;
+
+            // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
+            // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
+            // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
+            String correlationKey = CorrelationKey.compute(
+                finding.practiceSlug(),
+                targetType.name(),
+                targetId,
+                subjectUserId != null ? subjectUserId : contributorId,
+                finding.title(),
+                firstLocationPath(finding.evidence())
+            );
+
             // Insert (idempotent)
             int rows = practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -147,6 +165,7 @@ public class PracticeDetectionDeliveryService {
                 targetType.name(),
                 targetId,
                 contributorId,
+                subjectUserId,
                 finding.title(),
                 finding.verdict().name(),
                 finding.severity().name(),
@@ -154,6 +173,7 @@ public class PracticeDetectionDeliveryService {
                 evidenceJson,
                 finding.reasoning(),
                 finding.guidance(),
+                correlationKey,
                 detectedAt
             );
 
@@ -236,6 +256,27 @@ public class PracticeDetectionDeliveryService {
             );
         }
         return new Target(WorkArtifact.PULL_REQUEST, pullRequestId, pullRequest.getAuthor().getId());
+    }
+
+    /**
+     * The file path of a finding's first evidence location, or {@code null} when it has none (a metadata
+     * practice like PR-description quality). Feeds {@link CorrelationKey} — the PATH only, never a line
+     * number, so a finding that survives a few lines moving keeps one cross-run identity.
+     */
+    private static String firstLocationPath(JsonNode evidence) {
+        if (evidence == null || evidence.isNull()) {
+            return null;
+        }
+        JsonNode locations = evidence.get("locations");
+        if (locations == null || !locations.isArray() || locations.isEmpty()) {
+            return null;
+        }
+        JsonNode first = locations.get(0);
+        if (first == null || !first.isObject()) {
+            return null;
+        }
+        JsonNode path = first.get("path");
+        return path != null && path.isString() ? path.asString() : null;
     }
 
     public record DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {}

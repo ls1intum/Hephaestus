@@ -53,6 +53,10 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_practice_finding_contributor_detected", columnList = "contributor_id, detected_at DESC"),
         @Index(name = "idx_practice_finding_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_practice_finding_target", columnList = "target_type, target_id"),
+        // Cross-run identity (ADR 0021 C2): supersession + reaction-history follow one finding across re-detections.
+        @Index(name = "idx_practice_finding_correlation", columnList = "correlation_key"),
+        // Reviewer-side findings are filed against the subject, not the contributor; index for subject dashboards.
+        @Index(name = "idx_practice_finding_subject", columnList = "subject_user_id"),
     }
 )
 @Getter
@@ -114,6 +118,26 @@ public class PracticeFinding {
         foreignKey = @ForeignKey(name = "fk_practice_finding_contributor")
     )
     private User contributor;
+
+    /**
+     * The user the finding is ABOUT when that differs from the {@link #contributor} — i.e. reviewer-side
+     * practices, where the subject is the reviewer (ADR 0021, C2). NULL means the subject IS the contributor
+     * (the author-side default). Raw {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the
+     * cross-cutting identity columns scalar; the DB FK {@code fk_practice_finding_subject} is Liquibase-managed.
+     */
+    @Column(name = "subject_user_id")
+    private Long subjectUserId;
+
+    /**
+     * Stable cross-run identity (ADR 0021, C2): a deterministic hash of what the finding is ABOUT
+     * (practice + target + subject + a content anchor), NEVER of when it was produced (no job id, no line
+     * number). Lets later {@code Feedback} supersede rather than re-post, and lets a reaction follow one
+     * underlying problem across re-detections — the primitive the research question's "do practices change
+     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey}.
+     * Nullable: backfill-free, populated on new findings only.
+     */
+    @Column(name = "correlation_key", length = 64)
+    private String correlationKey;
 
     @NotNull
     @Column(name = "title", nullable = false, length = 255)

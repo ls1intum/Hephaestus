@@ -276,6 +276,59 @@ erDiagram
         BIGINT label_id PK,FK
     }
 
+    Feedback {
+        UUID id PK
+        VARCHAR(255) idempotency_key "NOT NULL"
+        UUID agent_job_id FK,UK "NOT NULL"
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(32) target_type
+        BIGINT target_id
+        BIGINT recipient_user_id FK "NOT NULL"
+        BIGINT subject_user_id FK
+        VARCHAR(32) surface "NOT NULL"
+        INTEGER unit_ordinal UK "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(32) suppression_reason
+        TEXT rendered_body
+        VARCHAR(16) origin "NOT NULL"
+        VARCHAR(255) model_id
+        VARCHAR(255) composer_version
+        VARCHAR(255) synthesis_prompt_version
+        UUID supersedes_id FK
+        VARCHAR(64) continuity_key
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ delivered_at
+    }
+
+    FeedbackFinding {
+        UUID feedback_id PK,FK
+        UUID finding_id PK,FK
+        VARCHAR(16) display_role "NOT NULL"
+        INTEGER ordinal "NOT NULL"
+    }
+
+    FeedbackPlacement {
+        UUID id PK
+        UUID feedback_id FK "NOT NULL"
+        VARCHAR(32) placement "NOT NULL"
+        VARCHAR(16) anchor_kind
+        TEXT anchor_path
+        TEXT anchor_old_path
+        INTEGER anchor_start_line
+        INTEGER anchor_end_line
+        VARCHAR(8) anchor_side
+        VARCHAR(8) anchor_start_side
+        TEXT anchor_quote
+        VARCHAR(64) pinned_commit_sha
+        TEXT external_ref
+        TEXT thread_external_ref
+        BOOLEAN resolved
+        TIMESTAMPTZ resolved_at
+        TEXT resolved_external_ref
+        VARCHAR(16) posted_state "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
     FeedbackPost {
         BIGINT id PK
         BIGINT connection_id FK,UK "NOT NULL"
@@ -554,6 +607,7 @@ erDiagram
         BIGINT practice_goal_id FK
         VARCHAR(32) focus_artifact "NOT NULL"
         VARCHAR(16) polarity "NOT NULL"
+        VARCHAR(16) audience_role "NOT NULL"
     }
 
     PracticeFinding {
@@ -572,6 +626,8 @@ erDiagram
         TEXT reasoning
         TEXT guidance
         TIMESTAMPTZ detected_at "NOT NULL"
+        VARCHAR(64) correlation_key
+        BIGINT subject_user_id FK
     }
 
     PracticeGoal {
@@ -953,6 +1009,7 @@ erDiagram
     GitProvider ||--|| Discussion : references
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
+    AgentJob ||--|| Feedback : has
     Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
@@ -1009,6 +1066,11 @@ erDiagram
     Discussion ||--o{ DiscussionComment : commented_on
     User ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
+    Workspace ||--o{ Feedback : has
+    User ||--o{ Feedback : recipient_user_id
+    User ||--o{ Feedback : subject_user_id
+    Feedback ||--o{ Feedback : references
+    Feedback ||--o{ FeedbackPlacement : has
     PracticeFinding ||--o{ FindingReaction : has
     User ||--o{ FindingReaction : references
     User ||--o{ GitCommit : authored_by
@@ -1028,6 +1090,7 @@ erDiagram
     PracticeGoal ||--o{ Practice : has
     Practice ||--o{ PracticeFinding : has
     User ||--o{ PracticeFinding : references
+    User ||--o{ PracticeFinding : has
     User ||--o{ Project : created_by
     Issue ||--o{ ProjectItem : has
     User ||--o{ ProjectItem : created_by
@@ -1053,6 +1116,8 @@ erDiagram
     Issue }o--o{ CommitPullRequest : references
     Discussion }o--o{ DiscussionLabel : labeled
     Label }o--o{ DiscussionLabel : labeled
+    Feedback }o--o{ FeedbackFinding : has
+    PracticeFinding }o--o{ FeedbackFinding : has
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : blocked_issue_id
