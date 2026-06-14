@@ -151,6 +151,12 @@ public class ReviewThreadContentProvider implements ContentProvider {
                     if (t == null) {
                         continue;
                     }
+                    // A thread opened by Hephaestus's OWN posted note is the tool's own output, not a
+                    // reviewer thread — emitting it (and counting it in unresolvedCount) would feed the
+                    // agent the tool's self-reference as if it were reviewer input. Drop it entirely.
+                    if (isHephaestusThread(t)) {
+                        continue;
+                    }
                     boolean isUnresolved = t.getState() == PullRequestReviewThread.State.UNRESOLVED;
                     if (isUnresolved) {
                         unresolved++;
@@ -198,6 +204,37 @@ public class ReviewThreadContentProvider implements ContentProvider {
             // Best-effort: cross-context enrichment must never fail the job.
             log.warn("ReviewThreadContentProvider failed, continuing without review-thread state: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Marker embedded in every Hephaestus practice-review note ({@code <!-- hephaestus-diff-note -->},
+     * {@code <!-- hephaestus:practice-review:… -->}). A human reviewer never writes it, so a thread that
+     * carries it is the tool's own posted finding, never a reviewer thread. The {@code rootComment} FK is
+     * not populated by the sync, so we scan the thread's comment set (the marker is the reliable signal —
+     * the mirror's Hephaestus identity is a {@code group_*_bot_*} access-token login indistinguishable
+     * from a human reviewer's by login alone).
+     */
+    private static final String HEPHAESTUS_MARKER = "<!-- hephaestus";
+
+    private static boolean isHephaestusThread(PullRequestReviewThread t) {
+        var comments = t.getComments();
+        if (comments == null || comments.isEmpty()) {
+            return false;
+        }
+        for (var c : comments) {
+            if (c == null) {
+                continue;
+            }
+            String body = c.getBody();
+            if (body != null && body.contains(HEPHAESTUS_MARKER)) {
+                return true;
+            }
+            String login = login(c.getAuthor());
+            if (login != null && login.toLowerCase(java.util.Locale.ROOT).contains("hephaestus")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ObjectNode toThread(PullRequestReviewThread t) {

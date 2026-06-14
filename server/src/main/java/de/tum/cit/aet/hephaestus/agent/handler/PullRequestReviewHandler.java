@@ -90,7 +90,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // grounded in one of these must survive the diff-scope filter. test_presence/branch_graph were removed
         // here in lockstep with deleting those providers — they were worktree-derived Transform, not content.
         ContentProvider.OUTPUT_PREFIX + "linked_work_items.json",
-        ContentProvider.OUTPUT_PREFIX + "review_threads.json"
+        ContentProvider.OUTPUT_PREFIX + "review_threads.json",
+        // General (conversation-tab) MR review discussion — position-less notes GitLab routes to
+        // IssueComment, surfaced by GeneralReviewCommentContentProvider. The reviewer-craft practices
+        // ground in this alongside comments.json; a finding citing it must survive the diff-scope filter.
+        ContentProvider.OUTPUT_PREFIX + "general_comments.json"
     );
 
     /**

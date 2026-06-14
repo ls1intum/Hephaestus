@@ -103,6 +103,19 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         return t;
     }
 
+    private de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment comment(
+        String login,
+        String body
+    ) {
+        var c =
+            new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment();
+        c.setBody(body);
+        if (login != null) {
+            c.setAuthor(user(login));
+        }
+        return c;
+    }
+
     private PullRequest mergedPr() {
         PullRequest pr = new PullRequest();
         pr.setMerged(true);
@@ -175,6 +188,37 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         // no per-row "effective"/"superseded" flag. Raw rows only; the agent judges.
         assertThat(out.has("changesRequestedUnaddressed")).isFalse();
         assertThat(decisions.get(0).has("superseded")).isFalse();
+    }
+
+    @Test
+    void contribute_hephaestusOwnThread_excludedFromCountAndEmit() throws Exception {
+        // A thread whose comments are Hephaestus's own posted note (marker-bearing) must NOT count as a
+        // reviewer thread — the rootComment FK is null in sync, so the comment set is the signal.
+        PullRequestReviewThread botThread = thread(PullRequestReviewThread.State.UNRESOLVED, "src/Foo.swift", 10, null);
+        botThread.setComments(
+            java.util.Set.of(comment(null, "Add a unit test for encodeDepth.\n<!-- hephaestus-diff-note -->"))
+        );
+
+        PullRequestReviewThread humanThread = thread(
+            PullRequestReviewThread.State.UNRESOLVED,
+            "src/Bar.swift",
+            5,
+            null
+        );
+        humanThread.setComments(
+            java.util.Set.of(comment("reviewer-a", "This force-unwrap will crash — can we guard it?"))
+        );
+
+        when(threadRepository.findAllByPullRequestIdWithResolvedBy(PR_ID)).thenReturn(List.of(botThread, humanThread));
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        // Only the human reviewer thread is counted; the Hephaestus note is dropped entirely.
+        assertThat(out.get("unresolvedCount").asInt()).isEqualTo(1);
+        assertThat(out.get("threads")).hasSize(1);
+        assertThat(out.get("threads").get(0).get("path").asString()).isEqualTo("src/Bar.swift");
     }
 
     @Test

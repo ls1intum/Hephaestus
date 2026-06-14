@@ -16,15 +16,19 @@ public interface PullRequestReviewThreadRepository extends JpaRepository<PullReq
     java.util.Optional<PullRequestReviewThread> findByNodeIdAndProviderId(String nodeId, Long providerId);
 
     /**
-     * All review threads of a pull request, with {@code resolvedBy} eagerly fetched so the
-     * cross-context provider can attribute who resolved each thread without an N+1 lazy load.
-     * Read-only context materialisation; the caller establishes workspace scope.
+     * All review threads of a pull request, with {@code resolvedBy} and the thread's {@code comments}
+     * (plus their authors) eagerly fetched so the cross-context provider can attribute who resolved each
+     * thread AND tell whether the thread is Hephaestus's own posted note — without an N+1 lazy load.
+     * (The {@code rootComment} FK is not populated by the sync, so the comment set is the reliable source
+     * for the marker check.) Read-only context materialisation; the caller establishes workspace scope.
      */
     @org.springframework.data.jpa.repository.Query(
         """
-        SELECT t
+        SELECT DISTINCT t
         FROM PullRequestReviewThread t
         LEFT JOIN FETCH t.resolvedBy
+        LEFT JOIN FETCH t.comments c
+        LEFT JOIN FETCH c.author
         WHERE t.pullRequest.id = :pullRequestId
         """
     )
