@@ -33,19 +33,22 @@ public class JobTypeHandlerConfiguration {
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
+    private final ReactionSuppressionFilter reactionSuppressionFilter;
 
     JobTypeHandlerConfiguration(
         JsonMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
-        TaskEnvelopeWriter taskEnvelopeWriter
+        TaskEnvelopeWriter taskEnvelopeWriter,
+        ReactionSuppressionFilter reactionSuppressionFilter
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.reviewProperties = reviewProperties;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
+        this.reactionSuppressionFilter = reactionSuppressionFilter;
     }
 
     @Bean
@@ -73,7 +76,8 @@ public class JobTypeHandlerConfiguration {
         UserPreferencesRepository userPreferencesRepository,
         PullRequestRepository pullRequestRepository,
         WorkspaceRepository workspaceRepository,
-        FeedbackLedgerRecorder feedbackLedgerRecorder
+        FeedbackLedgerRecorder feedbackLedgerRecorder,
+        de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService findingTrendService
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
@@ -82,7 +86,8 @@ public class JobTypeHandlerConfiguration {
             pullRequestRepository,
             workspaceRepository,
             reviewProperties,
-            feedbackLedgerRecorder
+            feedbackLedgerRecorder,
+            findingTrendService
         );
     }
 
@@ -115,7 +120,8 @@ public class JobTypeHandlerConfiguration {
             resultParser,
             deliveryService,
             feedbackService,
-            secretDiffScanner
+            secretDiffScanner,
+            reactionSuppressionFilter
         );
     }
 

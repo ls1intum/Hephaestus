@@ -262,7 +262,8 @@ public class PracticeDetectionDeliveryService {
      * practice like PR-description quality). Feeds {@link CorrelationKey} — the PATH only, never a line
      * number, so a finding that survives a few lines moving keeps one cross-run identity.
      */
-    private static String firstLocationPath(JsonNode evidence) {
+    /** First evidence file path — the locus rule shared with ReactionSuppressionFilter (B2). Package-private. */
+    static String firstLocationPath(JsonNode evidence) {
         if (evidence == null || evidence.isNull()) {
             return null;
         }

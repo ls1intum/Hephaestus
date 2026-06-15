@@ -13,4 +13,8 @@ public enum FeedbackSuppressionReason {
     LOW_CONFIDENCE,
     /** Dropped by a policy floor / rate cap that bounds how much is surfaced at once. */
     POLICY_FLOOR_DROP,
+    /** The subject explicitly DISPUTED this locus on an earlier run; not re-nagged unless evidence changes (B2). */
+    REACTED_DISPUTED,
+    /** The subject marked this locus NOT_APPLICABLE on an earlier run; not re-nagged unless evidence changes (B2). */
+    REACTED_NOT_APPLICABLE,
 }

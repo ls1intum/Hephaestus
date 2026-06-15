@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
@@ -53,6 +54,9 @@ public class FeedbackLedgerRecorder {
 
     /** One unit per job today; >0 reserved for future multi-recipient / reviewer-side fan-out. */
     private static final int IN_CONTEXT_UNIT_ORDINAL = 0;
+
+    /** SUPPRESSED units (B2) start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
+    private static final int SUPPRESSED_UNIT_ORDINAL_BASE = 1000;
 
     private final PracticeFindingRepository practiceFindingRepository;
     private final FeedbackRepository feedbackRepository;
@@ -224,6 +228,51 @@ public class FeedbackLedgerRecorder {
                     .filter(ref -> ref != null && !ref.isBlank())
                     .findFirst()
             );
+    }
+
+    /**
+     * Record a SUPPRESSED ledger unit for a locus withheld by reaction-aware suppression (ADR 0021, B2) — the
+     * student already DISPUTED / marked NOT_APPLICABLE / DISMISSED this concern, so it was NOT re-delivered.
+     * Writing it (rather than silently dropping) means an eval sees the finding was deliberately withheld, not
+     * a model miss. Uses a high {@code unit_ordinal} ({@value #SUPPRESSED_UNIT_ORDINAL_BASE}+) so it never
+     * collides with the live IN_CONTEXT unit (ordinal 0) on the {@code (agent_job_id, unit_ordinal)} guard.
+     * Best-effort: REQUIRES_NEW, callers wrap in try/catch — a ledger failure never affects delivery.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSuppressed(AgentJob job, PracticeFinding finding, FeedbackSuppressionReason reason, int index) {
+        int unitOrdinal = SUPPRESSED_UNIT_ORDINAL_BASE + index;
+        if (feedbackRepository.existsByAgentJobIdAndUnitOrdinal(job.getId(), unitOrdinal)) {
+            return; // already recorded (job retry)
+        }
+        Instant now = Instant.now();
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .idempotencyKey(job.getId() + ":" + unitOrdinal)
+                .agentJobId(job.getId())
+                .workspaceId(job.getWorkspace().getId())
+                .targetType(finding.getTargetType())
+                .targetId(finding.getTargetId())
+                .recipientUserId(finding.getContributor().getId())
+                .subjectUserId(finding.getSubjectUserId())
+                .surface(FeedbackSurface.IN_CONTEXT)
+                .unitOrdinal(unitOrdinal)
+                .state(FeedbackState.SUPPRESSED)
+                .suppressionReason(reason)
+                .origin(FeedbackOrigin.AGENT)
+                .modelId(job.getLlmModel())
+                .composerVersion(DeliveryComposer.COMPOSER_VERSION)
+                .continuityKey(continuityKeyFor(finding))
+                .createdAt(now)
+                .build()
+        );
+        feedbackFindingRepository.insertIfAbsent(feedback.getId(), finding.getId(), FeedbackFindingDisplayRole.PRIMARY.name(), 0);
+        log.info(
+            "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, correlationKey={}",
+            job.getId(),
+            feedback.getId(),
+            reason,
+            finding.getCorrelationKey()
+        );
     }
 
     /** The stable continuity line for a finding: (target, recipient, in-context surface). */

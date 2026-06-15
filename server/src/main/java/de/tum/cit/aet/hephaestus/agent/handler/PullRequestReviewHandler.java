@@ -135,6 +135,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
     private final SecretDiffScanner secretDiffScanner;
+    private final ReactionSuppressionFilter reactionSuppressionFilter;
 
     PullRequestReviewHandler(
         JsonMapper objectMapper,
@@ -146,7 +147,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
-        SecretDiffScanner secretDiffScanner
+        SecretDiffScanner secretDiffScanner,
+        ReactionSuppressionFilter reactionSuppressionFilter
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -158,6 +160,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
         this.secretDiffScanner = secretDiffScanner;
+        this.reactionSuppressionFilter = reactionSuppressionFilter;
     }
 
     @Override
@@ -403,17 +406,32 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
+        // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
+        // marked NOT_APPLICABLE / DISMISSED on an earlier run, and stiffen the wording on an APPLIED-but-
+        // -recurring locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
+        // deliver() because correlation_key is persisted there; before compose() so the drop reaches both the
+        // summary and the inline notes.
+        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, scopedFindings);
+        List<PracticeDetectionResultParser.ValidatedFinding> deliverable = reactions.deliverable();
+        if (deliverable.isEmpty() && !scopedFindings.isEmpty()) {
+            // Everything this run was already reacted away — a SUCCESS (the student told us to stop nagging),
+            // not a delivery failure. The SUPPRESSED ledger rows are written; the prior edit-in-place summary
+            // stays as-is. Nothing new to post.
+            log.info("All {} findings suppressed by prior reactions: jobId={}", scopedFindings.size(), job.getId());
+            return;
+        }
+
         Map<String, Polarity> polarityBySlug =
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
-            scopedFindings,
+            deliverable,
             WorkArtifact.PULL_REQUEST,
             polarityBySlug
         );
         if (delivery != null) {
-            log.info("Server-side delivery composed from {} findings: jobId={}", scopedFindings.size(), job.getId());
+            log.info("Server-side delivery composed from {} findings: jobId={}", deliverable.size(), job.getId());
             if (!delivery.diffNotes().isEmpty()) {
                 var validLines = computeDiffValidLines(job);
                 if (!validLines.isEmpty()) {

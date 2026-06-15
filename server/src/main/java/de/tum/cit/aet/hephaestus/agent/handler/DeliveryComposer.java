@@ -421,13 +421,17 @@ class DeliveryComposer {
             .distinct()
             .limit(2)
             .toList();
-        if (phrases.isEmpty()) {
-            return "";
-        }
-        String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
         // The lead-in counts the IMPROVEMENTS that follow, not the strengths named — otherwise a single
         // strength in front of two suggestions reads "one thing to tighten:" above a list of two.
         String tail = improvementCount > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
+        if (phrases.isEmpty()) {
+            // C2: a real OBSERVED strength exists but none has a curated gerund phrase. Acknowledge it
+            // GENERICALLY rather than (a) silently dropping the whole opener — a real positive then vanishes —
+            // or (b) dumping an ungrammatical raw slug into the "Nice work <gerund>" frame (the Obsphera
+            // E2E grammar break). "Nice work here" is grammatical and never drops the acknowledgement.
+            return "Nice work here" + tail;
+        }
+        String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
         return "Nice work " + strengths + tail;
     }
 

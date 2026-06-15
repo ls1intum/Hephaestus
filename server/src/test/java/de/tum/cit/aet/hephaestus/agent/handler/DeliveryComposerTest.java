@@ -598,6 +598,32 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
+    void compose_uncuratedPositive_acknowledgesGenericallyNeverDropsSilently() {
+        // C2: a real OBSERVED strength whose practice has no curated gerund phrase must still be acknowledged
+        // (generically, grammatically) — not silently dropped, and not dumped as a raw ungrammatical slug.
+        List<ValidatedFinding> findings = new ArrayList<>();
+        findings.add(positiveFinding("some-uncurated-practice-xyz"));
+        findings.add(
+            negativeFinding(
+                "describe-what-and-why",
+                "PR description lacks a rationale sentence",
+                Severity.MINOR,
+                List.of(),
+                List.of(),
+                "The body lists what changed but not why.",
+                "Add a sentence explaining the motivation."
+            )
+        );
+
+        String mrNote = DeliveryComposer.compose(findings).mrNote();
+
+        assertThat(mrNote).startsWith("Nice work here");
+        // never dump the raw slug into the opener
+        assertThat(mrNote).doesNotContain("some uncurated practice xyz");
+        assertThat(mrNote).contains("to tighten:");
+    }
+
+    @Test
     void sanitizeStudentText_stripsInternalGradingVocabulary() {
         // The exact grading-mechanics phrasing observed leaking into live student notes.
         String leaked1 = "The body has no rationale, which results in a NEGATIVE finding with MINOR severity.";
