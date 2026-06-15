@@ -57,7 +57,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             parser,
             deliveryService,
             feedbackService,
-            new SecretDiffScanner()
+            new SecretDiffScanner(),
+            org.mockito.Mockito.mock(ReactionSuppressionFilter.class)
         );
     }
 
