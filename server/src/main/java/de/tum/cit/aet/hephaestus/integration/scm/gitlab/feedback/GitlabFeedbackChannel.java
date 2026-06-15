@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,45 +124,71 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
     /**
      * Edit an existing MR/issue note in place via the {@code updateNote} mutation (ADR 0021 re-review UX).
      * No noteable resolution is needed — the note's own global id ({@code externalId}, e.g.
-     * {@code gid://gitlab/Note/123}) addresses it directly. A vendor rejection (the prior note was deleted
-     * by a human, the id is stale) surfaces as {@link FeedbackDeliveryException}; the caller then re-posts.
+     * {@code gid://gitlab/Note/123}) addresses it directly. Returns a typed {@link UpdateOutcome}: a
+     * confirmed-deleted note is {@code GONE} (the caller re-posts); a rate-limit / transport / unknown error
+     * is {@code TRANSIENT} (the caller keeps the prior summary and does NOT re-post, so a flaky update never
+     * double-posts). Only a blank external id — a data bug — throws {@link FeedbackDeliveryException}.
      */
     @Override
-    public SummaryHandle updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
+    public UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
         long scopeId = target.ref().workspaceId();
-        if (gitLabProvider.isRateLimitCritical(scopeId)) {
-            throw new FeedbackDeliveryException(
-                "GitLab rate limit critical — skipping summary edit for scope " + scopeId
-            );
-        }
+        // A blank id is a ledger/data bug, never recoverable by re-posting — keep it a hard error.
         if (externalId == null || externalId.isBlank()) {
             throw new FeedbackDeliveryException("Cannot edit a GitLab note in place: external note id is missing");
         }
+        // Rate-limit / network / unknown errors are TRANSIENT: keep the prior summary, do NOT re-post (a flaky
+        // update must not double-post a second summary). Only a confirmed-deleted note is GONE.
+        if (gitLabProvider.isRateLimitCritical(scopeId)) {
+            return UpdateOutcome.transientFailure("GitLab rate limit critical for scope " + scopeId);
+        }
         String body = escapeSlashCommands(content.body());
 
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("UpdateNote")
-            .variable("id", externalId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+        ClientGraphQlResponse response;
+        try {
+            response = gitLabProvider
+                .forScope(scopeId)
+                .documentName("UpdateNote")
+                .variable("id", externalId)
+                .variable("body", body)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+        } catch (RuntimeException e) {
+            return UpdateOutcome.transientFailure("updateNote transport error: " + e.getMessage());
+        }
 
         if (response == null) {
-            throw new FeedbackDeliveryException("Null response from updateNote mutation");
+            return UpdateOutcome.transientFailure("Null response from updateNote mutation");
         }
 
         List<String> mutationErrors = response.field("updateNote.errors").getValue();
         if (mutationErrors != null && !mutationErrors.isEmpty()) {
-            throw new FeedbackDeliveryException("GitLab updateNote failed: " + mutationErrors);
+            return looksGone(mutationErrors)
+                ? UpdateOutcome.gone("GitLab updateNote: " + mutationErrors)
+                : UpdateOutcome.transientFailure("GitLab updateNote failed: " + mutationErrors);
         }
 
         String noteId = response.field("updateNote.note.id").getValue();
         if (noteId == null) {
-            throw new FeedbackDeliveryException("No note ID in updateNote response");
+            // The mutation neither confirmed gone nor returned an id — treat as transient, don't double-post.
+            return UpdateOutcome.transientFailure("No note id in updateNote response");
         }
         log.info("Edited GitLab note in place: workspaceId={}, noteId={}", scopeId, noteId);
-        return new SummaryHandle(noteId);
+        return UpdateOutcome.edited(new SummaryHandle(noteId));
+    }
+
+    /** Conservative NOT_FOUND heuristic: GitLab signals a deleted note only via a free-text mutation error. */
+    private static boolean looksGone(List<String> errors) {
+        return errors
+            .stream()
+            .filter(Objects::nonNull)
+            .map(e -> e.toLowerCase(Locale.ROOT))
+            .anyMatch(
+                e ->
+                    e.contains("not found") ||
+                    e.contains("does not exist") ||
+                    e.contains("could not be found") ||
+                    e.contains("couldn't be found")
+            );
     }
 
     static String escapeSlashCommands(String body) {

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
@@ -170,49 +171,84 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         lenient().when(errorsField.getValue()).thenReturn(List.of());
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        SummaryHandle handle = channel.updateSummary(
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
             target,
             "gid://gitlab/Note/789",
             new FeedbackContent("updated body", "marker")
         );
 
-        assertThat(handle.externalId()).isEqualTo("gid://gitlab/Note/789");
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.EDITED);
+        assertThat(outcome.handle().externalId()).isEqualTo("gid://gitlab/Note/789");
         // No MR/issue resolution — the note id addresses the comment directly.
         verify(spec).variable(eq("id"), eq("gid://gitlab/Note/789"));
     }
 
     @Test
-    void updateSummaryThrowsOnMutationErrors() {
+    void updateSummaryReturnsGoneOnNotFoundError() {
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        stubMutationErrors(List.of("note not found"));
 
-        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
-        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
-        when(gitLabProvider.forScope(1L)).thenReturn(client);
-        when(client.documentName(any())).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+            target,
+            "gid://gitlab/Note/gone",
+            new FeedbackContent("body", "marker")
+        );
 
-        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        ClientResponseField errorsField = mock(ClientResponseField.class);
-        when(response.field("updateNote.errors")).thenReturn(errorsField);
-        when(errorsField.getValue()).thenReturn(List.of("note not found"));
-        when(spec.execute()).thenReturn(Mono.just(response));
+        // A deleted note → GONE so the caller posts fresh (NOT a throw, NOT a transient double-post).
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
+    }
 
-        // A vendor rejection (the prior note was deleted) surfaces so the caller falls back to a fresh post.
-        assertThatThrownBy(() ->
-            channel.updateSummary(target, "gid://gitlab/Note/gone", new FeedbackContent("body", "marker"))
-        )
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("updateNote failed");
+    @Test
+    void updateSummaryReturnsTransientOnGenericError() {
+        FeedbackTarget target = gitlabTarget();
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        stubMutationErrors(List.of("something went wrong"));
+
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+            target,
+            "gid://gitlab/Note/1",
+            new FeedbackContent("body", "marker")
+        );
+
+        // An unknown vendor error → TRANSIENT: keep the prior summary, do NOT re-post (no double-post).
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
+    }
+
+    @Test
+    void updateSummaryReturnsTransientOnRateLimitCritical() {
+        FeedbackTarget target = gitlabTarget();
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
+
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+            target,
+            "gid://gitlab/Note/1",
+            new FeedbackContent("body", "marker")
+        );
+
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.TRANSIENT);
     }
 
     @Test
     void updateSummaryThrowsOnBlankExternalId() {
         FeedbackTarget target = gitlabTarget();
-        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        // A blank id is a data bug, not recoverable — still a hard error (checked before any rate-limit/transport).
         assertThatThrownBy(() -> channel.updateSummary(target, "  ", new FeedbackContent("body", "marker")))
             .isInstanceOf(FeedbackDeliveryException.class)
             .hasMessageContaining("external note id is missing");
+    }
+
+    private void stubMutationErrors(List<String> errors) {
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        ClientResponseField errorsField = mock(ClientResponseField.class);
+        when(response.field("updateNote.errors")).thenReturn(errorsField);
+        when(errorsField.getValue()).thenReturn(errors);
+        when(spec.execute()).thenReturn(Mono.just(response));
     }
 
     private static FeedbackTarget gitlabTarget() {

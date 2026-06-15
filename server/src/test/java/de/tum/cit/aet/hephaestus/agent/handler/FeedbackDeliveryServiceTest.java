@@ -156,7 +156,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             // A live summary already exists on this continuity line → edit it, do not post anew.
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn("IC_prior");
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
+                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
+            );
 
             service.deliverFeedback(job, new DeliveryContent("Re-reviewed: still fix the tests.", List.of()));
 
@@ -171,8 +173,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            // Edit can't land (channel returns null = append-only or comment gone) → post a new one.
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(null);
+            // Edit found the prior comment GONE (a human deleted it) → post a fresh one.
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
+                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.GONE, null)
+            );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
 
             service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of()));
@@ -180,6 +184,23 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_new");
+        }
+
+        @Test
+        @DisplayName("a TRANSIENT update error keeps the prior summary and does NOT post a duplicate (B4)")
+        void transientUpdateKeepsPriorSummaryNoFreshPost() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
+            // A rate-limit / network blip → TRANSIENT: keep the live summary, never create-fallback (no double-post).
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
+                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
+            );
+
+            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
+
+            verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior"); // still points at the live summary
         }
 
         @Test
@@ -199,7 +220,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
-            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn("IC_prior");
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(
+                new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.EDITED, "IC_prior")
+            );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
             when(
                 findingTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)

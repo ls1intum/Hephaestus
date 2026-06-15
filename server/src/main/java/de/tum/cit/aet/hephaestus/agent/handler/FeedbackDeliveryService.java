@@ -181,14 +181,27 @@ class FeedbackDeliveryService {
         // Re-review UX (ADR 0021): edit the persistent summary IN PLACE across re-reviews so the PR keeps ONE
         // evolving overview comment instead of accumulating a fresh one each run (the Qodo persistent_comment /
         // CodeRabbit model). The recorder returns the current live summary's comment id for this continuity
-        // line; if an edit can't land (append-only channel, or a human deleted the prior comment) we fall back
-        // to a new post. The recorder supersedes the prior ledger unit when it records this run.
+        // line; the typed UpdateResult decides what happens when the edit can't land — crucially, a TRANSIENT
+        // failure must NOT create-fallback (that double-posts a second summary), only a confirmed-gone one does.
         String priorRef = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
-        String commentId = priorRef != null ? commentPoster.updateFormattedBody(job, priorRef, formatted) : null;
-        boolean editedInPlace = commentId != null;
-        if (commentId == null) {
-            commentId = commentPoster.postFormattedBody(job, formatted);
+        PullRequestCommentPoster.UpdateResult update =
+            priorRef != null ? commentPoster.updateFormattedBody(job, priorRef, formatted) : null;
+
+        if (update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
+            // The edit hit a recoverable error (rate limit / network). Keep the still-live prior summary; do NOT
+            // post a fresh one. Nothing new is delivered this run — and an unchanged comment pings nobody, so the
+            // A4 ping must stay silent too.
+            job.setDeliveryCommentId(priorRef);
+            log.warn(
+                "Summary edit transient — kept prior summary, no fresh post: jobId={}, commentId={}",
+                job.getId(),
+                priorRef
+            );
+            return;
         }
+
+        boolean editedInPlace = update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED;
+        String commentId = editedInPlace ? update.externalId() : commentPoster.postFormattedBody(job, formatted);
         if (commentId == null) {
             // We had a real, non-blank summary to post but the provider returned no comment id —
             // the contributor sees nothing. Treat as an integrity failure so the job is marked FAILED.

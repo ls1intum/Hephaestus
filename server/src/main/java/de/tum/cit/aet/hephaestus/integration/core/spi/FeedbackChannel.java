@@ -20,15 +20,15 @@ public interface FeedbackChannel {
      * instead of accumulating one comment per run (the Qodo {@code persistent_comment} / CodeRabbit model).
      * {@code externalId} is the handle a prior {@link #postSummary} returned.
      *
-     * <p>Vendors whose summary surface cannot be edited (append-only) keep the default and the caller falls
-     * back to a fresh {@link #postSummary}. A vendor that <em>can</em> edit but finds the prior comment gone
-     * (a human deleted it) signals that with {@link FeedbackDeliveryException} so the caller re-posts.
-     *
-     * @throws UnsupportedOperationException if this channel cannot edit a summary in place
-     * @throws FeedbackDeliveryException if the edit was attempted but the vendor rejected it
+     * <p>Returns a typed {@link UpdateOutcome} rather than throwing for recoverable cases, so the caller can
+     * tell apart: {@code EDITED} (success), {@code GONE} (the prior comment is confirmed deleted — re-post),
+     * {@code TRANSIENT} (a rate-limit / network / unknown vendor error — keep the prior summary, do NOT
+     * re-post this run, else a flaky update double-posts a second summary), and {@code UNSUPPORTED}
+     * (append-only channel — re-post). A genuine data error (e.g. a blank external id) still throws
+     * {@link FeedbackDeliveryException}.
      */
-    default SummaryHandle updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
-        throw new UnsupportedOperationException("Channel " + kind() + " does not support editing a summary in place");
+    default UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
+        return UpdateOutcome.unsupported();
     }
 
     /**
@@ -62,4 +62,36 @@ public interface FeedbackChannel {
 
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021 C6). */
     record SummaryHandle(String externalId) {}
+
+    /**
+     * The outcome of an {@link #updateSummary} attempt. {@code TRANSIENT} is the load-bearing case: the caller
+     * must NOT create-fallback on it (that double-posts), only on {@code GONE}/{@code UNSUPPORTED}.
+     */
+    record UpdateOutcome(Kind kind, SummaryHandle handle, String reason) {
+        public enum Kind {
+            EDITED,
+            GONE,
+            TRANSIENT,
+            UNSUPPORTED,
+        }
+
+        public static UpdateOutcome edited(SummaryHandle handle) {
+            return new UpdateOutcome(Kind.EDITED, handle, null);
+        }
+
+        /** The prior comment is confirmed gone (a human deleted it) — the caller should re-post. */
+        public static UpdateOutcome gone(String reason) {
+            return new UpdateOutcome(Kind.GONE, null, reason);
+        }
+
+        /** A recoverable failure (rate limit, network, unknown vendor error) — keep the prior summary, do not re-post. */
+        public static UpdateOutcome transientFailure(String reason) {
+            return new UpdateOutcome(Kind.TRANSIENT, null, reason);
+        }
+
+        /** This channel cannot edit in place (append-only) — the caller should re-post. */
+        public static UpdateOutcome unsupported() {
+            return new UpdateOutcome(Kind.UNSUPPORTED, null, null);
+        }
+    }
 }

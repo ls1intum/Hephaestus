@@ -229,14 +229,13 @@ class PullRequestCommentPoster {
      * Edits an already-posted summary comment IN PLACE (ADR 0021 re-review UX): reuses the prior comment id
      * so the PR/MR keeps a single, evolving overview thread across re-reviews rather than accumulating one
      * comment per run. Returns the external id on success, or {@code null} when the edit cannot land — the
-     * channel is append-only ({@link UnsupportedOperationException}) or the prior comment is gone
-     * ({@link FeedbackDeliveryException}, e.g. a human deleted it). On {@code null}, the caller falls back to
-     * {@link #postFormattedBody}. A {@code null} return is therefore a soft signal, never a delivery failure.
+     * channel is append-only or the prior comment is confirmed gone. The {@link UpdateResult} tells the caller
+     * which: {@code EDITED} (success), {@code GONE}/{@code UNSUPPORTED} (re-post), {@code TRANSIENT} (keep the
+     * prior summary, do NOT re-post — a flaky update must not double-post). A blank-id data bug still throws.
      *
      * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
      */
-    @Nullable
-    String updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
+    UpdateResult updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
         long workspaceId = job.getWorkspace().getId();
         IntegrationKind kind = job.getIntegrationKind();
         if (kind == null) {
@@ -246,31 +245,55 @@ class PullRequestCommentPoster {
         }
         FeedbackChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
-        try {
-            SummaryHandle handle = channel.updateSummary(
-                target,
-                externalRef,
-                new FeedbackContent(formattedBody, summaryMarkerFor(job))
-            );
-            log.info(
-                "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
-                job.getId(),
-                kind,
-                handle.externalId()
-            );
-            return handle.externalId();
-        } catch (UnsupportedOperationException e) {
-            log.debug("Channel {} cannot edit a summary in place; caller will post anew: jobId={}", kind, job.getId());
-            return null;
-        } catch (FeedbackDeliveryException e) {
-            // The prior comment is likely gone (a human deleted it) or the id is stale. Don't fail the job —
-            // signal the caller to post a fresh summary instead.
-            log.info(
-                "Summary edit-in-place did not land (prior comment gone?); falling back to a new post: jobId={}, error={}",
-                job.getId(),
-                e.getMessage()
-            );
-            return null;
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+            target,
+            externalRef,
+            new FeedbackContent(formattedBody, summaryMarkerFor(job))
+        );
+        return switch (outcome.kind()) {
+            case EDITED -> {
+                log.info(
+                    "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
+                    job.getId(),
+                    kind,
+                    outcome.handle().externalId()
+                );
+                yield new UpdateResult(UpdateResult.Kind.EDITED, outcome.handle().externalId());
+            }
+            case GONE -> {
+                log.info(
+                    "Summary edit found the prior comment gone; will post anew: jobId={}, reason={}",
+                    job.getId(),
+                    outcome.reason()
+                );
+                yield new UpdateResult(UpdateResult.Kind.GONE, null);
+            }
+            case TRANSIENT -> {
+                log.warn(
+                    "Summary edit hit a transient error; keeping the prior summary, not re-posting: jobId={}, reason={}",
+                    job.getId(),
+                    outcome.reason()
+                );
+                yield new UpdateResult(UpdateResult.Kind.TRANSIENT, null);
+            }
+            case UNSUPPORTED -> {
+                log.debug(
+                    "Channel {} cannot edit a summary in place; caller will post anew: jobId={}",
+                    kind,
+                    job.getId()
+                );
+                yield new UpdateResult(UpdateResult.Kind.UNSUPPORTED, null);
+            }
+        };
+    }
+
+    /** Agent-layer mirror of {@link FeedbackChannel.UpdateOutcome}, carrying only the external id the caller needs. */
+    record UpdateResult(Kind kind, @Nullable String externalId) {
+        enum Kind {
+            EDITED,
+            GONE,
+            TRANSIENT,
+            UNSUPPORTED,
         }
     }
 
