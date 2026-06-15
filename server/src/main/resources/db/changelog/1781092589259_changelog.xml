@@ -683,4 +683,58 @@
         </rollback>
     </changeSet>
 
+    <!-- A1 (ADR 0021): rank a target's review runs by detected_at without scanning all of a workspace's
+         findings, for FindingTrendService.computeForTarget (the cross-run trend read path). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-42">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_finding_target_run already present">
+            <not><indexExists indexName="idx_practice_finding_target_run"/></not>
+        </preConditions>
+        <comment>A1 trend: composite index for per-target run ranking (FindingTrendService).</comment>
+        <createIndex indexName="idx_practice_finding_target_run" tableName="practice_finding">
+            <column name="target_type"/>
+            <column name="target_id"/>
+            <column name="agent_job_id"/>
+            <column name="detected_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex indexName="idx_practice_finding_target_run" tableName="practice_finding"/>
+        </rollback>
+    </changeSet>
+
+    <!-- A2 (ADR 0021): denormalize correlation_key onto finding_reaction so a developer's reaction
+         (APPLIED / DISPUTED / NOT_APPLICABLE) follows ONE concern across the non-deterministic detector's
+         re-detections — the reaction is captured against the ephemeral per-run finding_id today, which
+         cannot be matched run-to-run. This is the key reaction-aware re-nag suppression (B2) reads. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-43">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.correlation_key already present">
+            <not><columnExists tableName="finding_reaction" columnName="correlation_key"/></not>
+        </preConditions>
+        <comment>A2: add finding_reaction.correlation_key + index (locus identity for reaction-aware suppression).</comment>
+        <addColumn tableName="finding_reaction">
+            <column name="correlation_key" type="VARCHAR(64)"/>
+        </addColumn>
+        <createIndex indexName="idx_finding_reaction_correlation" tableName="finding_reaction">
+            <column name="correlation_key"/>
+        </createIndex>
+        <rollback>
+            <dropIndex indexName="idx_finding_reaction_correlation" tableName="finding_reaction"/>
+            <dropColumn tableName="finding_reaction" columnName="correlation_key"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-44">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.correlation_key already backfilled">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM finding_reaction WHERE correlation_key IS NOT NULL</sqlCheck>
+        </preConditions>
+        <comment>A2 backfill: copy correlation_key from each reacted finding (rows whose source finding predates C2 stay null — they simply cannot participate in B2).</comment>
+        <sql>
+            UPDATE finding_reaction fr SET correlation_key = pf.correlation_key
+            FROM practice_finding pf
+            WHERE fr.finding_id = pf.id AND pf.correlation_key IS NOT NULL AND fr.correlation_key IS NULL;
+        </sql>
+        <rollback>
+            <sql>UPDATE finding_reaction SET correlation_key = NULL;</sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

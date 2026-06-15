@@ -292,6 +292,85 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("since") Instant since
     );
 
+    // Cross-run trend read path (ADR 0021, A1) — the measurement substrate FindingTrendService classifies.
+
+    /**
+     * The runs (agent jobs) that produced ≥1 correlation-keyed finding for a target, newest first by the
+     * run's latest detection. Pass {@code PageRequest.of(0, 2)} to get the two most-recent runs to diff.
+     * Workspace-scoped via {@code Practice.workspace}.
+     */
+    @Query(
+        """
+        SELECT f.agentJobId AS agentJobId, MAX(f.detectedAt) AS runAt
+        FROM PracticeFinding f JOIN f.practice p
+        WHERE f.targetType = :targetType AND f.targetId = :targetId AND p.workspace.id = :workspaceId
+          AND f.correlationKey IS NOT NULL
+        GROUP BY f.agentJobId
+        ORDER BY MAX(f.detectedAt) DESC
+        """
+    )
+    List<RunRef> findRecentRunRefsForTarget(
+        @Param("targetType") WorkArtifact targetType,
+        @Param("targetId") Long targetId,
+        @Param("workspaceId") Long workspaceId,
+        Pageable pageable
+    );
+
+    /**
+     * The (workspace, subject, practice) variant — the finding is ABOUT {@code coalesce(subject_user_id,
+     * contributor_id)}, matching {@code CorrelationKey}'s aboutUserId. Cross-target by construction.
+     */
+    @Query(
+        """
+        SELECT f.agentJobId AS agentJobId, MAX(f.detectedAt) AS runAt
+        FROM PracticeFinding f JOIN f.practice p
+        WHERE COALESCE(f.subjectUserId, f.contributor.id) = :aboutUserId AND p.slug = :practiceSlug
+          AND p.workspace.id = :workspaceId AND f.correlationKey IS NOT NULL
+        GROUP BY f.agentJobId
+        ORDER BY MAX(f.detectedAt) DESC
+        """
+    )
+    List<RunRef> findRecentRunRefsForSubjectPractice(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("workspaceId") Long workspaceId,
+        Pageable pageable
+    );
+
+    /** All correlation-keyed findings for the given (already-resolved) run job-ids, with the trend fields. */
+    @Query(
+        """
+        SELECT f.agentJobId AS agentJobId, f.correlationKey AS correlationKey, f.verdict AS verdict,
+               f.severity AS severity, f.confidence AS confidence, p.slug AS practiceSlug,
+               f.title AS title, f.detectedAt AS detectedAt
+        FROM PracticeFinding f JOIN f.practice p
+        WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.correlationKey IS NOT NULL
+        ORDER BY f.detectedAt DESC
+        """
+    )
+    List<LocusFinding> findLociByAgentJobs(
+        @Param("agentJobIds") java.util.Collection<UUID> agentJobIds,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    /** Projection: one run (agent job) with its latest detection timestamp. */
+    interface RunRef {
+        UUID getAgentJobId();
+        Instant getRunAt();
+    }
+
+    /** Projection: a correlation-keyed finding reduced to the fields the trend classifier needs. */
+    interface LocusFinding {
+        UUID getAgentJobId();
+        String getCorrelationKey();
+        Verdict getVerdict();
+        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Float getConfidence();
+        String getPracticeSlug();
+        String getTitle();
+        Instant getDetectedAt();
+    }
+
     /** Projection: severity → count. */
     interface SeverityCount {
         de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();

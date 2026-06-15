@@ -503,6 +503,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         String mrNote = result.mrNote();
         assertThat(mrNote).contains("Dead code in view");
         assertThat(mrNote).contains("Views/DashboardView.swift:15");
+        // The compact list is always labelled, even with NO non-inlinable findings — otherwise a clean PR
+        // shows an unlabelled wall of duplicated headers right after the count opener.
+        assertThat(mrNote).contains("Inline comments on the diff:");
 
         // Full detail is in the diff note, not MR summary
         assertThat(result.diffNotes()).hasSize(1);

@@ -729,11 +729,11 @@ class DeliveryComposer {
             }
         }
 
-        // Inline findings — compact list (title + location only, detail is on the diff)
+        // Inline findings — compact list (title + location only, detail is on the diff). The label is
+        // emitted whenever the list is non-empty: gating it on nonInlinable left a clean PR (only inline
+        // findings) showing an UNLABELED wall of duplicated headers right after the count opener.
         if (!inlinable.isEmpty()) {
-            if (!nonInlinable.isEmpty()) {
-                sb.append("**Inline comments on the diff:**\n\n");
-            }
+            sb.append("**Inline comments on the diff:**\n\n");
             for (ValidatedFinding f : inlinable) {
                 appendFindingHeader(sb, f, true);
                 sb.append("\n");
