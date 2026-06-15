@@ -203,7 +203,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?verdict=NEGATIVE", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?verdict=NOT_OBSERVED", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -226,7 +226,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             webTestClient
                 .get()
                 .uri(
-                    BASE_URI + "?practiceSlug={slug}&verdict=NEGATIVE",
+                    BASE_URI + "?practiceSlug={slug}&verdict=NOT_OBSERVED",
                     workspace.getWorkspaceSlug(),
                     practiceA.getSlug()
                 )

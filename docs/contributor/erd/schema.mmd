@@ -329,17 +329,6 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
-    FeedbackPost {
-        BIGINT id PK
-        BIGINT connection_id FK,UK "NOT NULL"
-        VARCHAR(256) subject_external_id UK "NOT NULL"
-        VARCHAR(48) subject_class "NOT NULL"
-        VARCHAR(48) post_kind UK "NOT NULL"
-        VARCHAR(256) external_post_id UK "NOT NULL"
-        JSONB vendor_metadata "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-    }
-
     FindingReaction {
         UUID id PK
         UUID finding_id FK "NOT NULL"
@@ -347,6 +336,7 @@ erDiagram
         VARCHAR(16) action "NOT NULL"
         TEXT explanation
         TIMESTAMPTZ created_at "NOT NULL"
+        VARCHAR(64) correlation_key
     }
 
     GitCommit {
@@ -1010,7 +1000,6 @@ erDiagram
     Repository ||--|| DiscussionCategory : has
     GitProvider ||--|| DiscussionComment : commented_on
     AgentJob ||--|| Feedback : has
-    Connection ||--|| FeedbackPost : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
     GitProvider ||--|| Issue : references
