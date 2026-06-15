@@ -28,5 +28,21 @@ public record PracticeReviewProperties(
     @Pattern(regexp = "^$|^https?://.*", message = "appBaseUrl must be empty or a valid http(s) URL")
     @DefaultValue("")
     String appBaseUrl,
-    @Min(0) @DefaultValue("15") int cooldownMinutes
+    @Min(0) @DefaultValue("15") int cooldownMinutes,
+    /**
+     * Whether to append the cross-run progress-delta footer (ADR 0021, B1/B3) and post the re-review
+     * notifying reply (A4) to the summary. Off by default — lit only once the trend read path is proven
+     * non-empty on a target (it needs ≥2 review runs to render anything anyway).
+     */
+    @DefaultValue("false") boolean progressFooter,
+    /**
+     * Whether reaction-aware suppression (ADR 0021, B2) drops re-nagging a locus the student already
+     * DISPUTED / marked NOT_APPLICABLE. Off by default; inert until a reaction exists for a recurring locus.
+     */
+    @DefaultValue("false") boolean reactionSuppression,
+    /**
+     * Whether the per-run volume cap / guaranteed-coverage policy floor (ADR 0021, C3) is applied. Off by
+     * default — behaviour-preserving when off.
+     */
+    @DefaultValue("false") boolean policyFloor
 ) {}

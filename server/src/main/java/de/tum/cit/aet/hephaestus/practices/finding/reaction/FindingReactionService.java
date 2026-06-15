@@ -83,6 +83,7 @@ public class FindingReactionService {
             .contributorId(currentUser.getId())
             .action(request.action())
             .explanation(request.explanation())
+            .correlationKey(finding.getCorrelationKey()) // A2: denormalize the stable locus at write time
             .build();
 
         FindingReaction saved = reactionRepository.save(reaction);

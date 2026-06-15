@@ -8,7 +8,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService;
+import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import java.util.List;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
@@ -39,6 +42,7 @@ class FeedbackDeliveryService {
     private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewProperties reviewProperties;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
+    private final FindingTrendService findingTrendService;
 
     FeedbackDeliveryService(
         PullRequestCommentPoster commentPoster,
@@ -47,7 +51,8 @@ class FeedbackDeliveryService {
         PullRequestRepository pullRequestRepository,
         WorkspaceRepository workspaceRepository,
         PracticeReviewProperties reviewProperties,
-        FeedbackLedgerRecorder feedbackLedgerRecorder
+        FeedbackLedgerRecorder feedbackLedgerRecorder,
+        FindingTrendService findingTrendService
     ) {
         this.commentPoster = commentPoster;
         this.diffNotePoster = diffNotePoster;
@@ -56,6 +61,7 @@ class FeedbackDeliveryService {
         this.workspaceRepository = workspaceRepository;
         this.reviewProperties = reviewProperties;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
+        this.findingTrendService = findingTrendService;
     }
 
     /**
@@ -130,9 +136,17 @@ class FeedbackDeliveryService {
             }
         }
 
+        // Cross-run trend (ADR 0021, B1/B3/A4) — flag-gated; needs ≥2 runs to render anything. Computed here
+        // (the target + workspace are known) and threaded into the summary so DeliveryComposer stays pure.
+        TrendDelta trend = reviewProperties.progressFooter()
+            ? findingTrendService
+                .computeForTarget(WorkArtifact.PULL_REQUEST, pullRequestId, job.getWorkspace().getId())
+                .orElse(null)
+            : null;
+
         // Always post new
 
-        postSummaryNote(job, delivery);
+        postSummaryNote(job, delivery, trend);
         postDiffNotes(job, delivery);
 
         // Record the delivered-feedback ledger (ADR 0021 C6) as a best-effort write-through side-effect:
@@ -149,7 +163,7 @@ class FeedbackDeliveryService {
         }
     }
 
-    private void postSummaryNote(AgentJob job, DeliveryContent delivery) {
+    private void postSummaryNote(AgentJob job, DeliveryContent delivery, @Nullable TrendDelta trend) {
         if (delivery.mrNote() == null) {
             return;
         }
@@ -158,7 +172,10 @@ class FeedbackDeliveryService {
             log.debug("Practice note was empty after sanitization, skipping post: jobId={}", job.getId());
             return;
         }
-        String formatted = formatPracticeNote(sanitized, job);
+        // B1/B3: append the collapsed progress-delta footer (empty string when nothing meaningfully changed).
+        String footer = ProgressFooterRenderer.render(trend);
+        String body = footer.isEmpty() ? sanitized : sanitized + "\n\n" + footer;
+        String formatted = formatPracticeNote(body, job);
 
         // Re-review UX (ADR 0021): edit the persistent summary IN PLACE across re-reviews so the PR keeps ONE
         // evolving overview comment instead of accumulating a fresh one each run (the Qodo persistent_comment /
@@ -185,6 +202,40 @@ class FeedbackDeliveryService {
             commentId,
             editedInPlace
         );
+
+        // A4: an edit-in-place pings nobody, so a re-review that actually moved the needle would be invisible.
+        // When (and only when) we edited a prior summary AND the finding set meaningfully changed, post ONE
+        // short notifying note — the edit keeps the canonical single overview, this generates the one
+        // notification that matters. Byte-identical / no-change re-reviews stay silent.
+        if (editedInPlace && trend != null && trend.hasMeaningfulChange()) {
+            postReReviewPing(job, trend);
+        }
+    }
+
+    /** A4: a short, marker-tagged notifying note pointing at the freshly-edited summary. Best-effort. */
+    private void postReReviewPing(AgentJob job, TrendDelta trend) {
+        List<String> parts = new java.util.ArrayList<>();
+        if (trend.countResolved() > 0) {
+            parts.add(trend.countResolved() + " resolved");
+        }
+        if (trend.countNew() > 0) {
+            parts.add(trend.countNew() + " new");
+        }
+        if (trend.countRegressed() > 0) {
+            parts.add(trend.countRegressed() + " slipped back");
+        }
+        String body =
+            "<!-- hephaestus:re-review-ping:" +
+            job.getId() +
+            " -->\n🔁 **Re-reviewed** — " +
+            String.join(", ", parts) +
+            ". See the updated review summary above.";
+        try {
+            String pingId = commentPoster.postFormattedBody(job, body);
+            log.info("Re-review ping posted: jobId={}, pingCommentId={}", job.getId(), pingId);
+        } catch (RuntimeException e) {
+            log.warn("Re-review ping failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
+        }
     }
 
     private void postDiffNotes(AgentJob job, DeliveryContent delivery) {

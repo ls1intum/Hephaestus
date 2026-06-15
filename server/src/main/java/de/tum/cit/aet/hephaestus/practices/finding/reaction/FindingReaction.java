@@ -49,6 +49,8 @@ import org.hibernate.annotations.OnDeleteAction;
             name = "idx_finding_reaction_finding_contributor",
             columnList = "finding_id, contributor_id, created_at DESC"
         ),
+        // A2 (ADR 0021): find a reaction by its stable locus across the detector's per-run re-detections.
+        @Index(name = "idx_finding_reaction_correlation", columnList = "correlation_key"),
     }
 )
 @Getter
@@ -77,6 +79,17 @@ public class FindingReaction {
      */
     @Column(name = "finding_id", nullable = false, insertable = false, updatable = false)
     private UUID findingId;
+
+    /**
+     * Denormalized copy of {@link PracticeFinding#getCorrelationKey()} (ADR 0021 C2), captured at
+     * reaction-write time. The reacted finding is EPHEMERAL — a new row each run — so its FK alone cannot
+     * locate this reaction on a later run; the {@code correlation_key} is the stable (practice, target,
+     * subject, file) locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE
+     * reaction against a re-detected finding. Nullable: a reaction whose source finding predates C2 (null
+     * key) stays null and simply cannot participate in B2.
+     */
+    @Column(name = "correlation_key", length = 64)
+    private String correlationKey;
 
     /**
      * The contributor who submitted this reaction. No cascade — users are long-lived

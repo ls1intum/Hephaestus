@@ -55,6 +55,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService findingTrendService;
+
     private FeedbackDeliveryService service;
 
     private static final Long WORKSPACE_ID = 99L;
@@ -66,7 +69,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        reviewProperties = new PracticeReviewProperties(false, true, false, APP_BASE_URL, 15);
+        reviewProperties = new PracticeReviewProperties(false, true, false, APP_BASE_URL, 15, false, false, false);
         service = new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,
@@ -74,7 +77,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pullRequestRepository,
             workspaceRepository,
             reviewProperties,
-            feedbackLedgerRecorder
+            feedbackLedgerRecorder,
+            findingTrendService
         );
         // Inline reconciliation now runs on every OPEN-PR delivery — even with zero diff notes — to clear an
         // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.

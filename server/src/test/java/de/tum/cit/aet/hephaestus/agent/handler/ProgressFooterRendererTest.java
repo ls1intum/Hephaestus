@@ -1,0 +1,81 @@
+package de.tum.cit.aet.hephaestus.agent.handler;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
+import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+/** Unit tests for the cross-run progress-delta footer (ADR 0021, B1/B3). */
+class ProgressFooterRendererTest extends BaseUnitTest {
+
+    @Test
+    void render_null_returnsEmpty() {
+        assertThat(ProgressFooterRenderer.render(null)).isEmpty();
+    }
+
+    @Test
+    void render_onlyPersisted_returnsEmpty_noMeaningfulChange() {
+        TrendDelta d = delta(List.of(transition("k1", TransitionStatus.PERSISTED, "still here", "x")));
+        assertThat(ProgressFooterRenderer.render(d)).isEmpty();
+    }
+
+    @Test
+    void render_resolvedAndNew_rendersCollapsedFooterWithCounts() {
+        TrendDelta d = delta(
+            List.of(
+                transition("k1", TransitionStatus.RESOLVED, "Unused import removed", "code-hygiene"),
+                transition("k2", TransitionStatus.NEW, "New dead branch", "control-flow"),
+                transition("k3", TransitionStatus.PERSISTED, "still open thing", "naming")
+            )
+        );
+
+        String out = ProgressFooterRenderer.render(d);
+
+        assertThat(out).contains("<details><summary>📈 Progress since your last review</summary>");
+        assertThat(out).contains("**1 resolved**");
+        assertThat(out).contains("**1 new**");
+        assertThat(out).contains("1 still open");
+        assertThat(out).contains("**Resolved ✓**");
+        assertThat(out).contains("Unused import removed");
+        assertThat(out).contains("`code-hygiene`");
+        assertThat(out).contains("</details>");
+    }
+
+    @Test
+    void render_regressed_rendersSlippedBackSection() {
+        TrendDelta d = delta(List.of(transition("k1", TransitionStatus.REGRESSED, "Tests dropped again", "ships-tests")));
+
+        String out = ProgressFooterRenderer.render(d);
+
+        assertThat(out).contains("**1 slipped back**");
+        assertThat(out).contains("Slipped back");
+        assertThat(out).contains("Tests dropped again");
+    }
+
+    private static TrendDelta delta(List<LocusTransition> transitions) {
+        return new TrendDelta(
+            WorkArtifact.PULL_REQUEST,
+            100L,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            Instant.parse("2026-06-15T10:00:00Z"),
+            Instant.parse("2026-06-14T10:00:00Z"),
+            transitions
+        );
+    }
+
+    private static LocusTransition transition(String key, TransitionStatus status, String title, String slug) {
+        Verdict prior = status == TransitionStatus.NEW ? null : Verdict.NOT_OBSERVED;
+        Verdict curr = status == TransitionStatus.RESOLVED ? null : Verdict.NOT_OBSERVED;
+        return new LocusTransition(key, status, slug, title, prior, curr, Severity.MAJOR, 0.8f);
+    }
+}
