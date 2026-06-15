@@ -74,7 +74,11 @@ class ReactionSuppressionFilter {
     /** A locus the student said was fixed but that recurs — matched in the composer by (slug, first path). */
     record EscalatedLocus(String practiceSlug, @Nullable String firstLocationPath) {}
 
-    ReactionDecision evaluate(AgentJob job, List<ValidatedFinding> scopedFindings) {
+    // Read-only tx so the persisted findings' lazy Practice/contributor associations initialise while we read
+    // their slug + subject (we run outside the handler's transaction). recordSuppressed writes in its own
+    // REQUIRES_NEW tx, so this readOnly flag does not constrain it.
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ReactionDecision evaluate(AgentJob job, List<ValidatedFinding> scopedFindings) {
         if (!reviewProperties.reactionSuppression()) {
             return new ReactionDecision(scopedFindings, Set.of(), 0);
         }
