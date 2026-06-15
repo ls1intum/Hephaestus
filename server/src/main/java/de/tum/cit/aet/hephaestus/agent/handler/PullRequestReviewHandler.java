@@ -407,8 +407,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
-        // marked NOT_APPLICABLE / DISMISSED on an earlier run, and stiffen the wording on an APPLIED-but-
-        // -recurring locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
+        // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an APPLIED-but-recurring
+        // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
         // deliver() because correlation_key is persisted there; before compose() so the drop reaches both the
         // summary and the inline notes.
         ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, scopedFindings);

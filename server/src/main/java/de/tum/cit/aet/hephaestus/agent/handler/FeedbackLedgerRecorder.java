@@ -151,26 +151,31 @@ public class FeedbackLedgerRecorder {
             feedbackRepository.updateState(supersedesId, FeedbackState.SUPERSEDED.name());
         }
 
-        // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the
-        // DELIVERED unit — it is recorded as SUPPRESSED below. Compute it once so the DELIVERED binding
-        // excludes it (else a dropped finding is bound to BOTH units and an eval double-counts it as delivered).
+        // Findings already withheld earlier in the flow as SUPPRESSED (B2 reaction suppression writes its
+        // REACTED_* units before this runs). Computed first so neither the DELIVERED binding NOR the policy
+        // floor re-binds them — B2 does NOT delete the PracticeFinding row, so a disputed-yet-recurring locus
+        // would otherwise land in the policy-dropped tail and get a SECOND (POLICY_FLOOR_DROP) SUPPRESSED unit.
+        Set<UUID> alreadySuppressed = new HashSet<>(
+            feedbackFindingRepository.findFindingIdsSuppressedForJob(job.getId())
+        );
+
+        // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the DELIVERED
+        // unit — it is recorded as SUPPRESSED below. Exclude anything already suppressed so it is dropped once.
         List<PracticeFinding> policyDropped = reviewProperties.policyFloor()
             ? PolicyFloorSelector.partition(
                   findings
                       .stream()
-                      .filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED)
+                      .filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED && !alreadySuppressed.contains(f.getId()))
                       .toList(),
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
               ).dropped()
             : List.of();
-        // Exclude from the DELIVERED unit anything that was NOT delivered: policy-floor-dropped this run, plus
-        // anything already written as SUPPRESSED earlier in the flow (B2 reaction suppression runs before this)
-        // — else a withheld finding is bound to both its SUPPRESSED unit and the DELIVERED unit.
+        // The DELIVERED unit binds nothing that was withheld: policy-floor-dropped this run + already-suppressed.
         Set<UUID> excludedIds = policyDropped
             .stream()
             .map(PracticeFinding::getId)
             .collect(Collectors.toCollection(HashSet::new));
-        excludedIds.addAll(feedbackFindingRepository.findFindingIdsSuppressedForJob(job.getId()));
+        excludedIds.addAll(alreadySuppressed);
 
         // Bind every DELIVERED finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.

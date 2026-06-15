@@ -51,7 +51,7 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
     /**
      * Latest reaction per {@code correlation_key} (stable locus) for the given keys, restricted to one
      * reacting contributor (the finding's subject — only the subject may react). Used by B2 to suppress
-     * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE / DISMISSED on an earlier run,
+     * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
      * even though the per-run finding row (and its {@code finding_id}) is different this run.
      */
     @Query(

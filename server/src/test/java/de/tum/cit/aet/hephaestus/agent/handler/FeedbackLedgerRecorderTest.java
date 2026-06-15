@@ -118,6 +118,31 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
+    void b2AndPolicyFloorBothOn_aSuppressedFindingIsNeverBoundTwice() {
+        // B2 × C3 interaction: a finding B2 already suppressed must NOT also be written as a POLICY_FLOOR_DROP
+        // unit — it does not re-enter the policy-dropped tail, and is bound exactly once across all units.
+        List<PracticeFinding> findings = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            findings.add(problem(0.9f - i * 0.1f));
+        }
+        UUID b2Id = findings.get(5).getId(); // the lowest-confidence one — would otherwise be in the dropped tail
+        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(findings);
+        var recorder = recorder(true); // policyFloor ON
+        when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
+
+        recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST);
+
+        var bound = ArgumentCaptor.forClass(UUID.class);
+        verify(feedbackFindingRepository, org.mockito.Mockito.atLeastOnce()).insertIfAbsent(
+            any(),
+            bound.capture(),
+            any(),
+            anyInt()
+        );
+        assertThat(bound.getAllValues()).doesNotHaveDuplicates().doesNotContain(b2Id);
+    }
+
+    @Test
     void alreadySuppressedFinding_isExcludedFromDeliveredUnit() {
         // A finding withheld earlier in the flow (B2 reaction suppression wrote a SUPPRESSED unit for it) must
         // NOT also be bound to the DELIVERED unit — else it is double-counted as delivered.

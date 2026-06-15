@@ -326,6 +326,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
                f.title AS title, f.detectedAt AS detectedAt
         FROM PracticeFinding f JOIN f.practice p
         WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.correlationKey IS NOT NULL
+          AND f.verdict <> de.tum.cit.aet.hephaestus.practices.model.Verdict.NOT_APPLICABLE
         ORDER BY f.detectedAt DESC
         """
     )
