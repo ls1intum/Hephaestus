@@ -260,7 +260,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
-            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
+            );
 
             handler.deliver(agentJob);
 
@@ -325,7 +327,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             // unconditionally on an OPEN PR (bb92f0010) with an EMPTY list — clearing any prior run's stale
             // line-numbered notes while posting no new ones.
             verify(commentPoster).postFormattedBody(any(), any());
-            verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(java.util.List.of()));
+            verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
     }
 
@@ -454,7 +456,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
-            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
+            );
 
             // First delivery
             handler.deliver(agentJob);

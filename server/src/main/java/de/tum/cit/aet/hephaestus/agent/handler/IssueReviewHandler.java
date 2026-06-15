@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -228,7 +229,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         // Record the delivered-feedback ledger (ADR 0021 C6) — best-effort, REQUIRES_NEW + try/catch so it
         // can never affect the issue note the contributor already received. Issues have no inline placements.
         try {
-            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE);
+            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE, List.of());
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",

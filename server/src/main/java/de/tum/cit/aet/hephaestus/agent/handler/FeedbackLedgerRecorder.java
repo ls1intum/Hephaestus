@@ -3,6 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackContinuityKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingDisplayRole;
@@ -32,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -92,9 +96,16 @@ public class FeedbackLedgerRecorder {
      * @param job the delivered job ({@code deliveryCommentId} holds the posted summary id)
      * @param delivery the composed content that was posted (summary body + inline notes)
      * @param artifact PR vs ISSUE (issues have no inline placements)
+     * @param inlineSignals the per-inline-note delivery outcomes (vendor note id, thread id, disposition)
+     *     emitted by the inline channel; empty for issues and for channels that cannot reconcile per-thread
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(AgentJob job, DeliveryContent delivery, WorkArtifact artifact) {
+    public void record(
+        AgentJob job,
+        DeliveryContent delivery,
+        WorkArtifact artifact,
+        List<DeliveredSignal> inlineSignals
+    ) {
         if (delivery == null) {
             return;
         }
@@ -207,10 +218,13 @@ public class FeedbackLedgerRecorder {
                 .build()
         );
 
-        // INLINE placements (PR only) — the ANCHOR is recoverable; the per-note vendor id is NOT returned
-        // by the inline channel today, so external_ref stays null (recovering it is a later SPI change).
+        // INLINE placements (PR only) — the ANCHOR is always recoverable; the durable vendor handle
+        // (external_ref / thread_external_ref) and the real posted_state come from the per-note DeliveredSignal
+        // the channel emitted this run. A note with no matching signal (append-only GitHub, or a channel that
+        // emitted none) keeps the anchor-only fallback: POSTED with a null external_ref.
         if (artifact == WorkArtifact.PULL_REQUEST) {
             for (DiffNote note : delivery.diffNotes()) {
+                DeliveredSignal signal = matchSignal(note, inlineSignals);
                 feedbackPlacementRepository.save(
                     FeedbackPlacement.builder()
                         .feedback(feedback)
@@ -220,7 +234,11 @@ public class FeedbackLedgerRecorder {
                         .anchorStartLine(note.startLine())
                         .anchorEndLine(note.endLine())
                         .anchorSide(PlacementAnchorSide.NEW)
-                        .postedState(PlacementPostedState.POSTED)
+                        .externalRef(signal != null ? signal.externalRef() : null)
+                        .threadExternalRef(signal != null ? signal.threadExternalRef() : null)
+                        .postedState(
+                            signal != null ? postedStateFor(signal.disposition()) : PlacementPostedState.POSTED
+                        )
                         .createdAt(now)
                         .build()
                 );
@@ -367,6 +385,45 @@ public class FeedbackLedgerRecorder {
             reason,
             finding.getCorrelationKey()
         );
+    }
+
+    /**
+     * Find the delivery signal for a posted note. Primary match is the stable {@code correlationKey} (the
+     * cross-run identity); when it is absent on either side (legacy / unkeyed notes) we fall back to the diff
+     * coordinates the signal anchored at — path + the note's terminal line, which for a single-line note is its
+     * start and for a range its end. Returns {@code null} when nothing matches (no signal was emitted).
+     */
+    private static @Nullable DeliveredSignal matchSignal(DiffNote note, List<DeliveredSignal> signals) {
+        if (signals.isEmpty()) {
+            return null;
+        }
+        if (note.correlationKey() != null) {
+            for (DeliveredSignal s : signals) {
+                if (note.correlationKey().equals(s.correlationKey())) {
+                    return s;
+                }
+            }
+        }
+        int terminalLine = note.endLine() != null ? note.endLine() : note.startLine();
+        for (DeliveredSignal s : signals) {
+            if (
+                s.anchor() instanceof DiffAnchor anchor &&
+                note.filePath().equals(anchor.filePath()) &&
+                anchor.newLineNumber() == terminalLine
+            ) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Map the channel's per-note {@link Disposition} onto the persisted {@link PlacementPostedState}: anything
+     * that left a durable note for the student (POSTED, fell back to a plain comment, or preserved an existing
+     * thread) is recorded as POSTED; only a terminal delivery failure is FAILED.
+     */
+    private static PlacementPostedState postedStateFor(Disposition disposition) {
+        return disposition == Disposition.FAILED ? PlacementPostedState.FAILED : PlacementPostedState.POSTED;
     }
 
     /** The stable continuity line for a finding: (target, recipient, in-context surface). */

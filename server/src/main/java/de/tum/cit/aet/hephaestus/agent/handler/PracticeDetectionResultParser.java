@@ -472,6 +472,12 @@ public class PracticeDetectionResultParser {
         }
     }
 
+    /**
+     * @param correlationKey the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey}
+     *     identity, stamped by {@code PullRequestReviewHandler} from the value
+     *     {@code PracticeDetectionDeliveryService.deliver} already computed (never recomputed downstream, so it
+     *     cannot drift from the persisted finding). {@code null} until stamped — the parser leaves it unset.
+     */
     public record ValidatedFinding(
         String practiceSlug,
         String title,
@@ -481,8 +487,51 @@ public class PracticeDetectionResultParser {
         JsonNode evidence,
         String reasoning,
         String guidance,
-        List<DiffNote> suggestedDiffNotes
-    ) {}
+        List<DiffNote> suggestedDiffNotes,
+        @Nullable String correlationKey
+    ) {
+        /** Pre-correlation compatibility shape: a finding with no correlation key yet (the parser's output). */
+        public ValidatedFinding(
+            String practiceSlug,
+            String title,
+            Verdict verdict,
+            Severity severity,
+            float confidence,
+            JsonNode evidence,
+            String reasoning,
+            String guidance,
+            List<DiffNote> suggestedDiffNotes
+        ) {
+            this(
+                practiceSlug,
+                title,
+                verdict,
+                severity,
+                confidence,
+                evidence,
+                reasoning,
+                guidance,
+                suggestedDiffNotes,
+                null
+            );
+        }
+
+        /** Returns a copy stamped with {@code key}; all other components are preserved by reference. */
+        public ValidatedFinding withCorrelationKey(@Nullable String key) {
+            return new ValidatedFinding(
+                practiceSlug,
+                title,
+                verdict,
+                severity,
+                confidence,
+                evidence,
+                reasoning,
+                guidance,
+                suggestedDiffNotes,
+                key
+            );
+        }
+    }
 
     public record DiscardedEntry(int index, String reason) {}
 
@@ -502,6 +551,25 @@ public class PracticeDetectionResultParser {
      * @param startLine first line number (1-based, must be positive)
      * @param endLine   optional last line number for multi-line (GitHub only; GitLab ignores)
      * @param body      markdown comment body (sanitized before posting)
+     * @param correlationKey the stable cross-run identity inherited from the finding this note belongs to, so a
+     *     posted placement can be matched back across re-runs; {@code null} until {@link DeliveryComposer}
+     *     carries it over from the stamped finding (the parser leaves it unset).
      */
-    public record DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {}
+    public record DiffNote(
+        String filePath,
+        int startLine,
+        @Nullable Integer endLine,
+        String body,
+        @Nullable String correlationKey
+    ) {
+        /** Pre-correlation compatibility shape: a note with no correlation key yet (the parser's output). */
+        public DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {
+            this(filePath, startLine, endLine, body, null);
+        }
+
+        /** Returns a copy stamped with {@code key}; all other components are preserved. */
+        public DiffNote withCorrelationKey(@Nullable String key) {
+            return new DiffNote(filePath, startLine, endLine, body, key);
+        }
+    }
 }

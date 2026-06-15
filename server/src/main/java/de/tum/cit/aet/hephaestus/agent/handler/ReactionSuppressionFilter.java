@@ -151,6 +151,8 @@ class ReactionSuppressionFilter {
     private static ValidatedFinding withEscalatedReasoning(ValidatedFinding vf) {
         String prefix = "You previously marked this as fixed, but it is still present. ";
         String reasoning = vf.reasoning() == null || vf.reasoning().isBlank() ? prefix.trim() : prefix + vf.reasoning();
+        // Preserve the correlation key the handler stamped on the input so the escalated copy keeps the same
+        // cross-run identity as the locus it re-nags.
         return new ValidatedFinding(
             vf.practiceSlug(),
             vf.title(),
@@ -160,7 +162,8 @@ class ReactionSuppressionFilter {
             vf.evidence(),
             reasoning,
             vf.guidance(),
-            vf.suggestedDiffNotes()
+            vf.suggestedDiffNotes(),
+            vf.correlationKey()
         );
     }
 

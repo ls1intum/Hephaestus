@@ -18,6 +18,13 @@ mutation AddPullRequestReviewWithThreads(
     }) {
         pullRequestReview {
             id
+            comments(first: 100) {
+                nodes {
+                    id
+                    path
+                    line
+                }
+            }
         }
     }
 }

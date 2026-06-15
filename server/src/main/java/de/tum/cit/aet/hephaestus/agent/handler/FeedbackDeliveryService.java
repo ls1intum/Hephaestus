@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -16,6 +17,8 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,8 +79,27 @@ class FeedbackDeliveryService {
      * failures (e.g. one diff note that fell outside a hunk) stay soft and are only logged.
      */
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
+        deliverFeedback(job, delivery, null);
+    }
+
+    /**
+     * Recomputes the MR summary body once the per-finding inline-delivery signals are known, demoting every
+     * inlinable finding whose inline comment actually landed to a "see inline comments" pointer (its detail
+     * already lives on the diff) while a finding whose note failed keeps its full summary line. Bound by the
+     * caller over the structured findings it composed from, so this service never sees them directly — the
+     * summary recomposition stays in {@link DeliveryComposer} and this service only feeds it the delivered
+     * keys and re-edits in place.
+     */
+    @FunctionalInterface
+    interface SummaryRecomposer {
+        /** @return the demoted summary body for the given delivered correlation keys, or {@code null} when there is none. */
+        @Nullable
+        String recompose(Set<String> deliveredCorrelationKeys);
+    }
+
+    void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery, @Nullable SummaryRecomposer recomposer) {
         try {
-            doDeliver(job, delivery);
+            doDeliver(job, delivery, recomposer);
         } catch (JobDeliveryException e) {
             // Integrity failure — propagate so the job is marked FAILED, not silently DELIVERED.
             throw e;
@@ -86,7 +108,7 @@ class FeedbackDeliveryService {
         }
     }
 
-    private void doDeliver(AgentJob job, @Nullable DeliveryContent delivery) {
+    private void doDeliver(AgentJob job, @Nullable DeliveryContent delivery, @Nullable SummaryRecomposer recomposer) {
         if (delivery == null) {
             log.debug("No delivery content, skipping: jobId={}", job.getId());
             return;
@@ -148,13 +170,21 @@ class FeedbackDeliveryService {
         // Always post new
 
         postSummaryNote(job, delivery, trend);
-        postDiffNotes(job, delivery);
+        List<InlineFindingChannel.DeliveredSignal> inlineSignals = postDiffNotes(job, delivery);
+
+        // The summary was composed+posted BEFORE the inline notes (the order the ledger + A4 ping depend on),
+        // so its inline section listed every finding's full line. Now that the inline signals are known, demote
+        // the findings whose inline comment actually landed to a "see inline comments" pointer by re-editing the
+        // same summary in place (B4-safe updateFormattedBody). A finding whose note failed keeps its full line.
+        reEditSummaryWithSignals(job, recomposer, inlineSignals, trend);
 
         // Record the delivered-feedback ledger (ADR 0021 C6) as a best-effort write-through side-effect:
         // REQUIRES_NEW inside the recorder + this try/catch mean a ledger failure can never alter or roll
-        // back the delivery the contributor already received.
+        // back the delivery the contributor already received. The inline signals carry each posted note's
+        // durable handle (external_ref / thread_external_ref / disposition) so the placement rows record
+        // what actually landed rather than an assumed POSTED + null.
         try {
-            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.PULL_REQUEST);
+            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.PULL_REQUEST, inlineSignals);
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",
@@ -226,6 +256,74 @@ class FeedbackDeliveryService {
         }
     }
 
+    /**
+     * Demotes the just-posted summary's inline section in place once the inline-delivery signals are known.
+     * Collects the correlation keys whose inline note actually LANDED — every disposition except
+     * {@link InlineFindingChannel.Disposition#FAILED} carries a posted comment — asks the recomposer for the
+     * demoted body, and edits the live summary comment in place via the B4-safe path. Best-effort and
+     * narrowly guarded: a no-op (no recomposer, no posted summary id, no delivered key, an unchanged body, or
+     * an edit that does not land) leaves the already-delivered full-line summary exactly as posted.
+     */
+    private void reEditSummaryWithSignals(
+        AgentJob job,
+        @Nullable SummaryRecomposer recomposer,
+        List<InlineFindingChannel.DeliveredSignal> inlineSignals,
+        @Nullable TrendDelta trend
+    ) {
+        String summaryRef = job.getDeliveryCommentId();
+        if (recomposer == null || summaryRef == null) {
+            return;
+        }
+        Set<String> deliveredKeys = inlineSignals
+            .stream()
+            .filter(s -> s.disposition() != InlineFindingChannel.Disposition.FAILED)
+            .map(InlineFindingChannel.DeliveredSignal::correlationKey)
+            .filter(key -> key != null && !key.isBlank())
+            .collect(Collectors.toSet());
+        if (deliveredKeys.isEmpty()) {
+            // Nothing landed inline → no finding can be demoted; the full-line summary already posted is correct.
+            return;
+        }
+
+        String demoted = recomposer.recompose(deliveredKeys);
+        if (demoted == null) {
+            return;
+        }
+        String sanitized = PullRequestCommentPoster.sanitize(demoted);
+        if (sanitized.isBlank()) {
+            return;
+        }
+        // Wrap identically to the first post (same footer + marker envelope) so only the inline section differs.
+        String footer = ProgressFooterRenderer.render(trend);
+        String body = footer.isEmpty() ? sanitized : sanitized + "\n\n" + footer;
+        String formatted = formatPracticeNote(body, job);
+
+        try {
+            PullRequestCommentPoster.UpdateResult update = commentPoster.updateFormattedBody(
+                job,
+                summaryRef,
+                formatted
+            );
+            if (update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED) {
+                log.info(
+                    "Summary demoted in place after inline delivery: jobId={}, commentId={}",
+                    job.getId(),
+                    summaryRef
+                );
+            } else {
+                // GONE/TRANSIENT/UNSUPPORTED: the demotion is cosmetic, so keep the full-line summary already
+                // delivered rather than re-posting a second comment. Logged for diagnosis, never fatal.
+                log.debug(
+                    "Summary demotion did not land ({}); keeping full-line summary: jobId={}",
+                    update.kind(),
+                    job.getId()
+                );
+            }
+        } catch (RuntimeException e) {
+            log.warn("Summary demotion failed (delivery unaffected): jobId={}, error={}", job.getId(), e.getMessage());
+        }
+    }
+
     /** A4: a short, marker-tagged notifying note pointing at the freshly-edited summary. Best-effort. */
     private void postReReviewPing(AgentJob job, TrendDelta trend) {
         List<String> parts = new ArrayList<>();
@@ -252,11 +350,14 @@ class FeedbackDeliveryService {
         }
     }
 
-    private void postDiffNotes(AgentJob job, DeliveryContent delivery) {
-        // NO empty-guard: a run that now produces zero inline notes must still RECONCILE — clearing this
-        // run's stale notes from an earlier review (the empty-diff pathology). reconcileInlineNotes clears
-        // first, then posts the (possibly empty) fresh set. Reached only AFTER the suppression guards above,
-        // so a closed/merged/draft/opted-out PR is never wiped.
+    /**
+     * Reconciles this run's inline notes and returns the per-finding delivery signals so the ledger can
+     * persist each placement's durable handle. NO empty-guard: a run that now produces zero inline notes must
+     * still RECONCILE — clearing this run's stale notes from an earlier review (the empty-diff pathology).
+     * reconcileInlineNotes clears first, then posts the (possibly empty) fresh set. Reached only AFTER the
+     * suppression guards above, so a closed/merged/draft/opted-out PR is never wiped.
+     */
+    private List<InlineFindingChannel.DeliveredSignal> postDiffNotes(AgentJob job, DeliveryContent delivery) {
         DiffNotePoster.DiffNoteResult diffResult = diffNotePoster.reconcileInlineNotes(job, delivery.diffNotes());
         log.info(
             "Diff notes reconciled: posted={}, failed={}, total={}, jobId={}",
@@ -265,6 +366,7 @@ class FeedbackDeliveryService {
             delivery.diffNotes().size(),
             job.getId()
         );
+        return diffResult.signals();
     }
 
     // Formatting

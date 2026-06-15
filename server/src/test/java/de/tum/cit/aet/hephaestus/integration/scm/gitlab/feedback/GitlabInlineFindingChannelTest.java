@@ -3,14 +3,16 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineFinding;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -18,10 +20,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
@@ -30,6 +34,8 @@ import reactor.core.publisher.Mono;
 
 class GitlabInlineFindingChannelTest extends BaseUnitTest {
 
+    private static final String MARKER = "<!-- hephaestus-diff-note -->";
+
     @Mock
     private GitLabGraphQlClientProvider gitLabProvider;
 
@@ -37,15 +43,17 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     private GitlabMrResolver mrResolver;
 
     private GitlabInlineFindingChannel channel;
+    private HttpGraphQlClient client;
 
     @BeforeEach
     void setUp() {
         channel = new GitlabInlineFindingChannel(gitLabProvider, mrResolver);
+        client = mock(HttpGraphQlClient.class);
     }
 
     @Test
     void emptyFindings() {
-        assertThat(channel.postInlineFindings(gitlabTarget(), List.of())).isEqualTo(new InlineResult(0, 0));
+        assertThat(channel.postInlineFindings(gitlabTarget(), List.of())).isEqualTo(InlineResult.counts(0, 0));
     }
 
     @Test
@@ -53,7 +61,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
         InlineResult result = channel.postInlineFindings(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker"))
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
         );
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
@@ -62,88 +70,236 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     @Test
     void missingDiffRefsSkips() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        // diffRefs absent → headSha/startSha null
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
             new MrInfo("gid://gitlab/MR/42", null, null, null)
         );
 
         InlineResult result = channel.postInlineFindings(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker"))
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
         );
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
     }
 
+    /** No prior thread for the key → a fresh CreateDiffNote thread, POSTED, with note + discussion ids captured. */
     @Test
-    void postsDiffNotesSuccessfully() {
-        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
-
-        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
-        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
-        when(gitLabProvider.forScope(1L)).thenReturn(client);
-        when(client.documentName(any())).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
-
-        // postInlineFindings is now pure-append (stale-note clearing moved to clearStaleFindings), so the only
-        // GraphQL call is CreateDiffNote — success (no errors).
-        ClientGraphQlResponse createResponse = mock(ClientGraphQlResponse.class);
-        ClientResponseField errorsField = mock(ClientResponseField.class);
-        when(createResponse.field("createDiffNote.errors")).thenReturn(errorsField);
-        when(errorsField.getValue()).thenReturn(List.of());
-
-        when(spec.execute()).thenReturn(Mono.just(createResponse));
+    void createsFreshThreadWhenNoPriorMatch() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of()); // no prior notes at all
+        ArgumentCaptor<String> bodyCaptor = stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
 
         InlineResult result = channel.postInlineFindings(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-this", "marker"))
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-this", MARKER, "ck-new"))
         );
 
         assertThat(result.posted()).isEqualTo(1);
         assertThat(result.failed()).isZero();
+        assertThat(result.signals())
+            .singleElement()
+            .satisfies(s -> {
+                assertThat(s.correlationKey()).isEqualTo("ck-new");
+                assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
+                assertThat(s.externalRef()).isEqualTo("gid://Note/NEW");
+                assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/NEW");
+            });
+        // The correlation key must be embedded in the posted body so the next run can match it.
+        assertThat(bodyCaptor.getValue()).contains("hephaestus-diff-note-ck=ck-new").contains(MARKER);
+    }
+
+    /** A prior bot thread with the SAME key and no human reply → UpdateNote in place; no new thread created. */
+    @Test
+    void editsInPlaceWhenKeyMatchesPriorBotThread() {
+        stubResolvedMr();
+        Map<String, Object> botNote = note(
+            "gid://Note/OLD",
+            "stale finding " + MARKER + "\n" + ckTag("ck-stable"),
+            false
+        );
+        Map<String, Object> disc = discussion("gid://Disc/OLD", List.of(botNote));
+        stubDiscussionsReturning(List.of(disc));
+
+        HttpGraphQlClient.RequestSpec updateSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("UpdateNote")).thenReturn(updateSpec);
+        when(updateSpec.variable(any(), any())).thenReturn(updateSpec);
+        ClientGraphQlResponse updateResponse = emptyErrors("updateNote.errors");
+        when(updateSpec.execute()).thenReturn(Mono.just(updateResponse));
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fresh text", MARKER, "ck-stable"))
+        );
+
+        verify(updateSpec).variable("id", "gid://Note/OLD");
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.signals())
+            .singleElement()
+            .satisfies(s -> {
+                assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
+                assertThat(s.externalRef()).isEqualTo("gid://Note/OLD");
+                assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/OLD");
+            });
+        // A matched key must NOT create a fresh thread.
+        verify(client, never()).documentName("CreateDiffNote");
+    }
+
+    /** A prior thread the developer replied to is PRESERVED — neither edited nor deleted. */
+    @Test
+    void preservesHumanRepliedThread() {
+        stubResolvedMr();
+        Map<String, Object> botNote = note("gid://Note/B", "issue " + MARKER + "\n" + ckTag("ck-human"), false);
+        Map<String, Object> humanReply = note("gid://Note/H", "Thanks, fixed it!", false);
+        Map<String, Object> disc = discussion("gid://Disc/B", List.of(botNote, humanReply));
+        stubDiscussionsReturning(List.of(disc));
+
+        // Both paths are stubbed leniently only to assert they are NEVER taken for a human-replied thread.
+        HttpGraphQlClient.RequestSpec updateSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        lenient().when(client.documentName("UpdateNote")).thenReturn(updateSpec);
+        HttpGraphQlClient.RequestSpec destroySpec = mock(HttpGraphQlClient.RequestSpec.class);
+        lenient().when(client.documentName("DestroyNote")).thenReturn(destroySpec);
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "re-detected", MARKER, "ck-human"))
+        );
+
+        verify(updateSpec, never()).execute();
+        verify(destroySpec, never()).execute();
+        assertThat(result.signals())
+            .singleElement()
+            .satisfies(s -> {
+                assertThat(s.disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
+                assertThat(s.externalRef()).isEqualTo("gid://Note/B");
+            });
+    }
+
+    /** A prior bot thread whose key is gone this run AND has no human reply → DestroyNote. Human-replied gone → kept. */
+    @Test
+    void deletesVanishedHumanFreeThreadsOnly() {
+        stubResolvedMr();
+        // Gone-A: pure bot, key not emitted this run → delete.
+        Map<String, Object> goneA = discussion(
+            "gid://Disc/A",
+            List.of(note("gid://Note/A", "old " + MARKER + "\n" + ckTag("ck-gone-A"), false))
+        );
+        // Gone-B: bot + human reply, key not emitted → preserve (never destroy human work).
+        Map<String, Object> goneB = discussion(
+            "gid://Disc/Bb",
+            List.of(
+                note("gid://Note/Bb", "old " + MARKER + "\n" + ckTag("ck-gone-B"), false),
+                note("gid://Note/Hb", "I disagree", false)
+            )
+        );
+        stubDiscussionsReturning(List.of(goneA, goneB));
+        // This run posts a single, different finding.
+        stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
+        HttpGraphQlClient.RequestSpec destroySpec = stubDestroy();
+
+        channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "current", MARKER, "ck-current"))
+        );
+
+        verify(destroySpec).variable("noteId", "gid://Note/A");
+        verify(destroySpec, never()).variable("noteId", "gid://Note/Bb");
     }
 
     @Test
     void clearStalePreservesHumanRepliedThreads() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-
-        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         when(gitLabProvider.forScope(1L)).thenReturn(client);
 
-        // Discussion A: a single marker-bearing bot note → safe to delete.
-        // Discussion B: a bot note PLUS a human reply (no marker) → must be preserved.
-        Map<String, Object> botNoteA = Map.of("id", "gid://Note/A", "body", "Issue here MARKER", "system", false);
-        Map<String, Object> discA = Map.of("notes", Map.of("nodes", List.of(botNoteA)));
-        Map<String, Object> botNoteB = Map.of("id", "gid://Note/B", "body", "Another issue MARKER", "system", false);
-        Map<String, Object> humanReply = Map.of("id", "gid://Note/H", "body", "Thanks, fixed it!", "system", false);
-        Map<String, Object> discB = Map.of("notes", Map.of("nodes", List.of(botNoteB, humanReply)));
-
-        HttpGraphQlClient.RequestSpec discussionsSpec = mock(HttpGraphQlClient.RequestSpec.class);
-        when(client.documentName("GetMergeRequestDiscussions")).thenReturn(discussionsSpec);
-        when(discussionsSpec.variable(any(), any())).thenReturn(discussionsSpec);
-        ClientGraphQlResponse discussionsResponse = mock(ClientGraphQlResponse.class);
-        ClientResponseField nodesField = mock(ClientResponseField.class);
-        when(discussionsResponse.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
-        when(nodesField.getValue()).thenReturn(List.of(discA, discB));
-        when(discussionsSpec.execute()).thenReturn(Mono.just(discussionsResponse));
-
-        HttpGraphQlClient.RequestSpec destroySpec = mock(HttpGraphQlClient.RequestSpec.class);
-        when(client.documentName("DestroyNote")).thenReturn(destroySpec);
-        when(destroySpec.variable(eq("noteId"), any())).thenReturn(destroySpec);
-        ClientGraphQlResponse destroyResponse = mock(ClientGraphQlResponse.class);
-        ClientResponseField destroyErrors = mock(ClientResponseField.class);
-        when(destroyResponse.field("destroyNote.errors")).thenReturn(destroyErrors);
-        when(destroyErrors.getValue()).thenReturn(List.of());
-        when(destroySpec.execute()).thenReturn(Mono.just(destroyResponse));
+        Map<String, Object> botNoteA = note("gid://Note/A", "Issue here MARKER", false);
+        Map<String, Object> discA = discussion(null, List.of(botNoteA));
+        Map<String, Object> botNoteB = note("gid://Note/B", "Another issue MARKER", false);
+        Map<String, Object> humanReply = note("gid://Note/H", "Thanks, fixed it!", false);
+        Map<String, Object> discB = discussion(null, List.of(botNoteB, humanReply));
+        stubDiscussionsReturning(List.of(discA, discB));
+        HttpGraphQlClient.RequestSpec destroySpec = stubDestroy();
 
         channel.clearStaleFindings(gitlabTarget(), "MARKER");
 
-        // The pure-bot thread is deleted; the human-replied thread is left intact.
         verify(destroySpec).variable("noteId", "gid://Note/A");
         verify(destroySpec, never()).variable("noteId", "gid://Note/B");
+    }
+
+    // --- stubbing helpers ----------------------------------------------------------------------------------
+
+    private void stubResolvedMr() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
+    }
+
+    private void stubDiscussionsReturning(List<Map<String, Object>> discussions) {
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("GetMergeRequestDiscussions")).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        when(response.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
+        when(nodesField.getValue()).thenReturn(discussions);
+        when(spec.execute()).thenReturn(Mono.just(response));
+    }
+
+    /** Stubs a successful CreateDiffNote returning the given note + discussion ids; captures the posted body. */
+    private ArgumentCaptor<String> stubCreateDiffNoteSuccess(String noteId, String discussionId) {
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("CreateDiffNote")).thenReturn(spec);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        when(spec.variable(eq("body"), bodyCaptor.capture())).thenReturn(spec);
+
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        stubField(response, "createDiffNote.errors", List.of());
+        stubField(response, "createDiffNote.note.id", noteId);
+        stubField(response, "createDiffNote.note.discussion.id", discussionId);
+        when(spec.execute()).thenReturn(Mono.just(response));
+        return bodyCaptor;
+    }
+
+    private HttpGraphQlClient.RequestSpec stubDestroy() {
+        HttpGraphQlClient.RequestSpec destroySpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("DestroyNote")).thenReturn(destroySpec);
+        when(destroySpec.variable(eq("noteId"), any())).thenReturn(destroySpec);
+        ClientGraphQlResponse destroyResponse = emptyErrors("destroyNote.errors");
+        when(destroySpec.execute()).thenReturn(Mono.just(destroyResponse));
+        return destroySpec;
+    }
+
+    private static ClientGraphQlResponse emptyErrors(String errorsPath) {
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        stubField(response, errorsPath, List.of());
+        return response;
+    }
+
+    private static void stubField(ClientGraphQlResponse response, String path, Object value) {
+        ClientResponseField field = mock(ClientResponseField.class);
+        when(response.field(path)).thenReturn(field);
+        when(field.getValue()).thenReturn(value);
+    }
+
+    private static Map<String, Object> note(String id, String body, boolean system) {
+        // HashMap-backed (not Map.of) so null discussion ids in tests don't throw.
+        Map<String, Object> n = new java.util.HashMap<>();
+        n.put("id", id);
+        n.put("body", body);
+        n.put("system", system);
+        return n;
+    }
+
+    private static Map<String, Object> discussion(String id, List<Map<String, Object>> notes) {
+        Map<String, Object> disc = new java.util.HashMap<>();
+        disc.put("id", id);
+        disc.put("notes", Map.of("nodes", new ArrayList<>(notes)));
+        return disc;
+    }
+
+    private static String ckTag(String key) {
+        return "<!-- hephaestus-diff-note-ck=" + key + " -->";
     }
 
     private static FeedbackTarget gitlabTarget() {

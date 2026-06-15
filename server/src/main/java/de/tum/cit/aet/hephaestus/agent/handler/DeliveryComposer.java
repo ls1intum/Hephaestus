@@ -137,6 +137,38 @@ class DeliveryComposer {
         WorkArtifact artifact,
         Map<String, Polarity> polarityBySlug
     ) {
+        // First-pass compose: inline notes have not been posted yet, so NO finding is known-delivered.
+        // An empty delivered-key set makes every inlinable finding render its full summary line — the
+        // safe pre-delivery state, and the permanent fallback for any finding whose inline note never lands.
+        return compose(findings, artifact, polarityBySlug, Set.of());
+    }
+
+    /**
+     * Recomposes ONLY the MR summary body after inline notes have been posted, demoting every inlinable
+     * finding whose inline comment actually landed (its {@code correlationKey} is in {@code deliveredKeys})
+     * to a one-line "see inline comments" pointer, while a finding whose inline note FAILED keeps its full
+     * summary line as the fallback. Re-runs the identical partition pipeline as {@link #compose} so the
+     * recomposed summary cannot drift from the first pass — only the inline section reacts to the signals.
+     * Returns {@code null} when there is nothing to summarise (mirrors {@link #compose}).
+     */
+    @Nullable
+    static String recomposeMrNote(
+        List<ValidatedFinding> findings,
+        WorkArtifact artifact,
+        Map<String, Polarity> polarityBySlug,
+        Set<String> deliveredKeys
+    ) {
+        DeliveryContent recomposed = compose(findings, artifact, polarityBySlug, deliveredKeys);
+        return recomposed == null ? null : recomposed.mrNote();
+    }
+
+    @Nullable
+    private static DeliveryContent compose(
+        List<ValidatedFinding> findings,
+        WorkArtifact artifact,
+        Map<String, Polarity> polarityBySlug,
+        Set<String> deliveredKeys
+    ) {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
@@ -214,8 +246,18 @@ class DeliveryComposer {
             .filter(f -> isStrength(f, polarityBySlug))
             .toList();
 
-        // MR summary note: opening + non-inlinable findings expanded + brief inline overview
-        String mrNote = composeMrNote(positives, negatives, nonInlinable, inlinable, artifact, improvementOverflow);
+        // MR summary note: opening + non-inlinable findings expanded + brief inline overview. The inline
+        // overview is signal-driven (deliveredKeys): a finding whose inline comment landed collapses to a
+        // pointer, one whose note failed keeps its full line as the summary fallback.
+        String mrNote = composeMrNote(
+            positives,
+            negatives,
+            nonInlinable,
+            inlinable,
+            artifact,
+            improvementOverflow,
+            deliveredKeys
+        );
 
         // Diff notes: ALL inlinable negatives get inline comments
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
@@ -682,7 +724,13 @@ class DeliveryComposer {
      * Compose the MR note. Structure:
      * 1. Opening issue/suggestion counts (evidence-anchored, no praise)
      * 2. Non-inlinable findings (full detail, with separators)
-     * 3. Brief overview of inline findings (just title + severity, no full content)
+     * 3. Brief overview of inline findings — signal-driven by {@code deliveredKeys}
+     *
+     * <p>Pure: the inline overview reacts only to the injected {@code deliveredKeys} set (no I/O). An
+     * inlinable finding whose inline comment actually landed (its correlation key is in the set) collapses
+     * to a single "see inline comments" pointer — the detail already lives on the diff. A finding whose
+     * inline note did NOT land keeps its full summary line, so a delivery failure still reaches the student
+     * somewhere. An empty set means "nothing delivered yet" → every inlinable finding keeps its full line.
      */
     static String composeMrNote(
         List<ValidatedFinding> positives,
@@ -690,7 +738,8 @@ class DeliveryComposer {
         List<ValidatedFinding> nonInlinable,
         List<ValidatedFinding> inlinable,
         WorkArtifact artifact,
-        int improvementOverflow
+        int improvementOverflow,
+        Set<String> deliveredKeys
     ) {
         var sb = new StringBuilder(4096);
 
@@ -733,12 +782,31 @@ class DeliveryComposer {
             }
         }
 
-        // Inline findings — compact list (title + location only, detail is on the diff). The label is
-        // emitted whenever the list is non-empty: gating it on nonInlinable left a clean PR (only inline
-        // findings) showing an UNLABELED wall of duplicated headers right after the count opener.
+        // Inline findings — signal-driven. The label is emitted whenever the list is non-empty: gating it
+        // on nonInlinable left a clean PR (only inline findings) showing an UNLABELED wall of duplicated
+        // headers right after the count opener. A finding whose inline comment LANDED (its correlation key
+        // is in deliveredKeys) is not re-listed here — its full detail already lives on the diff, so the
+        // summary only points at it. A finding whose inline note did NOT land keeps its full header line so
+        // the lesson still reaches the student in the summary (the delivery-failure fallback). With an empty
+        // deliveredKeys set (pre-delivery / no signals) every inlinable finding keeps its full line.
         if (!inlinable.isEmpty()) {
-            sb.append("**Inline comments on the diff:**\n\n");
-            for (ValidatedFinding f : inlinable) {
+            // A null/blank correlation key can never match a delivered key (and Set.of().contains(null)
+            // throws), so a keyless finding is always treated as undelivered → keeps its full summary line.
+            List<ValidatedFinding> undelivered = inlinable
+                .stream()
+                .filter(f -> f.correlationKey() == null || !deliveredKeys.contains(f.correlationKey()))
+                .toList();
+            long deliveredCount = inlinable.size() - undelivered.size();
+            sb.append("**Inline comments on the diff:**");
+            if (deliveredCount > 0) {
+                sb
+                    .append(" see the ")
+                    .append(deliveredCount)
+                    .append(deliveredCount == 1 ? " inline comment" : " inline comments")
+                    .append(" below.");
+            }
+            sb.append("\n\n");
+            for (ValidatedFinding f : undelivered) {
                 appendFindingHeader(sb, f, true);
                 sb.append("\n");
             }
@@ -1010,7 +1078,9 @@ class DeliveryComposer {
             // lesson posted on two separate files) reads as nagging; the summary already lists the finding
             // once, so one inline note carries the detail without the pile-on.
             if (!f.suggestedDiffNotes().isEmpty()) {
-                notes.add(f.suggestedDiffNotes().get(0));
+                // Carry the finding's correlation key onto the note so the inline channel can match the
+                // delivered placement back to its persisted finding (ADR 0021 C2).
+                notes.add(f.suggestedDiffNotes().get(0).withCorrelationKey(f.correlationKey()));
                 continue;
             }
 
@@ -1037,7 +1107,8 @@ class DeliveryComposer {
 
             String body = composeDiffNoteBody(f);
             if (body != null && !body.isBlank()) {
-                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body));
+                // Synthesized note inherits the finding's correlation key, same as the suggested-note branch.
+                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.correlationKey()));
             }
         }
 

@@ -467,7 +467,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             handler.deliver(job);
 
             verify(deliveryService).deliver(eq(job), any());
-            verify(feedbackService).deliverFeedback(eq(job), any());
+            verify(feedbackService).deliverFeedback(eq(job), any(), any());
         }
 
         @Test
@@ -476,6 +476,54 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThatThrownBy(() -> handler.deliver(job))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No valid findings");
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void stampsDeliveryCorrelationKeyOntoComposedDiffNote() {
+            // A NOT_OBSERVED finding with a code location synthesizes an inline diff note. The key deliver()
+            // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the
+            // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "error-handling",
+                    "title": "Unhandled error path",
+                    "verdict": "NOT_OBSERVED",
+                    "severity": "MAJOR",
+                    "confidence": 0.9,
+                    "reasoning": "The error branch is swallowed.",
+                    "guidance": "Surface the error to the caller.",
+                    "evidence": { "locations": [{ "path": "Sources/Auth.swift", "startLine": 12 }] }
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+
+            // Stub deliver() to return the SAME identity-keyed map the real service would: key every finding
+            // it received with a deterministic correlation key derived from the instance the handler passed.
+            when(deliveryService.deliver(eq(job), any())).thenAnswer(invocation -> {
+                List<PracticeDetectionResultParser.ValidatedFinding> received = invocation.getArgument(1);
+                Map<PracticeDetectionResultParser.ValidatedFinding, String> keys = new java.util.IdentityHashMap<>();
+                for (var f : received) {
+                    keys.put(f, "corr-" + f.practiceSlug());
+                }
+                return new DeliveryResult(received.size(), 0, 0, true, keys);
+            });
+
+            handler.deliver(job);
+
+            ArgumentCaptor<PracticeDetectionResultParser.DeliveryContent> captor = ArgumentCaptor.forClass(
+                PracticeDetectionResultParser.DeliveryContent.class
+            );
+            verify(feedbackService).deliverFeedback(eq(job), captor.capture(), any());
+            PracticeDetectionResultParser.DeliveryContent delivered = captor.getValue();
+            assertThat(delivered).isNotNull();
+            assertThat(delivered.diffNotes()).hasSize(1);
+            assertThat(delivered.diffNotes().get(0).correlationKey()).isEqualTo("corr-error-handling");
         }
     }
 }

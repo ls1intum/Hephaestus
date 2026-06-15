@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Capability-gated SPI for posting inline findings (SCM diff notes, knowledge-base
@@ -27,7 +28,59 @@ public interface InlineFindingChannel {
         // no-op — see Javadoc: only deletable-note vendors override.
     }
 
-    record InlineFinding(FindingAnchor anchor, String body, String marker) {}
+    /**
+     * One finding to post inline. {@code correlationKey} carries the stable
+     * {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey} identity so a delivery can be matched
+     * back to its placement across re-runs; it is {@code null} when the caller has no key for the finding. The
+     * 3-arg constructor is the pre-correlation compatibility shape and defaults the key to null.
+     */
+    record InlineFinding(FindingAnchor anchor, String body, String marker, @Nullable String correlationKey) {
+        public InlineFinding(FindingAnchor anchor, String body, String marker) {
+            this(anchor, body, marker, null);
+        }
+    }
 
-    record InlineResult(int posted, int failed) {}
+    /**
+     * Per-finding outcome of a delivery attempt, reported in {@link DeliveredSignal} so the placement layer can
+     * persist {@code posted_state} / {@code external_ref} without re-deriving it.
+     *
+     * <ul>
+     *   <li>{@code POSTED} — a new inline note/thread was created.
+     *   <li>{@code FELL_BACK} — the anchor was out of the diff hunk, posted as a plain comment instead.
+     *   <li>{@code PRESERVED_EXISTING} — an equivalent note already exists (e.g. a human-replied thread) and was
+     *       intentionally left untouched rather than re-posted.
+     *   <li>{@code FAILED} — the note could not be delivered (unsupported anchor, API error, rate limit).
+     * </ul>
+     */
+    enum Disposition {
+        POSTED,
+        FELL_BACK,
+        PRESERVED_EXISTING,
+        FAILED,
+    }
+
+    /**
+     * What actually happened to one finding, keyed by {@code correlationKey} so the caller can reconcile it
+     * against the persisted placement. {@code externalRef} is the vendor note id and {@code threadExternalRef}
+     * the enclosing discussion/thread id; both are {@code null} when no durable handle exists (e.g. a failure).
+     */
+    record DeliveredSignal(
+        @Nullable String correlationKey,
+        FindingAnchor anchor,
+        Disposition disposition,
+        @Nullable String externalRef,
+        @Nullable String threadExternalRef
+    ) {}
+
+    /**
+     * Aggregate delivery result. {@code signals} carries the per-finding {@link DeliveredSignal}s the placement
+     * layer persists; a path with no per-finding outcomes (rate-limit short-circuit, empty input) reports via
+     * {@link #counts}, which leaves {@code signals} empty.
+     */
+    record InlineResult(int posted, int failed, List<DeliveredSignal> signals) {
+        /** Count-only result with no per-finding signals (rate-limit short-circuit / empty input). */
+        public static InlineResult counts(int posted, int failed) {
+            return new InlineResult(posted, failed, List.of());
+        }
+    }
 }

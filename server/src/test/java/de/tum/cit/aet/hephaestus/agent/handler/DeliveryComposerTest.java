@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -1335,5 +1336,163 @@ class DeliveryComposerTest extends BaseUnitTest {
         // The actual lesson still lands.
         assertThat(note).contains("PR body lacks a quotable WHY");
         assertThat(note).contains("Add a '## Why' section");
+    }
+
+    @Test
+    void compose_synthesizedDiffNote_carriesFindingCorrelationKey() {
+        // A stamped finding (no agent suggestedDiffNotes) must propagate its correlation key onto the
+        // synthesized diff note so the inline channel can match the placement back to the persisted finding.
+        ValidatedFinding stamped = negativeFinding(
+            "code-hygiene",
+            "Dead code in view",
+            Severity.MINOR,
+            List.of(new LocationSpec("Views/DashboardView.swift", 15)),
+            null,
+            "Commented-out code adds noise.",
+            "Remove the commented-out block."
+        ).withCorrelationKey("corr-synth-123");
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).correlationKey()).isEqualTo("corr-synth-123");
+    }
+
+    // ----- Signal-driven inline-section demotion (C1) -----
+
+    @Test
+    void recomposeMrNote_demotesDeliveredInlineFindingToPointer_keepsFullLineForUndelivered() {
+        // Two inlinable findings, both with correlation keys. After inline delivery, ONE landed (its key is
+        // in deliveredKeys) and must collapse to a "see inline comments" pointer — its full header line is
+        // gone from the summary because the detail now lives on the diff. The OTHER did NOT land, so its full
+        // header line MUST survive in the summary as the delivery-failure fallback.
+        ValidatedFinding delivered = negativeFinding(
+            "code-hygiene",
+            "Dead code in view",
+            Severity.MINOR,
+            List.of(new LocationSpec("Views/DashboardView.swift", 15)),
+            null,
+            "Commented-out code adds noise.",
+            "Remove it."
+        ).withCorrelationKey("corr-delivered");
+        ValidatedFinding failed = negativeFinding(
+            "meaningful-naming",
+            "Non-descriptive name 'Data'",
+            Severity.MINOR,
+            List.of(new LocationSpec("Models/Data.swift", 8)),
+            null,
+            "Rename to a domain term.",
+            "Use PortfolioSnapshot."
+        ).withCorrelationKey("corr-failed");
+
+        List<ValidatedFinding> findings = List.of(delivered, failed);
+
+        // Baseline (no signals yet): both findings keep their full summary lines, no pointer.
+        String firstPass = DeliveryComposer.recomposeMrNote(findings, WorkArtifact.PULL_REQUEST, Map.of(), Set.of());
+        assertThat(firstPass).contains("Dead code in view").contains("Non-descriptive name 'Data'");
+        assertThat(firstPass).doesNotContain("see the");
+
+        // After delivery: only corr-delivered landed.
+        String demoted = DeliveryComposer.recomposeMrNote(
+            findings,
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Set.of("corr-delivered")
+        );
+
+        // The delivered finding's full header line is gone (demoted to the pointer).
+        assertThat(demoted).doesNotContain("Dead code in view");
+        // The pointer counts exactly the one delivered inline comment.
+        assertThat(demoted).contains("**Inline comments on the diff:** see the 1 inline comment below.");
+        // The finding whose inline note FAILED keeps its full summary line (the fallback).
+        assertThat(demoted).contains("Non-descriptive name 'Data'");
+        assertThat(demoted).contains("Models/Data.swift:8");
+    }
+
+    @Test
+    void recomposeMrNote_allInlineDelivered_collapsesWholeListToPointer() {
+        // Both inlinable findings landed → the inline section is just the header + a plural pointer, with NO
+        // per-finding lines left in the summary. A no-op that ignored deliveredKeys would still list both.
+        ValidatedFinding a = negativeFinding(
+            "code-hygiene",
+            "Dead code A",
+            Severity.MINOR,
+            List.of(new LocationSpec("A.swift", 1)),
+            null,
+            "Noise.",
+            "Remove."
+        ).withCorrelationKey("k-a");
+        ValidatedFinding b = negativeFinding(
+            "code-hygiene",
+            "Dead code B",
+            Severity.MINOR,
+            List.of(new LocationSpec("B.swift", 2)),
+            null,
+            "Noise.",
+            "Remove."
+        ).withCorrelationKey("k-b");
+
+        String demoted = DeliveryComposer.recomposeMrNote(
+            List.of(a, b),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Set.of("k-a", "k-b")
+        );
+
+        assertThat(demoted).contains("**Inline comments on the diff:** see the 2 inline comments below.");
+        assertThat(demoted).doesNotContain("Dead code A");
+        assertThat(demoted).doesNotContain("Dead code B");
+    }
+
+    @Test
+    void recomposeMrNote_keylessFindingNeverDemoted_evenWithMatchingEmptyKey() {
+        // A finding with no correlation key can never be demoted (it cannot be matched back to a posted note),
+        // so its full line always survives — and Set.of().contains(null) must not blow up.
+        ValidatedFinding keyless = negativeFinding(
+            "code-hygiene",
+            "Keyless dead code",
+            Severity.MINOR,
+            List.of(new LocationSpec("Z.swift", 3)),
+            null,
+            "Noise.",
+            "Remove."
+        );
+
+        String demoted = DeliveryComposer.recomposeMrNote(
+            List.of(keyless),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Set.of("some-other-key")
+        );
+
+        assertThat(demoted).contains("Keyless dead code");
+        assertThat(demoted).doesNotContain("see the");
+    }
+
+    @Test
+    void compose_agentSuggestedDiffNote_inheritsFindingCorrelationKey() {
+        // When the agent supplied its own suggestedDiffNote (which carries no key of its own), the finding's
+        // stamped key must still be carried over to the emitted note.
+        DiffNote suggested = new DiffNote("Views/DashboardView.swift", 20, null, "Consider extracting this.");
+        ValidatedFinding stamped = new ValidatedFinding(
+            "code-hygiene",
+            "Long method",
+            Verdict.NOT_OBSERVED,
+            Severity.MINOR,
+            0.9f,
+            buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),
+            "The method does too much.",
+            "Extract the rendering branch.",
+            List.of(suggested)
+        ).withCorrelationKey("corr-suggested-456");
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        // Body comes from the agent's suggestion; the key comes from the (stamped) finding.
+        assertThat(result.diffNotes().get(0).body()).isEqualTo("Consider extracting this.");
+        assertThat(result.diffNotes().get(0).correlationKey()).isEqualTo("corr-suggested-456");
     }
 }

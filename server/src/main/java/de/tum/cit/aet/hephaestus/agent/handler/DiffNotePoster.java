@@ -75,23 +75,25 @@ class DiffNotePoster {
 
         FeedbackChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
 
-        // Clear this run's prior inline notes FIRST (best-effort) so a re-review that now produces ZERO inline
-        // notes still removes stale ones — the empty-diff pathology where a re-reviewed PR keeps line-numbered
-        // notes on code no longer in the diff. No-op on append-only vendors (GitHub). Never throws into delivery.
-        try {
-            channel.clearStaleFindings(target, HEPHAESTUS_MARKER);
-        } catch (RuntimeException e) {
-            log.warn(
-                "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
-                kind,
-                job.getId(),
-                e.getMessage()
-            );
-        }
-
         List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes == null ? List.of() : diffNotes);
+
+        // Zero-note re-run: nothing to reconcile against, so clear this run's prior inline notes outright —
+        // the empty-diff pathology where a re-reviewed PR keeps line-numbered notes on code no longer in the
+        // diff. When there ARE findings we DON'T clear-then-post; postInlineFindings reconciles by correlation
+        // key (edit-in-place / preserve-human / delete-truly-gone), so a stable finding keeps its one thread
+        // instead of being destroyed and re-created every run. No-op on append-only vendors (GitHub).
         if (findings.isEmpty()) {
-            return new DiffNoteResult(0, 0);
+            try {
+                channel.clearStaleFindings(target, HEPHAESTUS_MARKER);
+            } catch (RuntimeException e) {
+                log.warn(
+                    "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
+                    kind,
+                    job.getId(),
+                    e.getMessage()
+                );
+            }
+            return new DiffNoteResult(0, 0, List.of());
         }
 
         try {
@@ -103,7 +105,10 @@ class DiffNotePoster {
                 result.failed(),
                 job.getId()
             );
-            return new DiffNoteResult(result.posted(), result.failed());
+            // Surface the per-finding DeliveredSignals so the ledger recorder can persist each placement's
+            // external_ref / thread_external_ref / posted_state instead of hardcoding POSTED + null. Channels
+            // that cannot reconcile per-thread (GitHub) report empty signals and the placement stays anchor-only.
+            return new DiffNoteResult(result.posted(), result.failed(), result.signals());
         } catch (FeedbackDeliveryException e) {
             throw new JobDeliveryException(e.getMessage(), e);
         }
@@ -124,10 +129,17 @@ class DiffNotePoster {
             FindingAnchor.DiffAnchor anchor = isMultiLine
                 ? new FindingAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
                 : new FindingAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
-            findings.add(new InlineFindingChannel.InlineFinding(anchor, sanitized, HEPHAESTUS_MARKER));
+            findings.add(
+                new InlineFindingChannel.InlineFinding(anchor, sanitized, HEPHAESTUS_MARKER, note.correlationKey())
+            );
         }
         return findings;
     }
 
-    record DiffNoteResult(int posted, int failed) {}
+    /**
+     * Outcome of an inline-note reconcile. {@code signals} carries the per-finding
+     * {@link InlineFindingChannel.DeliveredSignal}s so the caller can persist each placement's durable
+     * handle; it is empty for the zero-note clear path and for channels that cannot reconcile per-thread.
+     */
+    record DiffNoteResult(int posted, int failed, List<InlineFindingChannel.DeliveredSignal> signals) {}
 }

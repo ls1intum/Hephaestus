@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -110,6 +111,13 @@ public class PracticeDetectionDeliveryService {
         boolean hasNegative = false;
         Instant detectedAt = Instant.now();
 
+        // The exact correlation key persisted per finding, keyed by finding IDENTITY (not value-equality — two
+        // findings can be value-equal yet must each carry their own key). Returned so the handler stamps the
+        // SAME key onto the deliverable findings instead of recomputing it downstream, which could drift from
+        // what was persisted. Only known-slug findings are entered here; unknown-slug ones are skipped below
+        // (no key computed, never delivered), so the map aligns exactly with what the handler composes.
+        Map<ValidatedFinding, String> correlationKeys = new IdentityHashMap<>();
+
         for (int i = 0; i < validFindings.size(); i++) {
             ValidatedFinding finding = validFindings.get(i);
 
@@ -154,6 +162,7 @@ public class PracticeDetectionDeliveryService {
                 subjectUserId != null ? subjectUserId : contributorId,
                 firstLocationPath(finding.evidence())
             );
+            correlationKeys.put(finding, correlationKey);
 
             // Insert (idempotent)
             int rows = practiceFindingRepository.insertIfAbsent(
@@ -212,7 +221,7 @@ public class PracticeDetectionDeliveryService {
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative);
+        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, correlationKeys);
     }
 
     /**
@@ -279,5 +288,21 @@ public class PracticeDetectionDeliveryService {
         return path != null && path.isString() ? path.asString() : null;
     }
 
-    public record DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {}
+    /**
+     * @param correlationKeys the stable cross-run key persisted for each delivered finding, keyed by finding
+     *     identity, so the caller can stamp the SAME key onto its deliverable findings without recomputing it
+     *     (no drift from what was persisted). Empty when no findings were persisted.
+     */
+    public record DeliveryResult(
+        int inserted,
+        int discardedUnknownSlug,
+        int discardedDuplicate,
+        boolean hasNegative,
+        Map<ValidatedFinding, String> correlationKeys
+    ) {
+        /** Compatibility shape for call sites/tests that do not consume per-finding correlation keys. */
+        public DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {
+            this(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, Map.of());
+        }
+    }
 }

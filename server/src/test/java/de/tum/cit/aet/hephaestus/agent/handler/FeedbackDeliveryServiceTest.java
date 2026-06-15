@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.account.UserPreferencesRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -95,7 +97,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                     org.mockito.ArgumentMatchers.any()
                 )
             )
-            .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0));
+            .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0, List.of()));
     }
 
     private AgentJob createJob() {
@@ -137,7 +139,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment123");
             when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0)
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
             );
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
@@ -383,7 +385,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(2, 0)
+                new DiffNotePoster.DiffNoteResult(2, 0, List.of())
             );
 
             var diffNotes = List.of(
@@ -458,6 +460,95 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
+        }
+    }
+
+    @Nested
+    class SummaryDemotion {
+
+        private InlineFindingChannel.DeliveredSignal landedSignal(String correlationKey) {
+            return new InlineFindingChannel.DeliveredSignal(
+                correlationKey,
+                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFindingChannel.Disposition.POSTED,
+                "note-1",
+                "thread-1"
+            );
+        }
+
+        @Test
+        @DisplayName("re-edits the summary in place with the demoted body once a keyed inline note lands")
+        void reEditsSummaryAfterInlineDelivery() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(1, 0, List.of(landedSignal("corr-1")))
+            );
+            // The demotion edit lands.
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_summary"), any(String.class))).thenReturn(
+                new PullRequestCommentPoster.UpdateResult(
+                    PullRequestCommentPoster.UpdateResult.Kind.EDITED,
+                    "IC_summary"
+                )
+            );
+
+            var delivery = new DeliveryContent(
+                "Full-line summary.",
+                List.of(new DiffNote("src/Foo.java", 10, null, "x"))
+            );
+            // The recomposer must be CALLED with exactly the delivered key set, and its output must be what
+            // gets edited in place — a no-op that ignored the signals would never invoke updateFormattedBody.
+            service.deliverFeedback(job, delivery, deliveredKeys -> {
+                assertThat(deliveredKeys).containsExactly("corr-1");
+                return "Demoted summary body.";
+            });
+
+            ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_summary"), body.capture());
+            assertThat(body.getValue()).contains("Demoted summary body.");
+        }
+
+        @Test
+        @DisplayName("no demotion edit when nothing landed inline — the full-line summary stays as posted")
+        void noReEditWhenNoInlineDelivered() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
+            // Inline reconcile produced ZERO delivered signals (default benign stub, no signals).
+            boolean[] recomposed = { false };
+
+            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> {
+                recomposed[0] = true;
+                return "should-not-be-used";
+            });
+
+            // The recomposer is never consulted and the summary is never re-edited.
+            assertThat(recomposed[0]).isFalse();
+            verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
+        }
+
+        @Test
+        @DisplayName("a FAILED inline signal contributes no delivered key — its summary line is never demoted")
+        void failedSignalDoesNotDemote() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
+            var failed = new InlineFindingChannel.DeliveredSignal(
+                "corr-failed",
+                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFindingChannel.Disposition.FAILED,
+                null,
+                null
+            );
+            when(diffNotePoster.reconcileInlineNotes(eq(job), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(0, 1, List.of(failed))
+            );
+
+            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of()), keys -> "demoted");
+
+            // No non-FAILED key → no demotion edit; the full-line fallback summary already posted stands.
+            verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
         }
     }
 

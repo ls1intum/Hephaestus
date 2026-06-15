@@ -406,6 +406,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
+        // Stamp each finding with the EXACT correlation key deliver() persisted (ADR 0021 C2), keyed by
+        // identity so a delivered inline note can be matched back to its persisted finding without recomputing
+        // the key downstream (which could drift). Done BEFORE the reaction filter so an escalated copy inherits
+        // the key too. A finding absent from the map (unknown slug — never persisted, never delivered) is left
+        // unstamped; it cannot reach compose() anyway since the filter only re-emits what was passed in.
+        Map<PracticeDetectionResultParser.ValidatedFinding, String> correlationKeys = result.correlationKeys();
+        for (int i = 0; i < scopedFindings.size(); i++) {
+            String key = correlationKeys.get(scopedFindings.get(i));
+            if (key != null) {
+                scopedFindings.set(i, scopedFindings.get(i).withCorrelationKey(key));
+            }
+        }
+
         // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
         // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an APPLIED-but-recurring
         // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
@@ -445,7 +458,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
 
-        feedbackService.deliverFeedback(job, delivery);
+        // Recompose hook: after the inline notes post, the summary's inline section is demoted to a pointer
+        // for every finding whose comment actually landed (its detail then lives on the diff). Binding the
+        // findings + polarity here keeps FeedbackDeliveryService free of the composition inputs — it only
+        // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
+        feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
+            DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, polarityBySlug, deliveredKeys)
+        );
     }
 
     // Delivery-phase diff helpers (use GitDiffOperations; no longer duplicated in the handler)
