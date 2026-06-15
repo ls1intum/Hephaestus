@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 import de.tum.cit.aet.hephaestus.core.auth.AuthSessionService;
 import de.tum.cit.aet.hephaestus.core.auth.dev.DevLoginService;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  * the flag is on.
  */
 @Hidden
+@ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
 // Public by design: access is gated by the dev-login flag + SecurityConfig (fail-closed in prod), not by

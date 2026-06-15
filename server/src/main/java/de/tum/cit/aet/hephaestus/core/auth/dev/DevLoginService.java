@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.JwtPrincipalFactory;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Duration;
@@ -35,6 +36,7 @@ import org.springframework.web.server.ResponseStatusException;
  * must be impossible to switch on in production (mirrors {@code JwtSigningKeySealer}'s blank-key guard).
  */
 @Service
+@ConditionalOnServerRole
 @WorkspaceAgnostic("Dev sign-in mints an account-scoped session; not workspace-scoped")
 public class DevLoginService {
 
