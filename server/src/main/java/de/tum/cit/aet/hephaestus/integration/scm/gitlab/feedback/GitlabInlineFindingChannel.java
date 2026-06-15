@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +25,10 @@ import org.springframework.stereotype.Component;
  * time via {@code CreateDiffNote} (GitLab has no batch API). For positions outside the
  * diff hunk, falls back to a regular MR comment with {@code file:line} prefix.
  *
- * <p>Before posting, deletes existing hephaestus-marked diff notes on the MR
- * ({@code GetMergeRequestNotes} + {@code DestroyNote}) so re-runs don't accumulate
- * duplicates. Dedup is best-effort — failure is logged but doesn't block fresh posts.
+ * <p>Before posting, reconciles this reviewer's own stale marked diff notes on the MR
+ * ({@code GetMergeRequestDiscussions} + {@code DestroyNote}) so re-runs don't accumulate duplicates —
+ * but a thread a developer has replied to is PRESERVED, never deleted (the platform outdates it on code
+ * change instead). Dedup is best-effort — failure is logged but doesn't block fresh posts.
  *
  * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed.
  *
@@ -210,6 +212,14 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         return position;
     }
 
+    /**
+     * Removes this reviewer's own stale inline notes before re-posting — but NEVER a thread a developer has
+     * replied to (ADR 0021 re-review UX). We query discussions (not flat notes) so a marker-bearing note can
+     * be judged in the context of its thread: a discussion that contains any non-system note WITHOUT our
+     * marker means a human (or another tool) joined it, and deleting it would destroy their words. Such
+     * threads are PRESERVED and left to the platform's own code-change-driven outdating — we deliberately do
+     * not auto-resolve on non-detection, which is unsafe under the detector's run-to-run non-determinism.
+     */
     private void deleteOldMarkedNotes(long scopeId, String projectPath, int mrIid, String marker) {
         if (marker == null || marker.isBlank()) {
             return;
@@ -217,7 +227,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         try {
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
-                .documentName("GetMergeRequestNotes")
+                .documentName("GetMergeRequestDiscussions")
                 .variable("fullPath", projectPath)
                 .variable("iid", String.valueOf(mrIid))
                 .variable("first", NOTES_PAGE_SIZE)
@@ -228,56 +238,98 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 return;
             }
 
-            List<Map<String, Object>> notes = response.field("project.mergeRequest.notes.nodes").getValue();
-            if (notes == null || notes.isEmpty()) {
+            List<Map<String, Object>> discussions = response.field("project.mergeRequest.discussions.nodes").getValue();
+            if (discussions == null || discussions.isEmpty()) {
                 return;
             }
 
             int deleted = 0;
-            for (Map<String, Object> note : notes) {
-                String body = (String) note.get("body");
-                String noteId = (String) note.get("id");
-                Boolean isSystem = (Boolean) note.get("system");
-
-                if (Boolean.TRUE.equals(isSystem) || noteId == null || body == null) {
-                    continue;
-                }
-                if (!body.contains(marker)) {
+            int preserved = 0;
+            for (Map<String, Object> discussion : discussions) {
+                List<Map<String, Object>> notes = notesOf(discussion);
+                if (notes.isEmpty()) {
                     continue;
                 }
 
-                try {
-                    ClientGraphQlResponse deleteResponse = gitLabProvider
-                        .forScope(scopeId)
-                        .documentName("DestroyNote")
-                        .variable("noteId", noteId)
-                        .execute()
-                        .block(GRAPHQL_TIMEOUT);
-
-                    if (deleteResponse != null) {
-                        List<String> errors = deleteResponse.field("destroyNote.errors").getValue();
-                        if (errors == null || errors.isEmpty()) {
-                            deleted++;
-                        } else {
-                            log.debug("Failed to delete old diff note: noteId={}, errors={}", noteId, errors);
-                        }
+                List<String> markedNoteIds = new ArrayList<>();
+                boolean humanReplied = false;
+                for (Map<String, Object> note : notes) {
+                    if (Boolean.TRUE.equals(note.get("system"))) {
+                        continue; // GitLab system notes ("changed the description", etc.) never count.
                     }
-                } catch (Exception e) {
-                    log.debug("Failed to delete old diff note: noteId={}", noteId, e);
+                    String body = (String) note.get("body");
+                    String noteId = (String) note.get("id");
+                    if (noteId == null || body == null) {
+                        continue;
+                    }
+                    if (body.contains(marker)) {
+                        markedNoteIds.add(noteId);
+                    } else {
+                        humanReplied = true; // a person (or other tool) participated in this thread
+                    }
+                }
+
+                if (markedNoteIds.isEmpty()) {
+                    continue; // not one of our threads
+                }
+                if (humanReplied) {
+                    preserved += markedNoteIds.size();
+                    continue; // never destroy a thread a developer engaged with
+                }
+                for (String noteId : markedNoteIds) {
+                    if (destroyNote(scopeId, noteId)) {
+                        deleted++;
+                    }
                 }
             }
 
-            if (deleted > 0) {
+            if (deleted > 0 || preserved > 0) {
                 log.info(
-                    "Deleted {} old marked diff notes before re-posting: workspaceId={}, mr={}!{}",
+                    "Reconciled stale inline notes: deleted={}, preserved(human-replied)={}, workspaceId={}, mr={}!{}",
                     deleted,
+                    preserved,
                     scopeId,
                     projectPath,
                     mrIid
                 );
             }
         } catch (Exception e) {
-            log.debug("Failed to query existing MR notes for dedup: workspaceId={}", scopeId, e);
+            log.debug("Failed to reconcile existing MR discussions for dedup: workspaceId={}", scopeId, e);
+        }
+    }
+
+    /** Safely pulls a discussion's {@code notes.nodes} list, tolerating nulls in the GraphQL map. */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> notesOf(Map<String, Object> discussion) {
+        Object notesField = discussion.get("notes");
+        if (!(notesField instanceof Map<?, ?> notesMap)) {
+            return List.of();
+        }
+        Object nodes = notesMap.get("nodes");
+        return nodes instanceof List ? (List<Map<String, Object>>) nodes : List.of();
+    }
+
+    /** Destroys a single note; returns true on success. Best-effort — failures are logged, never thrown. */
+    private boolean destroyNote(long scopeId, String noteId) {
+        try {
+            ClientGraphQlResponse deleteResponse = gitLabProvider
+                .forScope(scopeId)
+                .documentName("DestroyNote")
+                .variable("noteId", noteId)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+            if (deleteResponse == null) {
+                return false;
+            }
+            List<String> errors = deleteResponse.field("destroyNote.errors").getValue();
+            if (errors == null || errors.isEmpty()) {
+                return true;
+            }
+            log.debug("Failed to delete old diff note: noteId={}, errors={}", noteId, errors);
+            return false;
+        } catch (Exception e) {
+            log.debug("Failed to delete old diff note: noteId={}", noteId, e);
+            return false;
         }
     }
 

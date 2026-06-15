@@ -2,7 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
@@ -16,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -100,6 +104,46 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
 
         assertThat(result.posted()).isEqualTo(1);
         assertThat(result.failed()).isZero();
+    }
+
+    @Test
+    void clearStalePreservesHumanRepliedThreads() {
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+
+        // Discussion A: a single marker-bearing bot note → safe to delete.
+        // Discussion B: a bot note PLUS a human reply (no marker) → must be preserved.
+        Map<String, Object> botNoteA = Map.of("id", "gid://Note/A", "body", "Issue here MARKER", "system", false);
+        Map<String, Object> discA = Map.of("notes", Map.of("nodes", List.of(botNoteA)));
+        Map<String, Object> botNoteB = Map.of("id", "gid://Note/B", "body", "Another issue MARKER", "system", false);
+        Map<String, Object> humanReply = Map.of("id", "gid://Note/H", "body", "Thanks, fixed it!", "system", false);
+        Map<String, Object> discB = Map.of("notes", Map.of("nodes", List.of(botNoteB, humanReply)));
+
+        HttpGraphQlClient.RequestSpec discussionsSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("GetMergeRequestDiscussions")).thenReturn(discussionsSpec);
+        when(discussionsSpec.variable(any(), any())).thenReturn(discussionsSpec);
+        ClientGraphQlResponse discussionsResponse = mock(ClientGraphQlResponse.class);
+        ClientResponseField nodesField = mock(ClientResponseField.class);
+        when(discussionsResponse.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
+        when(nodesField.getValue()).thenReturn(List.of(discA, discB));
+        when(discussionsSpec.execute()).thenReturn(Mono.just(discussionsResponse));
+
+        HttpGraphQlClient.RequestSpec destroySpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("DestroyNote")).thenReturn(destroySpec);
+        when(destroySpec.variable(eq("noteId"), any())).thenReturn(destroySpec);
+        ClientGraphQlResponse destroyResponse = mock(ClientGraphQlResponse.class);
+        ClientResponseField destroyErrors = mock(ClientResponseField.class);
+        when(destroyResponse.field("destroyNote.errors")).thenReturn(destroyErrors);
+        when(destroyErrors.getValue()).thenReturn(List.of());
+        when(destroySpec.execute()).thenReturn(Mono.just(destroyResponse));
+
+        channel.clearStaleFindings(gitlabTarget(), "MARKER");
+
+        // The pure-bot thread is deleted; the human-replied thread is left intact.
+        verify(destroySpec).variable("noteId", "gid://Note/A");
+        verify(destroySpec, never()).variable("noteId", "gid://Note/B");
     }
 
     private static FeedbackTarget gitlabTarget() {

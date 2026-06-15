@@ -226,6 +226,55 @@ class PullRequestCommentPoster {
     }
 
     /**
+     * Edits an already-posted summary comment IN PLACE (ADR 0021 re-review UX): reuses the prior comment id
+     * so the PR/MR keeps a single, evolving overview thread across re-reviews rather than accumulating one
+     * comment per run. Returns the external id on success, or {@code null} when the edit cannot land — the
+     * channel is append-only ({@link UnsupportedOperationException}) or the prior comment is gone
+     * ({@link FeedbackDeliveryException}, e.g. a human deleted it). On {@code null}, the caller falls back to
+     * {@link #postFormattedBody}. A {@code null} return is therefore a soft signal, never a delivery failure.
+     *
+     * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
+     */
+    @Nullable
+    String updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
+        long workspaceId = job.getWorkspace().getId();
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
+            );
+        }
+        FeedbackChannel channel = requireChannel(kind);
+        FeedbackTarget target = buildTarget(job, kind, workspaceId);
+        try {
+            SummaryHandle handle = channel.updateSummary(
+                target,
+                externalRef,
+                new FeedbackContent(formattedBody, summaryMarkerFor(job))
+            );
+            log.info(
+                "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
+                job.getId(),
+                kind,
+                handle.externalId()
+            );
+            return handle.externalId();
+        } catch (UnsupportedOperationException e) {
+            log.debug("Channel {} cannot edit a summary in place; caller will post anew: jobId={}", kind, job.getId());
+            return null;
+        } catch (FeedbackDeliveryException e) {
+            // The prior comment is likely gone (a human deleted it) or the id is stale. Don't fail the job —
+            // signal the caller to post a fresh summary instead.
+            log.info(
+                "Summary edit-in-place did not land (prior comment gone?); falling back to a new post: jobId={}, error={}",
+                job.getId(),
+                e.getMessage()
+            );
+            return null;
+        }
+    }
+
+    /**
      * Posts an already-formatted body as a comment on the job's ISSUE (vs the MR path above). Reuses the
      * same {@link FeedbackChannel#postSummary} call — only the subject is an issue ({@code path#iid})
      * rather than a merge request. Returns the external comment id, or throws {@link JobDeliveryException}

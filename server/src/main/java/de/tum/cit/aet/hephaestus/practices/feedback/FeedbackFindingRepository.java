@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,8 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Written via a native {@code ON CONFLICT DO NOTHING} upsert (mirrors {@code PracticeFinding
  * .insertIfAbsent}) — the {@code @EmbeddedId}/{@code @MapsId} entity is awkward to build for a plain
  * {@code save()}, and the native path is race-safe on a recorder retry.
+ *
+ * <p>Workspace-agnostic: the join row carries no tenant column — it is scoped through its parent
+ * {@link Feedback} (which holds {@code workspace_id}), so callers tenant-scope at the {@code Feedback} level.
  */
 @Repository
+@WorkspaceAgnostic("FeedbackFinding is a join row scoped through its parent Feedback's workspace_id, not its own")
 public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding, FeedbackFinding.Id> {
     @Modifying
     @Transactional

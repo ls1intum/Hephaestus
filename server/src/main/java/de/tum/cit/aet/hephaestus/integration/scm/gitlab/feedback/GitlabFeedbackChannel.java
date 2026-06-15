@@ -119,6 +119,50 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         return new SummaryHandle(noteId);
     }
 
+    /**
+     * Edit an existing MR/issue note in place via the {@code updateNote} mutation (ADR 0021 re-review UX).
+     * No noteable resolution is needed — the note's own global id ({@code externalId}, e.g.
+     * {@code gid://gitlab/Note/123}) addresses it directly. A vendor rejection (the prior note was deleted
+     * by a human, the id is stale) surfaces as {@link FeedbackDeliveryException}; the caller then re-posts.
+     */
+    @Override
+    public SummaryHandle updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
+        long scopeId = target.ref().workspaceId();
+        if (gitLabProvider.isRateLimitCritical(scopeId)) {
+            throw new FeedbackDeliveryException(
+                "GitLab rate limit critical — skipping summary edit for scope " + scopeId
+            );
+        }
+        if (externalId == null || externalId.isBlank()) {
+            throw new FeedbackDeliveryException("Cannot edit a GitLab note in place: external note id is missing");
+        }
+        String body = escapeSlashCommands(content.body());
+
+        ClientGraphQlResponse response = gitLabProvider
+            .forScope(scopeId)
+            .documentName("UpdateNote")
+            .variable("id", externalId)
+            .variable("body", body)
+            .execute()
+            .block(GRAPHQL_TIMEOUT);
+
+        if (response == null) {
+            throw new FeedbackDeliveryException("Null response from updateNote mutation");
+        }
+
+        List<String> mutationErrors = response.field("updateNote.errors").getValue();
+        if (mutationErrors != null && !mutationErrors.isEmpty()) {
+            throw new FeedbackDeliveryException("GitLab updateNote failed: " + mutationErrors);
+        }
+
+        String noteId = response.field("updateNote.note.id").getValue();
+        if (noteId == null) {
+            throw new FeedbackDeliveryException("No note ID in updateNote response");
+        }
+        log.info("Edited GitLab note in place: workspaceId={}, noteId={}", scopeId, noteId);
+        return new SummaryHandle(noteId);
+    }
+
     static String escapeSlashCommands(String body) {
         if (body == null || body.isEmpty()) {
             return body;

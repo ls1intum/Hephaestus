@@ -24,6 +24,8 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -94,12 +96,15 @@ public class FeedbackLedgerRecorder {
         long recipientUserId = any.getContributor().getId();
         WorkArtifact targetType = any.getTargetType();
         Long targetId = any.getTargetId();
-        String continuityKey = FeedbackContinuityKey.compute(
-            targetType.name(),
-            targetId,
-            recipientUserId,
-            FeedbackSurface.IN_CONTEXT
-        );
+        String continuityKey = continuityKeyFor(any);
+
+        // Re-review supersession (ADR 0021 re-review UX): the prior live unit on this continuity line is the
+        // one whose SUMMARY comment the delivery just edited in place. Flip it to SUPERSEDED and point this
+        // new row's supersedes_id at it, preserving the temporal record of what the student saw each run.
+        UUID supersedesId = feedbackRepository
+            .findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(continuityKey, FeedbackState.DELIVERED)
+            .map(Feedback::getId)
+            .orElse(null);
 
         Instant now = Instant.now();
         Feedback feedback = feedbackRepository.save(
@@ -119,10 +124,18 @@ public class FeedbackLedgerRecorder {
                 .modelId(job.getLlmModel())
                 .composerVersion(DeliveryComposer.COMPOSER_VERSION)
                 .continuityKey(continuityKey)
+                .supersedesId(supersedesId)
                 .createdAt(now)
                 .deliveredAt(now)
                 .build()
         );
+
+        // Flip the prior unit AFTER the new DELIVERED row lands, so there is never a window with zero live
+        // units on this line (a concurrent reader always sees exactly one). Native update — @Immutable forbids
+        // an ORM-level state mutation.
+        if (supersedesId != null) {
+            feedbackRepository.updateState(supersedesId, FeedbackState.SUPERSEDED.name());
+        }
 
         // Bind every assessed finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions are not part of what was delivered.
@@ -180,6 +193,46 @@ public class FeedbackLedgerRecorder {
             assessed.size(),
             artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
             continuityKey
+        );
+    }
+
+    /**
+     * The external comment id of the CURRENT live in-context summary for this job's continuity line, if any —
+     * the comment a re-review should EDIT IN PLACE rather than post anew (ADR 0021 re-review UX). Derived from
+     * the job's own findings so this read key is computed identically to the write key in {@link #record},
+     * with no reliance on PR↔finding id coupling. Empty when this is the first delivery on the line, the prior
+     * unit is already superseded/failed, or it had no recoverable SUMMARY placement (e.g. the post had failed).
+     *
+     * <p>Best-effort and side-effect free: runs in its own read-only transaction; callers treat any failure as
+     * "no prior summary" and post fresh.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Optional<String> priorLiveSummaryRef(AgentJob job) {
+        List<PracticeFinding> findings = practiceFindingRepository.findByAgentJobId(job.getId());
+        if (findings.isEmpty()) {
+            return Optional.empty();
+        }
+        String continuityKey = continuityKeyFor(findings.get(0));
+        return feedbackRepository
+            .findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(continuityKey, FeedbackState.DELIVERED)
+            .flatMap(prior ->
+                feedbackPlacementRepository
+                    .findByFeedbackId(prior.getId())
+                    .stream()
+                    .filter(p -> p.getPlacement() == PlacementSurface.SUMMARY)
+                    .map(FeedbackPlacement::getExternalRef)
+                    .filter(ref -> ref != null && !ref.isBlank())
+                    .findFirst()
+            );
+    }
+
+    /** The stable continuity line for a finding: (target, recipient, in-context surface). */
+    private static String continuityKeyFor(PracticeFinding any) {
+        return FeedbackContinuityKey.compute(
+            any.getTargetType().name(),
+            any.getTargetId(),
+            any.getContributor().getId(),
+            FeedbackSurface.IN_CONTEXT
         );
     }
 }

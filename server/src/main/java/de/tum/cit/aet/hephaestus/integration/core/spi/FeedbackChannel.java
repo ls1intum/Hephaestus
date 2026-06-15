@@ -15,6 +15,23 @@ public interface FeedbackChannel {
     SummaryHandle postSummary(FeedbackTarget target, FeedbackContent content);
 
     /**
+     * Edit an already-posted summary <em>in place</em> (ADR 0021 re-review UX): the persistent overview
+     * comment is updated rather than re-posted, so a re-reviewed PR/MR keeps ONE evolving summary thread
+     * instead of accumulating one comment per run (the Qodo {@code persistent_comment} / CodeRabbit model).
+     * {@code externalId} is the handle a prior {@link #postSummary} returned.
+     *
+     * <p>Vendors whose summary surface cannot be edited (append-only) keep the default and the caller falls
+     * back to a fresh {@link #postSummary}. A vendor that <em>can</em> edit but finds the prior comment gone
+     * (a human deleted it) signals that with {@link FeedbackDeliveryException} so the caller re-posts.
+     *
+     * @throws UnsupportedOperationException if this channel cannot edit a summary in place
+     * @throws FeedbackDeliveryException if the edit was attempted but the vendor rejected it
+     */
+    default SummaryHandle updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
+        throw new UnsupportedOperationException("Channel " + kind() + " does not support editing a summary in place");
+    }
+
+    /**
      * Format the vendor's external identifier for a pull request / merge request. GitHub
      * uses {@code repoFullName#prNumber}; GitLab uses {@code repoFullName!prNumber};
      * future kinds add their own. The {@code subjectExternalId} stored on the

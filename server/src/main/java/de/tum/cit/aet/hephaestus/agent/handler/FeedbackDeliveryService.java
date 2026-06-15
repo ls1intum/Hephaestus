@@ -19,9 +19,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Delivers practice review feedback to PRs/MRs.
  *
- * <p>Every delivery is independent: always posts a new MR summary comment + all diff notes.
- * No edit-in-place, no deduplication. Findings are already persisted by
- * {@link PracticeDetectionDeliveryService} before this is called.
+ * <p>The MR summary is EDITED IN PLACE across re-reviews (ADR 0021 re-review UX): a re-reviewed PR keeps
+ * one evolving overview comment rather than accumulating a fresh one per run, falling back to a new post
+ * only when the prior comment is gone. Inline diff notes are reconciled separately. Findings are already
+ * persisted by {@link PracticeDetectionDeliveryService} before this is called.
  *
  * <p>Delivery is best-effort (soft failure).
  *
@@ -158,7 +159,18 @@ class FeedbackDeliveryService {
             return;
         }
         String formatted = formatPracticeNote(sanitized, job);
-        String commentId = commentPoster.postFormattedBody(job, formatted);
+
+        // Re-review UX (ADR 0021): edit the persistent summary IN PLACE across re-reviews so the PR keeps ONE
+        // evolving overview comment instead of accumulating a fresh one each run (the Qodo persistent_comment /
+        // CodeRabbit model). The recorder returns the current live summary's comment id for this continuity
+        // line; if an edit can't land (append-only channel, or a human deleted the prior comment) we fall back
+        // to a new post. The recorder supersedes the prior ledger unit when it records this run.
+        String priorRef = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
+        String commentId = priorRef != null ? commentPoster.updateFormattedBody(job, priorRef, formatted) : null;
+        boolean editedInPlace = commentId != null;
+        if (commentId == null) {
+            commentId = commentPoster.postFormattedBody(job, formatted);
+        }
         if (commentId == null) {
             // We had a real, non-blank summary to post but the provider returned no comment id —
             // the contributor sees nothing. Treat as an integrity failure so the job is marked FAILED.
@@ -167,7 +179,12 @@ class FeedbackDeliveryService {
             );
         }
         job.setDeliveryCommentId(commentId);
-        log.info("Practice summary note posted: jobId={}, commentId={}", job.getId(), commentId);
+        log.info(
+            "Practice summary note delivered: jobId={}, commentId={}, editedInPlace={}",
+            job.getId(),
+            commentId,
+            editedInPlace
+        );
     }
 
     private void postDiffNotes(AgentJob job, DeliveryContent delivery) {

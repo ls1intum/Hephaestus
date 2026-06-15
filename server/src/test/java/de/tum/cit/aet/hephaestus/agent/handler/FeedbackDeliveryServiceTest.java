@@ -52,6 +52,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    @Mock
+    private FeedbackLedgerRecorder feedbackLedgerRecorder;
+
     private FeedbackDeliveryService service;
 
     private static final Long WORKSPACE_ID = 99L;
@@ -71,7 +74,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pullRequestRepository,
             workspaceRepository,
             reviewProperties,
-            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+            feedbackLedgerRecorder
         );
         // Inline reconciliation now runs on every OPEN-PR delivery — even with zero diff notes — to clear an
         // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
@@ -134,6 +137,39 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment123");
+        }
+
+        @Test
+        @DisplayName("re-review edits the prior summary in place instead of posting a new comment")
+        void editsPriorSummaryInPlace() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            // A live summary already exists on this continuity line → edit it, do not post anew.
+            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn("IC_prior");
+
+            service.deliverFeedback(job, new DeliveryContent("Re-reviewed: still fix the tests.", List.of()));
+
+            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
+            verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
+        }
+
+        @Test
+        @DisplayName("when the prior summary can't be edited (deleted by a human), falls back to a fresh post")
+        void fallsBackToNewPostWhenEditCannotLand() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
+            // Edit can't land (channel returns null = append-only or comment gone) → post a new one.
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn(null);
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
+
+            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of()));
+
+            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
+            verify(commentPoster).postFormattedBody(eq(job), any(String.class));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_new");
         }
 
         @Test
