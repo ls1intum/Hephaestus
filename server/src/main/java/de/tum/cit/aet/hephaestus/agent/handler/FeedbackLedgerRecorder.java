@@ -58,21 +58,27 @@ public class FeedbackLedgerRecorder {
     /** SUPPRESSED units (B2) start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
     private static final int SUPPRESSED_UNIT_ORDINAL_BASE = 1000;
 
+    /** Policy-floor SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
+    private static final int POLICY_FLOOR_UNIT_ORDINAL_BASE = 2000;
+
     private final PracticeFindingRepository practiceFindingRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackFindingRepository feedbackFindingRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
+    private final de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties reviewProperties;
 
     FeedbackLedgerRecorder(
         PracticeFindingRepository practiceFindingRepository,
         FeedbackRepository feedbackRepository,
         FeedbackFindingRepository feedbackFindingRepository,
-        FeedbackPlacementRepository feedbackPlacementRepository
+        FeedbackPlacementRepository feedbackPlacementRepository,
+        de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties reviewProperties
     ) {
         this.practiceFindingRepository = practiceFindingRepository;
         this.feedbackRepository = feedbackRepository;
         this.feedbackFindingRepository = feedbackFindingRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
+        this.reviewProperties = reviewProperties;
     }
 
     /**
@@ -190,6 +196,16 @@ public class FeedbackLedgerRecorder {
             }
         }
 
+        // C3 policy floor: record the volume-capped tail as SUPPRESSED units so an eval excludes them (they
+        // were model-correct, just policy-withheld) — flag-gated, best-effort, never affects the DELIVERED unit.
+        if (reviewProperties.policyFloor()) {
+            try {
+                recordPolicyFloor(job, findings);
+            } catch (RuntimeException e) {
+                log.warn("Policy-floor ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
+            }
+        }
+
         log.info(
             "Feedback ledger recorded: jobId={}, unit={}, findings={}, inlinePlacements={}, continuityKey={}",
             job.getId(),
@@ -198,6 +214,51 @@ public class FeedbackLedgerRecorder {
             artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
             continuityKey
         );
+    }
+
+    /**
+     * Record the volume-cap tail (C3): the same partition {@code DeliveryComposer} renders (keep all blocking
+     * + top-{@value DeliveryComposer#MAX_IMPROVEMENT_SUGGESTIONS} non-blocking), with every DROPPED problem
+     * written as a SUPPRESSED / POLICY_FLOOR_DROP unit so the eval can exclude it rather than score it a miss.
+     */
+    private void recordPolicyFloor(AgentJob job, List<PracticeFinding> findings) {
+        List<PracticeFinding> problems = findings.stream().filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED).toList();
+        de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector.Partition partition =
+            de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector.partition(
+                problems,
+                DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
+            );
+        Instant now = Instant.now();
+        int index = 0;
+        for (PracticeFinding dropped : partition.dropped()) {
+            int unitOrdinal = POLICY_FLOOR_UNIT_ORDINAL_BASE + index++;
+            if (feedbackRepository.existsByAgentJobIdAndUnitOrdinal(job.getId(), unitOrdinal)) {
+                continue;
+            }
+            Feedback unit = feedbackRepository.save(
+                Feedback.builder()
+                    .idempotencyKey(job.getId() + ":" + unitOrdinal)
+                    .agentJobId(job.getId())
+                    .workspaceId(job.getWorkspace().getId())
+                    .targetType(dropped.getTargetType())
+                    .targetId(dropped.getTargetId())
+                    .recipientUserId(dropped.getContributor().getId())
+                    .subjectUserId(dropped.getSubjectUserId())
+                    .surface(FeedbackSurface.IN_CONTEXT)
+                    .unitOrdinal(unitOrdinal)
+                    .state(FeedbackState.SUPPRESSED)
+                    .suppressionReason(FeedbackSuppressionReason.POLICY_FLOOR_DROP)
+                    .origin(FeedbackOrigin.AGENT)
+                    .modelId(job.getLlmModel())
+                    .composerVersion(DeliveryComposer.COMPOSER_VERSION)
+                    .createdAt(now)
+                    .build()
+            );
+            feedbackFindingRepository.insertIfAbsent(unit.getId(), dropped.getId(), FeedbackFindingDisplayRole.PRIMARY.name(), 0);
+        }
+        if (!partition.dropped().isEmpty()) {
+            log.info("Policy-floor: jobId={}, kept={}, dropped(suppressed)={}", job.getId(), partition.kept().size(), partition.dropped().size());
+        }
     }
 
     /**
