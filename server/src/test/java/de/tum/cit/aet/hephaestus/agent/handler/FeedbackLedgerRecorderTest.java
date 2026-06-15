@@ -56,6 +56,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(feedbackRepository.findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(any(), any())).thenReturn(
             Optional.empty()
         );
+        when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of());
         when(feedbackPlacementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return new FeedbackLedgerRecorder(
             practiceFindingRepository,
@@ -114,6 +115,25 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository).save(saved.capture());
         assertThat(saved.getValue().getState()).isEqualTo(FeedbackState.DELIVERED);
+    }
+
+    @Test
+    void alreadySuppressedFinding_isExcludedFromDeliveredUnit() {
+        // A finding withheld earlier in the flow (B2 reaction suppression wrote a SUPPRESSED unit for it) must
+        // NOT also be bound to the DELIVERED unit — else it is double-counted as delivered.
+        var kept = problem(0.9f);
+        var b2Suppressed = problem(0.8f);
+        UUID keptId = kept.getId();
+        UUID b2Id = b2Suppressed.getId();
+        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(kept, b2Suppressed));
+        var recorder = recorder(false);
+        when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
+
+        recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST);
+
+        var bound = ArgumentCaptor.forClass(UUID.class);
+        verify(feedbackFindingRepository).insertIfAbsent(any(), bound.capture(), any(), anyInt());
+        assertThat(bound.getAllValues()).containsExactly(keptId);
     }
 
     private AgentJob job() {

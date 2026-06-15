@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -162,14 +163,21 @@ public class FeedbackLedgerRecorder {
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
               ).dropped()
             : List.of();
-        Set<UUID> droppedIds = policyDropped.stream().map(PracticeFinding::getId).collect(Collectors.toSet());
+        // Exclude from the DELIVERED unit anything that was NOT delivered: policy-floor-dropped this run, plus
+        // anything already written as SUPPRESSED earlier in the flow (B2 reaction suppression runs before this)
+        // — else a withheld finding is bound to both its SUPPRESSED unit and the DELIVERED unit.
+        Set<UUID> excludedIds = policyDropped
+            .stream()
+            .map(PracticeFinding::getId)
+            .collect(Collectors.toCollection(HashSet::new));
+        excludedIds.addAll(feedbackFindingRepository.findFindingIdsSuppressedForJob(job.getId()));
 
         // Bind every DELIVERED finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
-        // strengths as SUPPORTING; NOT_APPLICABLE abstentions and policy-dropped problems are excluded.
+        // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
         List<PracticeFinding> assessed = findings
             .stream()
             .filter(f -> f.getVerdict() != Verdict.NOT_APPLICABLE)
-            .filter(f -> !droppedIds.contains(f.getId()))
+            .filter(f -> !excludedIds.contains(f.getId()))
             .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
             .toList();
         int ordinal = 0;

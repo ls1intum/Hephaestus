@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -39,4 +40,19 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
         @Param("displayRole") String displayRole,
         @Param("ordinal") int ordinal
     );
+
+    /**
+     * Finding ids already bound to a SUPPRESSED unit of this job — i.e. withheld earlier in the flow (B2
+     * reaction suppression writes its {@code REACTED_*} units before the DELIVERED unit is recorded). The
+     * DELIVERED binding excludes these so a withheld finding is never also counted as delivered.
+     */
+    @Query(
+        value = """
+        SELECT ff.finding_id FROM feedback_finding ff
+        JOIN feedback f ON f.id = ff.feedback_id
+        WHERE f.agent_job_id = :agentJobId AND f.state = 'SUPPRESSED'
+        """,
+        nativeQuery = true
+    )
+    List<UUID> findFindingIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 }
