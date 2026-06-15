@@ -7,14 +7,15 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import java.util.List;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
+import java.util.ArrayList;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,8 +141,8 @@ class FeedbackDeliveryService {
         // (the target + workspace are known) and threaded into the summary so DeliveryComposer stays pure.
         TrendDelta trend = reviewProperties.progressFooter()
             ? findingTrendService
-                .computeForTarget(WorkArtifact.PULL_REQUEST, pullRequestId, job.getWorkspace().getId())
-                .orElse(null)
+                  .computeForTarget(WorkArtifact.PULL_REQUEST, pullRequestId, job.getWorkspace().getId())
+                  .orElse(null)
             : null;
 
         // Always post new
@@ -214,7 +215,7 @@ class FeedbackDeliveryService {
 
     /** A4: a short, marker-tagged notifying note pointing at the freshly-edited summary. Best-effort. */
     private void postReReviewPing(AgentJob job, TrendDelta trend) {
-        List<String> parts = new java.util.ArrayList<>();
+        List<String> parts = new ArrayList<>();
         if (trend.countResolved() > 0) {
             parts.add(trend.countResolved() + " resolved");
         }

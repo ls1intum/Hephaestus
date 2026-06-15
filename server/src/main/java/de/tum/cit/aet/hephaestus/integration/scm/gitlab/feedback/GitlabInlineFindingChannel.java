@@ -270,7 +270,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 }
 
                 if (markedNoteIds.isEmpty()) {
-                    continue; // not one of our threads
+                    continue;
                 }
                 if (humanReplied) {
                     preserved += markedNoteIds.size();

@@ -37,7 +37,10 @@ class FindingTrendServiceTest extends BaseUnitTest {
 
     private void stubTwoTargetRuns() {
         when(repo.findRecentRunRefsForTarget(eq(WorkArtifact.PULL_REQUEST), eq(TARGET), eq(WS), any())).thenReturn(
-            List.of(runRef(JOB_CURR, Instant.parse("2026-06-15T10:00:00Z")), runRef(JOB_PREV, Instant.parse("2026-06-14T10:00:00Z")))
+            List.of(
+                runRef(JOB_CURR, Instant.parse("2026-06-15T10:00:00Z")),
+                runRef(JOB_PREV, Instant.parse("2026-06-14T10:00:00Z"))
+            )
         );
     }
 
@@ -130,29 +133,14 @@ class FindingTrendServiceTest extends BaseUnitTest {
         assertThat(service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS)).isEmpty();
     }
 
-    @Test
-    void computeForSubjectPractice_filtersToOnePractice() {
-        when(repo.findRecentRunRefsForSubjectPractice(eq(7L), eq("commit-discipline"), eq(WS), any())).thenReturn(
-            List.of(runRef(JOB_CURR, Instant.parse("2026-06-15T10:00:00Z")), runRef(JOB_PREV, Instant.parse("2026-06-14T10:00:00Z")))
-        );
-        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
-            List.of(
-                locus(JOB_PREV, "cd1", Verdict.NOT_OBSERVED, Severity.MINOR, "commit-discipline", "cd prior"),
-                locus(JOB_PREV, "md1", Verdict.NOT_OBSERVED, Severity.MINOR, "mr-description-quality", "md prior"),
-                locus(JOB_CURR, "cd1", Verdict.NOT_OBSERVED, Severity.MINOR, "commit-discipline", "cd now"),
-                locus(JOB_CURR, "md1", Verdict.NOT_OBSERVED, Severity.MINOR, "mr-description-quality", "md now")
-            )
-        );
-
-        TrendDelta d = service.computeForSubjectPractice(7L, "commit-discipline", WS).orElseThrow();
-
-        assertThat(d.transitions()).hasSize(1);
-        assertThat(d.transitions().get(0).practiceSlug()).isEqualTo("commit-discipline");
-        assertThat(d.transitions().get(0).status()).isEqualTo(TransitionStatus.PERSISTED);
-    }
-
     private static TransitionStatus status(TrendDelta d, String key) {
-        return d.transitions().stream().filter(t -> t.correlationKey().equals(key)).findFirst().orElseThrow().status();
+        return d
+            .transitions()
+            .stream()
+            .filter(t -> t.correlationKey().equals(key))
+            .findFirst()
+            .orElseThrow()
+            .status();
     }
 
     // --- projection stubs (anonymous implementations of the repository interface projections) ---
@@ -175,7 +163,15 @@ class FindingTrendServiceTest extends BaseUnitTest {
         return locusConf(job, key, v, sev, 0.8f, slug, title);
     }
 
-    private static LocusFinding locusConf(UUID job, String key, Verdict v, Severity sev, float conf, String slug, String title) {
+    private static LocusFinding locusConf(
+        UUID job,
+        String key,
+        Verdict v,
+        Severity sev,
+        float conf,
+        String slug,
+        String title
+    ) {
         return new LocusFinding() {
             @Override
             public UUID getAgentJobId() {

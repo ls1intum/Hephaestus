@@ -52,7 +52,9 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test
     void render_regressed_rendersSlippedBackSection() {
-        TrendDelta d = delta(List.of(transition("k1", TransitionStatus.REGRESSED, "Tests dropped again", "ships-tests")));
+        TrendDelta d = delta(
+            List.of(transition("k1", TransitionStatus.REGRESSED, "Tests dropped again", "ships-tests"))
+        );
 
         String out = ProgressFooterRenderer.render(d);
 

@@ -36,7 +36,16 @@ class AiSettingsServiceTest extends BaseUnitTest {
     private WorkspaceContext context;
 
     // Fleet defaults: runForAll=false, skipDrafts=true, deliverToMerged=false, cooldown=15
-    private final PracticeReviewProperties reviewProperties = new PracticeReviewProperties(false, true, false, "", 15, false, false, false);
+    private final PracticeReviewProperties reviewProperties = new PracticeReviewProperties(
+        false,
+        true,
+        false,
+        "",
+        15,
+        false,
+        false,
+        false
+    );
 
     @BeforeEach
     void setUp() {

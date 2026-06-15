@@ -9,10 +9,9 @@ import java.util.List;
 /**
  * The per-run volume cap (ADR 0021, C3): keep every blocking finding (CRITICAL/MAJOR) plus the top-K
  * non-blocking (MINOR/INFO) ones; the rest are "dropped" — surfaced to no one this run so the student is not
- * flooded into inaction. Pure and deterministic, mirroring {@code DeliveryComposer}'s improvement-tail cap so
- * the rendered "+N more minor suggestions" overflow count equals {@code dropped().size()}, and the ledger
- * records exactly what the renderer withheld (a dropped finding is model-correct, just policy-suppressed —
- * it is NOT a model miss).
+ * flooded into inaction. Pure and deterministic. The ledger records each dropped finding as SUPPRESSED so an
+ * eval excludes it (a dropped finding is model-correct, just policy-withheld — NOT a model miss). Applies the
+ * same keep-blocking-plus-top-K policy as {@code DeliveryComposer}'s improvement-tail cap.
  */
 public final class PolicyFloorSelector {
 
@@ -31,7 +30,7 @@ public final class PolicyFloorSelector {
         List<PracticeFinding> nonBlocking = new ArrayList<>();
         for (PracticeFinding f : problemFindings) {
             if (isBlocking(f.getSeverity())) {
-                kept.add(f); // blocking is never capped
+                kept.add(f);
             } else {
                 nonBlocking.add(f);
             }

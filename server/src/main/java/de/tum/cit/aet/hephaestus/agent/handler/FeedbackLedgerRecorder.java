@@ -18,10 +18,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -52,7 +54,6 @@ public class FeedbackLedgerRecorder {
 
     private static final Logger log = LoggerFactory.getLogger(FeedbackLedgerRecorder.class);
 
-    /** One unit per job today; >0 reserved for future multi-recipient / reviewer-side fan-out. */
     private static final int IN_CONTEXT_UNIT_ORDINAL = 0;
 
     /** SUPPRESSED units (B2) start here so they never collide with the live IN_CONTEXT unit (ordinal 0). */
@@ -65,14 +66,14 @@ public class FeedbackLedgerRecorder {
     private final FeedbackRepository feedbackRepository;
     private final FeedbackFindingRepository feedbackFindingRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
-    private final de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties reviewProperties;
+    private final PracticeReviewProperties reviewProperties;
 
     FeedbackLedgerRecorder(
         PracticeFindingRepository practiceFindingRepository,
         FeedbackRepository feedbackRepository,
         FeedbackFindingRepository feedbackFindingRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
-        de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties
     ) {
         this.practiceFindingRepository = practiceFindingRepository;
         this.feedbackRepository = feedbackRepository;
@@ -222,12 +223,14 @@ public class FeedbackLedgerRecorder {
      * written as a SUPPRESSED / POLICY_FLOOR_DROP unit so the eval can exclude it rather than score it a miss.
      */
     private void recordPolicyFloor(AgentJob job, List<PracticeFinding> findings) {
-        List<PracticeFinding> problems = findings.stream().filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED).toList();
-        de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector.Partition partition =
-            de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector.partition(
-                problems,
-                DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
-            );
+        List<PracticeFinding> problems = findings
+            .stream()
+            .filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED)
+            .toList();
+        PolicyFloorSelector.Partition partition = PolicyFloorSelector.partition(
+            problems,
+            DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
+        );
         Instant now = Instant.now();
         int index = 0;
         for (PracticeFinding dropped : partition.dropped()) {
@@ -254,10 +257,20 @@ public class FeedbackLedgerRecorder {
                     .createdAt(now)
                     .build()
             );
-            feedbackFindingRepository.insertIfAbsent(unit.getId(), dropped.getId(), FeedbackFindingDisplayRole.PRIMARY.name(), 0);
+            feedbackFindingRepository.insertIfAbsent(
+                unit.getId(),
+                dropped.getId(),
+                FeedbackFindingDisplayRole.PRIMARY.name(),
+                0
+            );
         }
         if (!partition.dropped().isEmpty()) {
-            log.info("Policy-floor: jobId={}, kept={}, dropped(suppressed)={}", job.getId(), partition.kept().size(), partition.dropped().size());
+            log.info(
+                "Policy-floor: jobId={}, kept={}, dropped(suppressed)={}",
+                job.getId(),
+                partition.kept().size(),
+                partition.dropped().size()
+            );
         }
     }
 
@@ -326,7 +339,12 @@ public class FeedbackLedgerRecorder {
                 .createdAt(now)
                 .build()
         );
-        feedbackFindingRepository.insertIfAbsent(feedback.getId(), finding.getId(), FeedbackFindingDisplayRole.PRIMARY.name(), 0);
+        feedbackFindingRepository.insertIfAbsent(
+            feedback.getId(),
+            finding.getId(),
+            FeedbackFindingDisplayRole.PRIMARY.name(),
+            0
+        );
         log.info(
             "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, correlationKey={}",
             job.getId(),

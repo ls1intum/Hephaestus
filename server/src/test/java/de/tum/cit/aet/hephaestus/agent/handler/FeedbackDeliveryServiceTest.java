@@ -18,6 +18,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -25,10 +29,12 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -184,6 +190,31 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
+        }
+
+        @Test
+        @DisplayName("with the progress-footer flag on, a meaningful re-review appends the footer and posts an A4 ping")
+        void appendsProgressFooterAndPingsOnMeaningfulReReview() {
+            var footerService = serviceWithProgressFooter();
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(feedbackLedgerRecorder.priorLiveSummaryRef(eq(job))).thenReturn(Optional.of("IC_prior"));
+            when(commentPoster.updateFormattedBody(eq(job), eq("IC_prior"), any(String.class))).thenReturn("IC_prior");
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
+            when(
+                findingTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
+            ).thenReturn(Optional.of(resolvedTrend()));
+
+            footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
+
+            // (a) the edited summary body carries the rendered footer
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
+            assertThat(body.getValue()).contains("Progress since your last review").contains("Resolved");
+            // (b) the A4 ping fired as a separate notifying note (edit-in-place pings nobody on its own)
+            var ping = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(job), ping.capture());
+            assertThat(ping.getValue()).contains("hephaestus:re-review-ping").contains("Re-reviewed");
         }
 
         @Test
@@ -438,5 +469,41 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             assertThat(result).doesNotContain("[Hephaestus]");
             assertThat(result).contains("Hephaestus Agent");
         }
+    }
+
+    private FeedbackDeliveryService serviceWithProgressFooter() {
+        var props = new PracticeReviewProperties(false, true, false, APP_BASE_URL, 15, true, false, false);
+        return new FeedbackDeliveryService(
+            commentPoster,
+            diffNotePoster,
+            userPreferencesRepository,
+            pullRequestRepository,
+            workspaceRepository,
+            props,
+            feedbackLedgerRecorder,
+            findingTrendService
+        );
+    }
+
+    private static TrendDelta resolvedTrend() {
+        var resolved = new TrendDelta.LocusTransition(
+            "k1",
+            TrendDelta.TransitionStatus.RESOLVED,
+            "code-hygiene",
+            "Unused import removed",
+            Verdict.NOT_OBSERVED,
+            null,
+            Severity.MINOR,
+            0.8f
+        );
+        return new TrendDelta(
+            WorkArtifact.PULL_REQUEST,
+            PULL_REQUEST_ID,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            Instant.parse("2026-06-15T10:00:00Z"),
+            Instant.parse("2026-06-14T10:00:00Z"),
+            List.of(resolved)
+        );
     }
 }

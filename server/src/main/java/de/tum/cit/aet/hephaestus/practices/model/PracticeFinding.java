@@ -54,7 +54,10 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_practice_finding_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_practice_finding_target", columnList = "target_type, target_id"),
         // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (FindingTrendService).
-        @Index(name = "idx_practice_finding_target_run", columnList = "target_type, target_id, agent_job_id, detected_at DESC"),
+        @Index(
+            name = "idx_practice_finding_target_run",
+            columnList = "target_type, target_id, agent_job_id, detected_at DESC"
+        ),
         // Cross-run identity (ADR 0021 C2): supersession + reaction-history follow one finding across re-detections.
         @Index(name = "idx_practice_finding_correlation", columnList = "correlation_key"),
         // Reviewer-side findings are filed against the subject, not the contributor; index for subject dashboards.

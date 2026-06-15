@@ -260,9 +260,9 @@ public class PracticeDetectionDeliveryService {
     /**
      * The file path of a finding's first evidence location, or {@code null} when it has none (a metadata
      * practice like PR-description quality). Feeds {@link CorrelationKey} — the PATH only, never a line
-     * number, so a finding that survives a few lines moving keeps one cross-run identity.
+     * number, so a finding that survives a few lines moving keeps one cross-run identity. Package-private so
+     * {@code ReactionSuppressionFilter} (B2) recomputes the same locus the SAME way.
      */
-    /** First evidence file path — the locus rule shared with ReactionSuppressionFilter (B2). Package-private. */
     static String firstLocationPath(JsonNode evidence) {
         if (evidence == null || evidence.isNull()) {
             return null;

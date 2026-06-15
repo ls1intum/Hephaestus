@@ -53,7 +53,10 @@ public class FindingTrendService {
         }
         RunRef curr = runs.get(0);
         RunRef prev = runs.get(1);
-        Map<UUID, List<LocusFinding>> byJob = lociByJob(List.of(curr.getAgentJobId(), prev.getAgentJobId()), workspaceId, null);
+        Map<UUID, List<LocusFinding>> byJob = lociByJob(
+            List.of(curr.getAgentJobId(), prev.getAgentJobId()),
+            workspaceId
+        );
         return Optional.of(
             new TrendDelta(
                 targetType,
@@ -62,57 +65,17 @@ public class FindingTrendService {
                 prev.getAgentJobId(),
                 curr.getRunAt(),
                 prev.getRunAt(),
-                classify(byJob.getOrDefault(prev.getAgentJobId(), List.of()), byJob.getOrDefault(curr.getAgentJobId(), List.of()))
+                classify(
+                    byJob.getOrDefault(prev.getAgentJobId(), List.of()),
+                    byJob.getOrDefault(curr.getAgentJobId(), List.of())
+                )
             )
         );
     }
 
-    /**
-     * The trend for one practice on one subject across targets — diffing the subject's two most-recent runs
-     * for that practice. {@link Optional#empty()} when fewer than two runs exist.
-     */
-    @Transactional(readOnly = true)
-    public Optional<TrendDelta> computeForSubjectPractice(Long aboutUserId, String practiceSlug, Long workspaceId) {
-        List<RunRef> runs = practiceFindingRepository.findRecentRunRefsForSubjectPractice(
-            aboutUserId,
-            practiceSlug,
-            workspaceId,
-            PageRequest.of(0, 2)
-        );
-        if (runs.size() < 2) {
-            return Optional.empty();
-        }
-        RunRef curr = runs.get(0);
-        RunRef prev = runs.get(1);
-        // findLociByAgentJobs is keyed by job-id, so a multi-practice run returns OTHER practices' loci too —
-        // filter to this practice before classifying.
-        Map<UUID, List<LocusFinding>> byJob = lociByJob(
-            List.of(curr.getAgentJobId(), prev.getAgentJobId()),
-            workspaceId,
-            practiceSlug
-        );
-        return Optional.of(
-            new TrendDelta(
-                null,
-                null,
-                curr.getAgentJobId(),
-                prev.getAgentJobId(),
-                curr.getRunAt(),
-                prev.getRunAt(),
-                classify(byJob.getOrDefault(prev.getAgentJobId(), List.of()), byJob.getOrDefault(curr.getAgentJobId(), List.of()))
-            )
-        );
-    }
-
-    private Map<UUID, List<LocusFinding>> lociByJob(List<UUID> jobIds, Long workspaceId, String practiceSlugFilter) {
+    private Map<UUID, List<LocusFinding>> lociByJob(List<UUID> jobIds, Long workspaceId) {
         Map<UUID, List<LocusFinding>> byJob = new LinkedHashMap<>();
         for (LocusFinding lf : practiceFindingRepository.findLociByAgentJobs(jobIds, workspaceId)) {
-            if (lf.getCorrelationKey() == null) {
-                continue; // defensive — the query already excludes nulls
-            }
-            if (practiceSlugFilter != null && !practiceSlugFilter.equals(lf.getPracticeSlug())) {
-                continue;
-            }
             byJob.computeIfAbsent(lf.getAgentJobId(), k -> new ArrayList<>()).add(lf);
         }
         return byJob;

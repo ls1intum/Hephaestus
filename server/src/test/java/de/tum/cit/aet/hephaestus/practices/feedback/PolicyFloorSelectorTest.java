@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -25,7 +24,13 @@ class PolicyFloorSelectorTest extends BaseUnitTest {
     @Test
     void nonBlockingTail_cappedToTopK() {
         var p = PolicyFloorSelector.partition(
-            List.of(f(Severity.MINOR, 0.5f), f(Severity.MINOR, 0.9f), f(Severity.INFO, 0.7f), f(Severity.MINOR, 0.6f), f(Severity.INFO, 0.4f)),
+            List.of(
+                f(Severity.MINOR, 0.5f),
+                f(Severity.MINOR, 0.9f),
+                f(Severity.INFO, 0.7f),
+                f(Severity.MINOR, 0.6f),
+                f(Severity.INFO, 0.4f)
+            ),
             3
         );
         assertThat(p.kept()).hasSize(3);
@@ -37,7 +42,13 @@ class PolicyFloorSelectorTest extends BaseUnitTest {
     @Test
     void blockingNeverCapped_evenBeyondTopK() {
         var p = PolicyFloorSelector.partition(
-            List.of(f(Severity.MAJOR, 0.5f), f(Severity.MAJOR, 0.6f), f(Severity.MAJOR, 0.7f), f(Severity.MAJOR, 0.8f), f(Severity.MINOR, 0.9f)),
+            List.of(
+                f(Severity.MAJOR, 0.5f),
+                f(Severity.MAJOR, 0.6f),
+                f(Severity.MAJOR, 0.7f),
+                f(Severity.MAJOR, 0.8f),
+                f(Severity.MINOR, 0.9f)
+            ),
             1
         );
         assertThat(p.kept()).hasSize(5); // 4 blocking + 1 minor (within topK=1)

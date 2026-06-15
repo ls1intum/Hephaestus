@@ -60,24 +60,39 @@ public record TrendDelta(
     ) {}
 
     public int countNew() {
-        return (int) transitions.stream().filter(t -> t.status() == TransitionStatus.NEW).count();
+        return (int) transitions
+            .stream()
+            .filter(t -> t.status() == TransitionStatus.NEW)
+            .count();
     }
 
     public int countPersisted() {
-        return (int) transitions.stream().filter(t -> t.status() == TransitionStatus.PERSISTED).count();
+        return (int) transitions
+            .stream()
+            .filter(t -> t.status() == TransitionStatus.PERSISTED)
+            .count();
     }
 
     public int countResolved() {
-        return (int) transitions.stream().filter(t -> t.status() == TransitionStatus.RESOLVED).count();
+        return (int) transitions
+            .stream()
+            .filter(t -> t.status() == TransitionStatus.RESOLVED)
+            .count();
     }
 
     public int countRegressed() {
-        return (int) transitions.stream().filter(t -> t.status() == TransitionStatus.REGRESSED).count();
+        return (int) transitions
+            .stream()
+            .filter(t -> t.status() == TransitionStatus.REGRESSED)
+            .count();
     }
 
     /** The resolved loci, for the "Resolved since last review ✓" lines (B1). */
     public List<LocusTransition> resolved() {
-        return transitions.stream().filter(t -> t.status() == TransitionStatus.RESOLVED).toList();
+        return transitions
+            .stream()
+            .filter(t -> t.status() == TransitionStatus.RESOLVED)
+            .toList();
     }
 
     public boolean isEmptyDelta() {

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -316,27 +317,6 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         Pageable pageable
     );
 
-    /**
-     * The (workspace, subject, practice) variant — the finding is ABOUT {@code coalesce(subject_user_id,
-     * contributor_id)}, matching {@code CorrelationKey}'s aboutUserId. Cross-target by construction.
-     */
-    @Query(
-        """
-        SELECT f.agentJobId AS agentJobId, MAX(f.detectedAt) AS runAt
-        FROM PracticeFinding f JOIN f.practice p
-        WHERE COALESCE(f.subjectUserId, f.contributor.id) = :aboutUserId AND p.slug = :practiceSlug
-          AND p.workspace.id = :workspaceId AND f.correlationKey IS NOT NULL
-        GROUP BY f.agentJobId
-        ORDER BY MAX(f.detectedAt) DESC
-        """
-    )
-    List<RunRef> findRecentRunRefsForSubjectPractice(
-        @Param("aboutUserId") Long aboutUserId,
-        @Param("practiceSlug") String practiceSlug,
-        @Param("workspaceId") Long workspaceId,
-        Pageable pageable
-    );
-
     /** All correlation-keyed findings for the given (already-resolved) run job-ids, with the trend fields. */
     @Query(
         """
@@ -349,7 +329,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         """
     )
     List<LocusFinding> findLociByAgentJobs(
-        @Param("agentJobIds") java.util.Collection<UUID> agentJobIds,
+        @Param("agentJobIds") Collection<UUID> agentJobIds,
         @Param("workspaceId") Long workspaceId
     );
 
