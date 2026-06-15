@@ -88,7 +88,16 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             resultParser,
             deliveryService,
             feedbackService,
-            new SecretDiffScanner()
+            new SecretDiffScanner(),
+            // Real flag-OFF filter: evaluate() returns the findings unchanged without touching the repos.
+            new ReactionSuppressionFilter(
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.class),
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository.class),
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
+                    false, true, false, "", 15, false, false, false
+                )
+            )
         );
     }
 
