@@ -131,6 +131,19 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         assertThat(d.deliverable().get(0).reasoning()).startsWith("You previously marked this as fixed");
     }
 
+    @Test
+    void appliedAndNowObserved_isDeliveredPlainNotEscalated() {
+        // APPLIED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
+        // untouched (escalation is keyed on verdict == NOT_OBSERVED, not on the reaction alone).
+        stubPersistedAndReaction(FindingReactionAction.APPLIED);
+
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Verdict.OBSERVED)));
+
+        assertThat(d.deliverable()).hasSize(1);
+        assertThat(d.suppressedCount()).isZero();
+        assertThat(d.deliverable().get(0).reasoning()).isEqualTo("because reasons"); // unchanged
+    }
+
     // --- helpers ---
 
     private void stubPersistedAndReaction(FindingReactionAction action) {

@@ -66,6 +66,63 @@ class FindingTrendServiceTest extends BaseUnitTest {
         assertThat(status(d, "keyX")).isEqualTo(TransitionStatus.PERSISTED);
         assertThat(status(d, "keyY")).isEqualTo(TransitionStatus.RESOLVED);
         assertThat(status(d, "keyZ")).isEqualTo(TransitionStatus.NEW);
+        // a RESOLVED locus carries the PRIOR run's prose (it is absent now; that is what the student last saw)
+        LocusTransition resolved = transition(d, "keyY");
+        assertThat(resolved.title()).isEqualTo("Y title");
+        assertThat(resolved.priorVerdict()).isEqualTo(Verdict.OBSERVED);
+        assertThat(resolved.currentVerdict()).isNull();
+    }
+
+    @Test
+    void computeForTarget_allLociPersistUnchanged_isNotMeaningful() {
+        // The negative case that guards the silent A4 path: a re-review that only re-flags the same loci with
+        // no verdict change must NOT count as meaningful change (else it would ping the author about nothing).
+        stubTwoTargetRuns();
+        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
+            List.of(
+                locus(JOB_PREV, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "still broken"),
+                locus(JOB_CURR, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "still broken")
+            )
+        );
+
+        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+
+        assertThat(d.countPersisted()).isEqualTo(1);
+        assertThat(d.countNew() + d.countResolved() + d.countRegressed()).isZero();
+        assertThat(d.hasMeaningfulChange()).isFalse();
+    }
+
+    @Test
+    void computeForTarget_ordersTransitionsRegressedNewResolvedPersisted() {
+        stubTwoTargetRuns();
+        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
+            List.of(
+                locus(JOB_PREV, "kP", Verdict.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
+                locus(JOB_CURR, "kP", Verdict.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
+                locus(JOB_PREV, "kR", Verdict.OBSERVED, Severity.MAJOR, "r", "was ok"),
+                locus(JOB_CURR, "kR", Verdict.NOT_OBSERVED, Severity.MAJOR, "r", "regressed"),
+                locus(JOB_CURR, "kN", Verdict.NOT_OBSERVED, Severity.MAJOR, "n", "new"),
+                locus(JOB_PREV, "kS", Verdict.NOT_OBSERVED, Severity.MAJOR, "s", "resolved")
+            )
+        );
+
+        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+
+        assertThat(d.transitions().stream().map(LocusTransition::status).toList()).containsExactly(
+            TransitionStatus.REGRESSED,
+            TransitionStatus.NEW,
+            TransitionStatus.RESOLVED,
+            TransitionStatus.PERSISTED
+        );
+    }
+
+    private static LocusTransition transition(TrendDelta d, String key) {
+        return d
+            .transitions()
+            .stream()
+            .filter(t -> t.correlationKey().equals(key))
+            .findFirst()
+            .orElseThrow();
     }
 
     @Test

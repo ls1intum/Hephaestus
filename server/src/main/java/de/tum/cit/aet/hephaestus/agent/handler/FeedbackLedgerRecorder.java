@@ -28,7 +28,9 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -148,11 +150,26 @@ public class FeedbackLedgerRecorder {
             feedbackRepository.updateState(supersedesId, FeedbackState.SUPERSEDED.name());
         }
 
-        // Bind every assessed finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
-        // strengths as SUPPORTING; NOT_APPLICABLE abstentions are not part of what was delivered.
+        // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the
+        // DELIVERED unit — it is recorded as SUPPRESSED below. Compute it once so the DELIVERED binding
+        // excludes it (else a dropped finding is bound to BOTH units and an eval double-counts it as delivered).
+        List<PracticeFinding> policyDropped = reviewProperties.policyFloor()
+            ? PolicyFloorSelector.partition(
+                  findings
+                      .stream()
+                      .filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED)
+                      .toList(),
+                  DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
+              ).dropped()
+            : List.of();
+        Set<UUID> droppedIds = policyDropped.stream().map(PracticeFinding::getId).collect(Collectors.toSet());
+
+        // Bind every DELIVERED finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
+        // strengths as SUPPORTING; NOT_APPLICABLE abstentions and policy-dropped problems are excluded.
         List<PracticeFinding> assessed = findings
             .stream()
             .filter(f -> f.getVerdict() != Verdict.NOT_APPLICABLE)
+            .filter(f -> !droppedIds.contains(f.getId()))
             .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
             .toList();
         int ordinal = 0;
@@ -198,10 +215,10 @@ public class FeedbackLedgerRecorder {
         }
 
         // C3 policy floor: record the volume-capped tail as SUPPRESSED units so an eval excludes them (they
-        // were model-correct, just policy-withheld) — flag-gated, best-effort, never affects the DELIVERED unit.
-        if (reviewProperties.policyFloor()) {
+        // were model-correct, just policy-withheld) — best-effort, never affects the DELIVERED unit.
+        if (!policyDropped.isEmpty()) {
             try {
-                recordPolicyFloor(job, findings);
+                recordPolicyFloor(job, policyDropped);
             } catch (RuntimeException e) {
                 log.warn("Policy-floor ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
             }
@@ -218,22 +235,14 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Record the volume-cap tail (C3): the same partition {@code DeliveryComposer} renders (keep all blocking
-     * + top-{@value DeliveryComposer#MAX_IMPROVEMENT_SUGGESTIONS} non-blocking), with every DROPPED problem
-     * written as a SUPPRESSED / POLICY_FLOOR_DROP unit so the eval can exclude it rather than score it a miss.
+     * Record the volume-cap tail (C3): each policy-DROPPED problem is written as a SUPPRESSED /
+     * POLICY_FLOOR_DROP unit so an eval can exclude it rather than score a model-correct-but-policy-withheld
+     * finding as a miss.
      */
-    private void recordPolicyFloor(AgentJob job, List<PracticeFinding> findings) {
-        List<PracticeFinding> problems = findings
-            .stream()
-            .filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED)
-            .toList();
-        PolicyFloorSelector.Partition partition = PolicyFloorSelector.partition(
-            problems,
-            DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
-        );
+    private void recordPolicyFloor(AgentJob job, List<PracticeFinding> dropped) {
         Instant now = Instant.now();
         int index = 0;
-        for (PracticeFinding dropped : partition.dropped()) {
+        for (PracticeFinding droppedFinding : dropped) {
             int unitOrdinal = POLICY_FLOOR_UNIT_ORDINAL_BASE + index++;
             if (feedbackRepository.existsByAgentJobIdAndUnitOrdinal(job.getId(), unitOrdinal)) {
                 continue;
@@ -243,10 +252,10 @@ public class FeedbackLedgerRecorder {
                     .idempotencyKey(job.getId() + ":" + unitOrdinal)
                     .agentJobId(job.getId())
                     .workspaceId(job.getWorkspace().getId())
-                    .targetType(dropped.getTargetType())
-                    .targetId(dropped.getTargetId())
-                    .recipientUserId(dropped.getContributor().getId())
-                    .subjectUserId(dropped.getSubjectUserId())
+                    .targetType(droppedFinding.getTargetType())
+                    .targetId(droppedFinding.getTargetId())
+                    .recipientUserId(droppedFinding.getContributor().getId())
+                    .subjectUserId(droppedFinding.getSubjectUserId())
                     .surface(FeedbackSurface.IN_CONTEXT)
                     .unitOrdinal(unitOrdinal)
                     .state(FeedbackState.SUPPRESSED)
@@ -259,19 +268,12 @@ public class FeedbackLedgerRecorder {
             );
             feedbackFindingRepository.insertIfAbsent(
                 unit.getId(),
-                dropped.getId(),
+                droppedFinding.getId(),
                 FeedbackFindingDisplayRole.PRIMARY.name(),
                 0
             );
         }
-        if (!partition.dropped().isEmpty()) {
-            log.info(
-                "Policy-floor: jobId={}, kept={}, dropped(suppressed)={}",
-                job.getId(),
-                partition.kept().size(),
-                partition.dropped().size()
-            );
-        }
+        log.info("Policy-floor: jobId={}, dropped(suppressed)={}", job.getId(), dropped.size());
     }
 
     /**

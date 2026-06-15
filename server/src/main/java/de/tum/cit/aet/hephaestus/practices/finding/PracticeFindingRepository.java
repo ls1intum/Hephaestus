@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.finding;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -307,7 +308,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         WHERE f.targetType = :targetType AND f.targetId = :targetId AND p.workspace.id = :workspaceId
           AND f.correlationKey IS NOT NULL
         GROUP BY f.agentJobId
-        ORDER BY MAX(f.detectedAt) DESC
+        ORDER BY MAX(f.detectedAt) DESC, f.agentJobId DESC
         """
     )
     List<RunRef> findRecentRunRefsForTarget(
@@ -344,7 +345,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         UUID getAgentJobId();
         String getCorrelationKey();
         Verdict getVerdict();
-        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Severity getSeverity();
         Float getConfidence();
         String getPracticeSlug();
         String getTitle();

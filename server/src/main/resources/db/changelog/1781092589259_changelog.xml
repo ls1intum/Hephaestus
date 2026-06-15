@@ -737,4 +737,23 @@
         </rollback>
     </changeSet>
 
+    <!-- B2 (ADR 0021): widen the suppression_reason CHECK to admit the reaction-aware reasons. Without this,
+         FeedbackLedgerRecorder.recordSuppressed throws a CHECK violation on every DISPUTED/NOT_APPLICABLE
+         suppression — caught best-effort, so the finding is still dropped, but the SUPPRESSED ledger row that
+         makes the withholding visible to an eval is never written. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-45">
+        <preConditions onFail="MARK_RAN" onFailMessage="suppression_reason CHECK already admits REACTED_*">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_suppression_reason' AND pg_get_constraintdef(oid) LIKE '%REACTED_DISPUTED%'</sqlCheck>
+        </preConditions>
+        <comment>B2: add REACTED_DISPUTED / REACTED_NOT_APPLICABLE to chk_feedback_suppression_reason.</comment>
+        <sql>
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

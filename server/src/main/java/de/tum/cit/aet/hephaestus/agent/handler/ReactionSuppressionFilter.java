@@ -65,8 +65,9 @@ class ReactionSuppressionFilter {
     /** Which findings to still deliver (escalated ones already rewritten) and how many were suppressed. */
     record ReactionDecision(List<ValidatedFinding> deliverable, int suppressedCount) {}
 
-    // Read-only tx: we run outside the handler's transaction and read each persisted finding's
-    // subject/contributor; recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
+    // Read-only tx: we run outside the handler's transaction and call any.getContributor().getId(), which
+    // initialises the lazy User proxy (its @Id lives on the BaseGitServiceEntity superclass, so the id is not
+    // readable without a load). recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
     public ReactionDecision evaluate(AgentJob job, List<ValidatedFinding> scopedFindings) {
         if (!reviewProperties.reactionSuppression()) {

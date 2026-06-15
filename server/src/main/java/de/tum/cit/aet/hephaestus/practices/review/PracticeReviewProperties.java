@@ -18,6 +18,11 @@ import org.springframework.validation.annotation.Validated;
  * @param appBaseUrl          base URL of the Hephaestus application (for preferences footer link);
  *                            empty string disables the footer link
  * @param cooldownMinutes     minimum minutes between reviews for the same PR. 0 disables cooldown.
+ * @param progressFooter      append the cross-run progress-delta footer (B1/B3) and post the re-review
+ *                            notifying reply (A4). Off by default; needs ≥2 runs on a target to render.
+ * @param reactionSuppression drop re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE
+ *                            (B2). Off by default; inert until a reaction exists for a recurring locus.
+ * @param policyFloor         apply the per-run volume cap (C3). Off by default; behaviour-preserving when off.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -29,20 +34,7 @@ public record PracticeReviewProperties(
     @DefaultValue("")
     String appBaseUrl,
     @Min(0) @DefaultValue("15") int cooldownMinutes,
-    /**
-     * Whether to append the cross-run progress-delta footer (ADR 0021, B1/B3) and post the re-review
-     * notifying reply (A4) to the summary. Off by default — lit only once the trend read path is proven
-     * non-empty on a target (it needs ≥2 review runs to render anything anyway).
-     */
     @DefaultValue("false") boolean progressFooter,
-    /**
-     * Whether reaction-aware suppression (ADR 0021, B2) drops re-nagging a locus the student already
-     * DISPUTED / marked NOT_APPLICABLE. Off by default; inert until a reaction exists for a recurring locus.
-     */
     @DefaultValue("false") boolean reactionSuppression,
-    /**
-     * Whether the per-run volume cap / guaranteed-coverage policy floor (ADR 0021, C3) is applied. Off by
-     * default — behaviour-preserving when off.
-     */
     @DefaultValue("false") boolean policyFloor
 ) {}

@@ -29,6 +29,10 @@ public record TrendDelta(
     Instant priorRunAt,
     List<LocusTransition> transitions
 ) {
+    public TrendDelta {
+        transitions = List.copyOf(transitions); // the measurement primitive is immutable
+    }
+
     /** How a single locus moved between the prior run and the current one. */
     public enum TransitionStatus {
         /** Present this run, absent the prior run. */
@@ -92,6 +96,14 @@ public record TrendDelta(
         return transitions
             .stream()
             .filter(t -> t.status() == TransitionStatus.RESOLVED)
+            .toList();
+    }
+
+    /** The slipped-back loci, for the "Slipped back" lines (B1). */
+    public List<LocusTransition> regressed() {
+        return transitions
+            .stream()
+            .filter(t -> t.status() == TransitionStatus.REGRESSED)
             .toList();
     }
 

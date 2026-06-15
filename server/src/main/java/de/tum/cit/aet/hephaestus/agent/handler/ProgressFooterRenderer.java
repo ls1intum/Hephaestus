@@ -52,11 +52,7 @@ final class ProgressFooterRenderer {
             sb.append("\n");
         }
 
-        List<LocusTransition> regressed = delta
-            .transitions()
-            .stream()
-            .filter(t -> t.status() == TrendDelta.TransitionStatus.REGRESSED)
-            .toList();
+        List<LocusTransition> regressed = delta.regressed();
         if (!regressed.isEmpty()) {
             sb.append("**Slipped back** — these were satisfied last time and are flagged again:\n");
             for (LocusTransition t : regressed) {
