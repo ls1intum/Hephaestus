@@ -284,7 +284,7 @@ erDiagram
         VARCHAR(32) artifact_type
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
-        BIGINT subject_user_id FK
+        BIGINT subject_user_id FK "NOT NULL"
         VARCHAR(32) surface "NOT NULL"
         INTEGER unit_ordinal UK "NOT NULL"
         VARCHAR(16) delivery_state "NOT NULL"
@@ -597,6 +597,8 @@ erDiagram
         VARCHAR(32) artifact_type "NOT NULL"
         VARCHAR(16) polarity "NOT NULL"
         VARCHAR(16) subject_role "NOT NULL"
+        TEXT why_it_matters
+        TEXT what_good_looks_like
     }
 
     PracticeArea {
@@ -629,6 +631,15 @@ erDiagram
         TIMESTAMPTZ detected_at "NOT NULL"
         VARCHAR(64) finding_fingerprint
         BIGINT subject_user_id FK "NOT NULL"
+        BIGINT practice_revision_id FK
+    }
+
+    PracticeRevision {
+        BIGINT id PK
+        BIGINT practice_id FK,UK "NOT NULL"
+        INTEGER revision_number UK "NOT NULL"
+        TEXT criteria "NOT NULL"
+        TIMESTAMP created_at "NOT NULL"
     }
 
     Project {
@@ -1010,6 +1021,7 @@ erDiagram
     GitProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
     Workspace ||--|| PracticeArea : has
+    Practice ||--|| PracticeRevision : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectItem ||--|| ProjectFieldValue : has
@@ -1079,6 +1091,7 @@ erDiagram
     Practice ||--o{ PracticeFinding : has
     User ||--o{ PracticeFinding : references
     User ||--o{ PracticeFinding : has
+    PracticeRevision ||--o{ PracticeFinding : has
     User ||--o{ Project : created_by
     Issue ||--o{ ProjectItem : has
     User ||--o{ ProjectItem : created_by

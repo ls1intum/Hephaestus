@@ -51,6 +51,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
+    private de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository practiceRevisionRepository;
+
+    @Mock
     private PracticeFindingRepository practiceFindingRepository;
 
     @Mock
@@ -76,6 +79,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     void setUp() {
         service = new PracticeDetectionDeliveryService(
             practiceRepository,
+            practiceRevisionRepository,
             practiceFindingRepository,
             pullRequestRepository,
             issueRepository,
@@ -117,6 +121,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyString(),
                     any(),
                     anyLong(),
+                    any(), // practiceRevisionId
                     anyString(),
                     anyLong(),
                     anyLong(),
@@ -157,6 +162,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
                 eq(testJob.getId()),
                 eq(10L),
+                isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("PULL_REQUEST"),
                 eq(456L),
                 eq(789L),
@@ -198,6 +204,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 any(),
                 anyLong(),
+                any(), // practiceRevisionId
                 anyString(),
                 anyLong(),
                 anyLong(),
@@ -365,6 +372,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyString(),
                     any(),
                     anyLong(),
+                    any(), // practiceRevisionId
                     anyString(),
                     anyLong(),
                     anyLong(),
@@ -402,6 +410,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 keyCaptor.capture(),
                 any(),
                 anyLong(),
+                any(), // practiceRevisionId
                 anyString(),
                 anyLong(),
                 anyLong(),
@@ -479,6 +488,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("pr-description-quality:0:ISSUE:999:" + testJob.getId()),
                 eq(testJob.getId()),
                 anyLong(),
+                isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("ISSUE"),
                 eq(999L),
                 eq(789L),

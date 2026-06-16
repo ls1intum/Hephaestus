@@ -95,6 +95,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             "key-" + id,
             agentJob.getId(),
             practice.getId(),
+            null, // practiceRevisionId — pre-versioning marker
             artifactType,
             artifactId,
             user.getId(),
@@ -476,6 +477,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "key-" + otherFindingId,
                 otherJob.getId(),
                 otherPractice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
@@ -749,6 +751,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "key-" + findingId,
                 agentJob.getId(),
                 practiceA.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 50L,
                 developer.getId(),
@@ -988,6 +991,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "key-" + ws2FindingId,
                 otherJob.getId(),
                 otherPractice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 100L,
                 developer.getId(),

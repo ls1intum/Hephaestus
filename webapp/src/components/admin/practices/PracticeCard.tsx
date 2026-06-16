@@ -55,6 +55,11 @@ export function PracticeCard({
 							)}
 						</div>
 						<p className="text-xs text-muted-foreground mt-0.5">{practice.slug}</p>
+						{practice.whyItMatters && (
+							<p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+								{practice.whyItMatters}
+							</p>
+						)}
 					</div>
 					<div className="flex items-center gap-2 shrink-0">
 						<Switch

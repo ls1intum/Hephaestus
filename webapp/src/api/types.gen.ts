@@ -570,6 +570,14 @@ export type UpdatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents?: Array<string>;
+    /**
+     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     */
+    whyItMatters?: string;
 };
 
 /**
@@ -1373,6 +1381,14 @@ export type Practice = {
      * Timestamp when the practice was last updated
      */
     updatedAt: Date;
+    /**
+     * Developer-facing exemplar (learner layer)
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Developer-facing rationale (learner layer)
+     */
+    whyItMatters?: string;
 };
 
 export type PageableObject = {
@@ -1605,6 +1621,32 @@ export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
  */
 export type AchievementProgress = {
     type: string;
+};
+
+/**
+ * Learner-facing view of a practice — criteria absent by construction
+ */
+export type LearnerPractice = {
+    /**
+     * Slug of the practice area this belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier
+     */
+    slug: string;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
 };
 
 export type LeagueChange = {
@@ -2035,6 +2077,14 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+    /**
+     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     */
+    whyItMatters?: string;
 };
 
 /**
@@ -4574,6 +4624,27 @@ export type SubmitReactionResponses = {
 };
 
 export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
+
+export type ListLearnerPracticesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/learner';
+};
+
+export type ListLearnerPracticesResponses = {
+    /**
+     * Learner practices returned
+     */
+    200: Array<LearnerPractice>;
+};
+
+export type ListLearnerPracticesResponse = ListLearnerPracticesResponses[keyof ListLearnerPracticesResponses];
 
 export type DeletePracticeData = {
     body?: never;

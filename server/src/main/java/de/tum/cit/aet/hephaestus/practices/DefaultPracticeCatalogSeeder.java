@@ -139,7 +139,9 @@ class DefaultPracticeCatalogSeeder {
             composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
             loadPrecomputeScript(slug),
             focus,
-            polarity
+            polarity,
+            text(practiceNode, "whyItMatters"),
+            text(practiceNode, "whatGoodLooksLike")
         );
     }
 

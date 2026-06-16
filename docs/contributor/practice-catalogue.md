@@ -47,8 +47,10 @@ over-claim its evidence basis:
 remove a label↔source contradiction: the civility practice (was *"ask rather than demand"*) and the
 injection practice (was *"validate and escape"*). Their **slugs are unchanged** — a slug is a finding
 fingerprint key (`FindingFingerprint.compute()` hashes `practiceSlug`), so renaming it would orphan every
-prior finding, reaction, and feedback correlated through it. The slug renames are therefore **deferred**
-into the future `practice_revision` / fingerprint-remap migration (see `practice-feedback-schema.md` §6).
+prior finding, reaction, and feedback correlated through it. The slug renames therefore wait on a
+**fingerprint-remap migration** (the SCD-2 `practice_revision` history — see
+`practice-feedback-schema.md` §3.8 — is now built, but a slug change still needs an explicit
+fingerprint remap so prior findings re-correlate rather than orphan; that remap is the gating step).
 
 ---
 
@@ -251,6 +253,13 @@ All of the following were applied to `default-catalog.json` and touch only human
 5. **Metadata adds**: ASVS V1/V2 tags on the two injection-adjacent practices; ISO 25010 / SWEBOK KA4 /
    DORA tags on `code-craftsmanship`; `credibilityTier` labels on `merged-past-unresolved-review-threads`
    (practitioner-norm) and `excludes-generated-and-build-artifacts`.
+6. **Developer-facing learner copy (all 32 practices)**: every practice now carries seeded `whyItMatters`
+   (a learner-facing *explanation* — why the practice matters) and `whatGoodLooksLike` (a concrete
+   **exemplar** — what good looks like). These feed the developer-facing layer served through
+   `LearnerPracticeDTO` / `GET /practices/learner`; that projection is **criteria-free by construction**
+   (it has no `criteria` field), and an authoring guard rejects detector verdict vocabulary
+   (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in `whatGoodLooksLike`, so the detection rubric never
+   leaks into learner copy. See `practice-feedback-schema.md` §3.1 / §3a / §6.
 
 **Rejected curation (named overreach):** an architecture/design area (§1.1 — out of scope by design); a
 third injection practice (the input/output split already exists across two practices); a

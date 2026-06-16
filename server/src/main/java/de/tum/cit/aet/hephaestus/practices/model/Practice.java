@@ -130,6 +130,24 @@ public class Practice {
     private String criteria;
 
     /**
+     * Developer-facing rationale: one or two sentences on WHY this practice matters — the cost it averts or
+     * the value it adds — in plain language a learner reads, never the detection rubric. Part of the
+     * learner-facing layer (Nicol &amp; Macfarlane-Dick 2006, P1: clarify what good performance is). Nullable;
+     * surfaced only in {@code LearnerPracticeDTO}, never alongside {@link #criteria}.
+     */
+    @Column(name = "why_it_matters", columnDefinition = "TEXT")
+    private String whyItMatters;
+
+    /**
+     * Developer-facing exemplar: a short, concrete picture of what doing this well looks like (an instance,
+     * not the rubric) — Sadler's (1989) "exemplars"/guild-knowledge made explicit. MUST NOT restate the
+     * {@link #criteria} or leak detection vocabulary (OBSERVED/NOT_OBSERVED); enforced by an authoring guard.
+     * Nullable; learner-facing only.
+     */
+    @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
+    private String whatGoodLooksLike;
+
+    /**
      * Optional Bun/TypeScript static analysis script that runs before the AI agent.
      * Produces structured hints (not verdicts) that the agent uses as starting points.
      * When null, no precomputation runs for this practice.

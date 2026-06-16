@@ -21,11 +21,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -68,6 +70,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -257,6 +262,37 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(result.inserted()).isEqualTo(1);
             assertThat(result.discardedUnknownSlug()).isEqualTo(1);
             assertThat(practiceFindingRepository.findAll()).hasSize(1);
+        }
+    }
+
+    @Nested
+    class RevisionPinning {
+
+        @Test
+        @DisplayName("persisted finding pins the practice's current criteria revision (SCD-2)")
+        void findingPinsCurrentRevision() {
+            // The seeded practice was saved straight through the repository, so it has no revision yet.
+            // Append revision 1 (the ostensive-as-authored) exactly as PracticeService.createPractice would.
+            Practice practice = practiceRepository
+                .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
+                .orElseThrow();
+            PracticeRevision revision = practiceRevisionRepository.save(
+                new PracticeRevision(practice, 1, practice.getCriteria())
+            );
+
+            var findings = List.of(finding("pr-description-quality", Observation.OBSERVED));
+
+            var result = deliveryService.deliver(agentJob, findings);
+
+            assertThat(result.inserted()).isEqualTo(1);
+
+            List<PracticeFinding> persisted = practiceFindingRepository.findAll();
+            assertThat(persisted).hasSize(1);
+            // The delivery service looks up the current revision per practice and passes practiceRevisionId
+            // to insertIfAbsent — so the finding must pin to exactly that revision, not null.
+            PracticeFinding only = persisted.get(0);
+            assertThat(only.getPracticeRevision()).isNotNull();
+            assertThat(only.getPracticeRevision().getId()).isEqualTo(revision.getId());
         }
     }
 

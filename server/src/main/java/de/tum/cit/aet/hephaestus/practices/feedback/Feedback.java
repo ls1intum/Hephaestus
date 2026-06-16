@@ -116,10 +116,14 @@ public class Feedback {
     private Long recipientUserId;
 
     /**
-     * The user this feedback is <em>about</em> when that differs from the recipient (e.g. reviewer-side feedback
-     * delivered to a facilitator). Nullable — usually the same person as {@link #recipientUserId}.
+     * The user this feedback is <em>about</em> — ALWAYS populated (symmetry with
+     * {@code PracticeFinding.subjectUserId} and xAPI's mandatory, unambiguous Actor). Equals
+     * {@link #recipientUserId} for the common author-side case; differs for reviewer-side feedback delivered
+     * to a facilitator. The former "nullable defaulting to recipient" was collapsed to an explicit value so
+     * every reader can trust the column without a fallback.
      */
-    @Column(name = "subject_user_id")
+    @NotNull
+    @Column(name = "subject_user_id", nullable = false)
     private Long subjectUserId;
 
     /** Destination class for this unit (in-context comment, conversation turn, reflection dashboard, facilitator). */

@@ -1011,4 +1011,86 @@
         </rollback>
     </changeSet>
 
+    <!-- Pressure-test bridge-to-A++: (A) practice_revision SCD-2 versioning so findings pin to the
+         criteria-as-it-was; (B) practice.why_it_matters + what_good_looks_like learner-facing columns;
+         (C) feedback.subject_user_id NOT NULL symmetry. All additive; criteria stays the current projection. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-61">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision table already present">
+            <not><tableExists tableName="practice_revision"/></not>
+        </preConditions>
+        <comment>A: practice_revision — append-only criteria snapshots (SCD-2).</comment>
+        <createTable tableName="practice_revision">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="practice_revisionPK"/>
+            </column>
+            <column name="practice_id" type="BIGINT"><constraints nullable="false"/></column>
+            <column name="revision_number" type="INT"><constraints nullable="false"/></column>
+            <column name="criteria" type="TEXT"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"><constraints nullable="false"/></column>
+        </createTable>
+        <rollback><dropTable tableName="practice_revision"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-62">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision constraints already present">
+            <not><indexExists indexName="uk_practice_revision_practice_number"/></not>
+        </preConditions>
+        <comment>A: unique(practice_id, revision_number) + index + FK to practice (CASCADE).</comment>
+        <addUniqueConstraint tableName="practice_revision" columnNames="practice_id, revision_number" constraintName="uk_practice_revision_practice_number"/>
+        <createIndex indexName="idx_practice_revision_practice" tableName="practice_revision"><column name="practice_id"/></createIndex>
+        <addForeignKeyConstraint baseTableName="practice_revision" baseColumnNames="practice_id" constraintName="fk_practice_revision_practice" referencedTableName="practice" referencedColumnNames="id" onDelete="CASCADE" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice_revision" constraintName="fk_practice_revision_practice"/>
+            <dropIndex indexName="idx_practice_revision_practice" tableName="practice_revision"/>
+            <dropUniqueConstraint tableName="practice_revision" constraintName="uk_practice_revision_practice_number"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-63">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_revision already backfilled">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM practice_revision</sqlCheck>
+        </preConditions>
+        <comment>A backfill: revision 1 (criteria-as-it-is) for every existing practice. Existing findings stay NULL = pre-versioning.</comment>
+        <sql>INSERT INTO practice_revision (practice_id, revision_number, criteria, created_at) SELECT id, 1, criteria, now() FROM practice;</sql>
+        <rollback><sql>DELETE FROM practice_revision WHERE revision_number = 1;</sql></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-64">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.practice_revision_id already present">
+            <not><columnExists tableName="practice_finding" columnName="practice_revision_id"/></not>
+        </preConditions>
+        <comment>A: practice_finding.practice_revision_id (nullable) + FK SET NULL — pins a finding to the criteria it fired against.</comment>
+        <addColumn tableName="practice_finding"><column name="practice_revision_id" type="BIGINT"/></addColumn>
+        <addForeignKeyConstraint baseTableName="practice_finding" baseColumnNames="practice_revision_id" constraintName="fk_practice_finding_revision" referencedTableName="practice_revision" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice_finding" constraintName="fk_practice_finding_revision"/>
+            <dropColumn tableName="practice_finding" columnName="practice_revision_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-65">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.why_it_matters already present">
+            <not><columnExists tableName="practice" columnName="why_it_matters"/></not>
+        </preConditions>
+        <comment>B: developer-facing learner columns (nullable; surfaced only via LearnerPracticeDTO, never with criteria).</comment>
+        <addColumn tableName="practice">
+            <column name="why_it_matters" type="TEXT"/>
+            <column name="what_good_looks_like" type="TEXT"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="practice" columnName="why_it_matters"/>
+            <dropColumn tableName="practice" columnName="what_good_looks_like"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-66">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback.subject_user_id already NOT NULL">
+            <sqlCheck expectedResult="YES">SELECT is_nullable FROM information_schema.columns WHERE table_name='feedback' AND column_name='subject_user_id'</sqlCheck>
+        </preConditions>
+        <comment>C: feedback.subject_user_id NOT NULL (backfill = recipient) — symmetry with PracticeFinding + xAPI Actor.</comment>
+        <sql>UPDATE feedback SET subject_user_id = recipient_user_id WHERE subject_user_id IS NULL;</sql>
+        <addNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/>
+        <rollback><dropNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/></rollback>
+    </changeSet>
+
 </databaseChangeLog>

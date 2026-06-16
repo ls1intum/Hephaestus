@@ -101,6 +101,17 @@ public class PracticeFinding {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Practice practice;
 
+    /**
+     * The {@link PracticeRevision} (criteria snapshot) the detector evaluated this finding against, pinning
+     * it to the ostensive-as-it-was for reproducibility (SCD-2). NULL = the finding predates versioning
+     * (an honest "pre-versioning" marker). Written via the native insert; SET NULL on revision delete so a
+     * finding survives history pruning.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "practice_revision_id", foreignKey = @ForeignKey(name = "fk_practice_finding_revision"))
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private PracticeRevision practiceRevision;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "artifact_type", length = 32, nullable = false)

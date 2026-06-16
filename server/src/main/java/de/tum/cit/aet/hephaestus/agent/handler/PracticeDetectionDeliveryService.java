@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,7 @@ public class PracticeDetectionDeliveryService {
     private static final Logger log = LoggerFactory.getLogger(PracticeDetectionDeliveryService.class);
 
     private final PracticeRepository practiceRepository;
+    private final PracticeRevisionRepository practiceRevisionRepository;
     private final PracticeFindingRepository practiceFindingRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
@@ -49,6 +52,7 @@ public class PracticeDetectionDeliveryService {
 
     public PracticeDetectionDeliveryService(
         PracticeRepository practiceRepository,
+        PracticeRevisionRepository practiceRevisionRepository,
         PracticeFindingRepository practiceFindingRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
@@ -56,6 +60,7 @@ public class PracticeDetectionDeliveryService {
         ObjectMapper objectMapper
     ) {
         this.practiceRepository = practiceRepository;
+        this.practiceRevisionRepository = practiceRevisionRepository;
         this.practiceFindingRepository = practiceFindingRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
@@ -118,6 +123,10 @@ public class PracticeDetectionDeliveryService {
         // (no key computed, never delivered), so the map aligns exactly with what the handler composes.
         Map<ValidatedFinding, String> findingFingerprints = new IdentityHashMap<>();
 
+        // Current criteria-revision per practice, memoized — every finding pins to the ostensive-as-it-was
+        // (SCD-2 reproducibility). Null if a practice has no revision yet (pre-versioning legacy practices).
+        Map<Long, Long> revisionByPractice = new HashMap<>();
+
         for (int i = 0; i < validFindings.size(); i++) {
             ValidatedFinding finding = validFindings.get(i);
 
@@ -165,11 +174,19 @@ public class PracticeDetectionDeliveryService {
             findingFingerprints.put(finding, findingFingerprint);
 
             // Insert (idempotent)
+            Long practiceRevisionId = revisionByPractice.computeIfAbsent(practice.getId(), pid ->
+                practiceRevisionRepository
+                    .findFirstByPracticeIdOrderByRevisionNumberDesc(pid)
+                    .map(rev -> rev.getId())
+                    .orElse(null)
+            );
+
             int rows = practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 idempotencyKey,
                 job.getId(),
                 practice.getId(),
+                practiceRevisionId,
                 artifactType.name(),
                 artifactId,
                 developerId,

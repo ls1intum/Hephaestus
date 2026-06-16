@@ -143,7 +143,9 @@ reviewer-side conduct without per-case branching.
 | subjectRole | SubjectRole | `subject_role` | no (default `AUTHOR`) | Whose conduct is judged; drives `subject_user_id` and delivery audience. | The firewall keeping reviewer-side lessons off the author. xAPI Actor semantics (the agent a statement is *about*) — [xAPI Statements 101](https://xapi.com/statements-101/). |
 | **area** | PracticeArea (`@ManyToOne`) | `practice_area_id` | yes | Optional roll-up bucket (NULL = ungrouped); 1:N. FK `fk_practice_area`, index `idx_practice_practice_area`. | Single owning bucket keeps per-area progress denominator unambiguous. SARIF `taxa`-style grouping. |
 | triggerEvents | JsonNode (jsonb) | `trigger_events` | no | Which domain events activate detection. | JSONB keeps the event set open without schema churn. |
-| criteria | String (TEXT) | `criteria` | no | NL spec passed to the detection agent. | The rule body the LLM evaluates against. |
+| criteria | String (TEXT) | `criteria` | no | NL spec passed to the detection agent. | The rule body the LLM evaluates against. Detector/admin **reference** register — never delivered to a learner (§3a). |
+| whyItMatters | String (TEXT) | `why_it_matters` | yes | Admin-authored learner-facing *explanation* — why this practice matters. Seeded for all 32 default practices; editable in the practices admin form. | Developer-facing Layer 1 (Nicol & Macfarlane-Dick 2006 P1 feed-up; Diátaxis *explanation*). Surfaced via `LearnerPracticeDTO` (§3a), never the detector. |
+| whatGoodLooksLike | String (TEXT) | `what_good_looks_like` | yes | Admin-authored learner-facing **exemplar** — what good looks like. Seeded for all 32 default practices; an authoring guard rejects detector verdict vocabulary (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in this field. | Developer-facing Layer 2 (Sadler 1989 exemplar; Hattie feed-forward). The guard keeps the rubric-leak/Goodhart vector physically closed. |
 | precomputeScript | String (TEXT) | `precompute_script` | yes | Optional Bun/TS static-analysis producing *hints, not verdicts*. | Narrows the agent search space; hints never become verdicts (provenance-admission contract). |
 | active | boolean | `is_active` | no (default true) | Soft delete / feature flag for detection. | Toggle without losing history. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp. | Audit trail. |
@@ -184,6 +186,7 @@ GitHub code-scanning term; our deduped-across-runs notion (their "alert" grain) 
 | idempotencyKey | String(255) | `idempotency_key` | no | Dedup key, unique (`uk_practice_finding_idempotency`). | Race-safe `insertIfAbsent` upsert; same finding cannot double-insert on re-run. |
 | agentJobId | UUID | `agent_job_id` | no | Producing job (FK `fk_practice_finding_agent_job`, Liquibase-managed). Raw UUID, not `@ManyToOne`. | Avoids a Modulith cycle into the `agent` module; cascade-delete with the job. |
 | practice | Practice (`@ManyToOne`) | `practice_id` | no | Evaluated practice; DB `ON DELETE CASCADE`. | Deleting a practice cleans its immutable findings without lifecycle callbacks. |
+| practiceRevision | PracticeRevision (`@ManyToOne`) | `practice_revision_id` | yes | Pins the finding to the `criteria`-as-it-was when the detector evaluated it; FK `fk_practice_finding_revision`, DB `ON DELETE SET NULL`. The delivery service looks up the current revision per practice and writes it on the native insert. | Reproducibility: *which criteria version fired this finding* is queryable (SCD-2 point-in-time). NULL marks pre-versioning findings honestly (deleting a revision detaches without losing the finding). See §3.8. |
 | artifactType | WorkArtifact | `artifact_type` | no | PR vs ISSUE the finding targets. | Routes finding to the correct dashboard/channel. |
 | artifactId | Long | `artifact_id` | no | External id of the target PR/issue. | Links to the specific artifact. |
 | developer | User (`@ManyToOne`) | `developer_id` | no | The contribution author being evaluated; FK `RESTRICT` (no cascade). | Findings outlive users; deleting a user with findings is blocked. |
@@ -264,7 +267,7 @@ chain.
 | artifactType | WorkArtifact | `artifact_type` | yes | Kind of artifact this is about. | Nullable: reflection-dashboard / facilitator-digest feedback is not anchored to one artifact. |
 | artifactId | Long | `artifact_id` | yes | External id of the target. | Nullable in lockstep with `artifactType`. |
 | recipientUserId | Long | `recipient_user_id` | no | The user this is delivered **to** (FK `fk_feedback_recipient`). Raw Long. | Messaging "To"-recipient; distinct from subject. ≈ xAPI Authority / audience — [xAPI/Caliper comparison](https://www.imsglobal.org/initial-xapicaliper-comparison). |
-| subjectUserId | Long | `subject_user_id` | yes | The user this is **about** when ≠ recipient (e.g. reviewer-side feedback to a facilitator). | xAPI Actor. Nullable defaulting to recipient — see §6 gap. |
+| subjectUserId | Long | `subject_user_id` | **no (ALWAYS populated)** | The user this is **about**: equals `recipientUserId` for author-facing units, the subject (e.g. the reviewer) when ≠ recipient (reviewer-side feedback to a facilitator). | xAPI Actor (mandatory, unambiguous). NOT NULL since the symmetry migration backfilled `subject_user_id = recipient_user_id`, matching `PracticeFinding.subjectUserId` — no delivery-row fallback remains (§4). |
 | surface | FeedbackChannel | `surface` | no | Destination class (in-context / conversation / reflection / facilitator). | Decouples "what we say" from "where it lands". Column name `surface`; concept word is **channel**. |
 | unitOrdinal | Integer | `unit_ordinal` | no | 0-based position within the producing job's output. | Idempotency-key component + stable delivery order. |
 | deliveryState | FeedbackDeliveryState | `delivery_state` | no | Lifecycle: prepared → delivered / superseded / suppressed / failed. | Conventional delivery state machine; SUPPRESSED ≈ SARIF `result.suppressions`. |
@@ -322,7 +325,30 @@ and per-anchor posting lifecycle so re-delivery, snapping and resolution reconci
 | postedState | PlacementPostedState | `posted_state` | no | Posting lifecycle vs the external surface. | Per-anchor reconciliation. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp. | Audit. |
 
-### 3.8 Enumerations
+### 3.8 `PracticeRevision` — table `practice_revision`
+
+Append-only **slowly-changing-dimension (SCD Type 2)** history of a practice's `criteria` text. Every
+time the `criteria` actually changes (value-compared), `PracticeService` appends a new revision; revision
+1 is written on practice create. `Practice.criteria` stays the **current projection** (no read path
+breaks), while `practice_revision` records every prior wording, so the recursive ostensive↔performative
+loop — facilitators reshaping the criteria over time in response to what they see enacted — is *recorded,
+not overwritten* (D'Adderio 2011 translation loop; the qualitative-coding codebook audit-trail / IRR
+norm; data-warehousing SCD-2). `PracticeFinding.practice_revision_id` (§3.3) pins each finding to the
+revision in force when it was detected, making *which criteria version fired this finding* queryable.
+
+| Field | Type | Column | Nullable | Description | Justification |
+| --- | --- | --- | --- | --- | --- |
+| id | Long | `id` | no | Auto-generated PK. | Surrogate key. |
+| practice | Practice (`@ManyToOne`) | `practice_id` | no | Owning practice; FK `fk_practice_revision_practice`, DB `ON DELETE CASCADE`. | Revisions are part of the practice's lifecycle; deleting the practice removes its history. |
+| revisionNumber | int | `revision_number` | no | Monotonic per-practice revision counter; revision 1 on create, `+1` on each criteria change. Unique with `practice_id` (`uk_practice_revision_practice_number`). | Point-in-time ordering; the cross-finding identity of a criteria version. |
+| criteria | String (TEXT) | `criteria` | no | Snapshot of the `criteria` text as of this revision. | The audit-trail record of the in-force rubric wording. |
+| createdAt | Instant | `created_at` | no (immutable) | When this revision was written. | Temporal reconstruction. |
+
+> A backfill changeset creates revision 1 for every practice that existed before versioning shipped, so
+> the history is complete from the migration forward; findings detected before versioning pin to NULL
+> (an honest "pre-versioning" marker, not a reproducible rubric snapshot).
+
+### 3.9 Enumerations
 
 | Enum | Values & meaning | Grounding |
 | --- | --- | --- |
@@ -356,14 +382,15 @@ The schema encodes two orthogonal axes that the display layer must keep separate
 
 **Field-by-audience matrix — enforce server-side, never in the webapp.** "Developer" and "Reviewer" are
 the *same human*; the column that applies is selected by the **finding's `subjectRole`**, not a static
-user role, so reviewer-craft never leaks to the author. Fields tagged "(deferred)" are the
-`whyItMatters` / `whatGoodLooksLike` learner-layer columns described in §6.
+user role, so reviewer-craft never leaks to the author. The `whyItMatters` / `whatGoodLooksLike`
+learner-layer columns are **implemented** — admin-authored `Practice` columns served to learners through
+`LearnerPracticeDTO` (`GET /practices/learner`), which carries no `criteria` field by construction.
 
 | Field | Developer / Learner | Reviewer (finding `subjectRole`=REVIEWER) | Facilitator / Instructor | Researcher / Admin |
 | --- | --- | --- | --- | --- |
 | `name` | yes | yes | yes | yes |
-| `whyItMatters` (deferred) | yes — Layer 1 | yes | yes | yes |
-| `whatGoodLooksLike` (deferred) | yes — Layer 2 (on request) | yes | yes | yes |
+| `whyItMatters` | yes — Layer 1 | yes | yes | yes |
+| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes | yes |
 | area / area progress | yes — own | yes — own | yes — cohort | yes |
 | per-finding `Feedback` (task-framed) | yes — own only | yes — own only | yes — cohort aggregate | yes |
 | **`criteria`** | **NEVER** | **NEVER** | read-only, opt-in | yes — edit |
@@ -376,10 +403,13 @@ user role, so reviewer-craft never leaks to the author. Fields tagged "(deferred
 1. **`criteria` is NEVER delivered to a learner.** Three independent groundings: Diátaxis register
    mismatch (`criteria` is *reference* material for the detector/admin; a learner needs *explanation* +
    *how-to/example*); Kluger & DeNisi (1996) — a rubric+score frame directs attention to the self/standard
-   and can *depress* performance; and Goodhart-style gaming of an exposed detection rubric. Omission must
-   be **physical** — a projection that does not carry the field (the §6 invariant; never "hidden in the
-   webapp", which still ships in the payload) — mirroring how CodeQL physically separates the
-   developer-facing `.qhelp` from the `.ql` query metadata.
+   and can *depress* performance; and Goodhart-style gaming of an exposed detection rubric. Omission is
+   **physical**, not policy: `LearnerPracticeDTO` is a record with no `criteria` component, so the field
+   cannot reach a learner even by accident (an integration test asserts the raw `GET /practices/learner`
+   JSON contains no `"criteria"`) — mirroring how CodeQL physically separates the developer-facing
+   `.qhelp` from the `.ql` query metadata. An authoring guard additionally rejects detector verdict
+   vocabulary (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in `whatGoodLooksLike`, keeping the rubric out
+   of the learner copy at the source.
 2. **Visibility keys off the *finding's* `subjectRole`, not a static user role.** Reviewer-craft feedback
    must not leak to the author — a known prior bug class in this codebase.
 
@@ -408,11 +438,12 @@ Hattie & Timperley (2007) feed-up/feed-back/feed-forward · CodeQL
   triad of ADR 0021: `Feedback` owns the rendered unit and lifecycle, `FeedbackPlacement` owns the
   physical posting/reconciliation, `FeedbackFinding` owns the composition. Keeping a parallel ledger with
   zero writers was dead weight and a second source of truth.
-- **The `null ⇒ developer` subject fallback** — removed. `PracticeFinding.subjectUserId` is now
-  `NOT NULL` and always explicitly populated. Every reader can trust the column without a fallback, and
-  reviewer-side findings (subject ≠ developer) are representable. This matches xAPI's requirement that the
-  Actor (the agent a statement is about) be mandatory and unambiguous
-  ([xAPI](https://xapi.com/statements-101/)).
+- **The `null ⇒ developer` / `null ⇒ recipient` subject fallbacks** — removed on **both** sides.
+  `PracticeFinding.subjectUserId` and `Feedback.subjectUserId` are now `NOT NULL` and always explicitly
+  populated (the feedback side backfilled `subject_user_id = recipient_user_id`). Every reader can trust
+  the column without a fallback, and reviewer-side findings/feedback (subject ≠ developer/recipient) are
+  representable. The two sides are now symmetric — both match xAPI's requirement that the Actor (the agent
+  a statement is about) be mandatory and unambiguous ([xAPI](https://xapi.com/statements-101/)).
 - **Legacy enum values** — `MIXED` → `CONTEXTUAL` (states *why* the direction is unfixed);
   `AUDIENCE_REVIEWER` → `REVIEWER` (the role) with `REVIEWER_SIDE` as the suppression reason. The old
   `Verdict` enum *type* became `Observation` (sign-neutral); the `verdict` *column/field name* is kept
@@ -489,69 +520,67 @@ breaks the "same word everywhere" contract and forces translation at every bound
 
 ---
 
-## 6. Open gaps the literature exposes
+## 6. Standards-divergence design decisions
 
-- **Fingerprint conflates two SARIF concepts.** SARIF separates `partialFingerprints` (a heuristic bucket
-  an RMS may further disambiguate) from `guid`/`correlationGuid` (a stable id assigned on ingest). We fold
-  both into one `finding_fingerprint` column. Acceptable today, but a reviewer should know the assigned-id
-  half is absent — re-bucketing churn cannot be disambiguated downstream the way an RMS could
+This section records where the schema **deliberately diverges from** SARIF and the learning-analytics
+standards, and *why each divergence is the right call* — not a backlog. Each is a documented decision,
+not an open TODO.
+
+> **Recently implemented (no longer pending).** The pressure-test of 2026-06 (see
+> `docs/contributor/practice-catalogue.md` and the dissertation memo) flagged three larger moves; all
+> three are now **built and validated** (unit + architecture + integration suites green; empty
+> `db:draft-changelog` drift; `openapi.yaml` / client / ERD regenerated):
+> - **Practice criteria versioning (SCD-2)** — `PracticeRevision` / `practice_revision` (§3.8) +
+>   `PracticeFinding.practice_revision_id` (§3.3). `PracticeService` appends revision 1 on create and a
+>   new revision whenever `criteria` actually changes (value-compared); `Practice.criteria` stays the
+>   current projection. Each finding pins to the criteria-as-it-was; a backfill changeset seeds revision 1
+>   for every pre-existing practice. The recursive ostensive↔performative loop is now recorded, and
+>   *which criteria version fired this finding* is queryable.
+> - **Developer-facing layer + physical anti-leak projection** — `Practice.whyItMatters` /
+>   `whatGoodLooksLike` (§3.1, seeded for all 32 default practices, editable in the admin form, guarded
+>   against detector verdict vocabulary) served through `LearnerPracticeDTO` / `GET /practices/learner`,
+>   which carries no `criteria` field **by construction** (§3a). "Criteria never reaches a learner" is now
+>   a physical guarantee, asserted by an integration test on the raw learner JSON.
+> - **`Feedback.subjectUserId` NOT NULL** (§3.5, §4) — backfilled `= recipient_user_id`, closing the
+>   asymmetry with `PracticeFinding.subjectUserId` (xAPI mandatory, unambiguous Actor on both sides).
+
+**Documented design decisions (deliberate keeps — do not "fix"):**
+
+- **`baseline_state` stays derived, not stored.** SARIF stores `result.baselineState`
+  (`new`/`unchanged`/`updated`/`absent`) as a first-class field; we compute the equivalent on read from
+  the supersession chain. Storing it would *duplicate* state the chain already encodes (a new row with no
+  `supersedes_id` is "new"; one with `supersedes_id` is "updated"; an unreplaced prior is "superseded"),
+  so a stored column would be a second source of truth that could drift from the chain. We accept the one
+  cost — a consumer wanting "only NEW findings this run" walks the chain rather than filtering a column
   ([SARIF #615](https://github.com/oasis-tcs/sarif-spec/issues/615)).
-- **`baselineState` is implicit, not stored.** SARIF stores `result.baselineState`
-  (`new`/`unchanged`/`updated`/`absent`) as a first-class field; we compute the equivalent on read from the
-  supersession chain. Equivalent in outcome, but a consumer cannot query "show me only NEW findings this
-  run" without walking the chain.
-- **`Feedback.subjectUserId` is nullable; `PracticeFinding.subjectUserId` is not.** The finding side
-  matches xAPI's mandatory, unambiguous Actor; the feedback side defaults subject⇒recipient via NULL. This
-  is a weaker contract than the finding side and re-introduces a (smaller) fallback on the delivery row —
-  worth tightening for symmetry ([xAPI](https://xapi.com/statements-101/)).
-- **No first-class polarity in any standard.** `Polarity` (esp. `CONTEXTUAL`) has no analogue in SARIF,
-  SonarQube, or code-scanning — all assume a rule fires only on something wrong. The orthogonal-axis design
-  is defensible and lossless on SARIF export, but it is *our* extension; interoperability tooling will not
-  understand `CONTEXTUAL` without the export mapping in §2.
-- **Confidence vs rank stored separately, not unified.** We keep `confidence` (0.0–1.0) where SARIF would
-  use `result.rank` (-1.0–1.0 diagnostic relevance). Fine, but the two are not the same scale and an export
-  must choose one.
-
-### Deferred schema work (grounded, sequenced — not yet built)
-
-The pressure-test of 2026-06 (see `docs/contributor/practice-catalogue.md` and the dissertation memo)
-landed several changes in code and **deferred** the following as larger, sequenced moves. Each is
-grounded; each is deferred for a stated reason, not abandoned.
-
-- **Practice versioning — `practice_revision` (SCD-2) + `finding.practice_revision_id`.** Add a
-  slowly-changing-dimension history of the `criteria` text (`effective_start`/`effective_end`/`is_current`,
-  monotonic `revision_no`) and a nullable FK on `PracticeFinding` so a finding **pins to criteria-as-it-was**.
-  This makes the ostensive↔performative *recursive loop* (performances reshape the criteria over time)
-  queryable, and makes every finding reproducible against the rubric version that produced it. Triangulated
-  by practice theory (D'Adderio 2011 translation loop), the qualitative-coding *codebook audit-trail* norm
-  (inter-rater reliability is interpretable only against the in-force codebook version), and data-warehousing
-  SCD-2 point-in-time reconstruction. **Deferred because** doing it before any other consumer exists would
-  orphan prior findings or require a bespoke remap with no other payoff; it is the natural home for the two
-  catalogue *slug* renames (slugs are fingerprint keys — see the catalogue reference). *Anchors:*
-  D'Adderio (2011); PEER/ASEE *Qualitative Coding / IRR*; MS Fabric SCD Type 2.
-- **`whyItMatters` / `whatGoodLooksLike` (nullable TEXT) + a `LearnerPracticeDTO`.** The developer-facing
-  layer — `whyItMatters` = Nicol & Macfarlane-Dick (2006) P1 feed-up / Diátaxis *explanation*;
-  `whatGoodLooksLike` = Sadler (1989) exemplar / Hattie feed-forward — plus a learner projection where
-  `criteria` is **absent by construction** (no field to forget to strip). **Deferred behind the learner
-  read path** and an authoring lint (`whatGoodLooksLike` must hold a concrete exemplar, must NOT contain
-  "criteria" or detector-verdict vocab), because adding two nullable TEXT columns ahead of a reader makes
-  them write-only dead columns and risks the Goodhart/Kluger-DeNisi leak (authors paraphrasing the rubric).
-  The §3a-matrix names survive on their own grounding, so deferring the columns costs no defensibility.
-- **`baseline_state`** — kept **derived, not stored** (see above); first-class storage deferred (a consumer
-  cannot query "only NEW findings this run" without walking the supersession chain).
-- **Assigned-id / `guid` distinct from `finding_fingerprint`** — SARIF separates `partialFingerprints`
-  (heuristic bucket) from `guid`/`correlationGuid` (a stable id assigned on ingest). We fold both into one
-  column; the assigned-id half is deferred.
-- **`Feedback.subjectUserId` NOT NULL symmetry** — the finding side is mandatory and unambiguous (xAPI
-  Actor); the feedback side still defaults subject⇒recipient via NULL. Tightening it for symmetry is
-  deferred (re-listed here as a sequenced item, not only a latent gap).
+- **Per-occurrence id *and* cross-run fingerprint — both grains are present.** SARIF separates a per-run
+  assigned `guid`/`correlationGuid` (a stable id assigned on ingest) from `partialFingerprints` (the
+  heuristic recurrence bucket). We already have **both**: `PracticeFinding.id` is a per-occurrence UUID
+  (the assigned-id grain), and `finding_fingerprint` is the cross-run recurrence key (the
+  `partialFingerprints` grain). Nothing is folded away or missing — the two SARIF grains map onto two
+  existing columns.
+- **`finding_fingerprint` is a *locus* hash, by design.** It hashes (practice, artifact, subject,
+  file-path) — the **locus** the finding is about — deliberately **not** a line number or content/title
+  hash. That keeps it stable across line moves and LLM re-wording of the title (proven 0/26 title
+  correlation), which is exactly what a recurrence key must do. Cross-file-rename stability is **out of
+  scope on purpose**: a moved locus is a *different* locus, and conflating the two would mis-merge
+  unrelated findings. This is the SARIF `partialFingerprints` philosophy (stable against churn), applied
+  to our domain.
+- **No first-class polarity in any standard — our orthogonal axis is the extension.** `Polarity` (esp.
+  `CONTEXTUAL`) has no analogue in SARIF, SonarQube, or code-scanning — all assume a rule fires only on
+  something wrong. The orthogonal-axis design is defensible and lossless on SARIF export (the mapping in
+  §2), but it is *our* extension; interoperability tooling needs that export mapping to understand
+  `CONTEXTUAL`.
+- **`confidence` (0.0–1.0) kept distinct from SARIF `result.rank` (-1.0–1.0).** The two are different
+  scales with different semantics; an export chooses one rather than pretending they are the same number.
 
 ### Honest caveats (state, don't hide)
 
 - Any **verbatim Routine-Dynamics-2016 quotation** must be pulled from a library copy before publication;
   the 2016 PDF is paywalled (verified via abstract + repec/Edinburgh records + the 2008 restatement).
-- **Pre-versioning findings pin to NULL** criteria-version until `practice_revision` ships — honest, but a
-  reviewer should know early findings are not reproducible against an exact rubric snapshot.
+- Findings detected **before** versioning shipped pin to NULL criteria-version (an honest "pre-versioning"
+  marker — those early findings are not reproducible against an exact rubric snapshot). Every finding from
+  the migration forward pins to a concrete revision.
 - **Affective dismissal is currently unmeasured** (absorbed as silence / absent row) until a UI affordance
   can elicit an explicit reject-without-reason act distinguishable from never-reacting.
 - The **"exposed-rubric gaming" claim is principled, not empirically studied** — it rests on

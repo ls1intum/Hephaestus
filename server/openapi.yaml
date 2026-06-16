@@ -2521,6 +2521,33 @@ paths:
       summary: Submit a reaction to a practice finding
       tags:
       - Finding Reaction
+  /workspaces/{workspaceSlug}/practices/learner:
+    get:
+      description: "Active practices projected for a developer: name, area, why-it-matters,\
+        \ what-good-looks-like. The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO\
+        \ has no such field)."
+      operationId: listLearnerPractices
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LearnerPractice"
+          description: Learner practices returned
+      security: []
+      summary: "List active practices, learner-facing"
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -4498,6 +4525,18 @@ components:
             type: string
           maxItems: 10
           minItems: 1
+        whatGoodLooksLike:
+          type: string
+          description: "Developer-facing exemplar (learner layer); a concrete instance,\
+            \ not the rubric"
+          maxLength: 2000
+          minLength: 0
+        whyItMatters:
+          type: string
+          description: "Developer-facing rationale (learner layer); plain language,\
+            \ never the detection rubric"
+          maxLength: 2000
+          minLength: 0
       required:
       - criteria
       - name
@@ -5062,6 +5101,28 @@ components:
       required:
       - leaguePointsChange
       - login
+    LearnerPractice:
+      type: object
+      description: Learner-facing view of a practice — criteria absent by construction
+      properties:
+        areaSlug:
+          type: string
+          description: "Slug of the practice area this belongs to, if any"
+        name:
+          type: string
+          description: Human-readable name
+        slug:
+          type: string
+          description: URL-safe identifier
+        whatGoodLooksLike:
+          type: string
+          description: A concrete picture of doing this well
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in plain language"
+      required:
+      - name
+      - slug
     LinearAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -5290,6 +5351,12 @@ components:
           type: string
           format: date-time
           description: Timestamp when the practice was last updated
+        whatGoodLooksLike:
+          type: string
+          description: Developer-facing exemplar (learner layer)
+        whyItMatters:
+          type: string
+          description: Developer-facing rationale (learner layer)
       required:
       - active
       - artifactType
@@ -6271,6 +6338,20 @@ components:
             type: string
           maxItems: 10
           minItems: 1
+        whatGoodLooksLike:
+          type: string
+          description: "Developer-facing exemplar (learner layer); a concrete instance,\
+            \ not the rubric"
+          maxLength: 2000
+          minLength: 0
+          pattern: .*\S.*
+        whyItMatters:
+          type: string
+          description: "Developer-facing rationale (learner layer); plain language,\
+            \ never the detection rubric"
+          maxLength: 2000
+          minLength: 0
+          pattern: .*\S.*
     UpdatePracticeReviewSettings:
       type: object
       description: Update per-workspace practice-review policy. Null fields unchanged;

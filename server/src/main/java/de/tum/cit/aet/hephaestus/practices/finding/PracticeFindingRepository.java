@@ -53,14 +53,14 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     @Query(
         value = """
         INSERT INTO practice_finding (
-            id, idempotency_key, agent_job_id, practice_id,
+            id, idempotency_key, agent_job_id, practice_id, practice_revision_id,
             artifact_type, artifact_id, developer_id, subject_user_id,
             title, verdict, severity, confidence,
             evidence, reasoning, guidance,
             finding_fingerprint, detected_at
         )
         VALUES (
-            :id, :idempotencyKey, :agentJobId, :practiceId,
+            :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
             :artifactType, :artifactId, :developerId, :subjectUserId,
             :title, :verdict, :severity, :confidence,
             CAST(:evidence AS jsonb), :reasoning, :guidance,
@@ -75,6 +75,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("idempotencyKey") String idempotencyKey,
         @Param("agentJobId") UUID agentJobId,
         @Param("practiceId") Long practiceId,
+        @Param("practiceRevisionId") Long practiceRevisionId,
         @Param("artifactType") String artifactType,
         @Param("artifactId") Long artifactId,
         @Param("developerId") Long developerId,

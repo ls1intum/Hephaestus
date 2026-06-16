@@ -5,10 +5,12 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +31,11 @@ public class PracticeService {
     private static final Logger log = LoggerFactory.getLogger(PracticeService.class);
 
     private final PracticeRepository practiceRepository;
+    private final PracticeRevisionRepository practiceRevisionRepository;
     private final WorkspaceRepository workspaceRepository;
+
+    /** Detector verdict vocabulary that must never leak into learner-facing copy (the authoring guard). */
+    private static final Pattern DETECTOR_VOCAB = Pattern.compile("\\b(?:NOT_)?OBSERVED\\b|\\bNOT_APPLICABLE\\b");
 
     @Transactional(readOnly = true)
     public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
@@ -63,6 +69,8 @@ public class PracticeService {
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
         practice.setCriteria(request.criteria());
         practice.setPrecomputeScript(request.precomputeScript());
+        practice.setWhyItMatters(request.whyItMatters());
+        practice.setWhatGoodLooksLike(request.whatGoodLooksLike());
         if (request.artifactType() != null) {
             practice.setArtifactType(request.artifactType());
         }
@@ -70,6 +78,7 @@ public class PracticeService {
             practice.setPolarity(request.polarity());
         }
         validateTriggerEventsForFocus(practice);
+        validateLearnerContent(practice);
 
         try {
             practice = practiceRepository.save(practice);
@@ -80,9 +89,38 @@ public class PracticeService {
                 ex
             );
         }
+        snapshotRevision(practice); // revision 1 — pins the ostensive as authored (reproducibility, SCD-2)
 
         log.info("Created practice '{}' (slug={}) in workspace {}", practice.getName(), practice.getSlug(), ctx.slug());
         return practice;
+    }
+
+    /**
+     * Append a new {@link PracticeRevision} snapshotting the practice's current {@code criteria}. Called on
+     * create (revision 1) and whenever {@code criteria} changes, so every finding can pin to the criteria
+     * version it was detected against (the ostensive-as-it-was).
+     */
+    private void snapshotRevision(Practice practice) {
+        int next = practiceRevisionRepository
+            .findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId())
+            .map(r -> r.getRevisionNumber() + 1)
+            .orElse(1);
+        practiceRevisionRepository.save(new PracticeRevision(practice, next, practice.getCriteria()));
+    }
+
+    /**
+     * Authoring guard for the learner-facing layer: {@code whatGoodLooksLike} is a concrete exemplar, so it
+     * must not leak the detector's verdict vocabulary (the rule that keeps the learner view free of the
+     * rubric — Goodhart / Kluger &amp; DeNisi 1996).
+     */
+    private static void validateLearnerContent(Practice practice) {
+        String exemplar = practice.getWhatGoodLooksLike();
+        if (exemplar != null && DETECTOR_VOCAB.matcher(exemplar).find()) {
+            throw new IllegalArgumentException(
+                "whatGoodLooksLike is learner-facing and must be a concrete exemplar — it must not contain" +
+                    " detector verdict vocabulary (OBSERVED / NOT_OBSERVED / NOT_APPLICABLE)."
+            );
+        }
     }
 
     /**
@@ -114,6 +152,7 @@ public class PracticeService {
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
         boolean changed = false;
+        boolean criteriaChanged = false;
         if (request.name() != null) {
             practice.setName(request.name());
             changed = true;
@@ -122,12 +161,21 @@ public class PracticeService {
             practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
             changed = true;
         }
-        if (request.criteria() != null) {
+        if (request.criteria() != null && !request.criteria().equals(practice.getCriteria())) {
             practice.setCriteria(request.criteria());
             changed = true;
+            criteriaChanged = true;
         }
         if (request.precomputeScript() != null) {
             practice.setPrecomputeScript(request.precomputeScript());
+            changed = true;
+        }
+        if (request.whyItMatters() != null) {
+            practice.setWhyItMatters(request.whyItMatters());
+            changed = true;
+        }
+        if (request.whatGoodLooksLike() != null) {
+            practice.setWhatGoodLooksLike(request.whatGoodLooksLike());
             changed = true;
         }
         if (request.artifactType() != null) {
@@ -144,7 +192,11 @@ public class PracticeService {
         }
 
         validateTriggerEventsForFocus(practice);
+        validateLearnerContent(practice);
         practice = practiceRepository.save(practice);
+        if (criteriaChanged) {
+            snapshotRevision(practice); // the ostensive shifted — append a new revision so it is recorded, not overwritten
+        }
         log.info("Updated practice '{}' (slug={}) in workspace {}", practice.getName(), slug, ctx.slug());
         return practice;
     }

@@ -61,6 +61,8 @@ interface FormState {
 	areaSlug: string;
 	triggerEvents: string[];
 	criteria: string;
+	whyItMatters: string;
+	whatGoodLooksLike: string;
 	precomputeScript: string;
 }
 
@@ -73,6 +75,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 			areaSlug: initialData.areaSlug ?? NO_AREA,
 			triggerEvents: [...initialData.triggerEvents],
 			criteria: initialData.criteria,
+			whyItMatters: initialData.whyItMatters ?? "",
+			whatGoodLooksLike: initialData.whatGoodLooksLike ?? "",
 			precomputeScript: initialData.precomputeScript ?? "",
 		};
 	}
@@ -83,6 +87,8 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 		areaSlug: NO_AREA,
 		triggerEvents: [],
 		criteria: "",
+		whyItMatters: "",
+		whatGoodLooksLike: "",
 		precomputeScript: "",
 	};
 }
@@ -156,6 +162,10 @@ export function PracticeForm({
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
 				artifactType: form.focusArtifact,
+				...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
+				...(form.whatGoodLooksLike.trim()
+					? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
+					: {}),
 				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
 			};
 			onSubmit(data, areaSlug);
@@ -165,6 +175,8 @@ export function PracticeForm({
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
 				artifactType: form.focusArtifact,
+				whyItMatters: form.whyItMatters.trim() || undefined,
+				whatGoodLooksLike: form.whatGoodLooksLike.trim() || undefined,
 				precomputeScript: form.precomputeScript.trim() || undefined,
 			};
 			onSubmit(initialData.slug, data, areaSlug);
@@ -400,6 +412,49 @@ export function PracticeForm({
 									{criteriaError}
 								</p>
 							)}
+						</section>
+
+						<Separator />
+
+						{/* Section: Learner guidance — developer-facing, never the detection criteria */}
+						<section className="space-y-4">
+							<div>
+								<h2 className="text-lg font-semibold">Learner guidance</h2>
+								<p className="text-sm text-muted-foreground">
+									Optional plain-language context shown to learners. These never influence
+									detection.
+								</p>
+							</div>
+
+							<div className="grid gap-2">
+								<Label htmlFor="practice-why-it-matters">Why it matters</Label>
+								<Textarea
+									id="practice-why-it-matters"
+									placeholder="Explain why this practice is worth caring about…"
+									value={form.whyItMatters}
+									onChange={(e) => setForm((prev) => ({ ...prev, whyItMatters: e.target.value }))}
+									className="min-h-24"
+								/>
+								<p className="text-xs text-muted-foreground">
+									Developer-facing — shown to learners, never the detection criteria.
+								</p>
+							</div>
+
+							<div className="grid gap-2">
+								<Label htmlFor="practice-what-good-looks-like">What good looks like</Label>
+								<Textarea
+									id="practice-what-good-looks-like"
+									placeholder="Describe a concrete example of doing this well…"
+									value={form.whatGoodLooksLike}
+									onChange={(e) =>
+										setForm((prev) => ({ ...prev, whatGoodLooksLike: e.target.value }))
+									}
+									className="min-h-24"
+								/>
+								<p className="text-xs text-muted-foreground">
+									Developer-facing — shown to learners, never the detection criteria.
+								</p>
+							</div>
 						</section>
 
 						<Separator />

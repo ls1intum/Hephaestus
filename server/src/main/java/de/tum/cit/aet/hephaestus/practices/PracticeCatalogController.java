@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.LearnerPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
@@ -71,6 +72,27 @@ public class PracticeCatalogController {
             .listPractices(workspaceContext, active)
             .stream()
             .map(PracticeDTO::from)
+            .toList();
+        return ResponseEntity.ok(practices);
+    }
+
+    @GetMapping("/learner")
+    @Operation(
+        summary = "List active practices, learner-facing",
+        description = "Active practices projected for a developer: name, area, why-it-matters, what-good-looks-like." +
+            " The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO has no such field)."
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "Learner practices returned",
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = LearnerPracticeDTO.class)))
+    )
+    @SecurityRequirements
+    public ResponseEntity<List<LearnerPracticeDTO>> listLearnerPractices(WorkspaceContext workspaceContext) {
+        List<LearnerPracticeDTO> practices = practiceService
+            .listPractices(workspaceContext, true)
+            .stream()
+            .map(LearnerPracticeDTO::from)
             .toList();
         return ResponseEntity.ok(practices);
     }

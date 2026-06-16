@@ -41,5 +41,17 @@ public record UpdatePracticeRequestDTO(
         example = "UNDESIRABLE"
     )
     @Nullable
-    Polarity polarity
+    Polarity polarity,
+
+    @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
+    @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")
+    @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")
+    @Nullable
+    String whyItMatters,
+
+    @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
+    @Pattern(regexp = ".*\\S.*", message = "What-good-looks-like must not be blank")
+    @Schema(description = "Developer-facing exemplar (learner layer); a concrete instance, not the rubric")
+    @Nullable
+    String whatGoodLooksLike
 ) {}

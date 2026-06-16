@@ -96,6 +96,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "key-1",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 42L,
                 developer.getId(),
@@ -136,6 +137,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "dup-key",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
@@ -156,6 +158,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "dup-key",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
@@ -186,6 +189,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "evidence-key",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 99L,
                 developer.getId(),
@@ -222,6 +226,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "purge-key",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
@@ -271,6 +276,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ws-a-key",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
@@ -291,6 +297,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ws-b-key",
                 agentJobB.getId(),
                 practiceB.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
@@ -337,6 +344,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "cascade-key-1",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
@@ -357,6 +365,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "cascade-key-2",
                 agentJob.getId(),
                 otherPractice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
@@ -477,6 +486,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "iso-2",
                 otherJob.getId(),
                 otherPractice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
@@ -537,6 +547,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "contrib-iso-2",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
                 otherDeveloper.getId(),
@@ -568,6 +579,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 idempotencyKey,
                 agentJob.getId(),
                 targetPractice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
@@ -597,6 +609,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "tt-roundtrip",
                 agentJob.getId(),
                 practice.getId(),
+                null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
