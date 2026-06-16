@@ -30,6 +30,47 @@ divergence is load-bearing (sign-neutral `Observation` × `Polarity`). The namin
 
 ---
 
+## 1a. Construct grounding (practice theory)
+
+The four core entities map cleanly onto the **three-component ontology of organizational routines**
+(Pentland & Feldman 2005, 2008) and its material-turn refinement (D'Adderio 2011), with the delivery
+layer grounded in formative-assessment theory (Hattie & Timperley 2007). A `Practice` row is an
+**artifact that *reflects* the ostensive aspect** of a software-engineering routine — Pentland &
+Feldman's third component, distinct from both the abstract pattern and its performances; its `criteria`
+field is, in D'Adderio's (2011, *J. Institutional Economics* 7(2):204–205) terms, *"a partial, selective,
+codified representation"* of that necessarily-tacit, plural ostensive pattern — **not the pattern
+itself**. We assert the *opposite* of what D'Adderio names "the categorical mistake": equating the
+artifact with the routine's ostensive aspect is the mistake; we never equate `criteria` with the
+ostensive, treating it only as the operationalised referent that makes the otherwise-tacit pattern
+observable for formative assessment (Sadler 1989). A `PracticeFinding` is the **performative
+enactment** — D'Adderio's "expression" (routines-in-practice), the situated-action trace. A `Feedback`
+unit is the **formative-assessment delivery** (Hattie & Timperley 2007) of one or more enactments to a
+person. (The current canon — Feldman, Pentland, D'Adderio & Lazaric 2016, "Beyond Routines as Things" —
+frames routines *as practices*, so `Practice` as the top noun is *more* defensible post-2016, not less.)
+
+| Practice-theory term | Hephaestus object | Note |
+| --- | --- | --- |
+| **ostensive aspect** (abstract, tacit, plural) | the **`Practice` *concept*** | lives in the cohort's shared understanding; NOT a column |
+| **artifact reflecting the ostensive** ("partial, selective, codified representation") | **`Practice.criteria`** | the written rule *as a representation of* the ostensive — never the ostensive itself |
+| **performative aspect / "expression"** (routines-in-practice) | **`PracticeFinding`** | the situated enactment / observable trace |
+| **formative-assessment delivery** | **`Feedback`** | task-framed feed-up/feed-back/feed-forward (Hattie & Timperley 2007) |
+
+*Construct sources:* Pentland & Feldman (2005), *Organizational routines as a unit of analysis*,
+Industrial and Corporate Change 14(5):793–815 ·
+[link](https://academic.oup.com/icc/article-abstract/14/5/793/656208) · Pentland & Feldman (2008),
+*Designing routines*, Information and Organization 18(4):235–250, p.241 ·
+[PDF](https://bpb-us-e2.wpmucdn.com/sites.uci.edu/dist/5/1068/files/2013/02/Pentland-and-Feldman-2008-Information-and-Organization.pdf) ·
+D'Adderio (2011), *Artefacts at the centre of routines*, J. Institutional Economics 7(2):197–230,
+pp.204–205 · [PDF](https://strathprints.strath.ac.uk/43784/1/S174413741000024Xa.pdf) ·
+Feldman, Pentland, D'Adderio & Lazaric (2016), *Beyond Routines as Things*, Organization Science
+27(3):505–513 · [link](https://pubsonline.informs.org/doi/10.1287/orsc.2016.1070) ·
+Sadler (1989), *Formative assessment and the design of instructional systems*, Instructional Science
+18:119–144 · [link](https://link.springer.com/article/10.1007/BF00117714) ·
+Hattie & Timperley (2007), *The Power of Feedback*, Review of Educational Research 77(1):81–112 ·
+[link](https://journals.sagepub.com/doi/10.3102/003465430298487).
+
+---
+
 ## 2. Ubiquitous language — one canonical name per concept
 
 This is the **single source of truth for naming**. Each concept has exactly one canonical name; the
@@ -171,9 +212,39 @@ context (#895)** so prior disputes never contaminate detection accuracy. The lat
 | findingFingerprint | String(64) | `finding_fingerprint` | yes | Denormalised copy of the finding's fingerprint at reaction-write time. | The reacted finding is ephemeral (new row each run); the fingerprint is the stable locus that recurs, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE reaction. Index `idx_finding_reaction_correlation`. |
 | developer | User (`@ManyToOne`) | `developer_id` | no | Reacting developer; FK `RESTRICT`. | Reactions outlive users. |
 | developerId | Long | `developer_id` | no (read-only mirror) | Scalar access without lazy load. | Hot-read optimisation. |
-| action | FindingReactionAction | `action` | no | `APPLIED` / `DISPUTED` / `NOT_APPLICABLE`. | Research signal (RQ1/RQ2/RQ4), not workflow. |
-| explanation | String (TEXT) | `explanation` | yes | Free-text rationale (required for `DISPUTED`). | Qualitative dispute signal. |
+| action | FindingReactionAction | `action` | no | `ENACTED` / `DISPUTED` (RESPONSE axis) / `NOT_APPLICABLE` (VALIDITY axis). | Research signal (RQ1/RQ2/RQ4), not workflow. The value set is a *recipience act* (see note below). |
+| explanation | String (TEXT) | `explanation` | yes | Free-text rationale (required for `DISPUTED`; the required explanation *is* the evaluative judgement). | Qualitative dispute signal. |
 | createdAt | Instant | `created_at` | no (immutable) | When the reaction was submitted. | Temporal "changed my mind" record. |
+
+> **`FindingReactionAction` partitions into two orthogonal sub-axes** (recipience theory).
+> A `FindingReaction` is the learner's answer to Lipnevich & Smith's (2022) third question — *"What
+> am I going to do with the feedback?"* — i.e. a **behavioural recipience act** (Winstone et al.
+> 2017, "enacting"). The values therefore split:
+> - **RESPONSE sub-axis `{ENACTED, DISPUTED}`** — what the learner *did* about a finding they accept
+>   is about them. `ENACTED` (renamed from `APPLIED`) records that the learner *acted to close the
+>   gap* — a proxy inferred from a later artifact/self-report; it **does NOT assert the gap closed
+>   correctly** (Winstone et al. 2017; Sadler 1989, feedback "used to alter the gap"). The escalation
+>   branch in `ReactionSuppressionFilter` re-nags an `ENACTED`-but-still-`NOT_OBSERVED` locus, which is
+>   only sound *because* the value claims action, not verified closure. `DISPUTED` is narrowed to the
+>   *reasoned* rejection — the learner reason-rejects the assessment, and the enforced `explanation`
+>   is the evaluative judgement (Carless & Boud 2018, "making judgements"). Affective *dismissal*
+>   (reject-without-reason) is currently absorbed as silence (an absent row) pending a UI affordance —
+>   a `DISMISSED` value is deliberately deferred (see §6).
+> - **VALIDITY sub-axis `{NOT_APPLICABLE}`** — *"is this finding valid/relevant here?"* is a
+>   finding-validity judgement, not a recipience act (Lipnevich & Smith 2022, Q3). The engagement DTO
+>   (`FindingReactionEngagementDTO`) therefore **excludes `NOT_APPLICABLE` from every uptake / non-uptake
+>   ratio** and reports it separately as a validity/scope signal that flows to the facilitator
+>   (Nicol & Macfarlane-Dick 2006, principle 7). The value stays in the enum for migration safety and
+>   keeps its suppression co-location (do not re-nag a credibly scoped-out locus).
+>
+> *Sources:* Winstone, Nash, Parker & Rowntree (2017), *Supporting Learners' Agentic Engagement With
+> Feedback*, Educational Psychologist 52(1):17–37 ·
+> [link](https://www.tandfonline.com/doi/abs/10.1080/00461520.2016.1207538) · Carless & Boud (2018),
+> *The development of student feedback literacy*, Assessment & Evaluation in HE 43(8):1315–1325 ·
+> [link](https://www.tandfonline.com/doi/full/10.1080/02602938.2018.1463354) · Lipnevich & Smith
+> (2022), *Student–Feedback Interaction Model: Revised*, Studies in Educational Evaluation 75:101208 ·
+> [link](https://www.sciencedirect.com/science/article/abs/pii/S0191491X22000852) ·
+> Nicol & Macfarlane-Dick (2006), Studies in Higher Education 31(2):199–218.
 
 ### 3.5 `Feedback` — table `feedback`
 
@@ -260,7 +331,7 @@ and per-anchor posting lifecycle so re-delivery, snapping and resolution reconci
 | **SubjectRole** | `AUTHOR` (subject == developer), `REVIEWER` (subject == reviewer, distinct from developer). | xAPI Actor. The firewall keeping reviewer-side lessons off the author. Replaces `audience_role`/`AUDIENCE_REVIEWER`. |
 | **Observation** | `OBSERVED` (present), `NOT_OBSERVED` (absent where expected), `NOT_APPLICABLE` (practice irrelevant to the work). | Sign-neutral; ≈ SARIF `result.kind` with the direction factored out. `NOT_APPLICABLE` is a verbatim SARIF match. |
 | **Severity** | `CRITICAL`, `MAJOR`, `MINOR`, `INFO` — impact, orthogonal to verdict. | SARIF `result.level` / SonarQube blocker..info. |
-| **FindingReactionAction** | `APPLIED` ("I fixed/will fix" — RQ2), `DISPUTED` ("AI is wrong", requires explanation — RQ1/RQ4), `NOT_APPLICABLE` ("valid but irrelevant" — RQ4). | Research signal, not workflow; no DISMISSED/ACKNOWLEDGED (non-action = absence of a row). |
+| **FindingReactionAction** | **RESPONSE axis:** `ENACTED` ("acted to close the gap"; outcome unverified — RQ2), `DISPUTED` ("AI is wrong", reasoned rejection, requires explanation — RQ1/RQ4). **VALIDITY axis:** `NOT_APPLICABLE` ("valid but irrelevant" — RQ4; excluded from uptake ratios). | Recipience act (Winstone 2017 "enacting"); not workflow. `ENACTED` renamed from `APPLIED` (claimed action ≠ verified closure). No `DISMISSED`/`ACKNOWLEDGED` — non-action = absence of a row; affective dismissal deferred behind a UI affordance (§6). |
 | **EvidenceRole** | `PRIMARY` (anchors the headline), `SUPPORTING` (corroborates). | Synthesis-time weighting; replaces `display_role`. |
 | **FeedbackChannel** | `IN_CONTEXT` (on the PR/issue), `CONVERSATION` (mentor turn), `REFLECTION_DASHBOARD` (recipient's private dashboard), `FACILITATOR` (instructor). | Decouples message from channel. |
 | **FeedbackDeliveryState** | `PREPARED`, `DELIVERED`, `SUPERSEDED` (replaced via `supersedes_id`), `SUPPRESSED` (withheld; see reason), `FAILED`. | Delivery state machine + review-tool edit-in-place (SUPERSEDED) + SARIF `suppressions` (SUPPRESSED). |
@@ -270,6 +341,60 @@ and per-anchor posting lifecycle so re-delivery, snapping and resolution reconci
 | **PlacementPostedState** | `PENDING`, `POSTED`, `SNAPPED` (anchor moved to nearest valid line), `FELL_BACK` (posted as summary/thread instead of inline), `OUTDATED` (diff line changed), `ORPHANED` (anchored code/thread gone), `GONE` (comment deleted out-of-band), `FAILED`. | GitHub/GitLab review-comment lifecycle. |
 | **PlacementAnchorKind** | `LINE`, `RANGE`, `FILE`, `IMAGE`. | Diff-anchor granularity. |
 | **PlacementAnchorSide** | `OLD` (left/base), `NEW` (right/head). | Unified-diff side. |
+
+---
+
+## 3a. Stakeholder display model (the projection contract)
+
+The schema encodes two orthogonal axes that the display layer must keep separate:
+
+- **Actor axis** = `Practice.subjectRole` (`AUTHOR`/`REVIEWER`) + the finding's `subject_user_id` — *who*
+  the practice evaluates. Already encoded.
+- **Audience axis** = *who reads the analytic*. The display model adds this. The split mirrors the
+  xAPI/Caliper `actor — verb — object` + `context.instructor` separation: a finding filed **against** a
+  developer can surface **to** a facilitator without being delivered **to** the developer.
+
+**Field-by-audience matrix — enforce server-side, never in the webapp.** "Developer" and "Reviewer" are
+the *same human*; the column that applies is selected by the **finding's `subjectRole`**, not a static
+user role, so reviewer-craft never leaks to the author. Fields tagged "(deferred)" are the
+`whyItMatters` / `whatGoodLooksLike` learner-layer columns described in §6.
+
+| Field | Developer / Learner | Reviewer (finding `subjectRole`=REVIEWER) | Facilitator / Instructor | Researcher / Admin |
+| --- | --- | --- | --- | --- |
+| `name` | yes | yes | yes | yes |
+| `whyItMatters` (deferred) | yes — Layer 1 | yes | yes | yes |
+| `whatGoodLooksLike` (deferred) | yes — Layer 2 (on request) | yes | yes | yes |
+| area / area progress | yes — own | yes — own | yes — cohort | yes |
+| per-finding `Feedback` (task-framed) | yes — own only | yes — own only | yes — cohort aggregate | yes |
+| **`criteria`** | **NEVER** | **NEVER** | read-only, opt-in | yes — edit |
+| `precomputeScript`, `triggerEvents`, `polarity`, `subjectRole` | no | no | no | yes — edit |
+| raw `OBSERVED`/`NOT_OBSERVED` verdict label | no — delivered as task-framed feedback | no | yes — aggregate | yes |
+| reaction `NOT_APPLICABLE` (validity signal) | n/a | n/a | yes — as a scope signal, **not** uptake | yes |
+
+**Two hard rules from theory (not UX taste):**
+
+1. **`criteria` is NEVER delivered to a learner.** Three independent groundings: Diátaxis register
+   mismatch (`criteria` is *reference* material for the detector/admin; a learner needs *explanation* +
+   *how-to/example*); Kluger & DeNisi (1996) — a rubric+score frame directs attention to the self/standard
+   and can *depress* performance; and Goodhart-style gaming of an exposed detection rubric. Omission must
+   be **physical** — a projection that does not carry the field (the §6 invariant; never "hidden in the
+   webapp", which still ships in the payload) — mirroring how CodeQL physically separates the
+   developer-facing `.qhelp` from the `.ql` query metadata.
+2. **Visibility keys off the *finding's* `subjectRole`, not a static user role.** Reviewer-craft feedback
+   must not leak to the author — a known prior bug class in this codebase.
+
+**Within-learner progressive disclosure (NN/g, Nielsen 1995):** Layer 1 = `name` + `whyItMatters` + this
+finding's feed-forward (what most learners need most of the time); Layer 2 (on request) =
+`whatGoodLooksLike` + area context + personal trend. Layer 3 (`criteria` / detector config) is a
+**different audience**, not a deeper layer — never surfaced to a learner.
+
+*Sources:* ADL xAPI ([Statements 101](https://xapi.com/statements-101/)) / IMS Caliper
+([comparison](https://www.imsglobal.org/initial-xapicaliper-comparison)) — actor↔audience separation ·
+Diátaxis ([diataxis.fr](https://diataxis.fr/)) — reference vs explanation register ·
+Nielsen Norman Group, [*Progressive Disclosure*](https://www.nngroup.com/articles/progressive-disclosure/)
+(Nielsen 1995) · Kluger & DeNisi (1996), Psychological Bulletin 119(2):254–284 ·
+Hattie & Timperley (2007) feed-up/feed-back/feed-forward · CodeQL
+[query-help files](https://codeql.github.com/docs/writing-codeql-queries/query-help-files/).
 
 ---
 
@@ -386,6 +511,52 @@ breaks the "same word everywhere" contract and forces translation at every bound
 - **Confidence vs rank stored separately, not unified.** We keep `confidence` (0.0–1.0) where SARIF would
   use `result.rank` (-1.0–1.0 diagnostic relevance). Fine, but the two are not the same scale and an export
   must choose one.
+
+### Deferred schema work (grounded, sequenced — not yet built)
+
+The pressure-test of 2026-06 (see `docs/contributor/practice-catalogue.md` and the dissertation memo)
+landed several changes in code and **deferred** the following as larger, sequenced moves. Each is
+grounded; each is deferred for a stated reason, not abandoned.
+
+- **Practice versioning — `practice_revision` (SCD-2) + `finding.practice_revision_id`.** Add a
+  slowly-changing-dimension history of the `criteria` text (`effective_start`/`effective_end`/`is_current`,
+  monotonic `revision_no`) and a nullable FK on `PracticeFinding` so a finding **pins to criteria-as-it-was**.
+  This makes the ostensive↔performative *recursive loop* (performances reshape the criteria over time)
+  queryable, and makes every finding reproducible against the rubric version that produced it. Triangulated
+  by practice theory (D'Adderio 2011 translation loop), the qualitative-coding *codebook audit-trail* norm
+  (inter-rater reliability is interpretable only against the in-force codebook version), and data-warehousing
+  SCD-2 point-in-time reconstruction. **Deferred because** doing it before any other consumer exists would
+  orphan prior findings or require a bespoke remap with no other payoff; it is the natural home for the two
+  catalogue *slug* renames (slugs are fingerprint keys — see the catalogue reference). *Anchors:*
+  D'Adderio (2011); PEER/ASEE *Qualitative Coding / IRR*; MS Fabric SCD Type 2.
+- **`whyItMatters` / `whatGoodLooksLike` (nullable TEXT) + a `LearnerPracticeDTO`.** The developer-facing
+  layer — `whyItMatters` = Nicol & Macfarlane-Dick (2006) P1 feed-up / Diátaxis *explanation*;
+  `whatGoodLooksLike` = Sadler (1989) exemplar / Hattie feed-forward — plus a learner projection where
+  `criteria` is **absent by construction** (no field to forget to strip). **Deferred behind the learner
+  read path** and an authoring lint (`whatGoodLooksLike` must hold a concrete exemplar, must NOT contain
+  "criteria" or detector-verdict vocab), because adding two nullable TEXT columns ahead of a reader makes
+  them write-only dead columns and risks the Goodhart/Kluger-DeNisi leak (authors paraphrasing the rubric).
+  The §3a-matrix names survive on their own grounding, so deferring the columns costs no defensibility.
+- **`baseline_state`** — kept **derived, not stored** (see above); first-class storage deferred (a consumer
+  cannot query "only NEW findings this run" without walking the supersession chain).
+- **Assigned-id / `guid` distinct from `finding_fingerprint`** — SARIF separates `partialFingerprints`
+  (heuristic bucket) from `guid`/`correlationGuid` (a stable id assigned on ingest). We fold both into one
+  column; the assigned-id half is deferred.
+- **`Feedback.subjectUserId` NOT NULL symmetry** — the finding side is mandatory and unambiguous (xAPI
+  Actor); the feedback side still defaults subject⇒recipient via NULL. Tightening it for symmetry is
+  deferred (re-listed here as a sequenced item, not only a latent gap).
+
+### Honest caveats (state, don't hide)
+
+- Any **verbatim Routine-Dynamics-2016 quotation** must be pulled from a library copy before publication;
+  the 2016 PDF is paywalled (verified via abstract + repec/Edinburgh records + the 2008 restatement).
+- **Pre-versioning findings pin to NULL** criteria-version until `practice_revision` ships — honest, but a
+  reviewer should know early findings are not reproducible against an exact rubric snapshot.
+- **Affective dismissal is currently unmeasured** (absorbed as silence / absent row) until a UI affordance
+  can elicit an explicit reject-without-reason act distinguishable from never-reacting.
+- The **"exposed-rubric gaming" claim is principled, not empirically studied** — it rests on
+  construct-validity reasoning (Goodhart) + Kluger & DeNisi (1996), not on a study of learners gaming an
+  AI-detection rubric specifically. Flagged as a named gap.
 
 ---
 

@@ -1882,7 +1882,7 @@ export const getLatestReactionOptions = (options: Options<GetLatestReactionData>
 /**
  * Submit a reaction to a practice finding
  *
- * Records the developer's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
+ * Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */
 export const submitReactionMutation = (options?: Partial<Options<SubmitReactionData>>): UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> => {
     const mutationOptions: UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> = {

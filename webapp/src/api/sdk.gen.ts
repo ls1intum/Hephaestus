@@ -913,7 +913,7 @@ export const getLatestReaction = <ThrowOnError extends boolean = false>(options:
 /**
  * Submit a reaction to a practice finding
  *
- * Records the developer's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
+ * Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */
 export const submitReaction = <ThrowOnError extends boolean = false>(options: Options<SubmitReactionData, ThrowOnError>) => (options.client ?? client).post<SubmitReactionResponses, SubmitReactionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

@@ -123,7 +123,7 @@ public class FindingReactionService {
             .countByDeveloperAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
             .forEach(p -> counts.put(p.getAction(), p.getCount()));
         return new FindingReactionEngagementDTO(
-            counts.getOrDefault(FindingReactionAction.APPLIED, 0L),
+            counts.getOrDefault(FindingReactionAction.ENACTED, 0L),
             counts.getOrDefault(FindingReactionAction.DISPUTED, 0L),
             counts.getOrDefault(FindingReactionAction.NOT_APPLICABLE, 0L)
         );

@@ -121,7 +121,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void appliedButStillNotObserved_isKeptWithStifferOpener() {
-        stubPersistedAndReaction(FindingReactionAction.APPLIED);
+        stubPersistedAndReaction(FindingReactionAction.ENACTED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
 
@@ -132,9 +132,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void appliedAndNowObserved_isDeliveredPlainNotEscalated() {
-        // APPLIED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
+        // ENACTED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
         // untouched (escalation is keyed on verdict == NOT_OBSERVED, not on the reaction alone).
-        stubPersistedAndReaction(FindingReactionAction.APPLIED);
+        stubPersistedAndReaction(FindingReactionAction.ENACTED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.OBSERVED)));
 

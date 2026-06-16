@@ -989,4 +989,26 @@
         </rollback>
     </changeSet>
 
+    <!-- E1 (pressure-test): rename FindingReactionAction value APPLIED→ENACTED. "applied" names an OUTCOME,
+         but the suppression filter escalates an ENACTED-but-still-NOT_OBSERVED locus — so the value must name
+         the recipience ACT, not the outcome (Winstone et al. 2017 "enacting"; Sadler 1989). Data UPDATE +
+         CHECK rebuild; constraint may carry its pre-table-rename name, so drop both possibilities. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-60">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.action already migrated APPLIED→ENACTED">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE pg_get_constraintdef(oid) LIKE '%''ENACTED''%' AND conrelid = 'finding_reaction'::regclass</sqlCheck>
+        </preConditions>
+        <comment>Rename reaction action value APPLIED→ENACTED (data + CHECK).</comment>
+        <sql>
+            UPDATE finding_reaction SET action = 'ENACTED' WHERE action = 'APPLIED';
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_feedback_action;
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
+            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_reaction_action CHECK (action IN ('ENACTED', 'DISPUTED', 'NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            UPDATE finding_reaction SET action = 'APPLIED' WHERE action = 'ENACTED';
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
+            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_feedback_action CHECK (action IN ('APPLIED', 'DISPUTED', 'NOT_APPLICABLE'));
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

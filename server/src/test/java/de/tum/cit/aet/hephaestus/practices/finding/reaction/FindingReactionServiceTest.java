@@ -87,16 +87,16 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 return fb;
             });
 
-            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
             FindingReactionDTO result = service.submitReaction(workspaceContext, FINDING_ID, request);
 
-            assertThat(result.action()).isEqualTo(FindingReactionAction.APPLIED);
+            assertThat(result.action()).isEqualTo(FindingReactionAction.ENACTED);
             assertThat(result.explanation()).isNull();
 
             verify(reactionRepository).save(feedbackCaptor.capture());
             FindingReaction saved = feedbackCaptor.getValue();
             assertThat(saved.getDeveloperId()).isEqualTo(CONTRIBUTOR_ID);
-            assertThat(saved.getAction()).isEqualTo(FindingReactionAction.APPLIED);
+            assertThat(saved.getAction()).isEqualTo(FindingReactionAction.ENACTED);
         }
 
         @Test
@@ -167,7 +167,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(OTHER_USER_ID));
 
-            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
             assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request))
                 .isInstanceOf(AccessForbiddenException.class)
                 .hasMessageContaining("developer");
@@ -177,7 +177,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
         void findingNotFoundThrows() {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.empty());
 
-            var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
             assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
@@ -200,7 +200,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 .finding(finding)
                 .findingId(FINDING_ID)
                 .developerId(CONTRIBUTOR_ID)
-                .action(FindingReactionAction.APPLIED)
+                .action(FindingReactionAction.ENACTED)
                 .createdAt(Instant.now())
                 .build();
             when(
@@ -210,7 +210,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
             Optional<FindingReactionDTO> result = service.getLatestReaction(workspaceContext, FINDING_ID);
 
             assertThat(result).isPresent();
-            assertThat(result.get().action()).isEqualTo(FindingReactionAction.APPLIED);
+            assertThat(result.get().action()).isEqualTo(FindingReactionAction.ENACTED);
             assertThat(result.get().findingId()).isEqualTo(FINDING_ID);
         }
 
@@ -250,7 +250,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
             var appliedProjection = new FindingReactionRepository.ActionCountProjection() {
                 @Override
                 public FindingReactionAction getAction() {
-                    return FindingReactionAction.APPLIED;
+                    return FindingReactionAction.ENACTED;
                 }
 
                 @Override
@@ -276,7 +276,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
 
             FindingReactionEngagementDTO result = service.getEngagement(workspaceContext);
 
-            assertThat(result.applied()).isEqualTo(3L);
+            assertThat(result.enacted()).isEqualTo(3L);
             assertThat(result.disputed()).isEqualTo(1L);
             assertThat(result.notApplicable()).isEqualTo(0L);
         }
@@ -291,7 +291,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
 
             FindingReactionEngagementDTO result = service.getEngagement(workspaceContext);
 
-            assertThat(result.applied()).isZero();
+            assertThat(result.enacted()).isZero();
             assertThat(result.disputed()).isZero();
             assertThat(result.notApplicable()).isZero();
         }
@@ -321,7 +321,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 .finding(finding1)
                 .findingId(findingId1)
                 .developerId(CONTRIBUTOR_ID)
-                .action(FindingReactionAction.APPLIED)
+                .action(FindingReactionAction.ENACTED)
                 .createdAt(Instant.now())
                 .build();
             FindingReaction fb2 = FindingReaction.builder()
@@ -344,7 +344,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).hasSize(2);
-            assertThat(result.get(findingId1).action()).isEqualTo(FindingReactionAction.APPLIED);
+            assertThat(result.get(findingId1).action()).isEqualTo(FindingReactionAction.ENACTED);
             assertThat(result.get(findingId2).action()).isEqualTo(FindingReactionAction.DISPUTED);
         }
     }

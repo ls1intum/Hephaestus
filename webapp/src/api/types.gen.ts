@@ -1822,19 +1822,19 @@ export type GitLabGroup = {
 };
 
 /**
- * Reaction engagement statistics for a developer in a workspace
+ * Reaction engagement for a developer, split into the response (uptake) and validity axes
  */
 export type FindingReactionEngagement = {
     /**
-     * Number of findings marked as applied/fixed
-     */
-    applied: number;
-    /**
-     * Number of findings disputed as incorrect
+     * RESPONSE: findings the developer rejected with a reasoned explanation
      */
     disputed: number;
     /**
-     * Number of findings marked as not applicable
+     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
+     */
+    enacted: number;
+    /**
+     * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
      */
     notApplicable: number;
 };
@@ -1846,7 +1846,7 @@ export type FindingReaction = {
     /**
      * The reaction action taken
      */
-    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    action: 'ENACTED' | 'DISPUTED' | 'NOT_APPLICABLE';
     /**
      * When the reaction was submitted
      */
@@ -2091,7 +2091,7 @@ export type CreateFindingReaction = {
     /**
      * The reaction action to record
      */
-    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    action: 'ENACTED' | 'DISPUTED' | 'NOT_APPLICABLE';
     /**
      * Explanation for the reaction. Required when action is DISPUTED.
      */

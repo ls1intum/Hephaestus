@@ -2481,7 +2481,7 @@ paths:
       tags:
       - Finding Reaction
     post:
-      description: "Records the developer's reaction (APPLIED, DISPUTED, NOT_APPLICABLE)\
+      description: "Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE)\
         \ to an AI-generated finding. Append-only: submitting again creates a new\
         \ record, preserving temporal history."
       operationId: submitReaction
@@ -4368,7 +4368,7 @@ components:
           type: string
           description: The reaction action to record
           enum:
-          - APPLIED
+          - ENACTED
           - DISPUTED
           - NOT_APPLICABLE
         explanation:
@@ -4696,7 +4696,7 @@ components:
           type: string
           description: The reaction action taken
           enum:
-          - APPLIED
+          - ENACTED
           - DISPUTED
           - NOT_APPLICABLE
         createdAt:
@@ -4721,23 +4721,27 @@ components:
       - id
     FindingReactionEngagement:
       type: object
-      description: Reaction engagement statistics for a developer in a workspace
+      description: "Reaction engagement for a developer, split into the response (uptake)\
+        \ and validity axes"
       properties:
-        applied:
-          type: integer
-          format: int64
-          description: Number of findings marked as applied/fixed
         disputed:
           type: integer
           format: int64
-          description: Number of findings disputed as incorrect
+          description: "RESPONSE: findings the developer rejected with a reasoned\
+            \ explanation"
+        enacted:
+          type: integer
+          format: int64
+          description: "RESPONSE: findings the developer acted on (the recipience\
+            \ act, not the outcome)"
         notApplicable:
           type: integer
           format: int64
-          description: Number of findings marked as not applicable
+          description: "VALIDITY: findings marked out-of-scope — a detector-scope\
+            \ signal, NOT an uptake count"
       required:
-      - applied
       - disputed
+      - enacted
       - notApplicable
     GitHubProvider:
       type: object

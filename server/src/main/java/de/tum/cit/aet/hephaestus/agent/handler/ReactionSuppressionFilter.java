@@ -28,7 +28,7 @@ import tools.jackson.databind.JsonNode;
  * its stable {@code finding_fingerprint}) and BEFORE the summary/inline notes are composed: a locus the student
  * already DISPUTED / marked NOT_APPLICABLE on an EARLIER run is dropped from this run's delivery (and a
  * SUPPRESSED ledger row is written so an eval sees it was deliberately withheld, not missed). A locus the
- * student marked APPLIED ("I fixed it") but that is STILL NOT_OBSERVED this run is kept, with stiffer wording.
+ * student marked ENACTED ("I fixed it") but that is STILL NOT_OBSERVED this run is kept, with stiffer wording.
  *
  * <p>The reaction is captured against the EPHEMERAL per-run finding id, which differs every run; matching is
  * therefore by {@code finding_fingerprint} (A2 denormalized it onto the reaction). Flag-gated
@@ -129,7 +129,7 @@ class ReactionSuppressionFilter {
                 suppressed++;
                 continue;
             }
-            if (action == FindingReactionAction.APPLIED && vf.verdict() == Observation.NOT_OBSERVED) {
+            if (action == FindingReactionAction.ENACTED && vf.verdict() == Observation.NOT_OBSERVED) {
                 deliverable.add(withEscalatedReasoning(vf)); // student said "fixed", but it recurs
                 continue;
             }
