@@ -533,7 +533,7 @@ export type UpdatePracticeReviewSettings = {
      */
     reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES'>;
     /**
-     * Run practice review for all contributors (vs only the run_practice_review role)
+     * Run practice review for all developers (vs only the run_practice_review role)
      */
     runForAllUsers?: boolean;
     /**
@@ -547,17 +547,13 @@ export type UpdatePracticeReviewSettings = {
  */
 export type UpdatePracticeRequest = {
     /**
-     * Practice category
+     * Artifact this practice evaluates
      */
-    category?: string;
+    artifactType?: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Practice evaluation criteria
      */
     criteria?: string;
-    /**
-     * Artifact this practice evaluates
-     */
-    focusArtifact?: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Human-readable name
      */
@@ -565,7 +561,7 @@ export type UpdatePracticeRequest = {
     /**
      * Whether the practice is a desirable habit, an anti-pattern, or context-dependent
      */
-    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'MIXED';
+    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'CONTEXTUAL';
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
@@ -579,7 +575,7 @@ export type UpdatePracticeRequest = {
 /**
  * Request to update an existing practice goal (PATCH — only non-null fields applied)
  */
-export type UpdatePracticeGoalRequest = {
+export type UpdatePracticeAreaRequest = {
     /**
      * Whether this goal is active
      */
@@ -874,7 +870,7 @@ export type RevokeSessionsResult = {
 /**
  * Reorder practice goals — displayOrder follows the list index
  */
-export type ReorderPracticeGoalsRequest = {
+export type ReorderPracticeAreasRequest = {
     /**
      * Goal slugs in the desired display order
      */
@@ -1182,9 +1178,115 @@ export type Profile = {
 };
 
 /**
+ * Practice finding summary for list views
+ */
+export type PracticeFindingList = {
+    /**
+     * Target entity ID
+     */
+    artifactId: number;
+    /**
+     * Target type (e.g. PULL_REQUEST)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * When the finding was detected
+     */
+    detectedAt: Date;
+    /**
+     * Finding ID
+     */
+    id: string;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Severity level
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Finding title
+     */
+    title: string;
+    /**
+     * Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
+     */
+    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
+};
+
+/**
+ * Full practice finding detail including guidance and evidence
+ */
+export type PracticeFindingDetail = {
+    /**
+     * Target entity ID
+     */
+    artifactId: number;
+    /**
+     * Target type (e.g. PULL_REQUEST)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * When the finding was detected
+     */
+    detectedAt: Date;
+    /**
+     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
+     */
+    evidence?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Actionable guidance for the developer
+     */
+    guidance?: string;
+    /**
+     * Finding ID
+     */
+    id: string;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * AI reasoning behind the verdict
+     */
+    reasoning?: string;
+    /**
+     * Severity level
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Finding title
+     */
+    title: string;
+    /**
+     * Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
+     */
+    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
+};
+
+/**
  * A practice goal grouping related practices into a learning objective
  */
-export type PracticeGoal = {
+export type PracticeArea = {
     /**
      * Whether this goal is active
      */
@@ -1220,120 +1322,6 @@ export type PracticeGoal = {
 };
 
 /**
- * Practice finding summary for list views
- */
-export type PracticeFindingList = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Severity level
-     */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Target entity ID
-     */
-    targetId: number;
-    /**
-     * Target type (e.g. PULL_REQUEST)
-     */
-    targetType: 'PULL_REQUEST' | 'ISSUE';
-    /**
-     * Finding title
-     */
-    title: string;
-    /**
-     * Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
-     */
-    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
-};
-
-/**
- * Full practice finding detail including guidance and evidence
- */
-export type PracticeFindingDetail = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
-     */
-    evidence?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Actionable guidance for the contributor
-     */
-    guidance?: string;
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * AI reasoning behind the verdict
-     */
-    reasoning?: string;
-    /**
-     * Severity level
-     */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Target entity ID
-     */
-    targetId: number;
-    /**
-     * Target type (e.g. PULL_REQUEST)
-     */
-    targetType: 'PULL_REQUEST' | 'ISSUE';
-    /**
-     * Finding title
-     */
-    title: string;
-    /**
-     * Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
-     */
-    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
-};
-
-/**
  * Practice definition for evaluating developer contributions
  */
 export type Practice = {
@@ -1342,9 +1330,9 @@ export type Practice = {
      */
     active: boolean;
     /**
-     * Practice category
+     * Artifact this practice evaluates
      */
-    category?: string;
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Timestamp when the practice was created
      */
@@ -1353,10 +1341,6 @@ export type Practice = {
      * Practice evaluation criteria
      */
     criteria: string;
-    /**
-     * Artifact this practice evaluates
-     */
-    focusArtifact: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Slug of the practice goal this practice is bound to, if any
      */
@@ -1372,7 +1356,7 @@ export type Practice = {
     /**
      * Whether the practice is a desirable habit, an anti-pattern, or context-dependent
      */
-    polarity: 'DESIRABLE' | 'UNDESIRABLE' | 'MIXED';
+    polarity: 'DESIRABLE' | 'UNDESIRABLE' | 'CONTEXTUAL';
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
@@ -1838,7 +1822,7 @@ export type GitLabGroup = {
 };
 
 /**
- * Reaction engagement statistics for a contributor in a workspace
+ * Reaction engagement statistics for a developer in a workspace
  */
 export type FindingReactionEngagement = {
     /**
@@ -1856,7 +1840,7 @@ export type FindingReactionEngagement = {
 };
 
 /**
- * Contributor reaction to an AI-generated practice finding
+ * Developer reaction to an AI-generated practice finding
  */
 export type FindingReaction = {
     /**
@@ -1930,6 +1914,36 @@ export type ExportCreated = {
     status?: string;
 };
 
+/**
+ * Per-practice finding summary for a developer
+ */
+export type DeveloperPracticeSummary = {
+    /**
+     * Timestamp of most recent finding
+     */
+    lastFindingAt?: Date;
+    /**
+     * Number of NOT_OBSERVED findings
+     */
+    notObservedCount: number;
+    /**
+     * Number of OBSERVED findings
+     */
+    observedCount: number;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Total number of findings
+     */
+    totalFindings: number;
+};
+
 export type CurrentUserView = {
     accessTokenExpiresAt?: number;
     appRole?: string;
@@ -1994,17 +2008,13 @@ export type CreateWorkspaceRequest = {
  */
 export type CreatePracticeRequest = {
     /**
-     * Practice category
+     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
      */
-    category?: string;
+    artifactType?: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Practice evaluation criteria
      */
     criteria: string;
-    /**
-     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
-     */
-    focusArtifact?: 'PULL_REQUEST' | 'ISSUE';
     /**
      * Human-readable name
      */
@@ -2012,7 +2022,7 @@ export type CreatePracticeRequest = {
     /**
      * Whether the practice is a desirable habit, an anti-pattern, or context-dependent. Defaults to DESIRABLE when omitted.
      */
-    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'MIXED';
+    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'CONTEXTUAL';
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
@@ -2030,7 +2040,7 @@ export type CreatePracticeRequest = {
 /**
  * Request to create a new practice goal
  */
-export type CreatePracticeGoalRequest = {
+export type CreatePracticeAreaRequest = {
     /**
      * What this goal develops
      */
@@ -2132,40 +2142,6 @@ export type CreateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
-};
-
-/**
- * Per-practice finding summary for a contributor
- */
-export type ContributorPracticeSummary = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * Timestamp of most recent finding
-     */
-    lastFindingAt?: Date;
-    /**
-     * Number of NOT_OBSERVED findings
-     */
-    notObservedCount: number;
-    /**
-     * Number of OBSERVED findings
-     */
-    observedCount: number;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Total number of findings
-     */
-    totalFindings: number;
 };
 
 /**
@@ -2319,7 +2295,7 @@ export type ChatMessageVote = {
 /**
  * Request to bind a practice to a goal, or unbind it when goalSlug is null
  */
-export type BindPracticeGoalRequest = {
+export type BindPracticeAreaRequest = {
     /**
      * Slug of the goal to bind to, or null to unbind
      */
@@ -2385,7 +2361,7 @@ export type AiSettingsView = {
      */
     practicesEnabled: boolean;
     /**
-     * Effective: run practice review for all contributors
+     * Effective: run practice review for all developers
      */
     runForAllUsers: boolean;
     /**
@@ -4202,13 +4178,13 @@ export type ListGoalsResponses = {
     /**
      * Goals returned
      */
-    200: Array<PracticeGoal>;
+    200: Array<PracticeArea>;
 };
 
 export type ListGoalsResponse = ListGoalsResponses[keyof ListGoalsResponses];
 
 export type CreateGoalData = {
-    body: CreatePracticeGoalRequest;
+    body: CreatePracticeAreaRequest;
     path: {
         /**
          * Workspace slug
@@ -4230,13 +4206,13 @@ export type CreateGoalResponses = {
     /**
      * Goal created
      */
-    201: PracticeGoal;
+    201: PracticeArea;
 };
 
 export type CreateGoalResponse = CreateGoalResponses[keyof CreateGoalResponses];
 
 export type ReorderGoalsData = {
-    body: ReorderPracticeGoalsRequest;
+    body: ReorderPracticeAreasRequest;
     path: {
         /**
          * Workspace slug
@@ -4258,7 +4234,7 @@ export type ReorderGoalsResponses = {
     /**
      * Goals reordered; the full ordered list is returned
      */
-    200: Array<PracticeGoal>;
+    200: Array<PracticeArea>;
 };
 
 export type ReorderGoalsResponse = ReorderGoalsResponses[keyof ReorderGoalsResponses];
@@ -4316,13 +4292,13 @@ export type GetGoalResponses = {
     /**
      * Goal returned
      */
-    200: PracticeGoal;
+    200: PracticeArea;
 };
 
 export type GetGoalResponse = GetGoalResponses[keyof GetGoalResponses];
 
 export type UpdateGoalData = {
-    body: UpdatePracticeGoalRequest;
+    body: UpdatePracticeAreaRequest;
     path: {
         /**
          * Workspace slug
@@ -4345,7 +4321,7 @@ export type UpdateGoalResponses = {
     /**
      * Goal updated
      */
-    200: PracticeGoal;
+    200: PracticeArea;
 };
 
 export type UpdateGoalResponse = UpdateGoalResponses[keyof UpdateGoalResponses];
@@ -4359,10 +4335,6 @@ export type ListPracticesData = {
         workspaceSlug: string;
     };
     query?: {
-        /**
-         * Filter by practice category
-         */
-        category?: string;
         /**
          * Filter by active state
          */
@@ -4499,7 +4471,7 @@ export type GetSummaryResponses = {
     /**
      * Practice summaries returned
      */
-    200: Array<ContributorPracticeSummary>;
+    200: Array<DeveloperPracticeSummary>;
 };
 
 export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
@@ -4585,7 +4557,7 @@ export type SubmitReactionErrors = {
      */
     400: unknown;
     /**
-     * Current user is not the finding's contributor
+     * Current user is not the finding's developer
      */
     403: unknown;
     /**
@@ -4720,7 +4692,7 @@ export type SetActiveResponses = {
 export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
 
 export type BindGoalData = {
-    body: BindPracticeGoalRequest;
+    body: BindPracticeAreaRequest;
     path: {
         /**
          * Workspace slug

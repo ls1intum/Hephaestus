@@ -30,10 +30,6 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
-    @Size(max = 64, message = "Category must be at most 64 characters")
-    @Schema(description = "Practice category", example = "code-quality")
-    String category,
-
     @NotNull(message = "Trigger events are required")
     @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
     @ValidTriggerEvents
@@ -57,7 +53,7 @@ public record CreatePracticeRequestDTO(
         example = "PULL_REQUEST"
     )
     @Nullable
-    WorkArtifact focusArtifact,
+    WorkArtifact artifactType,
 
     @Schema(
         description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent." +

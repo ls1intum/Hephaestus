@@ -16,7 +16,7 @@ public sealed interface ContextRequest
     permits ContextRequest.PracticeReviewRequest, ContextRequest.IssueReviewRequest, ContextRequest.MentorChatRequest
 {
     /**
-     * Build the materialised PR-review context: metadata, comments, diff, contributor history.
+     * Build the materialised PR-review context: metadata, comments, diff, developer history.
      * Carries the {@link AgentJob} the practice runner will execute.
      */
     record PracticeReviewRequest(AgentJob job) implements ContextRequest {
@@ -38,21 +38,21 @@ public sealed interface ContextRequest
     /**
      * Build the materialised mentor-chat context: user activity, workspace aspect, practice
      * catalog, findings history. There is no {@link AgentJob} — mentor chat is synchronous
-     * and runs against a long-lived interactive sandbox keyed by {@code (workspaceId, contributorId)}.
+     * and runs against a long-lived interactive sandbox keyed by {@code (workspaceId, developerId)}.
      *
      * @param workspaceId   workspace scoping for every aspect provider's queries
-     * @param contributorId the active user (sometimes called {@code userId}) the aspects describe
+     * @param developerId the active user (sometimes called {@code userId}) the aspects describe
      * @param threadId      conversation thread the request originated from (used by providers
      *                      that need per-thread cache keys)
      */
-    record MentorChatRequest(long workspaceId, long contributorId, UUID threadId) implements ContextRequest {
+    record MentorChatRequest(long workspaceId, long developerId, UUID threadId) implements ContextRequest {
         public MentorChatRequest {
             Objects.requireNonNull(threadId, "threadId must not be null");
             if (workspaceId <= 0) {
                 throw new IllegalArgumentException("workspaceId must be positive, got " + workspaceId);
             }
-            if (contributorId <= 0) {
-                throw new IllegalArgumentException("contributorId must be positive, got " + contributorId);
+            if (developerId <= 0) {
+                throw new IllegalArgumentException("developerId must be positive, got " + developerId);
             }
         }
     }

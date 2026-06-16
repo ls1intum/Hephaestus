@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.List;
@@ -9,20 +9,20 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The cross-run change at a review target (ADR 0021, A1) — for each stable {@code correlation_key} locus,
+ * The cross-run change at a review target (ADR 0021, A1) — for each stable {@code finding_fingerprint} locus,
  * how it moved between the prior review run and the current one. This is the measurement primitive the
  * research question ("do practices change over time?") reads, and the substrate the delivery layer renders
  * as a progress-delta footer (B3) and "Resolved since last review" lines (B1), and that the re-review
  * notification (A4) consults to decide whether anything actually changed.
  *
  * <p>Carries NO rendered prose — rendering belongs to {@code DeliveryComposer}. A locus is identified by
- * its {@code correlation_key} (the (practice, target, subject, file) locus, commit b2891d971), which is
+ * its {@code finding_fingerprint} (the (practice, target, subject, file) locus, commit b2891d971), which is
  * stable across the non-deterministic detector, so "the same concern recurring" is observable even when the
  * LLM re-words its title every run.
  */
 public record TrendDelta(
-    WorkArtifact targetType,
-    @Nullable Long targetId,
+    WorkArtifact artifactType,
+    @Nullable Long artifactId,
     UUID currentRunJobId,
     UUID priorRunJobId,
     Instant currentRunAt,
@@ -53,12 +53,12 @@ public record TrendDelta(
      * is null for NEW.
      */
     public record LocusTransition(
-        String correlationKey,
+        String findingFingerprint,
         TransitionStatus status,
         String practiceSlug,
         @Nullable String title,
-        @Nullable Verdict priorVerdict,
-        @Nullable Verdict currentVerdict,
+        @Nullable Observation priorVerdict,
+        @Nullable Observation currentVerdict,
         @Nullable Severity currentSeverity,
         @Nullable Float currentConfidence
     ) {}

@@ -25,7 +25,7 @@ import org.hibernate.annotations.Immutable;
  * <p>Where a {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding} is the raw, audience-neutral
  * observation an agent made, a {@code Feedback} is the author-facing (or reviewer-facing) <em>delivery</em> of
  * one or more of those findings: it carries the rendered body, the surface it was placed on, the synthesis
- * provenance, and its delivery {@link FeedbackState}. Findings are linked through the {@code FeedbackFinding}
+ * provenance, and its delivery {@link FeedbackDeliveryState}. Findings are linked through the {@code FeedbackFinding}
  * join and physically placed through {@code FeedbackPlacement} rows — see ADR 0021 (findings↔feedback synthesis seam).
  *
  * <p>Append-only for research-data integrity: a re-run that re-synthesises the same delivery unit inserts a new
@@ -40,8 +40,8 @@ import org.hibernate.annotations.Immutable;
  * <p>Follows the {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding} pattern: {@code @Immutable},
  * UUID PK assigned in {@code @PrePersist}, snake_case columns, string-stored enums.
  *
- * @see FeedbackState for the delivery lifecycle
- * @see FeedbackSurface for the destination class
+ * @see FeedbackDeliveryState for the delivery lifecycle
+ * @see FeedbackChannel for the destination class
  * @see FeedbackOrigin for who authored the unit
  */
 @Entity
@@ -55,8 +55,8 @@ import org.hibernate.annotations.Immutable;
         @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
         @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
-        @Index(name = "idx_feedback_target", columnList = "target_type, target_id"),
-        @Index(name = "idx_feedback_continuity", columnList = "continuity_key"),
+        @Index(name = "idx_feedback_target", columnList = "artifact_type, artifact_id"),
+        @Index(name = "idx_feedback_continuity", columnList = "feedback_thread_key"),
     }
 )
 @Getter
@@ -100,12 +100,12 @@ public class Feedback {
      * dashboard or a facilitator digest are not anchored to a single artifact.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "target_type", length = 32)
-    private WorkArtifact targetType;
+    @Column(name = "artifact_type", length = 32)
+    private WorkArtifact artifactType;
 
-    /** External id of the target artifact (PR/issue). Nullable in lockstep with {@link #targetType}. */
-    @Column(name = "target_id")
-    private Long targetId;
+    /** External id of the target artifact (PR/issue). Nullable in lockstep with {@link #artifactType}. */
+    @Column(name = "artifact_id")
+    private Long artifactId;
 
     /**
      * The user this feedback is delivered to. Raw {@code Long} (not {@code @ManyToOne}) to avoid a cycle into the
@@ -126,7 +126,7 @@ public class Feedback {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "surface", nullable = false, length = 32)
-    private FeedbackSurface surface;
+    private FeedbackChannel surface;
 
     /**
      * 0-based position of this unit within its producing job's output. Pairs with {@code agent_job_id} to form
@@ -139,8 +139,8 @@ public class Feedback {
     /** Delivery lifecycle state (prepared → delivered / superseded / suppressed / failed). */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "state", nullable = false, length = 16)
-    private FeedbackState state;
+    @Column(name = "delivery_state", nullable = false, length = 16)
+    private FeedbackDeliveryState deliveryState;
 
     /** Why a unit was withheld, when {@link #state} is {@code SUPPRESSED}. Null otherwise. */
     @Enumerated(EnumType.STRING)
@@ -181,8 +181,8 @@ public class Feedback {
      * Cross-run continuity identity tying together successive deliveries of “the same” feedback as it evolves,
      * independent of which job produced it. Indexed for chain lookups. Null when continuity is not tracked.
      */
-    @Column(name = "continuity_key", length = 64)
-    private String continuityKey;
+    @Column(name = "feedback_thread_key", length = 64)
+    private String feedbackThreadKey;
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)

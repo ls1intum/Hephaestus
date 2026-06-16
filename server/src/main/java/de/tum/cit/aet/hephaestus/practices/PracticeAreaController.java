@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeGoalRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGoalDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGoalsRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeGoalRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -45,28 +45,28 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Tag(name = "Practice Goals", description = "Manage practice goals")
 @RequiredArgsConstructor
 @Validated
-public class PracticeGoalController {
+public class PracticeAreaController {
 
-    private final PracticeGoalService goalService;
+    private final PracticeAreaService goalService;
 
     @GetMapping
     @Operation(summary = "List practice goals", description = "Returns the workspace's practice goals")
     @ApiResponse(
         responseCode = "200",
         description = "Goals returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeGoalDTO.class)))
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaDTO.class)))
     )
     @SecurityRequirements
-    public ResponseEntity<List<PracticeGoalDTO>> listGoals(
+    public ResponseEntity<List<PracticeAreaDTO>> listGoals(
         WorkspaceContext workspaceContext,
         @RequestParam(name = "activeOnly", required = false) @Parameter(
             description = "Return only active goals"
         ) Boolean activeOnly
     ) {
-        List<PracticeGoalDTO> goals = goalService
+        List<PracticeAreaDTO> goals = goalService
             .listGoals(workspaceContext, activeOnly)
             .stream()
-            .map(PracticeGoalDTO::from)
+            .map(PracticeAreaDTO::from)
             .toList();
         return ResponseEntity.ok(goals);
     }
@@ -76,7 +76,7 @@ public class PracticeGoalController {
     @ApiResponse(
         responseCode = "200",
         description = "Goal returned",
-        content = @Content(schema = @Schema(implementation = PracticeGoalDTO.class))
+        content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
     )
     @ApiResponse(
         responseCode = "404",
@@ -84,8 +84,8 @@ public class PracticeGoalController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @SecurityRequirements
-    public ResponseEntity<PracticeGoalDTO> getGoal(WorkspaceContext workspaceContext, @PathVariable String goalSlug) {
-        return ResponseEntity.ok(PracticeGoalDTO.from(goalService.getGoal(workspaceContext, goalSlug)));
+    public ResponseEntity<PracticeAreaDTO> getGoal(WorkspaceContext workspaceContext, @PathVariable String goalSlug) {
+        return ResponseEntity.ok(PracticeAreaDTO.from(goalService.getGoal(workspaceContext, goalSlug)));
     }
 
     @PostMapping
@@ -93,7 +93,7 @@ public class PracticeGoalController {
     @ApiResponse(
         responseCode = "201",
         description = "Goal created",
-        content = @Content(schema = @Schema(implementation = PracticeGoalDTO.class))
+        content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
     )
     @ApiResponse(
         responseCode = "409",
@@ -101,11 +101,11 @@ public class PracticeGoalController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeGoalDTO> createGoal(
+    public ResponseEntity<PracticeAreaDTO> createGoal(
         WorkspaceContext workspaceContext,
-        @Valid @RequestBody CreatePracticeGoalRequestDTO request
+        @Valid @RequestBody CreatePracticeAreaRequestDTO request
     ) {
-        PracticeGoal goal = goalService.createGoal(
+        PracticeArea goal = goalService.createGoal(
             workspaceContext,
             request.slug(),
             request.name(),
@@ -116,7 +116,7 @@ public class PracticeGoalController {
             .path("/{slug}")
             .buildAndExpand(goal.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(PracticeGoalDTO.from(goal));
+        return ResponseEntity.created(location).body(PracticeAreaDTO.from(goal));
     }
 
     @PatchMapping("/{goalSlug}")
@@ -124,7 +124,7 @@ public class PracticeGoalController {
     @ApiResponse(
         responseCode = "200",
         description = "Goal updated",
-        content = @Content(schema = @Schema(implementation = PracticeGoalDTO.class))
+        content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
     )
     @ApiResponse(
         responseCode = "404",
@@ -132,12 +132,12 @@ public class PracticeGoalController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeGoalDTO> updateGoal(
+    public ResponseEntity<PracticeAreaDTO> updateGoal(
         WorkspaceContext workspaceContext,
         @PathVariable String goalSlug,
-        @Valid @RequestBody UpdatePracticeGoalRequestDTO request
+        @Valid @RequestBody UpdatePracticeAreaRequestDTO request
     ) {
-        PracticeGoal goal = goalService.updateGoal(
+        PracticeArea goal = goalService.updateGoal(
             workspaceContext,
             goalSlug,
             request.name(),
@@ -147,7 +147,7 @@ public class PracticeGoalController {
         if (request.active() != null) {
             goal = goalService.setActive(workspaceContext, goalSlug, request.active());
         }
-        return ResponseEntity.ok(PracticeGoalDTO.from(goal));
+        return ResponseEntity.ok(PracticeAreaDTO.from(goal));
     }
 
     @PatchMapping("/reorder")
@@ -158,7 +158,7 @@ public class PracticeGoalController {
     @ApiResponse(
         responseCode = "200",
         description = "Goals reordered; the full ordered list is returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeGoalDTO.class)))
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaDTO.class)))
     )
     @ApiResponse(
         responseCode = "404",
@@ -166,15 +166,15 @@ public class PracticeGoalController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<List<PracticeGoalDTO>> reorderGoals(
+    public ResponseEntity<List<PracticeAreaDTO>> reorderGoals(
         WorkspaceContext workspaceContext,
-        @Valid @RequestBody ReorderPracticeGoalsRequestDTO request
+        @Valid @RequestBody ReorderPracticeAreasRequestDTO request
     ) {
         goalService.reorder(workspaceContext, request.orderedSlugs());
-        List<PracticeGoalDTO> goals = goalService
+        List<PracticeAreaDTO> goals = goalService
             .listGoals(workspaceContext, null)
             .stream()
-            .map(PracticeGoalDTO::from)
+            .map(PracticeAreaDTO::from)
             .toList();
         return ResponseEntity.ok(goals);
     }

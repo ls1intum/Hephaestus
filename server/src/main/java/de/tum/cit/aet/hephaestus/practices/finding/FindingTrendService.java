@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.Loc
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Computes the cross-run {@link TrendDelta} for a review target by diffing the two most-recent review runs
- * at the {@code correlation_key} locus grain (ADR 0021, A1). This is the READ side of the behavior-change
- * loop — the write side ({@code correlation_key} on every finding) has existed since C2, but nothing read
+ * at the {@code finding_fingerprint} locus grain (ADR 0021, A1). This is the READ side of the behavior-change
+ * loop — the write side ({@code finding_fingerprint} on every finding) has existed since C2, but nothing read
  * it back, so "did the practice at this locus resolve, persist, or recur?" had no answer. This service is
  * that answer, and the substrate the delivery layer renders (B1/B3) and the re-review notification (A4)
  * consults.
@@ -41,10 +41,10 @@ public class FindingTrendService {
      * when fewer than two runs exist — the first review has nothing to trend against.
      */
     @Transactional(readOnly = true)
-    public Optional<TrendDelta> computeForTarget(WorkArtifact targetType, Long targetId, Long workspaceId) {
+    public Optional<TrendDelta> computeForTarget(WorkArtifact artifactType, Long artifactId, Long workspaceId) {
         List<RunRef> runs = practiceFindingRepository.findRecentRunRefsForTarget(
-            targetType,
-            targetId,
+            artifactType,
+            artifactId,
             workspaceId,
             PageRequest.of(0, 2)
         );
@@ -59,8 +59,8 @@ public class FindingTrendService {
         );
         return Optional.of(
             new TrendDelta(
-                targetType,
-                targetId,
+                artifactType,
+                artifactId,
                 curr.getAgentJobId(),
                 prev.getAgentJobId(),
                 curr.getRunAt(),
@@ -82,8 +82,8 @@ public class FindingTrendService {
     }
 
     /**
-     * Diff two runs' loci. Each run is collapsed to one representative finding per correlation_key (a run can
-     * emit the same locus twice — CorrelationKey deliberately collapses two findings of one practice in one
+     * Diff two runs' loci. Each run is collapsed to one representative finding per finding_fingerprint (a run can
+     * emit the same locus twice — FindingFingerprint deliberately collapses two findings of one practice in one
      * file); the representative is the highest-severity, then highest-confidence, finding so the rendered
      * severity is the worst the run saw.
      */
@@ -112,7 +112,8 @@ public class FindingTrendService {
                 // present in both — PERSISTED, unless it backslid OBSERVED→NOT_OBSERVED (REGRESSED).
                 // NOT_OBSERVED→OBSERVED is an IMPROVEMENT, not a regression: it stays PERSISTED but currentVerdict
                 // carries OBSERVED so B1 can render "now satisfied".
-                boolean regressed = prior.getVerdict() == Verdict.OBSERVED && curr.getVerdict() == Verdict.NOT_OBSERVED;
+                boolean regressed =
+                    prior.getVerdict() == Observation.OBSERVED && curr.getVerdict() == Observation.NOT_OBSERVED;
                 TransitionStatus status = regressed ? TransitionStatus.REGRESSED : TransitionStatus.PERSISTED;
                 transitions.add(transition(key, status, curr, prior.getVerdict(), curr.getVerdict()));
             }
@@ -120,7 +121,7 @@ public class FindingTrendService {
         transitions.sort(
             Comparator.comparingInt((LocusTransition t) -> statusOrder(t.status()))
                 .thenComparing(t -> t.currentSeverity() == null ? Integer.MAX_VALUE : t.currentSeverity().ordinal())
-                .thenComparing(LocusTransition::correlationKey)
+                .thenComparing(LocusTransition::findingFingerprint)
         );
         return transitions;
     }
@@ -129,8 +130,8 @@ public class FindingTrendService {
         String key,
         TransitionStatus status,
         LocusFinding represent,
-        Verdict priorVerdict,
-        Verdict currentVerdict
+        Observation priorVerdict,
+        Observation currentVerdict
     ) {
         return new LocusTransition(
             key,
@@ -144,11 +145,11 @@ public class FindingTrendService {
         );
     }
 
-    /** Collapse a run to one representative finding per correlation_key (worst severity, then highest confidence). */
+    /** Collapse a run to one representative finding per finding_fingerprint (worst severity, then highest confidence). */
     private static Map<String, LocusFinding> collapse(List<LocusFinding> run) {
         Map<String, LocusFinding> map = new LinkedHashMap<>();
         for (LocusFinding lf : run) {
-            map.merge(lf.getCorrelationKey(), lf, FindingTrendService::worse);
+            map.merge(lf.getFindingFingerprint(), lf, FindingTrendService::worse);
         }
         return map;
     }

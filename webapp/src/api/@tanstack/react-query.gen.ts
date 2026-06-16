@@ -1700,7 +1700,7 @@ export const listPracticesQueryKey = (options: Options<ListPracticesData>) => cr
 /**
  * List practice definitions
  *
- * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
+ * Returns all practice definitions for the workspace, optionally filtered by active state
  */
 export const listPracticesOptions = (options: Options<ListPracticesData>) => queryOptions<ListPracticesResponse, DefaultError, ListPracticesResponse, ReturnType<typeof listPracticesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1737,7 +1737,7 @@ export const listFindingsQueryKey = (options: Options<ListFindingsData>) => crea
 /**
  * List findings for current user
  *
- * Paginated findings for the authenticated contributor with optional filters
+ * Paginated findings for the authenticated developer with optional filters
  */
 export const listFindingsOptions = (options: Options<ListFindingsData>) => queryOptions<ListFindingsResponse, DefaultError, ListFindingsResponse, ReturnType<typeof listFindingsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1757,7 +1757,7 @@ export const listFindingsInfiniteQueryKey = (options: Options<ListFindingsData>)
 /**
  * List findings for current user
  *
- * Paginated findings for the authenticated contributor with optional filters
+ * Paginated findings for the authenticated developer with optional filters
  */
 export const listFindingsInfiniteOptions = (options: Options<ListFindingsData>) => infiniteQueryOptions<ListFindingsResponse, DefaultError, InfiniteData<ListFindingsResponse>, QueryKey<Options<ListFindingsData>>, number | Pick<QueryKey<Options<ListFindingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
 // @ts-ignore
@@ -1882,7 +1882,7 @@ export const getLatestReactionOptions = (options: Options<GetLatestReactionData>
 /**
  * Submit a reaction to a practice finding
  *
- * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
+ * Records the developer's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */
 export const submitReactionMutation = (options?: Partial<Options<SubmitReactionData>>): UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> => {
     const mutationOptions: UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> = {

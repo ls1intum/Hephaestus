@@ -19,7 +19,7 @@ class ContextRequestTest extends BaseUnitTest {
         UUID threadId = UUID.randomUUID();
         MentorChatRequest req = new MentorChatRequest(1L, 2L, threadId);
         assertThat(req.workspaceId()).isEqualTo(1L);
-        assertThat(req.contributorId()).isEqualTo(2L);
+        assertThat(req.developerId()).isEqualTo(2L);
         assertThat(req.threadId()).isEqualTo(threadId);
 
         assertThatThrownBy(() -> new MentorChatRequest(0L, 2L, threadId))
@@ -27,7 +27,7 @@ class ContextRequestTest extends BaseUnitTest {
             .hasMessageContaining("workspaceId");
         assertThatThrownBy(() -> new MentorChatRequest(1L, 0L, threadId))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("contributorId");
+            .hasMessageContaining("developerId");
         assertThatThrownBy(() -> new MentorChatRequest(1L, 2L, null)).isInstanceOf(NullPointerException.class);
     }
 }

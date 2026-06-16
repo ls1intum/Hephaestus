@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ClipboardList } from "lucide-react";
-import type { Practice, PracticeGoal } from "@/api/types.gen";
+import type { Practice, PracticeArea } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PracticeCard } from "./PracticeCard";
@@ -8,7 +8,7 @@ import { PracticeCard } from "./PracticeCard";
 interface PracticeCardListProps {
 	workspaceSlug: string;
 	practices: Practice[];
-	goals: PracticeGoal[];
+	goals: PracticeArea[];
 	isLoading: boolean;
 	togglingPractices: Set<string>;
 	onDelete: (practice: Practice) => void;

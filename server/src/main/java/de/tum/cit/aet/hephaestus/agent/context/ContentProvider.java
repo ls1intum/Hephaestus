@@ -10,7 +10,7 @@ import java.util.Map;
  *
  * <p><strong>The admission test is PROVENANCE, not usefulness.</strong> A byte qualifies as integration
  * content iff it (a) lives in SQL / the integration's API object graph (for SCM: the PR/issue object, its
- * comments, the computed two-ref diff, review-decision + thread rows, resolved linked-issue rows, contributor
+ * comments, the computed two-ref diff, review-decision + thread rows, resolved linked-issue rows, developer
  * history) AND (b) is absent from the read-only worktree the sandbox already mounts at
  * {@code inputs/sources/scm/repo}. If a grep / JGit walk over that mount, or a parse of {@code diff.patch},
  * reproduces it, it is NOT integration content — it is downstream Transform.

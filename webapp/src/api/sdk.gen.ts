@@ -845,7 +845,7 @@ export const updateGoal = <ThrowOnError extends boolean = false>(options: Option
 /**
  * List practice definitions
  *
- * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
+ * Returns all practice definitions for the workspace, optionally filtered by active state
  */
 export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices', ...options });
 
@@ -865,7 +865,7 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 /**
  * List findings for current user
  *
- * Paginated findings for the authenticated contributor with optional filters
+ * Paginated findings for the authenticated developer with optional filters
  */
 export const listFindings = <ThrowOnError extends boolean = false>(options: Options<ListFindingsData, ThrowOnError>) => (options.client ?? client).get<ListFindingsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings', ...options });
 
@@ -913,7 +913,7 @@ export const getLatestReaction = <ThrowOnError extends boolean = false>(options:
 /**
  * Submit a reaction to a practice finding
  *
- * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
+ * Records the developer's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */
 export const submitReaction = <ThrowOnError extends boolean = false>(options: Options<SubmitReactionData, ThrowOnError>) => (options.client ?? client).post<SubmitReactionResponses, SubmitReactionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

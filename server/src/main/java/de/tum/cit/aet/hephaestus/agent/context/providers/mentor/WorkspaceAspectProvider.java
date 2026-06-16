@@ -41,7 +41,7 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code waitingDays}). The workspace-shape lives in this single aspect so the agent has
  * the per-tenant context it needs in one read.
  *
- * <p>Cache key: {@code workspaceId + ":" + contributorId} — the data is per-user per-workspace.
+ * <p>Cache key: {@code workspaceId + ":" + developerId} — the data is per-user per-workspace.
  */
 @Component
 @RequiredArgsConstructor
@@ -84,12 +84,12 @@ public class WorkspaceAspectProvider implements ContentProvider {
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
-        String key = req.workspaceId() + ":" + req.contributorId();
+        String key = req.workspaceId() + ":" + req.developerId();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
-            : buildPayload(req.workspaceId(), req.contributorId());
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+            : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -97,11 +97,11 @@ public class WorkspaceAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
-    public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
+    /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
+    public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(contributorId)
-            .orElseThrow(() -> new EntityNotFoundException("User", contributorId.toString()));
+            .findById(developerId)
+            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
@@ -119,14 +119,14 @@ public class WorkspaceAspectProvider implements ContentProvider {
         // the cache loader's generic "could not be loaded" wrapper.
         guarded(
             "recentSessions",
-            () -> addRecentSessions(root, workspaceId, contributorId),
+            () -> addRecentSessions(root, workspaceId, developerId),
             () -> root.putArray("recentSessions")
         );
         List<PullRequest> reviewPrs = guardedQuery("pendingReviewRequests", () ->
-            queryRepository.findPendingReviewRequestPrs(workspaceId, contributorId)
+            queryRepository.findPendingReviewRequestPrs(workspaceId, developerId)
         );
         List<Issue> assigned = guardedQuery("assignedIssues", () ->
-            queryRepository.findAssignedOpenIssues(workspaceId, contributorId)
+            queryRepository.findAssignedOpenIssues(workspaceId, developerId)
         );
         guarded("assignedIssues", () -> addAssignedIssues(root, assigned), () -> root.putArray("assignedIssues"));
         guarded(
@@ -167,12 +167,12 @@ public class WorkspaceAspectProvider implements ContentProvider {
         }
     }
 
-    private void addRecentSessions(ObjectNode root, Long workspaceId, Long contributorId) {
+    private void addRecentSessions(ObjectNode root, Long workspaceId, Long developerId) {
         // DB-side LIMIT via Pageable: previously the query returned every thread the user had
         // ever opened (power users hit 100s) and we trimmed in-memory; ship the cap as SQL.
         List<ChatThread> threads = queryRepository.findRecentChatThreads(
             workspaceId,
-            contributorId,
+            developerId,
             org.springframework.data.domain.PageRequest.of(0, MAX_RECENT_SESSIONS)
         );
         ArrayNode arr = root.putArray("recentSessions");

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -17,18 +17,17 @@ import tools.jackson.databind.JsonNode;
  * and structured evidence that are omitted from the list view.
  *
  * <p>Intentionally omits internal fields: {@code agentJobId}, {@code idempotencyKey},
- * and raw {@code contributorId}.
+ * and raw {@code developerId}.
  */
 @Schema(description = "Full practice finding detail including guidance and evidence")
 public record PracticeFindingDetailDTO(
     @NonNull @Schema(description = "Finding ID") UUID id,
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
-    @Nullable @Schema(description = "Practice category") String category,
-    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact targetType,
-    @NonNull @Schema(description = "Target entity ID") Long targetId,
+    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
+    @NonNull @Schema(description = "Target entity ID") Long artifactId,
     @NonNull @Schema(description = "Finding title") String title,
-    @NonNull @Schema(description = "Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Verdict verdict,
+    @NonNull @Schema(description = "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Observation verdict,
     @NonNull @Schema(description = "Severity level") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @Nullable
@@ -37,7 +36,7 @@ public record PracticeFindingDetailDTO(
     )
     Map<String, Object> evidence,
     @Nullable @Schema(description = "AI reasoning behind the verdict") String reasoning,
-    @Nullable @Schema(description = "Actionable guidance for the contributor") String guidance,
+    @Nullable @Schema(description = "Actionable guidance for the developer") String guidance,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
     public static PracticeFindingDetailDTO from(PracticeFinding f, tools.jackson.databind.ObjectMapper mapper) {
@@ -46,9 +45,8 @@ public record PracticeFindingDetailDTO(
             f.getId(),
             practice.getSlug(),
             practice.getName(),
-            practice.getCategory(),
-            f.getTargetType(),
-            f.getTargetId(),
+            f.getArtifactType(),
+            f.getArtifactId(),
             f.getTitle(),
             f.getVerdict(),
             f.getSeverity(),

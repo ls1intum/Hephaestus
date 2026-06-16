@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeGoalRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGoalDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGoalsRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeGoalRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -25,7 +25,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * Access-control coverage for {@link PracticeGoalController}.
+ * Access-control coverage for {@link PracticeAreaController}.
  *
  * <p>Read operations are annotated {@code @SecurityRequirements} (any workspace member); the four
  * mutating operations (create / update / reorder / delete) are {@code @RequireAtLeastWorkspaceAdmin}.
@@ -33,7 +33,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * reads, and that anonymous callers are rejected. Functional CRUD behaviour for the bind endpoint
  * lives on {@code PracticeCatalogControllerIntegrationTest}.
  */
-class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
+class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String BASE_URI = "/workspaces/{workspaceSlug}/practice-goals";
 
@@ -41,7 +41,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
     private WebTestClient webTestClient;
 
     @Autowired
-    private PracticeGoalRepository goalRepository;
+    private PracticeAreaRepository goalRepository;
 
     private Workspace workspace;
 
@@ -51,16 +51,16 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
         workspace = createWorkspace("goal-ws", "Goal WS", "goal-org", AccountType.ORG, owner);
     }
 
-    private PracticeGoal persistGoal(String slug, String name) {
-        PracticeGoal goal = new PracticeGoal();
+    private PracticeArea persistGoal(String slug, String name) {
+        PracticeArea goal = new PracticeArea();
         goal.setWorkspace(workspace);
         goal.setSlug(slug);
         goal.setName(name);
         return goalRepository.save(goal);
     }
 
-    private CreatePracticeGoalRequestDTO validCreateRequest(String slug) {
-        return new CreatePracticeGoalRequestDTO(slug, "Goal " + slug, "Develops " + slug, null);
+    private CreatePracticeAreaRequestDTO validCreateRequest(String slug) {
+        return new CreatePracticeAreaRequestDTO(slug, "Goal " + slug, "Develops " + slug, null);
     }
 
     /** Registers the current {@code @WithMentorUser} principal as a plain workspace MEMBER. */
@@ -211,7 +211,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
             asMember();
             persistGoal("forbidden-update", "Original");
 
-            var request = new UpdatePracticeGoalRequestDTO("Hacked Name", null, null, null);
+            var request = new UpdatePracticeAreaRequestDTO("Hacked Name", null, null, null);
 
             webTestClient
                 .patch()
@@ -223,7 +223,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .expectStatus()
                 .isForbidden();
 
-            PracticeGoal persisted = goalRepository
+            PracticeArea persisted = goalRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "forbidden-update")
                 .orElseThrow();
             assertThat(persisted.getName()).isEqualTo("Original");
@@ -232,7 +232,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            var request = new UpdatePracticeGoalRequestDTO("Name", null, null, null);
+            var request = new UpdatePracticeAreaRequestDTO("Name", null, null, null);
 
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
@@ -262,7 +262,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
             persistGoal("first", "First");
             persistGoal("second", "Second");
 
-            var request = new ReorderPracticeGoalsRequestDTO(List.of("second", "first"));
+            var request = new ReorderPracticeAreasRequestDTO(List.of("second", "first"));
 
             webTestClient
                 .patch()
@@ -295,7 +295,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
             persistGoal("first", "First");
             persistGoal("second", "Second");
 
-            var request = new ReorderPracticeGoalsRequestDTO(List.of("second", "first"));
+            var request = new ReorderPracticeAreasRequestDTO(List.of("second", "first"));
 
             webTestClient
                 .patch()
@@ -311,7 +311,7 @@ class PracticeGoalControllerIntegrationTest extends AbstractWorkspaceIntegration
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            var request = new ReorderPracticeGoalsRequestDTO(List.of("first", "second"));
+            var request = new ReorderPracticeAreasRequestDTO(List.of("first", "second"));
 
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);

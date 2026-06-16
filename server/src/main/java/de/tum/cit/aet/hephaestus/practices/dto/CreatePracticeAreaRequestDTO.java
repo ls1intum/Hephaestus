@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * Request DTO for creating a new practice goal.
  */
 @Schema(description = "Request to create a new practice goal")
-public record CreatePracticeGoalRequestDTO(
+public record CreatePracticeAreaRequestDTO(
     @NotBlank(message = "Slug is required")
     @Size(min = 3, max = 64, message = "Slug must be between 3 and 64 characters")
     @Pattern(

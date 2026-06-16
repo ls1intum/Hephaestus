@@ -24,7 +24,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
-    List<Practice> findByWorkspaceIdAndActiveTrueAndFocusArtifact(Long workspaceId, WorkArtifact focusArtifact);
+    List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
     // Fetches the bound goal eagerly so PracticeDTO.from (which reads goal.slug) is safe to map
     // outside the transaction — open-in-view is disabled.
@@ -39,7 +39,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     /**
-     * Lists practices for a workspace with optional category and active filters.
+     * Lists practices for a workspace with an optional active filter.
      * Null filter values are ignored (match all).
      */
     @EntityGraph(attributePaths = "goal")
@@ -47,16 +47,11 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         """
         SELECT p FROM Practice p
         WHERE p.workspace.id = :workspaceId
-        AND (:category IS NULL OR p.category = :category)
         AND (:active IS NULL OR p.active = :active)
         ORDER BY p.name ASC
         """
     )
-    List<Practice> findByFilters(
-        @Param("workspaceId") Long workspaceId,
-        @Param("category") String category,
-        @Param("active") Boolean active
-    );
+    List<Practice> findByFilters(@Param("workspaceId") Long workspaceId, @Param("active") Boolean active);
 
     /** Deletes all practices for the workspace. Cascades to practice_finding via ON DELETE CASCADE. */
     @Modifying

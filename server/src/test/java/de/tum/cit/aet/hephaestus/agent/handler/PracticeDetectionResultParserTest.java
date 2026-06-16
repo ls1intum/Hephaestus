@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiscardedEntry;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ParseResult;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.InputStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,7 +159,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding f = result.validFindings().get(0);
             assertThat(f.practiceSlug()).isEqualTo("pr-description-quality");
             assertThat(f.title()).isEqualTo("Good PR description");
-            assertThat(f.verdict()).isEqualTo(Verdict.OBSERVED);
+            assertThat(f.verdict()).isEqualTo(Observation.OBSERVED);
             assertThat(f.severity()).isEqualTo(Severity.INFO);
             assertThat(f.confidence()).isEqualTo(0.95f);
         }
@@ -195,7 +195,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Verdict.NOT_APPLICABLE);
+            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Observation.NOT_APPLICABLE);
         }
 
         @Test
@@ -206,7 +206,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Verdict.OBSERVED);
+            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Observation.OBSERVED);
         }
 
         @Test
@@ -222,7 +222,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
         @Test
         void forwardVocabularyVerdicts() {
-            for (Verdict v : new Verdict[] { Verdict.OBSERVED, Verdict.NOT_OBSERVED }) {
+            for (Observation v : new Observation[] { Observation.OBSERVED, Observation.NOT_OBSERVED }) {
                 ObjectNode finding = validFindingNode();
                 finding.put("verdict", v.name());
 
@@ -688,16 +688,16 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // Verify first finding
             ValidatedFinding first = result.validFindings().get(0);
             assertThat(first.practiceSlug()).isEqualTo("pr-description-quality");
-            assertThat(first.verdict()).isEqualTo(Verdict.OBSERVED);
+            assertThat(first.verdict()).isEqualTo(Observation.OBSERVED);
 
             // Verify negative finding
             ValidatedFinding negative = result.validFindings().get(1);
-            assertThat(negative.verdict()).isEqualTo(Verdict.NOT_OBSERVED);
+            assertThat(negative.verdict()).isEqualTo(Observation.NOT_OBSERVED);
             assertThat(negative.severity()).isEqualTo(Severity.MAJOR);
 
             // Verify remaining verdicts
-            assertThat(result.validFindings().get(3).verdict()).isEqualTo(Verdict.OBSERVED);
-            assertThat(result.validFindings().get(4).verdict()).isEqualTo(Verdict.NOT_OBSERVED);
+            assertThat(result.validFindings().get(3).verdict()).isEqualTo(Observation.OBSERVED);
+            assertThat(result.validFindings().get(4).verdict()).isEqualTo(Observation.NOT_OBSERVED);
         }
     }
 }

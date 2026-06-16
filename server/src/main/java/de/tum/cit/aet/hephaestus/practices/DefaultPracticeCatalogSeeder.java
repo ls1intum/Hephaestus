@@ -41,17 +41,17 @@ class DefaultPracticeCatalogSeeder {
 
     private final boolean enabled;
     private final JsonMapper objectMapper;
-    private final PracticeGoalService goalService;
+    private final PracticeAreaService goalService;
     private final PracticeService practiceService;
-    private final PracticeGoalRepository goalRepository;
+    private final PracticeAreaRepository goalRepository;
     private final WorkspaceRepository workspaceRepository;
 
     DefaultPracticeCatalogSeeder(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
         JsonMapper objectMapper,
-        PracticeGoalService goalService,
+        PracticeAreaService goalService,
         PracticeService practiceService,
-        PracticeGoalRepository goalRepository,
+        PracticeAreaRepository goalRepository,
         WorkspaceRepository workspaceRepository
     ) {
         this.enabled = enabled;
@@ -120,7 +120,7 @@ class DefaultPracticeCatalogSeeder {
     private CreatePracticeRequestDTO toCreateRequest(JsonNode catalog, JsonNode practiceNode) {
         List<String> triggerEvents = new ArrayList<>();
         practiceNode.path("triggerEvents").forEach(t -> triggerEvents.add(t.asString()));
-        WorkArtifact focus = WorkArtifact.valueOf(practiceNode.path("focusArtifact").asString());
+        WorkArtifact focus = WorkArtifact.valueOf(practiceNode.path("artifactType").asString());
         // A practice may opt into a non-default preamble (e.g. the code-judging PULL_REQUEST_CODE contract
         // for practices that read the diff) via a "preamble" key; otherwise the focus name is the key.
         String preambleKey = text(practiceNode, "preamble");
@@ -129,13 +129,12 @@ class DefaultPracticeCatalogSeeder {
         }
         String slug = practiceNode.path("slug").asString();
         // Optional: a practice may declare itself an anti-pattern ("UNDESIRABLE") or context-dependent
-        // ("MIXED"); absent → null → the entity default DESIRABLE (every catalogued practice today).
+        // ("CONTEXTUAL"); absent → null → the entity default DESIRABLE (every catalogued practice today).
         String polarityText = text(practiceNode, "polarity");
         Polarity polarity = polarityText == null ? null : Polarity.valueOf(polarityText);
         return new CreatePracticeRequestDTO(
             slug,
             practiceNode.path("name").asString(),
-            null,
             triggerEvents,
             composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
             loadPrecomputeScript(slug),

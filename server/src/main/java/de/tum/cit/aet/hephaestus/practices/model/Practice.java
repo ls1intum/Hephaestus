@@ -52,7 +52,7 @@ import tools.jackson.databind.JsonNode;
     indexes = {
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
         // Goal-scoped reads (Reflection/Facilitator dashboards) join finding→practice→goal; index the FK.
-        @Index(name = "idx_practice_practice_goal", columnList = "practice_goal_id"),
+        @Index(name = "idx_practice_practice_goal", columnList = "practice_area_id"),
     }
 )
 @Getter
@@ -78,22 +78,19 @@ public class Practice {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
-    @Column(name = "category", length = 64)
-    private String category;
-
     /**
      * The artifact this practice targets (PR vs ISSUE). The discriminator that routes the trigger
      * gate, the case-context builder, the {@code AgentJobType}/handler, and the delivery surface.
      * NOT NULL; defaults to {@code PULL_REQUEST} for backward compatibility.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "focus_artifact", nullable = false, length = 32)
+    @Column(name = "artifact_type", nullable = false, length = 32)
     @ColumnDefault("'PULL_REQUEST'")
-    private WorkArtifact focusArtifact = WorkArtifact.PULL_REQUEST;
+    private WorkArtifact artifactType = WorkArtifact.PULL_REQUEST;
 
     /**
      * Whether this practice describes a desirable habit, an anti-pattern, or a context-dependent
-     * pattern. Supplies the good/bad direction that {@link Verdict} omits, so {@code OBSERVED} can
+     * pattern. Supplies the good/bad direction that {@link Observation} omits, so {@code OBSERVED} can
      * mean "strength" for one practice and "problem" for another (see ADR 0021, F-6). NOT NULL;
      * defaults to {@code DESIRABLE} — every catalogued practice today is a desirable habit.
      */
@@ -109,21 +106,21 @@ public class Practice {
      * defaults to {@code AUTHOR} — every catalogued practice today is author-side (zero backfill).
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "audience_role", nullable = false, length = 16)
+    @Column(name = "subject_role", nullable = false, length = 16)
     @ColumnDefault("'AUTHOR'")
-    private AudienceRole audienceRole = AudienceRole.AUTHOR;
+    private SubjectRole subjectRole = SubjectRole.AUTHOR;
 
     /**
-     * Optional {@link PracticeGoal} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
+     * Optional {@link PracticeArea} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
      * many practices; a practice belongs to at most one goal): the single owning bucket keeps the
      * per-goal acted-on/total progress denominator unambiguous. Do not loosen to a join table without
-     * also switching progress math to per-(goal, practice) rows. Orthogonal to {@link #category}.
+     * also switching progress math to per-(goal, practice) rows.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "practice_goal_id", foreignKey = @ForeignKey(name = "fk_practice_goal"))
+    @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_goal"))
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ToString.Exclude
-    private PracticeGoal goal;
+    private PracticeArea goal;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)

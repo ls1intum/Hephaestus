@@ -39,7 +39,7 @@ import org.hibernate.annotations.OnDeleteAction;
  * {@code @ManyToOne} association is used with DB-level {@code ON DELETE CASCADE}.
  *
  * @see Feedback for the feedback unit being placed
- * @see PlacementSurface for SUMMARY/INLINE/CONVERSATION_TURN
+ * @see PlacementSlot for SUMMARY/INLINE/CONVERSATION_TURN
  * @see PlacementPostedState for the posting lifecycle
  */
 @Entity
@@ -85,8 +85,8 @@ public class FeedbackPlacement {
     /** Where this placement renders: SUMMARY, INLINE, or CONVERSATION_TURN. */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "placement", length = 32, nullable = false)
-    private PlacementSurface placement;
+    @Column(name = "slot", length = 32, nullable = false)
+    private PlacementSlot slot;
 
     // --- Diff anchor coordinates (all nullable: only INLINE placements anchor to a diff) ---
 

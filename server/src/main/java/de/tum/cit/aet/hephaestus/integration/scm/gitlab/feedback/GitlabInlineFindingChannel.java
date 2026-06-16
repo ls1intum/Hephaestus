@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
  * time via {@code CreateDiffNote} (GitLab has no batch API). For positions outside the
  * diff hunk, falls back to a regular MR comment with {@code file:line} prefix.
  *
- * <p>Reconciles by {@code correlationKey} rather than clear-then-post: each finding's stable key is embedded
+ * <p>Reconciles by {@code findingFingerprint} rather than clear-then-post: each finding's stable key is embedded
  * in the note body as a hidden HTML tag, and before posting we read the MR's existing discussions
  * ({@code GetMergeRequestDiscussions}) and index this reviewer's own prior threads by that key. A finding whose
  * key matches a prior, non-human-replied thread is EDITED in place ({@code UpdateNote}) so a stable finding
@@ -64,7 +64,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
      * Hidden per-finding correlation tag embedded in a note body so a prior thread can be matched back to the
      * finding that produced it across re-runs. Distinct from the run-level {@code marker} (which identifies all
      * hephaestus notes for the zero-note clear path); both coexist in the body. The key is alnum/dash/underscore
-     * (a {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey} digest), so no escaping is needed.
+     * (a {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} digest), so no escaping is needed.
      */
     private static final Pattern CK_TAG = Pattern.compile("<!-- hephaestus-diff-note-ck=([A-Za-z0-9_-]+) -->");
 
@@ -150,7 +150,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 continue;
             }
 
-            String key = finding.correlationKey();
+            String key = finding.findingFingerprint();
             if (key != null) {
                 seenKeys.add(key);
             }
@@ -361,7 +361,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             }
             if (body.contains(marker)) {
                 botNoteId = noteId;
-                botKey = parseCorrelationKey(body);
+                botKey = parseFindingFingerprint(body);
             } else {
                 humanReplied = true; // a person (or other tool) participated in this thread
             }
@@ -390,7 +390,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     private static DeliveredSignal failedSignal(InlineFinding finding) {
-        return new DeliveredSignal(finding.correlationKey(), finding.anchor(), Disposition.FAILED, null, null);
+        return new DeliveredSignal(finding.findingFingerprint(), finding.anchor(), Disposition.FAILED, null, null);
     }
 
     @Nullable
@@ -404,17 +404,17 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Nullable
-    private static String parseCorrelationKey(String body) {
+    private static String parseFindingFingerprint(String body) {
         Matcher m = CK_TAG.matcher(body);
         return m.find() ? m.group(1) : null;
     }
 
     /** Appends the hidden per-finding correlation tag; a null key (pre-correlation finding) appends nothing. */
-    private static String appendCorrelationTag(String body, @Nullable String correlationKey) {
-        if (correlationKey == null || correlationKey.isBlank()) {
+    private static String appendCorrelationTag(String body, @Nullable String findingFingerprint) {
+        if (findingFingerprint == null || findingFingerprint.isBlank()) {
             return body;
         }
-        return body + "\n<!-- hephaestus-diff-note-ck=" + correlationKey + " -->";
+        return body + "\n<!-- hephaestus-diff-note-ck=" + findingFingerprint + " -->";
     }
 
     /** A prior diff-note thread we posted, matched by its embedded correlation key. */

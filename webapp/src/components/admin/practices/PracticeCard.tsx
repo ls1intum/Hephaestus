@@ -35,13 +35,8 @@ export function PracticeCard({
 					<div className="flex-1 min-w-0">
 						<div className="flex items-center gap-2 mb-0.5">
 							<Badge variant="outline" className="text-xs">
-								{practice.focusArtifact === "ISSUE" ? "Issue" : "Pull request"}
+								{practice.artifactType === "ISSUE" ? "Issue" : "Pull request"}
 							</Badge>
-							{practice.category && (
-								<Badge variant="secondary" className="text-xs">
-									{practice.category}
-								</Badge>
-							)}
 						</div>
 						<div className="flex items-center gap-2">
 							<CardTitle className="text-lg">{practice.name}</CardTitle>

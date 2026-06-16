@@ -145,7 +145,7 @@ class DeliveryComposer {
 
     /**
      * Recomposes ONLY the MR summary body after inline notes have been posted, demoting every inlinable
-     * finding whose inline comment actually landed (its {@code correlationKey} is in {@code deliveredKeys})
+     * finding whose inline comment actually landed (its {@code findingFingerprint} is in {@code deliveredKeys})
      * to a one-line "see inline comments" pointer, while a finding whose inline note FAILED keeps its full
      * summary line as the fallback. Re-runs the identical partition pipeline as {@link #compose} so the
      * recomposed summary cannot drift from the first pass — only the inline section reacts to the signals.
@@ -794,7 +794,7 @@ class DeliveryComposer {
             // throws), so a keyless finding is always treated as undelivered → keeps its full summary line.
             List<ValidatedFinding> undelivered = inlinable
                 .stream()
-                .filter(f -> f.correlationKey() == null || !deliveredKeys.contains(f.correlationKey()))
+                .filter(f -> f.findingFingerprint() == null || !deliveredKeys.contains(f.findingFingerprint()))
                 .toList();
             long deliveredCount = inlinable.size() - undelivered.size();
             sb.append("**Inline comments on the diff:**");
@@ -1080,7 +1080,7 @@ class DeliveryComposer {
             if (!f.suggestedDiffNotes().isEmpty()) {
                 // Carry the finding's correlation key onto the note so the inline channel can match the
                 // delivered placement back to its persisted finding (ADR 0021 C2).
-                notes.add(f.suggestedDiffNotes().get(0).withCorrelationKey(f.correlationKey()));
+                notes.add(f.suggestedDiffNotes().get(0).withFindingFingerprint(f.findingFingerprint()));
                 continue;
             }
 
@@ -1108,7 +1108,7 @@ class DeliveryComposer {
             String body = composeDiffNoteBody(f);
             if (body != null && !body.isBlank()) {
                 // Synthesized note inherits the finding's correlation key, same as the suggested-note branch.
-                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.correlationKey()));
+                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.findingFingerprint()));
             }
         }
 

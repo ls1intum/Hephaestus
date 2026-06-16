@@ -20,53 +20,50 @@ import org.springframework.stereotype.Repository;
 @WorkspaceAgnostic("Reaction scoped through PracticeFinding -> Practice.workspace relationship")
 public interface FindingReactionRepository extends JpaRepository<FindingReaction, UUID> {
     /**
-     * Returns the most recent reaction for a specific finding by a specific contributor.
+     * Returns the most recent reaction for a specific finding by a specific developer.
      */
-    Optional<FindingReaction> findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(
-        UUID findingId,
-        Long contributorId
-    );
+    Optional<FindingReaction> findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(UUID findingId, Long developerId);
 
     /**
-     * Returns the latest reaction per finding for a given contributor, using PostgreSQL's
+     * Returns the latest reaction per finding for a given developer, using PostgreSQL's
      * {@code DISTINCT ON} for efficient "latest row per group" retrieval.
      *
-     * <p>Used to enrich finding lists with the contributor's current reaction state.
+     * <p>Used to enrich finding lists with the developer's current reaction state.
      */
     @Query(
         value = """
         SELECT DISTINCT ON (ff.finding_id) ff.*
         FROM finding_reaction ff
         WHERE ff.finding_id IN (:findingIds)
-          AND ff.contributor_id = :contributorId
+          AND ff.developer_id = :developerId
         ORDER BY ff.finding_id, ff.created_at DESC
         """,
         nativeQuery = true
     )
-    List<FindingReaction> findLatestByFindingIdsAndContributor(
+    List<FindingReaction> findLatestByFindingIdsAndDeveloper(
         @Param("findingIds") Collection<UUID> findingIds,
-        @Param("contributorId") Long contributorId
+        @Param("developerId") Long developerId
     );
 
     /**
-     * Latest reaction per {@code correlation_key} (stable locus) for the given keys, restricted to one
-     * reacting contributor (the finding's subject — only the subject may react). Used by B2 to suppress
+     * Latest reaction per {@code finding_fingerprint} (stable locus) for the given keys, restricted to one
+     * reacting developer (the finding's subject — only the subject may react). Used by B2 to suppress
      * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
      * even though the per-run finding row (and its {@code finding_id}) is different this run.
      */
     @Query(
         value = """
-        SELECT DISTINCT ON (fr.correlation_key) fr.*
+        SELECT DISTINCT ON (fr.finding_fingerprint) fr.*
         FROM finding_reaction fr
-        WHERE fr.correlation_key IN (:correlationKeys)
-          AND fr.contributor_id = :contributorId
-        ORDER BY fr.correlation_key, fr.created_at DESC
+        WHERE fr.finding_fingerprint IN (:findingFingerprints)
+          AND fr.developer_id = :developerId
+        ORDER BY fr.finding_fingerprint, fr.created_at DESC
         """,
         nativeQuery = true
     )
-    List<FindingReaction> findLatestByCorrelationKeysAndContributor(
-        @Param("correlationKeys") Collection<String> correlationKeys,
-        @Param("contributorId") Long contributorId
+    List<FindingReaction> findLatestByFindingFingerprintsAndDeveloper(
+        @Param("findingFingerprints") Collection<String> findingFingerprints,
+        @Param("developerId") Long developerId
     );
 
     /**
@@ -81,13 +78,13 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
         FROM FindingReaction ff
         JOIN ff.finding f
         JOIN f.practice p
-        WHERE ff.contributorId = :contributorId
+        WHERE ff.developerId = :developerId
           AND p.workspace.id = :workspaceId
         GROUP BY ff.action
         """
     )
-    List<ActionCountProjection> countByContributorAndWorkspaceGroupByAction(
-        @Param("contributorId") Long contributorId,
+    List<ActionCountProjection> countByDeveloperAndWorkspaceGroupByAction(
+        @Param("developerId") Long developerId,
         @Param("workspaceId") Long workspaceId
     );
 

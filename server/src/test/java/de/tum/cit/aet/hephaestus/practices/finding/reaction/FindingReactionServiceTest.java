@@ -59,10 +59,10 @@ class FindingReactionServiceTest extends BaseUnitTest {
         workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, false, Set.of());
     }
 
-    private PracticeFinding createFinding(Long contributorId) {
-        User contributor = new User();
-        contributor.setId(contributorId);
-        return PracticeFinding.builder().id(FINDING_ID).contributor(contributor).build();
+    private PracticeFinding createFinding(Long developerId) {
+        User developer = new User();
+        developer.setId(developerId);
+        return PracticeFinding.builder().id(FINDING_ID).developer(developer).build();
     }
 
     private User createUser(Long id) {
@@ -95,7 +95,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
 
             verify(reactionRepository).save(feedbackCaptor.capture());
             FindingReaction saved = feedbackCaptor.getValue();
-            assertThat(saved.getContributorId()).isEqualTo(CONTRIBUTOR_ID);
+            assertThat(saved.getDeveloperId()).isEqualTo(CONTRIBUTOR_ID);
             assertThat(saved.getAction()).isEqualTo(FindingReactionAction.APPLIED);
         }
 
@@ -162,7 +162,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void nonContributorThrows() {
+        void nonDeveloperThrows() {
             PracticeFinding finding = createFinding(CONTRIBUTOR_ID);
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(OTHER_USER_ID));
@@ -170,7 +170,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
             var request = new CreateFindingReactionDTO(FindingReactionAction.APPLIED, null);
             assertThatThrownBy(() -> service.submitReaction(workspaceContext, FINDING_ID, request))
                 .isInstanceOf(AccessForbiddenException.class)
-                .hasMessageContaining("contributor");
+                .hasMessageContaining("developer");
         }
 
         @Test
@@ -199,12 +199,12 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 .id(UUID.randomUUID())
                 .finding(finding)
                 .findingId(FINDING_ID)
-                .contributorId(CONTRIBUTOR_ID)
+                .developerId(CONTRIBUTOR_ID)
                 .action(FindingReactionAction.APPLIED)
                 .createdAt(Instant.now())
                 .build();
             when(
-                reactionRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
+                reactionRepository.findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
             ).thenReturn(Optional.of(feedback));
 
             Optional<FindingReactionDTO> result = service.getLatestReaction(workspaceContext, FINDING_ID);
@@ -220,7 +220,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
             when(findingRepository.findByIdAndWorkspaceId(FINDING_ID, WORKSPACE_ID)).thenReturn(Optional.of(finding));
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(
-                reactionRepository.findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
+                reactionRepository.findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(FINDING_ID, CONTRIBUTOR_ID)
             ).thenReturn(Optional.empty());
 
             Optional<FindingReactionDTO> result = service.getLatestReaction(workspaceContext, FINDING_ID);
@@ -270,9 +270,9 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 }
             };
 
-            when(
-                reactionRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
-            ).thenReturn(List.of(appliedProjection, disputedProjection));
+            when(reactionRepository.countByDeveloperAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
+                List.of(appliedProjection, disputedProjection)
+            );
 
             FindingReactionEngagementDTO result = service.getEngagement(workspaceContext);
 
@@ -285,9 +285,9 @@ class FindingReactionServiceTest extends BaseUnitTest {
         @DisplayName("returns all zeros when no feedback exists")
         void returnsZerosWhenEmpty() {
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
-            when(
-                reactionRepository.countByContributorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)
-            ).thenReturn(List.of());
+            when(reactionRepository.countByDeveloperAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
+                List.of()
+            );
 
             FindingReactionEngagementDTO result = service.getEngagement(workspaceContext);
 
@@ -320,7 +320,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 .id(UUID.randomUUID())
                 .finding(finding1)
                 .findingId(findingId1)
-                .contributorId(CONTRIBUTOR_ID)
+                .developerId(CONTRIBUTOR_ID)
                 .action(FindingReactionAction.APPLIED)
                 .createdAt(Instant.now())
                 .build();
@@ -328,14 +328,14 @@ class FindingReactionServiceTest extends BaseUnitTest {
                 .id(UUID.randomUUID())
                 .finding(finding2)
                 .findingId(findingId2)
-                .contributorId(CONTRIBUTOR_ID)
+                .developerId(CONTRIBUTOR_ID)
                 .action(FindingReactionAction.DISPUTED)
                 .explanation("Wrong")
                 .createdAt(Instant.now())
                 .build();
 
             when(
-                reactionRepository.findLatestByFindingIdsAndContributor(List.of(findingId1, findingId2), CONTRIBUTOR_ID)
+                reactionRepository.findLatestByFindingIdsAndDeveloper(List.of(findingId1, findingId2), CONTRIBUTOR_ID)
             ).thenReturn(List.of(fb1, fb2));
 
             Map<UUID, FindingReactionDTO> result = service.getLatestReactionByFindingIds(

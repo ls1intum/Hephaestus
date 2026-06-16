@@ -22,11 +22,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for managing contributor reaction on AI-generated practice findings.
+ * Service for managing developer reaction on AI-generated practice findings.
  *
  * <h2>Authorization</h2>
- * <p>Only the contributor who is the subject of a finding may submit reaction on it.
- * This ensures research data integrity — reaction represents the contributor's own
+ * <p>Only the developer who is the subject of a finding may submit reaction on it.
+ * This ensures research data integrity — reaction represents the developer's own
  * reaction, not a third party's assessment.
  *
  * <h2>Append-only semantics</h2>
@@ -52,7 +52,7 @@ public class FindingReactionService {
      * @param request          the reaction action and optional explanation
      * @return the created reaction DTO
      * @throws EntityNotFoundException  if the finding does not exist in this workspace
-     * @throws AccessForbiddenException if the current user is not the finding's contributor
+     * @throws AccessForbiddenException if the current user is not the finding's developer
      * @throws IllegalArgumentException if DISPUTED without an explanation
      */
     public FindingReactionDTO submitReaction(
@@ -65,8 +65,8 @@ public class FindingReactionService {
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
-        if (!finding.getContributor().getId().equals(currentUser.getId())) {
-            throw new AccessForbiddenException("Only the finding's contributor can submit a reaction");
+        if (!finding.getDeveloper().getId().equals(currentUser.getId())) {
+            throw new AccessForbiddenException("Only the finding's developer can submit a reaction");
         }
 
         if (
@@ -79,16 +79,16 @@ public class FindingReactionService {
         FindingReaction reaction = FindingReaction.builder()
             .finding(finding)
             .findingId(findingId)
-            .contributor(currentUser)
-            .contributorId(currentUser.getId())
+            .developer(currentUser)
+            .developerId(currentUser.getId())
             .action(request.action())
             .explanation(request.explanation())
-            .correlationKey(finding.getCorrelationKey()) // A2: denormalize the stable locus at write time
+            .findingFingerprint(finding.getFindingFingerprint()) // A2: denormalize the stable locus at write time
             .build();
 
         FindingReaction saved = reactionRepository.save(reaction);
         log.info(
-            "Recorded reaction: findingId={}, action={}, contributorId={}",
+            "Recorded reaction: findingId={}, action={}, developerId={}",
             findingId,
             request.action(),
             currentUser.getId()
@@ -108,7 +108,7 @@ public class FindingReactionService {
 
         var currentUser = userRepository.getCurrentUserElseThrow();
         return reactionRepository
-            .findFirstByFindingIdAndContributorIdOrderByCreatedAtDesc(findingId, currentUser.getId())
+            .findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(findingId, currentUser.getId())
             .map(FindingReactionDTO::from);
     }
 
@@ -120,7 +120,7 @@ public class FindingReactionService {
         var currentUser = userRepository.getCurrentUserElseThrow();
         Map<FindingReactionAction, Long> counts = new EnumMap<>(FindingReactionAction.class);
         reactionRepository
-            .countByContributorAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
+            .countByDeveloperAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
             .forEach(p -> counts.put(p.getAction(), p.getCount()));
         return new FindingReactionEngagementDTO(
             counts.getOrDefault(FindingReactionAction.APPLIED, 0L),
@@ -130,21 +130,18 @@ public class FindingReactionService {
     }
 
     /**
-     * Returns the latest reaction per finding for a given contributor.
+     * Returns the latest reaction per finding for a given developer.
      * Composable API for enriching finding lists (e.g., for issue #896).
      *
      * @return map of findingId → latest reaction DTO
      */
     @Transactional(readOnly = true)
-    public Map<UUID, FindingReactionDTO> getLatestReactionByFindingIds(
-        Collection<UUID> findingIds,
-        Long contributorId
-    ) {
+    public Map<UUID, FindingReactionDTO> getLatestReactionByFindingIds(Collection<UUID> findingIds, Long developerId) {
         if (findingIds.isEmpty()) {
             return Map.of();
         }
         return reactionRepository
-            .findLatestByFindingIdsAndContributor(findingIds, contributorId)
+            .findLatestByFindingIdsAndDeveloper(findingIds, developerId)
             .stream()
             .collect(Collectors.toMap(FindingReaction::getFindingId, FindingReactionDTO::from));
     }

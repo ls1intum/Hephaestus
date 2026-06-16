@@ -9,11 +9,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.GoalStandingRow;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -40,7 +40,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>The guard fields ({@code assessmentState=BLIND}, {@code praiseChannelOpen}) are machine facts; how
  * the mentor must act on them is taught in {@code agent/mentor/system.md}.
  *
- * <p>Cache key: {@code workspaceId + ":" + contributorId} — per-user-per-workspace.
+ * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
  */
 @Component
 @RequiredArgsConstructor
@@ -86,12 +86,12 @@ public class PracticeStandingAspectProvider implements ContentProvider {
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
-        String key = req.workspaceId() + ":" + req.contributorId();
+        String key = req.workspaceId() + ":" + req.developerId();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
-            : buildPayload(req.workspaceId(), req.contributorId());
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+            : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -99,17 +99,17 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
-    public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
+    /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
+    public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(contributorId)
-            .orElseThrow(() -> new EntityNotFoundException("User", contributorId.toString()));
+            .findById(developerId)
+            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Instant now = Instant.now();
         Instant since = now.minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
         Instant recentSince = now.minus(RECENT_DAYS, ChronoUnit.DAYS);
 
-        List<GoalStandingRow> rows = findingRepository.findGoalStandingByContributorAndWorkspace(
-            contributorId,
+        List<GoalStandingRow> rows = findingRepository.findGoalStandingByDeveloperAndWorkspace(
+            developerId,
             workspaceId,
             since,
             recentSince
@@ -119,7 +119,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         // still appears (marked BLIND) instead of silently vanishing.
         Map<String, GoalAcc> goals = new LinkedHashMap<>();
         for (Practice p : practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId)) {
-            PracticeGoal g = p.getGoal();
+            PracticeArea g = p.getGoal();
             if (g != null) {
                 goals.computeIfAbsent(g.getSlug(), k -> new GoalAcc(k, g.getName()));
             }
@@ -129,9 +129,9 @@ public class PracticeStandingAspectProvider implements ContentProvider {
             GoalAcc a = goals.computeIfAbsent(r.getGoalSlug(), k -> new GoalAcc(k, r.getGoalName()));
             long count = r.getCount() == null ? 0 : r.getCount();
             long recent = r.getRecentCount() == null ? 0 : r.getRecentCount();
-            Verdict v = r.getVerdict();
+            Observation v = r.getVerdict();
             Polarity pol = r.getPolarity();
-            if (v == Verdict.NOT_APPLICABLE) {
+            if (v == Observation.NOT_APPLICABLE) {
                 a.naCount += count;
             } else if (pol.isProblem(v)) {
                 a.flaggedCount += count;

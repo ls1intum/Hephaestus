@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -16,7 +16,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Builds aggregated contributor practice history JSON for the review agent context.
+ * Builds aggregated developer practice history JSON for the review agent context.
  *
  * <p>Queries {@link PracticeFindingRepository} for verdict counts per practice and
  * produces a compact JSON array suitable for injection into the agent sandbox as
@@ -26,9 +26,9 @@ import tools.jackson.databind.node.ObjectNode;
  * descending so the most problematic practices are always included when truncation occurs.
  */
 @Component
-public class ContributorHistoryProvider {
+public class DeveloperHistoryProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(ContributorHistoryProvider.class);
+    private static final Logger log = LoggerFactory.getLogger(DeveloperHistoryProvider.class);
 
     /** Maximum number of practices included in the history JSON. */
     static final int MAX_PRACTICES = 20;
@@ -36,21 +36,21 @@ public class ContributorHistoryProvider {
     private final PracticeFindingRepository practiceFindingRepository;
     private final ObjectMapper objectMapper;
 
-    public ContributorHistoryProvider(PracticeFindingRepository practiceFindingRepository, ObjectMapper objectMapper) {
+    public DeveloperHistoryProvider(PracticeFindingRepository practiceFindingRepository, ObjectMapper objectMapper) {
         this.practiceFindingRepository = practiceFindingRepository;
         this.objectMapper = objectMapper;
     }
 
     /**
-     * Builds contributor practice history JSON for agent context injection.
+     * Builds developer practice history JSON for agent context injection.
      *
-     * @param contributorId the contributor whose history to aggregate
+     * @param developerId the developer whose history to aggregate
      * @param workspaceId   the workspace scope
-     * @return compact JSON bytes, or empty if the contributor has no relevant history
+     * @return compact JSON bytes, or empty if the developer has no relevant history
      */
-    public Optional<byte[]> buildHistoryJson(Long contributorId, Long workspaceId) {
-        List<ContributorPracticeSummary> summaries = practiceFindingRepository.findContributorPracticeSummary(
-            contributorId,
+    public Optional<byte[]> buildHistoryJson(Long developerId, Long workspaceId) {
+        List<DeveloperPracticeSummary> summaries = practiceFindingRepository.findDeveloperPracticeSummary(
+            developerId,
             workspaceId
         );
 
@@ -60,7 +60,7 @@ public class ContributorHistoryProvider {
 
         // Group by practice slug, accumulate verdict counts and track latest detection
         Map<String, PracticeAggregate> byPractice = new LinkedHashMap<>();
-        for (ContributorPracticeSummary row : summaries) {
+        for (DeveloperPracticeSummary row : summaries) {
             byPractice.computeIfAbsent(row.getPracticeSlug(), slug -> new PracticeAggregate()).add(row);
         }
 
@@ -94,16 +94,16 @@ public class ContributorHistoryProvider {
         try {
             byte[] json = objectMapper.writeValueAsBytes(array);
             log.debug(
-                "Built contributor history: {} practices, {} bytes, contributorId={}, workspaceId={}",
+                "Built developer history: {} practices, {} bytes, developerId={}, workspaceId={}",
                 sorted.size(),
                 json.length,
-                contributorId,
+                developerId,
                 workspaceId
             );
             return Optional.of(json);
         } catch (JacksonException e) {
             // Should never happen for ObjectNode serialization
-            log.error("Failed to serialize contributor history JSON", e);
+            log.error("Failed to serialize developer history JSON", e);
             return Optional.empty();
         }
     }
@@ -117,7 +117,7 @@ public class ContributorHistoryProvider {
         long notObserved;
         Instant lastDetectedAt;
 
-        void add(ContributorPracticeSummary row) {
+        void add(DeveloperPracticeSummary row) {
             switch (row.getVerdict()) {
                 case OBSERVED -> observed += row.getCount();
                 case NOT_OBSERVED -> notObserved += row.getCount();

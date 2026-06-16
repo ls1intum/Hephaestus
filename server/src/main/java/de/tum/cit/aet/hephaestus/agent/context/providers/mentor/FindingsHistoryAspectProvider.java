@@ -10,9 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.VerdictCount;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -32,11 +32,11 @@ import tools.jackson.databind.node.ObjectNode;
  * Materialises {@code inputs/context/findings_history.json} for {@link MentorChatRequest}.
  *
  * <p>Combines per-practice findings (the practice-detection agent's output for this
- * contributor over the last 90 days) and reviews received in the same window. Lets the
+ * developer over the last 90 days) and reviews received in the same window. Lets the
  * mentor refer to specific findings by title and severity when discussing the user's work
  * patterns.
  *
- * <p>Cache key: {@code workspaceId + ":" + contributorId} — per-user-per-workspace.
+ * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
  */
 @Component
 @RequiredArgsConstructor
@@ -82,12 +82,12 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         MentorChatRequest req = (MentorChatRequest) request;
-        String key = req.workspaceId() + ":" + req.contributorId();
+        String key = req.workspaceId() + ":" + req.developerId();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         // Atomic compute-if-absent closes the get/build/put race on invalidation events.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.contributorId()))
-            : buildPayload(req.workspaceId(), req.contributorId());
+            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+            : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -95,32 +95,24 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         }
     }
 
-    /** Pure function of (workspaceId, contributorId). Callers cache through {@link CacheManager}. */
-    public ObjectNode buildPayload(Long workspaceId, Long contributorId) {
+    /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
+    public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(contributorId)
-            .orElseThrow(() -> new EntityNotFoundException("User", contributorId.toString()));
+            .findById(developerId)
+            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
-        List<PracticeFinding> recent = findingRepository.findRecentByContributorAndWorkspace(
-            contributorId,
+        List<PracticeFinding> recent = findingRepository.findRecentByDeveloperAndWorkspace(
+            developerId,
             workspaceId,
             since,
             PageRequest.of(0, MAX_RECENT_FINDINGS)
         );
-        List<VerdictCount> byVerdict = findingRepository.countByVerdictForContributor(
-            contributorId,
-            workspaceId,
-            since
-        );
-        List<SeverityCount> bySeverity = findingRepository.countBySeverityForContributor(
-            contributorId,
-            workspaceId,
-            since
-        );
+        List<VerdictCount> byVerdict = findingRepository.countByVerdictForDeveloper(developerId, workspaceId, since);
+        List<SeverityCount> bySeverity = findingRepository.countBySeverityForDeveloper(developerId, workspaceId, since);
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
             workspaceId,
-            contributorId,
+            developerId,
             since,
             PageRequest.of(0, MAX_RECENT_REVIEWS)
         );
@@ -135,7 +127,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         summary.put("totalFindings", verdictTotal);
 
         ObjectNode verdictNode = summary.putObject("byVerdict");
-        for (Verdict v : Verdict.values()) {
+        for (Observation v : Observation.values()) {
             verdictNode.put(v.name(), 0L);
         }
         for (VerdictCount row : byVerdict) {

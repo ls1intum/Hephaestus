@@ -281,13 +281,13 @@ erDiagram
         VARCHAR(255) idempotency_key "NOT NULL"
         UUID agent_job_id FK,UK "NOT NULL"
         BIGINT workspace_id FK "NOT NULL"
-        VARCHAR(32) target_type
-        BIGINT target_id
+        VARCHAR(32) artifact_type
+        BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
         BIGINT subject_user_id FK
         VARCHAR(32) surface "NOT NULL"
         INTEGER unit_ordinal UK "NOT NULL"
-        VARCHAR(16) state "NOT NULL"
+        VARCHAR(16) delivery_state "NOT NULL"
         VARCHAR(32) suppression_reason
         TEXT rendered_body
         VARCHAR(16) origin "NOT NULL"
@@ -295,7 +295,7 @@ erDiagram
         VARCHAR(255) composer_version
         VARCHAR(255) synthesis_prompt_version
         UUID supersedes_id FK
-        VARCHAR(64) continuity_key
+        VARCHAR(64) feedback_thread_key
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ delivered_at
     }
@@ -303,14 +303,14 @@ erDiagram
     FeedbackFinding {
         UUID feedback_id PK,FK
         UUID finding_id PK,FK
-        VARCHAR(16) display_role "NOT NULL"
+        VARCHAR(16) evidence_role "NOT NULL"
         INTEGER ordinal "NOT NULL"
     }
 
     FeedbackPlacement {
         UUID id PK
         UUID feedback_id FK "NOT NULL"
-        VARCHAR(32) placement "NOT NULL"
+        VARCHAR(32) slot "NOT NULL"
         VARCHAR(16) anchor_kind
         TEXT anchor_path
         TEXT anchor_old_path
@@ -332,11 +332,11 @@ erDiagram
     FindingReaction {
         UUID id PK
         UUID finding_id FK "NOT NULL"
-        BIGINT contributor_id FK "NOT NULL"
+        BIGINT developer_id FK "NOT NULL"
         VARCHAR(16) action "NOT NULL"
         TEXT explanation
         TIMESTAMPTZ created_at "NOT NULL"
-        VARCHAR(64) correlation_key
+        VARCHAR(64) finding_fingerprint
     }
 
     GitCommit {
@@ -587,17 +587,16 @@ erDiagram
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
-        VARCHAR(64) category
         JSONB trigger_events "NOT NULL"
         TEXT criteria "NOT NULL"
         BOOLEAN is_active "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
-        BIGINT practice_goal_id FK
-        VARCHAR(32) focus_artifact "NOT NULL"
+        BIGINT practice_area_id FK
+        VARCHAR(32) artifact_type "NOT NULL"
         VARCHAR(16) polarity "NOT NULL"
-        VARCHAR(16) audience_role "NOT NULL"
+        VARCHAR(16) subject_role "NOT NULL"
     }
 
     PracticeFinding {
@@ -605,9 +604,9 @@ erDiagram
         VARCHAR(255) idempotency_key UK "NOT NULL"
         UUID agent_job_id "NOT NULL"
         BIGINT practice_id FK "NOT NULL"
-        VARCHAR(32) target_type "NOT NULL"
-        BIGINT target_id "NOT NULL"
-        BIGINT contributor_id FK "NOT NULL"
+        VARCHAR(32) artifact_type "NOT NULL"
+        BIGINT artifact_id "NOT NULL"
+        BIGINT developer_id FK "NOT NULL"
         VARCHAR(255) title "NOT NULL"
         VARCHAR(16) verdict "NOT NULL"
         VARCHAR(16) severity "NOT NULL"
@@ -616,8 +615,8 @@ erDiagram
         TEXT reasoning
         TEXT guidance
         TIMESTAMPTZ detected_at "NOT NULL"
-        VARCHAR(64) correlation_key
-        BIGINT subject_user_id FK
+        VARCHAR(64) finding_fingerprint
+        BIGINT subject_user_id FK "NOT NULL"
     }
 
     PracticeGoal {
@@ -1076,7 +1075,7 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
-    PracticeGoal ||--o{ Practice : has
+    PracticeGoal ||--o{ Practice : references
     Practice ||--o{ PracticeFinding : has
     User ||--o{ PracticeFinding : references
     User ||--o{ PracticeFinding : has

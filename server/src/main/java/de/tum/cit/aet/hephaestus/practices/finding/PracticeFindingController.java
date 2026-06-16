@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
-import de.tum.cit.aet.hephaestus.practices.finding.dto.ContributorPracticeSummaryDTO;
+import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.PracticeFindingDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.PracticeFindingListDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,8 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
  * Read-only REST API for practice findings.
  *
  * <p>All endpoints require workspace membership (enforced by {@link WorkspaceScopedController}).
- * List, summary, and detail endpoints are scoped to the authenticated contributor's own
- * findings. The pull-request endpoint returns findings for all contributors on that PR.
+ * List, summary, and detail endpoints are scoped to the authenticated developer's own
+ * findings. The pull-request endpoint returns findings for all developers on that PR.
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/findings")
@@ -49,14 +49,14 @@ public class PracticeFindingController {
     @GetMapping
     @Operation(
         summary = "List findings for current user",
-        description = "Paginated findings for the authenticated contributor with optional filters"
+        description = "Paginated findings for the authenticated developer with optional filters"
     )
     @ApiResponse(responseCode = "200", description = "Paginated findings returned")
     @SecurityRequirements
     public ResponseEntity<Page<PracticeFindingListDTO>> listFindings(
         WorkspaceContext workspaceContext,
         @Parameter(description = "Filter by practice slug") @RequestParam(required = false) String practiceSlug,
-        @Parameter(description = "Filter by verdict") @RequestParam(required = false) Verdict verdict,
+        @Parameter(description = "Filter by verdict") @RequestParam(required = false) Observation verdict,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -78,14 +78,14 @@ public class PracticeFindingController {
     @ApiResponse(
         responseCode = "200",
         description = "Practice summaries returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContributorPracticeSummaryDTO.class)))
+        content = @Content(array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class)))
     )
     @SecurityRequirements
-    public ResponseEntity<List<ContributorPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
-        List<ContributorPracticeSummaryDTO> summaries = practiceFindingService
+    public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
+        List<DeveloperPracticeSummaryDTO> summaries = practiceFindingService
             .getSummary(workspaceContext.id())
             .stream()
-            .map(ContributorPracticeSummaryDTO::from)
+            .map(DeveloperPracticeSummaryDTO::from)
             .toList();
         return ResponseEntity.ok(summaries);
     }

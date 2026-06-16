@@ -32,9 +32,9 @@ public class PracticeService {
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional(readOnly = true)
-    public List<Practice> listPractices(WorkspaceContext ctx, String category, Boolean active) {
-        log.debug("Listing practices for workspace {} (category={}, active={})", ctx.slug(), category, active);
-        return practiceRepository.findByFilters(ctx.id(), category, active);
+    public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
+        log.debug("Listing practices for workspace {} (active={})", ctx.slug(), active);
+        return practiceRepository.findByFilters(ctx.id(), active);
     }
 
     @Transactional(readOnly = true)
@@ -60,12 +60,11 @@ public class PracticeService {
         practice.setWorkspace(workspace);
         practice.setSlug(request.slug());
         practice.setName(request.name());
-        practice.setCategory(request.category());
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
         practice.setCriteria(request.criteria());
         practice.setPrecomputeScript(request.precomputeScript());
-        if (request.focusArtifact() != null) {
-            practice.setFocusArtifact(request.focusArtifact());
+        if (request.artifactType() != null) {
+            practice.setArtifactType(request.artifactType());
         }
         if (request.polarity() != null) {
             practice.setPolarity(request.polarity());
@@ -91,7 +90,7 @@ public class PracticeService {
      * issue event (or vice versa) can never fire, so it is a configuration error rather than dead config.
      */
     private void validateTriggerEventsForFocus(Practice practice) {
-        var allowed = TriggerEventCatalog.eligibleFor(practice.getFocusArtifact());
+        var allowed = TriggerEventCatalog.eligibleFor(practice.getArtifactType());
         List<String> incompatible = TriggerEventsConverter.toList(practice.getTriggerEvents())
             .stream()
             .filter(event -> !allowed.contains(event))
@@ -101,7 +100,7 @@ public class PracticeService {
                 "Trigger events " +
                     incompatible +
                     " are not valid for a " +
-                    practice.getFocusArtifact() +
+                    practice.getArtifactType() +
                     " practice. Allowed events for this focus: " +
                     allowed
             );
@@ -119,10 +118,6 @@ public class PracticeService {
             practice.setName(request.name());
             changed = true;
         }
-        if (request.category() != null) {
-            practice.setCategory(request.category());
-            changed = true;
-        }
         if (request.triggerEvents() != null) {
             practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
             changed = true;
@@ -135,8 +130,8 @@ public class PracticeService {
             practice.setPrecomputeScript(request.precomputeScript());
             changed = true;
         }
-        if (request.focusArtifact() != null) {
-            practice.setFocusArtifact(request.focusArtifact());
+        if (request.artifactType() != null) {
+            practice.setArtifactType(request.artifactType());
             changed = true;
         }
         if (request.polarity() != null) {

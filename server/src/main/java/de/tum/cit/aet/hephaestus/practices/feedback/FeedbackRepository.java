@@ -34,7 +34,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * supersedes and whose comment it edits in place. There is at most one live row per key by
      * construction (each new delivery flips the previous to {@code SUPERSEDED}).
      */
-    Optional<Feedback> findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(String continuityKey, FeedbackState state);
+    Optional<Feedback> findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
+        String feedbackThreadKey,
+        FeedbackDeliveryState state
+    );
 
     /**
      * Flip a delivered unit to {@code SUPERSEDED} when a newer delivery for the same continuity line lands.
@@ -43,6 +46,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE feedback SET state = :state WHERE id = :id", nativeQuery = true)
+    @Query(value = "UPDATE feedback SET delivery_state = :state WHERE id = :id", nativeQuery = true)
     int updateState(@Param("id") UUID id, @Param("state") String state);
 }

@@ -1,12 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { PracticeCard } from "./PracticeCard";
-import {
-	mockPracticeLongText,
-	mockPracticeNoCategory,
-	mockPractices,
-	mockPracticeWithAllTriggers,
-} from "./storyMockData";
+import { mockPracticeLongText, mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
 
 const meta = {
 	component: PracticeCard,
@@ -41,7 +36,7 @@ export const Inactive: Story = {
 	},
 };
 
-/** Practice without category — tests no-badge rendering. */
+/** Practice with short criteria. */
 export const ShortCriteria: Story = {
 	args: {
 		practice: mockPractices[1],
@@ -59,13 +54,6 @@ export const AllTriggers: Story = {
 export const Toggling: Story = {
 	args: {
 		isToggling: true,
-	},
-};
-
-/** Active practice without category badge. */
-export const NoCategory: Story = {
-	args: {
-		practice: mockPracticeNoCategory,
 	},
 };
 

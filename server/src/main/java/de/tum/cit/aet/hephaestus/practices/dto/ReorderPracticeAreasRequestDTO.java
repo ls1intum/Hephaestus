@@ -9,7 +9,7 @@ import java.util.List;
  * so the whole ordering is written atomically in one request.
  */
 @Schema(description = "Reorder practice goals — displayOrder follows the list index")
-public record ReorderPracticeGoalsRequestDTO(
+public record ReorderPracticeAreasRequestDTO(
     @NotEmpty(message = "orderedSlugs must not be empty")
     @Schema(
         description = "Goal slugs in the desired display order",

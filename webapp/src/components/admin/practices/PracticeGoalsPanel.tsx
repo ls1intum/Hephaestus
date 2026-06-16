@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Check, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import type { Practice, PracticeGoal } from "@/api/types.gen";
+import type { Practice, PracticeArea } from "@/api/types.gen";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
 interface PracticeGoalsPanelProps {
-	goals: PracticeGoal[];
+	goals: PracticeArea[];
 	practices: Practice[];
 	onCreate: (name: string) => void;
 	onRename: (slug: string, name: string) => void;

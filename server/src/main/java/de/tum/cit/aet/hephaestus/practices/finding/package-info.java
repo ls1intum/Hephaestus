@@ -1,5 +1,5 @@
 /**
- * Finding persistence + per-contributor history — repositories and projections that the
+ * Finding persistence + per-developer history — repositories and projections that the
  * agent delivery layer and downstream views read from. Feedback DTOs live one level
  * deeper under {@code feedback.dto}.
  */

@@ -9,8 +9,8 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.Loc
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -49,10 +49,10 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "X title"),
-                locus(JOB_PREV, "keyY", Verdict.OBSERVED, Severity.MINOR, "y", "Y title"),
-                locus(JOB_CURR, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "X title v2"),
-                locus(JOB_CURR, "keyZ", Verdict.NOT_OBSERVED, Severity.CRITICAL, "z", "Z title")
+                locus(JOB_PREV, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, "x", "X title"),
+                locus(JOB_PREV, "keyY", Observation.OBSERVED, Severity.MINOR, "y", "Y title"),
+                locus(JOB_CURR, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, "x", "X title v2"),
+                locus(JOB_CURR, "keyZ", Observation.NOT_OBSERVED, Severity.CRITICAL, "z", "Z title")
             )
         );
 
@@ -69,7 +69,7 @@ class FindingTrendServiceTest extends BaseUnitTest {
         // a RESOLVED locus carries the PRIOR run's prose (it is absent now; that is what the student last saw)
         LocusTransition resolved = transition(d, "keyY");
         assertThat(resolved.title()).isEqualTo("Y title");
-        assertThat(resolved.priorVerdict()).isEqualTo(Verdict.OBSERVED);
+        assertThat(resolved.priorVerdict()).isEqualTo(Observation.OBSERVED);
         assertThat(resolved.currentVerdict()).isNull();
     }
 
@@ -80,8 +80,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "still broken"),
-                locus(JOB_CURR, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "still broken")
+                locus(JOB_PREV, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, "x", "still broken"),
+                locus(JOB_CURR, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, "x", "still broken")
             )
         );
 
@@ -97,12 +97,12 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "kP", Verdict.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
-                locus(JOB_CURR, "kP", Verdict.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
-                locus(JOB_PREV, "kR", Verdict.OBSERVED, Severity.MAJOR, "r", "was ok"),
-                locus(JOB_CURR, "kR", Verdict.NOT_OBSERVED, Severity.MAJOR, "r", "regressed"),
-                locus(JOB_CURR, "kN", Verdict.NOT_OBSERVED, Severity.MAJOR, "n", "new"),
-                locus(JOB_PREV, "kS", Verdict.NOT_OBSERVED, Severity.MAJOR, "s", "resolved")
+                locus(JOB_PREV, "kP", Observation.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
+                locus(JOB_CURR, "kP", Observation.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
+                locus(JOB_PREV, "kR", Observation.OBSERVED, Severity.MAJOR, "r", "was ok"),
+                locus(JOB_CURR, "kR", Observation.NOT_OBSERVED, Severity.MAJOR, "r", "regressed"),
+                locus(JOB_CURR, "kN", Observation.NOT_OBSERVED, Severity.MAJOR, "n", "new"),
+                locus(JOB_PREV, "kS", Observation.NOT_OBSERVED, Severity.MAJOR, "s", "resolved")
             )
         );
 
@@ -120,7 +120,7 @@ class FindingTrendServiceTest extends BaseUnitTest {
         return d
             .transitions()
             .stream()
-            .filter(t -> t.correlationKey().equals(key))
+            .filter(t -> t.findingFingerprint().equals(key))
             .findFirst()
             .orElseThrow();
     }
@@ -130,8 +130,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Verdict.OBSERVED, Severity.MAJOR, "x", "satisfied last run"),
-                locus(JOB_CURR, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "now broken")
+                locus(JOB_PREV, "keyX", Observation.OBSERVED, Severity.MAJOR, "x", "satisfied last run"),
+                locus(JOB_CURR, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, "x", "now broken")
             )
         );
 
@@ -140,8 +140,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         assertThat(d.countRegressed()).isEqualTo(1);
         LocusTransition t = d.transitions().get(0);
         assertThat(t.status()).isEqualTo(TransitionStatus.REGRESSED);
-        assertThat(t.priorVerdict()).isEqualTo(Verdict.OBSERVED);
-        assertThat(t.currentVerdict()).isEqualTo(Verdict.NOT_OBSERVED);
+        assertThat(t.priorVerdict()).isEqualTo(Observation.OBSERVED);
+        assertThat(t.currentVerdict()).isEqualTo(Observation.NOT_OBSERVED);
     }
 
     @Test
@@ -149,8 +149,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, "x", "was broken"),
-                locus(JOB_CURR, "keyX", Verdict.OBSERVED, Severity.MAJOR, "x", "now satisfied")
+                locus(JOB_PREV, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, "x", "was broken"),
+                locus(JOB_CURR, "keyX", Observation.OBSERVED, Severity.MAJOR, "x", "now satisfied")
             )
         );
 
@@ -160,7 +160,7 @@ class FindingTrendServiceTest extends BaseUnitTest {
         assertThat(d.countResolved()).isZero();
         LocusTransition t = d.transitions().get(0);
         assertThat(t.status()).isEqualTo(TransitionStatus.PERSISTED);
-        assertThat(t.currentVerdict()).isEqualTo(Verdict.OBSERVED);
+        assertThat(t.currentVerdict()).isEqualTo(Observation.OBSERVED);
     }
 
     @Test
@@ -168,10 +168,10 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Verdict.NOT_OBSERVED, Severity.MINOR, "x", "prior"),
+                locus(JOB_PREV, "keyX", Observation.NOT_OBSERVED, Severity.MINOR, "x", "prior"),
                 // current run emits keyX twice: MAJOR/conf .6 and CRITICAL/conf .9 → CRITICAL must win (severity over confidence)
-                locusConf(JOB_CURR, "keyX", Verdict.NOT_OBSERVED, Severity.MAJOR, 0.6f, "x", "dup a"),
-                locusConf(JOB_CURR, "keyX", Verdict.NOT_OBSERVED, Severity.CRITICAL, 0.9f, "x", "dup b")
+                locusConf(JOB_CURR, "keyX", Observation.NOT_OBSERVED, Severity.MAJOR, 0.6f, "x", "dup a"),
+                locusConf(JOB_CURR, "keyX", Observation.NOT_OBSERVED, Severity.CRITICAL, 0.9f, "x", "dup b")
             )
         );
 
@@ -194,7 +194,7 @@ class FindingTrendServiceTest extends BaseUnitTest {
         return d
             .transitions()
             .stream()
-            .filter(t -> t.correlationKey().equals(key))
+            .filter(t -> t.findingFingerprint().equals(key))
             .findFirst()
             .orElseThrow()
             .status();
@@ -216,14 +216,14 @@ class FindingTrendServiceTest extends BaseUnitTest {
         };
     }
 
-    private static LocusFinding locus(UUID job, String key, Verdict v, Severity sev, String slug, String title) {
+    private static LocusFinding locus(UUID job, String key, Observation v, Severity sev, String slug, String title) {
         return locusConf(job, key, v, sev, 0.8f, slug, title);
     }
 
     private static LocusFinding locusConf(
         UUID job,
         String key,
-        Verdict v,
+        Observation v,
         Severity sev,
         float conf,
         String slug,
@@ -236,12 +236,12 @@ class FindingTrendServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public String getCorrelationKey() {
+            public String getFindingFingerprint() {
                 return key;
             }
 
             @Override
-            public Verdict getVerdict() {
+            public Observation getVerdict() {
                 return v;
             }
 

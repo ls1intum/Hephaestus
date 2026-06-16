@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -19,11 +19,10 @@ public record PracticeFindingListDTO(
     @NonNull @Schema(description = "Finding ID") UUID id,
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
-    @Nullable @Schema(description = "Practice category") String category,
-    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact targetType,
-    @NonNull @Schema(description = "Target entity ID") Long targetId,
+    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
+    @NonNull @Schema(description = "Target entity ID") Long artifactId,
     @NonNull @Schema(description = "Finding title") String title,
-    @NonNull @Schema(description = "Verdict: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Verdict verdict,
+    @NonNull @Schema(description = "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Observation verdict,
     @NonNull @Schema(description = "Severity level") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
@@ -37,9 +36,8 @@ public record PracticeFindingListDTO(
             f.getId(),
             practice.getSlug(),
             practice.getName(),
-            practice.getCategory(),
-            f.getTargetType(),
-            f.getTargetId(),
+            f.getArtifactType(),
+            f.getArtifactId(),
             f.getTitle(),
             f.getVerdict(),
             f.getSeverity(),

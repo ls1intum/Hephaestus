@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Reconciliation under GitHub's append-only review model differs from GitLab's edit-in-place: a review
  * thread cannot be deleted or edited, only minimized. So each finding's stable
- * {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey} is embedded in the thread body as a
+ * {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} is embedded in the thread body as a
  * hidden HTML tag, and before posting we read the PR's existing review threads
  * ({@code GetPullRequestReviewThreads}) and index this reviewer's own prior threads by that key. A finding
  * whose key already has a live (non-outdated) bot thread is PRESERVED rather than re-posted, so a stable
@@ -69,7 +69,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
      * Hidden per-finding correlation tag embedded in a thread body so a prior thread can be matched back to the
      * finding that produced it across re-runs. Humans never type this HTML comment, so its presence in a thread's
      * first comment marks the thread as one of ours. The key is alnum/dash/underscore (a
-     * {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey} digest), so no escaping is needed.
+     * {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} digest), so no escaping is needed.
      */
     private static final Pattern CK_TAG = Pattern.compile("<!-- hephaestus-diff-note-ck=([A-Za-z0-9_-]+) -->");
 
@@ -124,7 +124,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             if (finding.body() == null || finding.body().isBlank()) {
                 continue;
             }
-            String key = finding.correlationKey();
+            String key = finding.findingFingerprint();
             PriorThread prior = key == null ? null : priorByKey.get(key);
             if (prior != null && !prior.outdated()) {
                 // The finding still holds and already has a live thread — leave it, don't duplicate.
@@ -154,9 +154,9 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         List<String> postedKeys = new ArrayList<>(toPost.size());
         for (InlineFinding finding : toPost) {
             FindingAnchor.DiffAnchor diff = (FindingAnchor.DiffAnchor) finding.anchor();
-            threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.correlationKey())));
+            threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.findingFingerprint())));
             postedAnchors.add(diff);
-            postedKeys.add(finding.correlationKey());
+            postedKeys.add(finding.findingFingerprint());
         }
 
         try {
@@ -345,7 +345,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         if (body == null || commentId == null) {
             return;
         }
-        String key = parseCorrelationKey(body);
+        String key = parseFindingFingerprint(body);
         if (key == null) {
             return; // human thread or a legacy bot note posted before keys existed — not ours to reconcile
         }
@@ -401,17 +401,17 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Nullable
-    private static String parseCorrelationKey(String body) {
+    private static String parseFindingFingerprint(String body) {
         Matcher m = CK_TAG.matcher(body);
         return m.find() ? m.group(1) : null;
     }
 
     /** Appends the hidden per-finding correlation tag; a null key (pre-correlation finding) appends nothing. */
-    private static String appendCorrelationTag(String body, @Nullable String correlationKey) {
-        if (correlationKey == null || correlationKey.isBlank()) {
+    private static String appendCorrelationTag(String body, @Nullable String findingFingerprint) {
+        if (findingFingerprint == null || findingFingerprint.isBlank()) {
             return body;
         }
-        return body + "\n<!-- hephaestus-diff-note-ck=" + correlationKey + " -->";
+        return body + "\n<!-- hephaestus-diff-note-ck=" + findingFingerprint + " -->";
     }
 
     /** A prior review thread we posted, matched by the correlation key in its first comment. */

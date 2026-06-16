@@ -23,10 +23,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -95,7 +95,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
     private Workspace workspace;
     private AgentJob agentJob;
-    private User contributor;
+    private User developer;
     private Long prId;
 
     @BeforeEach
@@ -123,12 +123,12 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        // Create contributor
+        // Create developer
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
-        contributor = TestUserFactory.createUser(200L, "test-pr-author", provider);
-        contributor = userRepository.save(contributor);
+        developer = TestUserFactory.createUser(200L, "test-pr-author", provider);
+        developer = userRepository.save(developer);
 
         // Create repository
         Repository repo = new Repository();
@@ -157,7 +157,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             now,
             now,
             now,
-            contributor.getId(),
+            developer.getId(),
             repo.getId(),
             null,
             null,
@@ -192,13 +192,12 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
-        p.setCategory("test");
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
     }
 
-    private ValidatedFinding finding(String slug, Verdict verdict) {
+    private ValidatedFinding finding(String slug, Observation verdict) {
         return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null, List.of());
     }
 
@@ -208,8 +207,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void validFindingsPersistedToDb() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.OBSERVED),
-                finding("error-handling", Verdict.NOT_OBSERVED)
+                finding("pr-description-quality", Observation.OBSERVED),
+                finding("error-handling", Observation.NOT_OBSERVED)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -222,7 +221,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.OBSERVED, Verdict.NOT_OBSERVED);
+                .containsExactlyInAnyOrder(Observation.OBSERVED, Observation.NOT_OBSERVED);
             assertThat(persisted)
                 .extracting(PracticeFinding::getConfidence)
                 .allMatch(c -> c == 0.9f);
@@ -231,7 +230,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("re-delivering same job creates no duplicates")
         void idempotentRedelivery() {
-            var findings = List.of(finding("pr-description-quality", Verdict.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Observation.OBSERVED));
 
             var first = deliveryService.deliver(agentJob, findings);
             var second = deliveryService.deliver(agentJob, findings);
@@ -249,8 +248,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void unknownSlugsSkipped() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.OBSERVED),
-                finding("nonexistent-practice", Verdict.OBSERVED)
+                finding("pr-description-quality", Observation.OBSERVED),
+                finding("nonexistent-practice", Observation.OBSERVED)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -275,7 +274,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                     new ValidatedFinding(
                         "pr-description-quality",
                         "Negative finding " + i,
-                        Verdict.NOT_OBSERVED,
+                        Observation.NOT_OBSERVED,
                         Severity.MINOR,
                         0.8f,
                         null,
@@ -299,7 +298,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         @Test
         void publishesEvent() {
-            var findings = List.of(finding("pr-description-quality", Verdict.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Observation.OBSERVED));
 
             deliveryService.deliver(agentJob, findings);
 
@@ -310,12 +309,12 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             PracticeDetectionCompletedEvent event = events.get(0);
             assertThat(event.agentJobId()).isEqualTo(agentJob.getId());
             assertThat(event.workspaceId()).isEqualTo(workspace.getId());
-            assertThat(event.targetType()).isEqualTo(WorkArtifact.PULL_REQUEST);
-            assertThat(event.targetId()).isEqualTo(prId);
+            assertThat(event.artifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(event.artifactId()).isEqualTo(prId);
             assertThat(event.findingsInserted()).isEqualTo(1);
             assertThat(event.findingsDiscarded()).isZero();
             assertThat(event.hasNegative()).isFalse();
-            assertThat(event.contributorId()).isEqualTo(contributor.getId());
+            assertThat(event.developerId()).isEqualTo(developer.getId());
         }
 
         @Test
@@ -341,8 +340,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void positiveVerdictsDoNotTriggerHasNegative() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.OBSERVED),
-                finding("error-handling", Verdict.OBSERVED)
+                finding("pr-description-quality", Observation.OBSERVED),
+                finding("error-handling", Observation.OBSERVED)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -354,7 +353,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.OBSERVED, Verdict.OBSERVED);
+                .containsExactlyInAnyOrder(Observation.OBSERVED, Observation.OBSERVED);
         }
     }
 
@@ -368,7 +367,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             agentJob.setMetadata(metadata);
             agentJob = agentJobRepository.save(agentJob);
 
-            var findings = List.of(finding("pr-description-quality", Verdict.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Observation.OBSERVED));
 
             assertThatThrownBy(() -> deliveryService.deliver(agentJob, findings))
                 .isInstanceOf(JobDeliveryException.class)

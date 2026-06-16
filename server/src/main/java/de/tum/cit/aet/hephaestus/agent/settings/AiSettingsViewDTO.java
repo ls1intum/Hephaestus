@@ -19,7 +19,7 @@ public record AiSettingsViewDTO(
     @Schema(description = "Config bound to power practice detection (null = fan-out to all enabled configs)")
     Long practiceConfigId,
     @Schema(description = "Config bound to power the mentor (null = oldest enabled config)") Long mentorConfigId,
-    @NonNull @Schema(description = "Effective: run practice review for all contributors") Boolean runForAllUsers,
+    @NonNull @Schema(description = "Effective: run practice review for all developers") Boolean runForAllUsers,
     @NonNull @Schema(description = "Effective: skip draft PRs/MRs") Boolean skipDrafts,
     @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs") Boolean deliverToMerged,
     @NonNull

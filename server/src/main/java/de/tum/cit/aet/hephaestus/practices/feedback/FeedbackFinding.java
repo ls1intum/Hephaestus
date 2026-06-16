@@ -30,8 +30,8 @@ import org.hibernate.annotations.OnDeleteAction;
  * Immutable many-to-many join binding a synthesized {@code Feedback} unit to the
  * {@link PracticeFinding}s it was composed from.
  *
- * <p>A single feedback unit can fuse several findings (e.g. one {@link FeedbackFindingDisplayRole#PRIMARY}
- * plus corroborating {@link FeedbackFindingDisplayRole#SUPPORTING} ones), and a single finding can be
+ * <p>A single feedback unit can fuse several findings (e.g. one {@link EvidenceRole#PRIMARY}
+ * plus corroborating {@link EvidenceRole#SUPPORTING} ones), and a single finding can be
  * reused across feedback units that target different surfaces. The composite primary key
  * {@code (feedback_id, finding_id)} makes the binding idempotent.
  *
@@ -45,7 +45,7 @@ import org.hibernate.annotations.OnDeleteAction;
  *
  * @see Feedback for the synthesized unit being composed
  * @see PracticeFinding for the evidence being bound
- * @see FeedbackFindingDisplayRole for the PRIMARY/SUPPORTING weighting
+ * @see EvidenceRole for the PRIMARY/SUPPORTING weighting
  */
 @Entity
 @Immutable
@@ -90,8 +90,8 @@ public class FeedbackFinding {
     /** Whether this finding anchors the unit's headline ({@code PRIMARY}) or reinforces it ({@code SUPPORTING}). */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "display_role", length = 16, nullable = false)
-    private FeedbackFindingDisplayRole displayRole;
+    @Column(name = "evidence_role", length = 16, nullable = false)
+    private EvidenceRole evidenceRole;
 
     /** Stable ordering of findings within the unit (lower = earlier). */
     @NotNull

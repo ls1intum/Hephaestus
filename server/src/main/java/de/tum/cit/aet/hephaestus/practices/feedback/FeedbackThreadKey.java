@@ -12,37 +12,37 @@ import java.util.Locale;
  * fresh one.
  *
  * <p><strong>Identity is the destination, NOT the content.</strong> A subtle early design hashed the set
- * of finding {@code correlation_key}s that composed the body — but that set churns between reviews (a
+ * of finding {@code finding_fingerprint}s that composed the body — but that set churns between reviews (a
  * finding is fixed, a new one appears), which would change the unit's identity exactly when supersession
  * is most wanted. The unit is therefore keyed by <em>where it is delivered</em>: the artifact
- * {@code (target_type, target_id)}, the {@code recipient}, and the {@code surface}. Two reviews of the
+ * {@code (artifact_type, artifact_id)}, the {@code recipient}, and the {@code surface}. Two reviews of the
  * same PR deliver the same in-context summary unit to the same author → same continuity key → the second
  * supersedes the first. The findings it references are the changing <em>content</em>, recorded separately.
  *
- * <p>Locale-safe (Locale.ROOT) lower-cased SHA-256 hex, 64 chars, matching {@code feedback.continuity_key
+ * <p>Locale-safe (Locale.ROOT) lower-cased SHA-256 hex, 64 chars, matching {@code feedback.feedback_thread_key
  * VARCHAR(64)}. Pure and side-effect free.
  */
-public final class FeedbackContinuityKey {
+public final class FeedbackThreadKey {
 
     private static final char SEP = '\u001F'; // ASCII unit separator
 
-    private FeedbackContinuityKey() {}
+    private FeedbackThreadKey() {}
 
     /**
      * Compute the stable continuity key for a delivery unit.
      *
-     * @param targetType the artifact-type discriminator (e.g. {@code PULL_REQUEST}); empty string when the
+     * @param artifactType the artifact-type discriminator (e.g. {@code PULL_REQUEST}); empty string when the
      *     unit is not artifact-anchored (a dashboard/facilitator digest)
-     * @param targetId the artifact id, or {@code null} when not artifact-anchored
+     * @param artifactId the artifact id, or {@code null} when not artifact-anchored
      * @param recipientUserId the user the unit is delivered to (required)
      * @param surface the delivery surface (required)
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
-    public static String compute(String targetType, Long targetId, long recipientUserId, FeedbackSurface surface) {
+    public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackChannel surface) {
         String canonical = new StringBuilder()
-            .append(targetType == null ? "" : targetType)
+            .append(artifactType == null ? "" : artifactType)
             .append(SEP)
-            .append(targetId == null ? "" : targetId)
+            .append(artifactId == null ? "" : artifactId)
             .append(SEP)
             .append(recipientUserId)
             .append(SEP)

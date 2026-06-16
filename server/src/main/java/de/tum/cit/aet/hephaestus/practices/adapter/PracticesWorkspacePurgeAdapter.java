@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeGoalRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
@@ -25,12 +25,12 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
 
     private final PracticeFindingRepository practiceFindingRepository;
     private final PracticeRepository practiceRepository;
-    private final PracticeGoalRepository practiceGoalRepository;
+    private final PracticeAreaRepository practiceGoalRepository;
 
     public PracticesWorkspacePurgeAdapter(
         PracticeFindingRepository practiceFindingRepository,
         PracticeRepository practiceRepository,
-        PracticeGoalRepository practiceGoalRepository
+        PracticeAreaRepository practiceGoalRepository
     ) {
         this.practiceFindingRepository = practiceFindingRepository;
         this.practiceRepository = practiceRepository;

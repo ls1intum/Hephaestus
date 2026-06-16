@@ -21,8 +21,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -339,7 +339,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         @Test
         void throwsWhenSummaryPostReturnsNoId() {
             // Integrity failure: a real, non-blank summary body was submitted but the provider
-            // returned no comment id — the contributor sees nothing, so the job must fail loud.
+            // returned no comment id — the developer sees nothing, so the job must fail loud.
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
@@ -466,9 +466,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Nested
     class SummaryDemotion {
 
-        private InlineFindingChannel.DeliveredSignal landedSignal(String correlationKey) {
+        private InlineFindingChannel.DeliveredSignal landedSignal(String findingFingerprint) {
             return new InlineFindingChannel.DeliveredSignal(
-                correlationKey,
+                findingFingerprint,
                 new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
                 InlineFindingChannel.Disposition.POSTED,
                 "note-1",
@@ -605,7 +605,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             TrendDelta.TransitionStatus.RESOLVED,
             "code-hygiene",
             "Unused import removed",
-            Verdict.NOT_OBSERVED,
+            Observation.NOT_OBSERVED,
             null,
             Severity.MINOR,
             0.8f

@@ -73,7 +73,7 @@ class FeedbackDeliveryService {
      *
      * <p>Two failure classes are treated differently. An <em>integrity</em> failure — null
      * {@code integrationKind}, no {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel}
-     * wired, or the summary post returning no id — means the contributor sees <em>nothing</em> despite
+     * wired, or the summary post returning no id — means the developer sees <em>nothing</em> despite
      * the agent having run (LLM cost incurred). Those surface as a {@link JobDeliveryException} so the
      * executor marks the job FAILED instead of silently reporting "DELIVERED". <em>Cosmetic</em>
      * failures (e.g. one diff note that fell outside a hunk) stay soft and are only logged.
@@ -94,7 +94,7 @@ class FeedbackDeliveryService {
     interface SummaryRecomposer {
         /** @return the demoted summary body for the given delivered correlation keys, or {@code null} when there is none. */
         @Nullable
-        String recompose(Set<String> deliveredCorrelationKeys);
+        String recompose(Set<String> deliveredFindingFingerprints);
     }
 
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery, @Nullable SummaryRecomposer recomposer) {
@@ -180,7 +180,7 @@ class FeedbackDeliveryService {
 
         // Record the delivered-feedback ledger (ADR 0021 C6) as a best-effort write-through side-effect:
         // REQUIRES_NEW inside the recorder + this try/catch mean a ledger failure can never alter or roll
-        // back the delivery the contributor already received. The inline signals carry each posted note's
+        // back the delivery the developer already received. The inline signals carry each posted note's
         // durable handle (external_ref / thread_external_ref / disposition) so the placement rows record
         // what actually landed rather than an assumed POSTED + null.
         try {
@@ -234,7 +234,7 @@ class FeedbackDeliveryService {
         String commentId = editedInPlace ? update.externalId() : commentPoster.postFormattedBody(job, formatted);
         if (commentId == null) {
             // We had a real, non-blank summary to post but the provider returned no comment id —
-            // the contributor sees nothing. Treat as an integrity failure so the job is marked FAILED.
+            // the developer sees nothing. Treat as an integrity failure so the job is marked FAILED.
             throw new JobDeliveryException(
                 "Summary note post returned no comment id despite a non-empty body: jobId=" + job.getId()
             );
@@ -277,7 +277,7 @@ class FeedbackDeliveryService {
         Set<String> deliveredKeys = inlineSignals
             .stream()
             .filter(s -> s.disposition() != InlineFindingChannel.Disposition.FAILED)
-            .map(InlineFindingChannel.DeliveredSignal::correlationKey)
+            .map(InlineFindingChannel.DeliveredSignal::findingFingerprint)
             .filter(key -> key != null && !key.isBlank())
             .collect(Collectors.toSet());
         if (deliveredKeys.isEmpty()) {

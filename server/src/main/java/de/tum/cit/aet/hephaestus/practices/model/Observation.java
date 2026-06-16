@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 /**
- * Verdict for a practice finding — whether the practice behaviour was <em>observed</em> in the
- * contributor's work, was <em>not observed</em>, or whether the practice is irrelevant.
+ * Observation for a practice finding — whether the practice behaviour was <em>observed</em> in the
+ * developer's work, was <em>not observed</em>, or whether the practice is irrelevant.
  *
  * <p><b>Sign-neutral.</b> A verdict states only what the detector saw; it does NOT encode "good"
  * or "bad". The good/bad direction is supplied by {@link Practice#getPolarity()}: for a
@@ -14,10 +14,10 @@ package de.tum.cit.aet.hephaestus.practices.model;
  * <p>Orthogonal to {@link Severity}: verdict captures <em>presence</em> (observed vs not), severity
  * captures <em>impact</em> (critical vs informational).
  */
-public enum Verdict {
-    /** The practice behaviour is present in the contributor's changed work. */
+public enum Observation {
+    /** The practice behaviour is present in the developer's changed work. */
     OBSERVED,
-    /** The practice behaviour is absent where it was expected in the contributor's changed work. */
+    /** The practice behaviour is absent where it was expected in the developer's changed work. */
     NOT_OBSERVED,
     /** The practice does not apply to the changed work (e.g., no network calls → error-state-handling is irrelevant). */
     NOT_APPLICABLE,

@@ -12,17 +12,17 @@ import org.jspecify.annotations.Nullable;
  * Deterministic cross-run identity for a {@code PracticeFinding} (ADR 0021, C2).
  *
  * <p>The correlation key answers "is this the <em>same</em> finding we surfaced on an earlier agent
- * run?" so feedback can supersede rather than re-post, and a contributor's reaction history can follow
+ * run?" so feedback can supersede rather than re-post, and a developer's reaction history can follow
  * one underlying problem across re-detections. It is therefore a stable hash of <em>what the finding is
  * about</em>, never of <em>when</em> it was produced:
  *
  * <ul>
  *   <li>{@code practiceSlug} — the practice's stable per-workspace slug (NOT its surrogate id, which is
  *       workspace-local and survives reseeds poorly); identity is per-practice.</li>
- *   <li>{@code targetType} + {@code targetId} — the artifact under review (PR / ISSUE).</li>
- *   <li>{@code subjectUserId} falling back to {@code contributorId} — the person the finding is
- *       <em>about</em>. For author-side practices this is the contributor; for reviewer-side practices
- *       the subject differs, and two reviewers on one PR must not collapse to one key.</li>
+ *   <li>{@code artifactType} + {@code artifactId} — the artifact under review (PR / ISSUE).</li>
+ *   <li>{@code subjectUserId} — the person the finding is <em>about</em> (always populated). For
+ *       author-side practices this equals the developer; for reviewer-side practices the subject differs,
+ *       and two reviewers on one PR must not collapse to one key.</li>
  *   <li>a <em>locus anchor</em> = the file {@code path} of the finding's first evidence location (empty
  *       when the practice has no file location). The path stably locates the concern within the artifact.</li>
  * </ul>
@@ -39,24 +39,24 @@ import org.jspecify.annotations.Nullable;
  * participates — callers MUST pass the path of the first location and MUST NOT fold in a line.
  *
  * <p>Output is the lowercase SHA-256 hex digest: 64 chars, matching {@code practice_finding
- * .correlation_key VARCHAR(64)}. Pure and side-effect free; safe to call before persistence.
+ * .finding_fingerprint VARCHAR(64)}. Pure and side-effect free; safe to call before persistence.
  */
-public final class CorrelationKey {
+public final class FindingFingerprint {
 
     /** Field separator chosen to never appear inside a slug, enum name, numeric id, or path segment. */
     private static final char SEP = '\u001F'; // ASCII unit separator
 
-    private CorrelationKey() {}
+    private FindingFingerprint() {}
 
     /**
      * Compute the stable 64-char correlation key for a finding.
      *
      * @param practiceSlug the practice's stable slug (required)
-     * @param targetType the artifact-type discriminator, e.g. {@code PULL_REQUEST} / {@code ISSUE} (required)
-     * @param targetId the artifact id under review (required)
-     * @param aboutUserId the user the finding is ABOUT — the subject for reviewer-side practices, else the
-     *     contributor; the caller resolves the {@code subjectUserId ?? contributorId} coalesce so the same
-     *     underlying problem keeps one identity regardless of which of the two ids carries it
+     * @param artifactType the artifact-type discriminator, e.g. {@code PULL_REQUEST} / {@code ISSUE} (required)
+     * @param artifactId the artifact id under review (required)
+     * @param aboutUserId the user the finding is ABOUT — the always-populated {@code subjectUserId} (the
+     *     subject for reviewer-side practices; equals the developer for author-side), so the same underlying
+     *     problem keeps one identity across re-detections
      * @param firstLocationPath the file path of the finding's first evidence location, or {@code null}
      *     when the practice has no file location (e.g. PR-description quality). PASS THE PATH ONLY —
      *     never a line number. Normalised (locale-fixed lower-case + trim) so trivial path casing/spacing
@@ -65,20 +65,20 @@ public final class CorrelationKey {
      */
     public static String compute(
         String practiceSlug,
-        String targetType,
-        long targetId,
+        String artifactType,
+        long artifactId,
         long aboutUserId,
         @Nullable String firstLocationPath
     ) {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
-        Objects.requireNonNull(targetType, "targetType");
+        Objects.requireNonNull(artifactType, "artifactType");
 
         String canonical = new StringBuilder()
             .append(practiceSlug)
             .append(SEP)
-            .append(targetType)
+            .append(artifactType)
             .append(SEP)
-            .append(targetId)
+            .append(artifactId)
             .append(SEP)
             .append(aboutUserId)
             .append(SEP)

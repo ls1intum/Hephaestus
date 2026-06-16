@@ -11,11 +11,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.GoalStandingRow;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,14 +57,12 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         user.setLogin("student");
         when(userRepository.findById(eq(7L))).thenReturn(Optional.of(user));
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(spine);
-        when(findingRepository.findGoalStandingByContributorAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
-            rows
-        );
+        when(findingRepository.findGoalStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(rows);
         return provider.buildPayload(1L, 7L);
     }
 
     private static Practice practice(String goalSlug, String goalName) {
-        PracticeGoal g = new PracticeGoal();
+        PracticeArea g = new PracticeArea();
         g.setSlug(goalSlug);
         g.setName(goalName);
         Practice p = new Practice();
@@ -76,7 +74,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         String slug,
         String name,
         Polarity pol,
-        Verdict v,
+        Observation v,
         Severity sev,
         long count,
         long recent
@@ -98,7 +96,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
             }
 
             @Override
-            public Verdict getVerdict() {
+            public Observation getVerdict() {
                 return v;
             }
 
@@ -137,7 +135,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
                 "constructive-code-review",
                 "Reviewing constructively",
                 Polarity.DESIRABLE,
-                Verdict.NOT_APPLICABLE,
+                Observation.NOT_APPLICABLE,
                 Severity.INFO,
                 5,
                 0
@@ -160,7 +158,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
                 "robust-error-handling",
                 "Handling failure robustly",
                 Polarity.DESIRABLE,
-                Verdict.NOT_OBSERVED,
+                Observation.NOT_OBSERVED,
                 Severity.MAJOR,
                 3,
                 1
@@ -184,7 +182,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
                 "review-ready-work",
                 "Submitting review-ready work",
                 Polarity.DESIRABLE,
-                Verdict.OBSERVED,
+                Observation.OBSERVED,
                 Severity.INFO,
                 2,
                 1
@@ -202,7 +200,15 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void polarityDrivesCounts() {
         List<Practice> spine = List.of(practice("anti-pattern", "Avoids anti-patterns"));
         List<GoalStandingRow> rows = List.of(
-            row("anti-pattern", "Avoids anti-patterns", Polarity.UNDESIRABLE, Verdict.OBSERVED, Severity.MAJOR, 4, 2)
+            row(
+                "anti-pattern",
+                "Avoids anti-patterns",
+                Polarity.UNDESIRABLE,
+                Observation.OBSERVED,
+                Severity.MAJOR,
+                4,
+                2
+            )
         );
         JsonNode root = build(spine, rows);
 
@@ -223,9 +229,17 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
             )
         );
         List<GoalStandingRow> rows = List.of(
-            row("minor-goal", "Minor goal", Polarity.DESIRABLE, Verdict.NOT_OBSERVED, Severity.MINOR, 2, 0),
-            row("critical-goal", "Critical goal", Polarity.DESIRABLE, Verdict.NOT_OBSERVED, Severity.CRITICAL, 1, 1),
-            row("blind-goal", "Blind goal", Polarity.DESIRABLE, Verdict.NOT_APPLICABLE, Severity.INFO, 3, 0)
+            row("minor-goal", "Minor goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MINOR, 2, 0),
+            row(
+                "critical-goal",
+                "Critical goal",
+                Polarity.DESIRABLE,
+                Observation.NOT_OBSERVED,
+                Severity.CRITICAL,
+                1,
+                1
+            ),
+            row("blind-goal", "Blind goal", Polarity.DESIRABLE, Observation.NOT_APPLICABLE, Severity.INFO, 3, 0)
         );
         JsonNode root = build(spine, rows);
 
@@ -244,8 +258,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void worstSeverityIsMostSevere() {
         List<Practice> spine = List.of(practice("g", "Goal"));
         List<GoalStandingRow> rows = List.of(
-            row("g", "Goal", Polarity.DESIRABLE, Verdict.NOT_OBSERVED, Severity.MINOR, 1, 0),
-            row("g", "Goal", Polarity.DESIRABLE, Verdict.NOT_OBSERVED, Severity.CRITICAL, 1, 0)
+            row("g", "Goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MINOR, 1, 0),
+            row("g", "Goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.CRITICAL, 1, 0)
         );
         JsonNode root = build(spine, rows);
         assertThat(goal(root, "g").get("topSeverity").asString()).isEqualTo("CRITICAL");
@@ -268,13 +282,13 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(
             List.of(practice("review-ready-work", "Submitting review-ready work"))
         );
-        when(findingRepository.findGoalStandingByContributorAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
+        when(findingRepository.findGoalStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
             List.of(
                 row(
                     "review-ready-work",
                     "Submitting review-ready work",
                     Polarity.DESIRABLE,
-                    Verdict.OBSERVED,
+                    Observation.OBSERVED,
                     Severity.INFO,
                     2,
                     1
@@ -303,7 +317,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     private String trajectoryFor(long count, long recent) {
         JsonNode root = build(
             List.of(practice("g", "Goal")),
-            List.of(row("g", "Goal", Polarity.DESIRABLE, Verdict.NOT_OBSERVED, Severity.MAJOR, count, recent))
+            List.of(row("g", "Goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MAJOR, count, recent))
         );
         return goal(root, "g").get("trajectory").asString();
     }

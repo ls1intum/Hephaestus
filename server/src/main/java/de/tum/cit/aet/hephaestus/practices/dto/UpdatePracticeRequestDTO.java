@@ -20,10 +20,6 @@ public record UpdatePracticeRequestDTO(
     @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
-    @Size(max = 64, message = "Category must be at most 64 characters")
-    @Schema(description = "Practice category", example = "code-quality")
-    String category,
-
     @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
     @ValidTriggerEvents
     @Schema(description = "Domain events that trigger detection")
@@ -38,7 +34,7 @@ public record UpdatePracticeRequestDTO(
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
 
-    @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact focusArtifact,
+    @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact artifactType,
 
     @Schema(
         description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent",

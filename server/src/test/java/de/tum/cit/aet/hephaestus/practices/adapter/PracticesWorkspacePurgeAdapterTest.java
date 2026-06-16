@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeGoalRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -21,7 +21,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
-    private PracticeGoalRepository practiceGoalRepository;
+    private PracticeAreaRepository practiceGoalRepository;
 
     private PracticesWorkspacePurgeAdapter adapter;
 
@@ -47,9 +47,9 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("runs before default-order contributors")
+    @DisplayName("runs before default-order developers")
     void getOrder_returnsNegativeValue() {
-        // The adapter should run early, before other contributors
+        // The adapter should run early, before other developers
         assertThat(adapter.getOrder()).isLessThan(0);
     }
 }

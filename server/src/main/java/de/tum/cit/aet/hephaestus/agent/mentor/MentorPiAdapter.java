@@ -37,7 +37,7 @@ public class MentorPiAdapter {
 
     /**
      * Build the interactive sandbox spec for a mentor chat session. Sandbox is keyed by
-     * {@code (contributorId, workspaceId)}; concurrent attaches reuse the live handle.
+     * {@code (developerId, workspaceId)}; concurrent attaches reuse the live handle.
      * When {@code sessionRestore} is non-null, the prior turn's JSONL is injected at
      * {@code .sessions/<threadId>.jsonl} so Pi's {@code switchSession} restores byte-identical
      * state for prompt-cache continuity.
@@ -86,7 +86,7 @@ public class MentorPiAdapter {
 
         return new InteractiveSandboxSpec(
             UUID.randomUUID(),
-            Long.toString(request.contributorId()),
+            Long.toString(request.developerId()),
             Long.toString(request.workspaceId()),
             imageProperties.reference(),
             plan.command(),

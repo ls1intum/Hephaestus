@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Uses PATCH semantics: only non-null fields are applied.
  */
 @Schema(description = "Request to update an existing practice goal (PATCH — only non-null fields applied)")
-public record UpdatePracticeGoalRequestDTO(
+public record UpdatePracticeAreaRequestDTO(
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
     @Pattern(regexp = ".*\\S.*", message = "Name must not be blank")
     @Schema(description = "Human-readable name")

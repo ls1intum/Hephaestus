@@ -31,7 +31,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Immutable record of a practice evaluation for a specific contribution.
  *
- * <p>Each finding represents an AI agent's assessment of whether a contributor
+ * <p>Each finding represents an AI agent's assessment of whether a developer
  * followed or violated a {@link Practice} in a specific target (pull request, commit, review).
  * Findings are append-only and deduplicated by {@link #idempotencyKey}.
  *
@@ -50,17 +50,17 @@ import tools.jackson.databind.JsonNode;
     },
     indexes = {
         @Index(name = "idx_practice_finding_practice_detected", columnList = "practice_id, detected_at DESC"),
-        @Index(name = "idx_practice_finding_contributor_detected", columnList = "contributor_id, detected_at DESC"),
+        @Index(name = "idx_practice_finding_developer_detected", columnList = "developer_id, detected_at DESC"),
         @Index(name = "idx_practice_finding_agent_job", columnList = "agent_job_id"),
-        @Index(name = "idx_practice_finding_target", columnList = "target_type, target_id"),
+        @Index(name = "idx_practice_finding_target", columnList = "artifact_type, artifact_id"),
         // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (FindingTrendService).
         @Index(
             name = "idx_practice_finding_target_run",
-            columnList = "target_type, target_id, agent_job_id, detected_at DESC"
+            columnList = "artifact_type, artifact_id, agent_job_id, detected_at DESC"
         ),
         // Cross-run identity (ADR 0021 C2): supersession + reaction-history follow one finding across re-detections.
-        @Index(name = "idx_practice_finding_correlation", columnList = "correlation_key"),
-        // Reviewer-side findings are filed against the subject, not the contributor; index for subject dashboards.
+        @Index(name = "idx_practice_finding_correlation", columnList = "finding_fingerprint"),
+        // Reviewer-side findings are filed against the subject, not the developer; index for subject dashboards.
         @Index(name = "idx_practice_finding_subject", columnList = "subject_user_id"),
     }
 )
@@ -103,34 +103,37 @@ public class PracticeFinding {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "target_type", length = 32, nullable = false)
-    private WorkArtifact targetType;
+    @Column(name = "artifact_type", length = 32, nullable = false)
+    private WorkArtifact artifactType;
 
     @NotNull
-    @Column(name = "target_id", nullable = false)
-    private Long targetId;
+    @Column(name = "artifact_id", nullable = false)
+    private Long artifactId;
 
     /**
-     * The contributor whose work is being evaluated. No cascade — users are long-lived
+     * The developer whose work is being evaluated. No cascade — users are long-lived
      * and findings must survive independently; deleting a user with existing findings
      * is blocked by the FK constraint (RESTRICT).
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "contributor_id",
+        name = "developer_id",
         nullable = false,
-        foreignKey = @ForeignKey(name = "fk_practice_finding_contributor")
+        foreignKey = @ForeignKey(name = "fk_practice_finding_developer")
     )
-    private User contributor;
+    private User developer;
 
     /**
-     * The user the finding is ABOUT when that differs from the {@link #contributor} — i.e. reviewer-side
-     * practices, where the subject is the reviewer (ADR 0021, C2). NULL means the subject IS the contributor
-     * (the author-side default). Raw {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the
-     * cross-cutting identity columns scalar; the DB FK {@code fk_practice_finding_subject} is Liquibase-managed.
+     * Whose conduct the finding is filed against — ALWAYS populated (ADR 0021, C2): equals {@link #developer}
+     * for author-side practices (the whole catalogue today), the reviewer for reviewer-side practices. The
+     * former "NULL means the subject is the developer" default was collapsed into an explicit value so every
+     * reader can trust the column without a fallback. Raw {@code Long} FK to {@code user} (no {@code @ManyToOne})
+     * to keep the cross-cutting identity columns scalar; the DB FK {@code fk_practice_finding_subject} is
+     * Liquibase-managed.
      */
-    @Column(name = "subject_user_id")
+    @NotNull
+    @Column(name = "subject_user_id", nullable = false)
     private Long subjectUserId;
 
     /**
@@ -138,11 +141,11 @@ public class PracticeFinding {
      * (practice + target + subject + a content anchor), NEVER of when it was produced (no job id, no line
      * number). Lets later {@code Feedback} supersede rather than re-post, and lets a reaction follow one
      * underlying problem across re-detections — the primitive the research question's "do practices change
-     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey}.
+     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint}.
      * Nullable: backfill-free, populated on new findings only.
      */
-    @Column(name = "correlation_key", length = 64)
-    private String correlationKey;
+    @Column(name = "finding_fingerprint", length = 64)
+    private String findingFingerprint;
 
     @NotNull
     @Column(name = "title", nullable = false, length = 255)
@@ -151,7 +154,7 @@ public class PracticeFinding {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "verdict", length = 16, nullable = false)
-    private Verdict verdict;
+    private Observation verdict;
 
     @NotNull
     @Enumerated(EnumType.STRING)

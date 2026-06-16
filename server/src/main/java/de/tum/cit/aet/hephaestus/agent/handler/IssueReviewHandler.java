@@ -84,7 +84,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             );
         }
         ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("target_type", "ISSUE");
+        metadata.put("artifact_type", "ISSUE");
         metadata.put("repository_id", r.repositoryId());
         metadata.put("repository_full_name", r.repositoryFullName());
         metadata.put("issue_id", r.issueId());
@@ -227,7 +227,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         }
 
         // Record the delivered-feedback ledger (ADR 0021 C6) — best-effort, REQUIRES_NEW + try/catch so it
-        // can never affect the issue note the contributor already received. Issues have no inline placements.
+        // can never affect the issue note the developer already received. Issues have no inline placements.
         try {
             feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE, List.of());
         } catch (RuntimeException e) {

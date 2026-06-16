@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -23,10 +23,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
-class PracticeGoalServiceTest extends BaseUnitTest {
+class PracticeAreaServiceTest extends BaseUnitTest {
 
     @Mock
-    private PracticeGoalRepository practiceGoalRepository;
+    private PracticeAreaRepository practiceGoalRepository;
 
     @Mock
     private PracticeRepository practiceRepository;
@@ -35,7 +35,7 @@ class PracticeGoalServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @InjectMocks
-    private PracticeGoalService service;
+    private PracticeAreaService service;
 
     private static final WorkspaceContext CTX = new WorkspaceContext(
         1L,
@@ -54,20 +54,20 @@ class PracticeGoalServiceTest extends BaseUnitTest {
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(new Workspace()));
         when(practiceGoalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeGoal created = service.createGoal(CTX, "review-comms", "Effective review communication", "blurb", 0);
+        PracticeArea created = service.createGoal(CTX, "review-comms", "Effective review communication", "blurb", 0);
 
         assertThat(created.getSlug()).isEqualTo("review-comms");
         assertThat(created.getName()).isEqualTo("Effective review communication");
         assertThat(created.getDescription()).isEqualTo("blurb");
         assertThat(created.isActive()).isTrue();
-        verify(practiceGoalRepository).save(any(PracticeGoal.class));
+        verify(practiceGoalRepository).save(any(PracticeArea.class));
     }
 
     @Test
     void createGoal_duplicateSlug_throwsConflict() {
         when(practiceGoalRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
-        assertThatExceptionOfType(PracticeGoalSlugConflictException.class).isThrownBy(() ->
+        assertThatExceptionOfType(PracticeAreaSlugConflictException.class).isThrownBy(() ->
             service.createGoal(CTX, "dup", "Dup", null, 0)
         );
         verify(practiceGoalRepository, never()).save(any());
@@ -75,14 +75,14 @@ class PracticeGoalServiceTest extends BaseUnitTest {
 
     @Test
     void updateGoal_appliesPartialChanges() {
-        PracticeGoal goal = new PracticeGoal();
+        PracticeArea goal = new PracticeArea();
         goal.setSlug("g");
         goal.setName("Old");
         goal.setDisplayOrder(0);
         when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(goal));
         when(practiceGoalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeGoal updated = service.updateGoal(CTX, "g", "New", null, 5);
+        PracticeArea updated = service.updateGoal(CTX, "g", "New", null, 5);
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getDisplayOrder()).isEqualTo(5);
@@ -97,7 +97,7 @@ class PracticeGoalServiceTest extends BaseUnitTest {
     @Test
     void bindPractice_setsGoalWhenBothResolveInWorkspace() {
         Practice practice = new Practice();
-        PracticeGoal goal = new PracticeGoal();
+        PracticeArea goal = new PracticeArea();
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice));
         when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(goal));
         when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -110,7 +110,7 @@ class PracticeGoalServiceTest extends BaseUnitTest {
     @Test
     void bindPractice_nullGoalUnbinds() {
         Practice practice = new Practice();
-        practice.setGoal(new PracticeGoal());
+        practice.setGoal(new PracticeArea());
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice));
         when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -134,11 +134,11 @@ class PracticeGoalServiceTest extends BaseUnitTest {
 
     @Test
     void reorder_setsDisplayOrderByListIndex() {
-        PracticeGoal a = new PracticeGoal();
+        PracticeArea a = new PracticeArea();
         a.setSlug("a");
-        PracticeGoal b = new PracticeGoal();
+        PracticeArea b = new PracticeArea();
         b.setSlug("b");
-        PracticeGoal c = new PracticeGoal();
+        PracticeArea c = new PracticeArea();
         c.setSlug("c");
         when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "c")).thenReturn(Optional.of(c));
         when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "a")).thenReturn(Optional.of(a));

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -265,7 +265,7 @@ public class PracticeDetectionResultParser {
         }
 
         // Required: verdict
-        Verdict verdict = parseEnum(entry, "verdict", Verdict.class);
+        Observation verdict = parseEnum(entry, "verdict", Observation.class);
 
         // Required: severity
         Severity severity = parseEnum(entry, "severity", Severity.class);
@@ -473,7 +473,7 @@ public class PracticeDetectionResultParser {
     }
 
     /**
-     * @param correlationKey the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey}
+     * @param findingFingerprint the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint}
      *     identity, stamped by {@code PullRequestReviewHandler} from the value
      *     {@code PracticeDetectionDeliveryService.deliver} already computed (never recomputed downstream, so it
      *     cannot drift from the persisted finding). {@code null} until stamped — the parser leaves it unset.
@@ -481,20 +481,20 @@ public class PracticeDetectionResultParser {
     public record ValidatedFinding(
         String practiceSlug,
         String title,
-        Verdict verdict,
+        Observation verdict,
         Severity severity,
         float confidence,
         JsonNode evidence,
         String reasoning,
         String guidance,
         List<DiffNote> suggestedDiffNotes,
-        @Nullable String correlationKey
+        @Nullable String findingFingerprint
     ) {
         /** Pre-correlation compatibility shape: a finding with no correlation key yet (the parser's output). */
         public ValidatedFinding(
             String practiceSlug,
             String title,
-            Verdict verdict,
+            Observation verdict,
             Severity severity,
             float confidence,
             JsonNode evidence,
@@ -517,7 +517,7 @@ public class PracticeDetectionResultParser {
         }
 
         /** Returns a copy stamped with {@code key}; all other components are preserved by reference. */
-        public ValidatedFinding withCorrelationKey(@Nullable String key) {
+        public ValidatedFinding withFindingFingerprint(@Nullable String key) {
             return new ValidatedFinding(
                 practiceSlug,
                 title,
@@ -551,7 +551,7 @@ public class PracticeDetectionResultParser {
      * @param startLine first line number (1-based, must be positive)
      * @param endLine   optional last line number for multi-line (GitHub only; GitLab ignores)
      * @param body      markdown comment body (sanitized before posting)
-     * @param correlationKey the stable cross-run identity inherited from the finding this note belongs to, so a
+     * @param findingFingerprint the stable cross-run identity inherited from the finding this note belongs to, so a
      *     posted placement can be matched back across re-runs; {@code null} until {@link DeliveryComposer}
      *     carries it over from the stamped finding (the parser leaves it unset).
      */
@@ -560,7 +560,7 @@ public class PracticeDetectionResultParser {
         int startLine,
         @Nullable Integer endLine,
         String body,
-        @Nullable String correlationKey
+        @Nullable String findingFingerprint
     ) {
         /** Pre-correlation compatibility shape: a note with no correlation key yet (the parser's output). */
         public DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {
@@ -568,7 +568,7 @@ public class PracticeDetectionResultParser {
         }
 
         /** Returns a copy stamped with {@code key}; all other components are preserved. */
-        public DiffNote withCorrelationKey(@Nullable String key) {
+        public DiffNote withFindingFingerprint(@Nullable String key) {
             return new DiffNote(filePath, startLine, endLine, body, key);
         }
     }

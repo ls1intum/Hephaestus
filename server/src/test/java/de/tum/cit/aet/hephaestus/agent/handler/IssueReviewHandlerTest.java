@@ -90,7 +90,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             JobSubmission submission = handler.createSubmission(sampleRequest());
             JsonNode metadata = submission.metadata();
 
-            assertThat(metadata.get("target_type").asString()).isEqualTo("ISSUE");
+            assertThat(metadata.get("artifact_type").asString()).isEqualTo("ISSUE");
             assertThat(metadata.get("repository_id").asLong()).isEqualTo(123L);
             assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("issue_id").asLong()).isEqualTo(777L);

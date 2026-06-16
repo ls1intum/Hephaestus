@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
+import de.tum.cit.aet.hephaestus.practices.finding.DeveloperHistoryProvider;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -64,7 +64,7 @@ public class PullRequestContentProvider implements ContentProvider {
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
-    private final ContributorHistoryProvider contributorHistoryProvider;
+    private final DeveloperHistoryProvider developerHistoryProvider;
     private final GitDiffOperations gitDiffOperations;
     private final ConnectionService connectionService;
 
@@ -85,7 +85,7 @@ public class PullRequestContentProvider implements ContentProvider {
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
-        ContributorHistoryProvider contributorHistoryProvider,
+        DeveloperHistoryProvider developerHistoryProvider,
         GitDiffOperations gitDiffOperations,
         ConnectionService connectionService,
         List<ScmTokenSource> tokenSourceList
@@ -94,7 +94,7 @@ public class PullRequestContentProvider implements ContentProvider {
         this.gitRepositoryManager = gitRepositoryManager;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewCommentRepository = reviewCommentRepository;
-        this.contributorHistoryProvider = contributorHistoryProvider;
+        this.developerHistoryProvider = developerHistoryProvider;
         this.gitDiffOperations = gitDiffOperations;
         this.connectionService = connectionService;
         Map<IntegrationKind, ScmTokenSource> map = new EnumMap<>(IntegrationKind.class);
@@ -131,7 +131,7 @@ public class PullRequestContentProvider implements ContentProvider {
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
         storeMetadataAndComments(files, pullRequest, pullRequestId, metadata);
-        storeContributorHistory(files, pullRequest, job);
+        storeDeveloperHistory(files, pullRequest, job);
         computeAndStoreDiff(files, repositoryId, metadata, job);
         computeAndStoreDiffSummary(files);
     }
@@ -339,33 +339,33 @@ public class PullRequestContentProvider implements ContentProvider {
         }
     }
 
-    // Contributor history
+    // Developer history
 
-    private void storeContributorHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
+    private void storeDeveloperHistory(Map<String, byte[]> files, @Nullable PullRequest pullRequest, AgentJob job) {
         if (pullRequest == null || pullRequest.getAuthor() == null || job.getWorkspace() == null) {
             if (pullRequest != null && pullRequest.getAuthor() == null) {
-                log.debug("Skipping contributor history: PR has no author, pullRequestId={}", pullRequest.getId());
+                log.debug("Skipping developer history: PR has no author, pullRequestId={}", pullRequest.getId());
             }
             return;
         }
-        Long contributorId = pullRequest.getAuthor().getId();
+        Long developerId = pullRequest.getAuthor().getId();
         Long workspaceId = job.getWorkspace().getId();
 
         try {
-            Optional<byte[]> historyJson = contributorHistoryProvider.buildHistoryJson(contributorId, workspaceId);
+            Optional<byte[]> historyJson = developerHistoryProvider.buildHistoryJson(developerId, workspaceId);
             historyJson.ifPresent(json -> {
                 files.put(OUTPUT_PREFIX + "contributor_history.json", json);
                 log.info(
-                    "Injected contributor history: {} bytes, contributorId={}, workspaceId={}",
+                    "Injected developer history: {} bytes, developerId={}, workspaceId={}",
                     json.length,
-                    contributorId,
+                    developerId,
                     workspaceId
                 );
             });
         } catch (Exception e) {
             log.warn(
-                "Failed to build contributor history, continuing without it: contributorId={}, workspaceId={}",
-                contributorId,
+                "Failed to build developer history, continuing without it: developerId={}, workspaceId={}",
+                developerId,
                 workspaceId,
                 e
             );

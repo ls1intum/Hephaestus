@@ -21,9 +21,9 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,7 +49,7 @@ import tools.jackson.databind.node.ObjectNode;
  * and delivery-phase post-processing here — catalog injection is per-job and not provider-shaped.
  *
  * <p>Container workspace layout — read-only vs writable by LOCATION per ADR 0020 (see
- * {@code docs/contributor/agent/workspace-abi.mdx} for the full ABI):
+ * {@code docs/developer/agent/workspace-abi.mdx} for the full ABI):
  * <pre>
  * /workspace/
  * ├── inputs/                            # read-only — the path-guard whitelists exactly this subtree
@@ -343,7 +343,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         boolean allNotApplicable = parsed
             .validFindings()
             .stream()
-            .allMatch(f -> f.verdict() == Verdict.NOT_APPLICABLE);
+            .allMatch(f -> f.verdict() == Observation.NOT_APPLICABLE);
         if (allNotApplicable && secretFindings.isEmpty()) {
             Set<String> diffFiles = computeDiffStatFiles(job);
             boolean hasDiffContent = !diffFiles.isEmpty();
@@ -411,18 +411,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // the key downstream (which could drift). Done BEFORE the reaction filter so an escalated copy inherits
         // the key too. A finding absent from the map (unknown slug — never persisted, never delivered) is left
         // unstamped; it cannot reach compose() anyway since the filter only re-emits what was passed in.
-        Map<PracticeDetectionResultParser.ValidatedFinding, String> correlationKeys = result.correlationKeys();
+        Map<PracticeDetectionResultParser.ValidatedFinding, String> findingFingerprints = result.findingFingerprints();
         for (int i = 0; i < scopedFindings.size(); i++) {
-            String key = correlationKeys.get(scopedFindings.get(i));
+            String key = findingFingerprints.get(scopedFindings.get(i));
             if (key != null) {
-                scopedFindings.set(i, scopedFindings.get(i).withCorrelationKey(key));
+                scopedFindings.set(i, scopedFindings.get(i).withFindingFingerprint(key));
             }
         }
 
         // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
         // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an APPLIED-but-recurring
         // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
-        // deliver() because correlation_key is persisted there; before compose() so the drop reaches both the
+        // deliver() because finding_fingerprint is persisted there; before compose() so the drop reaches both the
         // summary and the inline notes.
         ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, scopedFindings);
         List<PracticeDetectionResultParser.ValidatedFinding> deliverable = reactions.deliverable();
@@ -493,7 +493,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (var f : existing) {
             if (
                 !"hardcoded-secrets".equals(f.practiceSlug()) ||
-                f.verdict() != Verdict.NOT_OBSERVED ||
+                f.verdict() != Observation.NOT_OBSERVED ||
                 f.evidence() == null
             ) {
                 continue;
@@ -549,7 +549,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new PracticeDetectionResultParser.ValidatedFinding(
             "hardcoded-secrets",
             "Hardcoded secret on a changed line",
-            Verdict.NOT_OBSERVED,
+            Observation.NOT_OBSERVED,
             severity,
             1.0f,
             evidence,

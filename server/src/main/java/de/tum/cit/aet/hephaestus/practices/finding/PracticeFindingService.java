@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.practices.finding;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
+import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.List;
 import java.util.Optional;
@@ -17,14 +17,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for reading practice findings scoped to the authenticated contributor.
+ * Service for reading practice findings scoped to the authenticated developer.
  *
  * <p>All methods resolve the current user from the security context via
  * {@link UserRepository#getCurrentUser()}. If the user is not yet synced as a
- * contributor (e.g., first login before any PR activity), list/summary endpoints
+ * developer (e.g., first login before any PR activity), list/summary endpoints
  * return empty results rather than failing.
  *
- * <p>For single-finding access, contributor ownership is enforced in SQL — a
+ * <p>For single-finding access, developer ownership is enforced in SQL — a
  * non-owner receives 404 (not 403) to avoid leaking finding existence.
  */
 @Service
@@ -37,20 +37,20 @@ public class PracticeFindingService {
     /**
      * Paginated findings for the current user in a workspace, with optional filters.
      *
-     * @return empty page if user is not a synced contributor
+     * @return empty page if user is not a synced developer
      */
     @Transactional(readOnly = true)
     public Page<PracticeFinding> getFindings(
         Long workspaceId,
         String practiceSlug,
-        Verdict verdict,
+        Observation verdict,
         Pageable pageable
     ) {
         Optional<User> currentUser = userRepository.getCurrentUser();
         if (currentUser.isEmpty()) {
             return Page.empty(pageable);
         }
-        return practiceFindingRepository.findByContributorAndWorkspace(
+        return practiceFindingRepository.findByDeveloperAndWorkspace(
             currentUser.get().getId(),
             workspaceId,
             practiceSlug,
@@ -62,20 +62,20 @@ public class PracticeFindingService {
     /**
      * Per-practice summary for the current user in a workspace.
      *
-     * @return empty list if user is not a synced contributor
+     * @return empty list if user is not a synced developer
      */
     @Transactional(readOnly = true)
-    public List<ContributorPracticeSummaryProjection> getSummary(Long workspaceId) {
+    public List<DeveloperPracticeSummaryProjection> getSummary(Long workspaceId) {
         Optional<User> currentUser = userRepository.getCurrentUser();
         if (currentUser.isEmpty()) {
             return List.of();
         }
-        return practiceFindingRepository.findSummaryByContributorAndWorkspace(currentUser.get().getId(), workspaceId);
+        return practiceFindingRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
     }
 
     /**
      * Single finding detail. Ownership is enforced in the SQL query itself —
-     * a finding belonging to another contributor simply won't be returned.
+     * a finding belonging to another developer simply won't be returned.
      *
      * @return the finding if it exists and belongs to the current user
      * @throws EntityNotFoundException if no user, or finding not found/not owned
@@ -87,7 +87,7 @@ public class PracticeFindingService {
             throw new EntityNotFoundException("PracticeFinding", findingId.toString());
         }
         return practiceFindingRepository
-            .findByIdAndContributorAndWorkspace(findingId, currentUser.get().getId(), workspaceId)
+            .findByIdAndDeveloperAndWorkspace(findingId, currentUser.get().getId(), workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
     }
 

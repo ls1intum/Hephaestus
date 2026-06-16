@@ -385,7 +385,7 @@ export const updateNotificationsResponseTransformer = async (data: any): Promise
     return data;
 };
 
-const practiceGoalSchemaResponseTransformer = (data: any) => {
+const practiceAreaSchemaResponseTransformer = (data: any) => {
     data.createdAt = new Date(data.createdAt);
     if (data.updatedAt) {
         data.updatedAt = new Date(data.updatedAt);
@@ -394,27 +394,27 @@ const practiceGoalSchemaResponseTransformer = (data: any) => {
 };
 
 export const listGoalsResponseTransformer = async (data: any): Promise<ListGoalsResponse> => {
-    data = data.map((item: any) => practiceGoalSchemaResponseTransformer(item));
+    data = data.map((item: any) => practiceAreaSchemaResponseTransformer(item));
     return data;
 };
 
 export const createGoalResponseTransformer = async (data: any): Promise<CreateGoalResponse> => {
-    data = practiceGoalSchemaResponseTransformer(data);
+    data = practiceAreaSchemaResponseTransformer(data);
     return data;
 };
 
 export const reorderGoalsResponseTransformer = async (data: any): Promise<ReorderGoalsResponse> => {
-    data = data.map((item: any) => practiceGoalSchemaResponseTransformer(item));
+    data = data.map((item: any) => practiceAreaSchemaResponseTransformer(item));
     return data;
 };
 
 export const getGoalResponseTransformer = async (data: any): Promise<GetGoalResponse> => {
-    data = practiceGoalSchemaResponseTransformer(data);
+    data = practiceAreaSchemaResponseTransformer(data);
     return data;
 };
 
 export const updateGoalResponseTransformer = async (data: any): Promise<UpdateGoalResponse> => {
-    data = practiceGoalSchemaResponseTransformer(data);
+    data = practiceAreaSchemaResponseTransformer(data);
     return data;
 };
 
@@ -456,7 +456,7 @@ export const getFindingsForPullRequestResponseTransformer = async (data: any): P
     return data;
 };
 
-const contributorPracticeSummarySchemaResponseTransformer = (data: any) => {
+const developerPracticeSummarySchemaResponseTransformer = (data: any) => {
     if (data.lastFindingAt) {
         data.lastFindingAt = new Date(data.lastFindingAt);
     }
@@ -464,7 +464,7 @@ const contributorPracticeSummarySchemaResponseTransformer = (data: any) => {
 };
 
 export const getSummaryResponseTransformer = async (data: any): Promise<GetSummaryResponse> => {
-    data = data.map((item: any) => contributorPracticeSummarySchemaResponseTransformer(item));
+    data = data.map((item: any) => developerPracticeSummarySchemaResponseTransformer(item));
     return data;
 };
 

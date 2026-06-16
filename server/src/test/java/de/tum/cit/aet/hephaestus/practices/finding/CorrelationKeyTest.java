@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
  * the {@code (practice, artifact, subject, file)} LOCUS, not the prose. These cases lock that grain and
  * what must NEVER perturb it.
  */
-class CorrelationKeyTest extends BaseUnitTest {
+class FindingFingerprintTest extends BaseUnitTest {
 
     private static final String SLUG = "ships-tests-with-the-change";
     private static final String TYPE = "PULL_REQUEST";
@@ -21,8 +21,8 @@ class CorrelationKeyTest extends BaseUnitTest {
     @Test
     @DisplayName("identical locus → identical 64-char key (deterministic across runs)")
     void deterministic() {
-        String a = CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
-        String b = CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
+        String a = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
+        String b = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
         assertThat(a).isEqualTo(b).hasSize(64).matches("[0-9a-f]{64}");
     }
 
@@ -30,34 +30,34 @@ class CorrelationKeyTest extends BaseUnitTest {
     @DisplayName("the title is NOT part of identity — re-wording the same concern keeps one key")
     void titleDoesNotParticipate() {
         // compute() no longer takes a title; same locus = same key regardless of how the agent phrased it.
-        String run1 = CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
-        String run2 = CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
+        String run1 = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
+        String run2 = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
         assertThat(run2).isEqualTo(run1);
     }
 
     @Test
     @DisplayName("the file PATH is part of identity; a different file is a different finding")
     void pathParticipates() {
-        String foo = CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
-        assertThat(CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "Bar.swift")).isNotEqualTo(foo);
+        String foo = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
+        assertThat(FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Bar.swift")).isNotEqualTo(foo);
     }
 
     @Test
     @DisplayName("a different practice / target / subject is a different finding")
     void discriminators() {
-        String base = CorrelationKey.compute(SLUG, TYPE, 42L, 7L, "F.swift");
-        assertThat(CorrelationKey.compute("other-practice", TYPE, 42L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(CorrelationKey.compute(SLUG, "ISSUE", 42L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(CorrelationKey.compute(SLUG, TYPE, 99L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(CorrelationKey.compute(SLUG, TYPE, 42L, 8L, "F.swift")).isNotEqualTo(base);
+        String base = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "F.swift");
+        assertThat(FindingFingerprint.compute("other-practice", TYPE, 42L, 7L, "F.swift")).isNotEqualTo(base);
+        assertThat(FindingFingerprint.compute(SLUG, "ISSUE", 42L, 7L, "F.swift")).isNotEqualTo(base);
+        assertThat(FindingFingerprint.compute(SLUG, TYPE, 99L, 7L, "F.swift")).isNotEqualTo(base);
+        assertThat(FindingFingerprint.compute(SLUG, TYPE, 42L, 8L, "F.swift")).isNotEqualTo(base);
     }
 
     @Test
     @DisplayName("a metadata practice (null path) correlates by (practice, target, subject) and is stable")
     void nullPathStable() {
-        String n1 = CorrelationKey.compute("mr-description-quality", TYPE, 42L, 7L, null);
-        String n2 = CorrelationKey.compute("mr-description-quality", TYPE, 42L, 7L, null);
+        String n1 = FindingFingerprint.compute("mr-description-quality", TYPE, 42L, 7L, null);
+        String n2 = FindingFingerprint.compute("mr-description-quality", TYPE, 42L, 7L, null);
         assertThat(n1).isEqualTo(n2).hasSize(64);
-        assertThat(n1).isNotEqualTo(CorrelationKey.compute("mr-description-quality", TYPE, 42L, 7L, "F.swift"));
+        assertThat(n1).isNotEqualTo(FindingFingerprint.compute("mr-description-quality", TYPE, 42L, 7L, "F.swift"));
     }
 }

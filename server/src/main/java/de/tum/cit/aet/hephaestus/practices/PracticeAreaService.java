@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for managing {@link PracticeGoal}s — the configurable learning-objective grouping over
+ * Service for managing {@link PracticeArea}s — the configurable learning-objective grouping over
  * practices — and binding practices to them.
  *
  * <p>A goal is a read-model/organizing concept: it groups practices for the dashboards and never
@@ -25,16 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class PracticeGoalService {
+public class PracticeAreaService {
 
-    private static final Logger log = LoggerFactory.getLogger(PracticeGoalService.class);
+    private static final Logger log = LoggerFactory.getLogger(PracticeAreaService.class);
 
-    private final PracticeGoalRepository practiceGoalRepository;
+    private final PracticeAreaRepository practiceGoalRepository;
     private final PracticeRepository practiceRepository;
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional(readOnly = true)
-    public List<PracticeGoal> listGoals(WorkspaceContext ctx, @Nullable Boolean activeOnly) {
+    public List<PracticeArea> listGoals(WorkspaceContext ctx, @Nullable Boolean activeOnly) {
         return Boolean.TRUE.equals(activeOnly)
             ? practiceGoalRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(ctx.id())
             : practiceGoalRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
@@ -49,23 +49,23 @@ public class PracticeGoalService {
     public void reorder(WorkspaceContext ctx, List<String> orderedSlugs) {
         int order = 0;
         for (String slug : orderedSlugs) {
-            PracticeGoal goal = practiceGoalRepository
+            PracticeArea goal = practiceGoalRepository
                 .findByWorkspaceIdAndSlug(ctx.id(), slug)
-                .orElseThrow(() -> new EntityNotFoundException("PracticeGoal", slug));
+                .orElseThrow(() -> new EntityNotFoundException("PracticeArea", slug));
             goal.setDisplayOrder(order++);
             practiceGoalRepository.save(goal);
         }
     }
 
     @Transactional(readOnly = true)
-    public PracticeGoal getGoal(WorkspaceContext ctx, String slug) {
+    public PracticeArea getGoal(WorkspaceContext ctx, String slug) {
         return practiceGoalRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
-            .orElseThrow(() -> new EntityNotFoundException("PracticeGoal", slug));
+            .orElseThrow(() -> new EntityNotFoundException("PracticeArea", slug));
     }
 
     @Transactional
-    public PracticeGoal createGoal(
+    public PracticeArea createGoal(
         WorkspaceContext ctx,
         String slug,
         String name,
@@ -73,7 +73,7 @@ public class PracticeGoalService {
         int displayOrder
     ) {
         if (practiceGoalRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
-            throw new PracticeGoalSlugConflictException(
+            throw new PracticeAreaSlugConflictException(
                 "A practice goal with slug '" + slug + "' already exists in this workspace."
             );
         }
@@ -81,7 +81,7 @@ public class PracticeGoalService {
             .findById(ctx.id())
             .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
 
-        PracticeGoal goal = new PracticeGoal();
+        PracticeArea goal = new PracticeArea();
         goal.setWorkspace(workspace);
         goal.setSlug(slug);
         goal.setName(name);
@@ -92,7 +92,7 @@ public class PracticeGoalService {
             goal = practiceGoalRepository.save(goal);
         } catch (DataIntegrityViolationException ex) {
             // Safety net for a concurrent create with the same slug.
-            throw new PracticeGoalSlugConflictException(
+            throw new PracticeAreaSlugConflictException(
                 "A practice goal with slug '" + slug + "' already exists in this workspace.",
                 ex
             );
@@ -102,14 +102,14 @@ public class PracticeGoalService {
     }
 
     @Transactional
-    public PracticeGoal updateGoal(
+    public PracticeArea updateGoal(
         WorkspaceContext ctx,
         String slug,
         @Nullable String name,
         @Nullable String description,
         @Nullable Integer displayOrder
     ) {
-        PracticeGoal goal = getGoal(ctx, slug);
+        PracticeArea goal = getGoal(ctx, slug);
         if (name != null) {
             goal.setName(name);
         }
@@ -123,16 +123,16 @@ public class PracticeGoalService {
     }
 
     @Transactional
-    public PracticeGoal setActive(WorkspaceContext ctx, String slug, boolean active) {
-        PracticeGoal goal = getGoal(ctx, slug);
+    public PracticeArea setActive(WorkspaceContext ctx, String slug, boolean active) {
+        PracticeArea goal = getGoal(ctx, slug);
         goal.setActive(active);
         return practiceGoalRepository.save(goal);
     }
 
-    /** Deletes a goal. Bound practices are unbound (their {@code practice_goal_id} is SET NULL by the FK). */
+    /** Deletes a goal. Bound practices are unbound (their {@code practice_area_id} is SET NULL by the FK). */
     @Transactional
     public void deleteGoal(WorkspaceContext ctx, String slug) {
-        PracticeGoal goal = getGoal(ctx, slug);
+        PracticeArea goal = getGoal(ctx, slug);
         practiceGoalRepository.delete(goal);
         log.info("Deleted practice goal (slug={}) in workspace {}", slug, ctx.slug());
     }
@@ -151,9 +151,9 @@ public class PracticeGoalService {
         if (goalSlug == null) {
             practice.setGoal(null);
         } else {
-            PracticeGoal goal = practiceGoalRepository
+            PracticeArea goal = practiceGoalRepository
                 .findByWorkspaceIdAndSlug(ctx.id(), goalSlug)
-                .orElseThrow(() -> new EntityNotFoundException("PracticeGoal", goalSlug));
+                .orElseThrow(() -> new EntityNotFoundException("PracticeArea", goalSlug));
             practice.setGoal(goal);
         }
         return practiceRepository.save(practice);

@@ -6,25 +6,25 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
+import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackContinuityKey;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingDisplayRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackOrigin;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.time.Instant;
@@ -118,16 +118,19 @@ public class FeedbackLedgerRecorder {
         }
 
         PracticeFinding any = findings.get(0);
-        long recipientUserId = any.getContributor().getId();
-        WorkArtifact targetType = any.getTargetType();
-        Long targetId = any.getTargetId();
-        String continuityKey = continuityKeyFor(any);
+        long recipientUserId = any.getDeveloper().getId();
+        WorkArtifact artifactType = any.getArtifactType();
+        Long artifactId = any.getArtifactId();
+        String feedbackThreadKey = feedbackThreadKeyFor(any);
 
         // Re-review supersession (ADR 0021 re-review UX): the prior live unit on this continuity line is the
         // one whose SUMMARY comment the delivery just edited in place. Flip it to SUPERSEDED and point this
         // new row's supersedes_id at it, preserving the temporal record of what the student saw each run.
         UUID supersedesId = feedbackRepository
-            .findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(continuityKey, FeedbackState.DELIVERED)
+            .findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
+                feedbackThreadKey,
+                FeedbackDeliveryState.DELIVERED
+            )
             .map(Feedback::getId)
             .orElse(null);
 
@@ -137,18 +140,18 @@ public class FeedbackLedgerRecorder {
                 .idempotencyKey(job.getId() + ":" + IN_CONTEXT_UNIT_ORDINAL)
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
-                .targetType(targetType)
-                .targetId(targetId)
+                .artifactType(artifactType)
+                .artifactId(artifactId)
                 .recipientUserId(recipientUserId)
                 .subjectUserId(any.getSubjectUserId())
-                .surface(FeedbackSurface.IN_CONTEXT)
+                .surface(FeedbackChannel.IN_CONTEXT)
                 .unitOrdinal(IN_CONTEXT_UNIT_ORDINAL)
-                .state(FeedbackState.DELIVERED)
+                .deliveryState(FeedbackDeliveryState.DELIVERED)
                 .renderedBody(delivery.mrNote())
                 .origin(FeedbackOrigin.AGENT)
                 .modelId(job.getLlmModel())
                 .composerVersion(DeliveryComposer.COMPOSER_VERSION)
-                .continuityKey(continuityKey)
+                .feedbackThreadKey(feedbackThreadKey)
                 .supersedesId(supersedesId)
                 .createdAt(now)
                 .deliveredAt(now)
@@ -159,7 +162,7 @@ public class FeedbackLedgerRecorder {
         // units on this line (a concurrent reader always sees exactly one). Native update — @Immutable forbids
         // an ORM-level state mutation.
         if (supersedesId != null) {
-            feedbackRepository.updateState(supersedesId, FeedbackState.SUPERSEDED.name());
+            feedbackRepository.updateState(supersedesId, FeedbackDeliveryState.SUPERSEDED.name());
         }
 
         // Findings already withheld earlier in the flow as SUPPRESSED (B2 reaction suppression writes its
@@ -176,7 +179,7 @@ public class FeedbackLedgerRecorder {
             ? PolicyFloorSelector.partition(
                   findings
                       .stream()
-                      .filter(f -> f.getVerdict() == Verdict.NOT_OBSERVED && !alreadySuppressed.contains(f.getId()))
+                      .filter(f -> f.getVerdict() == Observation.NOT_OBSERVED && !alreadySuppressed.contains(f.getId()))
                       .toList(),
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
               ).dropped()
@@ -192,16 +195,14 @@ public class FeedbackLedgerRecorder {
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
         List<PracticeFinding> assessed = findings
             .stream()
-            .filter(f -> f.getVerdict() != Verdict.NOT_APPLICABLE)
+            .filter(f -> f.getVerdict() != Observation.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
             .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
             .toList();
         int ordinal = 0;
         for (PracticeFinding f : assessed) {
-            FeedbackFindingDisplayRole role =
-                f.getVerdict() == Verdict.NOT_OBSERVED
-                    ? FeedbackFindingDisplayRole.PRIMARY
-                    : FeedbackFindingDisplayRole.SUPPORTING;
+            EvidenceRole role =
+                f.getVerdict() == Observation.NOT_OBSERVED ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
             feedbackFindingRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
@@ -209,7 +210,7 @@ public class FeedbackLedgerRecorder {
         feedbackPlacementRepository.save(
             FeedbackPlacement.builder()
                 .feedback(feedback)
-                .placement(PlacementSurface.SUMMARY)
+                .slot(PlacementSlot.SUMMARY)
                 .externalRef(job.getDeliveryCommentId())
                 .postedState(
                     job.getDeliveryCommentId() != null ? PlacementPostedState.POSTED : PlacementPostedState.FAILED
@@ -228,7 +229,7 @@ public class FeedbackLedgerRecorder {
                 feedbackPlacementRepository.save(
                     FeedbackPlacement.builder()
                         .feedback(feedback)
-                        .placement(PlacementSurface.INLINE)
+                        .slot(PlacementSlot.INLINE)
                         .anchorKind(note.endLine() != null ? PlacementAnchorKind.RANGE : PlacementAnchorKind.LINE)
                         .anchorPath(note.filePath())
                         .anchorStartLine(note.startLine())
@@ -256,12 +257,12 @@ public class FeedbackLedgerRecorder {
         }
 
         log.info(
-            "Feedback ledger recorded: jobId={}, unit={}, findings={}, inlinePlacements={}, continuityKey={}",
+            "Feedback ledger recorded: jobId={}, unit={}, findings={}, inlinePlacements={}, feedbackThreadKey={}",
             job.getId(),
             feedback.getId(),
             assessed.size(),
             artifact == WorkArtifact.PULL_REQUEST ? delivery.diffNotes().size() : 0,
-            continuityKey
+            feedbackThreadKey
         );
     }
 
@@ -283,13 +284,13 @@ public class FeedbackLedgerRecorder {
                     .idempotencyKey(job.getId() + ":" + unitOrdinal)
                     .agentJobId(job.getId())
                     .workspaceId(job.getWorkspace().getId())
-                    .targetType(droppedFinding.getTargetType())
-                    .targetId(droppedFinding.getTargetId())
-                    .recipientUserId(droppedFinding.getContributor().getId())
+                    .artifactType(droppedFinding.getArtifactType())
+                    .artifactId(droppedFinding.getArtifactId())
+                    .recipientUserId(droppedFinding.getDeveloper().getId())
                     .subjectUserId(droppedFinding.getSubjectUserId())
-                    .surface(FeedbackSurface.IN_CONTEXT)
+                    .surface(FeedbackChannel.IN_CONTEXT)
                     .unitOrdinal(unitOrdinal)
-                    .state(FeedbackState.SUPPRESSED)
+                    .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                     .suppressionReason(FeedbackSuppressionReason.POLICY_FLOOR_DROP)
                     .origin(FeedbackOrigin.AGENT)
                     .modelId(job.getLlmModel())
@@ -300,7 +301,7 @@ public class FeedbackLedgerRecorder {
             feedbackFindingRepository.insertIfAbsent(
                 unit.getId(),
                 droppedFinding.getId(),
-                FeedbackFindingDisplayRole.PRIMARY.name(),
+                EvidenceRole.PRIMARY.name(),
                 0
             );
         }
@@ -323,14 +324,17 @@ public class FeedbackLedgerRecorder {
         if (findings.isEmpty()) {
             return Optional.empty();
         }
-        String continuityKey = continuityKeyFor(findings.get(0));
+        String feedbackThreadKey = feedbackThreadKeyFor(findings.get(0));
         return feedbackRepository
-            .findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(continuityKey, FeedbackState.DELIVERED)
+            .findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
+                feedbackThreadKey,
+                FeedbackDeliveryState.DELIVERED
+            )
             .flatMap(prior ->
                 feedbackPlacementRepository
                     .findByFeedbackId(prior.getId())
                     .stream()
-                    .filter(p -> p.getPlacement() == PlacementSurface.SUMMARY)
+                    .filter(p -> p.getSlot() == PlacementSlot.SUMMARY)
                     .map(FeedbackPlacement::getExternalRef)
                     .filter(ref -> ref != null && !ref.isBlank())
                     .findFirst()
@@ -357,38 +361,33 @@ public class FeedbackLedgerRecorder {
                 .idempotencyKey(job.getId() + ":" + unitOrdinal)
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
-                .targetType(finding.getTargetType())
-                .targetId(finding.getTargetId())
-                .recipientUserId(finding.getContributor().getId())
+                .artifactType(finding.getArtifactType())
+                .artifactId(finding.getArtifactId())
+                .recipientUserId(finding.getDeveloper().getId())
                 .subjectUserId(finding.getSubjectUserId())
-                .surface(FeedbackSurface.IN_CONTEXT)
+                .surface(FeedbackChannel.IN_CONTEXT)
                 .unitOrdinal(unitOrdinal)
-                .state(FeedbackState.SUPPRESSED)
+                .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                 .suppressionReason(reason)
                 .origin(FeedbackOrigin.AGENT)
                 .modelId(job.getLlmModel())
                 .composerVersion(DeliveryComposer.COMPOSER_VERSION)
-                .continuityKey(continuityKeyFor(finding))
+                .feedbackThreadKey(feedbackThreadKeyFor(finding))
                 .createdAt(now)
                 .build()
         );
-        feedbackFindingRepository.insertIfAbsent(
-            feedback.getId(),
-            finding.getId(),
-            FeedbackFindingDisplayRole.PRIMARY.name(),
-            0
-        );
+        feedbackFindingRepository.insertIfAbsent(feedback.getId(), finding.getId(), EvidenceRole.PRIMARY.name(), 0);
         log.info(
-            "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, correlationKey={}",
+            "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, findingFingerprint={}",
             job.getId(),
             feedback.getId(),
             reason,
-            finding.getCorrelationKey()
+            finding.getFindingFingerprint()
         );
     }
 
     /**
-     * Find the delivery signal for a posted note. Primary match is the stable {@code correlationKey} (the
+     * Find the delivery signal for a posted note. Primary match is the stable {@code findingFingerprint} (the
      * cross-run identity); when it is absent on either side (legacy / unkeyed notes) we fall back to the diff
      * coordinates the signal anchored at — path + the note's terminal line, which for a single-line note is its
      * start and for a range its end. Returns {@code null} when nothing matches (no signal was emitted).
@@ -397,9 +396,9 @@ public class FeedbackLedgerRecorder {
         if (signals.isEmpty()) {
             return null;
         }
-        if (note.correlationKey() != null) {
+        if (note.findingFingerprint() != null) {
             for (DeliveredSignal s : signals) {
-                if (note.correlationKey().equals(s.correlationKey())) {
+                if (note.findingFingerprint().equals(s.findingFingerprint())) {
                     return s;
                 }
             }
@@ -427,12 +426,12 @@ public class FeedbackLedgerRecorder {
     }
 
     /** The stable continuity line for a finding: (target, recipient, in-context surface). */
-    private static String continuityKeyFor(PracticeFinding any) {
-        return FeedbackContinuityKey.compute(
-            any.getTargetType().name(),
-            any.getTargetId(),
-            any.getContributor().getId(),
-            FeedbackSurface.IN_CONTEXT
+    private static String feedbackThreadKeyFor(PracticeFinding any) {
+        return FeedbackThreadKey.compute(
+            any.getArtifactType().name(),
+            any.getArtifactId(),
+            any.getDeveloper().getId(),
+            FeedbackChannel.IN_CONTEXT
         );
     }
 }

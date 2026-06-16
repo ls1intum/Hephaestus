@@ -130,7 +130,7 @@ class DiffNotePoster {
                 ? new FindingAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
                 : new FindingAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
             findings.add(
-                new InlineFindingChannel.InlineFinding(anchor, sanitized, HEPHAESTUS_MARKER, note.correlationKey())
+                new InlineFindingChannel.InlineFinding(anchor, sanitized, HEPHAESTUS_MARKER, note.findingFingerprint())
             );
         }
         return findings;

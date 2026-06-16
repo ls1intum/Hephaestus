@@ -1,10 +1,10 @@
 /**
- * Code-health module — AI-driven practice detection and contributor findings.
+ * Code-health module — AI-driven practice detection and developer findings.
  *
  * <p>Listens for {@code ScmDomainEvent}s from {@link de.tum.cit.aet.hephaestus.integration.scm}
  * processors, gates new reviews via {@code PracticeReviewDetectionGate}, dispatches agent
  * jobs through {@link de.tum.cit.aet.hephaestus.agent}, and persists results as
- * {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding}. Contributor
+ * {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding}. Developer
  * feedback lives in the same module.
  *
  * <p>Sub-packages expose narrow APIs via {@link org.springframework.modulith.NamedInterface}:

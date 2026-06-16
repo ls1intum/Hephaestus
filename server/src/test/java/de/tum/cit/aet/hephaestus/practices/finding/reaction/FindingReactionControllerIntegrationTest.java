@@ -11,10 +11,10 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -75,7 +75,6 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
-        practice.setCategory("test");
         practice.setCriteria("Test description");
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
@@ -87,16 +86,17 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        // Create a practice finding with the admin user as contributor
+        // Create a practice finding with the admin user as developer
         finding = PracticeFinding.builder()
             .idempotencyKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
             .practice(practice)
-            .targetType(WorkArtifact.PULL_REQUEST)
-            .targetId(42L)
-            .contributor(adminUser)
+            .artifactType(WorkArtifact.PULL_REQUEST)
+            .artifactId(42L)
+            .developer(adminUser)
+            .subjectUserId(adminUser.getId())
             .title("Missing error handling")
-            .verdict(Verdict.NOT_OBSERVED)
+            .verdict(Observation.NOT_OBSERVED)
             .severity(Severity.MAJOR)
             .confidence(0.85f)
             .detectedAt(Instant.now())
@@ -224,8 +224,8 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        void nonContributorReturns403() {
-            // "mentor" user exists in DB and has workspace membership, but is NOT the finding's contributor
+        void nonDeveloperReturns403() {
+            // "mentor" user exists in DB and has workspace membership, but is NOT the finding's developer
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 

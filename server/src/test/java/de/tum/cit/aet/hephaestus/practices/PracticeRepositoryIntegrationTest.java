@@ -35,12 +35,11 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("practice-test"));
     }
 
-    private Practice createPractice(String slug, String name, String category) {
+    private Practice createPractice(String slug, String name) {
         Practice practice = new Practice();
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
-        practice.setCategory(category);
         practice.setCriteria("Default criteria for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practice;
@@ -51,7 +50,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void savesAndRetrieves() {
-            Practice practice = createPractice("test-slug", "Test Practice", "test-category");
+            Practice practice = createPractice("test-slug", "Test Practice");
             practice.setCriteria("Check for quality");
             practice.setActive(false);
 
@@ -64,7 +63,6 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             Practice found = practiceRepository.findById(saved.getId()).orElseThrow();
             assertThat(found.getSlug()).isEqualTo("test-slug");
             assertThat(found.getName()).isEqualTo("Test Practice");
-            assertThat(found.getCategory()).isEqualTo("test-category");
             assertThat(found.getTriggerEvents().toString()).contains("PullRequestCreated");
             assertThat(found.getCriteria()).isEqualTo("Check for quality");
             assertThat(found.isActive()).isFalse();
@@ -76,9 +74,9 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void rejectsDuplicateSlugInWorkspace() {
-            practiceRepository.save(createPractice("unique-slug", "First", "cat"));
+            practiceRepository.save(createPractice("unique-slug", "First"));
 
-            Practice duplicate = createPractice("unique-slug", "Second", "cat");
+            Practice duplicate = createPractice("unique-slug", "Second");
             assertThatThrownBy(() -> practiceRepository.saveAndFlush(duplicate)).isInstanceOf(
                 DataIntegrityViolationException.class
             );
@@ -86,12 +84,12 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void allowsSameSlugInDifferentWorkspaces() {
-            practiceRepository.save(createPractice("shared-slug", "First", "cat"));
+            practiceRepository.save(createPractice("shared-slug", "First"));
 
             Workspace otherWorkspace = workspaceRepository.save(
                 WorkspaceTestFixtures.activeWorkspace("other-workspace")
             );
-            Practice otherPractice = createPractice("shared-slug", "Second", "cat");
+            Practice otherPractice = createPractice("shared-slug", "Second");
             otherPractice.setWorkspace(otherWorkspace);
 
             Practice saved = practiceRepository.saveAndFlush(otherPractice);
@@ -104,8 +102,8 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void findsActivePracticesOnly() {
-            Practice active = createPractice("active", "Active", "cat");
-            Practice inactive = createPractice("inactive", "Inactive", "cat");
+            Practice active = createPractice("active", "Active");
+            Practice inactive = createPractice("inactive", "Inactive");
             inactive.setActive(false);
             practiceRepository.save(active);
             practiceRepository.save(inactive);
@@ -119,8 +117,8 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("findByWorkspaceIdAndSlug returns matching practice")
         void findsBySlug() {
-            practiceRepository.save(createPractice("target", "Target", "cat"));
-            practiceRepository.save(createPractice("other", "Other", "cat"));
+            practiceRepository.save(createPractice("target", "Target"));
+            practiceRepository.save(createPractice("other", "Other"));
 
             var found = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "target");
 
@@ -132,18 +130,18 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void existsByWorkspace() {
             assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isFalse();
 
-            practiceRepository.save(createPractice("test", "Test", "cat"));
+            practiceRepository.save(createPractice("test", "Test"));
 
             assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isTrue();
         }
 
         @Test
         void deletesAllByWorkspace() {
-            practiceRepository.save(createPractice("one", "One", "cat"));
-            practiceRepository.save(createPractice("two", "Two", "cat"));
+            practiceRepository.save(createPractice("one", "One"));
+            practiceRepository.save(createPractice("two", "Two"));
 
             Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
-            Practice otherPractice = createPractice("other", "Other", "cat");
+            Practice otherPractice = createPractice("other", "Other");
             otherPractice.setWorkspace(otherWorkspace);
             practiceRepository.save(otherPractice);
 

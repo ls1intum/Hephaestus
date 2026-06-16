@@ -25,9 +25,9 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -183,7 +183,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             );
         lenient()
             .when(
-                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
                     de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
@@ -253,7 +253,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 new LinkedHashMap<>(Map.of("inputs/context/metadata.json", metadataBytes))
             );
             when(
-                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
                     de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
@@ -303,7 +303,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void rejectsMalformedSlug() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(
-                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
                     de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
@@ -318,7 +318,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void throwsWhenNoActivePractices() {
             when(workspaceContextBuilder.build(any())).thenReturn(new LinkedHashMap<>());
             when(
-                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
                     de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
@@ -346,7 +346,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             providerFiles.put("inputs/context/comments.json", "[]".getBytes(StandardCharsets.UTF_8));
             when(workspaceContextBuilder.build(any())).thenReturn(providerFiles);
             when(
-                practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
+                practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(
                     WORKSPACE_ID,
                     de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST
                 )
@@ -367,14 +367,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingInDiff() {
-            var finding = finding("fatal-error-crash", Verdict.NOT_OBSERVED, "Sources/View.swift");
+            var finding = finding("fatal-error-crash", Observation.NOT_OBSERVED, "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Verdict.NOT_OBSERVED, "inputs/context/metadata.json");
+            var finding = finding("mr-description-quality", Observation.NOT_OBSERVED, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
@@ -383,19 +383,19 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void filtersFindingBackedByNonWhitelistedInternal() {
             // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
             // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
-            var finding = finding("review-noise", Verdict.NOT_OBSERVED, "inputs/context/contributor_history.json");
+            var finding = finding("review-noise", Observation.NOT_OBSERVED, "inputs/context/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         @Test
         void filtersFindingOutsideDiff() {
-            var finding = finding("view-logic-separation", Verdict.NOT_OBSERVED, "Sources/Other.swift");
+            var finding = finding("view-logic-separation", Observation.NOT_OBSERVED, "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Verdict verdict, String path) {
+        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Observation verdict, String path) {
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "title",
@@ -480,7 +480,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         @SuppressWarnings("unchecked")
-        void stampsDeliveryCorrelationKeyOntoComposedDiffNote() {
+        void stampsDeliveryFindingFingerprintOntoComposedDiffNote() {
             // A NOT_OBSERVED finding with a code location synthesizes an inline diff note. The key deliver()
             // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the
             // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).
@@ -523,7 +523,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             PracticeDetectionResultParser.DeliveryContent delivered = captor.getValue();
             assertThat(delivered).isNotNull();
             assertThat(delivered.diffNotes()).hasSize(1);
-            assertThat(delivered.diffNotes().get(0).correlationKey()).isEqualTo("corr-error-handling");
+            assertThat(delivered.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-error-handling");
         }
     }
 }

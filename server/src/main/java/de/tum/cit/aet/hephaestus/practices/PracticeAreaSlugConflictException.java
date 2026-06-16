@@ -7,16 +7,16 @@ import java.io.Serial;
  * Mapped to an RFC-7807 {@code ProblemDetail} by {@link PracticesControllerAdvice}, mirroring
  * {@link PracticeSlugConflictException} so both conflicts in this module return the same 409 shape.
  */
-public class PracticeGoalSlugConflictException extends RuntimeException {
+public class PracticeAreaSlugConflictException extends RuntimeException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public PracticeGoalSlugConflictException(String message) {
+    public PracticeAreaSlugConflictException(String message) {
         super(message);
     }
 
-    public PracticeGoalSlugConflictException(String message, Throwable cause) {
+    public PracticeAreaSlugConflictException(String message, Throwable cause) {
         super(message, cause);
     }
 }

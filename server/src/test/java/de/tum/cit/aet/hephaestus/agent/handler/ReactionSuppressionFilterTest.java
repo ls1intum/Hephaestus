@@ -12,16 +12,15 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey;
+import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReaction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -47,7 +46,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     private static final long CONTRIBUTOR = 7L;
     private static final long TARGET = 100L;
     // The canonical key the filter recomputes for a SLUG finding with no location — the SAME value deliver() persists.
-    private static final String CK = CorrelationKey.compute(
+    private static final String CK = FindingFingerprint.compute(
         SLUG,
         WorkArtifact.PULL_REQUEST.name(),
         TARGET,
@@ -66,7 +65,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void flagOff_passesThroughUnchanged_noRepoCalls() {
-        List<ValidatedFinding> in = List.of(vf(SLUG, Verdict.NOT_OBSERVED));
+        List<ValidatedFinding> in = List.of(vf(SLUG, Observation.NOT_OBSERVED));
 
         var d = filter(false).evaluate(TestEntities.agentJob(), in);
 
@@ -79,7 +78,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void disputedLocus_isSuppressedAndLedgered() {
         stubPersistedAndReaction(FindingReactionAction.DISPUTED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Verdict.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
 
         assertThat(d.deliverable()).isEmpty();
         assertThat(d.suppressedCount()).isEqualTo(1);
@@ -100,7 +99,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         var filter = filter(true);
         var job = TestEntities.agentJob();
-        var in = List.of(vf(SLUG, Verdict.NOT_OBSERVED));
+        var in = List.of(vf(SLUG, Observation.NOT_OBSERVED));
 
         assertThatCode(() -> filter.evaluate(job, in)).doesNotThrowAnyException();
         assertThat(filter.evaluate(job, in).deliverable()).isEmpty(); // still suppressed despite the failed write
@@ -110,11 +109,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
         when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByCorrelationKeysAndContributor(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(findingReactionRepository.findLatestByFindingFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of()
         );
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Verdict.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -124,7 +123,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void appliedButStillNotObserved_isKeptWithStifferOpener() {
         stubPersistedAndReaction(FindingReactionAction.APPLIED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Verdict.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -137,7 +136,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         // untouched (escalation is keyed on verdict == NOT_OBSERVED, not on the reaction alone).
         stubPersistedAndReaction(FindingReactionAction.APPLIED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Verdict.OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.OBSERVED)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -150,12 +149,12 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(CK);
         var reaction = reaction(action);
         when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByCorrelationKeysAndContributor(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(findingReactionRepository.findLatestByFindingFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of(reaction)
         );
     }
 
-    private static ValidatedFinding vf(String slug, Verdict verdict) {
+    private static ValidatedFinding vf(String slug, Observation verdict) {
         return new ValidatedFinding(
             slug,
             slug + " title",
@@ -169,21 +168,19 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
-    private PracticeFinding pf(String correlationKey) {
+    private PracticeFinding pf(String findingFingerprint) {
         PracticeFinding pf = org.mockito.Mockito.mock(PracticeFinding.class);
-        User contributor = new User();
-        contributor.setId(CONTRIBUTOR);
-        when(pf.getCorrelationKey()).thenReturn(correlationKey);
-        when(pf.getContributor()).thenReturn(contributor);
-        when(pf.getSubjectUserId()).thenReturn(null);
-        when(pf.getTargetType()).thenReturn(WorkArtifact.PULL_REQUEST);
-        when(pf.getTargetId()).thenReturn(TARGET);
+        // subject_user_id is always populated; for author-side findings it equals the developer.
+        when(pf.getFindingFingerprint()).thenReturn(findingFingerprint);
+        when(pf.getSubjectUserId()).thenReturn(CONTRIBUTOR);
+        when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        when(pf.getArtifactId()).thenReturn(TARGET);
         return pf;
     }
 
     private static FindingReaction reaction(FindingReactionAction action) {
         FindingReaction r = org.mockito.Mockito.mock(FindingReaction.class);
-        when(r.getCorrelationKey()).thenReturn(CK);
+        when(r.getFindingFingerprint()).thenReturn(CK);
         when(r.getAction()).thenReturn(action);
         return r;
     }

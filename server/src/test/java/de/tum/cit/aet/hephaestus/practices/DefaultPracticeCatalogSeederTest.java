@@ -26,13 +26,13 @@ import tools.jackson.databind.json.JsonMapper;
 class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Mock
-    private PracticeGoalService goalService;
+    private PracticeAreaService goalService;
 
     @Mock
     private PracticeService practiceService;
 
     @Mock
-    private PracticeGoalRepository goalRepository;
+    private PracticeAreaRepository goalRepository;
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -81,7 +81,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(goalService, times(32)).bindPractice(any(), any(), any());
 
         // 6 of the 32 practices are issue-focused and must seed with WorkArtifact.ISSUE.
-        var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::focusArtifact).toList();
+        var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::artifactType).toList();
         assertThat(foci).contains(WorkArtifact.ISSUE, WorkArtifact.PULL_REQUEST);
         assertThat(
             foci
@@ -98,7 +98,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             assertThat(fence).as("preamble fenced ahead of the practice criteria").isGreaterThan(40);
             String preamble = request.criteria().substring(0, fence);
             assertThat(preamble).containsIgnoringCase(
-                request.focusArtifact() == WorkArtifact.ISSUE ? "issue" : "pull request"
+                request.artifactType() == WorkArtifact.ISSUE ? "issue" : "pull request"
             );
         }
     }

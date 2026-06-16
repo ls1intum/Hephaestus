@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * <p>Each field represents the count of reaction events with that action type.
  * Zero counts are returned as 0, not omitted.
  */
-@Schema(description = "Reaction engagement statistics for a contributor in a workspace")
+@Schema(description = "Reaction engagement statistics for a developer in a workspace")
 public record FindingReactionEngagementDTO(
     @Schema(description = "Number of findings marked as applied/fixed", requiredMode = Schema.RequiredMode.REQUIRED)
     long applied,

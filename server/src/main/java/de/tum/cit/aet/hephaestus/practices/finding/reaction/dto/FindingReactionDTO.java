@@ -7,9 +7,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Response DTO representing a contributor's reaction on a practice finding.
+ * Response DTO representing a developer's reaction on a practice finding.
  */
-@Schema(description = "Contributor reaction to an AI-generated practice finding")
+@Schema(description = "Developer reaction to an AI-generated practice finding")
 public record FindingReactionDTO(
     @Schema(description = "Unique reaction ID", requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
     @Schema(description = "ID of the finding this reaction is about", requiredMode = Schema.RequiredMode.REQUIRED)

@@ -1,5 +1,5 @@
 /**
- * Domain primitives — {@code Practice}, {@code PracticeFinding}, {@code Verdict},
+ * Domain primitives — {@code Practice}, {@code PracticeFinding}, {@code Observation},
  * {@code Severity}, {@code WorkArtifact}. Read-only DTO-like types referenced
  * by consumers ({@code agent}, {@code notification}, downstream views).
  */

@@ -16,34 +16,34 @@ class PolarityTest extends BaseUnitTest {
     @Test
     @DisplayName("DESIRABLE: NOT_OBSERVED is the problem, OBSERVED is the strength")
     void desirable() {
-        assertThat(Polarity.DESIRABLE.isProblem(Verdict.NOT_OBSERVED)).isTrue();
-        assertThat(Polarity.DESIRABLE.isProblem(Verdict.OBSERVED)).isFalse();
-        assertThat(Polarity.DESIRABLE.isStrength(Verdict.OBSERVED)).isTrue();
-        assertThat(Polarity.DESIRABLE.isStrength(Verdict.NOT_OBSERVED)).isFalse();
+        assertThat(Polarity.DESIRABLE.isProblem(Observation.NOT_OBSERVED)).isTrue();
+        assertThat(Polarity.DESIRABLE.isProblem(Observation.OBSERVED)).isFalse();
+        assertThat(Polarity.DESIRABLE.isStrength(Observation.OBSERVED)).isTrue();
+        assertThat(Polarity.DESIRABLE.isStrength(Observation.NOT_OBSERVED)).isFalse();
     }
 
     @Test
     @DisplayName("UNDESIRABLE: OBSERVED (did the bad thing) is the problem, NOT_OBSERVED is the strength")
     void undesirable() {
-        assertThat(Polarity.UNDESIRABLE.isProblem(Verdict.OBSERVED)).isTrue();
-        assertThat(Polarity.UNDESIRABLE.isProblem(Verdict.NOT_OBSERVED)).isFalse();
-        assertThat(Polarity.UNDESIRABLE.isStrength(Verdict.NOT_OBSERVED)).isTrue();
-        assertThat(Polarity.UNDESIRABLE.isStrength(Verdict.OBSERVED)).isFalse();
+        assertThat(Polarity.UNDESIRABLE.isProblem(Observation.OBSERVED)).isTrue();
+        assertThat(Polarity.UNDESIRABLE.isProblem(Observation.NOT_OBSERVED)).isFalse();
+        assertThat(Polarity.UNDESIRABLE.isStrength(Observation.NOT_OBSERVED)).isTrue();
+        assertThat(Polarity.UNDESIRABLE.isStrength(Observation.OBSERVED)).isFalse();
     }
 
     @Test
-    @DisplayName("MIXED follows the desirable direction (NOT_OBSERVED is the problem)")
+    @DisplayName("CONTEXTUAL follows the desirable direction (NOT_OBSERVED is the problem)")
     void mixed() {
-        assertThat(Polarity.MIXED.isProblem(Verdict.NOT_OBSERVED)).isTrue();
-        assertThat(Polarity.MIXED.isStrength(Verdict.OBSERVED)).isTrue();
+        assertThat(Polarity.CONTEXTUAL.isProblem(Observation.NOT_OBSERVED)).isTrue();
+        assertThat(Polarity.CONTEXTUAL.isStrength(Observation.OBSERVED)).isTrue();
     }
 
     @Test
     @DisplayName("NOT_APPLICABLE is never a problem nor a strength, regardless of polarity")
     void notApplicableIsNeither() {
         for (Polarity p : Polarity.values()) {
-            assertThat(p.isProblem(Verdict.NOT_APPLICABLE)).as("%s problem", p).isFalse();
-            assertThat(p.isStrength(Verdict.NOT_APPLICABLE)).as("%s strength", p).isFalse();
+            assertThat(p.isProblem(Observation.NOT_APPLICABLE)).as("%s problem", p).isFalse();
+            assertThat(p.isStrength(Observation.NOT_APPLICABLE)).as("%s strength", p).isFalse();
         }
     }
 }

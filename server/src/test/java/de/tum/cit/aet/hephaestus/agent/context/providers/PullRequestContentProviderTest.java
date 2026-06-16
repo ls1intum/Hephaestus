@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.finding.ContributorHistoryProvider;
+import de.tum.cit.aet.hephaestus.practices.finding.DeveloperHistoryProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +48,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     private PullRequestReviewCommentRepository reviewCommentRepository;
 
     @Mock
-    private ContributorHistoryProvider contributorHistoryProvider;
+    private DeveloperHistoryProvider developerHistoryProvider;
 
     @Mock
     private GitDiffOperations gitDiffOperations;
@@ -67,7 +67,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             gitRepositoryManager,
             pullRequestRepository,
             reviewCommentRepository,
-            contributorHistoryProvider,
+            developerHistoryProvider,
             gitDiffOperations,
             connectionService,
             List.of()
@@ -218,10 +218,10 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
-    class ContributorHistory {
+    class DeveloperHistory {
 
         @Test
-        void includesContributorHistory() {
+        void includesDeveloperHistory() {
             PullRequest pr = new PullRequest();
             pr.setTitle("Fix bug");
             User author = new User();
@@ -234,7 +234,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
             byte[] historyJson = "[{\"practice\":\"error-handling\",\"negative\":3}]".getBytes(StandardCharsets.UTF_8);
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
+            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
@@ -254,7 +254,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
+            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
 
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
@@ -274,7 +274,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             stubGit();
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pr));
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
+            when(developerHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
                 new RuntimeException("DB connection timeout")
             );
 
@@ -297,7 +297,7 @@ class PullRequestContentProviderTest extends BaseUnitTest {
             Map<String, byte[]> files = new LinkedHashMap<>();
             provider.contribute(request(sampleMetadata()), files);
 
-            verifyNoInteractions(contributorHistoryProvider);
+            verifyNoInteractions(developerHistoryProvider);
             assertThat(files).doesNotContainKey("inputs/context/contributor_history.json");
         }
     }

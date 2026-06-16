@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
@@ -62,7 +62,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             humanizeTitle(slug) + " (positive)",
-            Verdict.OBSERVED,
+            Observation.OBSERVED,
             Severity.INFO,
             0.90f,
             null,
@@ -84,7 +84,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Verdict.NOT_OBSERVED,
+            Observation.NOT_OBSERVED,
             severity,
             0.92f,
             buildEvidence(locations, snippets),
@@ -244,7 +244,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding withReasoning = new ValidatedFinding(
             "error-state-handling",
             "Error state handling (positive)",
-            Verdict.OBSERVED,
+            Observation.OBSERVED,
             Severity.INFO,
             0.95f,
             null,
@@ -801,7 +801,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Verdict.OBSERVED,
+            Observation.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -812,7 +812,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding real = new ValidatedFinding(
             "issue-scoped-to-single-concern",
             "Single concern",
-            Verdict.OBSERVED,
+            Observation.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -835,7 +835,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Verdict.OBSERVED,
+            Observation.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -891,7 +891,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding na1 = new ValidatedFinding(
             "issue-scoped-to-single-concern",
             "n/a",
-            Verdict.NOT_APPLICABLE,
+            Observation.NOT_APPLICABLE,
             Severity.INFO,
             0.9f,
             null,
@@ -902,7 +902,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding na2 = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "n/a",
-            Verdict.NOT_APPLICABLE,
+            Observation.NOT_APPLICABLE,
             Severity.INFO,
             0.9f,
             null,
@@ -1104,7 +1104,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Verdict.NOT_OBSERVED,
+            Observation.NOT_OBSERVED,
             severity,
             confidence,
             buildEvidence(List.of(new LocationSpec(slug + ".swift", 10)), null),
@@ -1225,7 +1225,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding observed = new ValidatedFinding(
             "uses-force-unwrap",
             "Force-unwrap present in changed code",
-            Verdict.OBSERVED,
+            Observation.OBSERVED,
             Severity.MAJOR,
             0.92f,
             buildEvidence(List.of(new LocationSpec("Views/StockView.swift", 42)), List.of("let u = URL(s)!")),
@@ -1339,7 +1339,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_synthesizedDiffNote_carriesFindingCorrelationKey() {
+    void compose_synthesizedDiffNote_carriesFindingFindingFingerprint() {
         // A stamped finding (no agent suggestedDiffNotes) must propagate its correlation key onto the
         // synthesized diff note so the inline channel can match the placement back to the persisted finding.
         ValidatedFinding stamped = negativeFinding(
@@ -1350,13 +1350,13 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove the commented-out block."
-        ).withCorrelationKey("corr-synth-123");
+        ).withFindingFingerprint("corr-synth-123");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
         assertThat(result).isNotNull();
         assertThat(result.diffNotes()).hasSize(1);
-        assertThat(result.diffNotes().get(0).correlationKey()).isEqualTo("corr-synth-123");
+        assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-synth-123");
     }
 
     // ----- Signal-driven inline-section demotion (C1) -----
@@ -1375,7 +1375,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove it."
-        ).withCorrelationKey("corr-delivered");
+        ).withFindingFingerprint("corr-delivered");
         ValidatedFinding failed = negativeFinding(
             "meaningful-naming",
             "Non-descriptive name 'Data'",
@@ -1384,7 +1384,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Rename to a domain term.",
             "Use PortfolioSnapshot."
-        ).withCorrelationKey("corr-failed");
+        ).withFindingFingerprint("corr-failed");
 
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
@@ -1422,7 +1422,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withCorrelationKey("k-a");
+        ).withFindingFingerprint("k-a");
         ValidatedFinding b = negativeFinding(
             "code-hygiene",
             "Dead code B",
@@ -1431,7 +1431,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withCorrelationKey("k-b");
+        ).withFindingFingerprint("k-b");
 
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(a, b),
@@ -1471,21 +1471,21 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_agentSuggestedDiffNote_inheritsFindingCorrelationKey() {
+    void compose_agentSuggestedDiffNote_inheritsFindingFindingFingerprint() {
         // When the agent supplied its own suggestedDiffNote (which carries no key of its own), the finding's
         // stamped key must still be carried over to the emitted note.
         DiffNote suggested = new DiffNote("Views/DashboardView.swift", 20, null, "Consider extracting this.");
         ValidatedFinding stamped = new ValidatedFinding(
             "code-hygiene",
             "Long method",
-            Verdict.NOT_OBSERVED,
+            Observation.NOT_OBSERVED,
             Severity.MINOR,
             0.9f,
             buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withCorrelationKey("corr-suggested-456");
+        ).withFindingFingerprint("corr-suggested-456");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1493,6 +1493,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes()).hasSize(1);
         // Body comes from the agent's suggestion; the key comes from the (stamped) finding.
         assertThat(result.diffNotes().get(0).body()).isEqualTo("Consider extracting this.");
-        assertThat(result.diffNotes().get(0).correlationKey()).isEqualTo("corr-suggested-456");
+        assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-suggested-456");
     }
 }

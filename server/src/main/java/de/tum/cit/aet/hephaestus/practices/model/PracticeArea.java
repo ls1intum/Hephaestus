@@ -24,16 +24,15 @@ import lombok.ToString;
 
 /**
  * Workspace-scoped <b>practice goal</b> — a configurable learning objective that groups practices,
- * naming a development behaviour expected of contributors (e.g. "effective review communication").
+ * naming a development behaviour expected of developers (e.g. "effective review communication").
  *
  * <p>A goal is a <b>read-model / organizing</b> concept only. Practices remain the unit of detection;
  * a goal never enters {@code trigger_events}, {@code criteria}, the detector, or the
- * {@link PracticeFinding} schema. Goals organise findings for contributors (Reflection Dashboard) and
+ * {@link PracticeFinding} schema. Goals organise findings for developers (Reflection Dashboard) and
  * facilitators (Facilitator Dashboard).
  *
- * <p><b>Three orthogonal axes — do not conflate:</b> a goal (this configurable learning-objective axis)
- * is distinct from a practice's intrinsic {@link Practice#getCategory() category} (catalog taxonomy) and
- * from the delivery channel (Hattie level). A practice belongs to at most one goal
+ * <p><b>Two orthogonal axes — do not conflate:</b> a goal (this configurable learning-objective axis)
+ * is distinct from the delivery channel (Hattie level). A practice belongs to at most one goal
  * (see {@link Practice#getGoal()}): the 1:N binding is load-bearing for the per-goal acted-on/total
  * progress denominator — do not loosen it to a many-to-many join without also switching progress math
  * to per-(goal, practice) rows.
@@ -52,7 +51,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class PracticeGoal {
+public class PracticeArea {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

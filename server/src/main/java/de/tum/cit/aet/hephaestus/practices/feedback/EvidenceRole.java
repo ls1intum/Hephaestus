@@ -12,7 +12,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  *   <li>{@link #SUPPORTING} — corroborating evidence folded into the same unit.</li>
  * </ul>
  */
-public enum FeedbackFindingDisplayRole {
+public enum EvidenceRole {
     /** Anchors the feedback unit's headline message. */
     PRIMARY,
     /** Corroborating evidence folded into the same feedback unit. */

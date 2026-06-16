@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGoalRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
@@ -48,12 +48,12 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeCatalogController {
 
     private final PracticeService practiceService;
-    private final PracticeGoalService goalService;
+    private final PracticeAreaService goalService;
 
     @GetMapping
     @Operation(
         summary = "List practice definitions",
-        description = "Returns all practice definitions for the workspace, optionally filtered by category and/or active state"
+        description = "Returns all practice definitions for the workspace, optionally filtered by active state"
     )
     @ApiResponse(
         responseCode = "200",
@@ -63,13 +63,12 @@ public class PracticeCatalogController {
     @SecurityRequirements
     public ResponseEntity<List<PracticeDTO>> listPractices(
         WorkspaceContext workspaceContext,
-        @RequestParam(required = false) @Parameter(description = "Filter by practice category") String category,
         @RequestParam(name = "active", required = false) @Parameter(
             description = "Filter by active state"
         ) Boolean active
     ) {
         List<PracticeDTO> practices = practiceService
-            .listPractices(workspaceContext, category, active)
+            .listPractices(workspaceContext, active)
             .stream()
             .map(PracticeDTO::from)
             .toList();
@@ -185,7 +184,7 @@ public class PracticeCatalogController {
     public ResponseEntity<PracticeDTO> bindGoal(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
-        @Valid @RequestBody BindPracticeGoalRequestDTO request
+        @Valid @RequestBody BindPracticeAreaRequestDTO request
     ) {
         Practice practice = goalService.bindPractice(workspaceContext, practiceSlug, request.goalSlug());
         return ResponseEntity.ok(PracticeDTO.from(practice));

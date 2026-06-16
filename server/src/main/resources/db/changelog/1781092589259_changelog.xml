@@ -756,4 +756,202 @@
         </rollback>
     </changeSet>
 
+    <!--
+        ============================================================================================
+        Naming migration (groups A–E + Tier-4): bring the Liquibase-managed schema to the FINAL
+        column / FK / index names the committed JPA entities now declare. The entities are the source
+        of truth; these changeSets are purely additive renames (renameColumn / ALTER ... RENAME) so the
+        Hibernate-vs-Liquibase drift gate (db:draft-changelog) reports an empty diff.
+
+        Renaming a column in Postgres auto-updates dependent index definitions and CHECK-constraint
+        expressions (the constraint/index NAME is unchanged), so only the handful of index/FK NAMES
+        that the entities themselves changed get an explicit ALTER ... RENAME below. Table name
+        practice_goal is intentionally KEPT (entity PracticeArea maps @Table(name="practice_goal")).
+        ============================================================================================
+    -->
+
+    <!-- Group A/E: practice column renames (practice_goal_id→practice_area_id, focus_artifact→artifact_type, audience_role→subject_role). Index/FK NAMES (idx_practice_practice_goal, fk_practice_goal) are unchanged — renameColumn auto-updates their column refs. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-46">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice columns already renamed to final names">
+            <columnExists tableName="practice" columnName="practice_goal_id"/>
+        </preConditions>
+        <comment>Rename practice columns to final names: practice_goal_id→practice_area_id, focus_artifact→artifact_type, audience_role→subject_role.</comment>
+        <renameColumn tableName="practice" oldColumnName="practice_goal_id" newColumnName="practice_area_id" columnDataType="BIGINT"/>
+        <renameColumn tableName="practice" oldColumnName="focus_artifact" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
+        <renameColumn tableName="practice" oldColumnName="audience_role" newColumnName="subject_role" columnDataType="VARCHAR(16)"/>
+        <rollback>
+            <renameColumn tableName="practice" oldColumnName="subject_role" newColumnName="audience_role" columnDataType="VARCHAR(16)"/>
+            <renameColumn tableName="practice" oldColumnName="artifact_type" newColumnName="focus_artifact" columnDataType="VARCHAR(32)"/>
+            <renameColumn tableName="practice" oldColumnName="practice_area_id" newColumnName="practice_goal_id" columnDataType="BIGINT"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Tier-4: drop practice.category (column removed from the entity entirely; nullable VARCHAR(64), 0 dependents). -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-47">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.category already dropped">
+            <columnExists tableName="practice" columnName="category"/>
+        </preConditions>
+        <comment>Drop practice.category (removed from the PracticeArea/Practice model; no constraint/index depends on it).</comment>
+        <dropColumn tableName="practice" columnName="category"/>
+        <rollback>
+            <addColumn tableName="practice">
+                <column name="category" type="VARCHAR(64)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- ADR 0021: Polarity.MIXED renamed to CONTEXTUAL (no CHECK constraint on practice.polarity; data-only). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-48">
+        <preConditions onFail="MARK_RAN" onFailMessage="no practice.polarity='MIXED' rows to remap">
+            <columnExists tableName="practice" columnName="polarity"/>
+        </preConditions>
+        <comment>Remap practice.polarity 'MIXED'→'CONTEXTUAL' (enum value rename; polarity has no CHECK).</comment>
+        <sql>UPDATE practice SET polarity = 'CONTEXTUAL' WHERE polarity = 'MIXED';</sql>
+        <rollback>
+            <sql>UPDATE practice SET polarity = 'MIXED' WHERE polarity = 'CONTEXTUAL';</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Group D/E + Tier-4: practice_finding column renames. target_type→artifact_type, target_id→artifact_id, contributor_id→developer_id, correlation_key→finding_fingerprint. CHECK chk_practice_finding_target_type + indexes idx_practice_finding_target / _target_run / _correlation keep their NAMES (column refs auto-update). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-49">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding columns already renamed to final names">
+            <columnExists tableName="practice_finding" columnName="target_type"/>
+        </preConditions>
+        <comment>Rename practice_finding columns: target_type→artifact_type, target_id→artifact_id, contributor_id→developer_id, correlation_key→finding_fingerprint.</comment>
+        <renameColumn tableName="practice_finding" oldColumnName="target_type" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
+        <renameColumn tableName="practice_finding" oldColumnName="target_id" newColumnName="artifact_id" columnDataType="BIGINT"/>
+        <renameColumn tableName="practice_finding" oldColumnName="contributor_id" newColumnName="developer_id" columnDataType="BIGINT"/>
+        <renameColumn tableName="practice_finding" oldColumnName="correlation_key" newColumnName="finding_fingerprint" columnDataType="VARCHAR(64)"/>
+        <rollback>
+            <renameColumn tableName="practice_finding" oldColumnName="finding_fingerprint" newColumnName="correlation_key" columnDataType="VARCHAR(64)"/>
+            <renameColumn tableName="practice_finding" oldColumnName="developer_id" newColumnName="contributor_id" columnDataType="BIGINT"/>
+            <renameColumn tableName="practice_finding" oldColumnName="artifact_id" newColumnName="target_id" columnDataType="BIGINT"/>
+            <renameColumn tableName="practice_finding" oldColumnName="artifact_type" newColumnName="target_type" columnDataType="VARCHAR(32)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Group D: rename the FK + indexes whose NAME the entity changed (contributor→developer). The _correlation index keeps its name. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-50">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding contributor→developer FK/index already renamed">
+            <foreignKeyConstraintExists foreignKeyName="fk_practice_finding_contributor"/>
+        </preConditions>
+        <comment>Rename practice_finding contributor→developer FK + index NAMES to match the entity.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE practice_finding RENAME CONSTRAINT fk_practice_finding_contributor TO fk_practice_finding_developer;
+            ALTER INDEX idx_practice_finding_contributor_detected RENAME TO idx_practice_finding_developer_detected;
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding RENAME CONSTRAINT fk_practice_finding_developer TO fk_practice_finding_contributor;
+            ALTER INDEX idx_practice_finding_developer_detected RENAME TO idx_practice_finding_contributor_detected;
+        </rollback>
+    </changeSet>
+
+    <!-- ADR 0021 subject_user_id collapse: backfill from developer_id (now renamed) then enforce NOT NULL (entity: @Column(nullable=false)). MUST run AFTER -49 so developer_id exists. feedback.subject_user_id stays nullable. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-51">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.subject_user_id already NOT NULL">
+            <columnExists tableName="practice_finding" columnName="subject_user_id"/>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_name = 'practice_finding' AND column_name = 'subject_user_id' AND is_nullable = 'NO'
+            </sqlCheck>
+        </preConditions>
+        <comment>Collapse subject_user_id: backfill from developer_id where null, then enforce NOT NULL (entity now @Column(nullable=false)).</comment>
+        <sql>UPDATE practice_finding SET subject_user_id = developer_id WHERE subject_user_id IS NULL;</sql>
+        <addNotNullConstraint tableName="practice_finding" columnName="subject_user_id" columnDataType="BIGINT"/>
+        <rollback>
+            <dropNotNullConstraint tableName="practice_finding" columnName="subject_user_id" columnDataType="BIGINT"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Group E2 + Tier-4: feedback column renames. target_type→artifact_type, target_id→artifact_id, state→delivery_state, continuity_key→feedback_thread_key. Indexes idx_feedback_target / idx_feedback_continuity keep their NAMES (column refs auto-update). chk_feedback_state / chk_feedback_target_type keep their names; the state→delivery_state rename auto-updates the chk_feedback_state expression. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-52">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback columns already renamed to final names">
+            <columnExists tableName="feedback" columnName="state"/>
+        </preConditions>
+        <comment>Rename feedback columns: target_type→artifact_type, target_id→artifact_id, state→delivery_state, continuity_key→feedback_thread_key.</comment>
+        <renameColumn tableName="feedback" oldColumnName="target_type" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
+        <renameColumn tableName="feedback" oldColumnName="target_id" newColumnName="artifact_id" columnDataType="BIGINT"/>
+        <renameColumn tableName="feedback" oldColumnName="state" newColumnName="delivery_state" columnDataType="VARCHAR(16)"/>
+        <renameColumn tableName="feedback" oldColumnName="continuity_key" newColumnName="feedback_thread_key" columnDataType="VARCHAR(64)"/>
+        <rollback>
+            <renameColumn tableName="feedback" oldColumnName="feedback_thread_key" newColumnName="continuity_key" columnDataType="VARCHAR(64)"/>
+            <renameColumn tableName="feedback" oldColumnName="delivery_state" newColumnName="state" columnDataType="VARCHAR(16)"/>
+            <renameColumn tableName="feedback" oldColumnName="artifact_id" newColumnName="target_id" columnDataType="BIGINT"/>
+            <renameColumn tableName="feedback" oldColumnName="artifact_type" newColumnName="target_type" columnDataType="VARCHAR(32)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ADR 0021: SuppressionReason.AUDIENCE_REVIEWER renamed to REVIEWER_SIDE. Data remap + rebuild chk_feedback_suppression_reason allowed-list (keeping the B2 reaction-aware reasons added in -45). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-53">
+        <preConditions onFail="MARK_RAN" onFailMessage="suppression_reason CHECK already uses REVIEWER_SIDE">
+            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_suppression_reason' AND pg_get_constraintdef(oid) LIKE '%AUDIENCE_REVIEWER%'</sqlCheck>
+        </preConditions>
+        <comment>Remap feedback.suppression_reason 'AUDIENCE_REVIEWER'→'REVIEWER_SIDE' and rebuild chk_feedback_suppression_reason.</comment>
+        <sql>
+            UPDATE feedback SET suppression_reason = 'REVIEWER_SIDE' WHERE suppression_reason = 'AUDIENCE_REVIEWER';
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            UPDATE feedback SET suppression_reason = 'AUDIENCE_REVIEWER' WHERE suppression_reason = 'REVIEWER_SIDE';
+            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
+        </rollback>
+    </changeSet>
+
+    <!-- Group E2: feedback_placement.placement→slot. chk_feedback_placement_placement keeps its NAME (expression auto-updates). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-54">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement.placement already renamed to slot">
+            <columnExists tableName="feedback_placement" columnName="placement"/>
+        </preConditions>
+        <comment>Rename feedback_placement.placement→slot.</comment>
+        <renameColumn tableName="feedback_placement" oldColumnName="placement" newColumnName="slot" columnDataType="VARCHAR(32)"/>
+        <rollback>
+            <renameColumn tableName="feedback_placement" oldColumnName="slot" newColumnName="placement" columnDataType="VARCHAR(32)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Group E2: feedback_finding.display_role→evidence_role. chk_feedback_finding_display_role keeps its NAME (expression auto-updates). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-55">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding.display_role already renamed to evidence_role">
+            <columnExists tableName="feedback_finding" columnName="display_role"/>
+        </preConditions>
+        <comment>Rename feedback_finding.display_role→evidence_role.</comment>
+        <renameColumn tableName="feedback_finding" oldColumnName="display_role" newColumnName="evidence_role" columnDataType="VARCHAR(16)"/>
+        <rollback>
+            <renameColumn tableName="feedback_finding" oldColumnName="evidence_role" newColumnName="display_role" columnDataType="VARCHAR(16)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Group D: finding_reaction column renames (contributor_id→developer_id, correlation_key→finding_fingerprint) + rename the FK + indexes whose NAME the entity changed. idx_finding_reaction_correlation keeps its name. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-56">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction columns already renamed to final names">
+            <columnExists tableName="finding_reaction" columnName="contributor_id"/>
+        </preConditions>
+        <comment>Rename finding_reaction columns: contributor_id→developer_id, correlation_key→finding_fingerprint.</comment>
+        <renameColumn tableName="finding_reaction" oldColumnName="contributor_id" newColumnName="developer_id" columnDataType="BIGINT"/>
+        <renameColumn tableName="finding_reaction" oldColumnName="correlation_key" newColumnName="finding_fingerprint" columnDataType="VARCHAR(64)"/>
+        <rollback>
+            <renameColumn tableName="finding_reaction" oldColumnName="finding_fingerprint" newColumnName="correlation_key" columnDataType="VARCHAR(64)"/>
+            <renameColumn tableName="finding_reaction" oldColumnName="developer_id" newColumnName="contributor_id" columnDataType="BIGINT"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-57">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction contributor→developer FK/indexes already renamed">
+            <foreignKeyConstraintExists foreignKeyName="fk_finding_reaction_contributor"/>
+        </preConditions>
+        <comment>Rename finding_reaction contributor→developer FK + index NAMES to match the entity.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE finding_reaction RENAME CONSTRAINT fk_finding_reaction_contributor TO fk_finding_reaction_developer;
+            ALTER INDEX idx_finding_reaction_contributor_created RENAME TO idx_finding_reaction_developer_created;
+            ALTER INDEX idx_finding_reaction_finding_contributor RENAME TO idx_finding_reaction_finding_developer;
+        </sql>
+        <rollback>
+            ALTER TABLE finding_reaction RENAME CONSTRAINT fk_finding_reaction_developer TO fk_finding_reaction_contributor;
+            ALTER INDEX idx_finding_reaction_developer_created RENAME TO idx_finding_reaction_contributor_created;
+            ALTER INDEX idx_finding_reaction_finding_developer RENAME TO idx_finding_reaction_finding_contributor;
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

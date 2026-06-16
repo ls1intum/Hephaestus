@@ -14,7 +14,7 @@
 				{
 					"slug": "scope-one-reviewable-change",
 					"name": "Scope the change to one reviewable concern",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady"
@@ -24,7 +24,7 @@
 				{
 					"slug": "describe-what-and-why",
 					"name": "Describe what changed and why",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady"
@@ -34,7 +34,7 @@
 				{
 					"slug": "ready-and-traceable-handoff",
 					"name": "Hand the change off ready and traceable",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady"
@@ -44,7 +44,7 @@
 				{
 					"slug": "commit-subjects-explain-each-change",
 					"name": "Write commit subjects a reviewer can follow",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -55,7 +55,7 @@
 				{
 					"slug": "honours-linked-issue-acceptance-criteria",
 					"name": "State which of the linked issue’s acceptance criteria are done vs deferred",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"preamble": "PULL_REQUEST_CODE",
 					"triggerEvents": [
 						"PullRequestCreated",
@@ -75,7 +75,7 @@
 				{
 					"slug": "engaging-with-inline-review-comments",
 					"name": "Substantive inline review comments are taken up rather than left dangling",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"ReviewSubmitted",
 						"PullRequestSynchronized",
@@ -86,7 +86,7 @@
 				{
 					"slug": "merged-past-unresolved-review-threads",
 					"name": "Close the review loop before merging",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestMerged"
 					],
@@ -103,7 +103,7 @@
 				{
 					"slug": "issue-states-an-actionable-problem",
 					"name": "The issue states a problem a maintainer can act on",
-					"focusArtifact": "ISSUE",
+					"artifactType": "ISSUE",
 					"triggerEvents": [
 						"IssueCreated",
 						"IssueLabeled"
@@ -113,7 +113,7 @@
 				{
 					"slug": "issue-scoped-to-single-concern",
 					"name": "The issue is scoped to a single concern",
-					"focusArtifact": "ISSUE",
+					"artifactType": "ISSUE",
 					"triggerEvents": [
 						"IssueCreated",
 						"IssueLabeled"
@@ -123,7 +123,7 @@
 				{
 					"slug": "issue-has-checkable-outcome",
 					"name": "The issue defines a checkable outcome",
-					"focusArtifact": "ISSUE",
+					"artifactType": "ISSUE",
 					"triggerEvents": [
 						"IssueCreated",
 						"IssueLabeled",
@@ -142,7 +142,7 @@
 				{
 					"slug": "leaves-useful-specific-review-comments",
 					"name": "Leave useful, specific review comments",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"ReviewSubmitted"
 					],
@@ -152,7 +152,7 @@
 				{
 					"slug": "reviews-respectfully-asks-rather-than-demands",
 					"name": "Review respectfully — ask rather than demand",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"ReviewSubmitted"
 					],
@@ -162,7 +162,7 @@
 				{
 					"slug": "reviews-substantively-with-understanding",
 					"name": "Review substantively, not a rubber-stamp",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"ReviewSubmitted"
 					],
@@ -180,7 +180,7 @@
 				{
 					"slug": "ships-tests-with-the-change",
 					"name": "Ship tests with the change",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -192,7 +192,7 @@
 				{
 					"slug": "keeps-the-test-suite-honest",
 					"name": "Keep the test suite honest",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -212,7 +212,7 @@
 				{
 					"slug": "removes-duplication-instead-of-copy-pasting",
 					"name": "Factor out duplication instead of copy-pasting",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -224,7 +224,7 @@
 				{
 					"slug": "keeps-functions-small-and-single-purpose",
 					"name": "Keep functions small and single-purpose",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -236,7 +236,7 @@
 				{
 					"slug": "leaves-the-code-clean-with-intent-revealing-comments",
 					"name": "Leave the code clean, comment the why",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -256,7 +256,7 @@
 				{
 					"slug": "handles-errors-instead-of-swallowing-them",
 					"name": "Handle errors instead of swallowing them",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -268,7 +268,7 @@
 				{
 					"slug": "validates-inputs-and-edge-cases-at-the-boundary",
 					"name": "Validate inputs and edge cases at the boundary",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -280,7 +280,7 @@
 				{
 					"slug": "avoids-unsafe-panics-and-chosen-crashes",
 					"name": "Avoid unsafe panics and chosen crashes",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -300,7 +300,7 @@
 				{
 					"slug": "validates-and-escapes-untrusted-input",
 					"name": "Validate and escape untrusted input",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -312,7 +312,7 @@
 				{
 					"slug": "avoids-insecure-defaults-and-over-broad-permissions",
 					"name": "Avoid insecure defaults and over-broad permissions",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -324,7 +324,7 @@
 				{
 					"slug": "changes-dependencies-deliberately",
 					"name": "Change dependencies deliberately",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -344,7 +344,7 @@
 				{
 					"slug": "records-significant-decisions-with-rationale",
 					"name": "Record significant decisions with rationale",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -356,7 +356,7 @@
 				{
 					"slug": "documents-public-api-and-behaviour-changes",
 					"name": "Document public API and behaviour changes",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -376,7 +376,7 @@
 				{
 					"slug": "commits-are-atomic-and-cohesive",
 					"name": "Keep commits atomic and cohesive",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -388,7 +388,7 @@
 				{
 					"slug": "excludes-generated-and-build-artifacts",
 					"name": "Keep generated and build artifacts out of the change",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady",
@@ -400,7 +400,7 @@
 				{
 					"slug": "branches-from-the-integration-branch",
 					"name": "Branch from the integration branch, not an in-flight feature branch",
-					"focusArtifact": "PULL_REQUEST",
+					"artifactType": "PULL_REQUEST",
 					"triggerEvents": [
 						"PullRequestCreated",
 						"PullRequestReady"
@@ -418,7 +418,7 @@
 				{
 					"slug": "breaks-large-work-into-trackable-subtasks",
 					"name": "Break large work into trackable subtasks",
-					"focusArtifact": "ISSUE",
+					"artifactType": "ISSUE",
 					"triggerEvents": [
 						"IssueCreated",
 						"IssueLabeled",
@@ -429,7 +429,7 @@
 				{
 					"slug": "triages-the-issue-with-labels-and-ownership",
 					"name": "Triage the issue with labels and ownership",
-					"focusArtifact": "ISSUE",
+					"artifactType": "ISSUE",
 					"triggerEvents": [
 						"IssueCreated",
 						"IssueLabeled"
@@ -439,7 +439,7 @@
 				{
 					"slug": "issue-closed-with-unmet-outcome",
 					"name": "Confirm the outcome before closing the issue",
-					"focusArtifact": "ISSUE",
+					"artifactType": "ISSUE",
 					"triggerEvents": [
 						"IssueClosed"
 					],

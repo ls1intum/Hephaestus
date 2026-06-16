@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGoal;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * Response DTO for a practice goal — a configurable grouping of related practices.
  */
 @Schema(description = "A practice goal grouping related practices into a learning objective")
-public record PracticeGoalDTO(
+public record PracticeAreaDTO(
     @NonNull @Schema(description = "Goal ID") Long id,
     @NonNull @Schema(description = "URL-safe identifier unique within the workspace") String slug,
     @NonNull @Schema(description = "Human-readable name") String name,
@@ -20,8 +20,8 @@ public record PracticeGoalDTO(
     @NonNull @Schema(description = "Timestamp when the goal was created") Instant createdAt,
     @Nullable @Schema(description = "Timestamp when the goal was last updated") Instant updatedAt
 ) {
-    public static PracticeGoalDTO from(PracticeGoal goal) {
-        return new PracticeGoalDTO(
+    public static PracticeAreaDTO from(PracticeArea goal) {
+        return new PracticeAreaDTO(
             goal.getId(),
             goal.getSlug(),
             goal.getName(),

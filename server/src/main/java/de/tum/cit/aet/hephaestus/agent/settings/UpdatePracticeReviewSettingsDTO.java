@@ -13,7 +13,7 @@ import java.util.Set;
  */
 @Schema(description = "Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.")
 public record UpdatePracticeReviewSettingsDTO(
-    @Schema(description = "Run practice review for all contributors (vs only the run_practice_review role)")
+    @Schema(description = "Run practice review for all developers (vs only the run_practice_review role)")
     Boolean runForAllUsers,
     @Schema(description = "Skip practice review for draft PRs/MRs") Boolean skipDrafts,
     @Schema(description = "Deliver feedback to already-merged PRs/MRs") Boolean deliverToMerged,

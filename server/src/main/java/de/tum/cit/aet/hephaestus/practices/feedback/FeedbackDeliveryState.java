@@ -4,7 +4,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * Delivery lifecycle of a {@link Feedback} unit. Append-only: transitions are recorded by inserting a new
  * superseding row, never by mutating an existing one.
  */
-public enum FeedbackState {
+public enum FeedbackDeliveryState {
     /** Synthesised and rendered, but not yet placed on its surface. */
     PREPARED,
     /** Successfully delivered to its surface. */

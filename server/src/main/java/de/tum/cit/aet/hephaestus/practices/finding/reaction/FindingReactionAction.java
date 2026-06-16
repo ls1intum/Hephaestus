@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 /**
- * Actions a contributor can take on an AI-generated practice finding.
+ * Actions a developer can take on an AI-generated practice finding.
  *
  * <p>Designed for research signal, not workflow management:
  * <ul>
@@ -13,10 +13,10 @@ package de.tum.cit.aet.hephaestus.practices.finding.reaction;
  * <p>No DISMISSED or ACKNOWLEDGED — non-action is the absence of a reaction row.
  */
 public enum FindingReactionAction {
-    /** Contributor fixed or will fix the issue identified by the finding. */
+    /** Developer fixed or will fix the issue identified by the finding. */
     APPLIED,
-    /** Contributor believes the AI assessment is incorrect. Requires an explanation. */
+    /** Developer believes the AI assessment is incorrect. Requires an explanation. */
     DISPUTED,
-    /** Finding is valid but not relevant to the contributor's context. */
+    /** Finding is valid but not relevant to the developer's context. */
     NOT_APPLICABLE,
 }

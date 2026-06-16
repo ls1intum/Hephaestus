@@ -11,9 +11,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -56,7 +56,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     private Workspace workspace;
     private Practice practice;
     private AgentJob agentJob;
-    private User contributor;
+    private User developer;
 
     @BeforeEach
     void setUp() {
@@ -68,7 +68,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
-        practice.setCategory("test");
         practice.setCriteria("Test description");
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         practice = practiceRepository.save(practice);
@@ -82,8 +81,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
-        contributor = TestUserFactory.createUser(100L, "test-contributor", provider);
-        contributor = userRepository.save(contributor);
+        developer = TestUserFactory.createUser(100L, "test-developer", provider);
+        developer = userRepository.save(developer);
     }
 
     @Nested
@@ -99,8 +98,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 42L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Good PR description",
                 "OBSERVED",
                 "INFO",
@@ -139,8 +138,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 1L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Duplicate test",
                 "OBSERVED",
                 "INFO",
@@ -159,8 +158,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 2L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Should not insert",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -189,8 +188,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 99L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Missing error handling in Main.java",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -225,8 +224,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 1L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Purge test finding",
                 "OBSERVED",
                 "INFO",
@@ -256,7 +255,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceB.setWorkspace(workspaceB);
             practiceB.setSlug("practice-b");
             practiceB.setName("Practice B");
-            practiceB.setCategory("test");
             practiceB.setCriteria("Workspace B practice");
             practiceB.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             practiceB = practiceRepository.save(practiceB);
@@ -275,8 +273,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 1L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "WS-A finding",
                 "OBSERVED",
                 "INFO",
@@ -295,8 +293,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practiceB.getId(),
                 "PULL_REQUEST",
                 2L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "WS-B finding",
                 "NOT_OBSERVED",
                 "MINOR",
@@ -329,7 +327,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setWorkspace(workspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
-            otherPractice.setCategory("test");
             otherPractice.setCriteria("Other description");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             otherPractice = practiceRepository.save(otherPractice);
@@ -342,8 +339,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 1L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Cascade test 1",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -362,8 +359,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 otherPractice.getId(),
                 "PULL_REQUEST",
                 2L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Cascade test 2",
                 "OBSERVED",
                 "INFO",
@@ -387,12 +384,12 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class FindContributorPracticeSummaryTests {
+    class FindDeveloperPracticeSummaryTests {
 
         @Test
         void returnsEmptyForNoFindings() {
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
+            List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
+                developer.getId(),
                 workspace.getId()
             );
 
@@ -407,25 +404,25 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             insertFinding("sum-3", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T14:30:00Z"));
             insertFinding("sum-4", practice, "OBSERVED", Instant.parse("2026-03-17T08:00:00Z"));
 
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
+            List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
+                developer.getId(),
                 workspace.getId()
             );
 
             assertThat(result).hasSize(2); // One row per (slug, verdict) combination
 
-            ContributorPracticeSummary negative = result
+            DeveloperPracticeSummary negative = result
                 .stream()
-                .filter(s -> s.getVerdict() == Verdict.NOT_OBSERVED)
+                .filter(s -> s.getVerdict() == Observation.NOT_OBSERVED)
                 .findFirst()
                 .orElseThrow();
             assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
             assertThat(negative.getCount()).isEqualTo(3);
             assertThat(negative.getLastDetectedAt()).isEqualTo(Instant.parse("2026-03-20T14:30:00Z"));
 
-            ContributorPracticeSummary positive = result
+            DeveloperPracticeSummary positive = result
                 .stream()
-                .filter(s -> s.getVerdict() == Verdict.OBSERVED)
+                .filter(s -> s.getVerdict() == Observation.OBSERVED)
                 .findFirst()
                 .orElseThrow();
             assertThat(positive.getCount()).isEqualTo(1);
@@ -437,7 +434,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             secondPractice.setWorkspace(workspace);
             secondPractice.setSlug("error-handling");
             secondPractice.setName("Error Handling");
-            secondPractice.setCategory("test");
             secondPractice.setCriteria("Handle errors");
             secondPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             secondPractice = practiceRepository.save(secondPractice);
@@ -445,14 +441,14 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             insertFinding("multi-1", practice, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
             insertFinding("multi-2", secondPractice, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
 
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
+            List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
+                developer.getId(),
                 workspace.getId()
             );
 
             assertThat(result).hasSize(2);
             assertThat(result)
-                .extracting(ContributorPracticeSummary::getPracticeSlug)
+                .extracting(DeveloperPracticeSummary::getPracticeSlug)
                 .containsExactlyInAnyOrder("test-practice", "error-handling");
         }
 
@@ -463,7 +459,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("test-practice"); // Same slug, different workspace
             otherPractice.setName("Test Practice");
-            otherPractice.setCategory("test");
             otherPractice.setCriteria("Other workspace practice");
             otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             otherPractice = practiceRepository.save(otherPractice);
@@ -476,7 +471,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             // Finding in target workspace
             insertFinding("iso-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
-            // Finding in other workspace (same contributor)
+            // Finding in other workspace (same developer)
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 "iso-2",
@@ -484,8 +479,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 otherPractice.getId(),
                 "PULL_REQUEST",
                 2L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Other WS finding",
                 "NOT_OBSERVED",
                 "MAJOR",
@@ -497,8 +492,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 Instant.parse("2026-03-20T10:00:00Z")
             );
 
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
+            List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
+                developer.getId(),
                 workspace.getId()
             );
 
@@ -517,8 +512,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             insertFinding("time-2", practice, "NOT_OBSERVED", latest);
             insertFinding("time-3", practice, "NOT_OBSERVED", middle);
 
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
+            List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
+                developer.getId(),
                 workspace.getId()
             );
 
@@ -527,16 +522,16 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        void contributorIsolation() {
+        void developerIsolation() {
             GitProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
                 .orElseThrow();
-            User otherContributor = TestUserFactory.createUser(200L, "other-contributor", provider);
-            otherContributor = userRepository.save(otherContributor);
+            User otherDeveloper = TestUserFactory.createUser(200L, "other-developer", provider);
+            otherDeveloper = userRepository.save(otherDeveloper);
 
-            // Finding for target contributor
+            // Finding for target developer
             insertFinding("contrib-iso-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
-            // Finding for other contributor (same practice, same workspace)
+            // Finding for other developer (same practice, same workspace)
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 "contrib-iso-2",
@@ -544,9 +539,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 2L,
-                otherContributor.getId(),
-                null,
-                "Other contributor finding",
+                otherDeveloper.getId(),
+                otherDeveloper.getId(),
+                "Other developer finding",
                 "NOT_OBSERVED",
                 "MAJOR",
                 0.8f,
@@ -557,8 +552,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 Instant.parse("2026-03-20T10:00:00Z")
             );
 
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
+            List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
+                developer.getId(),
                 workspace.getId()
             );
 
@@ -575,8 +570,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 targetPractice.getId(),
                 "PULL_REQUEST",
                 1L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Test finding",
                 verdict,
                 "INFO",
@@ -591,7 +586,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class TargetTypeTests {
+    class ArtifactTypeTests {
 
         @Test
         @DisplayName("persisted 'PULL_REQUEST' maps to WorkArtifact.PULL_REQUEST on read")
@@ -604,8 +599,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 practice.getId(),
                 "PULL_REQUEST",
                 1L,
-                contributor.getId(),
-                null,
+                developer.getId(),
+                developer.getId(),
                 "Enum mapping test",
                 "OBSERVED",
                 "INFO",
@@ -618,7 +613,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             );
 
             PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
-            assertThat(found.getTargetType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+            assertThat(found.getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
         }
     }
 }

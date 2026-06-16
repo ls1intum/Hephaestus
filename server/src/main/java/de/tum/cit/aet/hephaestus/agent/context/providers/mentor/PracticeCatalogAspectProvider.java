@@ -24,7 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Materialises {@code inputs/context/practice_catalog.json} for {@link MentorChatRequest}.
  *
  * <p>Lists workspace practices with criteria so the mentor agent can talk about specific
- * coding standards that apply to the user's contributions. Independent of {@code contributorId}
+ * coding standards that apply to the user's contributions. Independent of {@code developerId}
  * — every member of a workspace sees the same practice catalog, so the cache key is just
  * the workspace.
  */

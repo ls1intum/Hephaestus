@@ -201,7 +201,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesControllerTests {
 
         /**
-         * Only PracticeCatalogController (practice CRUD), PracticeGoalController (goal CRUD + binding),
+         * Only PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD + binding),
          * PracticeFindingController (contributor findings API), and FindingReactionController
          * (contributor reactions) are allowed as REST entry points in the practices module.
          */
@@ -215,13 +215,13 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .should()
                 .haveSimpleName("PracticeCatalogController")
                 .orShould()
-                .haveSimpleName("PracticeGoalController")
+                .haveSimpleName("PracticeAreaController")
                 .orShould()
                 .haveSimpleName("PracticeFindingController")
                 .orShould()
                 .haveSimpleName("FindingReactionController")
                 .because(
-                    "Only PracticeCatalogController, PracticeGoalController, PracticeFindingController, and " +
+                    "Only PracticeCatalogController, PracticeAreaController, PracticeFindingController, and " +
                         "FindingReactionController are allowed REST entry points"
                 );
             rule.check(classes);

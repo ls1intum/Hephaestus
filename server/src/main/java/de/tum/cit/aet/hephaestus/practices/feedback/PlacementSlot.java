@@ -9,7 +9,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  *   <li>{@link #CONVERSATION_TURN} — a turn in a mentor/facilitator conversation thread.</li>
  * </ul>
  */
-public enum PlacementSurface {
+public enum PlacementSlot {
     /** Rendered in the PR/MR/issue summary body. */
     SUMMARY,
     /** Anchored to a specific diff location. */

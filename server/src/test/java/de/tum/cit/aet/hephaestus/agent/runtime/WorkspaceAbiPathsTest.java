@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  * Guardrail for the workspace ABI rename ({@code .context/} → {@code inputs/context/}).
  * Scans the bundled Pi runtime resources (orchestrator + runner) for any remaining legacy
  * references that would slip past the rolling-deploy contract documented in
- * {@code docs/contributor/agent/workspace-abi.mdx}.
+ * {@code docs/developer/agent/workspace-abi.mdx}.
  */
 class WorkspaceAbiPathsTest extends HephaestusArchitectureTest {
 

@@ -51,7 +51,7 @@ class PracticeCatalogInjector {
      */
     Map<String, Polarity> polarityBySlug(Long workspaceId, WorkArtifact focus) {
         return practiceRepository
-            .findByWorkspaceIdAndActiveTrueAndFocusArtifact(workspaceId, focus)
+            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
             .stream()
             .collect(Collectors.toMap(Practice::getSlug, Practice::getPolarity, (a, b) -> a));
     }
@@ -68,10 +68,7 @@ class PracticeCatalogInjector {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
         Long workspaceId = job.getWorkspace().getId();
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrueAndFocusArtifact(
-            workspaceId,
-            focus
-        );
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus);
         // Lifecycle phase-correctness: when the job carries the trigger event that spawned it, materialise
         // ONLY the practices whose triggerEvents include that event — so an authoring practice is not
         // re-litigated on a fixup push (PullRequestSynchronized), a reviewer practice runs only after a
@@ -113,7 +110,6 @@ class PracticeCatalogInjector {
             ObjectNode entry = index.addObject();
             entry.put("slug", p.getSlug());
             entry.put("name", p.getName());
-            entry.put("category", p.getCategory() != null ? p.getCategory() : "");
             entry.put("goal", goalSlug);
         }
         try {

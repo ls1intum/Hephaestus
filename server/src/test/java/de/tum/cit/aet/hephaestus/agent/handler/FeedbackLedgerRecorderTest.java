@@ -16,18 +16,18 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -59,9 +59,9 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     private FeedbackLedgerRecorder recorder(boolean policyFloor) {
         when(feedbackRepository.existsByAgentJobIdAndUnitOrdinal(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(feedbackRepository.findFirstByContinuityKeyAndStateOrderByCreatedAtDesc(any(), any())).thenReturn(
-            Optional.empty()
-        );
+        when(
+            feedbackRepository.findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())
+        ).thenReturn(Optional.empty());
         when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of());
         when(feedbackPlacementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return new FeedbackLedgerRecorder(
@@ -101,7 +101,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         long suppressed = saved
             .getAllValues()
             .stream()
-            .filter(f -> f.getState() == FeedbackState.SUPPRESSED)
+            .filter(f -> f.getDeliveryState() == FeedbackDeliveryState.SUPPRESSED)
             .filter(f -> f.getSuppressionReason() == FeedbackSuppressionReason.POLICY_FLOOR_DROP)
             .count();
         assertThat(suppressed).isEqualTo(2);
@@ -120,13 +120,13 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         verify(feedbackFindingRepository, org.mockito.Mockito.times(5)).insertIfAbsent(any(), any(), any(), anyInt());
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository).save(saved.capture());
-        assertThat(saved.getValue().getState()).isEqualTo(FeedbackState.DELIVERED);
+        assertThat(saved.getValue().getDeliveryState()).isEqualTo(FeedbackDeliveryState.DELIVERED);
     }
 
     @Test
     void inlinePlacement_persistsExternalRefAndThreadFromMatchingSignal() {
         // A3: the INLINE placement must carry the durable vendor handles the channel reported, not a hardcoded
-        // POSTED + null. The note and its DeliveredSignal share a correlationKey, so the signal's externalRef /
+        // POSTED + null. The note and its DeliveredSignal share a findingFingerprint, so the signal's externalRef /
         // threadExternalRef land on the saved FeedbackPlacement. A no-op (the old hardcoded null) fails this.
         var finding = problem(0.9f);
         when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
@@ -152,7 +152,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackPlacement inline = placements
             .getAllValues()
             .stream()
-            .filter(p -> p.getPlacement() == PlacementSurface.INLINE)
+            .filter(p -> p.getSlot() == PlacementSlot.INLINE)
             .findFirst()
             .orElseThrow();
         assertThat(inline.getExternalRef()).isEqualTo("note-gid-42");
@@ -161,8 +161,8 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void inlinePlacement_fallsBackToPathLineWhenNoCorrelationKey_andFailedSignalMapsToFailed() {
-        // No correlationKey on the note (legacy/unkeyed) → match by path + terminal line. A FAILED disposition
+    void inlinePlacement_fallsBackToPathLineWhenNoFindingFingerprint_andFailedSignalMapsToFailed() {
+        // No findingFingerprint on the note (legacy/unkeyed) → match by path + terminal line. A FAILED disposition
         // must persist as a FAILED placement with no external_ref, so a dead delivery is not recorded as POSTED.
         var finding = problem(0.9f);
         when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
@@ -188,7 +188,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackPlacement inline = placements
             .getAllValues()
             .stream()
-            .filter(p -> p.getPlacement() == PlacementSurface.INLINE)
+            .filter(p -> p.getSlot() == PlacementSlot.INLINE)
             .findFirst()
             .orElseThrow();
         assertThat(inline.getPostedState()).isEqualTo(PlacementPostedState.FAILED);
@@ -247,15 +247,15 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     private PracticeFinding problem(float confidence) {
         PracticeFinding pf = mock(PracticeFinding.class);
-        User contributor = new User();
-        contributor.setId(7L);
+        User developer = new User();
+        developer.setId(7L);
         lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
-        lenient().when(pf.getVerdict()).thenReturn(Verdict.NOT_OBSERVED);
+        lenient().when(pf.getVerdict()).thenReturn(Observation.NOT_OBSERVED);
         lenient().when(pf.getSeverity()).thenReturn(Severity.MINOR);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
-        lenient().when(pf.getContributor()).thenReturn(contributor);
-        lenient().when(pf.getTargetType()).thenReturn(WorkArtifact.PULL_REQUEST);
-        lenient().when(pf.getTargetId()).thenReturn(100L);
+        lenient().when(pf.getDeveloper()).thenReturn(developer);
+        lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(pf.getArtifactId()).thenReturn(100L);
         lenient().when(pf.getSubjectUserId()).thenReturn(null);
         return pf;
     }

@@ -28,7 +28,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
     @Transactional
     @Query(
         value = """
-        INSERT INTO feedback_finding (feedback_id, finding_id, display_role, ordinal)
+        INSERT INTO feedback_finding (feedback_id, finding_id, evidence_role, ordinal)
         VALUES (:feedbackId, :findingId, :displayRole, :ordinal)
         ON CONFLICT (feedback_id, finding_id) DO NOTHING
         """,
@@ -50,7 +50,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
         value = """
         SELECT ff.finding_id FROM feedback_finding ff
         JOIN feedback f ON f.id = ff.feedback_id
-        WHERE f.agent_job_id = :agentJobId AND f.state = 'SUPPRESSED'
+        WHERE f.agent_job_id = :agentJobId AND f.delivery_state = 'SUPPRESSED'
         """,
         nativeQuery = true
     )

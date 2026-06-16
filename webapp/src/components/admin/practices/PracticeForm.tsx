@@ -3,7 +3,7 @@ import { useState } from "react";
 import type {
 	CreatePracticeRequest,
 	Practice,
-	PracticeGoal,
+	PracticeArea,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import { CodeEditor } from "@/components/shared/CodeEditor";
@@ -36,7 +36,7 @@ const NO_GOAL = "__none__";
 interface PracticeFormCreateProps {
 	mode: "create";
 	/** Goals offered in the binding picker. Binding is a separate mutation the container runs after create. */
-	goals: PracticeGoal[];
+	goals: PracticeArea[];
 	onSubmit: (data: CreatePracticeRequest, goalSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
@@ -46,7 +46,7 @@ interface PracticeFormCreateProps {
 interface PracticeFormEditProps {
 	mode: "edit";
 	initialData: Practice;
-	goals: PracticeGoal[];
+	goals: PracticeArea[];
 	onSubmit: (slug: string, data: UpdatePracticeRequest, goalSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
@@ -57,7 +57,6 @@ export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
 interface FormState {
 	name: string;
 	slug: string;
-	category: string;
 	focusArtifact: WorkArtifact;
 	goalSlug: string;
 	triggerEvents: string[];
@@ -70,8 +69,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 		return {
 			name: initialData.name,
 			slug: initialData.slug,
-			category: initialData.category ?? "",
-			focusArtifact: initialData.focusArtifact,
+			focusArtifact: initialData.artifactType,
 			goalSlug: initialData.goalSlug ?? NO_GOAL,
 			triggerEvents: [...initialData.triggerEvents],
 			criteria: initialData.criteria,
@@ -81,7 +79,6 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 	return {
 		name: "",
 		slug: "",
-		category: "",
 		focusArtifact: "PULL_REQUEST",
 		goalSlug: NO_GOAL,
 		triggerEvents: [],
@@ -158,8 +155,7 @@ export function PracticeForm({
 				slug: form.slug,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
-				focusArtifact: form.focusArtifact,
-				...(form.category.trim() ? { category: form.category.trim() } : {}),
+				artifactType: form.focusArtifact,
 				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
 			};
 			onSubmit(data, goalSlug);
@@ -168,8 +164,7 @@ export function PracticeForm({
 				name: form.name,
 				criteria: form.criteria.trim(),
 				triggerEvents: form.triggerEvents,
-				focusArtifact: form.focusArtifact,
-				category: form.category.trim() || undefined,
+				artifactType: form.focusArtifact,
 				precomputeScript: form.precomputeScript.trim() || undefined,
 			};
 			onSubmit(initialData.slug, data, goalSlug);
@@ -264,17 +259,6 @@ export function PracticeForm({
 											{slugError}
 										</p>
 									)}
-								</div>
-
-								<div className="grid gap-2">
-									<Label htmlFor="practice-category">Category</Label>
-									<Input
-										id="practice-category"
-										placeholder="e.g. code-quality"
-										value={form.category}
-										onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-										maxLength={64}
-									/>
 								</div>
 
 								<div className="grid gap-4 sm:grid-cols-2">

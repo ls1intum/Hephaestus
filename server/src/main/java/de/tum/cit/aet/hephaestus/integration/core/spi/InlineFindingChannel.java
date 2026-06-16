@@ -29,12 +29,12 @@ public interface InlineFindingChannel {
     }
 
     /**
-     * One finding to post inline. {@code correlationKey} carries the stable
-     * {@link de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey} identity so a delivery can be matched
+     * One finding to post inline. {@code findingFingerprint} carries the stable
+     * {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} identity so a delivery can be matched
      * back to its placement across re-runs; it is {@code null} when the caller has no key for the finding. The
      * 3-arg constructor is the pre-correlation compatibility shape and defaults the key to null.
      */
-    record InlineFinding(FindingAnchor anchor, String body, String marker, @Nullable String correlationKey) {
+    record InlineFinding(FindingAnchor anchor, String body, String marker, @Nullable String findingFingerprint) {
         public InlineFinding(FindingAnchor anchor, String body, String marker) {
             this(anchor, body, marker, null);
         }
@@ -60,12 +60,12 @@ public interface InlineFindingChannel {
     }
 
     /**
-     * What actually happened to one finding, keyed by {@code correlationKey} so the caller can reconcile it
+     * What actually happened to one finding, keyed by {@code findingFingerprint} so the caller can reconcile it
      * against the persisted placement. {@code externalRef} is the vendor note id and {@code threadExternalRef}
      * the enclosing discussion/thread id; both are {@code null} when no durable handle exists (e.g. a failure).
      */
     record DeliveredSignal(
-        @Nullable String correlationKey,
+        @Nullable String findingFingerprint,
         FindingAnchor anchor,
         Disposition disposition,
         @Nullable String externalRef,

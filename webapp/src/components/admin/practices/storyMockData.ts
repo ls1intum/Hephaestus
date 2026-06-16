@@ -5,11 +5,10 @@ export const mockPractices: Practice[] = [
 		id: 1,
 		slug: "pr-description-quality",
 		name: "PR Description Quality",
-		category: "code-quality",
 		triggerEvents: ["PullRequestCreated", "PullRequestReady"],
 		criteria:
 			"## PR Description Quality\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required Elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
-		focusArtifact: "PULL_REQUEST",
+		artifactType: "PULL_REQUEST",
 		polarity: "DESIRABLE",
 		active: true,
 		createdAt: new Date("2025-06-01"),
@@ -19,11 +18,10 @@ export const mockPractices: Practice[] = [
 		id: 2,
 		slug: "code-review-thoroughness",
 		name: "Code Review Thoroughness",
-		category: "code-quality",
 		triggerEvents: ["ReviewSubmitted"],
 		criteria:
 			"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
-		focusArtifact: "PULL_REQUEST",
+		artifactType: "PULL_REQUEST",
 		polarity: "DESIRABLE",
 		active: true,
 		createdAt: new Date("2025-06-02"),
@@ -36,7 +34,7 @@ export const mockPractices: Practice[] = [
 		triggerEvents: ["PullRequestCreated", "PullRequestSynchronized"],
 		criteria:
 			"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
-		focusArtifact: "PULL_REQUEST",
+		artifactType: "PULL_REQUEST",
 		polarity: "DESIRABLE",
 		active: false,
 		createdAt: new Date("2025-06-03"),
@@ -44,7 +42,7 @@ export const mockPractices: Practice[] = [
 	},
 ];
 
-/** Active practice without category — tests the no-badge rendering path. */
+/** A minimal active practice with no precompute script. */
 export const mockPracticeNoCategory: Practice = {
 	id: 5,
 	slug: "error-state-handling",
@@ -52,7 +50,7 @@ export const mockPracticeNoCategory: Practice = {
 	triggerEvents: ["PullRequestCreated"],
 	criteria:
 		"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
-	focusArtifact: "PULL_REQUEST",
+	artifactType: "PULL_REQUEST",
 	polarity: "DESIRABLE",
 	active: true,
 	createdAt: new Date("2025-06-05"),
@@ -64,7 +62,6 @@ export const mockPracticeLongText: Practice = {
 	id: 6,
 	slug: "very-long-practice-name-to-test-overflow-in-card-layouts",
 	name: "Extremely Verbose Practice Name That Tests Text Wrapping and Overflow Behavior in Card Layouts",
-	category: "very-long-category-name",
 	triggerEvents: [
 		"PullRequestCreated",
 		"PullRequestReady",
@@ -73,7 +70,7 @@ export const mockPracticeLongText: Practice = {
 	],
 	criteria:
 		"## Very Long Criteria\n\nThis is a multi-paragraph criteria block designed to test the line-clamp behavior on the card preview.\n\n### Section 1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n### Section 2\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n### Section 3\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-	focusArtifact: "PULL_REQUEST",
+	artifactType: "PULL_REQUEST",
 	polarity: "DESIRABLE",
 	active: true,
 	createdAt: new Date("2025-06-06"),
@@ -84,7 +81,6 @@ export const mockPracticeWithAllTriggers: Practice = {
 	id: 4,
 	slug: "commit-discipline",
 	name: "Commit Discipline",
-	category: "commit-hygiene",
 	triggerEvents: [
 		"PullRequestCreated",
 		"PullRequestReady",
@@ -109,14 +105,14 @@ export const mockPracticeWithAllTriggers: Practice = {
 		"",
 		"export default { findings };",
 	].join("\n"),
-	focusArtifact: "PULL_REQUEST",
+	artifactType: "PULL_REQUEST",
 	polarity: "DESIRABLE",
 	active: true,
 	createdAt: new Date("2025-06-04"),
 	updatedAt: new Date("2025-06-16"),
 };
 
-export const mockGoals: import("@/api/types.gen").PracticeGoal[] = [
+export const mockGoals: import("@/api/types.gen").PracticeArea[] = [
 	{
 		id: 1,
 		slug: "review-ready-work",

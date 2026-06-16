@@ -346,7 +346,7 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         return result
             .signals()
             .stream()
-            .filter(s -> key.equals(s.correlationKey()))
+            .filter(s -> key.equals(s.findingFingerprint()))
             .findFirst()
             .orElseThrow(() -> new AssertionError("no signal for key " + key));
     }

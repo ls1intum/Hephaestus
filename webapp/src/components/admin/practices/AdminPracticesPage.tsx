@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertCircle, Plus } from "lucide-react";
 import { useState } from "react";
-import type { Practice, PracticeGoal } from "@/api/types.gen";
+import type { Practice, PracticeArea } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -20,7 +20,7 @@ import { PracticeCardList } from "./PracticeCardList";
 interface AdminPracticesPageProps {
 	workspaceSlug: string;
 	practices: Practice[];
-	goals: PracticeGoal[];
+	goals: PracticeArea[];
 	isLoading: boolean;
 	isError?: boolean;
 	isDeleting: boolean;
@@ -53,7 +53,7 @@ export function AdminPracticesPage({
 	const [focusFilter, setFocusFilter] = useState<FocusFilter>("ALL");
 
 	const visiblePractices =
-		focusFilter === "ALL" ? practices : practices.filter((p) => p.focusArtifact === focusFilter);
+		focusFilter === "ALL" ? practices : practices.filter((p) => p.artifactType === focusFilter);
 
 	const handleDeleteConfirm = () => {
 		if (deletingPractice) {

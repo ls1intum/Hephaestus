@@ -11,8 +11,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.VerdictCount;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashMap;
@@ -56,15 +56,10 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
         when(
-            findingRepository.findRecentByContributorAndWorkspace(
-                eq(2L),
-                eq(1L),
-                any(Instant.class),
-                any(Pageable.class)
-            )
+            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
-        when(findingRepository.countByVerdictForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
-        when(findingRepository.countBySeverityForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
+        when(findingRepository.countByVerdictForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
+        when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(
             queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
@@ -78,7 +73,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(0L);
         // All verdicts present even when count is 0 — keeps the wire shape stable.
-        for (Verdict v : Verdict.values()) {
+        for (Observation v : Observation.values()) {
             assertThat(root.get("summary").get("byVerdict").has(v.name())).isTrue();
         }
         for (Severity s : Severity.values()) {
@@ -95,20 +90,15 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
         when(
-            findingRepository.findRecentByContributorAndWorkspace(
-                eq(2L),
-                eq(1L),
-                any(Instant.class),
-                any(Pageable.class)
-            )
+            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
-        VerdictCount positive = mockVerdictCount(Verdict.OBSERVED, 3L);
-        VerdictCount negative = mockVerdictCount(Verdict.NOT_OBSERVED, 1L);
-        when(findingRepository.countByVerdictForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(
+        VerdictCount positive = mockVerdictCount(Observation.OBSERVED, 3L);
+        VerdictCount negative = mockVerdictCount(Observation.NOT_OBSERVED, 1L);
+        when(findingRepository.countByVerdictForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(
             List.of(positive, negative)
         );
         SeverityCount major = mockSeverityCount(Severity.MAJOR, 2L);
-        when(findingRepository.countBySeverityForContributor(eq(2L), eq(1L), any(Instant.class))).thenReturn(
+        when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(
             List.of(major)
         );
         when(
@@ -126,10 +116,10 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(4L);
     }
 
-    private static VerdictCount mockVerdictCount(Verdict v, long c) {
+    private static VerdictCount mockVerdictCount(Observation v, long c) {
         return new VerdictCount() {
             @Override
-            public Verdict getVerdict() {
+            public Observation getVerdict() {
                 return v;
             }
 

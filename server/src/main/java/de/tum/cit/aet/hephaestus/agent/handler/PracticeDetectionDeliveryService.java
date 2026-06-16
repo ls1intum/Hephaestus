@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey;
+import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.IdentityHashMap;
@@ -64,7 +64,7 @@ public class PracticeDetectionDeliveryService {
     }
 
     /** Resolved delivery target: who the finding is about + the typed (kind, id) reference. */
-    private record Target(WorkArtifact type, Long id, Long contributorId) {}
+    private record Target(WorkArtifact type, Long id, Long developerId) {}
 
     /**
      * Persist validated findings and publish completion event.
@@ -98,11 +98,11 @@ public class PracticeDetectionDeliveryService {
             return new DeliveryResult(0, validFindings.size(), 0, false);
         }
 
-        // Resolve the typed target + the contributor the finding is about, routing on the artifact.
+        // Resolve the typed target + the developer the finding is about, routing on the artifact.
         Target target = resolveTarget(job, metadata);
-        Long contributorId = target.contributorId();
-        WorkArtifact targetType = target.type();
-        Long targetId = target.id();
+        Long developerId = target.developerId();
+        WorkArtifact artifactType = target.type();
+        Long artifactId = target.id();
 
         // Persist findings
         int inserted = 0;
@@ -116,7 +116,7 @@ public class PracticeDetectionDeliveryService {
         // SAME key onto the deliverable findings instead of recomputing it downstream, which could drift from
         // what was persisted. Only known-slug findings are entered here; unknown-slug ones are skipped below
         // (no key computed, never delivered), so the map aligns exactly with what the handler composes.
-        Map<ValidatedFinding, String> correlationKeys = new IdentityHashMap<>();
+        Map<ValidatedFinding, String> findingFingerprints = new IdentityHashMap<>();
 
         for (int i = 0; i < validFindings.size(); i++) {
             ValidatedFinding finding = validFindings.get(i);
@@ -135,7 +135,7 @@ public class PracticeDetectionDeliveryService {
 
             // Build idempotency key — includes index to allow multiple findings per practice
             String idempotencyKey =
-                finding.practiceSlug() + ":" + i + ":" + targetType.name() + ":" + targetId + ":" + job.getId();
+                finding.practiceSlug() + ":" + i + ":" + artifactType.name() + ":" + artifactId + ":" + job.getId();
 
             // Serialize evidence
             String evidenceJson = null;
@@ -147,22 +147,22 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
-            // Author-side practices (the whole catalogue today) file the finding against the contributor,
-            // so subject_user_id stays null (== contributor); reviewer-audience practices will set the
-            // reviewer here once they ship (ADR 0021 C2).
-            Long subjectUserId = null;
+            // Whose conduct the finding is filed against — always explicit (never null): the developer for
+            // author-side practices (the whole catalogue today), the reviewer for reviewer-audience practices
+            // once they ship (ADR 0021 C2).
+            Long subjectUserId = developerId;
 
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
             // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
-            String correlationKey = CorrelationKey.compute(
+            String findingFingerprint = FindingFingerprint.compute(
                 finding.practiceSlug(),
-                targetType.name(),
-                targetId,
-                subjectUserId != null ? subjectUserId : contributorId,
+                artifactType.name(),
+                artifactId,
+                subjectUserId,
                 firstLocationPath(finding.evidence())
             );
-            correlationKeys.put(finding, correlationKey);
+            findingFingerprints.put(finding, findingFingerprint);
 
             // Insert (idempotent)
             int rows = practiceFindingRepository.insertIfAbsent(
@@ -170,9 +170,9 @@ public class PracticeDetectionDeliveryService {
                 idempotencyKey,
                 job.getId(),
                 practice.getId(),
-                targetType.name(),
-                targetId,
-                contributorId,
+                artifactType.name(),
+                artifactId,
+                developerId,
                 subjectUserId,
                 finding.title(),
                 finding.verdict().name(),
@@ -181,7 +181,7 @@ public class PracticeDetectionDeliveryService {
                 evidenceJson,
                 finding.reasoning(),
                 finding.guidance(),
-                correlationKey,
+                findingFingerprint,
                 detectedAt
             );
 
@@ -193,7 +193,7 @@ public class PracticeDetectionDeliveryService {
             // Track negative findings based on verdict, not insert result.
             // Critical for retry delivery: on retry, insertIfAbsent returns 0 for existing
             // findings, but we still need correct hasNegative for the delivery gate.
-            if (finding.verdict() == Verdict.NOT_OBSERVED) {
+            if (finding.verdict() == Observation.NOT_OBSERVED) {
                 hasNegative = true;
             }
         }
@@ -212,31 +212,31 @@ public class PracticeDetectionDeliveryService {
             new PracticeDetectionCompletedEvent(
                 job.getId(),
                 workspaceId,
-                targetType,
-                targetId,
-                contributorId,
+                artifactType,
+                artifactId,
+                developerId,
                 inserted,
                 totalDiscarded,
                 hasNegative
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, correlationKeys);
+        return new DeliveryResult(inserted, discardedUnknownSlug, discardedDuplicate, hasNegative, findingFingerprints);
     }
 
     /**
-     * Route the delivery target on the job's artifact. Issue jobs carry {@code target_type=ISSUE} +
-     * {@code issue_id}; PR jobs carry {@code pull_request_id} (no {@code target_type} → defaults to PR,
+     * Route the delivery target on the job's artifact. Issue jobs carry {@code artifact_type=ISSUE} +
+     * {@code issue_id}; PR jobs carry {@code pull_request_id} (no {@code artifact_type} → defaults to PR,
      * keeping existing PR jobs and replays working).
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
-        String targetType = metadata.has("target_type") ? metadata.get("target_type").asString() : "PULL_REQUEST";
-        if (WorkArtifact.ISSUE.name().equals(targetType)) {
+        String artifactType = metadata.has("artifact_type") ? metadata.get("artifact_type").asString() : "PULL_REQUEST";
+        if (WorkArtifact.ISSUE.name().equals(artifactType)) {
             if (!metadata.has("issue_id")) {
                 throw new JobDeliveryException("Missing issue_id in job metadata: jobId=" + job.getId());
             }
             Long issueId = metadata.get("issue_id").asLong();
-            // TYPE(i)=Issue finder: never resolve a PullRequest under an ISSUE target_type (shared table/id space).
+            // TYPE(i)=Issue finder: never resolve a PullRequest under an ISSUE artifact_type (shared table/id space).
             Issue issue = issueRepository
                 .findByIdWithRepository(issueId)
                 .orElseThrow(() ->
@@ -268,7 +268,7 @@ public class PracticeDetectionDeliveryService {
 
     /**
      * The file path of a finding's first evidence location, or {@code null} when it has none (a metadata
-     * practice like PR-description quality). Feeds {@link CorrelationKey} — the PATH only, never a line
+     * practice like PR-description quality). Feeds {@link FindingFingerprint} — the PATH only, never a line
      * number, so a finding that survives a few lines moving keeps one cross-run identity. Package-private so
      * {@code ReactionSuppressionFilter} (B2) recomputes the same locus the SAME way.
      */
@@ -289,7 +289,7 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * @param correlationKeys the stable cross-run key persisted for each delivered finding, keyed by finding
+     * @param findingFingerprints the stable cross-run key persisted for each delivered finding, keyed by finding
      *     identity, so the caller can stamp the SAME key onto its deliverable findings without recomputing it
      *     (no drift from what was persisted). Empty when no findings were persisted.
      */
@@ -298,7 +298,7 @@ public class PracticeDetectionDeliveryService {
         int discardedUnknownSlug,
         int discardedDuplicate,
         boolean hasNegative,
-        Map<ValidatedFinding, String> correlationKeys
+        Map<ValidatedFinding, String> findingFingerprints
     ) {
         /** Compatibility shape for call sites/tests that do not consume per-finding correlation keys. */
         public DeliveryResult(int inserted, int discardedUnknownSlug, int discardedDuplicate, boolean hasNegative) {

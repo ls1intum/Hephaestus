@@ -138,7 +138,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
-        p.setCategory("test");
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(triggerEvents));
         p.setActive(active);

@@ -29,9 +29,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -132,8 +132,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
 
-        User contributor = TestUserFactory.createUser(500L, "pipeline-author", provider);
-        contributor = userRepository.save(contributor);
+        User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
+        developer = userRepository.save(developer);
 
         Repository repo = new Repository();
         repo.setNativeId(4001L);
@@ -160,7 +160,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             now,
             now,
             now,
-            contributor.getId(),
+            developer.getId(),
             repo.getId(),
             null,
             null,
@@ -212,7 +212,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
-        p.setCategory("test");
         p.setCriteria("Test " + slug);
         p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
         return practiceRepository.save(p);
@@ -271,7 +270,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             assertThat(findings).hasSize(2);
             assertThat(findings)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.OBSERVED, Verdict.NOT_OBSERVED);
+                .containsExactlyInAnyOrder(Observation.OBSERVED, Observation.NOT_OBSERVED);
 
             // Verify completion event
             List<PracticeDetectionCompletedEvent> events = applicationEvents

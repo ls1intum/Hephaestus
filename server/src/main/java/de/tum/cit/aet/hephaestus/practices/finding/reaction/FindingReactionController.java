@@ -24,14 +24,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * REST controller for contributor reaction on AI-generated practice findings.
+ * REST controller for developer reaction on AI-generated practice findings.
  *
  * <p>All endpoints are workspace-scoped and require authentication.
- * Reaction submission is restricted to the finding's contributor.
+ * Reaction submission is restricted to the finding's developer.
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/findings")
-@Tag(name = "Finding Reaction", description = "Contributor reactions to AI-generated practice findings")
+@Tag(name = "Finding Reaction", description = "Developer reactions to AI-generated practice findings")
 @RequiredArgsConstructor
 @Validated
 public class FindingReactionController {
@@ -41,7 +41,7 @@ public class FindingReactionController {
     @PostMapping("/{findingId}/reactions")
     @Operation(
         summary = "Submit a reaction to a practice finding",
-        description = "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
+        description = "Records the developer's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
             "Append-only: submitting again creates a new record, preserving temporal history."
     )
     @ApiResponse(
@@ -56,7 +56,7 @@ public class FindingReactionController {
     )
     @ApiResponse(
         responseCode = "403",
-        description = "Current user is not the finding's contributor",
+        description = "Current user is not the finding's developer",
         content = @Content(schema = @Schema(hidden = true))
     )
     @ApiResponse(

@@ -3,13 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.finding.CorrelationKey;
+import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReaction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Verdict;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,13 +25,13 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Reaction-aware re-nag suppression (ADR 0021, B2). Runs AFTER the findings are persisted (so each carries
- * its stable {@code correlation_key}) and BEFORE the summary/inline notes are composed: a locus the student
+ * its stable {@code finding_fingerprint}) and BEFORE the summary/inline notes are composed: a locus the student
  * already DISPUTED / marked NOT_APPLICABLE on an EARLIER run is dropped from this run's delivery (and a
  * SUPPRESSED ledger row is written so an eval sees it was deliberately withheld, not missed). A locus the
  * student marked APPLIED ("I fixed it") but that is STILL NOT_OBSERVED this run is kept, with stiffer wording.
  *
  * <p>The reaction is captured against the EPHEMERAL per-run finding id, which differs every run; matching is
- * therefore by {@code correlation_key} (A2 denormalized it onto the reaction). Flag-gated
+ * therefore by {@code finding_fingerprint} (A2 denormalized it onto the reaction). Flag-gated
  * ({@code hephaestus.practice-review.reaction-suppression}); a no-op when off, when no findings were persisted,
  * or when no reaction matches.
  */
@@ -65,7 +65,7 @@ class ReactionSuppressionFilter {
     /** Which findings to still deliver (escalated ones already rewritten) and how many were suppressed. */
     record ReactionDecision(List<ValidatedFinding> deliverable, int suppressedCount) {}
 
-    // Read-only tx: we run outside the handler's transaction and call any.getContributor().getId(), which
+    // Read-only tx: we run outside the handler's transaction and call any.getDeveloper().getId(), which
     // initialises the lazy User proxy (its @Id lives on the BaseGitServiceEntity superclass, so the id is not
     // readable without a load). recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
@@ -78,26 +78,26 @@ class ReactionSuppressionFilter {
             return new ReactionDecision(scopedFindings, 0);
         }
 
-        // All findings of one job share the recipient + target. The reacting party is the subject (== the
-        // contributor today; subject_user_id stays null for the author-side catalogue) — the same aboutUserId
-        // deliver() folded into each correlation_key.
+        // All findings of one job share the recipient + target. The reacting party is the subject
+        // (== the developer for the author-side catalogue today) — the same aboutUserId deliver() folded
+        // into each finding_fingerprint. subject_user_id is always populated, so no fallback is needed.
         PracticeFinding any = persisted.get(0);
-        long aboutUserId = any.getSubjectUserId() != null ? any.getSubjectUserId() : any.getContributor().getId();
-        String targetType = any.getTargetType().name();
-        long targetId = any.getTargetId();
+        long aboutUserId = any.getSubjectUserId();
+        String artifactType = any.getArtifactType().name();
+        long artifactId = any.getArtifactId();
 
         Map<String, PracticeFinding> persistedByKey = new HashMap<>();
         for (PracticeFinding f : persisted) {
-            if (f.getCorrelationKey() != null) {
-                persistedByKey.putIfAbsent(f.getCorrelationKey(), f);
+            if (f.getFindingFingerprint() != null) {
+                persistedByKey.putIfAbsent(f.getFindingFingerprint(), f);
             }
         }
         Map<String, FindingReactionAction> actionByKey = new HashMap<>();
-        for (FindingReaction r : findingReactionRepository.findLatestByCorrelationKeysAndContributor(
+        for (FindingReaction r : findingReactionRepository.findLatestByFindingFingerprintsAndDeveloper(
             persistedByKey.keySet(),
             aboutUserId
         )) {
-            actionByKey.put(r.getCorrelationKey(), r.getAction());
+            actionByKey.put(r.getFindingFingerprint(), r.getAction());
         }
         if (actionByKey.isEmpty()) {
             return new ReactionDecision(scopedFindings, 0);
@@ -108,11 +108,11 @@ class ReactionSuppressionFilter {
         int suppressedIndex = 0;
         for (ValidatedFinding vf : scopedFindings) {
             // Recompute the canonical locus key the same way deliver() did, so we match the persisted row a
-            // reaction is keyed to — without re-deriving identity (CorrelationKey deliberately excludes the title).
-            String key = CorrelationKey.compute(
+            // reaction is keyed to — without re-deriving identity (FindingFingerprint deliberately excludes the title).
+            String key = FindingFingerprint.compute(
                 vf.practiceSlug(),
-                targetType,
-                targetId,
+                artifactType,
+                artifactId,
                 aboutUserId,
                 firstLocationPath(vf.evidence())
             );
@@ -129,7 +129,7 @@ class ReactionSuppressionFilter {
                 suppressed++;
                 continue;
             }
-            if (action == FindingReactionAction.APPLIED && vf.verdict() == Verdict.NOT_OBSERVED) {
+            if (action == FindingReactionAction.APPLIED && vf.verdict() == Observation.NOT_OBSERVED) {
                 deliverable.add(withEscalatedReasoning(vf)); // student said "fixed", but it recurs
                 continue;
             }
@@ -163,7 +163,7 @@ class ReactionSuppressionFilter {
             reasoning,
             vf.guidance(),
             vf.suggestedDiffNotes(),
-            vf.correlationKey()
+            vf.findingFingerprint()
         );
     }
 

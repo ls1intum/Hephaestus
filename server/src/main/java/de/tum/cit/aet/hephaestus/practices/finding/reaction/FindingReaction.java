@@ -26,15 +26,15 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 /**
- * Immutable record of a contributor's reaction to an AI-generated practice finding.
+ * Immutable record of a developer's reaction to an AI-generated practice finding.
  *
- * <p>Append-only for research data integrity: a contributor submitting a second reaction
+ * <p>Append-only for research data integrity: a developer submitting a second reaction
  * creates a new row, preserving the temporal record of when they first saw and then
- * changed their mind about a finding. The latest row per (finding, contributor) is
+ * changed their mind about a finding. The latest row per (finding, developer) is
  * the "current" state for dashboard display.
  *
  * <p>Explicitly excluded from agent context (#895) — the AI must not know whether
- * a contributor previously disputed a finding, to avoid contaminating accuracy measurement.
+ * a developer previously disputed a finding, to avoid contaminating accuracy measurement.
  *
  * @see PracticeFinding for the finding being reacted to
  * @see FindingReactionAction for the action taxonomy
@@ -44,13 +44,13 @@ import org.hibernate.annotations.OnDeleteAction;
 @Table(
     name = "finding_reaction",
     indexes = {
-        @Index(name = "idx_finding_reaction_contributor_created", columnList = "contributor_id, created_at DESC"),
+        @Index(name = "idx_finding_reaction_developer_created", columnList = "developer_id, created_at DESC"),
         @Index(
-            name = "idx_finding_reaction_finding_contributor",
-            columnList = "finding_id, contributor_id, created_at DESC"
+            name = "idx_finding_reaction_finding_developer",
+            columnList = "finding_id, developer_id, created_at DESC"
         ),
         // A2 (ADR 0021): find a reaction by its stable locus across the detector's per-run re-detections.
-        @Index(name = "idx_finding_reaction_correlation", columnList = "correlation_key"),
+        @Index(name = "idx_finding_reaction_correlation", columnList = "finding_fingerprint"),
     }
 )
 @Getter
@@ -81,36 +81,36 @@ public class FindingReaction {
     private UUID findingId;
 
     /**
-     * Denormalized copy of {@link PracticeFinding#getCorrelationKey()} (ADR 0021 C2), captured at
+     * Denormalized copy of {@link PracticeFinding#getFindingFingerprint()} (ADR 0021 C2), captured at
      * reaction-write time. The reacted finding is EPHEMERAL — a new row each run — so its FK alone cannot
-     * locate this reaction on a later run; the {@code correlation_key} is the stable (practice, target,
+     * locate this reaction on a later run; the {@code finding_fingerprint} is the stable (practice, target,
      * subject, file) locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE
      * reaction against a re-detected finding. Nullable: a reaction whose source finding predates C2 (null
      * key) stays null and simply cannot participate in B2.
      */
-    @Column(name = "correlation_key", length = 64)
-    private String correlationKey;
+    @Column(name = "finding_fingerprint", length = 64)
+    private String findingFingerprint;
 
     /**
-     * The contributor who submitted this reaction. No cascade — users are long-lived
+     * The developer who submitted this reaction. No cascade — users are long-lived
      * and reaction must survive independently; deleting a user with existing reaction
      * is blocked by the FK constraint (RESTRICT).
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "contributor_id",
+        name = "developer_id",
         nullable = false,
-        foreignKey = @ForeignKey(name = "fk_finding_reaction_contributor")
+        foreignKey = @ForeignKey(name = "fk_finding_reaction_developer")
     )
-    private User contributor;
+    private User developer;
 
     /**
-     * Direct access to the contributor ID without triggering a lazy load on the {@link #contributor} proxy.
+     * Direct access to the developer ID without triggering a lazy load on the {@link #developer} proxy.
      * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
      */
-    @Column(name = "contributor_id", nullable = false, insertable = false, updatable = false)
-    private Long contributorId;
+    @Column(name = "developer_id", nullable = false, insertable = false, updatable = false)
+    private Long developerId;
 
     @NotNull
     @Enumerated(EnumType.STRING)
