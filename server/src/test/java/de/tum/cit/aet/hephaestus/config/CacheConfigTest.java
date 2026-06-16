@@ -26,6 +26,7 @@ class CacheConfigTest extends BaseUnitTest {
         "contributors",
         "mentor_findings_aspect",
         "mentor_practice_aspect",
+        "mentor_practice_standing_aspect",
         "mentor_user_aspect",
         "mentor_workspace_aspect",
         "pullRequestTemplates"
@@ -53,6 +54,7 @@ class CacheConfigTest extends BaseUnitTest {
             "mentor_user_aspect",
             "mentor_workspace_aspect",
             "mentor_practice_aspect",
+            "mentor_practice_standing_aspect",
             "mentor_findings_aspect"
         );
         for (String name : mentorCaches) {
