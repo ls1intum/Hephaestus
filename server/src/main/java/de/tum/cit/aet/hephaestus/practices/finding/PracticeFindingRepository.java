@@ -364,4 +364,45 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         de.tum.cit.aet.hephaestus.practices.model.Verdict getVerdict();
         Long getCount();
     }
+
+    /**
+     * Per-goal standing rows for the mentor prepared-context aspect: one row per
+     * (goal, polarity, verdict, severity) for a contributor in the look-back window, with the
+     * recent-window sub-count and the most-recent detection. The sign decision (problem vs strength)
+     * is deliberately left to {@link de.tum.cit.aet.hephaestus.practices.model.Polarity} in Java —
+     * this query only projects the raw verdict + polarity so the rule stays single-sourced.
+     * Ungrouped practices ({@code p.goal IS NULL}) are excluded; they remain visible in
+     * {@code findings_history.json}.
+     */
+    @Query(
+        """
+        SELECT p.goal.slug AS goalSlug, p.goal.name AS goalName, p.polarity AS polarity,
+               f.verdict AS verdict, f.severity AS severity, COUNT(f) AS count,
+               SUM(CASE WHEN f.detectedAt >= :recentSince THEN 1L ELSE 0L END) AS recentCount
+        FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id = :contributorId
+          AND p.workspace.id = :workspaceId
+          AND f.detectedAt >= :since
+          AND p.goal IS NOT NULL
+        GROUP BY p.goal.slug, p.goal.name, p.polarity, f.verdict, f.severity
+        """
+    )
+    List<GoalStandingRow> findGoalStandingByContributorAndWorkspace(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since,
+        @Param("recentSince") Instant recentSince
+    );
+
+    /** Projection: per (goal, polarity, verdict, severity) standing for a contributor. */
+    interface GoalStandingRow {
+        String getGoalSlug();
+        String getGoalName();
+        de.tum.cit.aet.hephaestus.practices.model.Polarity getPolarity();
+        de.tum.cit.aet.hephaestus.practices.model.Verdict getVerdict();
+        de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
+        Long getCount();
+        Long getRecentCount();
+    }
 }

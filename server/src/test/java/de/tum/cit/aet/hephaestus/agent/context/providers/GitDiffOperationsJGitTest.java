@@ -214,6 +214,17 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
         assertThat(ops.resolveDiffRange(repoDir, "main", "feature", null)).isNull();
     }
 
+    @Test
+    void resolveDiffRangeNullWhenSourceAlreadyMergedIntoTarget() throws GitAPIException, IOException {
+        // Fast-forward main up to feature's head so feature is an ancestor of main: the merge-base equals
+        // head, so a 3-dot diff is legitimately empty and the range must be null (not a phantom 2-dot range).
+        git.checkout().setName("main").call();
+        git.merge().include(repo.resolve("feature")).call();
+        repo.updateRef("refs/remotes/origin/main").link("refs/heads/main");
+
+        assertThat(ops.resolveDiffRange(repoDir, "main", "feature", headSha)).isNull();
+    }
+
     private void write(String name, String content) throws IOException {
         Files.writeString(repoDir.resolve(name), content, StandardCharsets.UTF_8);
     }

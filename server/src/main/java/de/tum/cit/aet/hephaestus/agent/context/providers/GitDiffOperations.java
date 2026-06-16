@@ -132,6 +132,8 @@ public class GitDiffOperations {
                 }
             }
 
+            // No usable 3-dot base: the source is already an ancestor of the target (merged → a 3-dot
+            // diff is legitimately empty) or the histories are disjoint. Both legitimately resolve to null.
             return null;
         });
     }

@@ -97,12 +97,13 @@ const TURN_GRACE_MS = (() => {
 // callback even leaves the runner. This is a defence-in-depth check; the authoritative
 // whitelist lives Java-side in MentorAspects.ALLOWED_OUTPUT_KEYS (full-key match against
 // the aspect providers' OUTPUT_KEY constants). Keep this set aligned with the
-// {User,Workspace,PracticeCatalog,FindingsHistory}AspectProvider basenames.
+// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding}AspectProvider basenames.
 const FETCH_CONTEXT_ALLOWED = new Set([
     "workspace.json",
     "user.json",
     "practice_catalog.json",
     "findings_history.json",
+    "practice_standing.json",
 ]);
 
 // JSON-RPC error codes
@@ -367,9 +368,9 @@ function defineFetchContextTool() {
         name: "fetch_context",
         label: "Fetch Context",
         description:
-            "Fetch a Hephaestus context aspect (workspace state, user activity, practice catalog, finding history) " +
-            "from the server. Returns JSON content. Allowed paths: workspace.json, user.json, " +
-            "practice_catalog.json, findings_history.json. Names match the aspect provider OUTPUT_KEY constants.",
+            "Fetch a Hephaestus context aspect (workspace state, user activity, practice catalog, finding history, " +
+            "prepared practice standing) from the server. Returns JSON content. Allowed paths: workspace.json, user.json, " +
+            "practice_catalog.json, findings_history.json, practice_standing.json. Names match the aspect provider OUTPUT_KEY constants.",
         parameters: {
             type: "object",
             additionalProperties: false,

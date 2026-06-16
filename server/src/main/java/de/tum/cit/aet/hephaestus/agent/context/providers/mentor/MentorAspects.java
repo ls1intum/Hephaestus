@@ -14,7 +14,8 @@ public final class MentorAspects {
         UserAspectProvider.OUTPUT_KEY,
         WorkspaceAspectProvider.OUTPUT_KEY,
         PracticeCatalogAspectProvider.OUTPUT_KEY,
-        FindingsHistoryAspectProvider.OUTPUT_KEY
+        FindingsHistoryAspectProvider.OUTPUT_KEY,
+        PracticeStandingAspectProvider.OUTPUT_KEY
     );
 
     private MentorAspects() {}

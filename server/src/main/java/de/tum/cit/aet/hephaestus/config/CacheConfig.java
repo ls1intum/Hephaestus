@@ -32,7 +32,8 @@ import org.springframework.context.annotation.Configuration;
  * <h2>Mentor aspect caches</h2>
  *
  * <p>{@code mentor_user_aspect}, {@code mentor_workspace_aspect},
- * {@code mentor_practice_aspect}, {@code mentor_findings_aspect} feed the
+ * {@code mentor_practice_aspect}, {@code mentor_practice_standing_aspect},
+ * {@code mentor_findings_aspect} feed the
  * {@code agent.context.providers.mentor.*} content providers. 5-minute TTL is short enough
  * that staleness across a single chat turn (which itself runs in seconds) is invisible to
  * users, but long enough that two consecutive turns from the same user hit warm. The
@@ -78,6 +79,7 @@ public class CacheConfig {
         new CacheSpec("contributors", LONG_TTL, LONG_MAX),
         new CacheSpec("mentor_findings_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("mentor_practice_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
+        new CacheSpec("mentor_practice_standing_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("mentor_user_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("mentor_workspace_aspect", MENTOR_ASPECT_TTL, MENTOR_MAX),
         new CacheSpec("pullRequestTemplates", LONG_TTL, LONG_MAX)

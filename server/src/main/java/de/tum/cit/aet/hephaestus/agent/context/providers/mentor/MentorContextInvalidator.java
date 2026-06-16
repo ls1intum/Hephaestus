@@ -37,7 +37,8 @@ public class MentorContextInvalidator {
     private static final List<String> PER_USER_CACHES = List.of(
         "mentor_user_aspect",
         "mentor_workspace_aspect",
-        "mentor_findings_aspect"
+        "mentor_findings_aspect",
+        "mentor_practice_standing_aspect"
     );
 
     private final CacheManager cacheManager;
