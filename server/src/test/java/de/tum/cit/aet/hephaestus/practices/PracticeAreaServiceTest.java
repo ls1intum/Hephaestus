@@ -26,7 +26,7 @@ import org.mockito.Mock;
 class PracticeAreaServiceTest extends BaseUnitTest {
 
     @Mock
-    private PracticeAreaRepository practiceGoalRepository;
+    private PracticeAreaRepository practiceAreaRepository;
 
     @Mock
     private PracticeRepository practiceRepository;
@@ -49,82 +49,82 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     );
 
     @Test
-    void createGoal_persistsWithFields() {
-        when(practiceGoalRepository.existsByWorkspaceIdAndSlug(1L, "review-comms")).thenReturn(false);
+    void createArea_persistsWithFields() {
+        when(practiceAreaRepository.existsByWorkspaceIdAndSlug(1L, "review-comms")).thenReturn(false);
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(new Workspace()));
-        when(practiceGoalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeArea created = service.createGoal(CTX, "review-comms", "Effective review communication", "blurb", 0);
+        PracticeArea created = service.createArea(CTX, "review-comms", "Effective review communication", "blurb", 0);
 
         assertThat(created.getSlug()).isEqualTo("review-comms");
         assertThat(created.getName()).isEqualTo("Effective review communication");
         assertThat(created.getDescription()).isEqualTo("blurb");
         assertThat(created.isActive()).isTrue();
-        verify(practiceGoalRepository).save(any(PracticeArea.class));
+        verify(practiceAreaRepository).save(any(PracticeArea.class));
     }
 
     @Test
-    void createGoal_duplicateSlug_throwsConflict() {
-        when(practiceGoalRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
+    void createArea_duplicateSlug_throwsConflict() {
+        when(practiceAreaRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
         assertThatExceptionOfType(PracticeAreaSlugConflictException.class).isThrownBy(() ->
-            service.createGoal(CTX, "dup", "Dup", null, 0)
+            service.createArea(CTX, "dup", "Dup", null, 0)
         );
-        verify(practiceGoalRepository, never()).save(any());
+        verify(practiceAreaRepository, never()).save(any());
     }
 
     @Test
-    void updateGoal_appliesPartialChanges() {
-        PracticeArea goal = new PracticeArea();
-        goal.setSlug("g");
-        goal.setName("Old");
-        goal.setDisplayOrder(0);
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(goal));
-        when(practiceGoalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    void updateArea_appliesPartialChanges() {
+        PracticeArea area = new PracticeArea();
+        area.setSlug("g");
+        area.setName("Old");
+        area.setDisplayOrder(0);
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
+        when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeArea updated = service.updateGoal(CTX, "g", "New", null, 5);
+        PracticeArea updated = service.updateArea(CTX, "g", "New", null, 5);
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getDisplayOrder()).isEqualTo(5);
     }
 
     @Test
-    void getGoal_missing_throwsNotFound() {
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "nope")).thenReturn(Optional.empty());
-        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() -> service.getGoal(CTX, "nope"));
+    void getArea_missing_throwsNotFound() {
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "nope")).thenReturn(Optional.empty());
+        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() -> service.getArea(CTX, "nope"));
     }
 
     @Test
-    void bindPractice_setsGoalWhenBothResolveInWorkspace() {
+    void bindPractice_setsAreaWhenBothResolveInWorkspace() {
         Practice practice = new Practice();
-        PracticeArea goal = new PracticeArea();
+        PracticeArea area = new PracticeArea();
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice));
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(goal));
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
         when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Practice bound = service.bindPractice(CTX, "p", "g");
 
-        assertThat(bound.getGoal()).isSameAs(goal);
+        assertThat(bound.getArea()).isSameAs(area);
     }
 
     @Test
-    void bindPractice_nullGoalUnbinds() {
+    void bindPractice_nullAreaUnbinds() {
         Practice practice = new Practice();
-        practice.setGoal(new PracticeArea());
+        practice.setArea(new PracticeArea());
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(practice));
         when(practiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Practice unbound = service.bindPractice(CTX, "p", null);
 
-        assertThat(unbound.getGoal()).isNull();
+        assertThat(unbound.getArea()).isNull();
     }
 
     @Test
-    void bindPractice_unresolvedGoal_throwsNotFound() {
-        // A goal slug the workspace-scoped finder does not resolve → EntityNotFoundException. This unit
+    void bindPractice_unresolvedArea_throwsNotFound() {
+        // A area slug the workspace-scoped finder does not resolve → EntityNotFoundException. This unit
         // covers the not-found mapping only; it stubs the scoped finder and does not prove tenant isolation.
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(new Practice()));
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
 
         assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
             service.bindPractice(CTX, "p", "foreign")
@@ -140,21 +140,21 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         b.setSlug("b");
         PracticeArea c = new PracticeArea();
         c.setSlug("c");
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "c")).thenReturn(Optional.of(c));
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "a")).thenReturn(Optional.of(a));
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "b")).thenReturn(Optional.of(b));
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "c")).thenReturn(Optional.of(c));
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "a")).thenReturn(Optional.of(a));
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "b")).thenReturn(Optional.of(b));
 
         service.reorder(CTX, List.of("c", "a", "b"));
 
         assertThat(c.getDisplayOrder()).isEqualTo(0);
         assertThat(a.getDisplayOrder()).isEqualTo(1);
         assertThat(b.getDisplayOrder()).isEqualTo(2);
-        verify(practiceGoalRepository, times(3)).save(any());
+        verify(practiceAreaRepository, times(3)).save(any());
     }
 
     @Test
     void reorder_unknownSlug_throws() {
-        when(practiceGoalRepository.findByWorkspaceIdAndSlug(1L, "ghost")).thenReturn(Optional.empty());
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "ghost")).thenReturn(Optional.empty());
 
         assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
             service.reorder(CTX, List.of("ghost"))

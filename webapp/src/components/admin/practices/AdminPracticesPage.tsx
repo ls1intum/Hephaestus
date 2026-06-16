@@ -20,7 +20,7 @@ import { PracticeCardList } from "./PracticeCardList";
 interface AdminPracticesPageProps {
 	workspaceSlug: string;
 	practices: Practice[];
-	goals: PracticeArea[];
+	areas: PracticeArea[];
 	isLoading: boolean;
 	isError?: boolean;
 	isDeleting: boolean;
@@ -40,7 +40,7 @@ const FOCUS_FILTERS: ReadonlyArray<{ value: FocusFilter; label: string }> = [
 export function AdminPracticesPage({
 	workspaceSlug,
 	practices,
-	goals,
+	areas,
 	isLoading,
 	isError = false,
 	isDeleting,
@@ -114,7 +114,7 @@ export function AdminPracticesPage({
 				<PracticeCardList
 					workspaceSlug={workspaceSlug}
 					practices={visiblePractices}
-					goals={goals}
+					areas={areas}
 					isLoading={isLoading}
 					togglingPractices={togglingPractices}
 					onDelete={setDeletingPractice}

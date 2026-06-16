@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.GoalStandingRow;
+import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -60,7 +60,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
     /** Recent-window split for the improving/regressing trajectory signal. */
     private static final int RECENT_DAYS = 14;
 
-    /** Number of priority goals the mentor should lead with. */
+    /** Number of priority areas the mentor should lead with. */
     private static final int MAX_PRIORITIES = 3;
 
     private static final String CACHE_NAME = "mentor_practice_standing_aspect";
@@ -108,25 +108,25 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         Instant since = now.minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
         Instant recentSince = now.minus(RECENT_DAYS, ChronoUnit.DAYS);
 
-        List<GoalStandingRow> rows = findingRepository.findGoalStandingByDeveloperAndWorkspace(
+        List<AreaStandingRow> rows = findingRepository.findAreaStandingByDeveloperAndWorkspace(
             developerId,
             workspaceId,
             since,
             recentSince
         );
 
-        // Goal spine: every goal owning an ACTIVE practice — so a goal with zero / all-NA findings
+        // Area spine: every area owning an ACTIVE practice — so an area with zero / all-NA findings
         // still appears (marked BLIND) instead of silently vanishing.
-        Map<String, GoalAcc> goals = new LinkedHashMap<>();
+        Map<String, AreaAcc> areas = new LinkedHashMap<>();
         for (Practice p : practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId)) {
-            PracticeArea g = p.getGoal();
+            PracticeArea g = p.getArea();
             if (g != null) {
-                goals.computeIfAbsent(g.getSlug(), k -> new GoalAcc(k, g.getName()));
+                areas.computeIfAbsent(g.getSlug(), k -> new AreaAcc(k, g.getName()));
             }
         }
 
-        for (GoalStandingRow r : rows) {
-            GoalAcc a = goals.computeIfAbsent(r.getGoalSlug(), k -> new GoalAcc(k, r.getGoalName()));
+        for (AreaStandingRow r : rows) {
+            AreaAcc a = areas.computeIfAbsent(r.getAreaSlug(), k -> new AreaAcc(k, r.getAreaName()));
             long count = r.getCount() == null ? 0 : r.getCount();
             long recent = r.getRecentCount() == null ? 0 : r.getRecentCount();
             Observation v = r.getVerdict();
@@ -148,13 +148,13 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         ObjectNode window = root.putObject("window");
         window.put("lookbackDays", LOOKBACK_DAYS).put("recentDays", RECENT_DAYS).put("generatedAt", now.toString());
 
-        ArrayNode goalsArr = root.putArray("goals");
-        List<GoalAcc> priorityCandidates = new ArrayList<>();
-        for (GoalAcc a : goals.values()) {
+        ArrayNode areasArr = root.putArray("areas");
+        List<AreaAcc> priorityCandidates = new ArrayList<>();
+        for (AreaAcc a : areas.values()) {
             boolean assessed = (a.flaggedCount + a.affirmedCount) > 0;
-            ObjectNode g = goalsArr.addObject();
-            g.put("goalSlug", a.slug);
-            g.put("goalName", a.name);
+            ObjectNode g = areasArr.addObject();
+            g.put("areaSlug", a.slug);
+            g.put("areaName", a.name);
             g.put("assessmentState", assessed ? "ASSESSED" : "BLIND");
             g.put("flaggedCount", a.flaggedCount);
             g.put("affirmedCount", a.affirmedCount);
@@ -173,15 +173,15 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         // Worst-first by severity (ordinal CRITICAL=0..INFO=3, so ASCENDING ordinal = MORE severe —
         // NOT a max), then by recent activity, then by total flagged.
         priorityCandidates.sort(
-            Comparator.<GoalAcc>comparingInt(a -> a.topSeverity == null ? Integer.MAX_VALUE : a.topSeverity.ordinal())
-                .thenComparing(Comparator.<GoalAcc>comparingLong(a -> a.recentFlagged).reversed())
-                .thenComparing(Comparator.<GoalAcc>comparingLong(a -> a.flaggedCount).reversed())
+            Comparator.<AreaAcc>comparingInt(a -> a.topSeverity == null ? Integer.MAX_VALUE : a.topSeverity.ordinal())
+                .thenComparing(Comparator.<AreaAcc>comparingLong(a -> a.recentFlagged).reversed())
+                .thenComparing(Comparator.<AreaAcc>comparingLong(a -> a.flaggedCount).reversed())
         );
         ArrayNode prioritiesArr = root.putArray("priorities");
-        for (GoalAcc a : priorityCandidates.subList(0, Math.min(MAX_PRIORITIES, priorityCandidates.size()))) {
+        for (AreaAcc a : priorityCandidates.subList(0, Math.min(MAX_PRIORITIES, priorityCandidates.size()))) {
             ObjectNode n = prioritiesArr.addObject();
-            n.put("goalSlug", a.slug);
-            n.put("goalName", a.name);
+            n.put("areaSlug", a.slug);
+            n.put("areaName", a.name);
             if (a.topSeverity != null) {
                 n.put("topSeverity", a.topSeverity.name());
             }
@@ -202,7 +202,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         return candidate.ordinal() < current.ordinal() ? candidate : current;
     }
 
-    private static String trajectory(GoalAcc a) {
+    private static String trajectory(AreaAcc a) {
         if (a.flaggedCount == 0) {
             return "none";
         }
@@ -215,7 +215,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         return "steady";
     }
 
-    private static final class GoalAcc {
+    private static final class AreaAcc {
 
         final String slug;
         final String name;
@@ -228,7 +228,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         @Nullable
         Severity topSeverity;
 
-        GoalAcc(String slug, String name) {
+        AreaAcc(String slug, String name) {
             this.slug = slug;
             this.name = name;
         }

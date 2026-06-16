@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for workspace-scoped practice goals (the configurable learning-objective grouping over
+ * Repository for workspace-scoped practice areas (the configurable learning-objective grouping over
  * practices).
  */
 @Repository
@@ -28,7 +28,7 @@ public interface PracticeAreaRepository extends JpaRepository<PracticeArea, Long
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    /** Deletes all goals for the workspace. Practices' {@code practice_area_id} is SET NULL by the FK. */
+    /** Deletes all areas for the workspace. Practices' {@code practice_area_id} is SET NULL by the FK. */
     @Modifying
     @Transactional
     @Query("DELETE FROM PracticeArea g WHERE g.workspace.id = :workspaceId")

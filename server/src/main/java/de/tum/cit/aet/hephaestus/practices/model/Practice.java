@@ -51,8 +51,8 @@ import tools.jackson.databind.JsonNode;
     ),
     indexes = {
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
-        // Goal-scoped reads (Reflection/Facilitator dashboards) join finding→practice→goal; index the FK.
-        @Index(name = "idx_practice_practice_goal", columnList = "practice_area_id"),
+        // Area-scoped reads (Reflection/Facilitator dashboards) join finding→practice→area; index the FK.
+        @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
     }
 )
 @Getter
@@ -111,16 +111,16 @@ public class Practice {
     private SubjectRole subjectRole = SubjectRole.AUTHOR;
 
     /**
-     * Optional {@link PracticeArea} this practice rolls up to (NULL = ungrouped). 1:N (one goal owns
-     * many practices; a practice belongs to at most one goal): the single owning bucket keeps the
-     * per-goal acted-on/total progress denominator unambiguous. Do not loosen to a join table without
-     * also switching progress math to per-(goal, practice) rows.
+     * Optional {@link PracticeArea} this practice rolls up to (NULL = ungrouped). 1:N (one area owns
+     * many practices; a practice belongs to at most one area): the single owning bucket keeps the
+     * per-area acted-on/total progress denominator unambiguous. Do not loosen to a join table without
+     * also switching progress math to per-(area, practice) rows.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_goal"))
+    @JoinColumn(name = "practice_area_id", foreignKey = @ForeignKey(name = "fk_practice_area"))
     @OnDelete(action = OnDeleteAction.SET_NULL)
     @ToString.Exclude
-    private PracticeArea goal;
+    private PracticeArea area;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)

@@ -29,7 +29,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
     @Query(
         value = """
         INSERT INTO feedback_finding (feedback_id, finding_id, evidence_role, ordinal)
-        VALUES (:feedbackId, :findingId, :displayRole, :ordinal)
+        VALUES (:feedbackId, :findingId, :evidenceRole, :ordinal)
         ON CONFLICT (feedback_id, finding_id) DO NOTHING
         """,
         nativeQuery = true
@@ -37,7 +37,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
     int insertIfAbsent(
         @Param("feedbackId") UUID feedbackId,
         @Param("findingId") UUID findingId,
-        @Param("displayRole") String displayRole,
+        @Param("evidenceRole") String evidenceRole,
         @Param("ordinal") int ordinal
     );
 

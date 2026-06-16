@@ -48,7 +48,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeCatalogController {
 
     private final PracticeService practiceService;
-    private final PracticeAreaService goalService;
+    private final PracticeAreaService areaService;
 
     @GetMapping
     @Operation(
@@ -165,10 +165,10 @@ public class PracticeCatalogController {
         return ResponseEntity.ok(PracticeDTO.from(practice));
     }
 
-    @PutMapping("/{practiceSlug}/goal")
+    @PutMapping("/{practiceSlug}/area")
     @Operation(
-        summary = "Bind a practice to a goal",
-        description = "Binds the practice to the goal named by goalSlug, or unbinds it when goalSlug is null"
+        summary = "Bind a practice to an area",
+        description = "Binds the practice to the area named by areaSlug, or unbinds it when areaSlug is null"
     )
     @ApiResponse(
         responseCode = "200",
@@ -177,16 +177,16 @@ public class PracticeCatalogController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Practice or goal not found",
+        description = "Practice or area not found",
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeDTO> bindGoal(
+    public ResponseEntity<PracticeDTO> bindArea(
         WorkspaceContext workspaceContext,
         @PathVariable String practiceSlug,
         @Valid @RequestBody BindPracticeAreaRequestDTO request
     ) {
-        Practice practice = goalService.bindPractice(workspaceContext, practiceSlug, request.goalSlug());
+        Practice practice = areaService.bindPractice(workspaceContext, practiceSlug, request.areaSlug());
         return ResponseEntity.ok(PracticeDTO.from(practice));
     }
 

@@ -54,13 +54,13 @@ function PracticeDetectionLayout() {
 			fuzzy: true,
 		}),
 	);
-	const isGoals = Boolean(
+	const isAreas = Boolean(
 		matchRoute({
-			to: "/w/$workspaceSlug/admin/ai/practice-detection/goals",
+			to: "/w/$workspaceSlug/admin/ai/practice-detection/areas",
 			fuzzy: true,
 		}),
 	);
-	const activeTab = isGoals ? "goals" : isCatalog ? "catalog" : "policy";
+	const activeTab = isAreas ? "areas" : isCatalog ? "catalog" : "policy";
 
 	return (
 		<div className="container mx-auto max-w-3xl py-6 space-y-6">
@@ -79,9 +79,9 @@ function PracticeDetectionLayout() {
 							to: "/w/$workspaceSlug/admin/ai/practice-detection/catalog",
 							params: { workspaceSlug },
 						});
-					} else if (value === "goals") {
+					} else if (value === "areas") {
 						navigate({
-							to: "/w/$workspaceSlug/admin/ai/practice-detection/goals",
+							to: "/w/$workspaceSlug/admin/ai/practice-detection/areas",
 							params: { workspaceSlug },
 						});
 					} else {
@@ -94,7 +94,7 @@ function PracticeDetectionLayout() {
 			>
 				<TabsList>
 					<TabsTrigger value="policy">Policy</TabsTrigger>
-					<TabsTrigger value="goals">Goals</TabsTrigger>
+					<TabsTrigger value="areas">Areas</TabsTrigger>
 					<TabsTrigger value="catalog">Catalog</TabsTrigger>
 				</TabsList>
 			</Tabs>

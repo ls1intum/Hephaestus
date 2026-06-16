@@ -6,11 +6,11 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Request DTO for updating an existing practice goal.
+ * Request DTO for updating an existing practice area.
  *
  * <p>Uses PATCH semantics: only non-null fields are applied.
  */
-@Schema(description = "Request to update an existing practice goal (PATCH — only non-null fields applied)")
+@Schema(description = "Request to update an existing practice area (PATCH — only non-null fields applied)")
 public record UpdatePracticeAreaRequestDTO(
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
     @Pattern(regexp = ".*\\S.*", message = "Name must not be blank")
@@ -19,11 +19,11 @@ public record UpdatePracticeAreaRequestDTO(
     String name,
 
     @Size(max = 5000, message = "Description must be at most 5000 characters")
-    @Schema(description = "What this goal develops")
+    @Schema(description = "What this area develops")
     @Nullable
     String description,
 
     @Schema(description = "Sort order within the workspace") @Nullable Integer displayOrder,
 
-    @Schema(description = "Whether this goal is active") @Nullable Boolean active
+    @Schema(description = "Whether this area is active") @Nullable Boolean active
 ) {}

@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	bindGoalMutation,
+	bindAreaMutation,
 	createPracticeMutation,
-	listGoalsOptions,
+	listAreasOptions,
 	listPracticesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest } from "@/api/types.gen";
@@ -22,8 +22,8 @@ function CreatePracticeContainer() {
 	const queryClient = useQueryClient();
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 
-	const goalsQuery = useQuery({
-		...listGoalsOptions({
+	const areasQuery = useQuery({
+		...listAreasOptions({
 			path: { workspaceSlug: workspaceSlug ?? "" },
 			query: { activeOnly: true },
 		}),
@@ -31,17 +31,17 @@ function CreatePracticeContainer() {
 	});
 
 	const createPractice = useMutation(createPracticeMutation());
-	const bindGoal = useMutation(bindGoalMutation());
+	const bindArea = useMutation(bindAreaMutation());
 
-	const handleSubmit = async (data: CreatePracticeRequest, goalSlug: string | null) => {
+	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
 		if (!workspaceSlug) return;
 		try {
 			await createPractice.mutateAsync({ path: { workspaceSlug }, body: data });
-			// Goal binding is a separate endpoint, so it runs after the practice exists.
-			if (goalSlug) {
-				await bindGoal.mutateAsync({
+			// Area binding is a separate endpoint, so it runs after the practice exists.
+			if (areaSlug) {
+				await bindArea.mutateAsync({
 					path: { workspaceSlug, practiceSlug: data.slug },
-					body: { goalSlug },
+					body: { areaSlug },
 				});
 			}
 			queryClient.invalidateQueries({
@@ -69,10 +69,10 @@ function CreatePracticeContainer() {
 	return (
 		<PracticeForm
 			mode="create"
-			goals={goalsQuery.data ?? []}
+			areas={areasQuery.data ?? []}
 			onSubmit={handleSubmit}
 			onCancel={handleCancel}
-			isPending={createPractice.isPending || bindGoal.isPending}
+			isPending={createPractice.isPending || bindArea.isPending}
 		/>
 	);
 }

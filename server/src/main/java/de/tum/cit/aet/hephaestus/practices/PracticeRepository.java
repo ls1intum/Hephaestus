@@ -26,13 +26,13 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
-    // Fetches the bound goal eagerly so PracticeDTO.from (which reads goal.slug) is safe to map
+    // Fetches the bound area eagerly so PracticeDTO.from (which reads area.slug) is safe to map
     // outside the transaction — open-in-view is disabled.
-    @EntityGraph(attributePaths = "goal")
+    @EntityGraph(attributePaths = "area")
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    /** Practices bound to a goal (the per-goal dashboard aggregation key). */
-    List<Practice> findByWorkspaceIdAndGoalId(Long workspaceId, Long goalId);
+    /** Practices bound to an area (the per-area dashboard aggregation key). */
+    List<Practice> findByWorkspaceIdAndAreaId(Long workspaceId, Long areaId);
 
     boolean existsByWorkspaceId(Long workspaceId);
 
@@ -42,7 +42,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * Lists practices for a workspace with an optional active filter.
      * Null filter values are ignored (match all).
      */
-    @EntityGraph(attributePaths = "goal")
+    @EntityGraph(attributePaths = "area")
     @Query(
         """
         SELECT p FROM Practice p

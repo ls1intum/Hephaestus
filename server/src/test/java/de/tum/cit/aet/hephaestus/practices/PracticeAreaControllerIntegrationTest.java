@@ -35,32 +35,32 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  */
 class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
-    private static final String BASE_URI = "/workspaces/{workspaceSlug}/practice-goals";
+    private static final String BASE_URI = "/workspaces/{workspaceSlug}/practice-areas";
 
     @Autowired
     private WebTestClient webTestClient;
 
     @Autowired
-    private PracticeAreaRepository goalRepository;
+    private PracticeAreaRepository areaRepository;
 
     private Workspace workspace;
 
     @BeforeEach
     void setUpWorkspace() {
-        User owner = persistUser("goal-owner");
-        workspace = createWorkspace("goal-ws", "Goal WS", "goal-org", AccountType.ORG, owner);
+        User owner = persistUser("area-owner");
+        workspace = createWorkspace("area-ws", "Area WS", "area-org", AccountType.ORG, owner);
     }
 
-    private PracticeArea persistGoal(String slug, String name) {
-        PracticeArea goal = new PracticeArea();
-        goal.setWorkspace(workspace);
-        goal.setSlug(slug);
-        goal.setName(name);
-        return goalRepository.save(goal);
+    private PracticeArea persistArea(String slug, String name) {
+        PracticeArea area = new PracticeArea();
+        area.setWorkspace(workspace);
+        area.setSlug(slug);
+        area.setName(name);
+        return areaRepository.save(area);
     }
 
     private CreatePracticeAreaRequestDTO validCreateRequest(String slug) {
-        return new CreatePracticeAreaRequestDTO(slug, "Goal " + slug, "Develops " + slug, null);
+        return new CreatePracticeAreaRequestDTO(slug, "Area " + slug, "Develops " + slug, null);
     }
 
     /** Registers the current {@code @WithMentorUser} principal as a plain workspace MEMBER. */
@@ -72,15 +72,15 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // LIST — read, member-allowed (@SecurityRequirements)
 
     @Nested
-    @DisplayName("GET /practice-goals")
-    class ListGoals {
+    @DisplayName("GET /practice-areas")
+    class ListAreas {
 
         @Test
         @WithAdminUser
-        void shouldReturnGoalsForAdmin() {
+        void shouldReturnAreasForAdmin() {
             ensureAdminMembership(workspace);
-            persistGoal("alpha", "Alpha");
-            persistGoal("beta", "Beta");
+            persistArea("alpha", "Alpha");
+            persistArea("beta", "Beta");
 
             webTestClient
                 .get()
@@ -99,7 +99,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         @DisplayName("allows a plain workspace member to list")
         void shouldAllowMemberToList() {
             asMember();
-            persistGoal("member-visible", "Visible");
+            persistArea("member-visible", "Visible");
 
             webTestClient
                 .get()
@@ -123,19 +123,19 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // GET SINGLE — read, member-allowed (@SecurityRequirements)
 
     @Nested
-    @DisplayName("GET /practice-goals/{goalSlug}")
-    class GetGoal {
+    @DisplayName("GET /practice-areas/{areaSlug}")
+    class GetArea {
 
         @Test
         @WithMentorUser
-        @DisplayName("allows a plain workspace member to get a goal")
+        @DisplayName("allows a plain workspace member to get a area")
         void shouldAllowMemberToGet() {
             asMember();
-            persistGoal("member-get", "Member Get");
+            persistArea("member-get", "Member Get");
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "/{goalSlug}", workspace.getWorkspaceSlug(), "member-get")
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "member-get")
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -150,7 +150,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         void shouldReturnUnauthorized() {
             webTestClient
                 .get()
-                .uri(BASE_URI + "/{goalSlug}", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "any-slug")
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();
@@ -160,12 +160,12 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // CREATE — @RequireAtLeastWorkspaceAdmin
 
     @Nested
-    @DisplayName("POST /practice-goals")
-    class CreateGoal {
+    @DisplayName("POST /practice-areas")
+    class CreateArea {
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from creating a goal")
+        @DisplayName("forbids a plain workspace member from creating a area")
         void shouldReturn403ForNonAdmin() {
             asMember();
 
@@ -174,12 +174,12 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(validCreateRequest("forbidden-goal"))
+                .bodyValue(validCreateRequest("forbidden-area"))
                 .exchange()
                 .expectStatus()
                 .isForbidden();
 
-            assertThat(goalRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-goal")).isFalse();
+            assertThat(areaRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-area")).isFalse();
         }
 
         @Test
@@ -191,7 +191,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .post()
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(validCreateRequest("anon-goal"))
+                .bodyValue(validCreateRequest("anon-area"))
                 .exchange()
                 .expectStatus()
                 .isForbidden();
@@ -201,21 +201,21 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // UPDATE — @RequireAtLeastWorkspaceAdmin
 
     @Nested
-    @DisplayName("PATCH /practice-goals/{goalSlug}")
-    class UpdateGoal {
+    @DisplayName("PATCH /practice-areas/{areaSlug}")
+    class UpdateArea {
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from updating a goal")
+        @DisplayName("forbids a plain workspace member from updating a area")
         void shouldReturn403ForNonAdmin() {
             asMember();
-            persistGoal("forbidden-update", "Original");
+            persistArea("forbidden-update", "Original");
 
             var request = new UpdatePracticeAreaRequestDTO("Hacked Name", null, null, null);
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{goalSlug}", workspace.getWorkspaceSlug(), "forbidden-update")
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "forbidden-update")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -223,7 +223,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .expectStatus()
                 .isForbidden();
 
-            PracticeArea persisted = goalRepository
+            PracticeArea persisted = areaRepository
                 .findByWorkspaceIdAndSlug(workspace.getId(), "forbidden-update")
                 .orElseThrow();
             assertThat(persisted.getName()).isEqualTo("Original");
@@ -238,7 +238,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{goalSlug}", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(TestAuthUtils.withCsrf(csrf))
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -251,16 +251,16 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // REORDER — @RequireAtLeastWorkspaceAdmin
 
     @Nested
-    @DisplayName("PATCH /practice-goals/reorder")
-    class ReorderGoals {
+    @DisplayName("PATCH /practice-areas/reorder")
+    class ReorderAreas {
 
         @Test
         @WithAdminUser
-        @DisplayName("reorders goals for an admin and persists the new display order")
+        @DisplayName("reorders areas for an admin and persists the new display order")
         void shouldReorderForAdmin() {
             ensureAdminMembership(workspace);
-            persistGoal("first", "First");
-            persistGoal("second", "Second");
+            persistArea("first", "First");
+            persistArea("second", "Second");
 
             var request = new ReorderPracticeAreasRequestDTO(List.of("second", "first"));
 
@@ -280,20 +280,20 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .isEqualTo("first");
 
             assertThat(
-                goalRepository.findByWorkspaceIdAndSlug(workspace.getId(), "second").orElseThrow().getDisplayOrder()
+                areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), "second").orElseThrow().getDisplayOrder()
             ).isZero();
             assertThat(
-                goalRepository.findByWorkspaceIdAndSlug(workspace.getId(), "first").orElseThrow().getDisplayOrder()
+                areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), "first").orElseThrow().getDisplayOrder()
             ).isEqualTo(1);
         }
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from reordering goals")
+        @DisplayName("forbids a plain workspace member from reordering areas")
         void shouldReturn403ForNonAdmin() {
             asMember();
-            persistGoal("first", "First");
-            persistGoal("second", "Second");
+            persistArea("first", "First");
+            persistArea("second", "Second");
 
             var request = new ReorderPracticeAreasRequestDTO(List.of("second", "first"));
 
@@ -330,25 +330,25 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // DELETE — @RequireAtLeastWorkspaceAdmin
 
     @Nested
-    @DisplayName("DELETE /practice-goals/{goalSlug}")
-    class DeleteGoal {
+    @DisplayName("DELETE /practice-areas/{areaSlug}")
+    class DeleteArea {
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from deleting a goal")
+        @DisplayName("forbids a plain workspace member from deleting a area")
         void shouldReturn403ForNonAdmin() {
             asMember();
-            persistGoal("forbidden-delete", "Keep Me");
+            persistArea("forbidden-delete", "Keep Me");
 
             webTestClient
                 .delete()
-                .uri(BASE_URI + "/{goalSlug}", workspace.getWorkspaceSlug(), "forbidden-delete")
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "forbidden-delete")
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isForbidden();
 
-            assertThat(goalRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-delete")).isTrue();
+            assertThat(areaRepository.existsByWorkspaceIdAndSlug(workspace.getId(), "forbidden-delete")).isTrue();
         }
 
         @Test
@@ -358,7 +358,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
                 .delete()
-                .uri(BASE_URI + "/{goalSlug}", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(TestAuthUtils.withCsrf(csrf))
                 .exchange()
                 .expectStatus()

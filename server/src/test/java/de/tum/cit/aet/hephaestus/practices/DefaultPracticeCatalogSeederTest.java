@@ -26,13 +26,13 @@ import tools.jackson.databind.json.JsonMapper;
 class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
     @Mock
-    private PracticeAreaService goalService;
+    private PracticeAreaService areaService;
 
     @Mock
     private PracticeService practiceService;
 
     @Mock
-    private PracticeAreaRepository goalRepository;
+    private PracticeAreaRepository areaRepository;
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -41,9 +41,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         return new DefaultPracticeCatalogSeeder(
             enabled,
             JsonMapper.builder().build(),
-            goalService,
+            areaService,
             practiceService,
-            goalRepository,
+            areaRepository,
             workspaceRepository
         );
     }
@@ -51,34 +51,34 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     @Test
     void disabled_doesNothing() {
         seeder(false).seed();
-        verifyNoInteractions(workspaceRepository, goalRepository, goalService, practiceService);
+        verifyNoInteractions(workspaceRepository, areaRepository, areaService, practiceService);
     }
 
     @Test
     void noWorkspace_skips() {
         when(workspaceRepository.findAll()).thenReturn(List.of());
         seeder(true).seed();
-        verify(goalService, never()).createGoal(any(), any(), any(), any(), anyInt());
+        verify(areaService, never()).createArea(any(), any(), any(), any(), anyInt());
     }
 
     @Test
     void happyPath_seedsTheGroundedCatalog() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
-        when(goalRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
 
         seeder(true).seed();
 
-        // The shipped catalog is eleven goals with thirty-two practices total, each bound to its goal.
-        verify(goalService).createGoal(any(), eq("review-ready-work"), any(), any(), anyInt());
-        verify(goalService).createGoal(any(), eq("acting-on-review-feedback"), any(), any(), anyInt());
-        verify(goalService).createGoal(any(), eq("actionable-issue-authoring"), any(), any(), anyInt());
-        verify(goalService).createGoal(any(), eq("constructive-code-review"), any(), any(), anyInt());
-        verify(goalService).createGoal(any(), eq("testing-discipline"), any(), any(), anyInt());
-        verify(goalService, times(11)).createGoal(any(), any(), any(), any(), anyInt());
+        // The shipped catalog is eleven areas with thirty-two practices total, each bound to its area.
+        verify(areaService).createArea(any(), eq("review-ready-work"), any(), any(), anyInt());
+        verify(areaService).createArea(any(), eq("acting-on-review-feedback"), any(), any(), anyInt());
+        verify(areaService).createArea(any(), eq("actionable-issue-authoring"), any(), any(), anyInt());
+        verify(areaService).createArea(any(), eq("constructive-code-review"), any(), any(), anyInt());
+        verify(areaService).createArea(any(), eq("testing-discipline"), any(), any(), anyInt());
+        verify(areaService, times(11)).createArea(any(), any(), any(), any(), anyInt());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
         verify(practiceService, times(32)).createPractice(any(), practiceCaptor.capture());
-        verify(goalService, times(32)).bindPractice(any(), any(), any());
+        verify(areaService, times(32)).bindPractice(any(), any(), any());
 
         // 6 of the 32 practices are issue-focused and must seed with WorkArtifact.ISSUE.
         var foci = practiceCaptor.getAllValues().stream().map(CreatePracticeRequestDTO::artifactType).toList();
@@ -104,21 +104,21 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void idempotent_skipsGoalsThatAlreadyExist() {
+    void idempotent_skipsAreasThatAlreadyExist() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
-        when(goalRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
 
         seeder(true).seed();
 
-        verify(goalService, never()).createGoal(any(), any(), any(), any(), anyInt());
+        verify(areaService, never()).createArea(any(), any(), any(), any(), anyInt());
         verify(practiceService, never()).createPractice(any(), any());
     }
 
     @Test
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
-        when(goalRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
-        when(goalService.createGoal(any(), any(), any(), any(), anyInt())).thenThrow(new RuntimeException("boom"));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+        when(areaService.createArea(any(), any(), any(), any(), anyInt())).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
     }
@@ -131,8 +131,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         JsonNode catalog = JsonMapper.builder()
             .build()
             .readTree(getClass().getClassLoader().getResourceAsStream("practices/default-catalog.json"));
-        for (JsonNode goal : catalog.path("goals")) {
-            for (JsonNode practice : goal.path("practices")) {
+        for (JsonNode area : catalog.path("areas")) {
+            for (JsonNode practice : area.path("practices")) {
                 assertThat(practice.path("criteria").asString())
                     .as(
                         "criteria for '%s' must use real newlines, not a literal backslash-n",

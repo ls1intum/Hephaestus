@@ -23,8 +23,8 @@ public class PracticesControllerAdvice {
     }
 
     @ExceptionHandler(PracticeAreaSlugConflictException.class)
-    ProblemDetail handleGoalSlugConflict(PracticeAreaSlugConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Practice goal slug conflict", exception.getMessage());
+    ProblemDetail handleAreaSlugConflict(PracticeAreaSlugConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Practice area slug conflict", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

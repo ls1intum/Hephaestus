@@ -104,13 +104,13 @@ class PracticeCatalogInjector {
 
         ArrayNode index = objectMapper.createArrayNode();
         for (Practice p : practices) {
-            // goal groups practices for the runner's per-goal evaluation; falls back to the slug so an
+            // area groups practices for the runner's per-area evaluation; falls back to the slug so an
             // ungrouped practice still forms its own one-practice group.
-            String goalSlug = p.getGoal() != null ? p.getGoal().getSlug() : p.getSlug();
+            String areaSlug = p.getArea() != null ? p.getArea().getSlug() : p.getSlug();
             ObjectNode entry = index.addObject();
             entry.put("slug", p.getSlug());
             entry.put("name", p.getName());
-            entry.put("goal", goalSlug);
+            entry.put("area", areaSlug);
         }
         try {
             files.put(WorkspaceAbi.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));

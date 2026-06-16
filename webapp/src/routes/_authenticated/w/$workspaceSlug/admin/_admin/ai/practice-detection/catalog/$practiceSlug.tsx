@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	bindGoalMutation,
+	bindAreaMutation,
 	getPracticeOptions,
 	getPracticeQueryKey,
-	listGoalsOptions,
+	listAreasOptions,
 	listPracticesQueryKey,
 	updatePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -34,8 +34,8 @@ function EditPracticeContainer() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	const goalsQuery = useQuery({
-		...listGoalsOptions({
+	const areasQuery = useQuery({
+		...listAreasOptions({
 			path: { workspaceSlug: workspaceSlug ?? "" },
 			query: { activeOnly: true },
 		}),
@@ -43,21 +43,21 @@ function EditPracticeContainer() {
 	});
 
 	const updatePractice = useMutation(updatePracticeMutation());
-	const bindGoal = useMutation(bindGoalMutation());
+	const bindArea = useMutation(bindAreaMutation());
 
 	const handleSubmit = async (
 		slug: string,
 		data: UpdatePracticeRequest,
-		goalSlug: string | null,
+		areaSlug: string | null,
 	) => {
 		if (!workspaceSlug) return;
 		try {
 			await updatePractice.mutateAsync({ path: { workspaceSlug, practiceSlug: slug }, body: data });
 			// Only re-bind when the selection actually changed (binding is a distinct endpoint).
-			if ((practice?.goalSlug ?? null) !== goalSlug) {
-				await bindGoal.mutateAsync({
+			if ((practice?.areaSlug ?? null) !== areaSlug) {
+				await bindArea.mutateAsync({
 					path: { workspaceSlug, practiceSlug: slug },
-					body: { goalSlug: goalSlug ?? undefined },
+					body: { areaSlug: areaSlug ?? undefined },
 				});
 			}
 			queryClient.invalidateQueries({
@@ -77,9 +77,9 @@ function EditPracticeContainer() {
 		navigate({ to: ".." });
 	};
 
-	// Wait for goals too: the goal <Select> resolves its display label from the matching option, so
+	// Wait for areas too: the area <Select> resolves its display label from the matching option, so
 	// the options must exist before the bound value is set (otherwise it falls back to the raw slug).
-	if (isLoading || !practice || !goalsQuery.data) {
+	if (isLoading || !practice || !areasQuery.data) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<Spinner className="h-8 w-8" />
@@ -91,10 +91,10 @@ function EditPracticeContainer() {
 		<PracticeForm
 			mode="edit"
 			initialData={practice}
-			goals={goalsQuery.data}
+			areas={areasQuery.data}
 			onSubmit={handleSubmit}
 			onCancel={handleCancel}
-			isPending={updatePractice.isPending || bindGoal.isPending}
+			isPending={updatePractice.isPending || bindArea.isPending}
 		/>
 	);
 }

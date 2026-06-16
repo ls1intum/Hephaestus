@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.GoalStandingRow;
+import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -52,25 +52,25 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     @InjectMocks
     PracticeStandingAspectProvider provider;
 
-    private JsonNode build(List<Practice> spine, List<GoalStandingRow> rows) {
+    private JsonNode build(List<Practice> spine, List<AreaStandingRow> rows) {
         User user = new User();
         user.setLogin("student");
         when(userRepository.findById(eq(7L))).thenReturn(Optional.of(user));
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(spine);
-        when(findingRepository.findGoalStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(rows);
+        when(findingRepository.findAreaStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(rows);
         return provider.buildPayload(1L, 7L);
     }
 
-    private static Practice practice(String goalSlug, String goalName) {
+    private static Practice practice(String areaSlug, String areaName) {
         PracticeArea g = new PracticeArea();
-        g.setSlug(goalSlug);
-        g.setName(goalName);
+        g.setSlug(areaSlug);
+        g.setName(areaName);
         Practice p = new Practice();
-        p.setGoal(g);
+        p.setArea(g);
         return p;
     }
 
-    private static GoalStandingRow row(
+    private static AreaStandingRow row(
         String slug,
         String name,
         Polarity pol,
@@ -79,14 +79,14 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         long count,
         long recent
     ) {
-        return new GoalStandingRow() {
+        return new AreaStandingRow() {
             @Override
-            public String getGoalSlug() {
+            public String getAreaSlug() {
                 return slug;
             }
 
             @Override
-            public String getGoalName() {
+            public String getAreaName() {
                 return name;
             }
 
@@ -117,20 +117,20 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         };
     }
 
-    private static JsonNode goal(JsonNode root, String slug) {
-        for (JsonNode g : root.get("goals")) {
-            if (slug.equals(g.get("goalSlug").asString())) {
+    private static JsonNode area(JsonNode root, String slug) {
+        for (JsonNode g : root.get("areas")) {
+            if (slug.equals(g.get("areaSlug").asString())) {
                 return g;
             }
         }
-        throw new AssertionError("goal not present: " + slug);
+        throw new AssertionError("area not present: " + slug);
     }
 
     @Test
-    @DisplayName("all-NA goal is BLIND and excluded from priorities")
-    void allNaGoalIsBlind() {
+    @DisplayName("all-NA area is BLIND and excluded from priorities")
+    void allNaAreaIsBlind() {
         List<Practice> spine = List.of(practice("constructive-code-review", "Reviewing constructively"));
-        List<GoalStandingRow> rows = List.of(
+        List<AreaStandingRow> rows = List.of(
             row(
                 "constructive-code-review",
                 "Reviewing constructively",
@@ -143,17 +143,17 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         );
         JsonNode root = build(spine, rows);
 
-        JsonNode g = goal(root, "constructive-code-review");
+        JsonNode g = area(root, "constructive-code-review");
         assertThat(g.get("assessmentState").asString()).isEqualTo("BLIND");
         assertThat(g.get("flaggedCount").asInt()).isZero();
         assertThat(root.get("priorities")).isEmpty();
     }
 
     @Test
-    @DisplayName("flag-only DESIRABLE goal has praiseChannelOpen=false (affirmation asymmetry guard)")
-    void flagOnlyGoalHasPraiseChannelClosed() {
+    @DisplayName("flag-only DESIRABLE area has praiseChannelOpen=false (affirmation asymmetry guard)")
+    void flagOnlyAreaHasPraiseChannelClosed() {
         List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
-        List<GoalStandingRow> rows = List.of(
+        List<AreaStandingRow> rows = List.of(
             row(
                 "robust-error-handling",
                 "Handling failure robustly",
@@ -166,7 +166,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         );
         JsonNode root = build(spine, rows);
 
-        JsonNode g = goal(root, "robust-error-handling");
+        JsonNode g = area(root, "robust-error-handling");
         assertThat(g.get("assessmentState").asString()).isEqualTo("ASSESSED");
         assertThat(g.get("praiseChannelOpen").asBoolean()).isFalse();
         assertThat(g.get("flaggedCount").asInt()).isEqualTo(3);
@@ -175,9 +175,9 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
 
     @Test
     @DisplayName("an OBSERVED finding opens the praise channel")
-    void affirmedGoalOpensPraiseChannel() {
+    void affirmedAreaOpensPraiseChannel() {
         List<Practice> spine = List.of(practice("review-ready-work", "Submitting review-ready work"));
-        List<GoalStandingRow> rows = List.of(
+        List<AreaStandingRow> rows = List.of(
             row(
                 "review-ready-work",
                 "Submitting review-ready work",
@@ -190,7 +190,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         );
         JsonNode root = build(spine, rows);
 
-        JsonNode g = goal(root, "review-ready-work");
+        JsonNode g = area(root, "review-ready-work");
         assertThat(g.get("praiseChannelOpen").asBoolean()).isTrue();
         assertThat(g.get("affirmedCount").asInt()).isEqualTo(2);
     }
@@ -199,7 +199,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     @DisplayName("Polarity drives sign: an UNDESIRABLE practice counts OBSERVED as a problem")
     void polarityDrivesCounts() {
         List<Practice> spine = List.of(practice("anti-pattern", "Avoids anti-patterns"));
-        List<GoalStandingRow> rows = List.of(
+        List<AreaStandingRow> rows = List.of(
             row(
                 "anti-pattern",
                 "Avoids anti-patterns",
@@ -212,57 +212,57 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         );
         JsonNode root = build(spine, rows);
 
-        JsonNode g = goal(root, "anti-pattern");
+        JsonNode g = area(root, "anti-pattern");
         assertThat(g.get("flaggedCount").asInt()).isEqualTo(4);
         assertThat(g.get("affirmedCount").asInt()).isZero();
         assertThat(g.get("praiseChannelOpen").asBoolean()).isFalse();
     }
 
     @Test
-    @DisplayName("priorities rank worst-severity-first and exclude BLIND goals")
+    @DisplayName("priorities rank worst-severity-first and exclude BLIND areas")
     void prioritiesRankedWorstFirst() {
         List<Practice> spine = new ArrayList<>(
             List.of(
-                practice("minor-goal", "Minor goal"),
-                practice("critical-goal", "Critical goal"),
-                practice("blind-goal", "Blind goal")
+                practice("minor-area", "Minor area"),
+                practice("critical-area", "Critical area"),
+                practice("blind-area", "Blind area")
             )
         );
-        List<GoalStandingRow> rows = List.of(
-            row("minor-goal", "Minor goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MINOR, 2, 0),
+        List<AreaStandingRow> rows = List.of(
+            row("minor-area", "Minor area", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MINOR, 2, 0),
             row(
-                "critical-goal",
-                "Critical goal",
+                "critical-area",
+                "Critical area",
                 Polarity.DESIRABLE,
                 Observation.NOT_OBSERVED,
                 Severity.CRITICAL,
                 1,
                 1
             ),
-            row("blind-goal", "Blind goal", Polarity.DESIRABLE, Observation.NOT_APPLICABLE, Severity.INFO, 3, 0)
+            row("blind-area", "Blind area", Polarity.DESIRABLE, Observation.NOT_APPLICABLE, Severity.INFO, 3, 0)
         );
         JsonNode root = build(spine, rows);
 
         JsonNode priorities = root.get("priorities");
         assertThat(priorities).hasSize(2);
-        assertThat(priorities.get(0).get("goalSlug").asString()).isEqualTo("critical-goal");
+        assertThat(priorities.get(0).get("areaSlug").asString()).isEqualTo("critical-area");
         assertThat(priorities.get(0).get("topSeverity").asString()).isEqualTo("CRITICAL");
-        assertThat(priorities.get(1).get("goalSlug").asString()).isEqualTo("minor-goal");
+        assertThat(priorities.get(1).get("areaSlug").asString()).isEqualTo("minor-area");
         for (JsonNode p : priorities) {
-            assertThat(p.get("goalSlug").asString()).isNotEqualTo("blind-goal");
+            assertThat(p.get("areaSlug").asString()).isNotEqualTo("blind-area");
         }
     }
 
     @Test
     @DisplayName("worst severity is the most severe (CRITICAL beats MINOR), not enum-max")
     void worstSeverityIsMostSevere() {
-        List<Practice> spine = List.of(practice("g", "Goal"));
-        List<GoalStandingRow> rows = List.of(
-            row("g", "Goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MINOR, 1, 0),
-            row("g", "Goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.CRITICAL, 1, 0)
+        List<Practice> spine = List.of(practice("g", "Area"));
+        List<AreaStandingRow> rows = List.of(
+            row("g", "Area", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MINOR, 1, 0),
+            row("g", "Area", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.CRITICAL, 1, 0)
         );
         JsonNode root = build(spine, rows);
-        assertThat(goal(root, "g").get("topSeverity").asString()).isEqualTo("CRITICAL");
+        assertThat(area(root, "g").get("topSeverity").asString()).isEqualTo("CRITICAL");
     }
 
     @Test
@@ -282,7 +282,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(
             List.of(practice("review-ready-work", "Submitting review-ready work"))
         );
-        when(findingRepository.findGoalStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
+        when(findingRepository.findAreaStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
             List.of(
                 row(
                     "review-ready-work",
@@ -303,22 +303,22 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("user").get("login").asString()).isEqualTo("student");
-        assertThat(root.get("goals")).isNotEmpty();
+        assertThat(root.get("areas")).isNotEmpty();
     }
 
     @Test
-    @DisplayName("no active practices and no findings yields empty goals and priorities")
+    @DisplayName("no active practices and no findings yields empty areas and priorities")
     void emptyStandingIsEmpty() {
         JsonNode root = build(List.of(), List.of());
-        assertThat(root.get("goals")).isEmpty();
+        assertThat(root.get("areas")).isEmpty();
         assertThat(root.get("priorities")).isEmpty();
     }
 
     private String trajectoryFor(long count, long recent) {
         JsonNode root = build(
-            List.of(practice("g", "Goal")),
-            List.of(row("g", "Goal", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MAJOR, count, recent))
+            List.of(practice("g", "Area")),
+            List.of(row("g", "Area", Polarity.DESIRABLE, Observation.NOT_OBSERVED, Severity.MAJOR, count, recent))
         );
-        return goal(root, "g").get("trajectory").asString();
+        return area(root, "g").get("trajectory").asString();
     }
 }

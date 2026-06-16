@@ -26,7 +26,7 @@ public record PracticeDTO(
     @NonNull
     @Schema(description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent")
     Polarity polarity,
-    @Nullable @Schema(description = "Slug of the practice goal this practice is bound to, if any") String goalSlug,
+    @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @NonNull @Schema(description = "Whether this practice is actively being detected") Boolean active,
     @NonNull @Schema(description = "Timestamp when the practice was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the practice was last updated") Instant updatedAt
@@ -41,7 +41,7 @@ public record PracticeDTO(
             practice.getPrecomputeScript(),
             practice.getArtifactType(),
             practice.getPolarity(),
-            practice.getGoal() != null ? practice.getGoal().getSlug() : null,
+            practice.getArea() != null ? practice.getArea().getSlug() : null,
             practice.isActive(),
             practice.getCreatedAt(),
             practice.getUpdatedAt()

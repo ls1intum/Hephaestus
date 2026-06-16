@@ -23,6 +23,8 @@ tags:
   name: Account
 - description: Instance-admin login provider management
   name: Admin
+- description: Manage practice areas
+  name: Practice Areas
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: Workspace-scoped mentor chat threads
@@ -37,8 +39,6 @@ tags:
   name: Account
 - description: Instance-admin account management
   name: Admin
-- description: Manage practice goals
-  name: Practice Goals
 - description: Team management within workspace
   name: Teams
 - description: |-
@@ -2045,10 +2045,10 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/practice-goals:
+  /workspaces/{workspaceSlug}/practice-areas:
     get:
-      description: Returns the workspace's practice goals
-      operationId: listGoals
+      description: Returns the workspace's practice areas
+      operationId: listAreas
       parameters:
       - description: Workspace slug
         in: path
@@ -2057,7 +2057,7 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Return only active goals
+      - description: Return only active areas
         in: query
         name: activeOnly
         required: false
@@ -2071,13 +2071,13 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PracticeArea"
-          description: Goals returned
+          description: Areas returned
       security: []
-      summary: List practice goals
+      summary: List practice areas
       tags:
-      - Practice Goals
+      - Practice Areas
     post:
-      operationId: createGoal
+      operationId: createArea
       parameters:
       - description: Workspace slug
         in: path
@@ -2098,17 +2098,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PracticeArea"
-          description: Goal created
+          description: Area created
         "409":
-          description: Goal slug already exists in this workspace
-      summary: Create a new practice goal
+          description: Area slug already exists in this workspace
+      summary: Create a new practice area
       tags:
-      - Practice Goals
-  /workspaces/{workspaceSlug}/practice-goals/reorder:
+      - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/reorder:
     patch:
-      description: Sets each goal's display order to its index in the provided slug
+      description: Sets each area's display order to its index in the provided slug
         list (one atomic write)
-      operationId: reorderGoals
+      operationId: reorderAreas
       parameters:
       - description: Workspace slug
         in: path
@@ -2131,17 +2131,17 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PracticeArea"
-          description: Goals reordered; the full ordered list is returned
+          description: Areas reordered; the full ordered list is returned
         "404":
           description: A slug is unknown
-      summary: Reorder practice goals
+      summary: Reorder practice areas
       tags:
-      - Practice Goals
-  /workspaces/{workspaceSlug}/practice-goals/{goalSlug}:
+      - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
-      description: "Bound practices are unbound (their goal link is cleared), not\
+      description: "Bound practices are unbound (their area link is cleared), not\
         \ deleted"
-      operationId: deleteGoal
+      operationId: deleteArea
       parameters:
       - description: Workspace slug
         in: path
@@ -2151,20 +2151,20 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: goalSlug
+        name: areaSlug
         required: true
         schema:
           type: string
       responses:
         "204":
-          description: Goal deleted
+          description: Area deleted
         "404":
-          description: Goal not found
-      summary: Delete a practice goal
+          description: Area not found
+      summary: Delete a practice area
       tags:
-      - Practice Goals
+      - Practice Areas
     get:
-      operationId: getGoal
+      operationId: getArea
       parameters:
       - description: Workspace slug
         in: path
@@ -2174,7 +2174,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: goalSlug
+        name: areaSlug
         required: true
         schema:
           type: string
@@ -2184,15 +2184,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PracticeArea"
-          description: Goal returned
+          description: Area returned
         "404":
-          description: Goal not found
+          description: Area not found
       security: []
-      summary: Get a practice goal
+      summary: Get a practice area
       tags:
-      - Practice Goals
+      - Practice Areas
     patch:
-      operationId: updateGoal
+      operationId: updateArea
       parameters:
       - description: Workspace slug
         in: path
@@ -2202,7 +2202,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: goalSlug
+        name: areaSlug
         required: true
         schema:
           type: string
@@ -2218,12 +2218,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PracticeArea"
-          description: Goal updated
+          description: Area updated
         "404":
-          description: Goal not found
-      summary: Update a practice goal
+          description: Area not found
+      summary: Update a practice area
       tags:
-      - Practice Goals
+      - Practice Areas
   /workspaces/{workspaceSlug}/practices:
     get:
       description: "Returns all practice definitions for the workspace, optionally\
@@ -2640,11 +2640,11 @@ paths:
       summary: Set practice active state
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/{practiceSlug}/goal:
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/area:
     put:
-      description: "Binds the practice to the goal named by goalSlug, or unbinds it\
-        \ when goalSlug is null"
-      operationId: bindGoal
+      description: "Binds the practice to the area named by areaSlug, or unbinds it\
+        \ when areaSlug is null"
+      operationId: bindArea
       parameters:
       - description: Workspace slug
         in: path
@@ -2672,8 +2672,8 @@ paths:
                 $ref: "#/components/schemas/Practice"
           description: Binding updated
         "404":
-          description: Practice or goal not found
-      summary: Bind a practice to a goal
+          description: Practice or area not found
+      summary: Bind a practice to an area
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -4038,12 +4038,12 @@ components:
       - unlocked
     BindPracticeAreaRequest:
       type: object
-      description: "Request to bind a practice to a goal, or unbind it when goalSlug\
+      description: "Request to bind a practice to an area, or unbind it when areaSlug\
         \ is null"
       properties:
-        goalSlug:
+        areaSlug:
           type: string
-          description: "Slug of the goal to bind to, or null to unbind"
+          description: "Slug of the area to bind to, or null to unbind"
           example: review-ready-work
     ChatMessage:
       type: object
@@ -4415,11 +4415,11 @@ components:
       - type
     CreatePracticeAreaRequest:
       type: object
-      description: Request to create a new practice goal
+      description: Request to create a new practice area
       properties:
         description:
           type: string
-          description: What this goal develops
+          description: What this area develops
           maxLength: 5000
           minLength: 0
         displayOrder:
@@ -5239,6 +5239,9 @@ components:
         active:
           type: boolean
           description: Whether this practice is actively being detected
+        areaSlug:
+          type: string
+          description: "Slug of the practice area this practice is bound to, if any"
         artifactType:
           type: string
           description: Artifact this practice evaluates
@@ -5252,9 +5255,6 @@ components:
         criteria:
           type: string
           description: Practice evaluation criteria
-        goalSlug:
-          type: string
-          description: "Slug of the practice goal this practice is bound to, if any"
         id:
           type: integer
           format: int64
@@ -5299,18 +5299,18 @@ components:
       - updatedAt
     PracticeArea:
       type: object
-      description: A practice goal grouping related practices into a learning objective
+      description: A practice area grouping related practices into a learning objective
       properties:
         active:
           type: boolean
-          description: Whether this goal is active
+          description: Whether this area is active
         createdAt:
           type: string
           format: date-time
-          description: Timestamp when the goal was created
+          description: Timestamp when the area was created
         description:
           type: string
-          description: What this goal develops
+          description: What this area develops
         displayOrder:
           type: integer
           format: int32
@@ -5318,7 +5318,7 @@ components:
         id:
           type: integer
           format: int64
-          description: Goal ID
+          description: Area ID
         name:
           type: string
           description: Human-readable name
@@ -5328,7 +5328,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-          description: Timestamp when the goal was last updated
+          description: Timestamp when the area was last updated
       required:
       - active
       - createdAt
@@ -5849,11 +5849,11 @@ components:
       - newSlug
     ReorderPracticeAreasRequest:
       type: object
-      description: Reorder practice goals — displayOrder follows the list index
+      description: Reorder practice areas — displayOrder follows the list index
       properties:
         orderedSlugs:
           type: array
-          description: Goal slugs in the desired display order
+          description: Area slugs in the desired display order
           example:
           - review-ready-work
           - acting-on-review-feedback
@@ -6199,15 +6199,15 @@ components:
       - active
     UpdatePracticeAreaRequest:
       type: object
-      description: Request to update an existing practice goal (PATCH — only non-null
+      description: Request to update an existing practice area (PATCH — only non-null
         fields applied)
       properties:
         active:
           type: boolean
-          description: Whether this goal is active
+          description: Whether this area is active
         description:
           type: string
-          description: What this goal develops
+          description: What this area develops
           maxLength: 5000
           minLength: 0
         displayOrder:

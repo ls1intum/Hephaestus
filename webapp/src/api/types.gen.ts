@@ -573,15 +573,15 @@ export type UpdatePracticeRequest = {
 };
 
 /**
- * Request to update an existing practice goal (PATCH — only non-null fields applied)
+ * Request to update an existing practice area (PATCH — only non-null fields applied)
  */
 export type UpdatePracticeAreaRequest = {
     /**
-     * Whether this goal is active
+     * Whether this area is active
      */
     active?: boolean;
     /**
-     * What this goal develops
+     * What this area develops
      */
     description?: string;
     /**
@@ -868,11 +868,11 @@ export type RevokeSessionsResult = {
 };
 
 /**
- * Reorder practice goals — displayOrder follows the list index
+ * Reorder practice areas — displayOrder follows the list index
  */
 export type ReorderPracticeAreasRequest = {
     /**
-     * Goal slugs in the desired display order
+     * Area slugs in the desired display order
      */
     orderedSlugs: Array<string>;
 };
@@ -1284,19 +1284,19 @@ export type PracticeFindingDetail = {
 };
 
 /**
- * A practice goal grouping related practices into a learning objective
+ * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
     /**
-     * Whether this goal is active
+     * Whether this area is active
      */
     active: boolean;
     /**
-     * Timestamp when the goal was created
+     * Timestamp when the area was created
      */
     createdAt: Date;
     /**
-     * What this goal develops
+     * What this area develops
      */
     description?: string;
     /**
@@ -1304,7 +1304,7 @@ export type PracticeArea = {
      */
     displayOrder: number;
     /**
-     * Goal ID
+     * Area ID
      */
     id: number;
     /**
@@ -1316,7 +1316,7 @@ export type PracticeArea = {
      */
     slug: string;
     /**
-     * Timestamp when the goal was last updated
+     * Timestamp when the area was last updated
      */
     updatedAt?: Date;
 };
@@ -1330,6 +1330,10 @@ export type Practice = {
      */
     active: boolean;
     /**
+     * Slug of the practice area this practice is bound to, if any
+     */
+    areaSlug?: string;
+    /**
      * Artifact this practice evaluates
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
@@ -1341,10 +1345,6 @@ export type Practice = {
      * Practice evaluation criteria
      */
     criteria: string;
-    /**
-     * Slug of the practice goal this practice is bound to, if any
-     */
-    goalSlug?: string;
     /**
      * Practice ID
      */
@@ -2038,11 +2038,11 @@ export type CreatePracticeRequest = {
 };
 
 /**
- * Request to create a new practice goal
+ * Request to create a new practice area
  */
 export type CreatePracticeAreaRequest = {
     /**
-     * What this goal develops
+     * What this area develops
      */
     description?: string;
     /**
@@ -2293,13 +2293,13 @@ export type ChatMessageVote = {
 };
 
 /**
- * Request to bind a practice to a goal, or unbind it when goalSlug is null
+ * Request to bind a practice to an area, or unbind it when areaSlug is null
  */
 export type BindPracticeAreaRequest = {
     /**
-     * Slug of the goal to bind to, or null to unbind
+     * Slug of the area to bind to, or null to unbind
      */
-    goalSlug?: string;
+    areaSlug?: string;
 };
 
 /**
@@ -4157,7 +4157,7 @@ export type UpdateNotificationsResponses = {
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
 
-export type ListGoalsData = {
+export type ListAreasData = {
     body?: never;
     path: {
         /**
@@ -4167,23 +4167,23 @@ export type ListGoalsData = {
     };
     query?: {
         /**
-         * Return only active goals
+         * Return only active areas
          */
         activeOnly?: boolean;
     };
-    url: '/workspaces/{workspaceSlug}/practice-goals';
+    url: '/workspaces/{workspaceSlug}/practice-areas';
 };
 
-export type ListGoalsResponses = {
+export type ListAreasResponses = {
     /**
-     * Goals returned
+     * Areas returned
      */
     200: Array<PracticeArea>;
 };
 
-export type ListGoalsResponse = ListGoalsResponses[keyof ListGoalsResponses];
+export type ListAreasResponse = ListAreasResponses[keyof ListAreasResponses];
 
-export type CreateGoalData = {
+export type CreateAreaData = {
     body: CreatePracticeAreaRequest;
     path: {
         /**
@@ -4192,26 +4192,26 @@ export type CreateGoalData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-goals';
+    url: '/workspaces/{workspaceSlug}/practice-areas';
 };
 
-export type CreateGoalErrors = {
+export type CreateAreaErrors = {
     /**
-     * Goal slug already exists in this workspace
+     * Area slug already exists in this workspace
      */
     409: unknown;
 };
 
-export type CreateGoalResponses = {
+export type CreateAreaResponses = {
     /**
-     * Goal created
+     * Area created
      */
     201: PracticeArea;
 };
 
-export type CreateGoalResponse = CreateGoalResponses[keyof CreateGoalResponses];
+export type CreateAreaResponse = CreateAreaResponses[keyof CreateAreaResponses];
 
-export type ReorderGoalsData = {
+export type ReorderAreasData = {
     body: ReorderPracticeAreasRequest;
     path: {
         /**
@@ -4220,111 +4220,111 @@ export type ReorderGoalsData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-goals/reorder';
+    url: '/workspaces/{workspaceSlug}/practice-areas/reorder';
 };
 
-export type ReorderGoalsErrors = {
+export type ReorderAreasErrors = {
     /**
      * A slug is unknown
      */
     404: unknown;
 };
 
-export type ReorderGoalsResponses = {
+export type ReorderAreasResponses = {
     /**
-     * Goals reordered; the full ordered list is returned
+     * Areas reordered; the full ordered list is returned
      */
     200: Array<PracticeArea>;
 };
 
-export type ReorderGoalsResponse = ReorderGoalsResponses[keyof ReorderGoalsResponses];
+export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
 
-export type DeleteGoalData = {
+export type DeleteAreaData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        goalSlug: string;
+        areaSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
 };
 
-export type DeleteGoalErrors = {
+export type DeleteAreaErrors = {
     /**
-     * Goal not found
+     * Area not found
      */
     404: unknown;
 };
 
-export type DeleteGoalResponses = {
+export type DeleteAreaResponses = {
     /**
-     * Goal deleted
+     * Area deleted
      */
     204: void;
 };
 
-export type DeleteGoalResponse = DeleteGoalResponses[keyof DeleteGoalResponses];
+export type DeleteAreaResponse = DeleteAreaResponses[keyof DeleteAreaResponses];
 
-export type GetGoalData = {
+export type GetAreaData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        goalSlug: string;
+        areaSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
 };
 
-export type GetGoalErrors = {
+export type GetAreaErrors = {
     /**
-     * Goal not found
+     * Area not found
      */
     404: unknown;
 };
 
-export type GetGoalResponses = {
+export type GetAreaResponses = {
     /**
-     * Goal returned
+     * Area returned
      */
     200: PracticeArea;
 };
 
-export type GetGoalResponse = GetGoalResponses[keyof GetGoalResponses];
+export type GetAreaResponse = GetAreaResponses[keyof GetAreaResponses];
 
-export type UpdateGoalData = {
+export type UpdateAreaData = {
     body: UpdatePracticeAreaRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        goalSlug: string;
+        areaSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-goals/{goalSlug}';
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
 };
 
-export type UpdateGoalErrors = {
+export type UpdateAreaErrors = {
     /**
-     * Goal not found
+     * Area not found
      */
     404: unknown;
 };
 
-export type UpdateGoalResponses = {
+export type UpdateAreaResponses = {
     /**
-     * Goal updated
+     * Area updated
      */
     200: PracticeArea;
 };
 
-export type UpdateGoalResponse = UpdateGoalResponses[keyof UpdateGoalResponses];
+export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
 
 export type ListPracticesData = {
     body?: never;
@@ -4691,7 +4691,7 @@ export type SetActiveResponses = {
 
 export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
 
-export type BindGoalData = {
+export type BindAreaData = {
     body: BindPracticeAreaRequest;
     path: {
         /**
@@ -4701,24 +4701,24 @@ export type BindGoalData = {
         practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/goal';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/area';
 };
 
-export type BindGoalErrors = {
+export type BindAreaErrors = {
     /**
-     * Practice or goal not found
+     * Practice or area not found
      */
     404: unknown;
 };
 
-export type BindGoalResponses = {
+export type BindAreaResponses = {
     /**
      * Binding updated
      */
     200: Practice;
 };
 
-export type BindGoalResponse = BindGoalResponses[keyof BindGoalResponses];
+export type BindAreaResponse = BindAreaResponses[keyof BindAreaResponses];
 
 export type GetUserProfileData = {
     body?: never;

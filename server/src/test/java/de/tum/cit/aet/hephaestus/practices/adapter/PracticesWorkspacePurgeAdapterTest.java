@@ -21,7 +21,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
-    private PracticeAreaRepository practiceGoalRepository;
+    private PracticeAreaRepository practiceAreaRepository;
 
     private PracticesWorkspacePurgeAdapter adapter;
 
@@ -30,7 +30,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         adapter = new PracticesWorkspacePurgeAdapter(
             practiceFindingRepository,
             practiceRepository,
-            practiceGoalRepository
+            practiceAreaRepository
         );
     }
 
@@ -40,10 +40,10 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then — findings, practices, and goals are all removed.
+        // Then — findings, practices, and areas are all removed.
         verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
-        verify(practiceGoalRepository).deleteAllByWorkspaceId(workspaceId);
+        verify(practiceAreaRepository).deleteAllByWorkspaceId(workspaceId);
     }
 
     @Test

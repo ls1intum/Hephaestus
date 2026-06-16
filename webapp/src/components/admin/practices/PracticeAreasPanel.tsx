@@ -17,25 +17,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
-interface PracticeGoalsPanelProps {
-	goals: PracticeArea[];
+interface PracticeAreasPanelProps {
+	areas: PracticeArea[];
 	practices: Practice[];
 	onCreate: (name: string) => void;
 	onRename: (slug: string, name: string) => void;
 	onToggleActive: (slug: string, active: boolean) => void;
 	onDelete: (slug: string) => void;
-	/** Persist a new top-to-bottom ordering of all goal slugs. */
+	/** Persist a new top-to-bottom ordering of all area slugs. */
 	onReorder: (orderedSlugs: string[]) => void;
 	isMutating: boolean;
 }
 
 /**
- * Presentational CRUD surface for practice goals: create, rename inline, toggle active, and delete.
- * A goal is just a grouping — deleting it unbinds its practices (they keep their definitions), which
+ * Presentational CRUD surface for practice areas: create, rename inline, toggle active, and delete.
+ * An area is just a grouping — deleting it unbinds its practices (they keep their definitions), which
  * the delete confirmation states plainly.
  */
-export function PracticeGoalsPanel({
-	goals,
+export function PracticeAreasPanel({
+	areas,
 	practices,
 	onCreate,
 	onRename,
@@ -43,18 +43,18 @@ export function PracticeGoalsPanel({
 	onDelete,
 	onReorder,
 	isMutating,
-}: PracticeGoalsPanelProps) {
+}: PracticeAreasPanelProps) {
 	const [newName, setNewName] = useState("");
 	const [editingSlug, setEditingSlug] = useState<string | null>(null);
 	const [editDraft, setEditDraft] = useState("");
 
-	const countFor = (slug: string) => practices.filter((p) => p.goalSlug === slug).length;
+	const countFor = (slug: string) => practices.filter((p) => p.areaSlug === slug).length;
 
-	/** Swap the goal at `index` with its neighbour and persist the whole new ordering. */
+	/** Swap the area at `index` with its neighbour and persist the whole new ordering. */
 	const move = (index: number, direction: -1 | 1) => {
 		const target = index + direction;
-		if (target < 0 || target >= goals.length) return;
-		const slugs = goals.map((g) => g.slug);
+		if (target < 0 || target >= areas.length) return;
+		const slugs = areas.map((g) => g.slug);
 		[slugs[index], slugs[target]] = [slugs[target], slugs[index]];
 		onReorder(slugs);
 	};
@@ -75,39 +75,39 @@ export function PracticeGoalsPanel({
 	return (
 		<div className="space-y-6">
 			<div>
-				<h2 className="text-lg font-semibold">Goals</h2>
+				<h2 className="text-lg font-semibold">Areas</h2>
 				<p className="text-sm text-muted-foreground">
-					Goals group related practices into a learning objective. Create your own or adjust the
-					seeded defaults — practices are bound to a goal from the practice editor.
+					Areas group related practices into a learning objective. Create your own or adjust the
+					seeded defaults — practices are bound to an area from the practice editor.
 				</p>
 			</div>
 
-			{/* Add a goal */}
+			{/* Add an area */}
 			<div className="flex items-center gap-2">
 				<Input
-					placeholder="New goal name, e.g. Submitting review-ready work"
+					placeholder="New area name, e.g. Submitting review-ready work"
 					value={newName}
 					onChange={(e) => setNewName(e.target.value)}
 					onKeyDown={(e) => {
 						if (e.key === "Enter") submitNew();
 					}}
-					aria-label="New goal name"
+					aria-label="New area name"
 				/>
 				<Button onClick={submitNew} disabled={newName.trim().length < 3 || isMutating}>
 					<Plus className="h-4 w-4" />
-					Add goal
+					Add area
 				</Button>
 			</div>
 
-			{/* Goals list */}
+			{/* Areas list */}
 			<ul className="divide-y rounded-lg border">
-				{goals.length === 0 && (
+				{areas.length === 0 && (
 					<li className="px-4 py-6 text-sm text-muted-foreground">
-						No goals yet. Add one above to start grouping practices.
+						No areas yet. Add one above to start grouping practices.
 					</li>
 				)}
-				{goals.map((goal, index) => (
-					<li key={goal.slug} className="flex items-center gap-3 px-4 py-3">
+				{areas.map((area, index) => (
+					<li key={area.slug} className="flex items-center gap-3 px-4 py-3">
 						{/* Reorder controls — drive the seeded catalog grouping order on the dashboards. */}
 						<div className="flex flex-col">
 							<Button
@@ -116,7 +116,7 @@ export function PracticeGoalsPanel({
 								className="h-5 w-5"
 								onClick={() => move(index, -1)}
 								disabled={index === 0 || isMutating}
-								aria-label={`Move ${goal.name} up`}
+								aria-label={`Move ${area.name} up`}
 							>
 								<ArrowUp className="h-3.5 w-3.5" />
 							</Button>
@@ -125,30 +125,30 @@ export function PracticeGoalsPanel({
 								variant="ghost"
 								className="h-5 w-5"
 								onClick={() => move(index, 1)}
-								disabled={index === goals.length - 1 || isMutating}
-								aria-label={`Move ${goal.name} down`}
+								disabled={index === areas.length - 1 || isMutating}
+								aria-label={`Move ${area.name} down`}
 							>
 								<ArrowDown className="h-3.5 w-3.5" />
 							</Button>
 						</div>
 						<div className="flex-1 min-w-0">
-							{editingSlug === goal.slug ? (
+							{editingSlug === area.slug ? (
 								<div className="flex items-center gap-1.5">
 									<Input
 										value={editDraft}
 										onChange={(e) => setEditDraft(e.target.value)}
 										onKeyDown={(e) => {
-											if (e.key === "Enter") commitRename(goal.slug);
+											if (e.key === "Enter") commitRename(area.slug);
 											if (e.key === "Escape") setEditingSlug(null);
 										}}
 										className="h-8"
 										autoFocus
-										aria-label={`Rename ${goal.name}`}
+										aria-label={`Rename ${area.name}`}
 									/>
 									<Button
 										size="icon-sm"
 										variant="ghost"
-										onClick={() => commitRename(goal.slug)}
+										onClick={() => commitRename(area.slug)}
 										aria-label="Save name"
 									>
 										<Check className="h-4 w-4" />
@@ -168,46 +168,46 @@ export function PracticeGoalsPanel({
 										type="button"
 										className="font-medium truncate hover:underline"
 										onClick={() => {
-											setEditingSlug(goal.slug);
-											setEditDraft(goal.name);
+											setEditingSlug(area.slug);
+											setEditDraft(area.name);
 										}}
 									>
-										{goal.name}
+										{area.name}
 									</button>
-									<Badge variant="secondary">{countFor(goal.slug)} practices</Badge>
-									{!goal.active && <Badge variant="outline">Inactive</Badge>}
+									<Badge variant="secondary">{countFor(area.slug)} practices</Badge>
+									{!area.active && <Badge variant="outline">Inactive</Badge>}
 								</div>
 							)}
-							<p className="text-xs text-muted-foreground truncate">{goal.slug}</p>
+							<p className="text-xs text-muted-foreground truncate">{area.slug}</p>
 						</div>
 
 						<Switch
-							checked={goal.active}
-							onCheckedChange={(checked) => onToggleActive(goal.slug, checked)}
+							checked={area.active}
+							onCheckedChange={(checked) => onToggleActive(area.slug, checked)}
 							disabled={isMutating}
-							aria-label={`${goal.active ? "Deactivate" : "Activate"} ${goal.name}`}
+							aria-label={`${area.active ? "Deactivate" : "Activate"} ${area.name}`}
 						/>
 
 						<AlertDialog>
 							<AlertDialogTrigger
 								render={
-									<Button size="icon-sm" variant="ghost" aria-label={`Delete ${goal.name}`}>
+									<Button size="icon-sm" variant="ghost" aria-label={`Delete ${area.name}`}>
 										<Trash2 className="h-4 w-4 text-destructive" />
 									</Button>
 								}
 							/>
 							<AlertDialogContent>
 								<AlertDialogHeader>
-									<AlertDialogTitle>Delete “{goal.name}”?</AlertDialogTitle>
+									<AlertDialogTitle>Delete “{area.name}”?</AlertDialogTitle>
 									<AlertDialogDescription>
-										The {countFor(goal.slug)} practices bound to this goal keep their definitions —
+										The {countFor(area.slug)} practices bound to this area keep their definitions —
 										they just become unassigned. This cannot be undone.
 									</AlertDialogDescription>
 								</AlertDialogHeader>
 								<AlertDialogFooter>
 									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction onClick={() => onDelete(goal.slug)}>
-										Delete goal
+									<AlertDialogAction onClick={() => onDelete(area.slug)}>
+										Delete area
 									</AlertDialogAction>
 								</AlertDialogFooter>
 							</AlertDialogContent>

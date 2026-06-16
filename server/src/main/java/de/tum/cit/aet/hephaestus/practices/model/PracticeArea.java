@@ -23,28 +23,28 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Workspace-scoped <b>practice goal</b> — a configurable learning objective that groups practices,
+ * Workspace-scoped <b>practice area</b> — a configurable learning objective that groups practices,
  * naming a development behaviour expected of developers (e.g. "effective review communication").
  *
- * <p>A goal is a <b>read-model / organizing</b> concept only. Practices remain the unit of detection;
- * a goal never enters {@code trigger_events}, {@code criteria}, the detector, or the
- * {@link PracticeFinding} schema. Goals organise findings for developers (Reflection Dashboard) and
+ * <p>An area is a <b>read-model / organizing</b> concept only. Practices remain the unit of detection;
+ * an area never enters {@code trigger_events}, {@code criteria}, the detector, or the
+ * {@link PracticeFinding} schema. Areas organise findings for developers (Reflection Dashboard) and
  * facilitators (Facilitator Dashboard).
  *
- * <p><b>Two orthogonal axes — do not conflate:</b> a goal (this configurable learning-objective axis)
- * is distinct from the delivery channel (Hattie level). A practice belongs to at most one goal
- * (see {@link Practice#getGoal()}): the 1:N binding is load-bearing for the per-goal acted-on/total
+ * <p><b>Two orthogonal axes — do not conflate:</b> an area (this configurable learning-objective axis)
+ * is distinct from the delivery channel (Hattie level). A practice belongs to at most one area
+ * (see {@link Practice#getArea()}): the 1:N binding is load-bearing for the per-area acted-on/total
  * progress denominator — do not loosen it to a many-to-many join without also switching progress math
- * to per-(goal, practice) rows.
+ * to per-(area, practice) rows.
  */
 @Entity
 @Table(
-    name = "practice_goal",
+    name = "practice_area",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_practice_goal_workspace_slug",
+        name = "uk_practice_area_workspace_slug",
         columnNames = { "workspace_id", "slug" }
     ),
-    indexes = @Index(name = "idx_practice_goal_workspace_active", columnList = "workspace_id, is_active")
+    indexes = @Index(name = "idx_practice_area_workspace_active", columnList = "workspace_id, is_active")
 )
 @Getter
 @Setter
@@ -59,7 +59,7 @@ public class PracticeArea {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_practice_goal_workspace"))
+    @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_practice_area_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 
@@ -71,11 +71,11 @@ public class PracticeArea {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
-    /** Optional blurb shown on the goal card. */
+    /** Optional blurb shown on the area card. */
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    /** Cohort-level toggle: which goals the dashboards surface. Independent of {@link Practice#isActive()}. */
+    /** Cohort-level toggle: which areas the dashboards surface. Independent of {@link Practice#isActive()}. */
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 

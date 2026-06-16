@@ -599,6 +599,18 @@ erDiagram
         VARCHAR(16) subject_role "NOT NULL"
     }
 
+    PracticeArea {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) name "NOT NULL"
+        TEXT description
+        BOOLEAN is_active "NOT NULL"
+        INTEGER display_order "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
     PracticeFinding {
         UUID id PK
         VARCHAR(255) idempotency_key UK "NOT NULL"
@@ -617,18 +629,6 @@ erDiagram
         TIMESTAMPTZ detected_at "NOT NULL"
         VARCHAR(64) finding_fingerprint
         BIGINT subject_user_id FK "NOT NULL"
-    }
-
-    PracticeGoal {
-        BIGINT id PK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(64) slug UK "NOT NULL"
-        VARCHAR(128) name "NOT NULL"
-        TEXT description
-        BOOLEAN is_active "NOT NULL"
-        INTEGER display_order "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at
     }
 
     Project {
@@ -1009,7 +1009,7 @@ erDiagram
     GitProvider ||--|| Milestone : references
     GitProvider ||--|| Organization : references
     Workspace ||--|| Practice : has
-    Workspace ||--|| PracticeGoal : has
+    Workspace ||--|| PracticeArea : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectItem ||--|| ProjectFieldValue : has
@@ -1075,7 +1075,7 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
-    PracticeGoal ||--o{ Practice : references
+    PracticeArea ||--o{ Practice : has
     Practice ||--o{ PracticeFinding : has
     User ||--o{ PracticeFinding : references
     User ||--o{ PracticeFinding : has

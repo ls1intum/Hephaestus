@@ -365,17 +365,17 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     }
 
     /**
-     * Per-goal standing rows for the mentor prepared-context aspect: one row per
-     * (goal, polarity, verdict, severity) for a developer in the look-back window, with the
+     * Per-area standing rows for the mentor prepared-context aspect: one row per
+     * (area, polarity, verdict, severity) for a developer in the look-back window, with the
      * recent-window sub-count and the most-recent detection. The sign decision (problem vs strength)
      * is deliberately left to {@link de.tum.cit.aet.hephaestus.practices.model.Polarity} in Java —
      * this query only projects the raw verdict + polarity so the rule stays single-sourced.
-     * Ungrouped practices ({@code p.goal IS NULL}) are excluded; they remain visible in
+     * Ungrouped practices ({@code p.area IS NULL}) are excluded; they remain visible in
      * {@code findings_history.json}.
      */
     @Query(
         """
-        SELECT p.goal.slug AS goalSlug, p.goal.name AS goalName, p.polarity AS polarity,
+        SELECT p.area.slug AS areaSlug, p.area.name AS areaName, p.polarity AS polarity,
                f.verdict AS verdict, f.severity AS severity, COUNT(f) AS count,
                SUM(CASE WHEN f.detectedAt >= :recentSince THEN 1L ELSE 0L END) AS recentCount
         FROM PracticeFinding f
@@ -383,21 +383,21 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         WHERE f.developer.id = :developerId
           AND p.workspace.id = :workspaceId
           AND f.detectedAt >= :since
-          AND p.goal IS NOT NULL
-        GROUP BY p.goal.slug, p.goal.name, p.polarity, f.verdict, f.severity
+          AND p.area IS NOT NULL
+        GROUP BY p.area.slug, p.area.name, p.polarity, f.verdict, f.severity
         """
     )
-    List<GoalStandingRow> findGoalStandingByDeveloperAndWorkspace(
+    List<AreaStandingRow> findAreaStandingByDeveloperAndWorkspace(
         @Param("developerId") Long developerId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
         @Param("recentSince") Instant recentSince
     );
 
-    /** Projection: per (goal, polarity, verdict, severity) standing for a developer. */
-    interface GoalStandingRow {
-        String getGoalSlug();
-        String getGoalName();
+    /** Projection: per (area, polarity, verdict, severity) standing for a developer. */
+    interface AreaStandingRow {
+        String getAreaSlug();
+        String getAreaName();
         de.tum.cit.aet.hephaestus.practices.model.Polarity getPolarity();
         de.tum.cit.aet.hephaestus.practices.model.Observation getVerdict();
         de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();

@@ -437,7 +437,7 @@ function chunkArray(arr, size) {
     return out;
 }
 
-// Group practice slugs by their goal (from index.json), preserving order. A goal forms one coherent,
+// Group practice slugs by their area (from index.json), preserving order. A area forms one coherent,
 // focused evaluation; ungrouped practices fall back to their own one-practice group.
 function loadPracticeGroups() {
     try {
@@ -445,14 +445,14 @@ function loadPracticeGroups() {
         if (!existsSync(indexPath)) return [];
         const index = JSON.parse(readFileSync(indexPath, "utf-8"));
         if (!Array.isArray(index)) return [];
-        const byGoal = new Map();
+        const byArea = new Map();
         for (const p of index) {
             if (!p.slug) continue;
-            const goal = p.goal || p.slug;
-            if (!byGoal.has(goal)) byGoal.set(goal, []);
-            byGoal.get(goal).push(p.slug);
+            const area = p.area || p.slug;
+            if (!byArea.has(area)) byArea.set(area, []);
+            byArea.get(area).push(p.slug);
         }
-        return [...byGoal.entries()].map(([goal, slugs]) => ({ goal, slugs }));
+        return [...byArea.entries()].map(([area, slugs]) => ({ area, slugs }));
     } catch {
         return [];
     }
@@ -580,7 +580,7 @@ async function main() {
                     contextWindow: 131072,
                     maxTokens: 4096,
                     // Opt into Anthropic-style cache_control markers so the large stable prefix (system
-                    // prompt + the diff/context the agent reads once) is cached across the per-goal turns.
+                    // prompt + the diff/context the agent reads once) is cached across the per-area turns.
                     // A no-op if the gateway ignores the markers; verify via usage.cacheRead before relying on it.
                     compat: { cacheControlFormat: "anthropic", supportsLongCacheRetention: true },
                 },
@@ -658,8 +658,8 @@ async function main() {
 
     // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
     // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
-    // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER GOAL
-    // (a coherent 2-4 practice group); each turn reads only that goal's per-practice criteria. report_finding
+    // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
+    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
     // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
     // practice gets a verdict. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
@@ -667,7 +667,7 @@ async function main() {
     const groups = loadPracticeGroups();
     const batches = [];
     if (groups.length > 0) {
-        // One batch per goal; sub-chunk a goal that exceeds batchSize so context stays bounded.
+        // One batch per area; sub-chunk a area that exceeds batchSize so context stays bounded.
         for (const g of groups) {
             for (const chunk of chunkArray(g.slugs, batchSize)) batches.push(chunk);
         }
@@ -675,7 +675,7 @@ async function main() {
         batches.push(...(allSlugs.length > batchSize ? chunkArray(allSlugs, batchSize) : [allSlugs]));
     }
     console.error(
-        `[pi-runner] Fan-out: ${allSlugs.length} practices in ${groups.length || "?"} goals -> ${batches.length} focused turn(s)`,
+        `[pi-runner] Fan-out: ${allSlugs.length} practices in ${groups.length || "?"} areas -> ${batches.length} focused turn(s)`,
     );
 
     try {

@@ -112,7 +112,7 @@ export const mockPracticeWithAllTriggers: Practice = {
 	updatedAt: new Date("2025-06-16"),
 };
 
-export const mockGoals: import("@/api/types.gen").PracticeArea[] = [
+export const mockAreas: import("@/api/types.gen").PracticeArea[] = [
 	{
 		id: 1,
 		slug: "review-ready-work",

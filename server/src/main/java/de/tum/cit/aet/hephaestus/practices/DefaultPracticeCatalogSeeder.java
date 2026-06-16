@@ -23,12 +23,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Seeds a grounded default practice catalog (process-level goals + their practices) into the default
+ * Seeds a grounded default practice catalog (process-level areas + their practices) into the default
  * workspace once workspaces exist ({@link WorkspacesInitializedEvent}). The catalog lives as data in
  * {@code resources/practices/default-catalog.json} so it stays editable without code changes, and every
- * row remains fully configurable afterwards through the normal practice/goal CRUD endpoints.
+ * row remains fully configurable afterwards through the normal practice/area CRUD endpoints.
  *
- * <p>Idempotent: a goal that already exists in the workspace is skipped, so re-running on startup (or
+ * <p>Idempotent: an area that already exists in the workspace is skipped, so re-running on startup (or
  * after an admin has edited the catalog) never overwrites configured state. Failures are isolated from
  * the rest of startup, mirroring {@code DefaultAgentConfigSeeder}.
  */
@@ -41,24 +41,24 @@ class DefaultPracticeCatalogSeeder {
 
     private final boolean enabled;
     private final JsonMapper objectMapper;
-    private final PracticeAreaService goalService;
+    private final PracticeAreaService areaService;
     private final PracticeService practiceService;
-    private final PracticeAreaRepository goalRepository;
+    private final PracticeAreaRepository areaRepository;
     private final WorkspaceRepository workspaceRepository;
 
     DefaultPracticeCatalogSeeder(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
         JsonMapper objectMapper,
-        PracticeAreaService goalService,
+        PracticeAreaService areaService,
         PracticeService practiceService,
-        PracticeAreaRepository goalRepository,
+        PracticeAreaRepository areaRepository,
         WorkspaceRepository workspaceRepository
     ) {
         this.enabled = enabled;
         this.objectMapper = objectMapper;
-        this.goalService = goalService;
+        this.areaService = areaService;
         this.practiceService = practiceService;
-        this.goalRepository = goalRepository;
+        this.areaRepository = areaRepository;
         this.workspaceRepository = workspaceRepository;
     }
 
@@ -83,34 +83,34 @@ class DefaultPracticeCatalogSeeder {
         WorkspaceContext ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
 
         JsonNode catalog = readCatalog();
-        int seededGoals = 0;
+        int seededAreas = 0;
         int seededPractices = 0;
-        for (JsonNode goalNode : catalog.path("goals")) {
-            String goalSlug = goalNode.path("slug").asString();
-            if (goalRepository.existsByWorkspaceIdAndSlug(ctx.id(), goalSlug)) {
+        for (JsonNode areaNode : catalog.path("areas")) {
+            String areaSlug = areaNode.path("slug").asString();
+            if (areaRepository.existsByWorkspaceIdAndSlug(ctx.id(), areaSlug)) {
                 // Already present — respect any admin edits and do not overwrite.
                 continue;
             }
-            goalService.createGoal(
+            areaService.createArea(
                 ctx,
-                goalSlug,
-                goalNode.path("name").asString(),
-                text(goalNode, "description"),
-                goalNode.path("displayOrder").asInt()
+                areaSlug,
+                areaNode.path("name").asString(),
+                text(areaNode, "description"),
+                areaNode.path("displayOrder").asInt()
             );
-            seededGoals++;
+            seededAreas++;
 
-            for (JsonNode practiceNode : goalNode.path("practices")) {
+            for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
                 practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));
-                goalService.bindPractice(ctx, practiceSlug, goalSlug);
+                areaService.bindPractice(ctx, practiceSlug, areaSlug);
                 seededPractices++;
             }
         }
-        if (seededGoals > 0) {
+        if (seededAreas > 0) {
             log.info(
-                "Seeded default practice catalog: {} goals, {} practices into workspace {}",
-                seededGoals,
+                "Seeded default practice catalog: {} areas, {} practices into workspace {}",
+                seededAreas,
                 seededPractices,
                 workspace.getId()
             );

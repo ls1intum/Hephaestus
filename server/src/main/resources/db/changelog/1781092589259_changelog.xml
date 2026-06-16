@@ -954,4 +954,39 @@
         </rollback>
     </changeSet>
 
+    <!-- goal→area: complete the PracticeGoal→PracticeArea rename at the DB level (table + its PK/uk/idx/fk + the
+         practice→area FK/index) so the schema matches the renamed entities. Column practice.practice_area_id was
+         already renamed in -46; this finishes the table + constraint/index names. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-58">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_goal table already renamed to practice_area">
+            <tableExists tableName="practice_goal"/>
+        </preConditions>
+        <comment>Rename table practice_goal → practice_area (entity PracticeArea).</comment>
+        <renameTable oldTableName="practice_goal" newTableName="practice_area"/>
+        <rollback><renameTable oldTableName="practice_area" newTableName="practice_goal"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-59">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_area constraints/indexes already renamed">
+            <foreignKeyConstraintExists foreignKeyName="fk_practice_goal"/>
+        </preConditions>
+        <comment>Rename practice_area + practice constraints/indexes from *_practice_goal_* to *_practice_area_*.</comment>
+        <sql>
+            ALTER TABLE practice_area RENAME CONSTRAINT "practice_goalPK" TO "practice_areaPK";
+            ALTER TABLE practice_area RENAME CONSTRAINT uk_practice_goal_workspace_slug TO uk_practice_area_workspace_slug;
+            ALTER INDEX idx_practice_goal_workspace_active RENAME TO idx_practice_area_workspace_active;
+            ALTER TABLE practice_area RENAME CONSTRAINT fk_practice_goal_workspace TO fk_practice_area_workspace;
+            ALTER TABLE practice RENAME CONSTRAINT fk_practice_goal TO fk_practice_area;
+            ALTER INDEX idx_practice_practice_goal RENAME TO idx_practice_practice_area;
+        </sql>
+        <rollback>
+            ALTER TABLE practice_area RENAME CONSTRAINT "practice_areaPK" TO "practice_goalPK";
+            ALTER TABLE practice_area RENAME CONSTRAINT uk_practice_area_workspace_slug TO uk_practice_goal_workspace_slug;
+            ALTER INDEX idx_practice_area_workspace_active RENAME TO idx_practice_goal_workspace_active;
+            ALTER TABLE practice_area RENAME CONSTRAINT fk_practice_area_workspace TO fk_practice_goal_workspace;
+            ALTER TABLE practice RENAME CONSTRAINT fk_practice_area TO fk_practice_goal;
+            ALTER INDEX idx_practice_practice_area RENAME TO idx_practice_practice_goal;
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

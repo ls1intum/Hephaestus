@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { PracticeForm } from "./PracticeForm";
-import { mockGoals, mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
+import { mockAreas, mockPractices, mockPracticeWithAllTriggers } from "./storyMockData";
 
 /**
  * Full-page form for creating or editing a practice definition.
@@ -14,7 +14,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		mode: "create",
-		goals: mockGoals,
+		areas: mockAreas,
 		onSubmit: fn(),
 		onCancel: fn(),
 		isPending: false,

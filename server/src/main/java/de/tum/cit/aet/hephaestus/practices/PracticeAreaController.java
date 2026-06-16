@@ -33,79 +33,79 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Controller for CRUD management of practice goals — the configurable groupings that organise
+ * Controller for CRUD management of practice areas — the configurable groupings that organise
  * practices into learning objectives.
  *
  * <p>All endpoints are workspace-scoped. Read operations require workspace membership; write
- * operations require workspace admin or owner role. Binding a practice to a goal lives on the
- * practice resource ({@code PUT /practices/{slug}/goal}).
+ * operations require workspace admin or owner role. Binding a practice to an area lives on the
+ * practice resource ({@code PUT /practices/{slug}/area}).
  */
 @WorkspaceScopedController
-@RequestMapping("/practice-goals")
-@Tag(name = "Practice Goals", description = "Manage practice goals")
+@RequestMapping("/practice-areas")
+@Tag(name = "Practice Areas", description = "Manage practice areas")
 @RequiredArgsConstructor
 @Validated
 public class PracticeAreaController {
 
-    private final PracticeAreaService goalService;
+    private final PracticeAreaService areaService;
 
     @GetMapping
-    @Operation(summary = "List practice goals", description = "Returns the workspace's practice goals")
+    @Operation(summary = "List practice areas", description = "Returns the workspace's practice areas")
     @ApiResponse(
         responseCode = "200",
-        description = "Goals returned",
+        description = "Areas returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaDTO.class)))
     )
     @SecurityRequirements
-    public ResponseEntity<List<PracticeAreaDTO>> listGoals(
+    public ResponseEntity<List<PracticeAreaDTO>> listAreas(
         WorkspaceContext workspaceContext,
         @RequestParam(name = "activeOnly", required = false) @Parameter(
-            description = "Return only active goals"
+            description = "Return only active areas"
         ) Boolean activeOnly
     ) {
-        List<PracticeAreaDTO> goals = goalService
-            .listGoals(workspaceContext, activeOnly)
+        List<PracticeAreaDTO> areas = areaService
+            .listAreas(workspaceContext, activeOnly)
             .stream()
             .map(PracticeAreaDTO::from)
             .toList();
-        return ResponseEntity.ok(goals);
+        return ResponseEntity.ok(areas);
     }
 
-    @GetMapping("/{goalSlug}")
-    @Operation(summary = "Get a practice goal")
+    @GetMapping("/{areaSlug}")
+    @Operation(summary = "Get a practice area")
     @ApiResponse(
         responseCode = "200",
-        description = "Goal returned",
+        description = "Area returned",
         content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Goal not found",
+        description = "Area not found",
         content = @Content(schema = @Schema(hidden = true))
     )
     @SecurityRequirements
-    public ResponseEntity<PracticeAreaDTO> getGoal(WorkspaceContext workspaceContext, @PathVariable String goalSlug) {
-        return ResponseEntity.ok(PracticeAreaDTO.from(goalService.getGoal(workspaceContext, goalSlug)));
+    public ResponseEntity<PracticeAreaDTO> getArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
+        return ResponseEntity.ok(PracticeAreaDTO.from(areaService.getArea(workspaceContext, areaSlug)));
     }
 
     @PostMapping
-    @Operation(summary = "Create a new practice goal")
+    @Operation(summary = "Create a new practice area")
     @ApiResponse(
         responseCode = "201",
-        description = "Goal created",
+        description = "Area created",
         content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
     )
     @ApiResponse(
         responseCode = "409",
-        description = "Goal slug already exists in this workspace",
+        description = "Area slug already exists in this workspace",
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeAreaDTO> createGoal(
+    public ResponseEntity<PracticeAreaDTO> createArea(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreatePracticeAreaRequestDTO request
     ) {
-        PracticeArea goal = goalService.createGoal(
+        PracticeArea area = areaService.createArea(
             workspaceContext,
             request.slug(),
             request.name(),
@@ -114,50 +114,50 @@ public class PracticeAreaController {
         );
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{slug}")
-            .buildAndExpand(goal.getSlug())
+            .buildAndExpand(area.getSlug())
             .toUri();
-        return ResponseEntity.created(location).body(PracticeAreaDTO.from(goal));
+        return ResponseEntity.created(location).body(PracticeAreaDTO.from(area));
     }
 
-    @PatchMapping("/{goalSlug}")
-    @Operation(summary = "Update a practice goal")
+    @PatchMapping("/{areaSlug}")
+    @Operation(summary = "Update a practice area")
     @ApiResponse(
         responseCode = "200",
-        description = "Goal updated",
+        description = "Area updated",
         content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Goal not found",
+        description = "Area not found",
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeAreaDTO> updateGoal(
+    public ResponseEntity<PracticeAreaDTO> updateArea(
         WorkspaceContext workspaceContext,
-        @PathVariable String goalSlug,
+        @PathVariable String areaSlug,
         @Valid @RequestBody UpdatePracticeAreaRequestDTO request
     ) {
-        PracticeArea goal = goalService.updateGoal(
+        PracticeArea area = areaService.updateArea(
             workspaceContext,
-            goalSlug,
+            areaSlug,
             request.name(),
             request.description(),
             request.displayOrder()
         );
         if (request.active() != null) {
-            goal = goalService.setActive(workspaceContext, goalSlug, request.active());
+            area = areaService.setActive(workspaceContext, areaSlug, request.active());
         }
-        return ResponseEntity.ok(PracticeAreaDTO.from(goal));
+        return ResponseEntity.ok(PracticeAreaDTO.from(area));
     }
 
     @PatchMapping("/reorder")
     @Operation(
-        summary = "Reorder practice goals",
-        description = "Sets each goal's display order to its index in the provided slug list (one atomic write)"
+        summary = "Reorder practice areas",
+        description = "Sets each area's display order to its index in the provided slug list (one atomic write)"
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Goals reordered; the full ordered list is returned",
+        description = "Areas reordered; the full ordered list is returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaDTO.class)))
     )
     @ApiResponse(
@@ -166,33 +166,33 @@ public class PracticeAreaController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<List<PracticeAreaDTO>> reorderGoals(
+    public ResponseEntity<List<PracticeAreaDTO>> reorderAreas(
         WorkspaceContext workspaceContext,
         @Valid @RequestBody ReorderPracticeAreasRequestDTO request
     ) {
-        goalService.reorder(workspaceContext, request.orderedSlugs());
-        List<PracticeAreaDTO> goals = goalService
-            .listGoals(workspaceContext, null)
+        areaService.reorder(workspaceContext, request.orderedSlugs());
+        List<PracticeAreaDTO> areas = areaService
+            .listAreas(workspaceContext, null)
             .stream()
             .map(PracticeAreaDTO::from)
             .toList();
-        return ResponseEntity.ok(goals);
+        return ResponseEntity.ok(areas);
     }
 
-    @DeleteMapping("/{goalSlug}")
+    @DeleteMapping("/{areaSlug}")
     @Operation(
-        summary = "Delete a practice goal",
-        description = "Bound practices are unbound (their goal link is cleared), not deleted"
+        summary = "Delete a practice area",
+        description = "Bound practices are unbound (their area link is cleared), not deleted"
     )
-    @ApiResponse(responseCode = "204", description = "Goal deleted")
+    @ApiResponse(responseCode = "204", description = "Area deleted")
     @ApiResponse(
         responseCode = "404",
-        description = "Goal not found",
+        description = "Area not found",
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<Void> deleteGoal(WorkspaceContext workspaceContext, @PathVariable String goalSlug) {
-        goalService.deleteGoal(workspaceContext, goalSlug);
+    public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
+        areaService.deleteArea(workspaceContext, areaSlug);
         return ResponseEntity.noContent().build();
     }
 }

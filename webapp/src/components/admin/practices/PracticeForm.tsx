@@ -30,14 +30,14 @@ import {
 	type WorkArtifact,
 } from "./constants";
 
-/** Sentinel for the "not bound to any goal" option (shadcn SelectItem cannot use an empty value). */
-const NO_GOAL = "__none__";
+/** Sentinel for the "not bound to any area" option (shadcn SelectItem cannot use an empty value). */
+const NO_AREA = "__none__";
 
 interface PracticeFormCreateProps {
 	mode: "create";
-	/** Goals offered in the binding picker. Binding is a separate mutation the container runs after create. */
-	goals: PracticeArea[];
-	onSubmit: (data: CreatePracticeRequest, goalSlug: string | null) => void;
+	/** Areas offered in the binding picker. Binding is a separate mutation the container runs after create. */
+	areas: PracticeArea[];
+	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
 	initialData?: never;
@@ -46,8 +46,8 @@ interface PracticeFormCreateProps {
 interface PracticeFormEditProps {
 	mode: "edit";
 	initialData: Practice;
-	goals: PracticeArea[];
-	onSubmit: (slug: string, data: UpdatePracticeRequest, goalSlug: string | null) => void;
+	areas: PracticeArea[];
+	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
 	onCancel: () => void;
 	isPending: boolean;
 }
@@ -58,7 +58,7 @@ interface FormState {
 	name: string;
 	slug: string;
 	focusArtifact: WorkArtifact;
-	goalSlug: string;
+	areaSlug: string;
 	triggerEvents: string[];
 	criteria: string;
 	precomputeScript: string;
@@ -70,7 +70,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 			name: initialData.name,
 			slug: initialData.slug,
 			focusArtifact: initialData.artifactType,
-			goalSlug: initialData.goalSlug ?? NO_GOAL,
+			areaSlug: initialData.areaSlug ?? NO_AREA,
 			triggerEvents: [...initialData.triggerEvents],
 			criteria: initialData.criteria,
 			precomputeScript: initialData.precomputeScript ?? "",
@@ -80,7 +80,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 		name: "",
 		slug: "",
 		focusArtifact: "PULL_REQUEST",
-		goalSlug: NO_GOAL,
+		areaSlug: NO_AREA,
 		triggerEvents: [],
 		criteria: "",
 		precomputeScript: "",
@@ -89,7 +89,7 @@ function getInitialState(mode: "create" | "edit", initialData?: Practice): FormS
 
 export function PracticeForm({
 	mode,
-	goals,
+	areas,
 	onSubmit,
 	onCancel,
 	isPending,
@@ -147,7 +147,7 @@ export function PracticeForm({
 		setSubmitted(true);
 		if (!isValid) return;
 
-		const goalSlug = form.goalSlug === NO_GOAL ? null : form.goalSlug;
+		const areaSlug = form.areaSlug === NO_AREA ? null : form.areaSlug;
 
 		if (mode === "create") {
 			const data: CreatePracticeRequest = {
@@ -158,7 +158,7 @@ export function PracticeForm({
 				artifactType: form.focusArtifact,
 				...(form.precomputeScript.trim() ? { precomputeScript: form.precomputeScript.trim() } : {}),
 			};
-			onSubmit(data, goalSlug);
+			onSubmit(data, areaSlug);
 		} else {
 			const data: UpdatePracticeRequest = {
 				name: form.name,
@@ -167,7 +167,7 @@ export function PracticeForm({
 				artifactType: form.focusArtifact,
 				precomputeScript: form.precomputeScript.trim() || undefined,
 			};
-			onSubmit(initialData.slug, data, goalSlug);
+			onSubmit(initialData.slug, data, areaSlug);
 		}
 	};
 
@@ -302,25 +302,25 @@ export function PracticeForm({
 									</div>
 
 									<div className="grid gap-2">
-										<Label htmlFor="practice-goal">Goal</Label>
+										<Label htmlFor="practice-area">Area</Label>
 										<Select
-											value={form.goalSlug}
+											value={form.areaSlug}
 											onValueChange={(value) =>
-												setForm((prev) => ({ ...prev, goalSlug: value ?? NO_GOAL }))
+												setForm((prev) => ({ ...prev, areaSlug: value ?? NO_AREA }))
 											}
 										>
-											<SelectTrigger id="practice-goal">
+											<SelectTrigger id="practice-area">
 												<SelectValue placeholder="Not assigned">
-													{form.goalSlug === NO_GOAL
+													{form.areaSlug === NO_AREA
 														? undefined
-														: goals.find((g) => g.slug === form.goalSlug)?.name}
+														: areas.find((g) => g.slug === form.areaSlug)?.name}
 												</SelectValue>
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value={NO_GOAL}>Not assigned</SelectItem>
-												{goals.map((goal) => (
-													<SelectItem key={goal.slug} value={goal.slug}>
-														{goal.name}
+												<SelectItem value={NO_AREA}>Not assigned</SelectItem>
+												{areas.map((area) => (
+													<SelectItem key={area.slug} value={area.slug}>
+														{area.name}
 													</SelectItem>
 												))}
 											</SelectContent>

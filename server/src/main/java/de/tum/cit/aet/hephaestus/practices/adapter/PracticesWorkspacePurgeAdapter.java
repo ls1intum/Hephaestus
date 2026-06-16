@@ -25,16 +25,16 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
 
     private final PracticeFindingRepository practiceFindingRepository;
     private final PracticeRepository practiceRepository;
-    private final PracticeAreaRepository practiceGoalRepository;
+    private final PracticeAreaRepository practiceAreaRepository;
 
     public PracticesWorkspacePurgeAdapter(
         PracticeFindingRepository practiceFindingRepository,
         PracticeRepository practiceRepository,
-        PracticeAreaRepository practiceGoalRepository
+        PracticeAreaRepository practiceAreaRepository
     ) {
         this.practiceFindingRepository = practiceFindingRepository;
         this.practiceRepository = practiceRepository;
-        this.practiceGoalRepository = practiceGoalRepository;
+        this.practiceAreaRepository = practiceAreaRepository;
     }
 
     @Override
@@ -42,12 +42,12 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         // Delete practice findings explicitly (defense-in-depth; CASCADE would also handle this).
         practiceFindingRepository.deleteAllByPracticeWorkspaceId(workspaceId);
         // Delete practice definitions (CASCADE cleans up any remaining findings); this also clears the
-        // practice → practice_goal references, so goals can be removed next.
+        // practice → practice_area references, so areas can be removed next.
         practiceRepository.deleteAllByWorkspaceId(workspaceId);
-        // Delete practice goals (now unreferenced).
-        practiceGoalRepository.deleteAllByWorkspaceId(workspaceId);
+        // Delete practice areas (now unreferenced).
+        practiceAreaRepository.deleteAllByWorkspaceId(workspaceId);
 
-        log.info("Deleted practices, goals and findings for workspace: workspaceId={}", workspaceId);
+        log.info("Deleted practices, areas and findings for workspace: workspaceId={}", workspaceId);
     }
 
     @Override

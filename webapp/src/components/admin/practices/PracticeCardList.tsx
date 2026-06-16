@@ -8,14 +8,14 @@ import { PracticeCard } from "./PracticeCard";
 interface PracticeCardListProps {
 	workspaceSlug: string;
 	practices: Practice[];
-	goals: PracticeArea[];
+	areas: PracticeArea[];
 	isLoading: boolean;
 	togglingPractices: Set<string>;
 	onDelete: (practice: Practice) => void;
 	onSetActive: (slug: string, active: boolean) => void;
 }
 
-/** Active practices first, then alphabetical — applied within each goal section. */
+/** Active practices first, then alphabetical — applied within each area section. */
 function sortPractices(practices: Practice[]): Practice[] {
 	return [...practices].sort((a, b) => {
 		if (a.active !== b.active) return a.active ? -1 : 1;
@@ -26,7 +26,7 @@ function sortPractices(practices: Practice[]): Practice[] {
 export function PracticeCardList({
 	workspaceSlug,
 	practices,
-	goals,
+	areas,
 	isLoading,
 	togglingPractices,
 	onDelete,
@@ -72,27 +72,27 @@ export function PracticeCardList({
 		);
 	}
 
-	// Group practices by goal so the catalog reads by learning objective, not as a flat wall.
-	const byGoal = new Map<string, Practice[]>();
+	// Group practices by area so the catalog reads by learning objective, not as a flat wall.
+	const byArea = new Map<string, Practice[]>();
 	for (const practice of practices) {
-		const key = practice.goalSlug ?? "__unassigned__";
-		const bucket = byGoal.get(key);
+		const key = practice.areaSlug ?? "__unassigned__";
+		const bucket = byArea.get(key);
 		if (bucket) bucket.push(practice);
-		else byGoal.set(key, [practice]);
+		else byArea.set(key, [practice]);
 	}
 
-	const goalSections = [...goals]
+	const areaSections = [...areas]
 		.sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
-		.map((goal) => ({
-			key: goal.slug,
-			title: goal.name,
-			items: sortPractices(byGoal.get(goal.slug) ?? []),
+		.map((area) => ({
+			key: area.slug,
+			title: area.name,
+			items: sortPractices(byArea.get(area.slug) ?? []),
 		}))
 		.filter((section) => section.items.length > 0);
 
-	const unassigned = sortPractices(byGoal.get("__unassigned__") ?? []);
+	const unassigned = sortPractices(byArea.get("__unassigned__") ?? []);
 	const sections = [
-		...goalSections,
+		...areaSections,
 		...(unassigned.length > 0
 			? [{ key: "__unassigned__", title: "Unassigned", items: unassigned }]
 			: []),

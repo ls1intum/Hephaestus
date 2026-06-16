@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import { PracticeGoalsPanel } from "./PracticeGoalsPanel";
-import { mockGoals, mockPractices } from "./storyMockData";
+import { PracticeAreasPanel } from "./PracticeAreasPanel";
+import { mockAreas, mockPractices } from "./storyMockData";
 
 const meta = {
-	component: PracticeGoalsPanel,
+	component: PracticeAreasPanel,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		goals: mockGoals,
+		areas: mockAreas,
 		practices: mockPractices,
 		isMutating: false,
 		onCreate: fn(),
@@ -24,17 +24,17 @@ const meta = {
 			</div>
 		),
 	],
-} satisfies Meta<typeof PracticeGoalsPanel>;
+} satisfies Meta<typeof PracticeAreasPanel>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Seeded goals with per-goal practice counts and reorder controls. */
+/** Seeded areas with per-area practice counts and reorder controls. */
 export const Default: Story = {};
 
-/** No goals yet — the empty-state row prompts the admin to add one. */
+/** No areas yet — the empty-state row prompts the admin to add one. */
 export const Empty: Story = {
-	args: { goals: [] },
+	args: { areas: [] },
 };
 
 /** A mid-write state: every control is disabled while a mutation is in flight. */
@@ -42,9 +42,9 @@ export const Mutating: Story = {
 	args: { isMutating: true },
 };
 
-/** An inactive goal renders its "Inactive" badge and an off switch. */
-export const WithInactiveGoal: Story = {
+/** An inactive area renders its "Inactive" badge and an off switch. */
+export const WithInactiveArea: Story = {
 	args: {
-		goals: mockGoals.map((goal, i) => (i === 1 ? { ...goal, active: false } : goal)),
+		areas: mockAreas.map((area, i) => (i === 1 ? { ...area, active: false } : area)),
 	},
 };
