@@ -70,6 +70,7 @@ export function MessageActions({
 					<TooltipTrigger
 						render={
 							<Button
+								aria-label="Copy message"
 								className={buttonClasses}
 								variant="ghost"
 								size="icon"
@@ -87,7 +88,13 @@ export function MessageActions({
 					<Tooltip>
 						<TooltipTrigger
 							render={
-								<Button className={buttonClasses} variant="ghost" size="icon" onClick={onEdit} />
+								<Button
+									aria-label="Edit message"
+									className={buttonClasses}
+									variant="ghost"
+									size="icon"
+									onClick={onEdit}
+								/>
 							}
 						>
 							<PencilIcon size={14} />
@@ -104,6 +111,7 @@ export function MessageActions({
 								render={
 									<Button
 										data-testid="message-upvote"
+										aria-label="Good response"
 										className={cn(
 											"touch:w-10 size-8 text-muted-foreground hover:text-provider-success-foreground hover:bg-provider-success-foreground/10",
 											{
@@ -127,6 +135,7 @@ export function MessageActions({
 								render={
 									<Button
 										data-testid="message-downvote"
+										aria-label="Bad response"
 										className={cn(
 											"touch:w-10 size-8 text-muted-foreground hover:text-provider-danger-foreground hover:bg-provider-danger-foreground/10",
 											{

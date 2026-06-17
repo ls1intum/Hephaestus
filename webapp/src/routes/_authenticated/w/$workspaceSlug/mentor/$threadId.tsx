@@ -141,6 +141,11 @@ function ThreadContainer() {
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
 				onStop={mentorChat.stop}
+				onReload={() => {
+					// Clear the error banner, then re-run the last turn so the "Try again" button isn't a dead end.
+					mentorChat.clearError();
+					mentorChat.regenerate();
+				}}
 				onFileUpload={() => Promise.resolve([])} // No-op since attachments are disabled
 				onAttachmentsChange={() => {}} // No-op since attachments are disabled
 				onCopy={handleCopy}
