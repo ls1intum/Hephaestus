@@ -258,15 +258,30 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
      * to them by title in the conversation. Bounded by {@code limit} at the caller so the
      * page size stays a JPA concern.
      */
+    /**
+     * Recent findings the mentor can refer to by title in conversation.
+     *
+     * <p>Re-review deduped (same grain as {@link #findSummaryByDeveloperAndWorkspace}): keeps only each
+     * target's LATEST detection run, so a re-pushed PR's findings don't repeat across the list and the
+     * mentor doesn't see (and re-litigate) the same finding four times. Native because the latest-run
+     * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
+     * per finding (bounded by the page size) rather than JOIN-fetched.
+     */
     @Query(
-        """
-        SELECT f FROM PracticeFinding f
-        JOIN FETCH f.practice p
-        WHERE f.developer.id = :developerId
-          AND p.workspace.id = :workspaceId
-          AND f.detectedAt >= :since
-        ORDER BY f.detectedAt DESC
-        """
+        value = """
+        SELECT f.* FROM practice_finding f
+        JOIN practice p ON p.id = f.practice_id
+        WHERE f.developer_id = :developerId
+          AND p.workspace_id = :workspaceId
+          AND f.detected_at >= :since
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM practice_finding f2
+              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              ORDER BY f2.detected_at DESC LIMIT 1
+          )
+        ORDER BY f.detected_at DESC
+        """,
+        nativeQuery = true
     )
     List<PracticeFinding> findRecentByDeveloperAndWorkspace(
         @Param("developerId") Long developerId,
@@ -278,17 +293,26 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     /**
      * Severity histogram for a developer's findings within a workspace.
      * Returns {@code [severityName, count]} rows — caller maps to a name→count map.
+     *
+     * <p>Re-review deduped to each target's latest run (see {@link #findRecentByDeveloperAndWorkspace}) so
+     * the mentor's "how am I doing" histogram reflects current state, not the re-push multiplier.
      */
     @Query(
-        """
-        SELECT f.severity AS severity, COUNT(f) AS count
-        FROM PracticeFinding f
-        JOIN f.practice p
-        WHERE f.developer.id = :developerId
-          AND p.workspace.id = :workspaceId
-          AND f.detectedAt >= :since
+        value = """
+        SELECT f.severity AS severity, COUNT(f.id) AS count
+        FROM practice_finding f
+        JOIN practice p ON p.id = f.practice_id
+        WHERE f.developer_id = :developerId
+          AND p.workspace_id = :workspaceId
+          AND f.detected_at >= :since
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM practice_finding f2
+              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              ORDER BY f2.detected_at DESC LIMIT 1
+          )
         GROUP BY f.severity
-        """
+        """,
+        nativeQuery = true
     )
     List<SeverityCount> countBySeverityForDeveloper(
         @Param("developerId") Long developerId,
@@ -296,17 +320,27 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("since") Instant since
     );
 
-    /** Observation histogram for a developer's findings within a workspace. */
+    /**
+     * Observation histogram for a developer's findings within a workspace.
+     *
+     * <p>Re-review deduped to each target's latest run (see {@link #findRecentByDeveloperAndWorkspace}).
+     */
     @Query(
-        """
-        SELECT f.verdict AS verdict, COUNT(f) AS count
-        FROM PracticeFinding f
-        JOIN f.practice p
-        WHERE f.developer.id = :developerId
-          AND p.workspace.id = :workspaceId
-          AND f.detectedAt >= :since
+        value = """
+        SELECT f.verdict AS verdict, COUNT(f.id) AS count
+        FROM practice_finding f
+        JOIN practice p ON p.id = f.practice_id
+        WHERE f.developer_id = :developerId
+          AND p.workspace_id = :workspaceId
+          AND f.detected_at >= :since
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM practice_finding f2
+              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              ORDER BY f2.detected_at DESC LIMIT 1
+          )
         GROUP BY f.verdict
-        """
+        """,
+        nativeQuery = true
     )
     List<VerdictCount> countByVerdictForDeveloper(
         @Param("developerId") Long developerId,
@@ -395,18 +429,25 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
      * {@code findings_history.json}.
      */
     @Query(
-        """
-        SELECT p.area.slug AS areaSlug, p.area.name AS areaName, p.polarity AS polarity,
-               f.verdict AS verdict, f.severity AS severity, COUNT(f) AS count,
-               SUM(CASE WHEN f.detectedAt >= :recentSince THEN 1L ELSE 0L END) AS recentCount
-        FROM PracticeFinding f
-        JOIN f.practice p
-        WHERE f.developer.id = :developerId
-          AND p.workspace.id = :workspaceId
-          AND f.detectedAt >= :since
-          AND p.area IS NOT NULL
-        GROUP BY p.area.slug, p.area.name, p.polarity, f.verdict, f.severity
-        """
+        value = """
+        SELECT pa.slug AS "areaSlug", pa.name AS "areaName", p.polarity AS "polarity",
+               f.verdict AS "verdict", f.severity AS "severity", COUNT(f.id) AS "count",
+               SUM(CASE WHEN f.detected_at >= :recentSince THEN 1 ELSE 0 END) AS "recentCount"
+        FROM practice_finding f
+        JOIN practice p ON p.id = f.practice_id
+        JOIN practice_area pa ON pa.id = p.practice_area_id
+        WHERE f.developer_id = :developerId
+          AND p.workspace_id = :workspaceId
+          AND f.detected_at >= :since
+          AND p.practice_area_id IS NOT NULL
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM practice_finding f2
+              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              ORDER BY f2.detected_at DESC LIMIT 1
+          )
+        GROUP BY pa.slug, pa.name, p.polarity, f.verdict, f.severity
+        """,
+        nativeQuery = true
     )
     List<AreaStandingRow> findAreaStandingByDeveloperAndWorkspace(
         @Param("developerId") Long developerId,
