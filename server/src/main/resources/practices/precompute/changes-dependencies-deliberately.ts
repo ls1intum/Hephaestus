@@ -1,0 +1,343 @@
+// Precompute HINTS for changes-dependencies-deliberately. Surfaces facts only — the LLM judges whether a
+// dependency edit was deliberate (intentional add/remove/bump with an appropriate constraint) or careless
+// (loosened pin, dropped version, no lockfile). General by design: a per-manifest pattern table keyed off
+// the file basename, NOT a single ecosystem. Adding an ecosystem = adding a row, no engine change.
+//
+// For each changed manifest line we pair an added line against a removed line for the SAME dependency name
+// and classify the version-constraint delta as a neutral FACT:
+//   ADDED         — dep appears only on a + line (new dependency)
+//   REMOVED       — dep appears only on a - line (dependency dropped)
+//   PIN_LOOSENED  — exact/narrower constraint became a range/caret/tilde (==1.2.3 -> >=1.2, 1.2.3 -> ^1.2.3)
+//   PIN_DROPPED   — a version constraint was present and is now entirely absent
+//   BUMPED        — same constraint shape, different version value
+// This removes the carve-out branch the model kept mis-taking (it flipped verdict on identical loosened pins).
+import { findFiles } from "../lib/grep";
+import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+
+// ecosystem key -> how to recognise its manifest + lockfile, and how to read a "name => constraint" line.
+interface Ecosystem {
+	// manifest basename test (lowercased)
+	isManifest: (base: string) => boolean;
+	// sibling lockfile basenames for this ecosystem
+	lockfiles: string[];
+	// extract { name, constraint } from a single manifest line, or null if the line is not a dependency.
+	parse: (line: string) => { name: string; constraint: string } | null;
+}
+
+// A constraint is "loose" if it admits more than one version: range operators, caret, tilde, wildcard, or empty.
+const LOOSE = /(^$|[\^~*]|>=|<=|>|<|\.x\b|\bx\b|\|\||\s-\s|,)/;
+// A constraint is "exact" if it pins a single version: leading ==, =, or a bare semver-ish token.
+const EXACT = /^(==?|v)?\d/;
+
+function isLoose(c: string): boolean {
+	const t = c.trim();
+	if (t === "" || t === "*") return true;
+	if (EXACT.test(t) && !LOOSE.test(t.replace(/^==?/, ""))) return false;
+	return LOOSE.test(t);
+}
+
+// --- per-ecosystem line parsers (kept deliberately small + tolerant; the LLM reads full context) ---
+
+// JSON "name": "constraint"  (package.json dependency blocks)
+const reJsonDep = /^\s*"([^"]+)"\s*:\s*"([^"]*)"\s*,?\s*$/;
+// Well-known package.json scalar keys that are NOT dependencies — skip so we don't emit a "dep" hint for the
+// package's own name/version/etc. Generic to npm manifests, not repo-specific.
+const NPM_NON_DEP_KEYS = new Set([
+	"name",
+	"version",
+	"description",
+	"license",
+	"main",
+	"module",
+	"type",
+	"types",
+	"typings",
+	"homepage",
+	"author",
+	"private",
+	"packagemanager",
+	"bin",
+]);
+// TOML name = "constraint"  or  name = { version = "constraint" }
+const reTomlDep = /^\s*([A-Za-z0-9_.-]+)\s*=\s*(?:"([^"]*)"|\{[^}]*version\s*=\s*"([^"]*)"[^}]*\})/;
+// requirements.txt  name==1.2.3 / name>=1,<2 / name
+const reReqDep = /^\s*([A-Za-z0-9_.\-\[\]]+)\s*((?:[<>=!~]=?|@)\S.*)?$/;
+// Gemfile  gem "name", "~> 1.2"
+const reGemDep = /^\s*gem\s+["']([^"']+)["']\s*(?:,\s*["']([^"']*)["'])?/;
+// Maven pom.xml  <artifactId>name</artifactId> ... we approximate per-line on artifactId/version pairs.
+const reMvnArtifact = /<artifactId>\s*([^<\s]+)\s*<\/artifactId>/;
+const reMvnVersion = /<version>\s*([^<\s]+)\s*<\/version>/;
+// Gradle  implementation("group:name:1.2.3")  or  implementation 'group:name:1.2.3'
+const reGradleDep = /["']([\w.\-]+:[\w.\-]+):([^"']*)["']/;
+// Swift PM  .package(url: "...", from: "1.2.3") / exact: "1.2.3" / "1.0.0"..."2.0.0"
+const reSwiftPkg = /\.package\(\s*url:\s*["']([^"']+)["'][^)]*?(?:from:\s*["']([^"']+)["']|exact:\s*["']([^"']+)["']|["']([^"']+)["']\s*\.\.[.<]\s*["']([^"']+)["'])/;
+// go.mod  require module v1.2.3  (single-line or block-body line)
+const reGoMod = /^\s*(?:require\s+)?([\w./\-]+\.[\w./\-]+\/\S+|[\w.\-]+\/\S+)\s+(v\d\S*)/;
+
+const ECOSYSTEMS: Ecosystem[] = [
+	{
+		// npm / yarn / pnpm
+		isManifest: (b) => b === "package.json",
+		lockfiles: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json"],
+		parse: (line) => {
+			const m = reJsonDep.exec(line);
+			if (!m) return null;
+			// Skip the package's own scalar fields (name/version/etc.) so we only surface dependency-block edits.
+			if (NPM_NON_DEP_KEYS.has(m[1].toLowerCase())) return null;
+			return { name: m[1], constraint: m[2] };
+		},
+	},
+	{
+		// Rust Cargo
+		isManifest: (b) => b === "cargo.toml",
+		lockfiles: ["Cargo.lock"],
+		parse: (line) => {
+			const m = reTomlDep.exec(line);
+			if (!m) return null;
+			return { name: m[1], constraint: m[2] ?? m[3] ?? "" };
+		},
+	},
+	{
+		// Python requirements
+		isManifest: (b) => b === "requirements.txt" || b.endsWith(".requirements.txt"),
+		lockfiles: ["requirements.lock", "Pipfile.lock", "poetry.lock", "uv.lock"],
+		parse: (line) => {
+			const t = line.trim();
+			if (t === "" || t.startsWith("#") || t.startsWith("-")) return null;
+			const m = reReqDep.exec(t);
+			if (!m) return null;
+			return { name: m[1], constraint: m[2] ?? "" };
+		},
+	},
+	{
+		// Python pyproject (PEP 621 / poetry tables)
+		isManifest: (b) => b === "pyproject.toml",
+		lockfiles: ["poetry.lock", "uv.lock", "pdm.lock"],
+		parse: (line) => {
+			const m = reTomlDep.exec(line);
+			if (!m) return null;
+			return { name: m[1], constraint: m[2] ?? m[3] ?? "" };
+		},
+	},
+	{
+		// Ruby Bundler
+		isManifest: (b) => b === "gemfile",
+		lockfiles: ["Gemfile.lock"],
+		parse: (line) => {
+			const m = reGemDep.exec(line);
+			if (!m) return null;
+			return { name: m[1], constraint: m[2] ?? "" };
+		},
+	},
+	{
+		// Maven — paired artifactId/version handled in the manifest loop, parse() unused for pairing.
+		isManifest: (b) => b === "pom.xml",
+		lockfiles: [],
+		parse: () => null,
+	},
+	{
+		// Gradle (Groovy or Kotlin DSL)
+		isManifest: (b) => b === "build.gradle" || b === "build.gradle.kts",
+		lockfiles: ["gradle.lockfile"],
+		parse: (line) => {
+			const m = reGradleDep.exec(line);
+			if (!m) return null;
+			return { name: m[1], constraint: m[2] };
+		},
+	},
+	{
+		// Swift Package Manager
+		isManifest: (b) => b === "package.swift",
+		lockfiles: ["Package.resolved"],
+		parse: (line) => {
+			const m = reSwiftPkg.exec(line);
+			if (!m) return null;
+			const name = m[1].split("/").pop()?.replace(/\.git$/, "") ?? m[1];
+			// from: => caret-like (loose), exact: => exact, range => loose
+			const constraint = m[2] ? `from:${m[2]}` : m[3] ? `exact:${m[3]}` : m[4] ? `${m[4]}..${m[5]}` : "";
+			return { name, constraint };
+		},
+	},
+	{
+		// Go modules
+		isManifest: (b) => b === "go.mod",
+		lockfiles: ["go.sum"],
+		parse: (line) => {
+			const m = reGoMod.exec(line);
+			if (!m) return null;
+			return { name: m[1], constraint: m[2] };
+		},
+	},
+];
+
+function basenameLower(path: string): string {
+	return (path.split("/").pop() ?? path).toLowerCase();
+}
+
+function ecosystemFor(path: string): Ecosystem | null {
+	const base = basenameLower(path);
+	return ECOSYSTEMS.find((e) => e.isManifest(base)) ?? null;
+}
+
+// Classify the constraint delta for a dependency present on both sides (added + removed for same name).
+function classifyDelta(oldC: string, newC: string): string {
+	const o = oldC.trim();
+	const n = newC.trim();
+	if (o === n) return "BUMPED"; // identical text on both sides is unusual; treat as a noop bump candidate
+	const oExact = !isLoose(o);
+	const nLoose = isLoose(n);
+	if (n === "" && o !== "") return "PIN_DROPPED";
+	if (oExact && nLoose) return "PIN_LOOSENED";
+	return "BUMPED";
+}
+
+// Collect { name -> constraint } from added/removed manifest lines for a single ecosystem file.
+function collectDeps(
+	df: DiffFile,
+	eco: Ecosystem,
+	side: "added" | "removed",
+): Map<string, string> {
+	const out = new Map<string, string>();
+	const lines = side === "added" ? df.addedLines : df.removedLines;
+	for (const [, content] of lines) {
+		const parsed = eco.parse(content);
+		if (parsed) out.set(parsed.name, parsed.constraint);
+	}
+	return out;
+}
+
+// Maven needs pairing of <artifactId>/<version> across adjacent lines; handle it on its own.
+function collectMavenDeps(df: DiffFile, side: "added" | "removed"): Map<string, string> {
+	const out = new Map<string, string>();
+	const lines = side === "added" ? df.addedLines : df.removedLines;
+	const ordered = [...lines.entries()].sort((a, b) => a[0] - b[0]);
+	let pendingName: string | null = null;
+	for (const [, content] of ordered) {
+		const a = reMvnArtifact.exec(content);
+		if (a) {
+			pendingName = a[1];
+			out.set(a[1], ""); // record artifact even if no adjacent version line appears
+			continue;
+		}
+		const v = reMvnVersion.exec(content);
+		if (v && pendingName) {
+			out.set(pendingName, v[1]);
+			pendingName = null;
+		}
+	}
+	return out;
+}
+
+export default async function (repoPath: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+	const hints: Hint[] = [];
+	const changedManifests = new Set<string>();
+	const touchedLockfiles = new Set<string>();
+	let depsAdded = 0;
+	let depsRemoved = 0;
+	let pinsLoosened = 0;
+	let pinsDropped = 0;
+	let bumped = 0;
+
+	// Which lockfile basenames exist anywhere in the repo (sibling-present fact)?
+	const allLockfileNames = new Set(ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())));
+	const repoLockfilesPresent = new Set<string>();
+	// findFiles needs an extension; scan the basenames we care about via their extensions.
+	for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
+		for (const f of await findFiles(repoPath, ext)) {
+			const base = basenameLower(f);
+			if (allLockfileNames.has(base)) repoLockfilesPresent.add(base);
+		}
+	}
+
+	for (const [path, df] of diffFiles) {
+		const base = basenameLower(path);
+		if (allLockfileNames.has(base)) {
+			touchedLockfiles.add(base);
+			continue;
+		}
+		const eco = ecosystemFor(path);
+		if (!eco) continue;
+		changedManifests.add(path);
+
+		const isMaven = base === "pom.xml";
+		const added = isMaven ? collectMavenDeps(df, "added") : collectDeps(df, eco, "added");
+		const removed = isMaven ? collectMavenDeps(df, "removed") : collectDeps(df, eco, "removed");
+
+		// helper to find the diff line for a dependency name on a given side (for hint placement).
+		const lineFor = (name: string, side: "added" | "removed"): number => {
+			const lines = side === "added" ? df.addedLines : df.removedLines;
+			for (const [ln, content] of lines) if (content.includes(name)) return ln;
+			return 0;
+		};
+
+		const allNames = new Set<string>([...added.keys(), ...removed.keys()]);
+		for (const name of allNames) {
+			const inAdded = added.has(name);
+			const inRemoved = removed.has(name);
+			let fact: string;
+			let side: "added" | "removed" = "added";
+			if (inAdded && !inRemoved) {
+				fact = "ADDED";
+				depsAdded++;
+			} else if (!inAdded && inRemoved) {
+				fact = "REMOVED";
+				side = "removed";
+				depsRemoved++;
+			} else {
+				fact = classifyDelta(removed.get(name) ?? "", added.get(name) ?? "");
+				if (fact === "PIN_LOOSENED") pinsLoosened++;
+				else if (fact === "PIN_DROPPED") pinsDropped++;
+				else bumped++;
+			}
+			const oldC = removed.get(name) ?? "";
+			const newC = added.get(name) ?? "";
+			const ctx =
+				fact === "ADDED"
+					? `+ ${name} ${newC}`.trim()
+					: fact === "REMOVED"
+						? `- ${name} ${oldC}`.trim()
+						: `${name}: ${oldC} -> ${newC}`;
+			hints.push({
+				file: path,
+				line: lineFor(name, side),
+				pattern: `dep:${fact}`,
+				context: ctx.slice(0, 160),
+				inDiff: true,
+				flags: { ecosystem: base, dependency: name },
+			});
+		}
+	}
+
+	const lockfilePresent = repoLockfilesPresent.size > 0 || touchedLockfiles.size > 0;
+
+	const directions: string[] = [];
+	if (changedManifests.size > 0) {
+		directions.push(
+			`Dependency manifest(s) changed (${changedManifests.size}): ${depsAdded} added, ${depsRemoved} removed, ${pinsLoosened} pin(s) loosened, ${pinsDropped} pin(s) dropped, ${bumped} version bump(s) — investigate whether each constraint change is deliberate and appropriately bounded.`,
+		);
+		if (!lockfilePresent) {
+			directions.push(
+				"No sibling lockfile is present in the repo and none was touched in the diff — investigate whether the ecosystem expects a committed lockfile to make the resolved versions reproducible.",
+			);
+		} else if (touchedLockfiles.size === 0) {
+			directions.push(
+				"A lockfile exists in the repo but was not updated in this diff — investigate whether the manifest change should have a matching lockfile update.",
+			);
+		}
+	}
+
+	return {
+		hints: hints.slice(0, 40),
+		metrics: {
+			manifestsChanged: changedManifests.size,
+			depsAdded,
+			depsRemoved,
+			pinsLoosened,
+			pinsDropped,
+			bumped,
+			lockfilesTouched: touchedLockfiles.size,
+			lockfilePresent: lockfilePresent ? 1 : 0,
+		},
+		directions,
+	};
+}
