@@ -17,6 +17,13 @@
    in the diff at all). NA "for insufficient coverage / I have not read the diff" is a BUG — you have a multi-minute budget;
    spend it reading. If a precompute hint OR a prior review note names a specific `file:line`, you MUST open that exact hunk
    and evaluate it before deciding — quoting a hint and then abstaining for not reading it is forbidden.
+   **Reconcile with the precompute (MANDATORY).** When this practice's precompute surfaced one or more candidate hints
+   (a crash construct, a boundary/edge site, an insecure-default candidate, a debug-output trace, a duplicated block),
+   you may NOT emit NOT_APPLICABLE without addressing EVERY hint by `file:line`: either flag it (NOT_OBSERVED) or state the
+   specific invariant that makes that exact line safe. Writing "no such construct is present" / "no force-unwrap" / "no
+   untrusted input" while a hint named one is a FORBIDDEN contradiction with the facts you were handed — the hint is the
+   evidence; explain it, do not deny it. (Hints are candidates, not verdicts: a hint you can show is safe is a legitimate
+   reason to NOT flag THAT line — but you must show it, per `file:line`, not wave the whole practice to NA.)
 3. **Verdict trichotomy — a present, well-handled surface is OBSERVED, never NA.** For a practice whose subject IS present in
    the change, the verdict is OBSERVED (handled in an exemplary, above-bar way) or NOT_OBSERVED (a defect) — NOT NOT_APPLICABLE.
    NA is reserved for a surface that is genuinely ABSENT (no error-handling site in the diff, no security/untrusted-input
