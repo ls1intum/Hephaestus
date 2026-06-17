@@ -294,6 +294,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockGitlabResponse(String noteId) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        lenient().when(response.getErrors()).thenReturn(List.of());
         ClientResponseField idField = mock(ClientResponseField.class);
         when(response.field("createNote.note.id")).thenReturn(idField);
         when(idField.getValue()).thenReturn(noteId);
@@ -301,5 +302,32 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         lenient().when(response.field("createNote.errors")).thenReturn(errorsField);
         lenient().when(errorsField.getValue()).thenReturn(List.of());
         return response;
+    }
+
+    @Test
+    void postSummarySurfacesTopLevelError() {
+        // A read-only GitLab instance returns NO createNote payload, only a top-level GraphQL error. The
+        // channel must surface that reason — not a generic "No note ID" — so the failure is diagnosable.
+        FeedbackTarget target = gitlabTarget();
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
+            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
+        );
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        ResponseError readOnly = mock(ResponseError.class);
+        when(readOnly.getMessage()).thenReturn("You cannot perform write operations on a read-only instance");
+        when(response.getErrors()).thenReturn(List.of(readOnly));
+        when(spec.execute()).thenReturn(Mono.just(response));
+
+        assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
+            .isInstanceOf(FeedbackDeliveryException.class)
+            .hasMessageContaining("read-only instance");
     }
 }

@@ -108,6 +108,20 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
             throw new FeedbackDeliveryException("Null response from createNote mutation");
         }
 
+        // Surface TOP-LEVEL GraphQL errors with their real reason — createNote returns no payload at all when
+        // the instance is read-only ("You cannot perform write operations on a read-only instance"), the gid is
+        // unresolvable, or permission is denied. Without this the caller only saw a generic "No note ID",
+        // which hid a transient read-only window behind what looked like a hard failure.
+        List<String> topLevelErrors = response
+            .getErrors()
+            .stream()
+            .map(e -> e.getMessage())
+            .filter(Objects::nonNull)
+            .toList();
+        if (!topLevelErrors.isEmpty()) {
+            throw new FeedbackDeliveryException("GitLab createNote failed: " + topLevelErrors);
+        }
+
         List<String> mutationErrors = response.field("createNote.errors").getValue();
         if (mutationErrors != null && !mutationErrors.isEmpty()) {
             throw new FeedbackDeliveryException("GitLab createNote failed: " + mutationErrors);
