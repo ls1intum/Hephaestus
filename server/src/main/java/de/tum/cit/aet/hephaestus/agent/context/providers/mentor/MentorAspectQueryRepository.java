@@ -215,4 +215,47 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
         @Param("since") Instant since,
         org.springframework.data.domain.Pageable page
     );
+
+    /**
+     * The developer's own authored PULL REQUESTS in the workspace, newest first — the work itself (not
+     * findings about it), so the mentor has a concrete, linkable inventory of what they shipped. Same
+     * author + RepositoryToMonitor scoping as {@link #findReviewsReceivedSince}. {@code FROM PullRequest}
+     * narrows to the PR discriminator (single-table inheritance), so issues never leak in.
+     */
+    @Query(
+        """
+        SELECT p
+        FROM PullRequest p
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
+        WHERE p.author.id = :userId
+          AND rtm.workspace.id = :workspaceId
+        ORDER BY p.createdAt DESC
+        """
+    )
+    List<PullRequest> findRecentAuthoredPullRequests(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        org.springframework.data.domain.Pageable page
+    );
+
+    /**
+     * The developer's own authored ISSUES (excluding PRs via {@code TYPE(i) = Issue}) in the workspace,
+     * newest first. Companion to {@link #findRecentAuthoredPullRequests}.
+     */
+    @Query(
+        """
+        SELECT i
+        FROM Issue i
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
+        WHERE i.author.id = :userId
+          AND rtm.workspace.id = :workspaceId
+          AND TYPE(i) = Issue
+        ORDER BY i.createdAt DESC
+        """
+    )
+    List<Issue> findRecentAuthoredIssues(
+        @Param("workspaceId") Long workspaceId,
+        @Param("userId") Long userId,
+        org.springframework.data.domain.Pageable page
+    );
 }

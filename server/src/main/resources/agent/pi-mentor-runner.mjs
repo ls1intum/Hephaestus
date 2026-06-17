@@ -97,7 +97,7 @@ const TURN_GRACE_MS = (() => {
 // callback even leaves the runner. This is a defence-in-depth check; the authoritative
 // whitelist lives Java-side in MentorAspects.ALLOWED_OUTPUT_KEYS (full-key match against
 // the aspect providers' OUTPUT_KEY constants). Keep this set aligned with the
-// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding,DeliveredFeedback}AspectProvider basenames.
+// {User,Workspace,PracticeCatalog,FindingsHistory,PracticeStanding,DeliveredFeedback,RecentAuthoredWork}AspectProvider basenames.
 const FETCH_CONTEXT_ALLOWED = new Set([
     "workspace.json",
     "user.json",
@@ -105,6 +105,7 @@ const FETCH_CONTEXT_ALLOWED = new Set([
     "findings_history.json",
     "practice_standing.json",
     "delivered_feedback.json",
+    "recent_authored_work.json",
 ]);
 
 // JSON-RPC error codes
