@@ -896,6 +896,82 @@ export type RenameWorkspaceSlugRequest = {
 };
 
 /**
+ * A developer's readable feedback for one practice
+ */
+export type ReflectionPractice = {
+    /**
+     * Area name this practice belongs to, if any
+     */
+    areaName?: string;
+    /**
+     * Area slug this practice belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice
+     */
+    standing: 'NEEDS_WORK' | 'STRENGTH' | 'MIXED';
+    /**
+     * What the developer already does well here
+     */
+    strengths: Array<ReflectionItem>;
+    /**
+     * Specific feedback to act on (highest-impact first)
+     */
+    toWorkOn: Array<ReflectionItem>;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * A single piece of practice feedback to read and act on
+ */
+export type ReflectionItem = {
+    /**
+     * Id of the PR / issue this is about
+     */
+    artifactId: number;
+    /**
+     * The kind of work this is about (PR / issue)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Finding id — handle to open the full detail
+     */
+    findingId: string;
+    /**
+     * What to do about it, in plain language
+     */
+    guidance?: string;
+    /**
+     * Where in the work, e.g. "FrameRecorder.swift:212", when known
+     */
+    locator?: string;
+    /**
+     * Impact level
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The headline of the feedback
+     */
+    title: string;
+};
+
+/**
  * Detailed information about a pull request
  */
 export type PullRequestInfo = {
@@ -4504,6 +4580,27 @@ export type GetFindingsForPullRequestResponses = {
 };
 
 export type GetFindingsForPullRequestResponse = GetFindingsForPullRequestResponses[keyof GetFindingsForPullRequestResponses];
+
+export type GetReflectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/reflection';
+};
+
+export type GetReflectionResponses = {
+    /**
+     * Per-practice reflection cards returned
+     */
+    200: Array<ReflectionPractice>;
+};
+
+export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
 
 export type GetSummaryData = {
     body?: never;
