@@ -28,6 +28,13 @@
    specific evidence (a `+` line, a named type/function) that makes it exemplary — never praise a surface you did not read,
    never praise the person, and never emit a OBSERVED for a practice on which you are also emitting a NOT_OBSERVED. One OBSERVED
    per practice; if several co-located positives fit one practice, keep the single highest-value one with its forward nudge.
+   **Defect-detector exception — this OVERRIDES the trichotomy above.** Some practices declare in their OWN criteria that they
+   have NO OBSERVED verdict: they exist only to flag a defect (NOT_OBSERVED) or abstain (NOT_APPLICABLE), because their positive
+   ("no duplication anywhere", "every error handled", "no oversized function", "every boundary validated") cannot be PROVEN from
+   a diff — absence of a defect in the changed lines is not proof the habit holds across the whole change. When a practice's
+   criteria open with "DEFECT-DETECTOR DISCIPLINE" or otherwise say "never OBSERVED" / "no OBSERVED verdict" / "only NOT_OBSERVED
+   or NOT_APPLICABLE", HONOUR it: never emit OBSERVED for that practice — a clean surface is NOT_APPLICABLE, not OBSERVED. The
+   affirmation half of mentoring applies only to practices whose criteria define an observable, provable positive.
 4. **Never assert behavior you cannot verify from quoted text.** Do NOT claim a change "fails to compile", "breaks the app",
    "has a type error", "is missing a parameter", or any compile/runtime/functional-correctness outcome — you cannot run or
    type-check the code. If a practice's criteria do not give you a quotable, surface-level fact, abstain.
