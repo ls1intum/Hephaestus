@@ -21,6 +21,17 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	const isDiscussion =
 		labels.some((l) => /support|question|discussion/.test(l)) || (/\?\s*$/.test(title) && body.length < 120);
 
+	// Empty-or-title-echo gate — the SAME blunt classification fact the well-engineered sibling
+	// (issue-has-checkable-outcome) keys its verdict off. When the body carries no content of its own, there is
+	// NO deliverable to scope, so the practice is NOT_APPLICABLE — never OBSERVED off the title alone. Kept
+	// byte-aligned with the sibling's computation on purpose (precompute scripts ship as standalone DB rows).
+	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+	const titleNorm = norm(title);
+	const bodyNorm = norm(body);
+	const titleEcho =
+		bodyNorm.length > 0 && (bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
+	const emptyOrTitleEcho = body.length < 25 || titleEcho;
+
 	const checkboxes = (body.match(/^[\s>]*[-*]\s+\[[ xX]\]/gm) ?? []).length;
 	const childRefs = new Set((body.match(/(^|\s)#\d+\b/g) ?? []).map((s) => s.trim())).size;
 	const andAlso = (body.match(/\b(and also|additionally|as well as|plus,|also,)\b/gi) ?? []).length;
@@ -31,7 +42,11 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	const headingSections = (body.match(/^#{1,4}\s+\S/gm) ?? []).length;
 
 	const directions: string[] = [];
-	if (isStub)
+	if (emptyOrTitleEcho)
+		directions.push(
+			`Classification fact: body is empty or merely echoes the title (emptyOrTitleEcho=1) — there is NO quotable deliverable to scope; this practice is NOT_APPLICABLE, never OBSERVED off the title alone.`,
+		);
+	else if (isStub)
 		directions.push(
 			`Body is ${body.length} chars — no quotable deliverable span to scope for single-vs-multi concern.`,
 		);
@@ -49,6 +64,7 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 		metrics: {
 			bodyLength: body.length,
 			isStub: isStub ? 1 : 0,
+			emptyOrTitleEcho: emptyOrTitleEcho ? 1 : 0,
 			isDiscussion: isDiscussion ? 1 : 0,
 			checkboxes,
 			childIssueRefs: childRefs,

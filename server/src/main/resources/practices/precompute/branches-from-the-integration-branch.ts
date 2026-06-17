@@ -14,6 +14,10 @@ export default async function (_r: string, _d: Map<string, DiffFile>, meta: Pull
 		directions.push(
 			`This PR targets '${meta.target_branch}', which is not a conventional integration branch (main/master/dev/develop) — investigate whether the branch was cut from the integration branch or stacked on another feature branch.`,
 		);
+	} else if (targetIsIntegration) {
+		directions.push(
+			`This PR targets '${meta.target_branch}', a conventional integration branch — the concrete off-integration signal is FALSE. Emit NOT_APPLICABLE with reason 'target is an integration branch'; do NOT claim git history is unavailable (the full clone IS mounted at inputs/sources/scm/repo).`,
+		);
 	}
 	if (prCommitCount >= 8) {
 		directions.push(

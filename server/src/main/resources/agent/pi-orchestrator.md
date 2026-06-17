@@ -42,6 +42,13 @@
    criteria open with "DEFECT-DETECTOR DISCIPLINE" or otherwise say "never OBSERVED" / "no OBSERVED verdict" / "only NOT_OBSERVED
    or NOT_APPLICABLE", HONOUR it: never emit OBSERVED for that practice — a clean surface is NOT_APPLICABLE, not OBSERVED. The
    affirmation half of mentoring applies only to practices whose criteria define an observable, provable positive.
+
+   **Review-thread exception — the diff is NOT the surface.** Review-thread practices (`reviews-substantively-with-understanding`,
+   `reviews-respectfully-asks-rather-than-demands`, `leaves-useful-specific-review-comments`, `engaging-with-inline-review-comments`)
+   judge REVIEWER ACTIVITY, not the changed code. A large diff is NEVER their surface, and "a big PR got little review" is NOT by
+   itself a finding. If `review_threads.json` shows `reviewDecisions=[]` (no APPROVED reviewer decision) and no substantive reviewer
+   comment survives the author-exclusion filter, emit NOT_APPLICABLE — a not-yet-reviewed or draft/OPEN PR is never a substandard
+   review. Do NOT let the size of the change flip this to NOT_OBSERVED.
 4. **Never assert behavior you cannot verify from quoted text.** Do NOT claim a change "fails to compile", "breaks the app",
    "has a type error", "is missing a parameter", or any compile/runtime/functional-correctness outcome — you cannot run or
    type-check the code. If a practice's criteria do not give you a quotable, surface-level fact, abstain.
