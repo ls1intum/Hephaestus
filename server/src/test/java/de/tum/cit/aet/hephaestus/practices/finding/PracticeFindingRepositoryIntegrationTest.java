@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
@@ -594,6 +595,83 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 detectedAt
             );
+        }
+    }
+
+    @Nested
+    class FindSummaryDashboardDedupTests {
+
+        private AgentJob anotherJob() {
+            AgentJob job = new AgentJob();
+            job.setWorkspace(workspace);
+            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            return agentJobRepository.save(job);
+        }
+
+        private void insertForJob(String key, UUID jobId, long artifactId, String verdict, Instant detectedAt) {
+            practiceFindingRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                jobId,
+                practice.getId(),
+                null,
+                "PULL_REQUEST",
+                artifactId,
+                developer.getId(),
+                developer.getId(),
+                "finding",
+                verdict,
+                "INFO",
+                0.9f,
+                null,
+                null,
+                null,
+                null,
+                detectedAt
+            );
+        }
+
+        @Test
+        @DisplayName("dashboard summary counts only the latest run per target (re-review dedup)")
+        void countsOnlyLatestRunPerArtifact() {
+            // The SAME target (PR 42) reviewed twice: an earlier run said NOT_OBSERVED, a later run said OBSERVED.
+            // A naive COUNT would show 2 findings (1 observed, 1 not-observed); the dashboard must show the
+            // target's CURRENT state only — 1 finding, observed.
+            AgentJob laterJob = anotherJob();
+            insertForJob("dedup-old", agentJob.getId(), 42L, "NOT_OBSERVED", Instant.parse("2026-03-18T10:00:00Z"));
+            insertForJob("dedup-new", laterJob.getId(), 42L, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
+
+            List<DeveloperPracticeSummaryProjection> result =
+                practiceFindingRepository.findSummaryByDeveloperAndWorkspace(developer.getId(), workspace.getId());
+
+            assertThat(result).hasSize(1);
+            DeveloperPracticeSummaryProjection row = result.get(0);
+            assertThat(row.getPracticeSlug()).isEqualTo("test-practice");
+            assertThat(row.getTotalFindings()).isEqualTo(1L);
+            assertThat(row.getObservedCount()).isEqualTo(1L);
+            assertThat(row.getNotObservedCount()).isEqualTo(0L);
+            assertThat(row.getLastFindingAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
+        }
+
+        @Test
+        @DisplayName("each distinct target contributes its own latest run")
+        void countsEachTargetIndependently() {
+            // Target 42 reviewed twice (latest = OBSERVED); target 43 reviewed once (NOT_OBSERVED). The dedup is
+            // per-target, so the older run survives for 43 while only the newer run survives for 42.
+            AgentJob laterJob = anotherJob();
+            insertForJob("t42-old", agentJob.getId(), 42L, "NOT_OBSERVED", Instant.parse("2026-03-18T10:00:00Z"));
+            insertForJob("t42-new", laterJob.getId(), 42L, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
+            insertForJob("t43", agentJob.getId(), 43L, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
+
+            List<DeveloperPracticeSummaryProjection> result =
+                practiceFindingRepository.findSummaryByDeveloperAndWorkspace(developer.getId(), workspace.getId());
+
+            assertThat(result).hasSize(1);
+            DeveloperPracticeSummaryProjection row = result.get(0);
+            assertThat(row.getTotalFindings()).isEqualTo(2L);
+            assertThat(row.getObservedCount()).isEqualTo(1L);
+            assertThat(row.getNotObservedCount()).isEqualTo(1L);
         }
     }
 

@@ -135,23 +135,43 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     );
 
     /**
-     * Per-practice aggregation: verdict counts and last finding date for a developer.
+     * Per-practice aggregation for the developer dashboard: verdict counts and last finding date.
+     *
+     * <p><b>Re-review dedup (ADR 0021):</b> a target gets re-detected on every push, and every run writes a
+     * fresh {@link PracticeFinding} row — so a naive {@code COUNT} over all rows inflates the dashboard by the
+     * re-review multiplier (observed ~4× on the live mirror: a PR reviewed four times showed four times the
+     * findings). The dashboard must reflect each target's CURRENT state, so this query keeps only the findings
+     * from each target's LATEST detection run ({@code agent_job_id} with the most recent {@code detected_at}
+     * for that {@code (artifact_type, artifact_id)}). Superseded runs no longer count toward the habit signal.
+     *
+     * <p>Native (not JPQL) because the latest-run-per-target selection needs {@code ORDER BY ... LIMIT 1} in a
+     * correlated subquery, which JPQL cannot express. Aliases are quoted so the JDBC column labels match the
+     * {@link DeveloperPracticeSummaryProjection} getters exactly (Postgres folds unquoted identifiers to
+     * lower-case). Enum columns compare against their {@code STRING} storage form.
      */
     @Query(
-        """
-        SELECT p.slug AS practiceSlug,
-               p.name AS practiceName,
-               COUNT(f) AS totalFindings,
-               SUM(CASE WHEN f.verdict = de.tum.cit.aet.hephaestus.practices.model.Observation.OBSERVED THEN 1L ELSE 0L END) AS observedCount,
-               SUM(CASE WHEN f.verdict = de.tum.cit.aet.hephaestus.practices.model.Observation.NOT_OBSERVED THEN 1L ELSE 0L END) AS notObservedCount,
-               MAX(f.detectedAt) AS lastFindingAt
-        FROM PracticeFinding f
-        JOIN f.practice p
-        WHERE f.developer.id = :developerId
-        AND p.workspace.id = :workspaceId
+        value = """
+        SELECT p.slug AS "practiceSlug",
+               p.name AS "practiceName",
+               COUNT(f.id) AS "totalFindings",
+               SUM(CASE WHEN f.verdict = 'OBSERVED' THEN 1 ELSE 0 END) AS "observedCount",
+               SUM(CASE WHEN f.verdict = 'NOT_OBSERVED' THEN 1 ELSE 0 END) AS "notObservedCount",
+               MAX(f.detected_at) AS "lastFindingAt"
+        FROM practice_finding f
+        JOIN practice p ON p.id = f.practice_id
+        WHERE f.developer_id = :developerId
+          AND p.workspace_id = :workspaceId
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM practice_finding f2
+              WHERE f2.artifact_type = f.artifact_type
+                AND f2.artifact_id = f.artifact_id
+              ORDER BY f2.detected_at DESC
+              LIMIT 1
+          )
         GROUP BY p.slug, p.name
         ORDER BY p.name ASC
-        """
+        """,
+        nativeQuery = true
     )
     List<DeveloperPracticeSummaryProjection> findSummaryByDeveloperAndWorkspace(
         @Param("developerId") Long developerId,
