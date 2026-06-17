@@ -44,6 +44,11 @@ const SOURCES: Record<string, Array<[string, RegExp]>> = {
 	csharp: [
 		["Request fields", /\bRequest\.(Query|Form|Headers|Cookies|Body|QueryString)\b/],
 	],
+	swift: [
+		["URLSession / response data", /\bURLSession\b|\.dataTask\b|\bdata\s*\(\s*for\s*:/],
+		["request header / URL component", /\.value\s*\(\s*forHTTPHeaderField|\bURLComponents\b|\.queryItems\b/],
+		["UserDefaults / FileManager / env", /\b(UserDefaults\.standard|FileManager\.default|ProcessInfo\.processInfo\.environment)\b/],
+	],
 };
 
 // Sinks: dangerous operations that must receive validated/escaped input (SQL, command/eval, markup, path,
@@ -52,7 +57,7 @@ const SINKS: Record<string, Array<[string, RegExp]>> = {
 	all: [
 		["raw SQL string-concat", /\b(SELECT|INSERT|UPDATE|DELETE|WHERE|FROM)\b[^;]*(\+|\$\{|%s|f["']|`|\|\||\.\.)/i],
 		["eval", /\beval\s*\(/],
-		["exec / shell", /\b(exec|execSync|execve|spawn|popen|os\.system|subprocess\.(call|run|Popen)|shell_exec|system)\s*\(/],
+		["exec / shell", /\b(exec|execSync|execve|spawn|popen|os\.system|subprocess\.(call|run|Popen)|shell_exec)\s*\(|(?<![.\w])system\s*\(/],
 		["deserialize", /\b(pickle\.loads|yaml\.load\b|Marshal\.load|unserialize|JSON\.parse|deserialize)\s*\(/i],
 		["template render", /\b(render(_template)?|template|Mustache|Handlebars|Jinja|ejs)\b/i],
 		["path join with input", /\b(path\.join|os\.path\.join|filepath\.Join|Paths\.get|File\s*\()/],
@@ -77,6 +82,12 @@ const SINKS: Record<string, Array<[string, RegExp]>> = {
 		["SqlCommand concat", /\bnew\s+SqlCommand\b/],
 		["Html.Raw", /\bHtml\.Raw\s*\(/],
 	],
+	swift: [
+		["WKWebView loadHTMLString / evaluateJavaScript", /\b(loadHTMLString|evaluateJavaScript)\s*\(/],
+		["sqlite3 exec/prepare", /\bsqlite3_(exec|prepare(_v2)?)\s*\(/],
+		["Process / shell launch", /\bProcess\s*\(\)|\.launchPath\b|\blaunch\s*\(\)/],
+		["NSExpression / String(format:)", /\bNSExpression\b|\bString\s*\(\s*format\s*:/],
+	],
 };
 
 // extension -> language key (drives which SOURCES/SINKS rows refine the "all" set).
@@ -88,6 +99,7 @@ const EXT_LANG: Record<string, string> = {
 	rb: "ruby",
 	php: "php",
 	cs: "csharp",
+	swift: "swift",
 };
 
 // Sources and sinks co-occurring within this many added lines are surfaced as a candidate flow.
