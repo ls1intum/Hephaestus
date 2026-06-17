@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -169,6 +170,7 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         ClientResponseField errorsField = mock(ClientResponseField.class);
         lenient().when(response.field("updateNote.errors")).thenReturn(errorsField);
         lenient().when(errorsField.getValue()).thenReturn(List.of());
+        when(response.getErrors()).thenReturn(List.of());
         when(spec.execute()).thenReturn(Mono.just(response));
 
         FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
@@ -245,10 +247,44 @@ class GitlabFeedbackChannelTest extends BaseUnitTest {
         when(client.documentName(any())).thenReturn(spec);
         when(spec.variable(any(), any())).thenReturn(spec);
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        when(response.getErrors()).thenReturn(List.of());
         ClientResponseField errorsField = mock(ClientResponseField.class);
         when(response.field("updateNote.errors")).thenReturn(errorsField);
         when(errorsField.getValue()).thenReturn(errors);
         when(spec.execute()).thenReturn(Mono.just(response));
+    }
+
+    /**
+     * A deleted note has no {@code updateNote} payload at all — GitLab reports it as a TOP-LEVEL GraphQL error
+     * (the global id resolves to nothing). This is the orphaned-summary case observed live after a mirror
+     * re-import; it MUST classify as GONE so the caller re-posts a fresh summary rather than silently dropping it.
+     */
+    @Test
+    void updateSummaryReturnsGoneOnTopLevelNotFoundError() {
+        FeedbackTarget target = gitlabTarget();
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitLabProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        ResponseError notFound = mock(ResponseError.class);
+        when(notFound.getMessage()).thenReturn(
+            "The resource that you are attempting to access does not exist or you don't have permission to perform this action"
+        );
+        when(response.getErrors()).thenReturn(List.of(notFound));
+        when(spec.execute()).thenReturn(Mono.just(response));
+
+        FeedbackChannel.UpdateOutcome outcome = channel.updateSummary(
+            target,
+            "gid://gitlab/Note/4825166",
+            new FeedbackContent("body", "marker")
+        );
+
+        assertThat(outcome.kind()).isEqualTo(FeedbackChannel.UpdateOutcome.Kind.GONE);
     }
 
     private static FeedbackTarget gitlabTarget() {
