@@ -168,10 +168,15 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
      * subquery for every thread anyway. Joins {@code chat_thread} on {@code workspace_id} so the
      * query refuses cross-tenant ids the caller might pass — defence in depth even though the
      * upstream id list is already user-scoped.
+     *
+     * <p>{@code m.parts::text} casts the {@code jsonb} column to text so the projection element is a plain
+     * String the caller parses with {@code readTree}. Selecting the raw {@code jsonb} into an untyped
+     * {@code Object[]} made Hibernate apply its JSON Java-type and throw "JSON deserialize failed for String
+     * … from Array" — which silently degraded the whole prior-conversation aspect to empty.
      */
     @Query(
         value = """
-        SELECT DISTINCT ON (m.thread_id) m.thread_id, m.parts
+        SELECT DISTINCT ON (m.thread_id) m.thread_id, m.parts::text
           FROM chat_message m
           JOIN chat_thread t ON t.id = m.thread_id
          WHERE m.thread_id IN (:threadIds)

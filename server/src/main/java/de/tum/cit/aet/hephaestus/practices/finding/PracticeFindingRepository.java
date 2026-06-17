@@ -266,6 +266,12 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
      * mentor doesn't see (and re-litigate) the same finding four times. Native because the latest-run
      * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
      * per finding (bounded by the page size) rather than JOIN-fetched.
+     *
+     * <p>{@code NOT_APPLICABLE} is excluded: it dominated the list (~59% on the live mirror, all
+     * "no change needed / awaiting review" rows) and spent the page budget on findings the mentor cannot
+     * coach from, burying the actionable {@code NOT_OBSERVED} defects and {@code OBSERVED} strengths. The
+     * NA total still reaches the mentor via the verdict-count summary; this is the drill-down list only,
+     * and stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
      */
     @Query(
         value = """
@@ -274,6 +280,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         WHERE f.developer_id = :developerId
           AND p.workspace_id = :workspaceId
           AND f.detected_at >= :since
+          AND f.verdict <> 'NOT_APPLICABLE'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM practice_finding f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
