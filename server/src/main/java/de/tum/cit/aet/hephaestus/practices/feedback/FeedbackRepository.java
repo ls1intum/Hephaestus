@@ -30,6 +30,30 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     boolean existsByAgentJobIdAndUnitOrdinal(UUID agentJobId, Integer unitOrdinal);
 
     /**
+     * The feedback a developer actually RECEIVED in a workspace — only units that reached a surface
+     * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback aspect so the coach
+     * references the exact words the student saw ({@link Feedback#getRenderedBody()}) instead of
+     * reconstructing from raw pre-delivery findings (which may have been suppressed, superseded, or never
+     * postable). Bounded by the caller's {@code Pageable}.
+     */
+    @Query(
+        """
+        SELECT f FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+          AND f.deliveredAt >= :since
+        ORDER BY f.deliveredAt DESC
+        """
+    )
+    List<Feedback> findRecentDeliveredForRecipient(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("since") java.time.Instant since,
+        org.springframework.data.domain.Pageable pageable
+    );
+
+    /**
      * The current (not-yet-superseded) delivery for a continuity line — the prior unit a re-review
      * supersedes and whose comment it edits in place. There is at most one live row per key by
      * construction (each new delivery flips the previous to {@code SUPERSEDED}).
