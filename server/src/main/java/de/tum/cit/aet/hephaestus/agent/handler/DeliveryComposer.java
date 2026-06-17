@@ -562,7 +562,14 @@ class DeliveryComposer {
             "\\bcombined\\s+severity\\b|\\bmost\\s+severe\\s+sub-result\\b|" +
             "\\bcarve-out\\b|" +
             "\\bthreshold\\s+for\\s+downgrade\\b|\\b\\d+%\\s+threshold\\b|" +
-            "\\bis\\s+(?:MINOR|MAJOR|INFO|CRITICAL),?\\s+not\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "is MINOR, not MAJOR"
+            "\\bis\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\s*(?:\\([^)]*\\)\\s*)?,?\\s+not\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "is MINOR, not MAJOR" — tolerate an intervening "(a decomposition nudge)," parenthetical
+            // Verdict-justification phrasings observed leaking verbatim to students (live Obsphera eval): the
+            // grader narrating WHY a verdict/severity landed. Each lesson stands on the title + guidance + the
+            // severity icon without this machinery — drop the whole sentence.
+            "\\bverdict\\s+is\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // "the combined verdict is NOT_OBSERVED" (enum AFTER the noun)
+            "\\bcapped\\s+at\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // severity-cap arithmetic: "even a fully absent rationale would be capped at MINOR"
+            "\\bumbrella\\s+calibration\\b|" + // "Per the umbrella calibration … is MINOR"
+            "\\breason\\s+connective\\b|" + // "no sentence uses a reason connective such as 'so that', 'because' …"
             "\\brollup\\b|" +
             // Pipeline plumbing: internal context/precompute filenames + input-reconciliation narration.
             "\\bdiff_stat\\.txt\\b|\\bdiff_summary\\.md\\b|\\bmetadata\\.(?:body|json)\\b|" +

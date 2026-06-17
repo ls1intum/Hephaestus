@@ -710,6 +710,28 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
+    void sanitizeStudentText_stripsVerdictJustificationLeaks() {
+        // Live Obsphera eval: the grader's verdict/severity JUSTIFICATION leaked verbatim to students — the
+        // developer "watches the rubric get scored" instead of hearing a colleague. Severity is carried by
+        // the icon; these sentences are pure machinery and must drop, while the real lesson survives.
+        String leak =
+            "The body describes what changed but omits the why. Since the change touches only one file, the " +
+            "combined verdict is NOT_OBSERVED at MAJOR. Per the umbrella calibration this is MINOR " +
+            "(a decomposition nudge), not MAJOR. Even a fully absent rationale would be capped at MINOR here. " +
+            "No sentence uses a reason connective such as 'so that', 'because', or 'to avoid'. Add a short " +
+            "Why section that states the problem this change solves.";
+        String clean = DeliveryComposer.sanitizeStudentText(leak);
+        assertThat(clean).doesNotContain("verdict is NOT_OBSERVED");
+        assertThat(clean).doesNotContain("umbrella calibration");
+        assertThat(clean).doesNotContain("not MAJOR");
+        assertThat(clean).doesNotContain("capped at MINOR");
+        assertThat(clean).doesNotContain("reason connective");
+        // The genuine, actionable feedback survives.
+        assertThat(clean).contains("describes what changed but omits the why");
+        assertThat(clean).contains("Add a short Why section");
+    }
+
+    @Test
     void sanitizeStudentText_preservesMarkdownListAndHeadingNewlines() {
         // Live regression (obsphera CR2, 2026-06-12): a bulleted acceptance-criteria block whose items
         // each end in '.' was collapsed onto one run-on line ("session. - Users can create") because the
