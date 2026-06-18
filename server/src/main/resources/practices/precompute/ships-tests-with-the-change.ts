@@ -9,6 +9,7 @@ const isTest = (p: string) => TEST.test(p);
 
 export default async function (repoPath: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
 	let repoTestFileCount = 0;
+	let repoCodeFileCount = 0;
 	for (const ext of [
 		"swift",
 		"ts",
@@ -30,16 +31,26 @@ export default async function (repoPath: string, diffFiles: Map<string, DiffFile
 		"h",
 		"hpp",
 	]) {
-		repoTestFileCount += (await findFiles(repoPath, ext)).filter(isTest).length;
+		const all = await findFiles(repoPath, ext);
+		repoCodeFileCount += all.length;
+		repoTestFileCount += all.filter(isTest).length;
 	}
 	const changed = [...diffFiles.keys()];
 	const diffTestFiles = changed.filter(isTest).length;
 	const diffProdFiles = changed.filter((f) => !isTest(f) && CODE.test(f)).length;
+	// A repo with literally ZERO source files of ANY kind almost always means the worktree was not
+	// readable by this script (empty/unmounted clone), NOT that the project has no code. In that case
+	// repoTestFileCount=0 is UNRELIABLE and must never be read as "no tests exist".
+	const worktreeVisible = repoCodeFileCount > 0;
 
 	const directions: string[] = [];
-	if (repoTestFileCount === 0) {
+	if (!worktreeVisible) {
 		directions.push(
-			"No test files were found anywhere in the repository — there is no test target, so whether THIS change ships a covering test cannot be assessed here, and a 'tests pass' claim cannot be verified.",
+			"WORKTREE NOT VISIBLE to this script (0 source files of any kind were seen), so repoTestFileCount is UNRELIABLE — it is NOT evidence that tests are missing. Judge test-shipping from the DIFF instead: look for added/changed test files (+/- lines in *Test/*Spec/test_ files) and any test-run claim in the PR body; do not assert 'no tests' from this count.",
+		);
+	} else if (repoTestFileCount === 0) {
+		directions.push(
+			"No test files were found anywhere in the repository (worktree WAS readable) — there is likely no test target, so whether THIS change ships a covering test cannot be assessed here; still confirm against the diff before concluding tests are missing.",
 		);
 	} else if (diffProdFiles > 0 && diffTestFiles === 0) {
 		directions.push(
@@ -50,5 +61,15 @@ export default async function (repoPath: string, diffFiles: Map<string, DiffFile
 			`The change adds/edits ${diffTestFiles} test file(s) alongside ${diffProdFiles} production file(s).`,
 		);
 	}
-	return { hints: [], metrics: { repoTestFileCount, diffProductionFiles: diffProdFiles, diffTestFiles }, directions };
+	return {
+		hints: [],
+		metrics: {
+			repoTestFileCount,
+			repoCodeFileCount,
+			worktreeVisible: worktreeVisible ? 1 : 0,
+			diffProductionFiles: diffProdFiles,
+			diffTestFiles,
+		},
+		directions,
+	};
 }

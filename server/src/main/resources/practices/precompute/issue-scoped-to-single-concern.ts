@@ -3,6 +3,7 @@
 // many referenced child issues. FACTS only (counts + the sub-issue rollup); the LLM decides single vs
 // multi-concern. No verdict.
 import type { Hint } from "../lib/types";
+import { readProjectInventory } from "../lib/context";
 
 interface IssueMeta {
 	title?: string;
@@ -12,7 +13,12 @@ interface IssueMeta {
 	sub_issues_completed?: number;
 }
 
-export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
+export default async function (
+	_repo: string,
+	_diff: Map<string, unknown>,
+	m: IssueMeta,
+	contextDir?: string,
+) {
 	const body = (m.body ?? "").trim();
 	const title = (m.title ?? "").trim();
 	const labels = (m.labels ?? []).map((l) => l.toLowerCase());
@@ -44,7 +50,7 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	const directions: string[] = [];
 	if (emptyOrTitleEcho)
 		directions.push(
-			`Classification fact: body is empty or merely echoes the title (emptyOrTitleEcho=1) — there is NO quotable deliverable to scope; this practice is NOT_APPLICABLE, never OBSERVED off the title alone.`,
+			`Classification fact: body is empty or merely echoes the title (emptyOrTitleEcho=1) — there is NO quotable deliverable to scope. Decide from this fact; do not manufacture a concern from the title alone.`,
 		);
 	else if (isStub)
 		directions.push(
@@ -57,6 +63,17 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	directions.push(
 		`Scope-breadth facts: deliverableVerbMentions=${deliverableVerbs}, andAlsoConjunctions=${andAlso}, headingSections=${headingSections}, childIssueRefs=${childRefs}, subIssuesTotal=${m.sub_issues_total ?? 0}. Multi-concern requires >=2 quotable independently-shippable deliverables — verify in the body, do not infer from counts alone.`,
 	);
+
+	// Cross-artifact fact: how many sibling issues exist. When this issue references several of them, or the
+	// project is large, the scope question includes "should some of these concerns have been (or already are)
+	// separate issues?" — the LLM checks project_inventory.json; this only states the neighbour count.
+	const inventory = await readProjectInventory(contextDir);
+	const siblingIssueCount = inventory?.issues?.length ?? 0;
+	if (siblingIssueCount > 0) {
+		directions.push(
+			`Cross-artifact fact: ${siblingIssueCount} other issue(s) exist in this project (see project_inventory.json). If this issue bundles concerns that overlap separate siblings, that is evidence it is not scoped to a single concern — confirm against the inventory titles, do not infer from the count alone.`,
+		);
+	}
 
 	const hints: Hint[] = [];
 	return {
@@ -72,6 +89,7 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 			deliverableVerbMentions: deliverableVerbs,
 			headingSections,
 			subIssuesTotal: m.sub_issues_total ?? 0,
+			siblingIssueCount,
 		},
 		directions,
 	};

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -54,6 +55,21 @@ class PracticeCatalogInjector {
             .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
             .stream()
             .collect(Collectors.toMap(Practice::getSlug, Practice::getPolarity, (a, b) -> a));
+    }
+
+    /**
+     * The slugs of {@code focus}-scoped active practices that declare {@code DEFECT-DETECTOR DISCIPLINE} in
+     * their criteria — i.e. practices with no legal OBSERVED verdict (a clean surface is NOT_APPLICABLE, never
+     * OBSERVED). The delivery layer uses this to coerce a model-emitted OBSERVED to NOT_APPLICABLE before it
+     * ships to the student as a false strength (see {@code ValidatedFinding#coerceCoherence}).
+     */
+    Set<String> defectDetectorSlugs(Long workspaceId, WorkArtifact focus) {
+        return practiceRepository
+            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
+            .stream()
+            .filter(Practice::isDefectDetector)
+            .map(Practice::getSlug)
+            .collect(Collectors.toSet());
     }
 
     /**

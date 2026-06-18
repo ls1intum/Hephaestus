@@ -174,4 +174,13 @@ public class Practice {
     public void preUpdate() {
         this.updatedAt = Instant.now();
     }
+
+    /**
+     * Whether this practice is a defect-detector — its criteria declare {@code DEFECT-DETECTOR DISCIPLINE}, so it
+     * has no legal OBSERVED verdict (a clean surface is NOT_APPLICABLE, never a strength to endorse). The detection
+     * and delivery layers coerce/suppress accordingly; keeping the rule here keeps it in one place.
+     */
+    public boolean isDefectDetector() {
+        return criteria != null && criteria.contains("DEFECT-DETECTOR DISCIPLINE");
+    }
 }

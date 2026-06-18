@@ -515,7 +515,7 @@ class DeliveryComposer {
      */
     private static final Pattern GRADING_SENTENCE = Pattern.compile(
         "(?i)(" +
-            "\\bthe\\s+practice\\s+(?:requires|defines|expects|mandates|deems|treats|considers|states)\\b|" +
+            "\\bthe\\s+practice\\s+(?:requires|defines|expects|mandates|deems|treats|considers|states|flags)\\b|" +
             "\\b(?:according to|per|under|following|violat\\w+|satisf\\w+|fail\\w*)\\s+the\\s+practice\\b|" +
             "\\b(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
             "\\b(?:for|to|a|an|the)\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
@@ -532,6 +532,8 @@ class DeliveryComposer {
             "\\benriched\\s*[=:]|" +
             "\\b[AUDFN]\\s*\\+\\s*[AUDFN]\\s*==?\\s*\\d|" + // grader bucket arithmetic e.g. A+D=4420 (two-operand)
             "\\b[ADF]\\s*=\\s*\\d{2,}|" + // single multi-digit metric e.g. A=4094, F=28, D=326 (not prose "N = 3")
+            "\\([A-Z]\\s*=\\s*\\d+\\)|" + // a parenthesised counter, e.g. "(T = 13)", "(K = 3)" — criteria scoring vars
+            "\\bgiving\\s+[A-Z]\\s*=\\s*\\d+\\b|" + // "…combine distinct concerns with 'and', giving K = 3"
             "\\b(?:additions?|deletions?|changed[_ ]files?)\\s*[=:]\\s*\\d|" +
             "\\bgenerated/vendored\\s+(?:check|exclusion|dominance)\\b|" +
             "\\bpartition\\s+after\\b|" +
@@ -577,7 +579,15 @@ class DeliveryComposer {
             "\\bafter\\s+scanning\\b|" +
             // Raw snake_case API field tokens reaching prose, e.g. "sub_issues_total is null".
             "\\b[a-z]+(?:_[a-z]+)+\\s+(?:is|are)\\s+(?:null|present|set|empty)\\b|" +
-            "\\bsub_issues_total\\b" +
+            "\\bsub_issues_total\\b|" +
+            // Scoring-machinery leaks confirmed reaching students (gpt-oss):
+            // "noise fraction (2/14 ≈ 0.14) is ≤ 0.25, so the severity is INFO", "is_draft false, no WIP token",
+            // "satisfying the categorizing-label requirement". Each lesson stands on the title + guidance alone.
+            "\\bnoise\\s+fraction\\b|" + // space variant of noiseFraction
+            "\\bseverity\\s+is\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "so the severity is INFO"
+            "[≤≥<>]=?\\s*0?\\.\\d+|" + // a bare ratio threshold comparison, e.g. "≤ 0.25"
+            "\\bis_draft\\b|\\bWIP\\s+token\\b|" + // raw readiness field/token names
+            "\\bsatisf\\w+\\s+the\\s+[\\w-]+\\s+requirement\\b" + // "satisfying the categorizing-label requirement"
             ")"
     );
 
@@ -633,13 +643,6 @@ class DeliveryComposer {
      * never fires on a real code/JSON snippet that simply closes with a brace.
      */
     private static final Pattern ENVELOPE_TAIL = Pattern.compile("[\"'\\\\]*[}\\]][\"'\\\\]+\\s*$");
-
-    /**
-     * Peels a leading {@code "<key>":} (optionally-quoted value) off a metadata-envelope span the agent
-     * sometimes quotes raw. Hoisted to a static field — like the other patterns here — so it is compiled
-     * once rather than per {@link #metadataSnippetText} call.
-     */
-    private static final Pattern METADATA_FIELD = Pattern.compile("\"[A-Za-z_][A-Za-z0-9_]*\"\\s*:\\s*\"?");
 
     /**
      * Repairs the JSON-envelope corruption that occasionally reaches student text: the model terminates a
@@ -905,17 +908,15 @@ class DeliveryComposer {
             if (snippet != null && !containsGraderMechanics(snippet)) {
                 boolean hasCodeLocation = location != null && !isInternalPath(location);
                 if (hasCodeLocation) {
-                    // Real code reference → fenced code block.
+                    // Real code reference → fenced code block. This echo is high-value (shows the offending line).
                     sb.append("You wrote:\n");
                     sb.append("```").append(lang).append("\n").append(snippet).append("\n```\n\n");
-                } else {
-                    // Metadata field (e.g. a title/body span) → plain inline quote, never a ```json fence.
-                    // Skipped entirely when the field cleans to a bare number / JSON punctuation.
-                    String quoted = metadataSnippetText(snippet);
-                    if (!quoted.isBlank()) {
-                        sb.append("You wrote: “").append(quoted).append("”\n\n");
-                    }
                 }
+                // Metadata-field findings (title/body spans, draft/WIP flags) intentionally do NOT echo a
+                // "You wrote: …" quote. The agent's metadata span is frequently a truncated heading, a single
+                // token, a title==body echo, or a serialized boolean ("[Feat", "false", "Analysis Object Model
+                // (AOM)", a mid-sentence body cut) that reads as broken output and leaks raw fields to the
+                // student; it added no value the reasoning + guidance don't already carry.
             }
 
             appendStudentText(sb, f.reasoning());
@@ -941,38 +942,6 @@ class DeliveryComposer {
         if (!clean.isBlank()) {
             sb.append(clean).append("\n\n");
         }
-    }
-
-    /**
-     * Renders a metadata snippet as plain inline text: unwraps a {@code "field" : "value"} JSON span to
-     * just the value, collapses whitespace, and caps the length so the quote stays readable.
-     */
-    private static String metadataSnippetText(String snippet) {
-        String s = snippet.strip();
-        // The agent sometimes quotes a raw span of the metadata.json envelope, dragging JSON field
-        // syntax ("title": "...", "body": "...") into the quote. Peel it off: keep only the text after
-        // the LAST `"<key>":` separator (the field the finding is actually about). This also handles a
-        // cleanly terminated single field, which the prior trailing-anchored regex required.
-        // The leading "<key>": may carry a quoted value ("body": "...") or a bare one ("additions": 2306,
-        // "commits": [ {) — make the opening quote optional so numeric/array fields are peeled too.
-        Matcher field = METADATA_FIELD.matcher(s);
-        int valueStart = -1;
-        while (field.find()) {
-            valueStart = field.end();
-        }
-        if (valueStart >= 0) {
-            s = s.substring(valueStart);
-            // Drop whatever follows this value (the next "," field, a closing }/] brace) and a bare
-            // trailing quote a fully-terminated value leaves behind.
-            s = s.replaceAll("\"?\\s*[,}\\]].*$", "").replaceAll("\"\\s*$", "");
-        }
-        s = s.replace("\\n", " ").replace("\\t", " ").replace("\\\"", "\"").replaceAll("\\s+", " ").strip();
-        // A metadata value that is just a number or JSON punctuation is not worth quoting back to the
-        // developer ("You wrote: 2306" / "You wrote: [ {") — return blank so the caller drops the line.
-        if (s.isBlank() || s.matches("[\\d\\s.,:{}\\[\\]\"]+")) {
-            return "";
-        }
-        return s.length() > 160 ? s.substring(0, 157) + "..." : s;
     }
 
     /** Check if a path is an internal workspace artifact (not student code). */

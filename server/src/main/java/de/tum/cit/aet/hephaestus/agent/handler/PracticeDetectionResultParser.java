@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -531,6 +532,62 @@ public class PracticeDetectionResultParser {
                 key
             );
         }
+
+        /**
+         * Returns a copy with {@code (verdict, severity)} coerced to the system's coherence invariants,
+         * independent of what the (weak) model emitted:
+         * <ol>
+         *   <li><b>Defect-detector has no OBSERVED verdict.</b> A practice declaring {@code DEFECT-DETECTOR
+         *       DISCIPLINE} flags a defect (NOT_OBSERVED) or abstains (NOT_APPLICABLE); a model-emitted OBSERVED
+         *       there is a clean-bill-of-health that would ship as a false strength — coerce it to NOT_APPLICABLE.</li>
+         *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a NOT_OBSERVED gap; OBSERVED and
+         *       NOT_APPLICABLE carry the {@code INFO} sentinel, and a NOT_OBSERVED that arrived as {@code INFO}
+         *       (a defect with no band) is raised to {@code MINOR}.</li>
+         * </ol>
+         * Idempotent: a no-op coercion returns {@code this}.
+         */
+        public ValidatedFinding coerceCoherence(boolean isDefectDetector) {
+            Observation v = verdict;
+            String r = reasoning;
+            if (isDefectDetector && v == Observation.OBSERVED) {
+                v = Observation.NOT_APPLICABLE;
+                r = "[auto-downgraded: defect-detector practice has no OBSERVED verdict] " + reasoning;
+            }
+            Severity s =
+                v == Observation.NOT_OBSERVED ? (severity == Severity.INFO ? Severity.MINOR : severity) : Severity.INFO;
+            if (v == verdict && s == severity) {
+                return this;
+            }
+            return new ValidatedFinding(
+                practiceSlug,
+                title,
+                v,
+                s,
+                confidence,
+                evidence,
+                r,
+                guidance,
+                suggestedDiffNotes,
+                findingFingerprint
+            );
+        }
+    }
+
+    /**
+     * Apply {@link ValidatedFinding#coerceCoherence(boolean)} to every finding, passing the per-finding
+     * defect-detector flag from {@code defectDetectorSlugs}. Returns a fresh mutable list (call sites mutate
+     * it downstream for fingerprint stamping). Shared by the PR and Issue handlers so the rule lives in one
+     * place and cannot drift between them.
+     */
+    public static List<ValidatedFinding> coerceCoherence(
+        List<ValidatedFinding> findings,
+        Set<String> defectDetectorSlugs
+    ) {
+        List<ValidatedFinding> out = new ArrayList<>(findings.size());
+        for (ValidatedFinding f : findings) {
+            out.add(f.coerceCoherence(defectDetectorSlugs.contains(f.practiceSlug())));
+        }
+        return out;
     }
 
     public record DiscardedEntry(int index, String reason) {}

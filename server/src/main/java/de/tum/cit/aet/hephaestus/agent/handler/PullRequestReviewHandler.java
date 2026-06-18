@@ -390,6 +390,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
+        // Coherence coercion: keep (verdict, severity) coherent regardless of what the
+        // weak model emitted. A defect-detector practice's OBSERVED becomes NOT_APPLICABLE (no false strength
+        // ships to the student), and severity is pinned to the INFO sentinel except on a NOT_OBSERVED gap.
+        // Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the posted comment.
+        Set<String> defectDetectorSlugs =
+            job.getWorkspace() == null
+                ? Set.of()
+                : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
+        scopedFindings = new ArrayList<>(
+            PracticeDetectionResultParser.coerceCoherence(scopedFindings, defectDetectorSlugs)
+        );
+
         PracticeDetectionDeliveryService.DeliveryResult result;
         try {
             result = deliveryService.deliver(job, scopedFindings);

@@ -56,6 +56,8 @@ class PracticePiAdapterTest extends BaseUnitTest {
         assertThat(step)
             .contains("/workspace/" + WorkspaceAbi.CONTEXT_PREFIX + "diff.patch")
             .contains("/workspace/" + WorkspaceAbi.CONTEXT_PREFIX + "metadata.json")
+            // scripts receive the materialised context dir so they can read project_inventory.json etc.
+            .contains("--context /workspace/" + WorkspaceAbi.CONTEXT_PREFIX)
             .doesNotContain("/workspace/.context/");
     }
 

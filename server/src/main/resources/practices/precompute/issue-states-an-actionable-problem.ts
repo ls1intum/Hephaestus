@@ -3,6 +3,26 @@
 // reproduction / expected-vs-actual (BUG) or a value clause (STORY), and stub/empty/template bodies.
 // FACTS and DIRECTIONS only — the LLM decides whether the report is genuinely act-on-able. No verdict.
 import type { Hint } from "../lib/types";
+import { readProjectInventory, type InventoryItem } from "../lib/context";
+
+/** Title-token overlap (Jaccard) — a coarse near-duplicate signal across the project inventory. */
+function titleOverlap(a: string, b: string): number {
+	// String(...) coerces defensively: a malformed inventory item whose `title` is a number/object would
+	// otherwise throw on .toLowerCase() and discard this script's entire result (runner per-script catch).
+	const toks = (s: string) =>
+		new Set(
+			String(s ?? "")
+				.toLowerCase()
+				.split(/[^a-z0-9]+/)
+				.filter((t) => t.length > 3),
+		);
+	const x = toks(a);
+	const y = toks(b);
+	if (x.size === 0 || y.size === 0) return 0;
+	let inter = 0;
+	for (const t of x) if (y.has(t)) inter++;
+	return inter / (x.size + y.size - inter);
+}
 
 interface IssueMeta {
 	title?: string;
@@ -13,7 +33,12 @@ interface IssueMeta {
 
 const has = (re: RegExp, s: string) => re.test(s);
 
-export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
+export default async function (
+	_repo: string,
+	_diff: Map<string, unknown>,
+	m: IssueMeta,
+	contextDir?: string,
+) {
 	const body = (m.body ?? "").trim();
 	const title = (m.title ?? "").trim();
 	const labels = (m.labels ?? []).map((l) => l.toLowerCase());
@@ -76,7 +101,7 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 		);
 	} else if (looksUmbrella) {
 		directions.push(
-			`Classification fact: umbrella/requirement card with prose (label matches requirement/epic/umbrella). Its natural bar is decomposition into child stories rather than inline checkbox acceptance criteria.`,
+			`Classification fact: looksUmbrella=1 and emptyOrTitleEcho=0 — an umbrella/requirement card carrying substantive prose (a label matches requirement/epic/umbrella). Its actionability lives at the requirement level: its natural bar is decomposition into child stories, not a story-style who/beneficiary/so-that problem statement and not inline checkbox acceptance criteria.`,
 		);
 	}
 	if (isStub && !emptyOrTitleEcho)
@@ -87,17 +112,71 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 		directions.push(
 			`Body looks like an unmodified template (headings with little prose under them) — verify the author actually filled the sections.`,
 		);
-	directions.push(
-		`Work-kind signal: ${kind} (labelBug=${labelBug}, labelStory=${labelStory}). For a BUG, an act-on-able report usually needs reproduction + expected-vs-actual; for a STORY, a value/outcome clause.`,
-	);
-	if (kind === "BUG")
+	// When looksUmbrella holds on a prose card the requirement-level bar above governs; the per-kind story/bug
+	// readiness signals (which ask for a value/who-benefits clause or repro) do NOT apply to a requirement and
+	// would contradict the umbrella fact, so suppress them in that case.
+	const umbrellaProse = looksUmbrella && !emptyOrTitleEcho;
+	if (!umbrellaProse) {
 		directions.push(
-			`Bug readiness facts: reproductionPresent=${hasRepro}, expectedVsActualPresent=${hasExpectedActual} — confirm against the body text.`,
+			`Work-kind signal: ${kind} (labelBug=${labelBug}, labelStory=${labelStory}). For a BUG, an act-on-able report usually needs reproduction + expected-vs-actual; for a STORY, a value/outcome clause.`,
 		);
-	if (kind === "STORY")
+		if (kind === "BUG")
+			directions.push(
+				`Bug readiness facts: reproductionPresent=${hasRepro}, expectedVsActualPresent=${hasExpectedActual} — confirm against the body text.`,
+			);
+		if (kind === "STORY")
+			directions.push(
+				`Story readiness fact: valueClausePresent=${hasValueClause} ("so that…" / "as a… I want…") — confirm against the body text.`,
+			);
+	} else {
 		directions.push(
-			`Story readiness fact: valueClausePresent=${hasValueClause} ("so that…" / "as a… I want…") — confirm against the body text.`,
+			`Work-kind signal: REQUIREMENT/umbrella card — the per-kind story/bug readiness checks (value clause, who-benefits, reproduction) do NOT apply; its bar is requirement-level decomposition, per the umbrella fact above.`,
 		);
+	}
+
+	// A genuine actionable problem is usually NOT a restatement of one already filed. Title overlap is a
+	// CANDIDATE near-duplicate signal only; the LLM confirms duplication against the bodies (precompute never decides).
+	let nearDuplicateCount = 0;
+	let openPrTitleMatchCount = 0;
+	const inventory = await readProjectInventory(contextDir);
+	if (inventory?.issues?.length && title.length > 0) {
+		const matches: InventoryItem[] = inventory.issues
+			.filter((it) => titleOverlap(title, it.title ?? "") >= 0.5)
+			.slice(0, 3);
+		nearDuplicateCount = matches.length;
+		if (matches.length > 0) {
+			directions.push(
+				`Cross-artifact fact: ${matches.length} other issue(s) in this project share a strongly-overlapping title — ` +
+					matches.map((it) => `#${it.number} "${it.title}" (${it.state ?? "?"})`).join("; ") +
+					`. Open project_inventory.json and compare bodies before crediting this as a fresh, distinct problem.`,
+			);
+		} else if (inventory.truncated) {
+			// Capped listing: the absence of an overlap among the LISTED subset does NOT prove uniqueness.
+			directions.push(
+				`Cross-artifact fact: project_inventory.json lists ${inventory.issues.length} issue(s) but is TRUNCATED (capped subset, not exhaustive); none LISTED has a strongly-overlapping title, but a duplicate may exist outside the listing — do not conclude this is unique from the inventory alone.`,
+			);
+		} else {
+			directions.push(
+				`Cross-artifact fact: ${inventory.issues.length} other issue(s) exist in project_inventory.json (full listing, not truncated); none has a strongly-overlapping title — absence of an overlap here reflects the exhaustive listing, not a capped subset.`,
+			);
+		}
+	}
+
+	// "Is this work already in flight?" — scan OPEN pull requests for a strongly-overlapping title. PR->issue
+	// closing refs are not synced, so this title-overlap is a CANDIDATE signal only; the LLM confirms.
+	if (inventory?.pullRequests?.length && title.length > 0) {
+		const prMatches = inventory.pullRequests
+			.filter((p) => p.state === "OPEN" && titleOverlap(title, p.title ?? "") >= 0.5)
+			.slice(0, 3);
+		openPrTitleMatchCount = prMatches.length;
+		if (prMatches.length > 0) {
+			directions.push(
+				`Cross-artifact fact: ${prMatches.length} OPEN pull request(s) have a strongly-overlapping title — ` +
+					prMatches.map((p) => `#${p.number} "${p.title}"`).join("; ") +
+					`. This issue's work may already be in flight; open project_inventory.json and confirm before treating it as unaddressed (title overlap only — PR-to-issue links are not in the index).`,
+			);
+		}
+	}
 
 	const hints: Hint[] = [];
 	return {
@@ -113,6 +192,8 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 			emptyOrTitleEcho: emptyOrTitleEcho ? 1 : 0,
 			hasDeliverableTypeLabel: hasDeliverableTypeLabel ? 1 : 0,
 			looksUmbrella: looksUmbrella ? 1 : 0,
+			nearDuplicateTitleCount: nearDuplicateCount,
+			openPrTitleMatchCount,
 		},
 		directions,
 	};

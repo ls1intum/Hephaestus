@@ -183,7 +183,10 @@ function ecosystemFor(path: string): Ecosystem | null {
 function classifyDelta(oldC: string, newC: string): string {
 	const o = oldC.trim();
 	const n = newC.trim();
-	if (o === n) return "BUMPED"; // identical text on both sides is unusual; treat as a noop bump candidate
+	// Identical constraint text on both sides means the -X/+X pair differs only by whitespace/newline (e.g. a
+	// trailing-newline reflow): there is no version change, so surface a neutral no-change fact rather than a
+	// phantom version bump. UNCHANGED is informational only and is never counted toward the bump tally.
+	if (o === n) return "UNCHANGED";
 	const oExact = !isLoose(o);
 	const nLoose = isLoose(n);
 	if (n === "" && o !== "") return "PIN_DROPPED";
@@ -287,7 +290,9 @@ export default async function (repoPath: string, diffFiles: Map<string, DiffFile
 				fact = classifyDelta(removed.get(name) ?? "", added.get(name) ?? "");
 				if (fact === "PIN_LOOSENED") pinsLoosened++;
 				else if (fact === "PIN_DROPPED") pinsDropped++;
-				else bumped++;
+				else if (fact === "UNCHANGED") {
+					// whitespace/newline-only line pair — not a version change, count nothing
+				} else bumped++;
 			}
 			const oldC = removed.get(name) ?? "";
 			const newC = added.get(name) ?? "";

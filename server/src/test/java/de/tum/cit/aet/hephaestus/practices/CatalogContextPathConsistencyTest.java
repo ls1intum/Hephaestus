@@ -36,7 +36,8 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         // The two raw SQL-only graph projections (the agent cannot get these from the mounted worktree):
         "linked_work_items.json", // LinkedWorkItemContentProvider.OUTPUT_FILE — resolved linked-issue rows
         "review_threads.json", // ReviewThreadContentProvider — review-decision/thread rows
-        "general_comments.json" // GeneralReviewCommentContentProvider — conversation-tab (non-inline) MR review notes
+        "general_comments.json", // GeneralReviewCommentContentProvider — conversation-tab (non-inline) MR review notes
+        "project_inventory.json" // WorkspaceInventoryContentProvider.OUTPUT_FILE — whole-project issue/PR index
         // NOTE: test_presence.json + branch_graph.json were deleted (worktree-derived Transform, not content);
         // acceptance_criteria.json was a phantom (no provider ever emitted it). None may reappear.
     );

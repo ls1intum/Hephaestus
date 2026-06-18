@@ -23,6 +23,7 @@ const { values } = parseArgs({
 		repo: { type: "string" },
 		diff: { type: "string" },
 		metadata: { type: "string" },
+		context: { type: "string" },
 		output: { type: "string", default: ".precompute" },
 		timeout: { type: "string", default: "15000" },
 	},
@@ -30,7 +31,7 @@ const { values } = parseArgs({
 
 if (!values.repo) {
 	console.error(
-		"Usage: bun run runner.ts --repo <path> --diff <path> [--metadata <path>] [--output <dir>]",
+		"Usage: bun run runner.ts --repo <path> --diff <path> [--metadata <path>] [--context <dir>] [--output <dir>]",
 	);
 	process.exit(1);
 }
@@ -39,6 +40,10 @@ const globalStart = Date.now();
 const repoPath = values.repo;
 const outputDir = values.output!;
 const timeoutMs = parseInt(values.timeout!);
+// The materialised context directory (inputs/context/) — gives scripts read access to the SAME
+// cross-artifact context the agent sees (project_inventory.json, linked_work_items.json, comments.json,
+// issue_summary.md, …), so a precompute can point the LLM at relevant neighbours. Optional and read-only.
+const contextDir = values.context ?? (values.metadata ? values.metadata.replace(/\/[^/]*$/, "") : "");
 
 // Parse diff
 let diffFiles = new Map<string, DiffFile>();
@@ -123,7 +128,7 @@ const results = await Promise.allSettled(
 		try {
 			const mod = await import(modulePath);
 			const rawResult = await Promise.race([
-				mod.default(repoPath, diffFiles, metadata),
+				mod.default(repoPath, diffFiles, metadata, contextDir),
 				new Promise<never>((_, reject) =>
 					setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs),
 				),

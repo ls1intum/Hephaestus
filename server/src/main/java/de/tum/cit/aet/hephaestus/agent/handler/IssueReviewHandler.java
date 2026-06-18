@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,7 +151,8 @@ public class IssueReviewHandler implements JobTypeHandler {
             " in " +
             repoName +
             ". This is an ISSUE, not a pull request — there is no code diff. Read the issue context files " +
-            "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json), then " +
+            "(inputs/context/issue_summary.md, inputs/context/metadata.json, inputs/context/comments.json, and " +
+            "inputs/context/project_inventory.json for cross-artifact checks like duplicate/overlapping issues), then " +
             "evaluate each practice in inputs/practices/ against the issue and persist every justified finding via the " +
             "report_finding tool. Evidence locations should reference the issue thread/metadata, not source files. " +
             "Follow " +
@@ -172,7 +174,15 @@ public class IssueReviewHandler implements JobTypeHandler {
             );
         }
         // No diff-scope filtering: issue findings reference the thread/metadata, not diff files.
-        PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, parsed.validFindings());
+        // Coherence coercion: defect-detector OBSERVED -> NOT_APPLICABLE, severity sentinel.
+        // Applied once so the SAME coerced list reaches both deliver() (DB) and compose() (posted note).
+        Set<String> defectDetectorSlugs =
+            job.getWorkspace() == null
+                ? Set.of()
+                : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.ISSUE);
+        List<PracticeDetectionResultParser.ValidatedFinding> coercedFindings =
+            PracticeDetectionResultParser.coerceCoherence(parsed.validFindings(), defectDetectorSlugs);
+        PracticeDetectionDeliveryService.DeliveryResult result = deliveryService.deliver(job, coercedFindings);
         log.info(
             "Issue delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
             result.inserted(),
@@ -186,7 +196,7 @@ public class IssueReviewHandler implements JobTypeHandler {
                 ? Map.of()
                 : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.ISSUE);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
-            parsed.validFindings(),
+            coercedFindings,
             WorkArtifact.ISSUE,
             polarityBySlug
         );

@@ -133,6 +133,10 @@ public class PracticeFindingService {
             Practice practice = group.get(0).getPractice();
             Polarity polarity = practice.getPolarity();
 
+            // A defect-detector practice has no OBSERVED verdict, so a persisted OBSERVED row predating the
+            // write-time coercion must not surface here as a false "strength" — read-time guard for the dashboard.
+            boolean isDefectDetector = practice.isDefectDetector();
+
             // CRITICAL (ordinal 0) first so the highest-impact item leads the card.
             List<ReflectionItemDTO> toWorkOn = group
                 .stream()
@@ -141,12 +145,14 @@ public class PracticeFindingService {
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(ReflectionItemDTO::from)
                 .toList();
-            List<ReflectionItemDTO> strengths = group
-                .stream()
-                .filter(f -> polarity.isStrength(f.getVerdict()))
-                .limit(MAX_STRENGTHS_PER_PRACTICE)
-                .map(ReflectionItemDTO::from)
-                .toList();
+            List<ReflectionItemDTO> strengths = isDefectDetector
+                ? List.of()
+                : group
+                      .stream()
+                      .filter(f -> polarity.isStrength(f.getVerdict()))
+                      .limit(MAX_STRENGTHS_PER_PRACTICE)
+                      .map(ReflectionItemDTO::from)
+                      .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
                 continue; // defensive: NA is already filtered, so every finding lands in one bucket
             }

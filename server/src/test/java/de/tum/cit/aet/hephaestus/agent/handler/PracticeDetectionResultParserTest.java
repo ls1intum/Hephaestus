@@ -11,6 +11,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.InputStream;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -698,6 +700,94 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // Verify remaining verdicts
             assertThat(result.validFindings().get(3).verdict()).isEqualTo(Observation.OBSERVED);
             assertThat(result.validFindings().get(4).verdict()).isEqualTo(Observation.NOT_OBSERVED);
+        }
+    }
+
+    @Nested
+    @DisplayName("coerceCoherence — structural (verdict, severity) invariants")
+    class CoerceCoherence {
+
+        private ValidatedFinding finding(Observation verdict, Severity severity) {
+            return new ValidatedFinding("p", "t", verdict, severity, 0.9f, null, "reasoning", "guidance", List.of());
+        }
+
+        @Test
+        @DisplayName("defect-detector OBSERVED is coerced to NOT_APPLICABLE/INFO with an audit note")
+        void defectDetectorObservedToNa() {
+            var out = finding(Observation.OBSERVED, Severity.MAJOR).coerceCoherence(true);
+            assertThat(out.verdict()).isEqualTo(Observation.NOT_APPLICABLE);
+            assertThat(out.severity()).isEqualTo(Severity.INFO);
+            assertThat(out.reasoning()).startsWith("[auto-downgraded");
+        }
+
+        @Test
+        @DisplayName("non-defect-detector OBSERVED keeps verdict but pins severity to INFO")
+        void nonDefectObservedSeverityInfo() {
+            var out = finding(Observation.OBSERVED, Severity.MAJOR).coerceCoherence(false);
+            assertThat(out.verdict()).isEqualTo(Observation.OBSERVED);
+            assertThat(out.severity()).isEqualTo(Severity.INFO);
+        }
+
+        @Test
+        @DisplayName("NOT_OBSERVED with INFO severity is raised to MINOR (a gap must carry a band)")
+        void notObservedInfoToMinor() {
+            var out = finding(Observation.NOT_OBSERVED, Severity.INFO).coerceCoherence(false);
+            assertThat(out.verdict()).isEqualTo(Observation.NOT_OBSERVED);
+            assertThat(out.severity()).isEqualTo(Severity.MINOR);
+        }
+
+        @Test
+        @DisplayName("NOT_OBSERVED with a real band is unchanged (identity)")
+        void notObservedMajorUnchanged() {
+            var in = finding(Observation.NOT_OBSERVED, Severity.MAJOR);
+            assertThat(in.coerceCoherence(false)).isSameAs(in);
+        }
+
+        @Test
+        @DisplayName("NOT_APPLICABLE severity is pinned to INFO")
+        void naSeverityInfo() {
+            var out = finding(Observation.NOT_APPLICABLE, Severity.MAJOR).coerceCoherence(false);
+            assertThat(out.verdict()).isEqualTo(Observation.NOT_APPLICABLE);
+            assertThat(out.severity()).isEqualTo(Severity.INFO);
+        }
+
+        @Test
+        @DisplayName("defect-detector NOT_OBSERVED defect is preserved with its band")
+        void defectDetectorNotObservedPreserved() {
+            var out = finding(Observation.NOT_OBSERVED, Severity.MAJOR).coerceCoherence(true);
+            assertThat(out.verdict()).isEqualTo(Observation.NOT_OBSERVED);
+            assertThat(out.severity()).isEqualTo(Severity.MAJOR);
+        }
+
+        @Test
+        @DisplayName("list helper applies the per-slug defect-detector flag")
+        void listHelperPerSlug() {
+            var dd = new ValidatedFinding(
+                "sec",
+                "t",
+                Observation.OBSERVED,
+                Severity.INFO,
+                0.9f,
+                null,
+                "r",
+                "g",
+                List.of()
+            );
+            var ok = new ValidatedFinding(
+                "style",
+                "t",
+                Observation.OBSERVED,
+                Severity.MAJOR,
+                0.9f,
+                null,
+                "r",
+                "g",
+                List.of()
+            );
+            var out = PracticeDetectionResultParser.coerceCoherence(List.of(dd, ok), Set.of("sec"));
+            assertThat(out.get(0).verdict()).isEqualTo(Observation.NOT_APPLICABLE);
+            assertThat(out.get(1).verdict()).isEqualTo(Observation.OBSERVED);
+            assertThat(out.get(1).severity()).isEqualTo(Severity.INFO);
         }
     }
 }

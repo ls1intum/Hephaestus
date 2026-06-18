@@ -78,6 +78,22 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Slice<Issue> findByRepository_Id(Long repositoryId, Pageable pageable);
 
     /**
+     * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
+     * newest-first by number, for the cross-artifact project-context telescope. The author is fetched
+     * up front to avoid a per-row lazy load; labels/comments/bodies are intentionally NOT fetched — the
+     * inventory is a compact "what else exists in this project" index, not a full body.
+     *
+     * @param repositoryId the repository ID
+     * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
+     * @return newest-first issues for the repository
+     */
+    @Query(
+        "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone " +
+            "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId ORDER BY i.number DESC"
+    )
+    List<Issue> findIssueInventoryByRepositoryId(@Param("repositoryId") long repositoryId, Pageable pageable);
+
+    /**
      * Nullifies milestone references on all issues that reference the given milestone.
      * <p>
      * This is a direct database update that doesn't rely on Hibernate's collection state.

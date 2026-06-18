@@ -18,6 +18,7 @@ const { values } = parseArgs({
     repo: { type: "string" },
     diff: { type: "string" },
     metadata: { type: "string" },
+    context: { type: "string" },
     scripts: { type: "string", default: resolve(import.meta.dir, "../../../server/src/main/resources/practices/precompute") },
   },
 });
@@ -36,6 +37,7 @@ console.error(`Validating ${n} script(s) from ${values.scripts}`);
 const args = ["run", resolve(import.meta.dir, "runner.ts"), "--repo", values.repo!, "--output", work];
 if (values.diff) args.push("--diff", values.diff);
 if (values.metadata) args.push("--metadata", values.metadata);
+if (values.context) args.push("--context", values.context);
 const proc = Bun.spawnSync(["bun", ...args], { stderr: "inherit" });
 
 // Inspect results

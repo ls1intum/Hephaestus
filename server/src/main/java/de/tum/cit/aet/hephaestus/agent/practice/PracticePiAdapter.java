@@ -99,6 +99,10 @@ public class PracticePiAdapter {
             " --metadata " +
             contextTarget +
             "metadata.json" +
+            // Give scripts the materialised context dir so they can read the SAME cross-artifact context the
+            // agent sees (project_inventory.json, linked_work_items.json, …) and point the LLM at neighbours.
+            " --context " +
+            contextTarget +
             " --output " +
             precomputeOut +
             " > /tmp/precompute-runner.log 2>&1" +

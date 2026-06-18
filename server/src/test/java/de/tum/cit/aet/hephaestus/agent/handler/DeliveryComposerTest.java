@@ -15,7 +15,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -685,6 +689,53 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(clean).contains("Consider splitting the change.");
     }
 
+    // gpt-oss feedback eval: each of these scoring sentences reached the student verbatim in the delivered
+    // GitLab text. The lesson must survive on its title + guidance; the arithmetic, band words, raw field
+    // names, and scoring counters are dropped. One parameter row per leak class so a failure localises.
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("gptOssScoringMachineryLeaks")
+    void sanitizeStudentText_stripsGptOssScoringMachineryLeak(
+        String leakClass,
+        String input,
+        List<String> mustDrop,
+        String mustKeep
+    ) {
+        String clean = DeliveryComposer.sanitizeStudentText(input);
+        assertThat(clean).doesNotContain(mustDrop.toArray(String[]::new));
+        if (mustKeep != null) {
+            assertThat(clean).contains(mustKeep);
+        }
+    }
+
+    static Stream<Arguments> gptOssScoringMachineryLeaks() {
+        return Stream.of(
+            Arguments.of(
+                "noise-fraction + band word",
+                "Two of the fourteen commit subjects are generic. The noise fraction (2/14 ≈ 0.14) is ≤ 0.25, so the severity is INFO. Prefer specific, imperative commit subjects.",
+                List.of("noise fraction", "≤ 0.25", "severity is INFO"),
+                "Prefer specific, imperative commit subjects."
+            ),
+            Arguments.of(
+                "raw draft/WIP field names",
+                "The PR is marked as ready (is_draft false, no WIP token), satisfying the traceability requirement.",
+                List.of("is_draft", "WIP token", "satisfying the traceability requirement"),
+                null
+            ),
+            Arguments.of(
+                "the-practice-flags meta-voice",
+                "Debug prints were left in the code. The practice flags such leftover scaffolding as a blemish. Remove them before merging.",
+                List.of("The practice flags"),
+                "Remove them before merging."
+            ),
+            Arguments.of(
+                "parenthesised scoring counters",
+                "Metadata lists 13 non-merge commits (T = 13). Three commit subjects combine distinct concerns with \"and\", giving K = 3. Separate each logical change into its own commit.",
+                List.of("T = 13", "K = 3"),
+                "Separate each logical change into its own commit."
+            )
+        );
+    }
+
     @Test
     void sanitizeStudentText_stripsCrossPracticeOrchestrationLeaks() {
         // Live Obsphera eval (deepseek, pr1/pr6/pr7): the model narrated how findings were ROUTED between
@@ -938,9 +989,12 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_youWrote_stripsJsonEnvelopeLeakFromMetadataSnippet() {
-        // The agent sometimes quotes a raw span of metadata.json, dragging JSON field syntax into the
-        // "You wrote:" quote. The composed note must show the prose, never the "body": key/quotes.
+    void compose_metadataFinding_dropsYouWroteEchoEntirely() {
+        // A metadata-field finding (location metadata.json) no longer echoes a "You wrote: …" quote at all:
+        // the agent's metadata span was frequently a truncated heading / single token / title==body echo / raw
+        // JSON envelope ("[Feat", "false", "Analysis Object Model (AOM)", "body": "…") that read as broken
+        // output and leaked raw fields to the student. The lesson stands on the
+        // reasoning + guidance instead.
         ValidatedFinding f = negativeFinding(
             "mr-description-quality",
             "PR description lacks clear motivation",
@@ -956,11 +1010,14 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent dc = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST);
 
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).contains("You wrote:");
-        assertThat(dc.mrNote()).contains("## Description");
-        // No JSON envelope artifacts leak into the student-facing quote.
+        // No echo, and therefore none of the raw metadata-snippet / JSON-envelope artifacts can leak.
+        assertThat(dc.mrNote()).doesNotContain("You wrote:");
         assertThat(dc.mrNote()).doesNotContain("\"body\"");
         assertThat(dc.mrNote()).doesNotContain("\" : \"");
+        assertThat(dc.mrNote()).doesNotContain("#39: use Logger");
+        // The student still receives the actual lesson (reasoning + guidance).
+        assertThat(dc.mrNote()).contains("does not explain why the change is needed");
+        assertThat(dc.mrNote()).contains("Add a short Why paragraph");
     }
 
     // --- Cross-context follow-up fixes (F3 repo-strip, F4 epic dedup, F5 subordinate positive) ---

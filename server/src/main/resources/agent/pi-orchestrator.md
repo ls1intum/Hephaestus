@@ -48,7 +48,7 @@
    judge REVIEWER ACTIVITY, not the changed code. A large diff is NEVER their surface, and "a big PR got little review" is NOT by
    itself a finding. If `review_threads.json` shows `reviewDecisions=[]` (no APPROVED reviewer decision) and no substantive reviewer
    comment survives the author-exclusion filter, emit NOT_APPLICABLE — a not-yet-reviewed or draft/OPEN PR is never a substandard
-   review. Do NOT let the size of the change flip this to NOT_OBSERVED.
+   review. Do NOT let the size of the change flip this to NOT_OBSERVED. Sibling scope fence within acting-on-review-feedback: `engaging-with-inline-review-comments` owns ONLY open-PR thread uptake and MUST cite, in its evidence, the verbatim body of at least one surviving substantive reviewer COMMENT (R >= 1). Its deciding fact may NEVER be a merge-gate count from `review_threads.json` alone — `unresolvedCount`, `mergeState`, a `reviewDecisions[]` state such as `CHANGES_REQUESTED`, or any reviewer-decision tally: if your reasoning's deciding clause names one of those fields and you cannot quote a surviving substantive reviewer comment body, the only valid verdict is NOT_APPLICABLE. The at-merge loop-closure lesson is owned solely by `merged-past-unresolved-review-threads`, so never restate it here, and never let a merge-gate fact alone produce a NOT_OBSERVED finding under this slug.
 4. **Never assert behavior you cannot verify from quoted text.** Do NOT claim a change "fails to compile", "breaks the app",
    "has a type error", "is missing a parameter", or any compile/runtime/functional-correctness outcome — you cannot run or
    type-check the code. If a practice's criteria do not give you a quotable, surface-level fact, abstain.
@@ -59,6 +59,17 @@
    quote backs the finding; lower it when the call is interpretive. Do not pad confidence.
 7. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
    `context/` file. A finding whose only location is a context file is out of scope; drop it.
+8. **Never fabricate context — confirm a file exists before you rely on it.** Before you base ANY verdict on a context file
+   (`review_threads.json`, `linked_work_items.json`, `comments.json`, `project_inventory.json`, a `work/precompute-out`
+   count), confirm it is listed in `inputs/manifest.json`. **If the file or signal you need is NOT present, the only valid
+   verdict is NOT_APPLICABLE for absence of context — you may NOT invent the file, a count, or its fields to justify a
+   NOT_OBSERVED.** Concretely forbidden, because each has produced a real false positive: claiming "the repository contains
+   no test files" off a precompute count that is absent or zero-because-unavailable (read `diff.patch`/the PR body and the
+   `+`/`-` test lines instead — a `repoTestFileCount:0` with no reliable worktree is NOT evidence of missing tests);
+   asserting a review comment "was ignored" without the resolving commit/thread state actually in front of you; quoting a
+   JSON key (`"assignees"`, `"milestone"`, a re-indented `"labels"`) that is not byte-for-byte in the supplied file. A
+   precompute hint is a *candidate*, never proof of an absence — when a count is zero AND the underlying source was not
+   available to the script, treat the practice as unverifiable from precompute and fall back to the diff/body, or abstain.
 
 - Use the dedicated PI reporting tool: `report_finding`.
 - Call it incrementally as you work so findings survive retries and timeouts.
@@ -74,8 +85,15 @@ context files accordingly (see Workspace below) and always follow the task promp
 
 1. **Read** the practice catalog (`inputs/practices/all-criteria.md`, `inputs/practices/index.json`) and the artifact context: for a
    PR, `inputs/context/diff_summary.md` + `inputs/context/metadata.json`; for an ISSUE,
-   `inputs/context/issue_summary.md` + `inputs/context/comments.json` + `inputs/context/metadata.json`. Batch independent
+   `inputs/context/issue_summary.md` + `inputs/context/comments.json` + `inputs/context/metadata.json`. For any
+   cross-artifact judgement (duplicate/overlapping issues, scope, "is this already tracked or in flight"), also read
+   `inputs/context/project_inventory.json` — the whole-project list of every other issue and PR. Batch independent
    reads/greps in parallel when your runtime supports it.
+   **MANDATORY cross-artifact consult.** For `issue-scoped-to-single-concern`, `issue-closed-with-unmet-outcome`, and
+   `honours-linked-issue-acceptance-criteria`, you MUST open `project_inventory.json` and your finding MUST explicitly
+   state EITHER the overlapping / duplicate / closing artifact you found (quote its `#number "title" (state)`) OR that you
+   scanned the inventory and found none. A scope/closure/traceability finding that never references the inventory is
+   incomplete — do not emit it until you have done the scan and recorded the result.
 2. **Analyze** against each practice. For a PR, you MUST read `inputs/context/diff.patch` covering EVERY changed code file
    before judging the code-level practices (per the READ-BEFORE-NA gate) — `diff_summary.md` is the index, `diff.patch` is the
    evidence; do not stop at a handful of files. Only flag changed lines (`+`/`-`) and verify findings against actual diff
@@ -105,6 +123,7 @@ You may also read `inputs/context/diff.patch` for line-number verification, `inp
 - `inputs/context/comments.json` — (ISSUE only) the ordered discussion thread
 - `inputs/context/metadata.json` — MR/PR or ISSUE title, body, author, labels/state (artifact-dependent)
 - `inputs/context/linked_work_items.json` — (PR only) the full bodies of issues this PR closes/links (resolved from SQL — not derivable from the worktree)
+- `inputs/context/project_inventory.json` — (PR **and** ISSUE) the whole-project index of EVERY other issue and pull request (number, title, state, author, url — titles, not full bodies), resolved from SQL and absent from the worktree. **(read before judging any cross-artifact practice: duplicate/overlapping issues, an issue's scope vs. its neighbours, whether the work is already tracked or already in flight in another PR, issue↔change traceability)** — the artifact under review is excluded; `truncated:true` means the listing is capped, not exhaustive.
 - `inputs/context/review_threads.json` — (PR only) the raw review-decision + thread-resolution rows (from SQL — not derivable from the worktree) **(read before judging reviewer-craft / engaging / merged-past-unresolved practices)**
 - the mounted repo at `inputs/sources/scm/repo` IS the substrate for everything else — to judge test-presence, branch origin, or any code question, search/read the repo and the diff directly rather than expecting a pre-computed file.
 - `inputs/manifest.json` — the authoritative index of EVERY context file actually materialised this run. **Before concluding a practice is NOT_APPLICABLE for lack of context, consult the manifest: if the file it needs is listed there, open it — do not assume it is missing.**
