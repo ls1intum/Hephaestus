@@ -89,7 +89,7 @@ public class PracticeService {
                 ex
             );
         }
-        snapshotRevision(practice); // revision 1 — pins the ostensive as authored (reproducibility, SCD-2)
+        snapshotRevision(practice); // revision 1 — pins the criteria as authored (reproducibility, SCD-2)
 
         log.info("Created practice '{}' (slug={}) in workspace {}", practice.getName(), practice.getSlug(), ctx.slug());
         return practice;
@@ -98,7 +98,7 @@ public class PracticeService {
     /**
      * Append a new {@link PracticeRevision} snapshotting the practice's current {@code criteria}. Called on
      * create (revision 1) and whenever {@code criteria} changes, so every finding can pin to the criteria
-     * version it was detected against (the ostensive-as-it-was).
+     * version it was detected against (the criteria as it was).
      */
     private void snapshotRevision(Practice practice) {
         int next = practiceRevisionRepository
@@ -110,8 +110,7 @@ public class PracticeService {
 
     /**
      * Authoring guard for the learner-facing layer: {@code whatGoodLooksLike} is a concrete exemplar, so it
-     * must not leak the detector's verdict vocabulary (the rule that keeps the learner view free of the
-     * rubric — Goodhart / Kluger &amp; DeNisi 1996).
+     * must not leak the detector's verdict vocabulary — this keeps the learner view free of the rubric.
      */
     private static void validateLearnerContent(Practice practice) {
         String exemplar = practice.getWhatGoodLooksLike();
@@ -195,7 +194,7 @@ public class PracticeService {
         validateLearnerContent(practice);
         practice = practiceRepository.save(practice);
         if (criteriaChanged) {
-            snapshotRevision(practice); // the ostensive shifted — append a new revision so it is recorded, not overwritten
+            snapshotRevision(practice); // the criteria changed — append a new revision so it is recorded, not overwritten
         }
         log.info("Updated practice '{}' (slug={}) in workspace {}", practice.getName(), slug, ctx.slug());
         return practice;

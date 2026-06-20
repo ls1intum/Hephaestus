@@ -146,7 +146,7 @@ public class Feedback {
     @Column(name = "delivery_state", nullable = false, length = 16)
     private FeedbackDeliveryState deliveryState;
 
-    /** Why a unit was withheld, when {@link #state} is {@code SUPPRESSED}. Null otherwise. */
+    /** Why a unit was withheld, when {@link #deliveryState} is {@code SUPPRESSED}. Null otherwise. */
     @Enumerated(EnumType.STRING)
     @Column(name = "suppression_reason", length = 32)
     private FeedbackSuppressionReason suppressionReason;

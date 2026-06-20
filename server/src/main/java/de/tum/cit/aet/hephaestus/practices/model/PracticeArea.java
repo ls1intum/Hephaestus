@@ -32,7 +32,7 @@ import lombok.ToString;
  * facilitators (Facilitator Dashboard).
  *
  * <p><b>Two orthogonal axes — do not conflate:</b> an area (this configurable learning-objective axis)
- * is distinct from the delivery channel (Hattie level). A practice belongs to at most one area
+ * is distinct from the delivery channel. A practice belongs to at most one area
  * (see {@link Practice#getArea()}): the 1:N binding is load-bearing for the per-area acted-on/total
  * progress denominator — do not loosen it to a many-to-many join without also switching progress math
  * to per-(area, practice) rows.

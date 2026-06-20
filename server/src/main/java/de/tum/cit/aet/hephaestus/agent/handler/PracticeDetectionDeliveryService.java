@@ -123,7 +123,7 @@ public class PracticeDetectionDeliveryService {
         // (no key computed, never delivered), so the map aligns exactly with what the handler composes.
         Map<ValidatedFinding, String> findingFingerprints = new IdentityHashMap<>();
 
-        // Current criteria-revision per practice, memoized — every finding pins to the ostensive-as-it-was
+        // Current criteria-revision per practice, memoized — every finding pins to the criteria as it was
         // (SCD-2 reproducibility). Null if a practice has no revision yet (pre-versioning legacy practices).
         Map<Long, Long> revisionByPractice = new HashMap<>();
 

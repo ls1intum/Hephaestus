@@ -103,7 +103,7 @@ public class PracticeFinding {
 
     /**
      * The {@link PracticeRevision} (criteria snapshot) the detector evaluated this finding against, pinning
-     * it to the ostensive-as-it-was for reproducibility (SCD-2). NULL = the finding predates versioning
+     * it to the criteria as it was for reproducibility (SCD-2). NULL = the finding predates versioning
      * (an honest "pre-versioning" marker). Written via the native insert; SET NULL on revision delete so a
      * finding survives history pruning.
      */

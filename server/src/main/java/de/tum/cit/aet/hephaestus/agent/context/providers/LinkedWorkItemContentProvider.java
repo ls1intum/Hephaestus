@@ -29,11 +29,9 @@ import tools.jackson.databind.node.ObjectNode;
  * Cross-context, best-effort provider that de-blinds a PR review by materialising the linked
  * work-item(s) — issue body + acceptance criteria — into {@code inputs/context/linked_work_items.json}.
  *
- * <p>The battle-test found that ~1/3 of mentor-lesson misses were <em>context-blind</em>: the signal
- * lived in another artifact. The biggest payoff was the change → linked-issue link (MR 581/582): the
- * acceptance criteria that a change must satisfy live in the issue body, which the diff alone never
- * carries. This provider parses work-item references from three signals and resolves each to the issue
- * row so the agent can ground a "did this satisfy the acceptance criteria?" finding.
+ * <p>The acceptance criteria that a change must satisfy live in the linked issue body, which the diff
+ * alone never carries. This provider parses work-item references from three signals and resolves each to
+ * the issue row so the agent can ground a "did this satisfy the acceptance criteria?" finding.
  *
  * <p>Reference signals (telescope, not cage — hints + provenance, never full bodies):
  * <ul>
@@ -45,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  * </ul>
  *
  * <p>Output is intentionally compact (capped at {@link #MAX_ITEMS} items, body excerpted to
- * {@link #EXCERPT_CHARS} chars) because the gpt-oss gateway re-pays every byte per turn. Each item
+ * {@link #EXCERPT_CHARS} chars) to bound the context size fed to the agent per turn. Each item
  * carries a real {@code htmlUrl} so a finding grounded in it is clickably provenanced.
  *
  * <p>Best-effort ({@link #required()} == {@code false}): a missing repo, branch, or issue — or any

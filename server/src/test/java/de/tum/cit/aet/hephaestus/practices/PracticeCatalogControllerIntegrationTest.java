@@ -19,11 +19,14 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -473,13 +476,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getDetail()).contains("taken-slug");
         }
 
-        @Test
+        @ParameterizedTest(name = "rejects invalid slug \"{0}\"")
+        @MethodSource("invalidSlugs")
         @WithAdminUser
-        void shouldReturn400ForUppercaseSlug() {
+        void shouldReturn400ForInvalidSlug(String badSlug) {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
-                "INVALID_SLUG",
+                badSlug,
                 "Name",
                 List.of("PullRequestCreated"),
                 null,
@@ -510,88 +514,15 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .containsKey("slug");
         }
 
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForTrailingHyphen() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "bad-slug-",
-                "Name",
-                List.of("PullRequestCreated"),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+        static Stream<String> invalidSlugs() {
+            return Stream.of(
+                "INVALID_SLUG", // uppercase + underscore
+                "bad-slug-", // trailing hyphen
+                "bad--slug", // consecutive hyphens
+                "-bad-slug", // leading hyphen
+                "ab", // too short (< 3 chars)
+                "a".repeat(65) // too long (> 64 chars)
             );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForConsecutiveHyphens() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "bad--slug",
-                "Name",
-                List.of("PullRequestCreated"),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForLeadingHyphen() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "-bad-slug",
-                "Name",
-                List.of("PullRequestCreated"),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
         }
 
         @Test
@@ -684,62 +615,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getProperties().get("errors"))
                 .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                 .containsKeys("slug", "name", "criteria", "triggerEvents");
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForSlugTooShort() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "ab",
-                "Name",
-                List.of("PullRequestCreated"),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldReturn400ForSlugTooLong() {
-            ensureAdminMembership(workspace);
-
-            var request = new CreatePracticeRequestDTO(
-                "a".repeat(65),
-                "Name",
-                List.of("PullRequestCreated"),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-
-            webTestClient
-                .post()
-                .uri(BASE_URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest();
         }
 
         @Test

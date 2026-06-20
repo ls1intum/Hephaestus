@@ -27,15 +27,6 @@ class FindingFingerprintTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the title is NOT part of identity — re-wording the same concern keeps one key")
-    void titleDoesNotParticipate() {
-        // compute() no longer takes a title; same locus = same key regardless of how the agent phrased it.
-        String run1 = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
-        String run2 = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
-        assertThat(run2).isEqualTo(run1);
-    }
-
-    @Test
     @DisplayName("the file PATH is part of identity; a different file is a different finding")
     void pathParticipates() {
         String foo = FindingFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");

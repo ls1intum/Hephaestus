@@ -26,17 +26,16 @@ import tools.jackson.databind.node.ObjectNode;
  * <em>review-decision and thread-resolution state</em> into {@code
  * inputs/context/review_threads.json}.
  *
- * <p>The battle-test found two costly CONTEXT-BLIND misses where the signal lives in the review
- * decision + merge state, never in the diff and never in the inline comments:
+ * <p>Some review signals live in the review decision + merge state, never in the diff and never in the
+ * inline comments:
  *
  * <ul>
- *   <li>MR 577 — the author merged past <b>two unresolved {@code CHANGES_REQUESTED} reviews</b> via
- *       author auto-merge. {@code comments.json} is empty (no inline notes), so the review
- *       practices correctly read it as "no reviewer input" and abstain — yet the gate WAS jammed.
- *       The signal is the review <em>decision</em>, not an inline comment.
- *   <li>MR 575 — a "Looks good" rubber-stamp approval on hard-coded thresholds. The substance of
- *       the review lives in the review-decision row + the (un)resolved thread, not in a
- *       diff-anchored inline comment.
+ *   <li>An author can merge past unresolved {@code CHANGES_REQUESTED} reviews via auto-merge. When
+ *       {@code comments.json} is empty (no inline notes), the review practices read it as "no reviewer
+ *       input" and abstain — yet the gate WAS jammed. The signal is the review <em>decision</em>, not an
+ *       inline comment.
+ *   <li>A rubber-stamp approval ("Looks good"). The substance of the review lives in the review-decision
+ *       row + the (un)resolved thread, not in a diff-anchored inline comment.
  * </ul>
  *
  * <p>Both facts ARE already persisted: {@link PullRequestReview#getState()} carries the decision

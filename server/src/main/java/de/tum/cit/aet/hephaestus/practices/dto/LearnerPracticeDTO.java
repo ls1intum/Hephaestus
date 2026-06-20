@@ -8,11 +8,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Learner-facing projection of a {@link Practice}. <b>The detection {@code criteria} is absent BY
  * CONSTRUCTION</b> — this record has no field to carry it — making "criteria never reaches a learner" a
- * physical guarantee, not a UI convention (Diátaxis register mismatch; Kluger &amp; DeNisi 1996, where a
- * standard/self focus depresses performance; Goodhart gaming of an exposed rubric). It carries only what a
- * developer should see: the name, which area it belongs to, why it matters, and what good looks like
- * (Nicol &amp; Macfarlane-Dick 2006, P1; Sadler 1989, exemplars). NEVER widen this record with {@code criteria},
- * {@code precomputeScript}, {@code polarity}, or a raw verdict.
+ * physical guarantee, not a UI convention. It carries only what a developer should see: the name, which
+ * area it belongs to, why it matters, and what good looks like. NEVER widen this record with
+ * {@code criteria}, {@code precomputeScript}, {@code polarity}, or a raw verdict.
  */
 @Schema(description = "Learner-facing view of a practice — criteria absent by construction")
 public record LearnerPracticeDTO(

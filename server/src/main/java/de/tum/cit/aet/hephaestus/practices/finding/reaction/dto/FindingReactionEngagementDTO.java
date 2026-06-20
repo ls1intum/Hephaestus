@@ -3,14 +3,14 @@ package de.tum.cit.aet.hephaestus.practices.finding.reaction.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * Reaction engagement for the current developer in a workspace, reported along the two axes the feedback
- * literature keeps distinct (Lipnevich &amp; Smith 2022): a RESPONSE axis (what the developer did with the
- * feedback) and a VALIDITY axis (whether the finding applied at all).
+ * Reaction engagement for the current developer in a workspace, reported along two orthogonal axes: a
+ * RESPONSE axis (what the developer did with the feedback) and a VALIDITY axis (whether the finding applied
+ * at all).
  *
  * <p><b>{@code notApplicable} is a VALIDITY/scope signal, not an uptake count</b> — it MUST NOT be folded
  * into a response/uptake ratio with {@code enacted}/{@code disputed}. The uptake denominator is
  * {@code enacted + disputed} (the findings the developer engaged with as feedback); a high
- * {@code notApplicable} means the detector is mis-scoped, which is a separate signal (RQ4).
+ * {@code notApplicable} means the detector is mis-scoped, which is a separate signal.
  *
  * <p>Zero counts are returned as 0, not omitted.
  */
