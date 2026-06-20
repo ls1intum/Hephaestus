@@ -41,8 +41,10 @@ import org.springframework.stereotype.Component;
  * read back from the mutation payload and matched to findings by {@code path:line} so each
  * {@link DeliveredSignal} carries the durable comment + review handles.
  *
- * <p>The {@link #clearStaleFindings} override minimizes (hides as {@code OUTDATED}) the bot threads the
- * current run no longer emits — the GitHub analogue of GitLab's delete-stale-notes path.
+ * <p>Both the post path and the {@link #clearStaleFindings} override retire (minimize as {@code OUTDATED}) the
+ * prior bot threads whose finding the current run no longer emits — the GitHub analogue of GitLab's
+ * delete-stale-notes path. {@code clearStaleFindings} covers the zero-note re-run; {@code postInlineFindings}
+ * covers the partial-vanish case (some findings still hold, others went away).
  *
  * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed and logged;
  * GitHub has no analogue for document/channel/issue anchors on a PR review.
@@ -114,6 +116,9 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         // Partition findings: those whose key already has a live prior thread are preserved; the rest are posted.
         List<InlineFinding> toPost = new ArrayList<>(findings.size());
         List<DeliveredSignal> preservedSignals = new ArrayList<>();
+        // Keys still backed by a finding this run (preserved now, posted below). Prior threads outside this set
+        // belong to findings that vanished and must be retired.
+        Set<String> seenKeys = new HashSet<>();
         int unsupportedAnchorCount = 0;
         for (InlineFinding finding : findings) {
             if (!(finding.anchor() instanceof FindingAnchor.DiffAnchor diff)) {
@@ -131,16 +136,21 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
                 preservedSignals.add(
                     new DeliveredSignal(key, diff, Disposition.PRESERVED_EXISTING, prior.commentId(), prior.threadId())
                 );
+                seenKeys.add(key);
                 continue;
             }
             toPost.add(finding);
         }
 
         if (toPost.isEmpty()) {
+            // Nothing new to post, but findings that vanished since the last run still have live bot threads —
+            // retire them here too (this is the most common partial re-review: all survivors are preserved).
+            int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
             log.debug(
-                "All GitHub inline findings preserved or skipped (none to post): workspaceId={}, preserved={}",
+                "All GitHub inline findings preserved or skipped (none to post): workspaceId={}, preserved={}, minimized={}",
                 scopeId,
-                preservedSignals.size()
+                preservedSignals.size(),
+                minimized
             );
             return new InlineResult(preservedSignals.size(), unsupportedAnchorCount, List.copyOf(preservedSignals));
         }
@@ -158,6 +168,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             postedAnchors.add(diff);
             postedKeys.add(finding.findingFingerprint());
         }
+        seenKeys.addAll(postedKeys);
 
         try {
             ClientGraphQlResponse response = gitHubProvider
@@ -190,12 +201,16 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             String reviewId = response.field("addPullRequestReview.pullRequestReview.id").getValue();
             List<DeliveredSignal> postedSignals = buildPostedSignals(response, reviewId, postedAnchors, postedKeys);
 
+            // Retire prior bot threads whose finding vanished this run (still-seen = posted ∪ preserved).
+            int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
+
             log.info(
-                "Posted {} GitHub inline findings as single review: workspaceId={}, prNodeId={}, preserved={}",
+                "Posted {} GitHub inline findings as single review: workspaceId={}, prNodeId={}, preserved={}, minimized={}",
                 threads.size(),
                 scopeId,
                 prNodeId,
-                preservedSignals.size()
+                preservedSignals.size(),
+                minimized
             );
             List<DeliveredSignal> all = new ArrayList<>(postedSignals);
             all.addAll(preservedSignals);

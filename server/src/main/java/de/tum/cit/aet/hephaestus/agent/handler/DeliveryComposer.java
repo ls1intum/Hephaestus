@@ -344,8 +344,8 @@ class DeliveryComposer {
 
     /**
      * Compose the note posted when no issues were found — reports what was reviewed and, where the agent
-     * recorded reasoning, what it observed against each practice. Carries NO self-level praise: person-directed
-     * praise is the least effective feedback level (Hattie &amp; Timperley), so feedback stays task/process level.
+     * recorded reasoning, what it observed against each practice. Carries NO self-level praise: feedback stays
+     * at the task/process level, never person-directed.
      */
     private static String composeNoIssuesNote(List<ValidatedFinding> observed) {
         // Findings whose reasoning lets us cite a concrete observation, ranked most-certain first so the
@@ -373,9 +373,8 @@ class DeliveryComposer {
             }
             String label = capitalize(f.practiceSlug().replace('-', ' '));
             bullets.append("- **").append(label).append(":** ").append(summary);
-            // Feed-forward: a surfaced positive answers Hattie's "Where to next?" \u2014 append the grounded
-            // guidance (transferable principle + one forward prompt). Bare/empty/"No change needed." guidance
-            // (pre-feed-forward criteria) degrades gracefully to just the observation.
+            // Feed-forward: append the grounded guidance (transferable principle + one forward prompt). Bare,
+            // empty, or "No change needed." guidance degrades gracefully to just the observation.
             String forward = clampToSentenceBudget(
                 sanitizeStudentText(f.guidance() == null ? "" : f.guidance()).strip(),
                 OBSERVED_BUDGET
@@ -455,7 +454,7 @@ class DeliveryComposer {
         }
         // Curated gerund phrases ONLY — a non-curated slug humanised to raw text ("triages the issue …")
         // breaks the "Nice work keeping X and [Ying]" grammar, so an un-phrased strength is simply not
-        // named in the opener rather than dumped verbatim (Obsphera E2E: ungrammatical concatenation).
+        // named in the opener rather than dumped verbatim.
         List<String> phrases = positives
             .stream()
             .map(f -> STRENGTH_PHRASES.get(f.practiceSlug()))
@@ -469,8 +468,8 @@ class DeliveryComposer {
         if (phrases.isEmpty()) {
             // C2: a real OBSERVED strength exists but none has a curated gerund phrase. Acknowledge it
             // GENERICALLY rather than (a) silently dropping the whole opener — a real positive then vanishes —
-            // or (b) dumping an ungrammatical raw slug into the "Nice work <gerund>" frame (the Obsphera
-            // E2E grammar break). "Nice work here" is grammatical and never drops the acknowledgement.
+            // or (b) dumping an ungrammatical raw slug into the "Nice work <gerund>" frame. "Nice work here"
+            // is grammatical and never drops the acknowledgement.
             return "Nice work here" + tail;
         }
         String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
@@ -509,7 +508,7 @@ class DeliveryComposer {
     /**
      * Marks a sentence as pure grading-mechanics meta — if any of these appears, the whole sentence is
      * the grader explaining the rubric to itself, not feedback to the student, so it is dropped wholesale.
-     * Catches the phrasings observed leaking from gpt-oss-120b: "the practice requires…", "for a OBSERVED
+     * Catches phrasings observed leaking from the detection model: "the practice requires…", "for a OBSERVED
      * verdict", "MINOR severity level/band", "acceptable upper band", "according to/violating the
      * practice", "…line threshold".
      */
@@ -524,7 +523,7 @@ class DeliveryComposer {
             "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
             "\\b[≤<=>]*\\s*\\d+[\\s-]*(?:line|file)s?\\s+threshold\\b|" +
             "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b|" +
-            // Rubric-mechanics / criteria-computation leaks observed reaching students (deepseek echoes the
+            // Rubric-mechanics / criteria-computation leaks observed reaching students (the model echoes the
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
             "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" +
@@ -542,7 +541,7 @@ class DeliveryComposer {
             // practices ("sole owner (cross-practice)", "ready-and-traceable-handoff suppressed its …",
             // "ships-tests-with-the-change emitted NOT_APPLICABLE, both deferring here", "team-wide standing
             // nudge, never a per-MR blocker"). This is the grader talking to itself about ownership/delivery,
-            // never feedback to the student — drop the whole sentence. (Live Obsphera eval: leaked on pr1/pr6/pr7.)
+            // never feedback to the student — drop the whole sentence.
             "\\bcross-practice\\b|" +
             "\\bsole\\s+owner\\b|" +
             "\\bdeferr(?:ing|ed|s)\\b|" +
@@ -550,9 +549,9 @@ class DeliveryComposer {
             "\\bsuppress(?:ed|es|ing)\\s+its\\b|" +
             "\\b(?:team-wide\\s+)?standing\\s+nudge\\b|" +
             "\\bper-MR\\s+blocker\\b|" +
-            // Live Obsphera E2E eval (deepseek-v4-flash): the model echoes the criteria's classifier flowchart
-            // into student-facing reasoning — band maths, gate predicates, catalogue names, and pipeline
-            // plumbing. Each lesson survives in the title + guidance without any of this, so drop the sentence.
+            // The model echoes the criteria's classifier flowchart into student-facing reasoning — band maths,
+            // gate predicates, catalogue names, and pipeline plumbing. Each lesson survives in the title +
+            // guidance without any of this, so drop the sentence.
             "→\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // unicode-arrow band routing
             "\\bPer\\s+the\\s+(?:fixed\\s+)?(?:bucketing|criteria|severity\\s+rules?)\\b|" +
             "\\bunder\\s+the\\s+criteria\\b|" +
@@ -565,9 +564,9 @@ class DeliveryComposer {
             "\\bcarve-out\\b|" +
             "\\bthreshold\\s+for\\s+downgrade\\b|\\b\\d+%\\s+threshold\\b|" +
             "\\bis\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\s*(?:\\([^)]*\\)\\s*)?,?\\s+not\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "is MINOR, not MAJOR" — tolerate an intervening "(a decomposition nudge)," parenthetical
-            // Verdict-justification phrasings observed leaking verbatim to students (live Obsphera eval): the
-            // grader narrating WHY a verdict/severity landed. Each lesson stands on the title + guidance + the
-            // severity icon without this machinery — drop the whole sentence.
+            // Verdict-justification phrasings observed leaking verbatim to students: the grader narrating WHY a
+            // verdict/severity landed. Each lesson stands on the title + guidance + the severity icon without
+            // this machinery — drop the whole sentence.
             "\\bverdict\\s+is\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // "the combined verdict is NOT_OBSERVED" (enum AFTER the noun)
             "\\bcapped\\s+at\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // severity-cap arithmetic: "even a fully absent rationale would be capped at MINOR"
             "\\bumbrella\\s+calibration\\b|" + // "Per the umbrella calibration … is MINOR"
@@ -580,7 +579,7 @@ class DeliveryComposer {
             // Raw snake_case API field tokens reaching prose, e.g. "sub_issues_total is null".
             "\\b[a-z]+(?:_[a-z]+)+\\s+(?:is|are)\\s+(?:null|present|set|empty)\\b|" +
             "\\bsub_issues_total\\b|" +
-            // Scoring-machinery leaks confirmed reaching students (gpt-oss):
+            // Scoring-machinery leaks confirmed reaching students:
             // "noise fraction (2/14 ≈ 0.14) is ≤ 0.25, so the severity is INFO", "is_draft false, no WIP token",
             // "satisfying the categorizing-label requirement". Each lesson stands on the title + guidance alone.
             "\\bnoise\\s+fraction\\b|" + // space variant of noiseFraction
@@ -757,7 +756,7 @@ class DeliveryComposer {
         // before the critiques, so a suggestions-only note is never deficit-only when the job also
         // found strengths. Suppressed when there is a blocking (CRITICAL/MAJOR) issue: front-loading
         // praise ahead of a serious problem reads as a hollow "feedback sandwich" and dilutes the
-        // message. Task/process-level only (Hattie & Timperley) — never person-level praise.
+        // message. Task/process-level only — never person-level praise.
         boolean hasBlocking = allNegatives
             .stream()
             .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
@@ -1050,13 +1049,26 @@ class DeliveryComposer {
             if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
 
             // Prefer the agent's suggestedDiffNotes — but at most ONE per finding (its primary anchor). A
-            // single lesson split across several near-identical inline notes (Obsphera E2E: the "add a test"
-            // lesson posted on two separate files) reads as nagging; the summary already lists the finding
-            // once, so one inline note carries the detail without the pile-on.
+            // single lesson split across several near-identical inline notes reads as nagging; the summary
+            // already lists the finding once, so one inline note carries the detail without the pile-on.
             if (!f.suggestedDiffNotes().isEmpty()) {
-                // Carry the finding's correlation key onto the note so the inline channel can match the
-                // delivered placement back to its persisted finding (ADR 0021 C2).
-                notes.add(f.suggestedDiffNotes().get(0).withFindingFingerprint(f.findingFingerprint()));
+                // Prefer the agent's note, but run its body through the same student-text sanitizer the
+                // synthesized branch uses: the agent body is raw model output and can echo grading-meta that
+                // the student must never see (the synthesized path scrubs via appendStudentText, this one did
+                // not). Carry the finding's correlation key so the inline channel can match the delivered
+                // placement back to its persisted finding (ADR 0021 C2).
+                DiffNote suggested = f.suggestedDiffNotes().get(0);
+                String clean = sanitizeStudentText(suggested.body());
+                if (clean.isBlank()) continue;
+                notes.add(
+                    new DiffNote(
+                        suggested.filePath(),
+                        suggested.startLine(),
+                        suggested.endLine(),
+                        clean,
+                        f.findingFingerprint()
+                    )
+                );
                 continue;
             }
 

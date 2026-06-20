@@ -240,6 +240,65 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         verify(minimizeSpec, never()).variable(eq("subjectId"), any());
     }
 
+    @Test
+    void postPathMinimizesVanishedThreadWhenAllSurvivorsPreserved() {
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+
+        // Prior run posted ck-a and ck-b; this run only still finds ck-a. ck-b vanished and must be retired
+        // even though there is nothing new to post (the common partial re-review case — toPost is empty).
+        stubReviewThreads(
+            List.of(
+                thread("THREAD_a", "RC_a", "finding A\n" + ckTag("ck-a"), false, false),
+                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), false, false)
+            )
+        );
+        HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-a"))
+        );
+
+        assertThat(signalForKey(result, "ck-a").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
+        verify(client, never()).documentName("AddPullRequestReviewWithThreads");
+        verify(minimizeSpec).variable("subjectId", "RC_b");
+        verify(minimizeSpec, never()).variable("subjectId", "RC_a");
+    }
+
+    @Test
+    void postPathMinimizesVanishedThreadAlongsideNewPost() {
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+
+        // ck-a still holds (preserved), ck-c is new (posted), ck-b vanished (must be minimized on the post path).
+        stubReviewThreads(
+            List.of(
+                thread("THREAD_a", "RC_a", "finding A\n" + ckTag("ck-a"), false, false),
+                thread("THREAD_b", "RC_b", "finding B\n" + ckTag("ck-b"), false, false)
+            )
+        );
+        stubAddReview("REVIEW_9", List.of(comment("RC_c", "src/Baz.java", 30)));
+        HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(
+                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
+                new InlineFinding(new DiffAnchor("src/Baz.java", 30, null), "fix-c", "marker", "ck-c")
+            )
+        );
+
+        assertThat(signalForKey(result, "ck-a").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
+        assertThat(signalForKey(result, "ck-c").disposition()).isEqualTo(Disposition.POSTED);
+        verify(minimizeSpec).variable("subjectId", "RC_b");
+        verify(minimizeSpec, never()).variable("subjectId", "RC_a");
+        verify(minimizeSpec, never()).variable("subjectId", "RC_c");
+    }
+
     // --- stubbing helpers ----------------------------------------------------------------------------------
 
     /** Stubs GetPullRequestReviewThreads to return a single page of the given thread nodes. */

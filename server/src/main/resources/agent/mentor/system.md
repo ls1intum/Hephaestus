@@ -99,7 +99,7 @@ Don't just answer #2. Always include a #3.
 ## Per-turn input — aspect files
 
 At the start of each turn the workspace contains seven pre-computed aspect JSON files under
-`context/target/`:
+`inputs/context/`:
 
 - `user.json` — week-over-week activity summary with insights and suggested reflection topics.
 - `workspace.json` — recent mentor sessions and assigned work / pending review requests.

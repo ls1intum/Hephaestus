@@ -1574,4 +1574,39 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes().get(0).body()).isEqualTo("Consider extracting this.");
         assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-suggested-456");
     }
+
+    @Test
+    void compose_agentSuggestedDiffNote_scrubsGradingMetaFromBody() {
+        // The agent's own note body is raw model output; grading-meta in it must be stripped before it reaches
+        // the student, exactly like the synthesized fallback path (regression: this branch previously bypassed
+        // sanitizeStudentText and leaked rubric vocabulary verbatim on the inline note).
+        DiffNote suggested = new DiffNote(
+            "Views/DashboardView.swift",
+            20,
+            null,
+            "Add a test for the parser. The practice requires coverage for a OBSERVED verdict."
+        );
+        ValidatedFinding stamped = new ValidatedFinding(
+            "code-hygiene",
+            "Missing test",
+            Observation.NOT_OBSERVED,
+            Severity.MINOR,
+            0.9f,
+            buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),
+            "The method does too much.",
+            "Extract the rendering branch.",
+            List.of(suggested)
+        ).withFindingFingerprint("corr-scrub-789");
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        String body = result.diffNotes().get(0).body();
+        assertThat(body).contains("Add a test for the parser.");
+        assertThat(body).doesNotContainIgnoringCase("the practice requires");
+        assertThat(body).doesNotContain("OBSERVED");
+        // Key still propagates after the sanitize-and-rebuild.
+        assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-scrub-789");
+    }
 }
