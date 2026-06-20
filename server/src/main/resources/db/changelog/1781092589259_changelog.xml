@@ -6,120 +6,144 @@
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!--
-        Practice goals: a workspace-scoped, configurable learning-objective grouping over practices
-        (the proposal's "practice goal"). A goal is a read-model/organizing concept ONLY — it never
-        enters the detector or the finding schema. Binding is 1:N (one goal owns many practices; a
-        practice belongs to at most one goal) via practice.practice_goal_id, a real @ManyToOne FK
-        (fk_practice_goal, drift-checked) with ON DELETE SET NULL so deleting a goal unbinds — never
-        deletes — its practices. Column types mirror Hibernate ddl-auto emission (db:draft-changelog).
+        Consolidated branch changelog (practice-goals + ADR 0021 findings/feedback synthesis seam).
+
+        This file has never been applied in any environment, so greenfield objects are created DIRECTLY
+        under the FINAL names their JPA entities declare (PracticeArea, Practice, PracticeFinding,
+        Feedback, FeedbackFinding, FeedbackPlacement, PracticeRevision) — no intermediate legacy name is
+        ever materialised. The only RENAMES that remain are genuine renames of objects created in EARLIER
+        committed changelogs:
+          • finding_feedback → finding_reaction         (table+constraints created in 1774335316041)
+          • practice_finding.target_type/target_id/contributor_id → artifact_type/artifact_id/developer_id
+            and fk/idx contributor→developer            (created in 1773730203444)
+          • finding_reaction.contributor_id → developer_id and its fk/idx (the pre-existing finding_feedback columns)
+        Data/enum remaps on PRE-EXISTING data are preserved and land at their FINAL value in one shot
+        (verdict POSITIVE/NEGATIVE→OBSERVED/NOT_OBSERVED, target_type CHECK widened to ISSUE,
+        credential_mode OAUTH→API_KEY, action APPLIED→ENACTED). Greenfield CHECK allowed-lists are created
+        at their final values directly. Each changeSet keeps a MARK_RAN precondition + explicit rollback.
     -->
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-1">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_goal table already present">
-            <not><tableExists tableName="practice_goal"/></not>
-        </preConditions>
-        <comment>Workspace-scoped practice goals (configurable learning-objective grouping over practices).</comment>
-        <createTable tableName="practice_goal">
-            <column autoIncrement="true" name="id" type="BIGINT">
-                <constraints nullable="false" primaryKey="true" primaryKeyName="practice_goalPK"/>
-            </column>
-            <column name="workspace_id" type="BIGINT">
-                <constraints nullable="false"/>
-            </column>
-            <column name="slug" type="VARCHAR(64)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="name" type="VARCHAR(128)">
-                <constraints nullable="false"/>
-            </column>
-            <column name="description" type="TEXT"/>
-            <column name="is_active" type="BOOLEAN">
-                <constraints nullable="false"/>
-            </column>
-            <column name="display_order" type="INTEGER">
-                <constraints nullable="false"/>
-            </column>
-            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
-                <constraints nullable="false"/>
-            </column>
-            <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
-        </createTable>
-        <rollback><dropTable tableName="practice_goal"/></rollback>
-    </changeSet>
+    <!-- =========================================================================================
+         Genuine renames + data/enum remaps of PRE-EXISTING practice_finding objects.
+         (practice + practice_finding tables, their columns target_type/target_id/contributor_id/category
+         and the verdict/target_type CHECKs all originate in 1773730203444 / 1774563725885.)
+         The pre-existing-column renames run first so every greenfield object below references final names.
+         ========================================================================================= -->
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="uk_practice_goal_workspace_slug already present">
-            <not><indexExists indexName="uk_practice_goal_workspace_slug"/></not>
+    <!-- Group D/E + Tier-4: rename PRE-EXISTING practice_finding columns to their final names. The
+         dependent CHECK chk_practice_finding_target_type/_verdict + indexes idx_practice_finding_target /
+         _target_run keep their NAMES; Postgres auto-updates their column refs. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding columns already renamed to final names">
+            <columnExists tableName="practice_finding" columnName="target_type"/>
         </preConditions>
-        <comment>Slug unique per workspace; the stable key survives a name rename.</comment>
-        <addUniqueConstraint
-            tableName="practice_goal"
-            columnNames="workspace_id, slug"
-            constraintName="uk_practice_goal_workspace_slug"/>
+        <comment>Rename pre-existing practice_finding columns: target_type→artifact_type, target_id→artifact_id, contributor_id→developer_id.</comment>
+        <renameColumn tableName="practice_finding" oldColumnName="target_type" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
+        <renameColumn tableName="practice_finding" oldColumnName="target_id" newColumnName="artifact_id" columnDataType="BIGINT"/>
+        <renameColumn tableName="practice_finding" oldColumnName="contributor_id" newColumnName="developer_id" columnDataType="BIGINT"/>
         <rollback>
-            <dropUniqueConstraint tableName="practice_goal" constraintName="uk_practice_goal_workspace_slug"/>
+            <renameColumn tableName="practice_finding" oldColumnName="developer_id" newColumnName="contributor_id" columnDataType="BIGINT"/>
+            <renameColumn tableName="practice_finding" oldColumnName="artifact_id" newColumnName="target_id" columnDataType="BIGINT"/>
+            <renameColumn tableName="practice_finding" oldColumnName="artifact_type" newColumnName="target_type" columnDataType="VARCHAR(32)"/>
         </rollback>
     </changeSet>
 
+    <!-- Group D: rename the pre-existing FK + index whose NAME the entity changed (contributor→developer). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-2">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding contributor→developer FK/index already renamed">
+            <foreignKeyConstraintExists foreignKeyName="fk_practice_finding_contributor"/>
+        </preConditions>
+        <comment>Rename pre-existing practice_finding contributor→developer FK + index NAMES to match the entity.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE practice_finding RENAME CONSTRAINT fk_practice_finding_contributor TO fk_practice_finding_developer;
+            ALTER INDEX idx_practice_finding_contributor_detected RENAME TO idx_practice_finding_developer_detected;
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding RENAME CONSTRAINT fk_practice_finding_developer TO fk_practice_finding_contributor;
+            ALTER INDEX idx_practice_finding_developer_detected RENAME TO idx_practice_finding_contributor_detected;
+        </rollback>
+    </changeSet>
+
+    <!-- Tier-4: drop PRE-EXISTING practice.category (column removed from the entity entirely; nullable VARCHAR(64), 0 dependents). -->
     <changeSet author="hephaestus-practice-goals" id="1781092589259-3">
-        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_goal_workspace_active already present">
-            <not><indexExists indexName="idx_practice_goal_workspace_active"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.category already dropped">
+            <columnExists tableName="practice" columnName="category"/>
         </preConditions>
-        <comment>Surface "findings under active goals" per workspace.</comment>
-        <createIndex indexName="idx_practice_goal_workspace_active" tableName="practice_goal">
-            <column name="workspace_id"/>
-            <column name="is_active"/>
-        </createIndex>
-        <rollback><dropIndex indexName="idx_practice_goal_workspace_active" tableName="practice_goal"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-4">
-        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_goal_workspace already present">
-            <not><foreignKeyConstraintExists foreignKeyName="fk_practice_goal_workspace"/></not>
-        </preConditions>
-        <comment>Tenancy FK. No DB cascade — the workspace purge contributor removes goals explicitly (mirrors fk_practice_workspace).</comment>
-        <addForeignKeyConstraint
-            baseTableName="practice_goal" baseColumnNames="workspace_id"
-            constraintName="fk_practice_goal_workspace"
-            referencedTableName="workspace" referencedColumnNames="id"
-            validate="true"/>
+        <comment>Drop practice.category (removed from the PracticeArea/Practice model; no constraint/index depends on it).</comment>
+        <dropColumn tableName="practice" columnName="category"/>
         <rollback>
-            <dropForeignKeyConstraint baseTableName="practice_goal" constraintName="fk_practice_goal_workspace"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-5">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.practice_goal_id already present">
-            <not><columnExists tableName="practice" columnName="practice_goal_id"/></not>
-        </preConditions>
-        <comment>1:N binding column (NULL = ungrouped).</comment>
-        <addColumn tableName="practice">
-            <column name="practice_goal_id" type="BIGINT"/>
-        </addColumn>
-        <rollback><dropColumn tableName="practice" columnName="practice_goal_id"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-6">
-        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_goal already present">
-            <not><foreignKeyConstraintExists foreignKeyName="fk_practice_goal"/></not>
-        </preConditions>
-        <comment>practice → practice_goal. ON DELETE SET NULL: deleting a goal unbinds (never deletes) its practices.</comment>
-        <addForeignKeyConstraint
-            baseTableName="practice" baseColumnNames="practice_goal_id"
-            constraintName="fk_practice_goal"
-            referencedTableName="practice_goal" referencedColumnNames="id"
-            onDelete="SET NULL" validate="true"/>
-        <rollback>
-            <dropForeignKeyConstraint baseTableName="practice" constraintName="fk_practice_goal"/>
+            <addColumn tableName="practice">
+                <column name="category" type="VARCHAR(64)"/>
+            </addColumn>
         </rollback>
     </changeSet>
 
     <!--
-        Rename the mis-named reception table finding_feedback → finding_reaction (it records a
-        contributor's verdict on a finding, not feedback we sent), and its constraints/indexes.
+        ADR 0021 (F-6): make Verdict sign-neutral. Remap the PRE-EXISTING practice_finding.verdict values
+        POSITIVE→OBSERVED, NEGATIVE→NOT_OBSERVED (OBSERVED == old POSITIVE; NOT_OBSERVED == old NEGATIVE)
+        and re-point the existing CHECK to the final allowed-list (drops the unused NEEDS_REVIEW).
     -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-4">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding verdict already sign-neutral">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_practice_finding_verdict'
+                AND pg_get_constraintdef(oid) LIKE '%OBSERVED%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Rename verdict values POSITIVE→OBSERVED, NEGATIVE→NOT_OBSERVED and re-point the CHECK.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_verdict;
+            UPDATE practice_finding SET verdict = 'OBSERVED' WHERE verdict = 'POSITIVE';
+            UPDATE practice_finding SET verdict = 'NOT_OBSERVED' WHERE verdict = 'NEGATIVE';
+            ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_verdict
+                CHECK (verdict IN ('OBSERVED', 'NOT_OBSERVED', 'NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_verdict;
+            UPDATE practice_finding SET verdict = 'POSITIVE' WHERE verdict = 'OBSERVED';
+            UPDATE practice_finding SET verdict = 'NEGATIVE' WHERE verdict = 'NOT_OBSERVED';
+            ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_verdict
+                CHECK (verdict IN ('POSITIVE', 'NEGATIVE', 'NOT_APPLICABLE', 'NEEDS_REVIEW'));
+        </rollback>
+    </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-7">
+    <!--
+        Issues as first-class detection targets (not just PRs). Widen the PRE-EXISTING
+        chk_practice_finding_target_type (created PULL_REQUEST-only in 1774563725885) to admit ISSUE.
+        The column is already renamed to artifact_type above; the CHECK NAME is unchanged.
+    -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-5">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding artifact_type CHECK already admits ISSUE">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_practice_finding_target_type'
+                AND pg_get_constraintdef(oid) LIKE '%ISSUE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Widen the practice_finding artifact_type CHECK to admit ISSUE findings.</comment>
+        <sql>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_target_type;
+            ALTER TABLE practice_finding
+            ADD CONSTRAINT chk_practice_finding_target_type
+            CHECK (artifact_type IN ('PULL_REQUEST', 'ISSUE'));
+        </sql>
+        <rollback>
+            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_target_type;
+            ALTER TABLE practice_finding
+            ADD CONSTRAINT chk_practice_finding_target_type
+            CHECK (artifact_type IN ('PULL_REQUEST'));
+        </rollback>
+    </changeSet>
+
+    <!-- =========================================================================================
+         Genuine renames + data remap of the PRE-EXISTING finding_feedback table (created 1774335316041).
+         Rename the mis-named table (it records a contributor's verdict on a finding, not feedback we sent)
+         to finding_reaction, then bring its columns/FK/index to their final entity names and remap the
+         action enum APPLIED→ENACTED.
+         ========================================================================================= -->
+
+    <changeSet author="hephaestus-feedback" id="1781092589259-6">
         <preConditions onFail="MARK_RAN" onFailMessage="finding_feedback already renamed">
             <tableExists tableName="finding_feedback"/>
         </preConditions>
@@ -128,7 +152,7 @@
         <rollback><renameTable oldTableName="finding_reaction" newTableName="finding_feedback"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-8">
+    <changeSet author="hephaestus-feedback" id="1781092589259-7">
         <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction constraints already renamed">
             <not><indexExists indexName="idx_finding_reaction_finding_contributor"/></not>
         </preConditions>
@@ -153,67 +177,77 @@
         </rollback>
     </changeSet>
 
+    <!-- Group D: rename the pre-existing finding_reaction.contributor_id column (origin: finding_feedback) to developer_id. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-8">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.contributor_id already renamed to developer_id">
+            <columnExists tableName="finding_reaction" columnName="contributor_id"/>
+        </preConditions>
+        <comment>Rename finding_reaction.contributor_id→developer_id (pre-existing column).</comment>
+        <renameColumn tableName="finding_reaction" oldColumnName="contributor_id" newColumnName="developer_id" columnDataType="BIGINT"/>
+        <rollback>
+            <renameColumn tableName="finding_reaction" oldColumnName="developer_id" newColumnName="contributor_id" columnDataType="BIGINT"/>
+        </rollback>
+    </changeSet>
+
     <changeSet author="hephaestus-feedback" id="1781092589259-9">
-        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_practice_goal already present">
-            <not><indexExists indexName="idx_practice_practice_goal"/></not>
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction contributor→developer FK/indexes already renamed">
+            <foreignKeyConstraintExists foreignKeyName="fk_finding_reaction_contributor"/>
         </preConditions>
-        <comment>Index the goal FK: goal-scoped dashboard reads join finding→practice→goal.</comment>
-        <createIndex indexName="idx_practice_practice_goal" tableName="practice">
-            <column name="practice_goal_id"/>
-        </createIndex>
-        <rollback><dropIndex indexName="idx_practice_practice_goal" tableName="practice"/></rollback>
-    </changeSet>
-
-    <!--
-        Issues as first-class detection targets (not just PRs). focus_artifact is the discriminator that
-        routes a practice to the PR vs ISSUE pipeline (trigger gate → context builder → handler →
-        delivery). Defaults to PULL_REQUEST so every existing practice keeps its behavior. The
-        practice_finding target_type CHECK is widened to admit ISSUE findings.
-    -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-10">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.focus_artifact already present">
-            <not><columnExists tableName="practice" columnName="focus_artifact"/></not>
-        </preConditions>
-        <comment>Artifact discriminator on practice (PULL_REQUEST | ISSUE); defaults to PULL_REQUEST.</comment>
-        <addColumn tableName="practice">
-            <column name="focus_artifact" type="VARCHAR(32)" defaultValue="PULL_REQUEST">
-                <constraints nullable="false"/>
-            </column>
-        </addColumn>
-        <rollback><dropColumn tableName="practice" columnName="focus_artifact"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-11">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding target_type CHECK already admits ISSUE">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_constraint
-                WHERE conname = 'chk_practice_finding_target_type'
-                AND pg_get_constraintdef(oid) LIKE '%ISSUE%'
-            </sqlCheck>
-        </preConditions>
-        <comment>Widen the practice_finding target_type CHECK to admit ISSUE findings.</comment>
-        <sql>
-            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_target_type;
-            ALTER TABLE practice_finding
-            ADD CONSTRAINT chk_practice_finding_target_type
-            CHECK (target_type IN ('PULL_REQUEST', 'ISSUE'));
+        <comment>Rename finding_reaction contributor→developer FK + index NAMES to match the entity.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE finding_reaction RENAME CONSTRAINT fk_finding_reaction_contributor TO fk_finding_reaction_developer;
+            ALTER INDEX idx_finding_reaction_contributor_created RENAME TO idx_finding_reaction_developer_created;
+            ALTER INDEX idx_finding_reaction_finding_contributor RENAME TO idx_finding_reaction_finding_developer;
         </sql>
         <rollback>
-            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_target_type;
-            ALTER TABLE practice_finding
-            ADD CONSTRAINT chk_practice_finding_target_type
-            CHECK (target_type IN ('PULL_REQUEST'));
+            ALTER TABLE finding_reaction RENAME CONSTRAINT fk_finding_reaction_developer TO fk_finding_reaction_contributor;
+            ALTER INDEX idx_finding_reaction_developer_created RENAME TO idx_finding_reaction_contributor_created;
+            ALTER INDEX idx_finding_reaction_finding_developer RENAME TO idx_finding_reaction_finding_contributor;
+        </rollback>
+    </changeSet>
+
+    <!-- E1 (pressure-test): rename the PRE-EXISTING FindingReactionAction value APPLIED→ENACTED. "applied"
+         names an OUTCOME, but the suppression filter escalates an ENACTED-but-still-NOT_OBSERVED locus — so
+         the value must name the recipience ACT, not the outcome. Data UPDATE + CHECK rebuild. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-10">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.action already migrated APPLIED→ENACTED">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE pg_get_constraintdef(oid) LIKE '%''ENACTED''%' AND conrelid = 'finding_reaction'::regclass</sqlCheck>
+        </preConditions>
+        <comment>Rename reaction action value APPLIED→ENACTED (data + CHECK).</comment>
+        <sql>
+            UPDATE finding_reaction SET action = 'ENACTED' WHERE action = 'APPLIED';
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
+            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_reaction_action CHECK (action IN ('ENACTED', 'DISPUTED', 'NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            UPDATE finding_reaction SET action = 'APPLIED' WHERE action = 'ENACTED';
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
+            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_reaction_action CHECK (action IN ('APPLIED', 'DISPUTED', 'NOT_APPLICABLE'));
         </rollback>
     </changeSet>
 
     <!--
-        Workspace-configurable practice detection & mentor (PR #1011): runtime-binding FK columns +
-        practice-review policy overrides on workspace. All-nullable, no default: null = inherit the
-        fleet hephaestus.practice-review.* property, so existing workspaces are behaviourally unchanged
-        (zero backfill). ON DELETE SET NULL is a direct-SQL backstop — the app blocks deleting a bound
-        config with a 409. (Consolidated here per the one-changelog-per-PR rule.)
+        CredentialMode.OAUTH was removed from the enum. credential_mode is persisted as EnumType.STRING
+        into a free-form VARCHAR with no CHECK, so any existing row with credential_mode='OAUTH' would
+        now throw IllegalArgumentException on read. Re-map it to API_KEY — semantically the same direct
+        provider call with the token in llm_api_key. Idempotent no-op when no such rows exist.
     -->
+    <changeSet author="hephaestus-1011" id="1781092589259-11">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_config.credential_mode absent">
+            <columnExists tableName="agent_config" columnName="credential_mode"/>
+        </preConditions>
+        <comment>Re-map removed credential_mode 'OAUTH' to 'API_KEY' so persisted rows still deserialize.</comment>
+        <sql>UPDATE agent_config SET credential_mode = 'API_KEY' WHERE credential_mode = 'OAUTH';</sql>
+        <rollback/>
+    </changeSet>
 
+    <!--
+        Workspace-configurable practice detection & mentor (PR #1011): runtime-binding FK columns +
+        practice-review policy overrides on the PRE-EXISTING workspace table. All-nullable, no default:
+        null = inherit the fleet hephaestus.practice-review.* property, so existing workspaces are
+        behaviourally unchanged (zero backfill). ON DELETE SET NULL is a direct-SQL backstop — the app
+        blocks deleting a bound config with a 409. Columns are at their final names; no later rename.
+    -->
     <changeSet author="hephaestus-1011" id="1781092589259-12">
         <preConditions onFail="MARK_RAN" onFailMessage="workspace.practice_config_id already present">
             <not><columnExists tableName="workspace" columnName="practice_config_id"/></not>
@@ -290,34 +324,158 @@
         </rollback>
     </changeSet>
 
-    <!--
-        CredentialMode.OAUTH was removed from the enum. credential_mode is persisted as EnumType.STRING
-        into a free-form VARCHAR with no CHECK, so any existing row with credential_mode='OAUTH' would
-        now throw IllegalArgumentException on read. Re-map it to API_KEY — semantically the same direct
-        provider call with the token in llm_api_key. Idempotent no-op when no such rows exist.
-    -->
-    <changeSet author="hephaestus-1011" id="1781092589259-16">
-        <preConditions onFail="MARK_RAN" onFailMessage="agent_config.credential_mode absent">
-            <columnExists tableName="agent_config" columnName="credential_mode"/>
+    <!-- =========================================================================================
+         Greenfield: practice_area (the proposal's "practice goal" / learning-objective grouping).
+         Entity PracticeArea maps @Table(name="practice_area"). Created DIRECTLY under final names —
+         no practice_goal intermediate. A goal/area is a read-model/organizing concept ONLY — it never
+         enters the detector or the finding schema. Binding is 1:N via practice.practice_area_id, a real
+         @ManyToOne FK (fk_practice_area) with ON DELETE SET NULL so deleting an area unbinds — never
+         deletes — its practices.
+         ========================================================================================= -->
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-16">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_area table already present">
+            <not><tableExists tableName="practice_area"/></not>
         </preConditions>
-        <comment>Re-map removed credential_mode 'OAUTH' to 'API_KEY' so persisted rows still deserialize.</comment>
-        <sql>UPDATE agent_config SET credential_mode = 'API_KEY' WHERE credential_mode = 'OAUTH';</sql>
-        <rollback/>
+        <comment>Workspace-scoped practice areas (configurable learning-objective grouping over practices).</comment>
+        <createTable tableName="practice_area">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="practice_areaPK"/>
+            </column>
+            <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="is_active" type="BOOLEAN">
+                <constraints nullable="false"/>
+            </column>
+            <column name="display_order" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
+        </createTable>
+        <rollback><dropTable tableName="practice_area"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-17">
+        <preConditions onFail="MARK_RAN" onFailMessage="uk_practice_area_workspace_slug already present">
+            <not><indexExists indexName="uk_practice_area_workspace_slug"/></not>
+        </preConditions>
+        <comment>Slug unique per workspace; the stable key survives a name rename.</comment>
+        <addUniqueConstraint
+            tableName="practice_area"
+            columnNames="workspace_id, slug"
+            constraintName="uk_practice_area_workspace_slug"/>
+        <rollback>
+            <dropUniqueConstraint tableName="practice_area" constraintName="uk_practice_area_workspace_slug"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-18">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_area_workspace_active already present">
+            <not><indexExists indexName="idx_practice_area_workspace_active"/></not>
+        </preConditions>
+        <comment>Surface "findings under active areas" per workspace.</comment>
+        <createIndex indexName="idx_practice_area_workspace_active" tableName="practice_area">
+            <column name="workspace_id"/>
+            <column name="is_active"/>
+        </createIndex>
+        <rollback><dropIndex indexName="idx_practice_area_workspace_active" tableName="practice_area"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-19">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_area_workspace already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_practice_area_workspace"/></not>
+        </preConditions>
+        <comment>Tenancy FK. No DB cascade — the workspace purge contributor removes areas explicitly (mirrors fk_practice_workspace).</comment>
+        <addForeignKeyConstraint
+            baseTableName="practice_area" baseColumnNames="workspace_id"
+            constraintName="fk_practice_area_workspace"
+            referencedTableName="workspace" referencedColumnNames="id"
+            validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice_area" constraintName="fk_practice_area_workspace"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-20">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.practice_area_id already present">
+            <not><columnExists tableName="practice" columnName="practice_area_id"/></not>
+        </preConditions>
+        <comment>1:N binding column (NULL = ungrouped).</comment>
+        <addColumn tableName="practice">
+            <column name="practice_area_id" type="BIGINT"/>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="practice_area_id"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-21">
+        <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_area already present">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_practice_area"/></not>
+        </preConditions>
+        <comment>practice → practice_area. ON DELETE SET NULL: deleting an area unbinds (never deletes) its practices.</comment>
+        <addForeignKeyConstraint
+            baseTableName="practice" baseColumnNames="practice_area_id"
+            constraintName="fk_practice_area"
+            referencedTableName="practice_area" referencedColumnNames="id"
+            onDelete="SET NULL" validate="true"/>
+        <rollback>
+            <dropForeignKeyConstraint baseTableName="practice" constraintName="fk_practice_area"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-22">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_practice_area already present">
+            <not><indexExists indexName="idx_practice_practice_area"/></not>
+        </preConditions>
+        <comment>Index the area FK: area-scoped dashboard reads join finding→practice→area.</comment>
+        <createIndex indexName="idx_practice_practice_area" tableName="practice">
+            <column name="practice_area_id"/>
+        </createIndex>
+        <rollback><dropIndex indexName="idx_practice_practice_area" tableName="practice"/></rollback>
+    </changeSet>
+
+    <!-- =========================================================================================
+         Greenfield practice discriminator/learner columns, created DIRECTLY under final entity names
+         (artifact_type, polarity, subject_role, why_it_matters, what_good_looks_like).
+         ========================================================================================= -->
+
+    <!--
+        Issues as first-class detection targets: artifact_type is the discriminator that routes a practice
+        to the PR vs ISSUE pipeline. Defaults to PULL_REQUEST so every existing practice keeps its behavior.
+    -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-23">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.artifact_type already present">
+            <not><columnExists tableName="practice" columnName="artifact_type"/></not>
+        </preConditions>
+        <comment>Artifact discriminator on practice (PULL_REQUEST | ISSUE); defaults to PULL_REQUEST.</comment>
+        <addColumn tableName="practice">
+            <column name="artifact_type" type="VARCHAR(32)" defaultValue="PULL_REQUEST">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="artifact_type"/></rollback>
     </changeSet>
 
     <!--
-        ADR 0021 (F-6): make Verdict sign-neutral. POSITIVE/NEGATIVE carried a "good/bad" sign that
-        broke down for anti-pattern practices; the direction now lives on practice.polarity, leaving
-        verdict to state only presence (OBSERVED / NOT_OBSERVED / NOT_APPLICABLE). Every catalogued
-        practice today is a desirable habit, so polarity defaults to DESIRABLE and the row rename is
-        behaviour-preserving: OBSERVED == old POSITIVE, NOT_OBSERVED == old NEGATIVE.
+        ADR 0021 (F-6): the good/bad direction lives on practice.polarity (DESIRABLE | UNDESIRABLE |
+        CONTEXTUAL), leaving verdict to state only presence. Every catalogued practice today is a
+        desirable habit, so polarity defaults to DESIRABLE. No CHECK (enum guarded app-side).
     -->
-
-    <changeSet author="hephaestus-feedback" id="1781092589259-17">
+    <changeSet author="hephaestus-feedback" id="1781092589259-24">
         <preConditions onFail="MARK_RAN" onFailMessage="practice.polarity already present">
             <not><columnExists tableName="practice" columnName="polarity"/></not>
         </preConditions>
-        <comment>Good/bad direction on practice (DESIRABLE | UNDESIRABLE | MIXED); defaults to DESIRABLE.</comment>
+        <comment>Good/bad direction on practice (DESIRABLE | UNDESIRABLE | CONTEXTUAL); defaults to DESIRABLE.</comment>
         <addColumn tableName="practice">
             <column name="polarity" type="VARCHAR(16)" defaultValue="DESIRABLE">
                 <constraints nullable="false"/>
@@ -326,55 +484,63 @@
         <rollback><dropColumn tableName="practice" columnName="polarity"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-18">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding verdict already sign-neutral">
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM pg_constraint
-                WHERE conname = 'chk_practice_finding_verdict'
-                AND pg_get_constraintdef(oid) LIKE '%OBSERVED%'
-            </sqlCheck>
+    <changeSet author="hephaestus-feedback" id="1781092589259-25">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.subject_role already present">
+            <not><columnExists tableName="practice" columnName="subject_role"/></not>
         </preConditions>
-        <comment>Rename verdict values POSITIVE→OBSERVED, NEGATIVE→NOT_OBSERVED and re-point the CHECK.</comment>
-        <sql splitStatements="true" endDelimiter=";">
-            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_verdict;
-            UPDATE practice_finding SET verdict = 'OBSERVED' WHERE verdict = 'POSITIVE';
-            UPDATE practice_finding SET verdict = 'NOT_OBSERVED' WHERE verdict = 'NEGATIVE';
-            ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_verdict
-                CHECK (verdict IN ('OBSERVED', 'NOT_OBSERVED', 'NOT_APPLICABLE'));
-        </sql>
+        <comment>ADR 0021 C2: practice subject role (AUTHOR | REVIEWER); defaults to AUTHOR. Drives the reviewer/author delivery firewall. No CHECK (mirrors polarity/artifact_type; enum guarded app-side).</comment>
+        <addColumn tableName="practice">
+            <column name="subject_role" type="VARCHAR(16)" defaultValue="AUTHOR">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback><dropColumn tableName="practice" columnName="subject_role"/></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-26">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.why_it_matters already present">
+            <not><columnExists tableName="practice" columnName="why_it_matters"/></not>
+        </preConditions>
+        <comment>B: developer-facing learner columns (nullable; surfaced only via LearnerPracticeDTO, never with criteria).</comment>
+        <addColumn tableName="practice">
+            <column name="why_it_matters" type="TEXT"/>
+            <column name="what_good_looks_like" type="TEXT"/>
+        </addColumn>
         <rollback>
-            ALTER TABLE practice_finding DROP CONSTRAINT IF EXISTS chk_practice_finding_verdict;
-            UPDATE practice_finding SET verdict = 'POSITIVE' WHERE verdict = 'OBSERVED';
-            UPDATE practice_finding SET verdict = 'NEGATIVE' WHERE verdict = 'NOT_OBSERVED';
-            ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_verdict
-                CHECK (verdict IN ('POSITIVE', 'NEGATIVE', 'NOT_APPLICABLE'));
+            <dropColumn tableName="practice" columnName="why_it_matters"/>
+            <dropColumn tableName="practice" columnName="what_good_looks_like"/>
         </rollback>
     </changeSet>
 
-    <!-- ADR 0021 C2 findings/feedback synthesis seam. Names match the JPA entities EXACTLY (uk_/idx_/fk_/chk_). Timestamps use TIMESTAMP(6) WITH TIME ZONE; UUID PKs/FKs use type UUID. Each changeSet onFail=MARK_RAN + rollback, mirroring -17/-18. baseline_state DERIVED on read (no column). FindingReaction NOT reshaped here. -->
+    <!-- =========================================================================================
+         ADR 0021 C2 findings/feedback synthesis seam. Greenfield columns/tables created DIRECTLY under
+         final entity names (finding_fingerprint, subject_user_id, delivery_state, feedback_thread_key,
+         artifact_type/artifact_id, slot, evidence_role). Timestamps use TIMESTAMP(6) WITH TIME ZONE;
+         UUID PKs/FKs use type UUID. baseline_state DERIVED on read (no column).
+         ========================================================================================= -->
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-19">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.correlation_key already present">
-            <not><columnExists tableName="practice_finding" columnName="correlation_key"/></not>
+    <changeSet author="hephaestus-feedback" id="1781092589259-27">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.finding_fingerprint already present">
+            <not><columnExists tableName="practice_finding" columnName="finding_fingerprint"/></not>
         </preConditions>
         <comment>ADR 0021 C2: cross-run finding identity (stable hash; never line/jobId) + reviewer-subject. Nullable, backfill-free.</comment>
         <addColumn tableName="practice_finding">
-            <column name="correlation_key" type="VARCHAR(64)"/>
+            <column name="finding_fingerprint" type="VARCHAR(64)"/>
             <column name="subject_user_id" type="BIGINT"/>
         </addColumn>
         <rollback>
-            <dropColumn tableName="practice_finding" columnName="correlation_key"/>
+            <dropColumn tableName="practice_finding" columnName="finding_fingerprint"/>
             <dropColumn tableName="practice_finding" columnName="subject_user_id"/>
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-20">
+    <changeSet author="hephaestus-feedback" id="1781092589259-28">
         <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_finding_correlation already present">
             <not><indexExists indexName="idx_practice_finding_correlation"/></not>
         </preConditions>
-        <comment>Index the cross-run correlation key (supersession lookups) + subject_user_id (reviewer-subject dashboards).</comment>
+        <comment>Index the cross-run fingerprint (supersession lookups) + subject_user_id (reviewer-subject dashboards).</comment>
         <createIndex indexName="idx_practice_finding_correlation" tableName="practice_finding">
-            <column name="correlation_key"/>
+            <column name="finding_fingerprint"/>
         </createIndex>
         <createIndex indexName="idx_practice_finding_subject" tableName="practice_finding">
             <column name="subject_user_id"/>
@@ -385,7 +551,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-21">
+    <changeSet author="hephaestus-feedback" id="1781092589259-29">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_practice_finding_subject already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_practice_finding_subject"/></not>
         </preConditions>
@@ -396,22 +562,47 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-22">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.audience_role already present">
-            <not><columnExists tableName="practice" columnName="audience_role"/></not>
+    <!-- A1 (ADR 0021): rank a target's review runs by detected_at without scanning all of a workspace's
+         findings, for FindingTrendService.computeForTarget (the cross-run trend read path). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-30">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_finding_target_run already present">
+            <not><indexExists indexName="idx_practice_finding_target_run"/></not>
         </preConditions>
-        <comment>ADR 0021 C2: practice audience role (AUTHOR | REVIEWER); defaults to AUTHOR. Drives the reviewer/author delivery firewall. No CHECK (mirrors polarity/focus_artifact; enum guarded app-side).</comment>
-        <addColumn tableName="practice">
-            <column name="audience_role" type="VARCHAR(16)" defaultValue="AUTHOR">
-                <constraints nullable="false"/>
-            </column>
-        </addColumn>
-        <rollback><dropColumn tableName="practice" columnName="audience_role"/></rollback>
+        <comment>A1 trend: composite index for per-target run ranking (FindingTrendService).</comment>
+        <createIndex indexName="idx_practice_finding_target_run" tableName="practice_finding">
+            <column name="artifact_type"/>
+            <column name="artifact_id"/>
+            <column name="agent_job_id"/>
+            <column name="detected_at" descending="true"/>
+        </createIndex>
+        <rollback>
+            <dropIndex indexName="idx_practice_finding_target_run" tableName="practice_finding"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ADR 0021 subject_user_id collapse: backfill from developer_id then enforce NOT NULL (entity:
+         @Column(nullable=false)). The column is created nullable above (it joins existing rows that have no
+         reviewer-subject yet); this is the canonical create-nullable→backfill→NOT-NULL collapse, landing at
+         the final NOT NULL in one shot. feedback.subject_user_id is collapsed symmetrically below. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-31">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.subject_user_id already NOT NULL">
+            <columnExists tableName="practice_finding" columnName="subject_user_id"/>
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_name = 'practice_finding' AND column_name = 'subject_user_id' AND is_nullable = 'NO'
+            </sqlCheck>
+        </preConditions>
+        <comment>Collapse subject_user_id: backfill from developer_id where null, then enforce NOT NULL (entity now @Column(nullable=false)).</comment>
+        <sql>UPDATE practice_finding SET subject_user_id = developer_id WHERE subject_user_id IS NULL;</sql>
+        <addNotNullConstraint tableName="practice_finding" columnName="subject_user_id" columnDataType="BIGINT"/>
+        <rollback>
+            <dropNotNullConstraint tableName="practice_finding" columnName="subject_user_id" columnDataType="BIGINT"/>
+        </rollback>
     </changeSet>
 
     <!-- feedback (synthesized delivery unit, Immutable) -->
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-23">
+    <changeSet author="hephaestus-feedback" id="1781092589259-32">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback table already present">
             <not><tableExists tableName="feedback"/></not>
         </preConditions>
@@ -421,13 +612,13 @@
             <column name="idempotency_key" type="VARCHAR(255)"><constraints nullable="false"/></column>
             <column name="agent_job_id" type="UUID"><constraints nullable="false"/></column>
             <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
-            <column name="target_type" type="VARCHAR(32)"/>
-            <column name="target_id" type="BIGINT"/>
+            <column name="artifact_type" type="VARCHAR(32)"/>
+            <column name="artifact_id" type="BIGINT"/>
             <column name="recipient_user_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="subject_user_id" type="BIGINT"/>
             <column name="surface" type="VARCHAR(32)"><constraints nullable="false"/></column>
             <column name="unit_ordinal" type="INTEGER"><constraints nullable="false"/></column>
-            <column name="state" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="delivery_state" type="VARCHAR(16)"><constraints nullable="false"/></column>
             <column name="suppression_reason" type="VARCHAR(32)"/>
             <column name="rendered_body" type="TEXT"/>
             <column name="origin" type="VARCHAR(16)"><constraints nullable="false"/></column>
@@ -435,14 +626,14 @@
             <column name="composer_version" type="VARCHAR(255)"/>
             <column name="synthesis_prompt_version" type="VARCHAR(255)"/>
             <column name="supersedes_id" type="UUID"/>
-            <column name="continuity_key" type="VARCHAR(64)"/>
+            <column name="feedback_thread_key" type="VARCHAR(64)"/>
             <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="delivered_at" type="TIMESTAMP(6) WITH TIME ZONE"/>
         </createTable>
         <rollback><dropTable tableName="feedback"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-24">
+    <changeSet author="hephaestus-feedback" id="1781092589259-33">
         <preConditions onFail="MARK_RAN" onFailMessage="uk_feedback_idempotency already present">
             <not><indexExists indexName="uk_feedback_idempotency"/></not>
         </preConditions>
@@ -451,16 +642,16 @@
         <rollback><dropUniqueConstraint tableName="feedback" constraintName="uk_feedback_idempotency"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-25">
+    <changeSet author="hephaestus-feedback" id="1781092589259-34">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback CHECK constraints already present">
             <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_state'</sqlCheck>
         </preConditions>
-        <comment>Enum CHECKs for feedback (mirrors chk_practice_finding_* idiom). target_type uses full WorkArtifact vocabulary PULL_REQUEST/ISSUE.</comment>
+        <comment>Enum CHECKs for feedback at final allowed-lists (delivery_state column; suppression_reason includes REVIEWER_SIDE + the B2 reaction-aware reasons).</comment>
         <sql>
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_target_type CHECK (target_type IS NULL OR target_type IN ('PULL_REQUEST', 'ISSUE'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_target_type CHECK (artifact_type IS NULL OR artifact_type IN ('PULL_REQUEST', 'ISSUE'));
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_surface CHECK (surface IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION_DASHBOARD', 'FACILITATOR'));
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (state IN ('PREPARED', 'DELIVERED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (delivery_state IN ('PREPARED', 'DELIVERED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_origin CHECK (origin IN ('AGENT', 'POLICY_FLOOR', 'FALLBACK'));
         </sql>
         <rollback>
@@ -472,7 +663,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-26">
+    <changeSet author="hephaestus-feedback" id="1781092589259-35">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_agent_job already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_agent_job"/></not>
         </preConditions>
@@ -481,7 +672,7 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_agent_job"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-27">
+    <changeSet author="hephaestus-feedback" id="1781092589259-36">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_workspace already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_workspace"/></not>
         </preConditions>
@@ -490,7 +681,7 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_workspace"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-28">
+    <changeSet author="hephaestus-feedback" id="1781092589259-37">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_recipient already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_recipient"/></not>
         </preConditions>
@@ -499,16 +690,16 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_recipient"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-29">
+    <changeSet author="hephaestus-feedback" id="1781092589259-38">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_subject already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_subject"/></not>
         </preConditions>
-        <comment>FK feedback.subject_user_id to user.id (person the feedback is ABOUT). Nullable; SET NULL on delete.</comment>
+        <comment>FK feedback.subject_user_id to user.id (person the feedback is ABOUT). SET NULL on delete.</comment>
         <addForeignKeyConstraint baseTableName="feedback" baseColumnNames="subject_user_id" constraintName="sfk_feedback_subject" referencedTableName="user" referencedColumnNames="id" onDelete="SET NULL" validate="true"/>
         <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_subject"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-30">
+    <changeSet author="hephaestus-feedback" id="1781092589259-39">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_supersedes already present">
             <not><foreignKeyConstraintExists foreignKeyName="sfk_feedback_supersedes"/></not>
         </preConditions>
@@ -517,17 +708,17 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback" constraintName="sfk_feedback_supersedes"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-31">
+    <changeSet author="hephaestus-feedback" id="1781092589259-40">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback indexes already present">
             <not><indexExists indexName="idx_feedback_agent_job"/></not>
         </preConditions>
-        <comment>Query indexes: agent_job + workspace + supersedes/recipient FKs (Postgres does not auto-index referencing columns), recipient-timeline, target lookup, continuity_key supersession lookup.</comment>
+        <comment>Query indexes: agent_job + workspace + supersedes/recipient FKs (Postgres does not auto-index referencing columns), recipient-timeline, target lookup, feedback_thread_key supersession lookup.</comment>
         <createIndex indexName="idx_feedback_agent_job" tableName="feedback"><column name="agent_job_id"/></createIndex>
         <createIndex indexName="idx_feedback_workspace" tableName="feedback"><column name="workspace_id"/></createIndex>
         <createIndex indexName="idx_feedback_supersedes" tableName="feedback"><column name="supersedes_id"/></createIndex>
         <createIndex indexName="idx_feedback_recipient_created" tableName="feedback"><column name="recipient_user_id"/><column name="created_at" descending="true"/></createIndex>
-        <createIndex indexName="idx_feedback_target" tableName="feedback"><column name="target_type"/><column name="target_id"/></createIndex>
-        <createIndex indexName="idx_feedback_continuity" tableName="feedback"><column name="continuity_key"/></createIndex>
+        <createIndex indexName="idx_feedback_target" tableName="feedback"><column name="artifact_type"/><column name="artifact_id"/></createIndex>
+        <createIndex indexName="idx_feedback_continuity" tableName="feedback"><column name="feedback_thread_key"/></createIndex>
         <rollback>
             <dropIndex indexName="idx_feedback_continuity" tableName="feedback"/>
             <dropIndex indexName="idx_feedback_target" tableName="feedback"/>
@@ -538,9 +729,21 @@
         </rollback>
     </changeSet>
 
+    <!-- C: feedback.subject_user_id NOT NULL (backfill = recipient) — symmetry with PracticeFinding + xAPI
+         Actor. Canonical create-nullable→backfill→NOT-NULL collapse, landing at the final NOT NULL. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-41">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback.subject_user_id already NOT NULL">
+            <sqlCheck expectedResult="YES">SELECT is_nullable FROM information_schema.columns WHERE table_name='feedback' AND column_name='subject_user_id'</sqlCheck>
+        </preConditions>
+        <comment>C: feedback.subject_user_id NOT NULL (backfill = recipient).</comment>
+        <sql>UPDATE feedback SET subject_user_id = recipient_user_id WHERE subject_user_id IS NULL;</sql>
+        <addNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/>
+        <rollback><dropNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/></rollback>
+    </changeSet>
+
     <!-- feedback_finding (M:N composition, Immutable) -->
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-32">
+    <changeSet author="hephaestus-feedback" id="1781092589259-42">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding table already present">
             <not><tableExists tableName="feedback_finding"/></not>
         </preConditions>
@@ -548,23 +751,23 @@
         <createTable tableName="feedback_finding">
             <column name="feedback_id" type="UUID"><constraints nullable="false"/></column>
             <column name="finding_id" type="UUID"><constraints nullable="false"/></column>
-            <column name="display_role" type="VARCHAR(16)"><constraints nullable="false"/></column>
+            <column name="evidence_role" type="VARCHAR(16)"><constraints nullable="false"/></column>
             <column name="ordinal" type="INTEGER"><constraints nullable="false"/></column>
         </createTable>
         <addPrimaryKey tableName="feedback_finding" columnNames="feedback_id, finding_id" constraintName="feedback_finding_pkey"/>
         <rollback><dropTable tableName="feedback_finding"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-33">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding display_role CHECK already present">
-            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_finding_display_role'</sqlCheck>
+    <changeSet author="hephaestus-feedback" id="1781092589259-43">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding evidence_role CHECK already present">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_finding_evidence_role'</sqlCheck>
         </preConditions>
-        <comment>Enum CHECK for feedback_finding.display_role (PRIMARY | SUPPORTING).</comment>
-        <sql>ALTER TABLE feedback_finding ADD CONSTRAINT chk_feedback_finding_display_role CHECK (display_role IN ('PRIMARY', 'SUPPORTING'));</sql>
-        <rollback>ALTER TABLE feedback_finding DROP CONSTRAINT IF EXISTS chk_feedback_finding_display_role;</rollback>
+        <comment>Enum CHECK for feedback_finding.evidence_role (PRIMARY | SUPPORTING).</comment>
+        <sql>ALTER TABLE feedback_finding ADD CONSTRAINT chk_feedback_finding_evidence_role CHECK (evidence_role IN ('PRIMARY', 'SUPPORTING'));</sql>
+        <rollback>ALTER TABLE feedback_finding DROP CONSTRAINT IF EXISTS chk_feedback_finding_evidence_role;</rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-34">
+    <changeSet author="hephaestus-feedback" id="1781092589259-44">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_finding_feedback already present">
             <not><foreignKeyConstraintExists foreignKeyName="fk_feedback_finding_feedback"/></not>
         </preConditions>
@@ -573,7 +776,7 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback_finding" constraintName="fk_feedback_finding_feedback"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-35">
+    <changeSet author="hephaestus-feedback" id="1781092589259-45">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_finding_finding already present">
             <not><foreignKeyConstraintExists foreignKeyName="fk_feedback_finding_finding"/></not>
         </preConditions>
@@ -582,7 +785,7 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback_finding" constraintName="fk_feedback_finding_finding"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-36">
+    <changeSet author="hephaestus-feedback" id="1781092589259-46">
         <preConditions onFail="MARK_RAN" onFailMessage="idx_feedback_finding_finding already present">
             <not><indexExists indexName="idx_feedback_finding_finding"/></not>
         </preConditions>
@@ -593,7 +796,7 @@
 
     <!-- feedback_placement (1:N surface placement, Immutable) -->
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-37">
+    <changeSet author="hephaestus-feedback" id="1781092589259-47">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement table already present">
             <not><tableExists tableName="feedback_placement"/></not>
         </preConditions>
@@ -601,7 +804,7 @@
         <createTable tableName="feedback_placement">
             <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="feedback_placement_pkey"/></column>
             <column name="feedback_id" type="UUID"><constraints nullable="false"/></column>
-            <column name="placement" type="VARCHAR(32)"><constraints nullable="false"/></column>
+            <column name="slot" type="VARCHAR(32)"><constraints nullable="false"/></column>
             <column name="anchor_kind" type="VARCHAR(16)"/>
             <column name="anchor_path" type="TEXT"/>
             <column name="anchor_old_path" type="TEXT"/>
@@ -622,13 +825,13 @@
         <rollback><dropTable tableName="feedback_placement"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-38">
+    <changeSet author="hephaestus-feedback" id="1781092589259-48">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement CHECK constraints already present">
             <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_placement_posted_state'</sqlCheck>
         </preConditions>
-        <comment>Enum CHECKs for feedback_placement (placement / anchor_kind / anchor_side / anchor_start_side / posted_state).</comment>
+        <comment>Enum CHECKs for feedback_placement (slot / anchor_kind / anchor_side / anchor_start_side / posted_state). The slot CHECK keeps its name chk_feedback_placement_placement.</comment>
         <sql>
-            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_placement CHECK (placement IN ('SUMMARY', 'INLINE', 'CONVERSATION_TURN'));
+            ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_placement CHECK (slot IN ('SUMMARY', 'INLINE', 'CONVERSATION_TURN'));
             ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_anchor_kind CHECK (anchor_kind IS NULL OR anchor_kind IN ('LINE', 'RANGE', 'FILE', 'IMAGE'));
             ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_anchor_side CHECK (anchor_side IS NULL OR anchor_side IN ('OLD', 'NEW'));
             ALTER TABLE feedback_placement ADD CONSTRAINT chk_feedback_placement_anchor_start_side CHECK (anchor_start_side IS NULL OR anchor_start_side IN ('OLD', 'NEW'));
@@ -643,7 +846,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-39">
+    <changeSet author="hephaestus-feedback" id="1781092589259-49">
         <preConditions onFail="MARK_RAN" onFailMessage="fk_feedback_placement_feedback already present">
             <not><foreignKeyConstraintExists foreignKeyName="fk_feedback_placement_feedback"/></not>
         </preConditions>
@@ -652,7 +855,7 @@
         <rollback><dropForeignKeyConstraint baseTableName="feedback_placement" constraintName="fk_feedback_placement_feedback"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-40">
+    <changeSet author="hephaestus-feedback" id="1781092589259-50">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement indexes already present">
             <not><indexExists indexName="idx_feedback_placement_feedback"/></not>
         </preConditions>
@@ -668,10 +871,10 @@
     <!--
         ADR 0021 C7: drop the dead feedback_post subsystem. FeedbackPostService had zero injectors and the
         FeedbackPost/Repository/Service were never wired — the delivered-feedback record now lives in the
-        C6 ledger (feedback / feedback_placement.external_ref). Dropping the table keeps the Hibernate-vs-
-        Liquibase drift gate clean now that the entity is deleted.
+        C6 ledger (feedback / feedback_placement.external_ref). Dropping the PRE-EXISTING table keeps the
+        Hibernate-vs-Liquibase drift gate clean now that the entity is deleted.
     -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-41">
+    <changeSet author="hephaestus-feedback" id="1781092589259-51">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_post already dropped">
             <tableExists tableName="feedback_post"/>
         </preConditions>
@@ -683,338 +886,47 @@
         </rollback>
     </changeSet>
 
-    <!-- A1 (ADR 0021): rank a target's review runs by detected_at without scanning all of a workspace's
-         findings, for FindingTrendService.computeForTarget (the cross-run trend read path). -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-42">
-        <preConditions onFail="MARK_RAN" onFailMessage="idx_practice_finding_target_run already present">
-            <not><indexExists indexName="idx_practice_finding_target_run"/></not>
+    <!-- A2 (ADR 0021): denormalize the finding fingerprint onto finding_reaction so a developer's reaction
+         (ENACTED / DISPUTED / NOT_APPLICABLE) follows ONE concern across the non-deterministic detector's
+         re-detections. Greenfield column created DIRECTLY as finding_fingerprint (no correlation_key
+         intermediate); idx_finding_reaction_correlation is the entity's index name. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-52">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.finding_fingerprint already present">
+            <not><columnExists tableName="finding_reaction" columnName="finding_fingerprint"/></not>
         </preConditions>
-        <comment>A1 trend: composite index for per-target run ranking (FindingTrendService).</comment>
-        <createIndex indexName="idx_practice_finding_target_run" tableName="practice_finding">
-            <column name="target_type"/>
-            <column name="target_id"/>
-            <column name="agent_job_id"/>
-            <column name="detected_at" descending="true"/>
-        </createIndex>
-        <rollback>
-            <dropIndex indexName="idx_practice_finding_target_run" tableName="practice_finding"/>
-        </rollback>
-    </changeSet>
-
-    <!-- A2 (ADR 0021): denormalize correlation_key onto finding_reaction so a developer's reaction
-         (APPLIED / DISPUTED / NOT_APPLICABLE) follows ONE concern across the non-deterministic detector's
-         re-detections — the reaction is captured against the ephemeral per-run finding_id today, which
-         cannot be matched run-to-run. This is the key reaction-aware re-nag suppression (B2) reads. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-43">
-        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.correlation_key already present">
-            <not><columnExists tableName="finding_reaction" columnName="correlation_key"/></not>
-        </preConditions>
-        <comment>A2: add finding_reaction.correlation_key + index (locus identity for reaction-aware suppression).</comment>
+        <comment>A2: add finding_reaction.finding_fingerprint + index (locus identity for reaction-aware suppression).</comment>
         <addColumn tableName="finding_reaction">
-            <column name="correlation_key" type="VARCHAR(64)"/>
+            <column name="finding_fingerprint" type="VARCHAR(64)"/>
         </addColumn>
         <createIndex indexName="idx_finding_reaction_correlation" tableName="finding_reaction">
-            <column name="correlation_key"/>
+            <column name="finding_fingerprint"/>
         </createIndex>
         <rollback>
             <dropIndex indexName="idx_finding_reaction_correlation" tableName="finding_reaction"/>
-            <dropColumn tableName="finding_reaction" columnName="correlation_key"/>
+            <dropColumn tableName="finding_reaction" columnName="finding_fingerprint"/>
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-feedback" id="1781092589259-44">
-        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.correlation_key already backfilled">
-            <sqlCheck expectedResult="0">SELECT count(*) FROM finding_reaction WHERE correlation_key IS NOT NULL</sqlCheck>
-        </preConditions>
-        <comment>A2 backfill: copy correlation_key from each reacted finding (rows whose source finding predates C2 stay null — they simply cannot participate in B2).</comment>
-        <sql>
-            UPDATE finding_reaction fr SET correlation_key = pf.correlation_key
-            FROM practice_finding pf
-            WHERE fr.finding_id = pf.id AND pf.correlation_key IS NOT NULL AND fr.correlation_key IS NULL;
-        </sql>
-        <rollback>
-            <sql>UPDATE finding_reaction SET correlation_key = NULL;</sql>
-        </rollback>
-    </changeSet>
-
-    <!-- B2 (ADR 0021): widen the suppression_reason CHECK to admit the reaction-aware reasons. Without this,
-         FeedbackLedgerRecorder.recordSuppressed throws a CHECK violation on every DISPUTED/NOT_APPLICABLE
-         suppression — caught best-effort, so the finding is still dropped, but the SUPPRESSED ledger row that
-         makes the withholding visible to an eval is never written. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-45">
-        <preConditions onFail="MARK_RAN" onFailMessage="suppression_reason CHECK already admits REACTED_*">
-            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_suppression_reason' AND pg_get_constraintdef(oid) LIKE '%REACTED_DISPUTED%'</sqlCheck>
-        </preConditions>
-        <comment>B2: add REACTED_DISPUTED / REACTED_NOT_APPLICABLE to chk_feedback_suppression_reason.</comment>
-        <sql>
-            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
-        </sql>
-        <rollback>
-            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP'));
-        </rollback>
-    </changeSet>
-
-    <!--
-        ============================================================================================
-        Naming migration (groups A–E + Tier-4): bring the Liquibase-managed schema to the FINAL
-        column / FK / index names the committed JPA entities now declare. The entities are the source
-        of truth; these changeSets are purely additive renames (renameColumn / ALTER ... RENAME) so the
-        Hibernate-vs-Liquibase drift gate (db:draft-changelog) reports an empty diff.
-
-        Renaming a column in Postgres auto-updates dependent index definitions and CHECK-constraint
-        expressions (the constraint/index NAME is unchanged), so only the handful of index/FK NAMES
-        that the entities themselves changed get an explicit ALTER ... RENAME below. Table name
-        practice_goal is intentionally KEPT (entity PracticeArea maps @Table(name="practice_goal")).
-        ============================================================================================
-    -->
-
-    <!-- Group A/E: practice column renames (practice_goal_id→practice_area_id, focus_artifact→artifact_type, audience_role→subject_role). Index/FK NAMES (idx_practice_practice_goal, fk_practice_goal) are unchanged — renameColumn auto-updates their column refs. -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-46">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice columns already renamed to final names">
-            <columnExists tableName="practice" columnName="practice_goal_id"/>
-        </preConditions>
-        <comment>Rename practice columns to final names: practice_goal_id→practice_area_id, focus_artifact→artifact_type, audience_role→subject_role.</comment>
-        <renameColumn tableName="practice" oldColumnName="practice_goal_id" newColumnName="practice_area_id" columnDataType="BIGINT"/>
-        <renameColumn tableName="practice" oldColumnName="focus_artifact" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
-        <renameColumn tableName="practice" oldColumnName="audience_role" newColumnName="subject_role" columnDataType="VARCHAR(16)"/>
-        <rollback>
-            <renameColumn tableName="practice" oldColumnName="subject_role" newColumnName="audience_role" columnDataType="VARCHAR(16)"/>
-            <renameColumn tableName="practice" oldColumnName="artifact_type" newColumnName="focus_artifact" columnDataType="VARCHAR(32)"/>
-            <renameColumn tableName="practice" oldColumnName="practice_area_id" newColumnName="practice_goal_id" columnDataType="BIGINT"/>
-        </rollback>
-    </changeSet>
-
-    <!-- Tier-4: drop practice.category (column removed from the entity entirely; nullable VARCHAR(64), 0 dependents). -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-47">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.category already dropped">
-            <columnExists tableName="practice" columnName="category"/>
-        </preConditions>
-        <comment>Drop practice.category (removed from the PracticeArea/Practice model; no constraint/index depends on it).</comment>
-        <dropColumn tableName="practice" columnName="category"/>
-        <rollback>
-            <addColumn tableName="practice">
-                <column name="category" type="VARCHAR(64)"/>
-            </addColumn>
-        </rollback>
-    </changeSet>
-
-    <!-- ADR 0021: Polarity.MIXED renamed to CONTEXTUAL (no CHECK constraint on practice.polarity; data-only). -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-48">
-        <preConditions onFail="MARK_RAN" onFailMessage="no practice.polarity='MIXED' rows to remap">
-            <columnExists tableName="practice" columnName="polarity"/>
-        </preConditions>
-        <comment>Remap practice.polarity 'MIXED'→'CONTEXTUAL' (enum value rename; polarity has no CHECK).</comment>
-        <sql>UPDATE practice SET polarity = 'CONTEXTUAL' WHERE polarity = 'MIXED';</sql>
-        <rollback>
-            <sql>UPDATE practice SET polarity = 'MIXED' WHERE polarity = 'CONTEXTUAL';</sql>
-        </rollback>
-    </changeSet>
-
-    <!-- Group D/E + Tier-4: practice_finding column renames. target_type→artifact_type, target_id→artifact_id, contributor_id→developer_id, correlation_key→finding_fingerprint. CHECK chk_practice_finding_target_type + indexes idx_practice_finding_target / _target_run / _correlation keep their NAMES (column refs auto-update). -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-49">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding columns already renamed to final names">
-            <columnExists tableName="practice_finding" columnName="target_type"/>
-        </preConditions>
-        <comment>Rename practice_finding columns: target_type→artifact_type, target_id→artifact_id, contributor_id→developer_id, correlation_key→finding_fingerprint.</comment>
-        <renameColumn tableName="practice_finding" oldColumnName="target_type" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
-        <renameColumn tableName="practice_finding" oldColumnName="target_id" newColumnName="artifact_id" columnDataType="BIGINT"/>
-        <renameColumn tableName="practice_finding" oldColumnName="contributor_id" newColumnName="developer_id" columnDataType="BIGINT"/>
-        <renameColumn tableName="practice_finding" oldColumnName="correlation_key" newColumnName="finding_fingerprint" columnDataType="VARCHAR(64)"/>
-        <rollback>
-            <renameColumn tableName="practice_finding" oldColumnName="finding_fingerprint" newColumnName="correlation_key" columnDataType="VARCHAR(64)"/>
-            <renameColumn tableName="practice_finding" oldColumnName="developer_id" newColumnName="contributor_id" columnDataType="BIGINT"/>
-            <renameColumn tableName="practice_finding" oldColumnName="artifact_id" newColumnName="target_id" columnDataType="BIGINT"/>
-            <renameColumn tableName="practice_finding" oldColumnName="artifact_type" newColumnName="target_type" columnDataType="VARCHAR(32)"/>
-        </rollback>
-    </changeSet>
-
-    <!-- Group D: rename the FK + indexes whose NAME the entity changed (contributor→developer). The _correlation index keeps its name. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-50">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding contributor→developer FK/index already renamed">
-            <foreignKeyConstraintExists foreignKeyName="fk_practice_finding_contributor"/>
-        </preConditions>
-        <comment>Rename practice_finding contributor→developer FK + index NAMES to match the entity.</comment>
-        <sql splitStatements="true" endDelimiter=";">
-            ALTER TABLE practice_finding RENAME CONSTRAINT fk_practice_finding_contributor TO fk_practice_finding_developer;
-            ALTER INDEX idx_practice_finding_contributor_detected RENAME TO idx_practice_finding_developer_detected;
-        </sql>
-        <rollback>
-            ALTER TABLE practice_finding RENAME CONSTRAINT fk_practice_finding_developer TO fk_practice_finding_contributor;
-            ALTER INDEX idx_practice_finding_developer_detected RENAME TO idx_practice_finding_contributor_detected;
-        </rollback>
-    </changeSet>
-
-    <!-- ADR 0021 subject_user_id collapse: backfill from developer_id (now renamed) then enforce NOT NULL (entity: @Column(nullable=false)). MUST run AFTER -49 so developer_id exists. feedback.subject_user_id stays nullable. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-51">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.subject_user_id already NOT NULL">
-            <columnExists tableName="practice_finding" columnName="subject_user_id"/>
-            <sqlCheck expectedResult="0">
-                SELECT count(*) FROM information_schema.columns
-                WHERE table_name = 'practice_finding' AND column_name = 'subject_user_id' AND is_nullable = 'NO'
-            </sqlCheck>
-        </preConditions>
-        <comment>Collapse subject_user_id: backfill from developer_id where null, then enforce NOT NULL (entity now @Column(nullable=false)).</comment>
-        <sql>UPDATE practice_finding SET subject_user_id = developer_id WHERE subject_user_id IS NULL;</sql>
-        <addNotNullConstraint tableName="practice_finding" columnName="subject_user_id" columnDataType="BIGINT"/>
-        <rollback>
-            <dropNotNullConstraint tableName="practice_finding" columnName="subject_user_id" columnDataType="BIGINT"/>
-        </rollback>
-    </changeSet>
-
-    <!-- Group E2 + Tier-4: feedback column renames. target_type→artifact_type, target_id→artifact_id, state→delivery_state, continuity_key→feedback_thread_key. Indexes idx_feedback_target / idx_feedback_continuity keep their NAMES (column refs auto-update). chk_feedback_state / chk_feedback_target_type keep their names; the state→delivery_state rename auto-updates the chk_feedback_state expression. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-52">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback columns already renamed to final names">
-            <columnExists tableName="feedback" columnName="state"/>
-        </preConditions>
-        <comment>Rename feedback columns: target_type→artifact_type, target_id→artifact_id, state→delivery_state, continuity_key→feedback_thread_key.</comment>
-        <renameColumn tableName="feedback" oldColumnName="target_type" newColumnName="artifact_type" columnDataType="VARCHAR(32)"/>
-        <renameColumn tableName="feedback" oldColumnName="target_id" newColumnName="artifact_id" columnDataType="BIGINT"/>
-        <renameColumn tableName="feedback" oldColumnName="state" newColumnName="delivery_state" columnDataType="VARCHAR(16)"/>
-        <renameColumn tableName="feedback" oldColumnName="continuity_key" newColumnName="feedback_thread_key" columnDataType="VARCHAR(64)"/>
-        <rollback>
-            <renameColumn tableName="feedback" oldColumnName="feedback_thread_key" newColumnName="continuity_key" columnDataType="VARCHAR(64)"/>
-            <renameColumn tableName="feedback" oldColumnName="delivery_state" newColumnName="state" columnDataType="VARCHAR(16)"/>
-            <renameColumn tableName="feedback" oldColumnName="artifact_id" newColumnName="target_id" columnDataType="BIGINT"/>
-            <renameColumn tableName="feedback" oldColumnName="artifact_type" newColumnName="target_type" columnDataType="VARCHAR(32)"/>
-        </rollback>
-    </changeSet>
-
-    <!-- ADR 0021: SuppressionReason.AUDIENCE_REVIEWER renamed to REVIEWER_SIDE. Data remap + rebuild chk_feedback_suppression_reason allowed-list (keeping the B2 reaction-aware reasons added in -45). -->
     <changeSet author="hephaestus-feedback" id="1781092589259-53">
-        <preConditions onFail="MARK_RAN" onFailMessage="suppression_reason CHECK already uses REVIEWER_SIDE">
-            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_suppression_reason' AND pg_get_constraintdef(oid) LIKE '%AUDIENCE_REVIEWER%'</sqlCheck>
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.finding_fingerprint already backfilled">
+            <sqlCheck expectedResult="0">SELECT count(*) FROM finding_reaction WHERE finding_fingerprint IS NOT NULL</sqlCheck>
         </preConditions>
-        <comment>Remap feedback.suppression_reason 'AUDIENCE_REVIEWER'→'REVIEWER_SIDE' and rebuild chk_feedback_suppression_reason.</comment>
+        <comment>A2 backfill: copy the fingerprint from each reacted finding (rows whose source finding predates C2 stay null — they simply cannot participate in B2).</comment>
         <sql>
-            UPDATE feedback SET suppression_reason = 'REVIEWER_SIDE' WHERE suppression_reason = 'AUDIENCE_REVIEWER';
-            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
+            UPDATE finding_reaction fr SET finding_fingerprint = pf.finding_fingerprint
+            FROM practice_finding pf
+            WHERE fr.finding_id = pf.id AND pf.finding_fingerprint IS NOT NULL AND fr.finding_fingerprint IS NULL;
         </sql>
         <rollback>
-            UPDATE feedback SET suppression_reason = 'AUDIENCE_REVIEWER' WHERE suppression_reason = 'REVIEWER_SIDE';
-            ALTER TABLE feedback DROP CONSTRAINT IF EXISTS chk_feedback_suppression_reason;
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('AUDIENCE_REVIEWER', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
+            <sql>UPDATE finding_reaction SET finding_fingerprint = NULL;</sql>
         </rollback>
     </changeSet>
 
-    <!-- Group E2: feedback_placement.placement→slot. chk_feedback_placement_placement keeps its NAME (expression auto-updates). -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-54">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_placement.placement already renamed to slot">
-            <columnExists tableName="feedback_placement" columnName="placement"/>
-        </preConditions>
-        <comment>Rename feedback_placement.placement→slot.</comment>
-        <renameColumn tableName="feedback_placement" oldColumnName="placement" newColumnName="slot" columnDataType="VARCHAR(32)"/>
-        <rollback>
-            <renameColumn tableName="feedback_placement" oldColumnName="slot" newColumnName="placement" columnDataType="VARCHAR(32)"/>
-        </rollback>
-    </changeSet>
-
-    <!-- Group E2: feedback_finding.display_role→evidence_role. chk_feedback_finding_display_role keeps its NAME (expression auto-updates). -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-55">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_finding.display_role already renamed to evidence_role">
-            <columnExists tableName="feedback_finding" columnName="display_role"/>
-        </preConditions>
-        <comment>Rename feedback_finding.display_role→evidence_role.</comment>
-        <renameColumn tableName="feedback_finding" oldColumnName="display_role" newColumnName="evidence_role" columnDataType="VARCHAR(16)"/>
-        <rollback>
-            <renameColumn tableName="feedback_finding" oldColumnName="evidence_role" newColumnName="display_role" columnDataType="VARCHAR(16)"/>
-        </rollback>
-    </changeSet>
-
-    <!-- Group D: finding_reaction column renames (contributor_id→developer_id, correlation_key→finding_fingerprint) + rename the FK + indexes whose NAME the entity changed. idx_finding_reaction_correlation keeps its name. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-56">
-        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction columns already renamed to final names">
-            <columnExists tableName="finding_reaction" columnName="contributor_id"/>
-        </preConditions>
-        <comment>Rename finding_reaction columns: contributor_id→developer_id, correlation_key→finding_fingerprint.</comment>
-        <renameColumn tableName="finding_reaction" oldColumnName="contributor_id" newColumnName="developer_id" columnDataType="BIGINT"/>
-        <renameColumn tableName="finding_reaction" oldColumnName="correlation_key" newColumnName="finding_fingerprint" columnDataType="VARCHAR(64)"/>
-        <rollback>
-            <renameColumn tableName="finding_reaction" oldColumnName="finding_fingerprint" newColumnName="correlation_key" columnDataType="VARCHAR(64)"/>
-            <renameColumn tableName="finding_reaction" oldColumnName="developer_id" newColumnName="contributor_id" columnDataType="BIGINT"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-feedback" id="1781092589259-57">
-        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction contributor→developer FK/indexes already renamed">
-            <foreignKeyConstraintExists foreignKeyName="fk_finding_reaction_contributor"/>
-        </preConditions>
-        <comment>Rename finding_reaction contributor→developer FK + index NAMES to match the entity.</comment>
-        <sql splitStatements="true" endDelimiter=";">
-            ALTER TABLE finding_reaction RENAME CONSTRAINT fk_finding_reaction_contributor TO fk_finding_reaction_developer;
-            ALTER INDEX idx_finding_reaction_contributor_created RENAME TO idx_finding_reaction_developer_created;
-            ALTER INDEX idx_finding_reaction_finding_contributor RENAME TO idx_finding_reaction_finding_developer;
-        </sql>
-        <rollback>
-            ALTER TABLE finding_reaction RENAME CONSTRAINT fk_finding_reaction_developer TO fk_finding_reaction_contributor;
-            ALTER INDEX idx_finding_reaction_developer_created RENAME TO idx_finding_reaction_contributor_created;
-            ALTER INDEX idx_finding_reaction_finding_developer RENAME TO idx_finding_reaction_finding_contributor;
-        </rollback>
-    </changeSet>
-
-    <!-- goal→area: complete the PracticeGoal→PracticeArea rename at the DB level (table + its PK/uk/idx/fk + the
-         practice→area FK/index) so the schema matches the renamed entities. Column practice.practice_area_id was
-         already renamed in -46; this finishes the table + constraint/index names. -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-58">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_goal table already renamed to practice_area">
-            <tableExists tableName="practice_goal"/>
-        </preConditions>
-        <comment>Rename table practice_goal → practice_area (entity PracticeArea).</comment>
-        <renameTable oldTableName="practice_goal" newTableName="practice_area"/>
-        <rollback><renameTable oldTableName="practice_area" newTableName="practice_goal"/></rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-59">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice_area constraints/indexes already renamed">
-            <foreignKeyConstraintExists foreignKeyName="fk_practice_goal"/>
-        </preConditions>
-        <comment>Rename practice_area + practice constraints/indexes from *_practice_goal_* to *_practice_area_*.</comment>
-        <sql>
-            ALTER TABLE practice_area RENAME CONSTRAINT "practice_goalPK" TO "practice_areaPK";
-            ALTER TABLE practice_area RENAME CONSTRAINT uk_practice_goal_workspace_slug TO uk_practice_area_workspace_slug;
-            ALTER INDEX idx_practice_goal_workspace_active RENAME TO idx_practice_area_workspace_active;
-            ALTER TABLE practice_area RENAME CONSTRAINT fk_practice_goal_workspace TO fk_practice_area_workspace;
-            ALTER TABLE practice RENAME CONSTRAINT fk_practice_goal TO fk_practice_area;
-            ALTER INDEX idx_practice_practice_goal RENAME TO idx_practice_practice_area;
-        </sql>
-        <rollback>
-            ALTER TABLE practice_area RENAME CONSTRAINT "practice_areaPK" TO "practice_goalPK";
-            ALTER TABLE practice_area RENAME CONSTRAINT uk_practice_area_workspace_slug TO uk_practice_goal_workspace_slug;
-            ALTER INDEX idx_practice_area_workspace_active RENAME TO idx_practice_goal_workspace_active;
-            ALTER TABLE practice_area RENAME CONSTRAINT fk_practice_area_workspace TO fk_practice_goal_workspace;
-            ALTER TABLE practice RENAME CONSTRAINT fk_practice_area TO fk_practice_goal;
-            ALTER INDEX idx_practice_practice_area RENAME TO idx_practice_practice_goal;
-        </rollback>
-    </changeSet>
-
-    <!-- E1 (pressure-test): rename FindingReactionAction value APPLIED→ENACTED. "applied" names an OUTCOME,
-         but the suppression filter escalates an ENACTED-but-still-NOT_OBSERVED locus — so the value must name
-         the recipience ACT, not the outcome (Winstone et al. 2017 "enacting"; Sadler 1989). Data UPDATE +
-         CHECK rebuild; constraint may carry its pre-table-rename name, so drop both possibilities. -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-60">
-        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.action already migrated APPLIED→ENACTED">
-            <sqlCheck expectedResult="0">SELECT count(*) FROM pg_constraint WHERE pg_get_constraintdef(oid) LIKE '%''ENACTED''%' AND conrelid = 'finding_reaction'::regclass</sqlCheck>
-        </preConditions>
-        <comment>Rename reaction action value APPLIED→ENACTED (data + CHECK).</comment>
-        <sql>
-            UPDATE finding_reaction SET action = 'ENACTED' WHERE action = 'APPLIED';
-            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_feedback_action;
-            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
-            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_reaction_action CHECK (action IN ('ENACTED', 'DISPUTED', 'NOT_APPLICABLE'));
-        </sql>
-        <rollback>
-            UPDATE finding_reaction SET action = 'APPLIED' WHERE action = 'ENACTED';
-            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
-            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_feedback_action CHECK (action IN ('APPLIED', 'DISPUTED', 'NOT_APPLICABLE'));
-        </rollback>
-    </changeSet>
-
-    <!-- Pressure-test bridge-to-A++: (A) practice_revision SCD-2 versioning so findings pin to the
-         criteria-as-it-was; (B) practice.why_it_matters + what_good_looks_like learner-facing columns;
-         (C) feedback.subject_user_id NOT NULL symmetry. All additive; criteria stays the current projection. -->
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-61">
+    <!-- =========================================================================================
+         Pressure-test bridge-to-A++: practice_revision SCD-2 versioning so findings pin to the
+         criteria-as-it-was. All additive; criteria stays the current projection.
+         ========================================================================================= -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-54">
         <preConditions onFail="MARK_RAN" onFailMessage="practice_revision table already present">
             <not><tableExists tableName="practice_revision"/></not>
         </preConditions>
@@ -1031,7 +943,7 @@
         <rollback><dropTable tableName="practice_revision"/></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-62">
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-55">
         <preConditions onFail="MARK_RAN" onFailMessage="practice_revision constraints already present">
             <not><indexExists indexName="uk_practice_revision_practice_number"/></not>
         </preConditions>
@@ -1046,7 +958,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-63">
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-56">
         <preConditions onFail="MARK_RAN" onFailMessage="practice_revision already backfilled">
             <sqlCheck expectedResult="0">SELECT count(*) FROM practice_revision</sqlCheck>
         </preConditions>
@@ -1055,7 +967,7 @@
         <rollback><sql>DELETE FROM practice_revision WHERE revision_number = 1;</sql></rollback>
     </changeSet>
 
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-64">
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-57">
         <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.practice_revision_id already present">
             <not><columnExists tableName="practice_finding" columnName="practice_revision_id"/></not>
         </preConditions>
@@ -1066,31 +978,6 @@
             <dropForeignKeyConstraint baseTableName="practice_finding" constraintName="fk_practice_finding_revision"/>
             <dropColumn tableName="practice_finding" columnName="practice_revision_id"/>
         </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-65">
-        <preConditions onFail="MARK_RAN" onFailMessage="practice.why_it_matters already present">
-            <not><columnExists tableName="practice" columnName="why_it_matters"/></not>
-        </preConditions>
-        <comment>B: developer-facing learner columns (nullable; surfaced only via LearnerPracticeDTO, never with criteria).</comment>
-        <addColumn tableName="practice">
-            <column name="why_it_matters" type="TEXT"/>
-            <column name="what_good_looks_like" type="TEXT"/>
-        </addColumn>
-        <rollback>
-            <dropColumn tableName="practice" columnName="why_it_matters"/>
-            <dropColumn tableName="practice" columnName="what_good_looks_like"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="hephaestus-practice-goals" id="1781092589259-66">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback.subject_user_id already NOT NULL">
-            <sqlCheck expectedResult="YES">SELECT is_nullable FROM information_schema.columns WHERE table_name='feedback' AND column_name='subject_user_id'</sqlCheck>
-        </preConditions>
-        <comment>C: feedback.subject_user_id NOT NULL (backfill = recipient) — symmetry with PracticeFinding + xAPI Actor.</comment>
-        <sql>UPDATE feedback SET subject_user_id = recipient_user_id WHERE subject_user_id IS NULL;</sql>
-        <addNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/>
-        <rollback><dropNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/></rollback>
     </changeSet>
 
 </databaseChangeLog>
