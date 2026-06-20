@@ -43,14 +43,14 @@ over-claim its evidence basis:
 | **practitioner-canonical** | grounded in a canonical standard / practitioner source (SWEBOK, ISO/IEC 25010, OWASP, Google eng-practices, Conventional Commits) but **not** a controlled-outcome study |
 | **practitioner-norm** | a community / gatekeeping convention with **no** controlled-outcome study |
 
-**Two deferred slug renames.** Two practices were re-named (human `name`/`summary` only) in 2026-06 to
-remove a label↔source contradiction: the civility practice (was *"ask rather than demand"*) and the
-injection practice (was *"validate and escape"*). Their **slugs are unchanged** — a slug is a finding
-fingerprint key (`FindingFingerprint.compute()` hashes `practiceSlug`), so renaming it would orphan every
-prior finding, reaction, and feedback correlated through it. The slug renames therefore wait on a
-**fingerprint-remap migration** (the SCD-2 `practice_revision` history — see
-`practice-feedback-schema.md` §3.8 — is now built, but a slug change still needs an explicit
-fingerprint remap so prior findings re-correlate rather than orphan; that remap is the gating step).
+**Two deferred slug renames.** Two practices carry a human `name`/`summary` that intentionally differs
+from their slug, to remove a label↔source contradiction: the civility practice (slug reads *"ask rather
+than demand"*) and the injection practice (slug reads *"validate and escape"*). Their **slugs are left
+unchanged** — a slug is a finding fingerprint key (`FindingFingerprint.compute()` hashes `practiceSlug`),
+so renaming it would orphan every prior finding, reaction, and feedback correlated through it. A slug
+rename needs an explicit **fingerprint-remap migration** so prior findings re-correlate rather than
+orphan; that remap is the gating step (the SCD-2 `practice_revision` history — see
+`practice-feedback-schema.md` §3.8 — does not by itself remap fingerprints).
 
 ---
 
@@ -232,10 +232,10 @@ Each row: the practice's one-line grounding (study/standard + author/year) and i
 
 ---
 
-## 4. Curation changes landed in 2026-06 (name / criteria / metadata only — no slug churn)
+## 4. Curated names / criteria / metadata (no slug churn)
 
-All of the following were applied to `default-catalog.json` and touch only human-facing `name`/`summary`,
-`criteria` text, or metadata — never a slug (identity key), a stored enum, or a DB CHECK.
+The following `default-catalog.json` entries touch only human-facing `name`/`summary`, `criteria` text,
+or metadata — never a slug (identity key), a stored enum, or a DB CHECK.
 
 1. **Civility practice** (`reviews-respectfully-asks-rather-than-demands`): name → *"Keep review comments
    civil and about the code, not the person"*. Drops "ask rather than demand" — Google eng-practices

@@ -1,9 +1,15 @@
 # ADR 0021: Findings vs feedback — the agent produces evidence *and* granular feedback; we deliver feedback, never findings
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-14
-**Authors:** (draft — practice-mentoring owner; to be finalised with Felix)
+**Authors:** (practice-mentoring owner)
 **Builds on:** [ADR 0020](0020-context-fabric-everything-is-an-integration.md) (the content-fabric / `ContentProvider` seam and history-in-sandbox), [ADR 0007](0007-sandbox-spi-shape.md) (the Pi agent sandbox)
+
+> [!NOTE]
+> This ADR captures the **decision and rationale**. Some field/enum names below were renamed during
+> implementation (e.g. `correlation_key` → `finding_fingerprint`, `continuity_key` → `feedback_thread_key`,
+> `display_role` → `evidence_role`, `contributor_id` → `developer_id`). For the **authoritative shipped
+> schema and ubiquitous-language**, see `docs/contributor/practice-feedback-schema.md` §2.
 
 ## Context
 
@@ -211,4 +217,4 @@ The in-context comment becomes an agent-synthesised, grouped, lifted, **granular
 
 ## Sources
 
-Hattie & Timperley 2007; Shute 2008; Kluger & DeNisi 1996; Kulik & Kulik 1988; Nicol & Macfarlane-Dick 2006; Bull & Kay 2007; Jivet 2017/2018 + Bodily & Verbert 2017; Wessel et al. 2021/2022; Razzaq & Heffernan 2010. Internal: the praxis-bench decision register + exposé; the gold-feedback iteration arc; the whole-mirror battle-test; this PR's adversarial design workflows. Schema precedents distilled in `.context/schema-references/findings-feedback-precedents.md`.
+Grounded in the formative-assessment and feedback-uptake literature (feed-up / feed-back / feed-forward; feedback that changes the gap; the limits of person-level praise) and in SARIF / xAPI schema conventions. Schema precedents are distilled in `.context/schema-references/findings-feedback-precedents.md`.

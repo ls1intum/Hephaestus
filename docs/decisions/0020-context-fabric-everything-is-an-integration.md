@@ -9,11 +9,10 @@
 
 The practice-detection agent reviews a change from a materialised context directory
 (`context/target/*`) built by the `ContentProvider` SPI (`agent.context`, ADR 0007).
-Until this slice, that directory held only what the diff and the PR row carry:
-`metadata.json`, `diff.patch`, `diff_summary.md`, `comments.json`. The Obsphera
-whole-mirror battle-test found that ~1/3 of the mentor lessons that *should* have
-reached a student were **context-blind** misses, not detection misses: the signal lived
-in another artifact the agent never saw. The three sharpest examples:
+A directory that holds only what the diff and the PR row carry (`metadata.json`,
+`diff.patch`, `diff_summary.md`, `comments.json`) makes a large fraction of mentor
+lessons **context-blind** misses rather than detection misses: the signal lives in
+another artifact the agent never saw. Three sharp examples:
 
 - A change that `Closes #N` could not be judged against #N's acceptance criteria,
   because the criteria live in the **issue body**, never in the diff.
@@ -31,8 +30,8 @@ context with provenance**. The only genuinely *native* capabilities Hephaestus o
 call the substrate that makes any such content addressable, tenant-safe, and cacheable
 the **Context Fabric**.
 
-This ADR records the target architecture *and* is honest that this PR ships only the
-first, smallest slice of it on the existing seam.
+This ADR records the target architecture *and* the first, smallest slice of it that
+ships on the existing seam.
 
 ## Considered options
 
@@ -43,7 +42,7 @@ first, smallest slice of it on the existing seam.
 ## Decision register
 
 The Context Fabric is defined by the following decisions. Most are **target state**
-(staged follow-ups); the slice this PR ships is called out in §"What this PR ships".
+(staged follow-ups); the shipped slice is called out in §"Shipped slice".
 
 1. **SQL is the source of truth; disk is a rebuildable cache.** Persisted rows in
    Postgres are authoritative. Everything on the agent's disk (`context/target/*`, the
@@ -169,9 +168,9 @@ reframe end-to-end before paying for the migration:
 The audience tag, `consistencyToken`, split-confidence edges, RLS, and the
 `Connector` superset are **not** in the original slice. They are the staged follow-ups below.
 
-## Update (2026-06-13): CAS + final filesystem layout shipped
+## CAS and final filesystem layout
 
-The on-disk substrate is no longer SCM-special. The following decisions are now **realized**
+The on-disk substrate is not SCM-special. The following decisions are **realized**
 (additive, no schema change), so the layout is in its final, integration-namespaced shape and a
 future connector slots in with no restructuring:
 
@@ -205,8 +204,8 @@ the five-Kind PROV-O vocabulary, audience + `consistencyToken`, fail-CLOSED tena
 
 Positive:
 
-- The agent stops being context-blind on the three highest-payoff misses from the
-  battle-test, on a seam that already exists — zero schema migration, zero new SPI.
+- The agent stops being context-blind on the highest-payoff context-blind misses, on a
+  seam that already exists — zero schema migration, zero new SPI.
 - Each provider is best-effort and each practice is NA-safe: a workspace with git
   disabled, no linked issue, or no test target simply gets silence, never a spurious
   finding or a failed job.
@@ -260,4 +259,4 @@ Authorization System (USENIX ATC 2019, the "zookie" snapshot token); Apache Iceb
 spec and schema-evolution guidance; Databricks medallion (bronze/silver/gold) architecture
 guidance; W3C PROV-O provenance ontology. Internal: ADR 0015 (integration framework),
 ADR 0004 (SQL-layer tenancy), ADR 0007 (sandbox/ContentProvider seam), ADR 0014 (per-row
-AAD), and the Obsphera whole-mirror battle-test verdict.
+AAD), and internal mentor-quality evaluation.

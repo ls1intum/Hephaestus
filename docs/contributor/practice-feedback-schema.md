@@ -3,8 +3,7 @@
 > Status: living reference for the `practices` Spring Modulith module (entities under
 > `server/src/main/java/de/tum/cit/aet/hephaestus/practices/**`). Grounded in ADR 0021
 > (`docs/decisions/0021-findings-feedback-synthesis-seam.md`). Uses the **canonical vocabulary**
-> throughout — *area*, never *goal*. The legacy *goal* spelling has been **eliminated** across
-> code, schema, API, and UI; §5 records the completed migration.
+> throughout — *area*, never *goal* — one word per concept across code, schema, API, and UI.
 
 ---
 
@@ -32,42 +31,17 @@ divergence is load-bearing (sign-neutral `Observation` × `Polarity`). The namin
 
 ## 1a. Construct grounding (practice theory)
 
-The four core entities map cleanly onto the **three-component ontology of organizational routines**
-(Pentland & Feldman 2005, 2008) and its material-turn refinement (D'Adderio 2011), with the delivery
-layer grounded in formative-assessment theory (Hattie & Timperley 2007). A `Practice` row is an
-**artifact that *reflects* the ostensive aspect** of a software-engineering routine — Pentland &
-Feldman's third component, distinct from both the abstract pattern and its performances; its `criteria`
-field is, in D'Adderio's (2011, *J. Institutional Economics* 7(2):204–205) terms, *"a partial, selective,
-codified representation"* of that necessarily-tacit, plural ostensive pattern — **not the pattern
-itself**. We assert the *opposite* of what D'Adderio names "the categorical mistake": equating the
-artifact with the routine's ostensive aspect is the mistake; we never equate `criteria` with the
-ostensive, treating it only as the operationalised referent that makes the otherwise-tacit pattern
-observable for formative assessment (Sadler 1989). A `PracticeFinding` is the **performative
-enactment** — D'Adderio's "expression" (routines-in-practice), the situated-action trace. A `Feedback`
-unit is the **formative-assessment delivery** (Hattie & Timperley 2007) of one or more enactments to a
-person. (The current canon — Feldman, Pentland, D'Adderio & Lazaric 2016, "Beyond Routines as Things" —
-frames routines *as practices*, so `Practice` as the top noun is *more* defensible post-2016, not less.)
+The entity model is grounded in the theory of **organizational routines** (the abstract, tacit standard
+of a practice vs. its situated enactments) and in **formative-assessment** theory for the delivery layer.
+The full literature rationale lives in ADR 0021
+(`docs/decisions/0021-findings-feedback-synthesis-seam.md`); in engineering terms the mapping is:
 
-| Practice-theory term | Hephaestus object | Note |
+| Concept | Hephaestus object | What it is |
 | --- | --- | --- |
-| **ostensive aspect** (abstract, tacit, plural) | the **`Practice` *concept*** | lives in the cohort's shared understanding; NOT a column |
-| **artifact reflecting the ostensive** ("partial, selective, codified representation") | **`Practice.criteria`** | the written rule *as a representation of* the ostensive — never the ostensive itself |
-| **performative aspect / "expression"** (routines-in-practice) | **`PracticeFinding`** | the situated enactment / observable trace |
-| **formative-assessment delivery** | **`Feedback`** | task-framed feed-up/feed-back/feed-forward (Hattie & Timperley 2007) |
-
-*Construct sources:* Pentland & Feldman (2005), *Organizational routines as a unit of analysis*,
-Industrial and Corporate Change 14(5):793–815 ·
-[link](https://academic.oup.com/icc/article-abstract/14/5/793/656208) · Pentland & Feldman (2008),
-*Designing routines*, Information and Organization 18(4):235–250, p.241 ·
-[PDF](https://bpb-us-e2.wpmucdn.com/sites.uci.edu/dist/5/1068/files/2013/02/Pentland-and-Feldman-2008-Information-and-Organization.pdf) ·
-D'Adderio (2011), *Artefacts at the centre of routines*, J. Institutional Economics 7(2):197–230,
-pp.204–205 · [PDF](https://strathprints.strath.ac.uk/43784/1/S174413741000024Xa.pdf) ·
-Feldman, Pentland, D'Adderio & Lazaric (2016), *Beyond Routines as Things*, Organization Science
-27(3):505–513 · [link](https://pubsonline.informs.org/doi/10.1287/orsc.2016.1070) ·
-Sadler (1989), *Formative assessment and the design of instructional systems*, Instructional Science
-18:119–144 · [link](https://link.springer.com/article/10.1007/BF00117714) ·
-Hattie & Timperley (2007), *The Power of Feedback*, Review of Educational Research 77(1):81–112 ·
-[link](https://journals.sagepub.com/doi/10.3102/003465430298487).
+| the practice as a shared, tacit standard | the **`Practice` *concept*** | lives in the cohort's shared understanding; NOT a column |
+| the written rule representing that standard | **`Practice.criteria`** | a partial, codified representation — never the standard itself |
+| a single observed enactment | **`PracticeFinding`** | the situated, observable trace |
+| feedback synthesised for a person | **`Feedback`** | task-framed feed-up / feed-back / feed-forward |
 
 ---
 
@@ -90,7 +64,7 @@ Synonyms are a defect, not a convenience.
 | Cross-run feedback continuity | **feedback_thread_key** (`FeedbackThreadKey`) | `continuity_key` | names *what it threads* (successive deliveries), domain-readable |
 | Delivery destination class | **FeedbackChannel** / `surface` (column) | `surface` (as the *concept* word) | the concept is "channel"; `surface` survives only as the column name |
 | One physical render of a unit | **FeedbackPlacement** / **PlacementSlot** | `placement` (as a slot word) | the slot enum is `PlacementSlot`; the row is the `FeedbackPlacement` |
-| Finding's weight inside a unit | **EvidenceRole** (`PRIMARY` / `SUPPORTING`) | `display_role` | it weights *evidence*, not display; the stale `@Param("displayRole")` is residue (§5) |
+| Finding's weight inside a unit | **EvidenceRole** (`PRIMARY` / `SUPPORTING`) | `display_role` | it weights *evidence*, not display |
 | Whose conduct a practice judges | **SubjectRole** (`AUTHOR` / `REVIEWER`) | `audience_role`, `AUDIENCE_REVIEWER` | it is the *subject's* role; `AUDIENCE_REVIEWER` collapsed to `REVIEWER` (the side is `REVIEWER_SIDE`) |
 | Context-dependent polarity value | **CONTEXTUAL** | `MIXED` | "contextual" states *why* the direction is unfixed (context decides), not that it is merely mixed |
 
@@ -456,67 +430,21 @@ Hattie & Timperley (2007) feed-up/feed-back/feed-forward · CodeQL
 
 ---
 
-## 5. Legacy terminology eliminated — the `goal → area` migration (completed)
+## 5. Naming consistency — intentional keeps
 
-The canonical word for the grouping bucket is **area**; **`goal` was legacy** and has been removed from
-code, schema, API, and UI. This satisfies the DDD *Ubiquitous Language* mandate: one word per concept
-across the whole bounded context, model through UI
-([Fowler](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *Domain-Driven Design*). A
-synonym surviving in one layer (the DB table while the entity was already renamed) is a defect that
-breaks the "same word everywhere" contract and forces translation at every boundary.
+The grouping bucket is named **area** throughout (code, schema, API, UI) — one word per concept across
+the bounded context, model to UI (DDD *Ubiquitous Language*:
+[Fowler](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *Domain-Driven Design*).
 
-**Renamed to `area` (done — verified by an empty `db:draft-changelog` drift diff and the regenerated
-`openapi.yaml` / client / ERD):**
+A few identifiers intentionally retain an older spelling — these are deliberate, not debt, and must NOT
+be "fixed":
 
-- `Practice.goal` field + `getGoal()`/`setGoal()` → `area` / `getArea()`/`setArea()`
-  (`Practice.java`, `PracticeAreaService`, `PracticeDTO`, `PracticeCatalogInjector`,
-  `PracticeStandingAspectProvider`, `PracticeFindingRepository` JPQL `p.goal`, `PracticeRepository`
-  `attributePaths="goal"` + `findByWorkspaceIdAndGoalId`).
-- DB table `practice_goal` + PK `practice_goalPK` → `practice_area` / `practice_areaPK`
-  (`PracticeArea.java` `@Table`; changelog `1781092589259-58`/`-59` rename table + PK/uk/idx/fk; ERD `schema.mmd`).
-- FK `fk_practice_goal` (practice→area) → `fk_practice_area`.
-- Index `idx_practice_practice_goal` (on `practice.practice_area_id`) → `idx_practice_practice_area`.
-- `fk_practice_goal_workspace` / `uk_practice_goal_workspace_slug` / `idx_practice_goal_workspace_active`
-  → `*_practice_area_*`.
-- `PracticeAreaService` member vocab: `goalService`, `practiceGoalRepository`, `goalRepository`,
-  `createGoal`/`getGoal`/`updateGoal`/`deleteGoal`/`listGoals`, `bindPractice(goalSlug)` →
-  `areaService`, `practiceAreaRepository`, `areaRepository`, `createArea`/`getArea`/`updateArea`/
-  `deleteArea`/`listAreas`, `bindPractice(areaSlug)`.
-- REST routes `/practice-goals` + `/practices/{slug}/goal`; operationIds
-  `listGoals`/`getGoal`/`createGoal`/`updateGoal`/`deleteGoal`/`reorderGoals`/`bindGoal`; path param
-  `goalSlug`; tag `"Practice Goals"` → `/practice-areas` + `/practices/{slug}/area`; `listAreas`/…/
-  `bindArea`; `areaSlug`; tag `"Practice Areas"` (regenerate `openapi.yaml`).
-- DTO fields `PracticeDTO.goalSlug`, `BindPracticeAreaRequestDTO.goalSlug` → `areaSlug`.
-- `PracticeFindingRepository` projection `GoalStandingRow` + `getGoalSlug()`/`getGoalName()` +
-  `findGoalStandingByDeveloperAndWorkspace` + JPQL aliases `goalSlug`/`goalName` → `AreaStandingRow` +
-  `getAreaSlug()`/`getAreaName()` + `findAreaStandingByDeveloperAndWorkspace`.
-- `PracticeStandingAspectProvider` inner `GoalAcc` + `var goals` + `practice_standing.json` keys
-  `"goals"`/`"goalSlug"`/`"goalName"` → `AreaAcc` + `areas` + `"areas"`/`"areaSlug"`/`"areaName"`
-  (mentor ABI — coordinate with `mentor system.md`).
-- `PracticeCatalogInjector` runner entry key `"goal"` → `"area"`.
-- `default-catalog.json` top-level array key `"goals"` + seeder `catalog.path("goals")`/`goalNode` →
-  `"areas"`.
-- `PracticesControllerAdvice.handleGoalSlugConflict` + message `"Practice goal slug conflict"` →
-  `handleAreaSlugConflict` + `"Practice area slug conflict"`.
-- Webapp `PracticeGoalsPanel` (+ `.stories`), route `goals.tsx`, `PracticeGoalsContainer`, `byGoal`/
-  `goalSections`/`goalSlug`, `NO_GOAL`, `mockGoals`, and generated `listGoals`/…/`bindGoal` helpers →
-  `PracticeAreasPanel`, `areas.tsx`, `PracticeAreasContainer`, area-prefixed names (client regenerated
-  from OpenAPI via `openapi-ts`).
-- `FeedbackFindingRepository` `@Param("displayRole")` + native-SQL `:displayRole` → `@Param("evidenceRole")`
-  / `:evidenceRole` (the last non-`goal` residual; column was already `evidence_role`, field already
-  `evidenceRole`).
-
-**Legitimate keeps (NOT debt — do not "fix"):**
-
-- The `verdict` *column/field name* on `PracticeFinding` — only the enum *type* became `Observation`; the
-  changelog never renamed the column. (`VerdictCount` projection, `countByVerdictForDeveloper`,
-  `priorVerdict`/`currentVerdict` likewise stay.)
-- Index *names* `idx_practice_finding_correlation`, `idx_finding_reaction_correlation`,
-  `idx_feedback_continuity` — the migration deliberately kept the index names while their column refs were
-  auto-updated to `finding_fingerprint` / `feedback_thread_key` (cosmetic-only; changelog comments say so).
-- "correlation key" / "continuity key" prose in Javadoc — the columns are already
-  `finding_fingerprint` / `feedback_thread_key` and the helper classes already `FindingFingerprint` /
-  `FeedbackThreadKey`; only prose references the old names.
+- The `verdict` **column/field name** on `PracticeFinding` — only the enum *type* is `Observation`; the
+  column stays `verdict` (so do `VerdictCount`, `countByVerdictForDeveloper`,
+  `priorVerdict`/`currentVerdict`).
+- Index **names** `idx_practice_finding_correlation`, `idx_finding_reaction_correlation`,
+  `idx_feedback_continuity` are stable while their column references are `finding_fingerprint` /
+  `feedback_thread_key` — renaming an index is cosmetic churn with no schema benefit.
 
 ---
 
@@ -526,23 +454,20 @@ This section records where the schema **deliberately diverges from** SARIF and t
 standards, and *why each divergence is the right call* — not a backlog. Each is a documented decision,
 not an open TODO.
 
-> **Recently implemented (no longer pending).** The pressure-test of 2026-06 (see
-> `docs/contributor/practice-catalogue.md` and the dissertation memo) flagged three larger moves; all
-> three are now **built and validated** (unit + architecture + integration suites green; empty
-> `db:draft-changelog` drift; `openapi.yaml` / client / ERD regenerated):
-> - **Practice criteria versioning (SCD-2)** — `PracticeRevision` / `practice_revision` (§3.8) +
->   `PracticeFinding.practice_revision_id` (§3.3). `PracticeService` appends revision 1 on create and a
->   new revision whenever `criteria` actually changes (value-compared); `Practice.criteria` stays the
->   current projection. Each finding pins to the criteria-as-it-was; a backfill changeset seeds revision 1
->   for every pre-existing practice. The recursive ostensive↔performative loop is now recorded, and
->   *which criteria version fired this finding* is queryable.
-> - **Developer-facing layer + physical anti-leak projection** — `Practice.whyItMatters` /
->   `whatGoodLooksLike` (§3.1, seeded for all 32 default practices, editable in the admin form, guarded
->   against detector verdict vocabulary) served through `LearnerPracticeDTO` / `GET /practices/learner`,
->   which carries no `criteria` field **by construction** (§3a). "Criteria never reaches a learner" is now
->   a physical guarantee, asserted by an integration test on the raw learner JSON.
-> - **`Feedback.subjectUserId` NOT NULL** (§3.5, §4) — backfilled `= recipient_user_id`, closing the
->   asymmetry with `PracticeFinding.subjectUserId` (xAPI mandatory, unambiguous Actor on both sides).
+The schema also makes three larger decisions worth calling out:
+
+- **Practice criteria versioning (SCD-2)** — `PracticeRevision` / `practice_revision` (§3.8) +
+  `PracticeFinding.practice_revision_id` (§3.3). `PracticeService` appends revision 1 on create and a new
+  revision whenever `criteria` actually changes (value-compared); `Practice.criteria` stays the current
+  projection. Each finding pins to the criteria-as-it-was, so *which criteria version fired this finding*
+  is queryable.
+- **Developer-facing layer + physical anti-leak projection** — `Practice.whyItMatters` /
+  `whatGoodLooksLike` (§3.1, seeded for the default practices, editable in the admin form, guarded against
+  detector verdict vocabulary) are served through `LearnerPracticeDTO` / `GET /practices/learner`, which
+  carries no `criteria` field **by construction** (§3a): "criteria never reaches a learner" is a physical
+  guarantee, asserted by an integration test on the raw learner JSON.
+- **`Feedback.subjectUserId` NOT NULL** (§3.5, §4) — set equal to `recipient_user_id`, closing the
+  asymmetry with `PracticeFinding.subjectUserId` (xAPI mandatory, unambiguous Actor on both sides).
 
 **Documented design decisions (deliberate keeps — do not "fix"):**
 
