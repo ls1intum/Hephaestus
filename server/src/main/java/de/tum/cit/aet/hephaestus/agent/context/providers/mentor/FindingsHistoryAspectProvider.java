@@ -152,12 +152,10 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             node.put("severity", f.getSeverity().name());
             node.put("confidence", f.getConfidence());
             node.put("detectedAt", f.getDetectedAt().toString());
-            // The raw `reasoning` field is the model's internal rationale and routinely leaks criteria quotes,
-            // verdict/severity enums, and scoring machinery — none of which DeliveryComposer would post. Ship only
-            // the developer-facing title + guidance; the sanitised delivered body comes via DeliveredFeedbackAspectProvider.
-            if (f.getGuidance() != null) {
-                node.put("guidance", f.getGuidance());
-            }
+            // The finding-history node carries title + verdict + severity + reasoning only. Advice is NOT on the
+            // finding (ADR 0021) — the mentor receives the sanitised delivered feedback body via
+            // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
+            // raw, unsanitised text DeliveryComposer would never post.
         }
 
         ArrayNode reviewsArr = root.putArray("reviewsReceived");

@@ -5,7 +5,14 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackOrigin;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -41,6 +48,12 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Autowired
     private AgentJobRepository agentJobRepository;
+
+    @Autowired
+    private FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private FeedbackFindingRepository feedbackFindingRepository;
 
     private Workspace workspace;
     private Practice practiceA;
@@ -106,11 +119,36 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             confidence,
             null,
             "Test reasoning for " + title,
-            "Test guidance for " + title,
             null,
             detectedAt
         );
         return id;
+    }
+
+    /**
+     * Persist a DELIVERED {@link Feedback} unit carrying {@code body} and bind it to {@code findingId}. This is
+     * the developer's advice source post-ADR-0021 (the finding itself carries no advice), so the detail/reflection
+     * surfaces read guidance from here.
+     */
+    private void deliverFeedbackFor(UUID findingId, String body, Instant createdAt) {
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .idempotencyKey("fb-" + UUID.randomUUID())
+                .agentJobId(agentJob.getId())
+                .workspaceId(workspace.getId())
+                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactId(42L)
+                .recipientUserId(developer.getId())
+                .subjectUserId(developer.getId())
+                .surface(FeedbackChannel.IN_CONTEXT)
+                .unitOrdinal(0)
+                .deliveryState(FeedbackDeliveryState.DELIVERED)
+                .renderedBody(body)
+                .origin(FeedbackOrigin.AGENT)
+                .createdAt(createdAt)
+                .build()
+        );
+        feedbackFindingRepository.insertIfAbsent(feedback.getId(), findingId, "PRIMARY", 0);
     }
 
     // GET /practices/findings
@@ -488,7 +526,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 0.8f,
                 null,
                 "reasoning",
-                "guidance",
                 null,
                 now
             );
@@ -654,6 +691,9 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 42L,
                 now
             );
+            // Advice lives on the delivered Feedback, not the finding (ADR 0021): the detail view sources
+            // `guidance` from here.
+            deliverFeedbackFor(findingId, "Split this PR so each change reviews on its own.", now);
 
             webTestClient
                 .get()
@@ -684,7 +724,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .jsonPath("$.reasoning")
                 .isEqualTo("Test reasoning for Detailed finding")
                 .jsonPath("$.guidance")
-                .isEqualTo("Test guidance for Detailed finding")
+                .isEqualTo("Split this PR so each change reviews on its own.")
                 .jsonPath("$.detectedAt")
                 .isNotEmpty()
                 // Internal fields must not leak
@@ -762,7 +802,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 0.9f,
                 evidenceJson,
                 "reasoning",
-                "guidance",
                 null,
                 Instant.now()
             );
@@ -1002,7 +1041,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 0.8f,
                 null,
                 "reasoning",
-                "guidance",
                 null,
                 now
             );

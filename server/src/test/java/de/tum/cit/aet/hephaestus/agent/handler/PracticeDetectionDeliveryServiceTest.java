@@ -132,7 +132,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyFloat(),
                     any(),
                     any(),
-                    any(),
                     anyString(),
                     any()
                 )
@@ -171,7 +170,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("OBSERVED"),
                 eq("INFO"),
                 eq(0.9f),
-                isNull(),
                 isNull(),
                 isNull(),
                 anyString(),
@@ -213,7 +211,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 anyString(),
                 anyFloat(),
-                any(),
                 any(),
                 any(),
                 anyString(),
@@ -383,7 +380,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyFloat(),
                     any(),
                     any(),
-                    any(),
                     anyString(),
                     any()
                 )
@@ -419,7 +415,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 anyString(),
                 anyFloat(),
-                any(),
                 any(),
                 any(),
                 anyString(),
@@ -497,7 +492,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("NOT_OBSERVED"),
                 anyString(),
                 anyFloat(),
-                any(),
                 any(),
                 any(),
                 anyString(),

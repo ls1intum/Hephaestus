@@ -127,7 +127,8 @@ public class PracticeFindingController {
         @PathVariable UUID findingId
     ) {
         var finding = practiceFindingService.getFinding(workspaceContext.id(), findingId);
-        return ResponseEntity.ok(PracticeFindingDetailDTO.from(finding, objectMapper));
+        String deliveredGuidance = practiceFindingService.getDeliveredGuidance(findingId).orElse(null);
+        return ResponseEntity.ok(PracticeFindingDetailDTO.from(finding, deliveredGuidance, objectMapper));
     }
 
     @GetMapping("/pull-request/{prId}")

@@ -154,6 +154,11 @@ a stable cross-run identity (`finding_fingerprint` ≈ `partialFingerprints`). "
 GitHub code-scanning term; our deduped-across-runs notion (their "alert" grain) lives in
 `finding_fingerprint`.
 
+The finding carries **evidence + verdict + reasoning** (the verdict justification) and **no advice**: it is
+immutable evidence (ADR 0021 — "a finding gives a verdict, but no advice"). Advice is *feedback*, so it is
+composed into the delivered `Feedback` (`rendered_body`, §3.5) and the developer-facing read surfaces
+(reflection dashboard, finding detail, mentor history) source it from there — never from the finding.
+
 | Field | Type | Column | Nullable | Description | Justification |
 | --- | --- | --- | --- | --- | --- |
 | id | UUID | `id` | no | PK; assigned in `@PrePersist` if null. `insertIfAbsent` bypasses it and requires explicit UUID. | Immutable identifier. |
@@ -171,8 +176,7 @@ GitHub code-scanning term; our deduped-across-runs notion (their "alert" grain) 
 | severity | Severity | `severity` | no | Impact level, orthogonal to verdict. | SARIF `kind ⟂ level`; SonarQube blocker..info ladder. |
 | confidence | Float | `confidence` | no | Agent confidence 0.0–1.0. | Delivery filtering + quality; ≈ SARIF `result.rank` (diagnostic relevance). |
 | evidence | JsonNode (jsonb) | `evidence` | yes | `{locations:[{path,startLine,endLine}], snippets:[…], references:[…]}`. | Location is JSON, not columns, because many practices have no file location and findings can be multi-location. ≈ SARIF `result.locations`. |
-| reasoning | String (TEXT) | `reasoning` | yes | Agent's rationale. | Quality review + developer education. |
-| guidance | String (TEXT) | `guidance` | yes | Actionable remediation guidance. | Synthesised into `Feedback`. |
+| reasoning | String (TEXT) | `reasoning` | yes | Agent's rationale for the verdict (the verdict justification, not advice). | Quality review + developer education. |
 | detectedAt | Instant | `detected_at` | no | Detection timestamp; `@PrePersist` if null. | Temporal ordering for trends. |
 
 ### 3.4 `FindingReaction` — table `finding_reaction`

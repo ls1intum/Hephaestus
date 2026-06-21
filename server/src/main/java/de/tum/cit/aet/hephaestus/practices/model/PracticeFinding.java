@@ -198,9 +198,6 @@ public class PracticeFinding {
     @Column(name = "reasoning", columnDefinition = "TEXT")
     private String reasoning;
 
-    @Column(name = "guidance", columnDefinition = "TEXT")
-    private String guidance;
-
     @NotNull
     @Column(name = "detected_at", nullable = false)
     private Instant detectedAt;

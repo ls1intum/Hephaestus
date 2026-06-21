@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.finding;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository.DeliveredFindingBody;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionPracticeDTO;
@@ -21,7 +23,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -45,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticeFindingService {
 
     private final PracticeFindingRepository practiceFindingRepository;
+    private final FeedbackFindingRepository feedbackFindingRepository;
     private final UserRepository userRepository;
 
     /**
@@ -122,6 +127,13 @@ public class PracticeFindingService {
             PageRequest.of(0, MAX_REFLECTION_FINDINGS)
         );
 
+        // Advice now lives on the delivered Feedback (ADR 0021), not on the finding. Batch-fetch the
+        // finding-id → delivered-body map ONCE for every finding on this surface so each card's items can show
+        // what was actually delivered (null when nothing was). One query, not N+1.
+        Map<UUID, String> deliveredGuidance = deliveredGuidanceByFinding(
+            findings.stream().map(PracticeFinding::getId).collect(Collectors.toSet())
+        );
+
         // Group by practice, preserving first-seen (recency) order from the query.
         Map<String, List<PracticeFinding>> byPractice = new LinkedHashMap<>();
         for (PracticeFinding f : findings) {
@@ -143,7 +155,7 @@ public class PracticeFindingService {
                 .filter(f -> polarity.isProblem(f.getVerdict()))
                 .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
                 .limit(MAX_ITEMS_PER_PRACTICE)
-                .map(ReflectionItemDTO::from)
+                .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                 .toList();
             List<ReflectionItemDTO> strengths = isDefectDetector
                 ? List.of()
@@ -151,7 +163,7 @@ public class PracticeFindingService {
                       .stream()
                       .filter(f -> polarity.isStrength(f.getVerdict()))
                       .limit(MAX_STRENGTHS_PER_PRACTICE)
-                      .map(ReflectionItemDTO::from)
+                      .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                       .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
                 continue; // defensive: NA is already filtered, so every finding lands in one bucket
@@ -222,6 +234,37 @@ public class PracticeFindingService {
         return practiceFindingRepository
             .findByIdAndDeveloperAndWorkspace(findingId, currentUser.get().getId(), workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
+    }
+
+    /**
+     * The delivered feedback body for a single finding — the developer's advice source for the detail view
+     * (ADR 0021: advice lives on the delivered {@code Feedback}, not the immutable finding). Null when the
+     * finding was never delivered. Callers pass this into {@code PracticeFindingDetailDTO.from}.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> getDeliveredGuidance(UUID findingId) {
+        return Optional.ofNullable(deliveredGuidanceByFinding(Set.of(findingId)).get(findingId));
+    }
+
+    /**
+     * Batch-resolve finding-id → delivered feedback body for the given ids in ONE query. A finding can be bound
+     * to several DELIVERED units (re-deliveries); the most recent one (by feedback {@code createdAt}) wins so the
+     * surface shows the latest advice the developer actually saw. Findings with no DELIVERED feedback are absent
+     * from the map (the caller treats absence as "nothing delivered").
+     */
+    private Map<UUID, String> deliveredGuidanceByFinding(Set<UUID> findingIds) {
+        if (findingIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, DeliveredFindingBody> latest = new java.util.HashMap<>();
+        for (DeliveredFindingBody row : feedbackFindingRepository.findDeliveredBodiesByFindingIds(findingIds)) {
+            latest.merge(row.getFindingId(), row, (existing, candidate) ->
+                candidate.getFeedbackCreatedAt().isAfter(existing.getFeedbackCreatedAt()) ? candidate : existing
+            );
+        }
+        Map<UUID, String> result = new java.util.HashMap<>();
+        latest.forEach((id, row) -> result.put(id, row.getBody()));
+        return result;
     }
 
     /**

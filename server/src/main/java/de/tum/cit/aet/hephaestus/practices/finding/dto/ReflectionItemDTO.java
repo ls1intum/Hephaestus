@@ -19,17 +19,19 @@ import tools.jackson.databind.JsonNode;
 public record ReflectionItemDTO(
     @NonNull @Schema(description = "Finding id — handle to open the full detail") UUID findingId,
     @NonNull @Schema(description = "The headline of the feedback") String title,
-    @Nullable @Schema(description = "What to do about it, in plain language") String guidance,
+    @Nullable
+    @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")
+    String guidance,
     @NonNull @Schema(description = "Impact level") Severity severity,
     @NonNull @Schema(description = "The kind of work this is about (PR / issue)") WorkArtifact artifactType,
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
 ) {
-    public static ReflectionItemDTO from(PracticeFinding f) {
+    public static ReflectionItemDTO from(PracticeFinding f, @Nullable String deliveredGuidance) {
         return new ReflectionItemDTO(
             f.getId(),
             f.getTitle(),
-            f.getGuidance(),
+            deliveredGuidance,
             f.getSeverity(),
             f.getArtifactType(),
             f.getArtifactId(),

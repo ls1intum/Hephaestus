@@ -20,7 +20,6 @@ class ReflectionItemDTOTest extends BaseUnitTest {
         return PracticeFinding.builder()
             .id(UUID.randomUUID())
             .title("Distance-warning logic ships with no test")
-            .guidance("Add a unit test for evaluateDistance.")
             .severity(Severity.MAJOR)
             .verdict(Observation.NOT_OBSERVED)
             .artifactType(WorkArtifact.PULL_REQUEST)
@@ -35,7 +34,8 @@ class ReflectionItemDTOTest extends BaseUnitTest {
         var item = ReflectionItemDTO.from(
             finding(
                 "{\"locations\":[{\"path\":\"client/Obsphera/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"
-            )
+            ),
+            null
         );
         assertThat(item.locator()).isEqualTo("client/Obsphera/Services/AR/FrameRecorder.swift:212");
     }
@@ -45,31 +45,43 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     void internalContextPathSuppressed() {
         assertThat(
             ReflectionItemDTO.from(
-                finding("{\"locations\":[{\"path\":\"inputs/context/test_presence.json\",\"startLine\":1}]}")
+                finding("{\"locations\":[{\"path\":\"inputs/context/test_presence.json\",\"startLine\":1}]}"),
+                null
             ).locator()
         ).isNull();
         assertThat(
             ReflectionItemDTO.from(
-                finding("{\"locations\":[{\"path\":\"context/target/review_threads.json\",\"startLine\":1}]}")
+                finding("{\"locations\":[{\"path\":\"context/target/review_threads.json\",\"startLine\":1}]}"),
+                null
             ).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"metadata.json\"}]}")).locator()
+            ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"metadata.json\"}]}"), null).locator()
         ).isNull();
     }
 
     @Test
     @DisplayName("no evidence / no location → no locator (not an error)")
     void noLocation() {
-        assertThat(ReflectionItemDTO.from(finding(null)).locator()).isNull();
-        assertThat(ReflectionItemDTO.from(finding("{\"snippets\":[\"x\"]}")).locator()).isNull();
-        assertThat(ReflectionItemDTO.from(finding("{\"locations\":[]}")).locator()).isNull();
+        assertThat(ReflectionItemDTO.from(finding(null), null).locator()).isNull();
+        assertThat(ReflectionItemDTO.from(finding("{\"snippets\":[\"x\"]}"), null).locator()).isNull();
+        assertThat(ReflectionItemDTO.from(finding("{\"locations\":[]}"), null).locator()).isNull();
     }
 
     @Test
     @DisplayName("path with no startLine renders as the bare path")
     void pathWithoutLine() {
-        var item = ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"README.md\"}]}"));
+        var item = ReflectionItemDTO.from(finding("{\"locations\":[{\"path\":\"README.md\"}]}"), null);
         assertThat(item.locator()).isEqualTo("README.md");
+    }
+
+    @Test
+    @DisplayName("guidance is the delivered feedback body passed in — null when nothing was delivered")
+    void guidanceComesFromDeliveredBody() {
+        // ADR 0021: the finding carries no advice; guidance is the delivered Feedback body, supplied by the caller.
+        assertThat(ReflectionItemDTO.from(finding(null), "Add a unit test for evaluateDistance.").guidance()).isEqualTo(
+            "Add a unit test for evaluateDistance."
+        );
+        assertThat(ReflectionItemDTO.from(finding(null), null).guidance()).isNull();
     }
 }

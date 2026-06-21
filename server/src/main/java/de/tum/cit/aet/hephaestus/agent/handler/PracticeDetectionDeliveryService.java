@@ -197,7 +197,6 @@ public class PracticeDetectionDeliveryService {
                 finding.confidence(),
                 evidenceJson,
                 finding.reasoning(),
-                finding.guidance(),
                 findingFingerprint,
                 detectedAt
             );

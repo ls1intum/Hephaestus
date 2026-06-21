@@ -36,10 +36,16 @@ public record PracticeFindingDetailDTO(
     )
     Map<String, Object> evidence,
     @Nullable @Schema(description = "AI reasoning behind the verdict") String reasoning,
-    @Nullable @Schema(description = "Actionable guidance for the developer") String guidance,
+    @Nullable
+    @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")
+    String guidance,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
-    public static PracticeFindingDetailDTO from(PracticeFinding f, tools.jackson.databind.ObjectMapper mapper) {
+    public static PracticeFindingDetailDTO from(
+        PracticeFinding f,
+        @Nullable String deliveredGuidance,
+        tools.jackson.databind.ObjectMapper mapper
+    ) {
         var practice = f.getPractice();
         return new PracticeFindingDetailDTO(
             f.getId(),
@@ -53,7 +59,7 @@ public record PracticeFindingDetailDTO(
             f.getConfidence(),
             toMap(f.getEvidence(), mapper),
             f.getReasoning(),
-            f.getGuidance(),
+            deliveredGuidance,
             f.getDetectedAt()
         );
     }

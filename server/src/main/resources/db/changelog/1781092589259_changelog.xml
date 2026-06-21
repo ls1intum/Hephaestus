@@ -980,4 +980,21 @@
         </rollback>
     </changeSet>
 
+    <!-- ADR 0021: the immutable practice_finding carries NO advice — it records evidence + verdict + reasoning
+         (the verdict justification) only. Advice is feedback, so it lives on the delivered Feedback
+         (feedback.rendered_body) and the developer-facing read surfaces source it from there. Drop the now-unused
+         practice_finding.guidance column (created in 1773730203444). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-58">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.guidance already dropped">
+            <columnExists tableName="practice_finding" columnName="guidance"/>
+        </preConditions>
+        <comment>Drop practice_finding.guidance — advice now lives on the delivered Feedback, not the finding (ADR 0021).</comment>
+        <sql>ALTER TABLE practice_finding DROP COLUMN IF EXISTS guidance;</sql>
+        <rollback>
+            <addColumn tableName="practice_finding">
+                <column name="guidance" type="TEXT"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
