@@ -272,6 +272,32 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
+        void missingSeverityDefaultsToInfoNotDiscarded() {
+            // Regression: the model routinely omits severity on OBSERVED/NOT_APPLICABLE findings (the criteria
+            // literally say "OBSERVED (no severity)"). Such a finding must be KEPT with severity INFO, never
+            // discarded — coerceCoherence re-derives the band anyway, so dropping it silently loses coaching.
+            ObjectNode finding = validFindingNode();
+            finding.remove("severity");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).severity()).isEqualTo(Severity.INFO);
+            assertThat(result.discarded()).isEmpty();
+        }
+
+        @Test
+        void nullSeverityDefaultsToInfo() {
+            ObjectNode finding = validFindingNode();
+            finding.putNull("severity");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).severity()).isEqualTo(Severity.INFO);
+        }
+
+        @Test
         void confidenceBelowZero() {
             ObjectNode finding = validFindingNode();
             finding.put("confidence", -0.5);

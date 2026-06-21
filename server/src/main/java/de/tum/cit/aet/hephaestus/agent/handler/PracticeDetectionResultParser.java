@@ -268,8 +268,11 @@ public class PracticeDetectionResultParser {
         // Required: verdict
         Observation verdict = parseEnum(entry, "verdict", Observation.class);
 
-        // Required: severity
-        Severity severity = parseEnum(entry, "severity", Severity.class);
+        // Optional: severity. OBSERVED and NOT_APPLICABLE carry no coaching band (coerceCoherence forces INFO),
+        // and the model routinely omits severity for them — the criteria literally say "OBSERVED (no severity)".
+        // A missing/null severity defaults to INFO rather than discarding an otherwise-valid finding;
+        // coerceCoherence then re-derives the band (e.g. a NOT_OBSERVED with no severity floors to MINOR).
+        Severity severity = parseSeverityOrDefault(entry);
 
         // Required: confidence
         float confidence = parseConfidence(entry);
@@ -345,6 +348,21 @@ public class PracticeDetectionResultParser {
         }
         String text = node.asString();
         return text.isBlank() ? null : text;
+    }
+
+    /**
+     * Parses the optional {@code severity}. A missing, null, or non-text value defaults to
+     * {@link Severity#INFO} — the model commonly omits severity on OBSERVED / NOT_APPLICABLE findings, and
+     * {@link ValidatedFinding#coerceCoherence(boolean)} re-derives the final band regardless, so discarding
+     * such a finding would silently drop valid coaching. A present but unrecognised value still fails the
+     * entry (genuinely malformed output worth surfacing).
+     */
+    private static Severity parseSeverityOrDefault(JsonNode entry) {
+        JsonNode node = entry.get("severity");
+        if (node == null || node.isNull() || !node.isString()) {
+            return Severity.INFO;
+        }
+        return parseEnum(entry, "severity", Severity.class);
     }
 
     private static <E extends Enum<E>> E parseEnum(JsonNode entry, String field, Class<E> enumType) {
