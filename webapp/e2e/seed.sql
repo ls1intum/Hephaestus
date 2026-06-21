@@ -15,7 +15,7 @@ VALUES (1, 1, 'Default reviewer', true, 'ANTHROPIC', 'claude-sonnet-4-5', 600, 2
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO agent_config (id, workspace_id, name, enabled, llm_provider, model_name, llm_base_url, timeout_seconds, max_concurrent_jobs, allow_internet, created_at, credential_mode)
-VALUES (2, 1, 'GPU ASE (gpt-oss-120b)', true, 'OPENAI', 'openai/gpt-oss-120b', 'https://gpu.ase.cit.tum.de/api', 1200, 1, true, now(), 'API_KEY')
+VALUES (2, 1, 'LLM Gateway (gpt-oss-120b)', true, 'OPENAI', 'openai/gpt-oss-120b', 'https://llm-gateway.example/api', 1200, 1, true, now(), 'API_KEY')
 ON CONFLICT (id) DO NOTHING;
 
 -- SCM identity + membership for the dev account (id 1). The SPA lists/navigates workspaces by

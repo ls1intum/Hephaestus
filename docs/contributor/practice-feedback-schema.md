@@ -170,7 +170,7 @@ composed into the delivered `Feedback` (`rendered_body`, §3.5) and the develope
 | artifactId | Long | `artifact_id` | no | External id of the target PR/issue. | Links to the specific artifact. |
 | developer | User (`@ManyToOne`) | `developer_id` | no | The contribution author being evaluated; FK `RESTRICT` (no cascade). | Findings outlive users; deleting a user with findings is blocked. |
 | subjectUserId | Long | `subject_user_id` | **no (ALWAYS populated)** | Whose conduct the finding is *about*: equals `developer` for author-side, the reviewer for reviewer-side. Raw Long FK `fk_practice_finding_subject`. | xAPI Actor (the agent a statement is about) is mandatory and unambiguous — [xAPI](https://xapi.com/statements-101/). The former *null⇒developer* fallback was collapsed to an explicit value (§4). |
-| findingFingerprint | String(64) | `finding_fingerprint` | yes | Deterministic hash of what the finding is **about** (practice + target + subject + content anchor), never of *when* it was produced. | Enables supersession and reaction-continuity across re-detections. SARIF `partialFingerprints` — title excluded because the LLM re-words it every run (proven 0/26 correlation). Nullable: backfill-free, new findings only. |
+| findingFingerprint | String(64) | `finding_fingerprint` | yes | Deterministic hash of what the finding is **about** (practice + target + subject + content anchor), never of *when* it was produced. | Enables supersession and reaction-continuity across re-detections. SARIF `partialFingerprints` — title excluded because the LLM re-words it every run. Nullable: backfill-free, new findings only. |
 | title | String(255) | `title` | no | Short headline. | SARIF `result.message`. |
 | **verdict** | Observation | `verdict` | no | Sign-neutral presence verdict. | Column name `verdict` intentionally kept; only the *type* became `Observation` (§5 — legitimate keep). SARIF `result.kind`. |
 | severity | Severity | `severity` | no | Impact level, orthogonal to verdict. | SARIF `kind ⟂ level`; SonarQube blocker..info ladder. |
@@ -491,8 +491,8 @@ The schema also makes three larger decisions worth calling out:
   existing columns.
 - **`finding_fingerprint` is a *locus* hash, by design.** It hashes (practice, artifact, subject,
   file-path) — the **locus** the finding is about — deliberately **not** a line number or content/title
-  hash. That keeps it stable across line moves and LLM re-wording of the title (proven 0/26 title
-  correlation), which is exactly what a recurrence key must do. Cross-file-rename stability is **out of
+  hash. That keeps it stable across line moves and LLM re-wording of the title, which is exactly what a
+  recurrence key must do. Cross-file-rename stability is **out of
   scope on purpose**: a moved locus is a *different* locus, and conflating the two would mis-merge
   unrelated findings. This is the SARIF `partialFingerprints` philosophy (stable against churn), applied
   to our domain.
@@ -506,8 +506,6 @@ The schema also makes three larger decisions worth calling out:
 
 ### Honest caveats (state, don't hide)
 
-- Any **verbatim Routine-Dynamics-2016 quotation** must be pulled from a library copy before publication;
-  the 2016 PDF is paywalled (verified via abstract + repec/Edinburgh records + the 2008 restatement).
 - Findings detected **before** versioning shipped pin to NULL criteria-version (an honest "pre-versioning"
   marker — those early findings are not reproducible against an exact rubric snapshot). Every finding from
   the migration forward pins to a concrete revision.

@@ -1,7 +1,7 @@
 # Practice Catalogue — Curated, Grounded Reference
 
 > Status: curated reference for the default practice catalogue shipped in
-> `server/src/main/resources/practices/default-catalog.json` (**11 areas / 32 practices**). Companion
+> `server/src/main/resources/practices/default-catalog.json`. Companion
 > to `practice-feedback-schema.md` (the entity reference) and ADR 0021. This document grounds each area
 > in a body-of-knowledge **standards anchor** and assigns each practice a **credibility tier**, so the
 > catalogue's claims can be defended source-by-source. Uses the canonical vocabulary throughout —
@@ -228,7 +228,7 @@ Each row: the practice's one-line grounding (study/standard + author/year) and i
 | --- | --- | --- | --- |
 | `breaks-large-work-into-trackable-subtasks` | ISSUE | SWEBOK KA1 Requirements (decomposition) + CMMI Requirements Development & Management | **practitioner-canonical** |
 | `triages-the-issue-with-labels-and-ownership` | ISSUE | Practitioner convention — no standards body owns an issue-triage taxonomy | **practitioner-norm** |
-| `issue-closed-with-unmet-outcome` | ISSUE | *Issue Tracking Ecosystems* (2025, arXiv preprint) + practitioner convention (confirm the outcome before closing) | **peer-reviewed** *(preprint — weaker than a published study; flagged)* |
+| `issue-closed-with-unmet-outcome` | ISSUE | *Issue Tracking Ecosystems* (2025, arXiv preprint) + practitioner convention (confirm the outcome before closing) | preprint + convention |
 
 ---
 

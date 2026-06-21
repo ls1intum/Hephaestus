@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-06-09
-**Authors:** (draft — to be owned/finalised)
+**Authors:** Hephaestus maintainers
 **Finishes:** [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md) (the `workspace_membership.user_id → account_id` rename it specifies but never implemented)
 **Builds on:** [ADR 0004](0004-sql-layer-multi-tenancy.md), [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md)
 

@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-06-12
-**Authors:** (draft — practice-catalogue owner; to be finalised with Felix)
+**Authors:** Hephaestus maintainers
 **Builds on:** [ADR 0015](0015-unified-integration-framework.md) (the integration framework and `Connection` aggregate), [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md) (SQL-layer tenancy), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md) (per-row AAD), [ADR 0007](0007-sandbox-spi-shape.md) (the agent sandbox / `ContentProvider` seam)
 
 ## Context

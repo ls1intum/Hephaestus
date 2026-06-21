@@ -29,7 +29,7 @@ pnpm dev:webapp            # in another terminal
 # 2) Configure everything with your own PAT + LLM key (idempotent; re-run any time).
 scripts/e2e-setup.sh \
   --gitlab-pat glpat-… \
-  --llm-key sk-… --llm-base-url https://gpu.ase.cit.tum.de/api --model openai/gpt-oss-120b
+  --llm-key sk-… --llm-base-url https://llm-gateway.example/api --model openai/gpt-oss-120b
 
 # 3) Open http://localhost:4200 → "Dev sign in" → your workspace → run the trigger the script printed.
 ```

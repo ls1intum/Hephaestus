@@ -32,12 +32,10 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     @DisplayName("a real source location renders as path:line")
     void realSourceLocation() {
         var item = ReflectionItemDTO.from(
-            finding(
-                "{\"locations\":[{\"path\":\"client/Obsphera/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"
-            ),
+            finding("{\"locations\":[{\"path\":\"client/App/Services/AR/FrameRecorder.swift\",\"startLine\":212}]}"),
             null
         );
-        assertThat(item.locator()).isEqualTo("client/Obsphera/Services/AR/FrameRecorder.swift:212");
+        assertThat(item.locator()).isEqualTo("client/App/Services/AR/FrameRecorder.swift:212");
     }
 
     @Test

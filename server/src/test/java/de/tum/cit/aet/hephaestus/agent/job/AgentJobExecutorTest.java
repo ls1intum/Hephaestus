@@ -500,7 +500,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 objectMapper,
                 meterRegistry,
                 Optional.empty(),
-                Optional.of(workerPropsWithLlm("https://gpu.ase.cit.tum.de/v1", "operator-key"))
+                Optional.of(workerPropsWithLlm("https://llm-gateway.example/v1", "operator-key"))
             );
 
             Message msg = createMessage(jobId);
@@ -526,7 +526,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             assertThat(request.credentialMode()).isEqualTo(CredentialMode.API_KEY);
             assertThat(request.credential()).isEqualTo("operator-key");
-            assertThat(request.baseUrl()).isEqualTo("https://gpu.ase.cit.tum.de/v1");
+            assertThat(request.baseUrl()).isEqualTo("https://llm-gateway.example/v1");
             // Snapshot's LLM provider + model still flow through unchanged.
             assertThat(request.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
         }

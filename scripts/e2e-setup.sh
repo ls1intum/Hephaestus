@@ -11,7 +11,7 @@
 #
 # Usage:
 #   scripts/e2e-setup.sh --gitlab-pat glpat-… --llm-key sk-… \
-#     [--llm-base-url https://gpu.ase.cit.tum.de/api] [--model openai/gpt-oss-120b] \
+#     [--llm-base-url https://llm-gateway.example/api] [--model openai/gpt-oss-120b] \
 #     [--server-url https://gitlab.lrz.de] [--account-login hephaestustest] [--repo ns/project]
 # Every flag also reads an E2E_* env fallback (E2E_GITLAB_PAT, E2E_LLM_KEY, …).
 set -euo pipefail
