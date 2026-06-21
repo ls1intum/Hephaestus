@@ -75,27 +75,28 @@ export function PracticeAreasPanel({
 	return (
 		<div className="space-y-6">
 			<div>
-				<h2 className="text-lg font-semibold">Areas</h2>
+				<h2 className="text-lg font-semibold">Practice Areas</h2>
 				<p className="text-sm text-muted-foreground">
-					Areas group related practices into a learning objective. Create your own or adjust the
-					seeded defaults — practices are bound to an area from the practice editor.
+					Practice areas group related practices into a learning objective. Create your own or
+					adjust the seeded defaults — practices are bound to a practice area from the practice
+					editor.
 				</p>
 			</div>
 
-			{/* Add an area */}
+			{/* Add a practice area */}
 			<div className="flex items-center gap-2">
 				<Input
-					placeholder="New area name, e.g. Submitting review-ready work"
+					placeholder="New practice area name, e.g. Submitting review-ready work"
 					value={newName}
 					onChange={(e) => setNewName(e.target.value)}
 					onKeyDown={(e) => {
 						if (e.key === "Enter") submitNew();
 					}}
-					aria-label="New area name"
+					aria-label="New practice area name"
 				/>
 				<Button onClick={submitNew} disabled={newName.trim().length < 3 || isMutating}>
 					<Plus className="h-4 w-4" />
-					Add area
+					Add practice area
 				</Button>
 			</div>
 
@@ -103,7 +104,7 @@ export function PracticeAreasPanel({
 			<ul className="divide-y rounded-lg border">
 				{areas.length === 0 && (
 					<li className="px-4 py-6 text-sm text-muted-foreground">
-						No areas yet. Add one above to start grouping practices.
+						No practice areas yet. Add one above to start grouping practices.
 					</li>
 				)}
 				{areas.map((area, index) => (
@@ -200,14 +201,14 @@ export function PracticeAreasPanel({
 								<AlertDialogHeader>
 									<AlertDialogTitle>Delete “{area.name}”?</AlertDialogTitle>
 									<AlertDialogDescription>
-										The {countFor(area.slug)} practices bound to this area keep their definitions —
-										they just become unassigned. This cannot be undone.
+										The {countFor(area.slug)} practices bound to this practice area keep their
+										definitions — they just become unassigned. This cannot be undone.
 									</AlertDialogDescription>
 								</AlertDialogHeader>
 								<AlertDialogFooter>
 									<AlertDialogCancel>Cancel</AlertDialogCancel>
 									<AlertDialogAction onClick={() => onDelete(area.slug)}>
-										Delete area
+										Delete practice area
 									</AlertDialogAction>
 								</AlertDialogFooter>
 							</AlertDialogContent>

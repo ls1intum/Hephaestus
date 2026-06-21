@@ -94,7 +94,7 @@ function PracticeDetectionLayout() {
 			>
 				<TabsList>
 					<TabsTrigger value="policy">Policy</TabsTrigger>
-					<TabsTrigger value="areas">Areas</TabsTrigger>
+					<TabsTrigger value="areas">Practice Areas</TabsTrigger>
 					<TabsTrigger value="catalog">Catalog</TabsTrigger>
 				</TabsList>
 			</Tabs>

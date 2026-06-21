@@ -314,7 +314,7 @@ export function PracticeForm({
 									</div>
 
 									<div className="grid gap-2">
-										<Label htmlFor="practice-area">Area</Label>
+										<Label htmlFor="practice-area">Practice Area</Label>
 										<Select
 											value={form.areaSlug}
 											onValueChange={(value) =>

@@ -50,7 +50,7 @@ function PracticeAreasContainer() {
 		...createAreaMutation(),
 		onSuccess: () => {
 			invalidate();
-			toast.success("Area created");
+			toast.success("Practice area created");
 		},
 		onError: (error) => {
 			const status =
@@ -58,27 +58,29 @@ function PracticeAreasContainer() {
 					? (error as { status: number }).status
 					: undefined;
 			toast.error(
-				status === 409 ? "A area with that name already exists" : "Failed to create area",
+				status === 409
+					? "A practice area with that name already exists"
+					: "Failed to create practice area",
 			);
 		},
 	});
 	const updateArea = useMutation({
 		...updateAreaMutation(),
 		onSuccess: () => invalidate(),
-		onError: () => toast.error("Failed to update area"),
+		onError: () => toast.error("Failed to update practice area"),
 	});
 	const deleteArea = useMutation({
 		...deleteAreaMutation(),
 		onSuccess: () => {
 			invalidate();
-			toast.success("Area deleted");
+			toast.success("Practice area deleted");
 		},
-		onError: () => toast.error("Failed to delete area"),
+		onError: () => toast.error("Failed to delete practice area"),
 	});
 	const reorderAreas = useMutation({
 		...reorderAreasMutation(),
 		onSuccess: () => invalidate(),
-		onError: () => toast.error("Failed to reorder areas"),
+		onError: () => toast.error("Failed to reorder practice areas"),
 	});
 
 	if (!workspaceSlug || areasQuery.isLoading || practicesQuery.isLoading) {
