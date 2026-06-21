@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
+import de.tum.cit.aet.hephaestus.practices.TriggerEventCatalog;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.HashSet;
@@ -14,14 +14,11 @@ import java.util.stream.Collectors;
  */
 public class TriggerEventsValidator implements ConstraintValidator<ValidTriggerEvents, List<String>> {
 
-    static final Set<String> VALID_EVENTS = Set.of(
-        TriggerEventNames.PULL_REQUEST_CREATED,
-        TriggerEventNames.PULL_REQUEST_READY,
-        TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-        TriggerEventNames.REVIEW_SUBMITTED,
-        TriggerEventNames.ISSUE_CREATED,
-        TriggerEventNames.ISSUE_LABELED
-    );
+    // Single source of truth: TriggerEventCatalog defines every subscribable event (and its own javadoc
+    // says so). This validator only checks membership + de-dups, so it derives its allow-list from the
+    // catalog rather than keeping a second, drift-prone copy (which had gone stale — it rejected the
+    // retrospective PullRequestMerged / PullRequestClosed / IssueClosed triggers that seeded practices use).
+    static final Set<String> VALID_EVENTS = TriggerEventCatalog.allEvents();
 
     @Override
     public boolean isValid(List<String> value, ConstraintValidatorContext context) {

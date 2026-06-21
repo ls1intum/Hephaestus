@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The curated set of trigger events a practice may listen to, keyed by the artifact it evaluates.
@@ -45,4 +47,14 @@ public final class TriggerEventCatalog {
     public static Set<String> eligibleFor(WorkArtifact focus) {
         return focus == WorkArtifact.ISSUE ? ISSUE_EVENTS : PULL_REQUEST_EVENTS;
     }
+
+    /** Every event any practice may subscribe to, across all focuses — the API validation allow-list. */
+    public static Set<String> allEvents() {
+        return ALL_EVENTS;
+    }
+
+    private static final Set<String> ALL_EVENTS = Stream.concat(
+        PULL_REQUEST_EVENTS.stream(),
+        ISSUE_EVENTS.stream()
+    ).collect(Collectors.toUnmodifiableSet());
 }
