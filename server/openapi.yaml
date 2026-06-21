@@ -5465,7 +5465,8 @@ components:
             ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
         guidance:
           type: string
-          description: Actionable guidance for the developer
+          description: What to do — the delivered feedback for this finding (null
+            if nothing was delivered)
         id:
           type: string
           format: uuid
@@ -5955,7 +5956,8 @@ components:
           description: Finding id — handle to open the full detail
         guidance:
           type: string
-          description: "What to do about it, in plain language"
+          description: What to do — the delivered feedback for this finding (null
+            if nothing was delivered)
         locator:
           type: string
           description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\

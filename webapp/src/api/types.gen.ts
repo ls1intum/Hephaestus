@@ -954,7 +954,7 @@ export type ReflectionItem = {
      */
     findingId: string;
     /**
-     * What to do about it, in plain language
+     * What to do — the delivered feedback for this finding (null if nothing was delivered)
      */
     guidance?: string;
     /**
@@ -1334,7 +1334,7 @@ export type PracticeFindingDetail = {
         [key: string]: unknown;
     };
     /**
-     * Actionable guidance for the developer
+     * What to do — the delivered feedback for this finding (null if nothing was delivered)
      */
     guidance?: string;
     /**
