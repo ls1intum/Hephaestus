@@ -637,7 +637,7 @@ class DeliveryComposer {
     /**
      * A closing brace/bracket immediately followed by ≥1 quote/backslash at the very end of the text:
      * the serialized-object boundary the agent occasionally leaks INTO a guidance value (observed as a
-     * {@code '"}"} tail on deepseek output). A legitimate inline JSON example ends AT the brace
+     * {@code '"}"} tail in the model output). A legitimate inline JSON example ends AT the brace
      * ({@code {"k":"v"}}) with nothing after it — the trailing outer quote is the discriminator, so this
      * never fires on a real code/JSON snippet that simply closes with a brace.
      */

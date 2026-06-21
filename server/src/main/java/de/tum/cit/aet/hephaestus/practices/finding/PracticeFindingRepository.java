@@ -139,8 +139,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
      *
      * <p><b>Re-review dedup (ADR 0021):</b> a target gets re-detected on every push, and every run writes a
      * fresh {@link PracticeFinding} row — so a naive {@code COUNT} over all rows inflates the dashboard by the
-     * re-review multiplier (observed ~4× on the live mirror: a PR reviewed four times showed four times the
-     * findings). The dashboard must reflect each target's CURRENT state, so this query keeps only the findings
+     * re-review multiplier (a target re-reviewed N times shows N× the findings). The dashboard must reflect each target's CURRENT state, so this query keeps only the findings
      * from each target's LATEST detection run ({@code agent_job_id} with the most recent {@code detected_at}
      * for that {@code (artifact_type, artifact_id)}). Superseded runs no longer count toward the habit signal.
      *
@@ -267,8 +266,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
      * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
      * per finding (bounded by the page size) rather than JOIN-fetched.
      *
-     * <p>{@code NOT_APPLICABLE} is excluded: it dominated the list (~59% on the live mirror, all
-     * "no change needed / awaiting review" rows) and spent the page budget on findings the mentor cannot
+     * <p>{@code NOT_APPLICABLE} is excluded: it dominates the list (the bulk are "no change needed / awaiting review" rows) and spent the page budget on findings the mentor cannot
      * coach from, burying the actionable {@code NOT_OBSERVED} defects and {@code OBSERVED} strengths. The
      * NA total still reaches the mentor via the verdict-count summary; this is the drill-down list only,
      * and stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.

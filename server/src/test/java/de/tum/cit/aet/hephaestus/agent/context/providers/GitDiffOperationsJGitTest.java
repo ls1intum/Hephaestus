@@ -145,7 +145,7 @@ class GitDiffOperationsJGitTest extends BaseUnitTest {
 
     @Test
     void resolveDiffRangeUsesMergeBaseWhenTargetAdvancedPastForkPoint() throws GitAPIException, IOException {
-        // The bug (live Obsphera E2E): feature diverged at baseSha; then the TARGET branch advanced with
+        // Regression: the feature diverged at baseSha; then the TARGET branch advanced with
         // its own change. A 2-dot range [origin/main tip, head] would surface main's later change as a
         // phantom diff the developer never made. The range base MUST be the merge-base (baseSha), so the
         // diff is exactly what THIS branch added (3-dot), never what the target branch changed afterwards.

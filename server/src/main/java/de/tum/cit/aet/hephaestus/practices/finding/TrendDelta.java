@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * notification (A4) consults to decide whether anything actually changed.
  *
  * <p>Carries NO rendered prose — rendering belongs to {@code DeliveryComposer}. A locus is identified by
- * its {@code finding_fingerprint} (the (practice, target, subject, file) locus, commit b2891d971), which is
+ * its {@code finding_fingerprint} (the (practice, target, subject, file) locus), which is
  * stable across the non-deterministic detector, so "the same concern recurring" is observable even when the
  * LLM re-words its title every run.
  */

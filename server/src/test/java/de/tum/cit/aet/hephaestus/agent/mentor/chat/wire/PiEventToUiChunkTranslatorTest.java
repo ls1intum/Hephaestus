@@ -61,8 +61,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
             .containsExactly("Start", "StartStep");
         UIMessageChunk.Start start = (UIMessageChunk.Start) out.get(0);
         assertThat(start.messageId()).isEqualTo(assistantMessageId);
-        // model lives on message.role-bearing object, NOT a top-level event field — this is the
-        // bug the original audit exposed.
+        // model lives on the message's role-bearing object, NOT a top-level event field.
         assertThat(state.observedModel()).isEqualTo("claude-3-5-haiku-20241022");
     }
 
@@ -134,7 +133,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(second, state);
 
         // Just a TextDelta — TextStart already fired on the first delta. This is the second
-        // production-failure mode the audit caught: missing contentIndex → a fresh UUID per
+        // missing contentIndex → a fresh UUID per
         // delta → AI SDK reconciler can't merge them.
         assertThat(out)
             .extracting(c -> c.getClass().getSimpleName())

@@ -29,10 +29,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p><strong>Deliberately excluded</strong> from the digest, because they are not stable across runs:
  * the agent job id (a new id every run); any line number / column / range (edits shift lines); and —
- * critically — the finding <em>title</em>. A live two-run E2E proved the title makes identity inert: the
- * LLM re-words the same underlying concern every run ("DoD ticks 'All tests pass' with zero tests" vs
- * "'All tests pass' ticked but no tests exist"), so a title-anchored key never correlated across runs
- * (0/26 shared). Identity is therefore at the <em>(practice, artifact, subject, file)</em> locus grain —
+ * critically — the finding <em>title</em>. The title makes identity inert: the LLM re-words the same underlying concern every
+ * run ("DoD ticks 'All tests pass' with zero tests" vs "'All tests pass' ticked but no tests
+ * exist"), so a title-anchored key does not correlate across re-detections. Identity is therefore at the <em>(practice, artifact, subject, file)</em> locus grain —
  * the right grain for the research question "did the practice-concern at this locus persist or resolve?",
  * not "did this exact prose recur". Two distinct findings of one practice in one file collapse to one
  * locus; that is intentional (they are the same practice concern there). Only the evidence <em>path</em>

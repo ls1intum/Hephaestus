@@ -279,7 +279,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @TempDir
         Path tempDir;
 
-        // Size limit tests (from this PR)
+        // Size limit tests
 
         @Test
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {

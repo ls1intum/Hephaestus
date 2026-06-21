@@ -226,7 +226,7 @@ class PracticeRunnerLiveLlmTest {
                 .isTrue();
         }
 
-        // Planted-violation detection. gpt-oss-120b has 100% hit rate for this practice in audits;
+        // Planted-violation detection: this practice must be detected when the violation is present.
         // if it misses, the prompt or fixture is broken — not the LLM.
         boolean foundNegative = false;
         for (JsonNode finding : findings) {

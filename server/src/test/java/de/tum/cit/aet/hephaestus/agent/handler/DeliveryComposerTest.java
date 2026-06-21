@@ -671,7 +671,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void sanitizeStudentText_stripsRubricComputationLeaks() {
-        // Live regression (obsphera 582, deepseek): the model echoed the criteria's internal bucket maths
+        // Regression: the model echoed the criteria's internal bucket maths
         // and preamble tags verbatim into student-facing reasoning. These must never reach the student.
         String leak =
             "This change is large. enriched=true. Metadata: A=4094, D=326, A+D=4420, F=28. " +
@@ -738,7 +738,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void sanitizeStudentText_stripsCrossPracticeOrchestrationLeaks() {
-        // Live Obsphera eval (deepseek, pr1/pr6/pr7): the model narrated how findings were ROUTED between
+        // Regression: the model narrated how findings were ROUTED between
         // practices into student-facing reasoning — the grader talking to itself about ownership/delivery.
         // The whole orchestration sentence must be dropped; the real student feedback around it survives.
         String leak =
@@ -762,7 +762,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void sanitizeStudentText_stripsVerdictJustificationLeaks() {
-        // Live Obsphera eval: the grader's verdict/severity JUSTIFICATION leaked verbatim to students — the
+        // Regression: the grader's verdict/severity JUSTIFICATION leaked verbatim to students — the
         // developer "watches the rubric get scored" instead of hearing a colleague. Severity is carried by
         // the icon; these sentences are pure machinery and must drop, while the real lesson survives.
         String leak =
@@ -784,7 +784,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void sanitizeStudentText_preservesMarkdownListAndHeadingNewlines() {
-        // Live regression (obsphera CR2, 2026-06-12): a bulleted acceptance-criteria block whose items
+        // Regression: a bulleted acceptance-criteria block whose items
         // each end in '.' was collapsed onto one run-on line ("session. - Users can create") because the
         // sentence-split rejoined every sentence with a blank space, eating the list newlines.
         String guidance =
@@ -809,7 +809,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void sanitizeStudentText_repairsLeakedJsonEnvelopeCorruption() {
-        // Live regression (obsphera MR575, 2026-06-13): deepseek terminated the describe-what-and-why
+        // Regression: the model terminated the describe-what-and-why
         // guidance with a leaked serialized-object boundary ('"}") after echoing the final clause, so the
         // student received garbled text ("…optimal scan quality'\"ws to adjust…quality'\"}\"").
         String corrupt =
@@ -1330,7 +1330,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void stripsGraderMechanicsLeakFromStudentNote() {
-        // Live Obsphera E2E eval: the model echoes the criteria's classifier flowchart into student-facing
+        // Regression: the model echoes the criteria's classifier flowchart into student-facing
         // reasoning. Each rubric sentence must be dropped while the title + guidance keep the lesson. This
         // locks the leak-guard so a regression can never ship band maths / gate predicates / pipeline plumbing.
         String leakyReasoning = String.join(
@@ -1390,7 +1390,7 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void suppressesYouWroteQuoteWhenEvidenceCarriesGraderMechanics() {
-        // Live Obsphera E2E: the agent dropped its own plumbing into the evidence snippet, which the
+        // Regression: the agent dropped its own plumbing into the evidence snippet, which the
         // "You wrote:" quote rendered verbatim past the reasoning sanitizer. A real student quote never
         // contains pipeline tokens, so the whole quote is suppressed when it does.
         ValidatedFinding f = negativeFinding(

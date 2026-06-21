@@ -112,15 +112,15 @@ api PUT "/workspaces/$WS_SLUG/ai-settings/practice-config" -H 'content-type: app
 say "LLM runtime 'e2e-llm' (id $CFG_ID, $LP/$CRED, $MODEL) bound to practice detection"
 
 # ---- 6. the practices ------------------------------------------------------
-practice() { local slug="$1" name="$2" cat="$3" trig="$4" crit="$5"
+practice() { local slug="$1" name="$2" trig="$3" crit="$4"
   api POST "/workspaces/$WS_SLUG/practices" -H 'content-type: application/json' -d "$(jq -nc \
-    --arg s "$slug" --arg n "$name" --arg c "$cat" --argjson t "$trig" --arg cr "$crit" \
-    '{slug:$s,name:$n,category:$c,triggerEvents:$t,criteria:$cr}')" >/dev/null 2>&1 || true; }
-practice submit-reviewable-work "Submit reviewable work" REVIEW '["PullRequestCreated","PullRequestReady","PullRequestSynchronized"]' \
+    --arg s "$slug" --arg n "$name" --argjson t "$trig" --arg cr "$crit" \
+    '{slug:$s,name:$n,triggerEvents:$t,criteria:$cr}')" >/dev/null 2>&1 || true; }
+practice submit-reviewable-work "Submit reviewable work" '["PullRequestCreated","PullRequestReady","PullRequestSynchronized"]' \
   "The MR is appropriately scoped, has a clear description, passes CI, and is not a draft dump. Flag oversized/unfocused MRs and missing descriptions."
-practice act-on-feedback "Act on feedback" REVIEW '["ReviewSubmitted","PullRequestSynchronized"]' \
+practice act-on-feedback "Act on feedback" '["ReviewSubmitted","PullRequestSynchronized"]' \
   "After reviewers leave comments, the author addresses them with follow-up commits or replies rather than ignoring or force-resolving them."
-practice plan-and-scope-issues "Plan & scope issues" PLANNING '["PullRequestCreated"]' \
+practice plan-and-scope-issues "Plan & scope issues" '["PullRequestCreated"]' \
   "The MR references a well-defined, properly scoped issue and stays within that scope. Flag MRs with no linked issue or scope creep."
 say "practices created: Submit reviewable work · Act on feedback · Plan & scope issues"
 
