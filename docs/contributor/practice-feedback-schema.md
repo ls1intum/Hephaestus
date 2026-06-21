@@ -137,10 +137,10 @@ or the finding schema — practices remain the unit of detection.
 | id | Long | `id` | no | Auto-generated PK. | Surrogate key. |
 | workspace | Workspace (`@ManyToOne`) | `workspace_id` | no | Owning workspace (FK `fk_practice_area_workspace`). | Tenancy binding. |
 | slug | String(64) | `slug` | no | Stable key, unique per workspace (`uk_practice_area_workspace_slug`). | Survives a `name` rename. |
-| name | String(128) | `name` | no | Facilitator-renameable display label. | Dashboard label. |
+| name | String(128) | `name` | no | Admin-renameable display label. | Dashboard label. |
 | description | String (TEXT) | `description` | yes | Optional blurb on the area card. | Context for the bucket. |
 | active | boolean | `is_active` | no (default true) | Cohort-level visibility toggle; independent of `Practice.active`. | Surface/hide on dashboards without touching detection. |
-| displayOrder | int | `display_order` | no (default 0) | Facilitator dashboard ordering. | Deterministic UI sequence. |
+| displayOrder | int | `display_order` | no (default 0) | Admin dashboard ordering. | Deterministic UI sequence. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp. | Audit trail. |
 | updatedAt | Instant | `updated_at` | yes | Last-update timestamp. | Audit trail. |
 
@@ -210,7 +210,7 @@ context (#895)** so prior disputes never contaminate detection accuracy. The lat
 > - **VALIDITY sub-axis `{NOT_APPLICABLE}`** — *"is this finding valid/relevant here?"* is a
 >   finding-validity judgement, not a recipience act (Lipnevich & Smith 2022, Q3). The engagement DTO
 >   (`FindingReactionEngagementDTO`) therefore **excludes `NOT_APPLICABLE` from every uptake / non-uptake
->   ratio** and reports it separately as a validity/scope signal that flows to the facilitator
+>   ratio** and reports it separately as a validity/scope signal on the developer's own reflection view
 >   (Nicol & Macfarlane-Dick 2006, principle 7). The value stays in the enum for migration safety and
 >   keeps its suppression co-location (do not re-nag a credibly scoped-out locus).
 >
@@ -225,8 +225,8 @@ context (#895)** so prior disputes never contaminate detection accuracy. The lat
 
 ### 3.5 `Feedback` — table `feedback`
 
-Immutable, append-only synthesised **delivery** unit for a single recipient — the author-facing (or
-reviewer-/facilitator-facing) rendering of one or more findings, with rendered body, channel, provenance,
+Immutable, append-only synthesised **delivery** unit for a single recipient — the developer-facing
+rendering of one or more findings, with rendered body, channel, provenance,
 and delivery lifecycle. A re-run inserts a new row (deduped by `idempotency_key`) and points
 `supersedes_id` at the prior one rather than mutating it, so the record of what a student actually saw is
 preserved. `baseline_state` is intentionally **not** a column — derived on read from the supersession
@@ -238,11 +238,11 @@ chain.
 | idempotencyKey | String(255) | `idempotency_key` | no | Derived from `agent_job_id + unit_ordinal`; unique (`uk_feedback_idempotency`). | Re-emitted job cannot double-insert a unit. |
 | agentJobId | UUID | `agent_job_id` | no | Producing job (FK `fk_feedback_agent_job`, Liquibase). Raw UUID. | Avoids a cycle into `agent`; cascade-delete. |
 | workspaceId | Long | `workspace_id` | no | Owning workspace (FK `fk_feedback_workspace`, Liquibase). Raw Long. | Avoids a cycle into `workspace`; purge removes feedback explicitly. |
-| artifactType | WorkArtifact | `artifact_type` | yes | Kind of artifact this is about. | Nullable: reflection-dashboard / facilitator-digest feedback is not anchored to one artifact. |
+| artifactType | WorkArtifact | `artifact_type` | yes | Kind of artifact this is about. | Nullable: reflection-dashboard feedback is not anchored to one artifact. |
 | artifactId | Long | `artifact_id` | yes | External id of the target. | Nullable in lockstep with `artifactType`. |
 | recipientUserId | Long | `recipient_user_id` | no | The user this is delivered **to** (FK `fk_feedback_recipient`). Raw Long. | Messaging "To"-recipient; distinct from subject. ≈ xAPI Authority / audience — [xAPI/Caliper comparison](https://www.imsglobal.org/initial-xapicaliper-comparison). |
-| subjectUserId | Long | `subject_user_id` | **no (ALWAYS populated)** | The user this is **about**: equals `recipientUserId` for author-facing units, the subject (e.g. the reviewer) when ≠ recipient (reviewer-side feedback to a facilitator). | xAPI Actor (mandatory, unambiguous). NOT NULL since the symmetry migration backfilled `subject_user_id = recipient_user_id`, matching `PracticeFinding.subjectUserId` — no delivery-row fallback remains (§4). |
-| surface | FeedbackChannel | `surface` | no | Destination class (in-context / conversation / reflection / facilitator). | Decouples "what we say" from "where it lands". Column name `surface`; concept word is **channel**. |
+| subjectUserId | Long | `subject_user_id` | **no (ALWAYS populated)** | The user this is **about**: equals `recipientUserId` for author-facing units, the subject (e.g. the reviewer) when ≠ recipient (reviewer-side feedback). | xAPI Actor (mandatory, unambiguous). NOT NULL since the symmetry migration backfilled `subject_user_id = recipient_user_id`, matching `PracticeFinding.subjectUserId` — no delivery-row fallback remains (§4). |
+| surface | FeedbackChannel | `surface` | no | Destination class (in-context / conversation / reflection). | Decouples "what we say" from "where it lands". Column name `surface`; concept word is **channel**. |
 | unitOrdinal | Integer | `unit_ordinal` | no | 0-based position within the producing job's output. | Idempotency-key component + stable delivery order. |
 | deliveryState | FeedbackDeliveryState | `delivery_state` | no | Lifecycle: prepared → delivered / superseded / suppressed / failed. | Conventional delivery state machine; SUPPRESSED ≈ SARIF `result.suppressions`. |
 | suppressionReason | FeedbackSuppressionReason | `suppression_reason` | yes | Why a unit was withheld (set only when SUPPRESSED). | ≈ SARIF `suppression.justification`. |
@@ -305,7 +305,7 @@ Append-only **slowly-changing-dimension (SCD Type 2)** history of a practice's `
 time the `criteria` actually changes (value-compared), `PracticeService` appends a new revision; revision
 1 is written on practice create. `Practice.criteria` stays the **current projection** (no read path
 breaks), while `practice_revision` records every prior wording, so the recursive ostensive↔performative
-loop — facilitators reshaping the criteria over time in response to what they see enacted — is *recorded,
+loop — admins reshaping the criteria over time in response to what they see enacted — is *recorded,
 not overwritten* (D'Adderio 2011 translation loop; the qualitative-coding codebook audit-trail / IRR
 norm; data-warehousing SCD-2). `PracticeFinding.practice_revision_id` (§3.3) pins each finding to the
 revision in force when it was detected, making *which criteria version fired this finding* queryable.
@@ -333,7 +333,7 @@ revision in force when it was detected, making *which criteria version fired thi
 | **Severity** | `CRITICAL`, `MAJOR`, `MINOR`, `INFO` — impact, orthogonal to verdict. | SARIF `result.level` / SonarQube blocker..info. |
 | **FindingReactionAction** | **RESPONSE axis:** `ENACTED` ("acted to close the gap"; outcome unverified — RQ2), `DISPUTED` ("AI is wrong", reasoned rejection, requires explanation — RQ1/RQ4). **VALIDITY axis:** `NOT_APPLICABLE` ("valid but irrelevant" — RQ4; excluded from uptake ratios). | Recipience act (Winstone 2017 "enacting"); not workflow. `ENACTED` renamed from `APPLIED` (claimed action ≠ verified closure). No `DISMISSED`/`ACKNOWLEDGED` — non-action = absence of a row; affective dismissal deferred behind a UI affordance (§6). |
 | **EvidenceRole** | `PRIMARY` (anchors the headline), `SUPPORTING` (corroborates). | Synthesis-time weighting; replaces `display_role`. |
-| **FeedbackChannel** | `IN_CONTEXT` (on the PR/issue), `CONVERSATION` (mentor turn), `REFLECTION_DASHBOARD` (recipient's private dashboard), `FACILITATOR` (instructor). | Decouples message from channel. |
+| **FeedbackChannel** | `IN_CONTEXT` (on the PR/issue), `CONVERSATION` (mentor turn), `REFLECTION_DASHBOARD` (recipient's private dashboard). | Decouples message from channel. Every channel is developer-facing. |
 | **FeedbackDeliveryState** | `PREPARED`, `DELIVERED`, `SUPERSEDED` (replaced via `supersedes_id`), `SUPPRESSED` (withheld; see reason), `FAILED`. | Delivery state machine + review-tool edit-in-place (SUPERSEDED) + SARIF `suppressions` (SUPPRESSED). |
 | **FeedbackSuppressionReason** | `REVIEWER_SIDE`, `BELOW_THRESHOLD`, `LOW_CONFIDENCE`, `POLICY_FLOOR_DROP`, `REACTED_DISPUTED` (subject DISPUTED this locus earlier — B2), `REACTED_NOT_APPLICABLE` (subject marked N/A earlier — B2). | ≈ SARIF `suppression.justification`. `REVIEWER_SIDE` replaces legacy `AUDIENCE_REVIEWER`. |
 | **FeedbackOrigin** | `AGENT` (LLM), `POLICY_FLOOR` (deterministic guaranteed-coverage), `FALLBACK` (synthesis unavailable/failed). | Provenance for honest quality measurement. |
@@ -350,9 +350,10 @@ The schema encodes two orthogonal axes that the display layer must keep separate
 
 - **Actor axis** = `Practice.subjectRole` (`AUTHOR`/`REVIEWER`) + the finding's `subject_user_id` — *who*
   the practice evaluates. Already encoded.
-- **Audience axis** = *who reads the analytic*. The display model adds this. The split mirrors the
-  xAPI/Caliper `actor — verb — object` + `context.instructor` separation: a finding filed **against** a
-  developer can surface **to** a facilitator without being delivered **to** the developer.
+- **Audience axis** = *who reads the analytic*. The display model adds this. Every feedback unit is
+  developer-facing — findings, verdicts and aggregates go to the developer, never to a mentor, instructor,
+  or grader. The only non-developer reader is the researcher analysing **anonymised** study data and the
+  workspace admin who edits the catalog (criteria, area labels); neither receives a developer's feedback.
 
 **Field-by-audience matrix — enforce server-side, never in the webapp.** "Developer" and "Reviewer" are
 the *same human*; the column that applies is selected by the **finding's `subjectRole`**, not a static
@@ -360,17 +361,17 @@ user role, so reviewer-craft never leaks to the author. The `whyItMatters` / `wh
 learner-layer columns are **implemented** — admin-authored `Practice` columns served to learners through
 `LearnerPracticeDTO` (`GET /practices/learner`), which carries no `criteria` field by construction.
 
-| Field | Developer / Learner | Reviewer (finding `subjectRole`=REVIEWER) | Facilitator / Instructor | Researcher / Admin |
-| --- | --- | --- | --- | --- |
-| `name` | yes | yes | yes | yes |
-| `whyItMatters` | yes — Layer 1 | yes | yes | yes |
-| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes | yes |
-| area / area progress | yes — own | yes — own | yes — cohort | yes |
-| per-finding `Feedback` (task-framed) | yes — own only | yes — own only | yes — cohort aggregate | yes |
-| **`criteria`** | **NEVER** | **NEVER** | read-only, opt-in | yes — edit |
-| `precomputeScript`, `triggerEvents`, `polarity`, `subjectRole` | no | no | no | yes — edit |
-| raw `OBSERVED`/`NOT_OBSERVED` verdict label | no — delivered as task-framed feedback | no | yes — aggregate | yes |
-| reaction `NOT_APPLICABLE` (validity signal) | n/a | n/a | yes — as a scope signal, **not** uptake | yes |
+| Field | Developer / Learner | Reviewer (finding `subjectRole`=REVIEWER) | Researcher / Admin |
+| --- | --- | --- | --- |
+| `name` | yes | yes | yes |
+| `whyItMatters` | yes — Layer 1 | yes | yes |
+| `whatGoodLooksLike` | yes — Layer 2 (on request) | yes | yes |
+| area / area progress | yes — own | yes — own | yes — anonymised |
+| per-finding `Feedback` (task-framed) | yes — own only | yes — own only | yes — anonymised |
+| **`criteria`** | **NEVER** | **NEVER** | yes — edit (admin) |
+| `precomputeScript`, `triggerEvents`, `polarity`, `subjectRole` | no | no | yes — edit (admin) |
+| raw `OBSERVED`/`NOT_OBSERVED` verdict label | no — delivered as task-framed feedback | no | yes — anonymised |
+| reaction `NOT_APPLICABLE` (validity signal) | own — scope signal, **not** uptake | n/a | yes — anonymised |
 
 **Two hard rules from theory (not UX taste):**
 

@@ -28,8 +28,7 @@ import lombok.ToString;
  *
  * <p>An area is a <b>read-model / organizing</b> concept only. Practices remain the unit of detection;
  * an area never enters {@code trigger_events}, {@code criteria}, the detector, or the
- * {@link PracticeFinding} schema. Areas organise findings for developers (Reflection Dashboard) and
- * facilitators (Facilitator Dashboard).
+ * {@link PracticeFinding} schema. Areas organise a developer's own findings on their Reflection dashboard.
  *
  * <p><b>Two orthogonal axes — do not conflate:</b> an area (this configurable learning-objective axis)
  * is distinct from the delivery channel. A practice belongs to at most one area
@@ -67,7 +66,7 @@ public class PracticeArea {
     @Column(name = "slug", nullable = false, length = 64)
     private String slug;
 
-    /** Facilitator-renameable display label. */
+    /** Admin-renameable display label. */
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
@@ -79,7 +78,7 @@ public class PracticeArea {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
-    /** Facilitator dashboard ordering. */
+    /** Admin dashboard ordering. */
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
 

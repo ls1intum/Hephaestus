@@ -6,7 +6,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * <ul>
  *   <li>{@link #SUMMARY} — the PR/MR/issue summary body (one per feedback unit, typically).</li>
  *   <li>{@link #INLINE} — anchored to a specific diff location (file + line/range).</li>
- *   <li>{@link #CONVERSATION_TURN} — a turn in a mentor/facilitator conversation thread.</li>
+ *   <li>{@link #CONVERSATION_TURN} — a turn in a mentor conversation thread.</li>
  * </ul>
  */
 public enum PlacementSlot {

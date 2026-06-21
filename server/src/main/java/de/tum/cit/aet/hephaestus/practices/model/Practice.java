@@ -51,7 +51,7 @@ import tools.jackson.databind.JsonNode;
     ),
     indexes = {
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
-        // Area-scoped reads (Reflection/Facilitator dashboards) join finding→practice→area; index the FK.
+        // Area-scoped reads (the developer's Reflection dashboard) join finding→practice→area; index the FK.
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
     }
 )

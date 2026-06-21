@@ -27,7 +27,7 @@ import org.hibernate.annotations.OnDeleteAction;
  * An immutable, append-only snapshot of a {@link Practice}'s {@code criteria} at a point in time — the
  * rubric exactly as it was when a finding was detected against it.
  *
- * <p>Why this exists (reproducibility): facilitators edit {@code Practice.criteria} over time. If those
+ * <p>Why this exists (reproducibility): admins edit {@code Practice.criteria} over time. If those
  * edits were destructive, no past finding could be reproduced against the rubric that actually fired it.
  * This is Slowly-Changing-Dimension Type 2 over {@code criteria}: each edit appends a revision;
  * {@link Practice#getCriteria()} remains the current projection, so no read path breaks.

@@ -96,8 +96,8 @@ public class Feedback {
     private Long workspaceId;
 
     /**
-     * The kind of work artifact this feedback is about (PR / issue). Nullable: surfaces such as a reflection
-     * dashboard or a facilitator digest are not anchored to a single artifact.
+     * The kind of work artifact this feedback is about (PR / issue). Nullable: a reflection-dashboard unit
+     * is not anchored to a single artifact.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "artifact_type", length = 32)
@@ -118,15 +118,15 @@ public class Feedback {
     /**
      * The user this feedback is <em>about</em> — ALWAYS populated (symmetry with
      * {@code PracticeFinding.subjectUserId} and xAPI's mandatory, unambiguous Actor). Equals
-     * {@link #recipientUserId} for the common author-side case; differs for reviewer-side feedback delivered
-     * to a facilitator. The former "nullable defaulting to recipient" was collapsed to an explicit value so
-     * every reader can trust the column without a fallback.
+     * {@link #recipientUserId} for the common author-side case; differs when the unit is about someone other
+     * than its recipient (e.g. reviewer-side feedback). The former "nullable defaulting to recipient" was
+     * collapsed to an explicit value so every reader can trust the column without a fallback.
      */
     @NotNull
     @Column(name = "subject_user_id", nullable = false)
     private Long subjectUserId;
 
-    /** Destination class for this unit (in-context comment, conversation turn, reflection dashboard, facilitator). */
+    /** Destination class for this unit (in-context comment, conversation turn, reflection dashboard). */
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "surface", nullable = false, length = 32)

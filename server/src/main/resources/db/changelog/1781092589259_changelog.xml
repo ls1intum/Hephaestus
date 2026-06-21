@@ -649,7 +649,7 @@
         <comment>Enum CHECKs for feedback at final allowed-lists (delivery_state column; suppression_reason includes REVIEWER_SIDE + the B2 reaction-aware reasons).</comment>
         <sql>
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_target_type CHECK (artifact_type IS NULL OR artifact_type IN ('PULL_REQUEST', 'ISSUE'));
-            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_surface CHECK (surface IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION_DASHBOARD', 'FACILITATOR'));
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_surface CHECK (surface IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION_DASHBOARD'));
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (delivery_state IN ('PREPARED', 'DELIVERED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_suppression_reason CHECK (suppression_reason IS NULL OR suppression_reason IN ('REVIEWER_SIDE', 'BELOW_THRESHOLD', 'LOW_CONFIDENCE', 'POLICY_FLOOR_DROP', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE'));
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_origin CHECK (origin IN ('AGENT', 'POLICY_FLOOR', 'FALLBACK'));

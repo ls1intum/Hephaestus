@@ -10,6 +10,10 @@
 > implementation (e.g. `correlation_key` → `finding_fingerprint`, `continuity_key` → `feedback_thread_key`,
 > `display_role` → `evidence_role`, `contributor_id` → `developer_id`). For the **authoritative shipped
 > schema and ubiquitous-language**, see `docs/contributor/practice-feedback-schema.md` §2.
+>
+> The `FACILITATOR` delivery channel discussed below was **subsequently removed**: every `FeedbackChannel`
+> is developer-facing — feedback is delivered to the developer it is about, never to a mentor, instructor,
+> or grader. The system has no facilitator/evaluative delivery surface.
 
 ## Context
 

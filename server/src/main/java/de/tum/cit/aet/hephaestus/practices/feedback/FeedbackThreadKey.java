@@ -32,7 +32,7 @@ public final class FeedbackThreadKey {
      * Compute the stable continuity key for a delivery unit.
      *
      * @param artifactType the artifact-type discriminator (e.g. {@code PULL_REQUEST}); empty string when the
-     *     unit is not artifact-anchored (a dashboard/facilitator digest)
+     *     unit is not artifact-anchored (a dashboard digest)
      * @param artifactId the artifact id, or {@code null} when not artifact-anchored
      * @param recipientUserId the user the unit is delivered to (required)
      * @param surface the delivery surface (required)
