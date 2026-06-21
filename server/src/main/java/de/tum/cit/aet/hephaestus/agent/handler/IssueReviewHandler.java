@@ -195,10 +195,15 @@ public class IssueReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.ISSUE);
+        Map<String, String> whyBySlug =
+            job.getWorkspace() == null
+                ? Map.of()
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.ISSUE);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             coercedFindings,
             WorkArtifact.ISSUE,
-            polarityBySlug
+            polarityBySlug,
+            whyBySlug
         );
         postIssueNote(job, delivery);
     }

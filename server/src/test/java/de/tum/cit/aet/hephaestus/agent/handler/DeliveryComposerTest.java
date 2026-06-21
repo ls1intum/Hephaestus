@@ -630,13 +630,13 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void sanitizeStudentText_stripsInternalGradingVocabulary() {
-        // The exact grading-mechanics phrasing observed leaking into live student notes.
+        // Grading-mechanics phrasing the model can emit; it must never reach the student.
         String leaked1 = "The body has no rationale, which results in a NEGATIVE finding with MINOR severity.";
         String leaked2 =
             "This exceeds the ≤200 line threshold for a POSITIVE finding, placing it in the INFO severity band.";
         String leaked3 = "The title is generic, violating the practice that requires an imperative summary.";
 
-        // The exact mid-paragraph leak observed on MR !13 (two sentences, second is pure rubric meta).
+        // A mid-paragraph leak: two sentences where the second is pure rubric meta.
         String leaked4 =
             "The title is descriptive but the body only lists what was done without a quoted sentence " +
             "that explains why. The practice requires a specific 'why' sentence to be present for a " +
@@ -689,9 +689,9 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(clean).contains("Consider splitting the change.");
     }
 
-    // gpt-oss feedback eval: each of these scoring sentences reached the student verbatim in the delivered
-    // GitLab text. The lesson must survive on its title + guidance; the arithmetic, band words, raw field
-    // names, and scoring counters are dropped. One parameter row per leak class so a failure localises.
+    // Scoring sentences the model can emit must never survive into the delivered text: the lesson stays on
+    // its title + guidance, while the arithmetic, band words, raw field names, and scoring counters are
+    // dropped. One parameter row per leak class so a failure localises.
     @ParameterizedTest(name = "{0}")
     @MethodSource("gptOssScoringMachineryLeaks")
     void sanitizeStudentText_stripsGptOssScoringMachineryLeak(
@@ -838,8 +838,6 @@ class DeliveryComposerTest extends BaseUnitTest {
             "checkable outcomes.";
         assertThat(DeliveryComposer.sanitizeStudentText(repeatedPhrase)).isEqualTo(repeatedPhrase);
     }
-
-    // --- Live-E2E regression fixes (go98weh batch, 2026-06-11) ---
 
     @Test
     void compose_forIssue_negativeFindingsExpandedInFull_neverDemotedToVanishingDiffNote() {
@@ -1031,7 +1029,7 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "ships-tests-with-the-change",
                 "Production logic without a test",
                 Severity.MINOR,
-                List.of(new LocationSpec("inputs/sources/scm/repo/client/Obsphera/Services/APIClient.swift", 12)),
+                List.of(new LocationSpec("inputs/sources/scm/repo/client/App/Services/APIClient.swift", 12)),
                 null,
                 "New logic added without a test.",
                 "Add a unit test."
@@ -1039,7 +1037,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
         var dc = DeliveryComposer.compose(findings, WorkArtifact.PULL_REQUEST);
         assertThat(dc).isNotNull();
-        assertThat(dc.mrNote()).contains("client/Obsphera/Services/APIClient.swift");
+        assertThat(dc.mrNote()).contains("client/App/Services/APIClient.swift");
         assertThat(dc.mrNote()).doesNotContain("inputs/sources/scm/repo/client/");
     }
 
@@ -1468,7 +1466,13 @@ class DeliveryComposerTest extends BaseUnitTest {
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
         // Baseline (no signals yet): both findings keep their full summary lines, no pointer.
-        String firstPass = DeliveryComposer.recomposeMrNote(findings, WorkArtifact.PULL_REQUEST, Map.of(), Set.of());
+        String firstPass = DeliveryComposer.recomposeMrNote(
+            findings,
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of(),
+            Set.of()
+        );
         assertThat(firstPass).contains("Dead code in view").contains("Non-descriptive name 'Data'");
         assertThat(firstPass).doesNotContain("see the");
 
@@ -1476,6 +1480,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         String demoted = DeliveryComposer.recomposeMrNote(
             findings,
             WorkArtifact.PULL_REQUEST,
+            Map.of(),
             Map.of(),
             Set.of("corr-delivered")
         );
@@ -1516,6 +1521,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of(a, b),
             WorkArtifact.PULL_REQUEST,
             Map.of(),
+            Map.of(),
             Set.of("k-a", "k-b")
         );
 
@@ -1541,6 +1547,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(keyless),
             WorkArtifact.PULL_REQUEST,
+            Map.of(),
             Map.of(),
             Set.of("some-other-key")
         );
@@ -1608,5 +1615,191 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(body).doesNotContain("OBSERVED");
         // Key still propagates after the sanitize-and-rebuild.
         assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-scrub-789");
+    }
+
+    // Transferable-principle ("Why this matters") surfacing — the catalogue whyItMatters wired into delivery.
+
+    private static final String SCOPE_WHY =
+        "A reviewer can only hold so much in their head at once; a focused change gets read carefully.";
+
+    @Test
+    void compose_withWhyBySlug_surfacesTransferablePrincipleOnCritique() {
+        var f = negativeFinding(
+            "scope-one-reviewable-change",
+            "Change spans many unrelated concerns",
+            Severity.MAJOR,
+            List.of(),
+            List.of(),
+            "This MR touches authentication, UI, and the build config in one diff.",
+            "Split each concern into its own MR."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(f),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of("scope-one-reviewable-change", SCOPE_WHY)
+        );
+
+        assertThat(result).isNotNull();
+        // The authored principle is surfaced verbatim, labelled, between the observation and the next step.
+        assertThat(result.mrNote()).contains("_Why this matters:_ " + SCOPE_WHY);
+    }
+
+    @Test
+    void compose_withWhyBySlug_emptyMapIsBehaviourIdentical() {
+        var f = negativeFinding(
+            "scope-one-reviewable-change",
+            "Change spans many unrelated concerns",
+            Severity.MAJOR,
+            List.of(),
+            List.of(),
+            "Touches three concerns.",
+            "Split it up."
+        );
+
+        String withoutMap = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST).mrNote();
+        String withEmptyMap = DeliveryComposer.compose(
+            List.of(f),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of()
+        ).mrNote();
+
+        assertThat(withEmptyMap).isEqualTo(withoutMap);
+        assertThat(withEmptyMap).doesNotContain("Why this matters");
+    }
+
+    @Test
+    void compose_withWhyBySlug_surfacesPrincipleOncePerDelivery() {
+        // Two critiques of the SAME practice must carry the principle exactly once (no repetition).
+        var a = negativeFinding(
+            "scope-one-reviewable-change",
+            "Concern A bundled in",
+            Severity.MAJOR,
+            List.of(),
+            List.of(),
+            "Bundles concern A.",
+            "Extract A."
+        );
+        var b = negativeFinding(
+            "scope-one-reviewable-change",
+            "Concern B bundled in",
+            Severity.MINOR,
+            List.of(),
+            List.of(),
+            "Bundles concern B.",
+            "Extract B."
+        );
+
+        String note = DeliveryComposer.compose(
+            List.of(a, b),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of("scope-one-reviewable-change", SCOPE_WHY)
+        ).mrNote();
+
+        assertThat(note).containsOnlyOnce("_Why this matters:_");
+    }
+
+    @Test
+    void compose_withWhyBySlug_skipsPrincipleOnInfoNudge() {
+        // INFO-severity nudges are too low-value to carry the extra principle line (cognitive-load budget).
+        var info = negativeFinding(
+            "leaves-the-code-clean-with-intent-revealing-comments",
+            "A stray TODO remains",
+            Severity.INFO,
+            List.of(),
+            List.of(),
+            "One leftover TODO.",
+            "Drop or resolve it."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(info),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of(
+                "leaves-the-code-clean-with-intent-revealing-comments",
+                "Intent-revealing code lowers the next reader's cost."
+            )
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.mrNote()).doesNotContain("Why this matters");
+    }
+
+    @Test
+    void compose_withWhyBySlug_atMostOneAdvisoryPrincipleAcrossDelivery() {
+        // Two DIFFERENT advisory (MINOR) critiques: only the lead one carries a principle — no wall of rationale.
+        var a = negativeFinding(
+            "describe-what-and-why",
+            "Thin description",
+            Severity.MINOR,
+            List.of(),
+            List.of(),
+            "Body is thin.",
+            "Add a why."
+        );
+        var b = negativeFinding(
+            "scope-one-reviewable-change",
+            "PR is large",
+            Severity.MINOR,
+            List.of(),
+            List.of(),
+            "Touches many files.",
+            "Split it."
+        );
+
+        String note = DeliveryComposer.compose(
+            List.of(a, b),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of(
+                "describe-what-and-why",
+                "A clear description lets a reviewer orient before reading the diff.",
+                "scope-one-reviewable-change",
+                SCOPE_WHY
+            )
+        ).mrNote();
+
+        assertThat(note).containsOnlyOnce("_Why this matters:_");
+    }
+
+    @Test
+    void compose_withWhyBySlug_blockingKeepsPrinciplePlusOneAdvisory() {
+        // A blocking critique keeps its principle; one advisory teaching moment also lands → two lines total.
+        var blocking = negativeFinding(
+            "handles-errors-instead-of-swallowing-them",
+            "Swallowed error",
+            Severity.MAJOR,
+            List.of(),
+            List.of(),
+            "Error is dropped.",
+            "Surface it."
+        );
+        var advisory = negativeFinding(
+            "describe-what-and-why",
+            "Thin description",
+            Severity.MINOR,
+            List.of(),
+            List.of(),
+            "Body is thin.",
+            "Add a why."
+        );
+
+        String note = DeliveryComposer.compose(
+            List.of(blocking, advisory),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            Map.of(
+                "handles-errors-instead-of-swallowing-them",
+                "A swallowed error turns a loud failure into a silent one nobody can debug.",
+                "describe-what-and-why",
+                "A clear description lets a reviewer orient before reading the diff."
+            )
+        ).mrNote();
+
+        assertThat(note.split("_Why this matters:_", -1)).hasSize(3); // 2 occurrences => 3 split parts
     }
 }

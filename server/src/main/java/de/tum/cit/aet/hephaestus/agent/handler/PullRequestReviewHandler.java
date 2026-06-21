@@ -88,8 +88,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ContentProvider.OUTPUT_PREFIX + "diff_summary.md",
         ContentProvider.OUTPUT_PREFIX + "comments.json",
         // Raw SQL-only integration objects (the agent cannot get these from the mounted worktree): a finding
-        // grounded in one of these must survive the diff-scope filter. test_presence/branch_graph were removed
-        // here in lockstep with deleting those providers — they were worktree-derived Transform, not content.
+        // grounded in one of these must survive the diff-scope filter. Only objects absent from the worktree
+        // belong here — anything derivable from the checkout is content the agent reads directly.
         ContentProvider.OUTPUT_PREFIX + "linked_work_items.json",
         ContentProvider.OUTPUT_PREFIX + "review_threads.json",
         // General (conversation-tab) MR review discussion — position-less notes GitLab routes to
@@ -102,7 +102,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * Process/metadata-level PR practices whose evidence is the PR metadata, the commit subjects, or the
      * review thread — NOT a diff line. {@code filterByDiffScope} is a guard for CODE-defect findings whose
      * location must sit inside the diff; applied to these process practices it would wrongly drop a valid
-     * finding the moment the agent attaches a stray (non-diff) location to it (observed: a commit-subject
+     * finding the moment the agent attaches a stray (non-diff) location to it (e.g. a commit-subject
      * finding citing a commit ref). These slugs therefore bypass the diff-scope filter.
      */
     private static final Set<String> METADATA_LEVEL_PRACTICES = Set.of(
@@ -450,10 +450,15 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
+        Map<String, String> whyBySlug =
+            job.getWorkspace() == null
+                ? Map.of()
+                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
             WorkArtifact.PULL_REQUEST,
-            polarityBySlug
+            polarityBySlug,
+            whyBySlug
         );
         if (delivery != null) {
             log.info("Server-side delivery composed from {} findings: jobId={}", deliverable.size(), job.getId());
@@ -475,11 +480,17 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // findings + polarity here keeps FeedbackDeliveryService free of the composition inputs — it only
         // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
-            DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, polarityBySlug, deliveredKeys)
+            DeliveryComposer.recomposeMrNote(
+                deliverable,
+                WorkArtifact.PULL_REQUEST,
+                polarityBySlug,
+                whyBySlug,
+                deliveredKeys
+            )
         );
     }
 
-    // Delivery-phase diff helpers (use GitDiffOperations; no longer duplicated in the handler)
+    // Delivery-phase diff helpers (delegate to GitDiffOperations)
 
     /**
      * Run the deterministic secret pre-pass over the job's raw diff and map each hit to a synthetic

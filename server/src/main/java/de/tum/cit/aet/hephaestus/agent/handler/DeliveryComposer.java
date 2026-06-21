@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,7 +129,7 @@ class DeliveryComposer {
      * <p>{@code polarityBySlug} supplies each practice's {@link Polarity} so "is this finding a problem
      * vs a strength?" is decided sign-correctly (ADR 0021, F-6) instead of assuming every
      * {@code NOT_OBSERVED} is a gap. A slug absent from the map defaults to {@link Polarity#DESIRABLE},
-     * which — because every catalogued practice is desirable today — keeps behaviour identical when no
+     * which — because every catalogued practice is desirable — keeps behaviour identical when no
      * map is supplied.
      */
     @Nullable
@@ -137,10 +138,27 @@ class DeliveryComposer {
         WorkArtifact artifact,
         Map<String, Polarity> polarityBySlug
     ) {
+        return compose(findings, artifact, polarityBySlug, Map.of());
+    }
+
+    /**
+     * Compose with the catalogue-authored transferable principle ({@code whyBySlug}, keyed by practice
+     * slug from {@code Practice.whyItMatters}) surfaced on substantive critiques. The principle is the
+     * feed-forward layer the model is deliberately told NOT to write itself (so it cannot fabricate or
+     * drift it); the server supplies it verbatim here. An empty map omits the principle line, leaving the
+     * rest of the delivery unchanged.
+     */
+    @Nullable
+    static DeliveryContent compose(
+        List<ValidatedFinding> findings,
+        WorkArtifact artifact,
+        Map<String, Polarity> polarityBySlug,
+        Map<String, String> whyBySlug
+    ) {
         // First-pass compose: inline notes have not been posted yet, so NO finding is known-delivered.
         // An empty delivered-key set makes every inlinable finding render its full summary line — the
         // safe pre-delivery state, and the permanent fallback for any finding whose inline note never lands.
-        return compose(findings, artifact, polarityBySlug, Set.of());
+        return compose(findings, artifact, polarityBySlug, whyBySlug, Set.of());
     }
 
     /**
@@ -156,9 +174,10 @@ class DeliveryComposer {
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
         Map<String, Polarity> polarityBySlug,
+        Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
-        DeliveryContent recomposed = compose(findings, artifact, polarityBySlug, deliveredKeys);
+        DeliveryContent recomposed = compose(findings, artifact, polarityBySlug, whyBySlug, deliveredKeys);
         return recomposed == null ? null : recomposed.mrNote();
     }
 
@@ -167,11 +186,15 @@ class DeliveryComposer {
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
         Map<String, Polarity> polarityBySlug,
+        Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
+        // One transferable principle per practice per delivery — shared across the summary and the inline
+        // diff notes so a slug's "Why this matters" lands exactly once, wherever that finding renders in full.
+        Set<String> emittedWhy = new HashSet<>();
 
         List<ValidatedFinding> negatives = findings
             .stream()
@@ -256,11 +279,13 @@ class DeliveryComposer {
             inlinable,
             artifact,
             improvementOverflow,
-            deliveredKeys
+            deliveredKeys,
+            whyBySlug,
+            emittedWhy
         );
 
         // Diff notes: ALL inlinable negatives get inline comments
-        List<DiffNote> diffNotes = collectDiffNotes(inlinable);
+        List<DiffNote> diffNotes = collectDiffNotes(inlinable, whyBySlug, emittedWhy);
 
         return new DeliveryContent(mrNote, diffNotes);
     }
@@ -508,7 +533,7 @@ class DeliveryComposer {
     /**
      * Marks a sentence as pure grading-mechanics meta — if any of these appears, the whole sentence is
      * the grader explaining the rubric to itself, not feedback to the student, so it is dropped wholesale.
-     * Catches phrasings observed leaking from the detection model: "the practice requires…", "for a OBSERVED
+     * Catches grading-meta phrasings the detection model can emit: "the practice requires…", "for a OBSERVED
      * verdict", "MINOR severity level/band", "acceptable upper band", "according to/violating the
      * practice", "…line threshold".
      */
@@ -523,7 +548,7 @@ class DeliveryComposer {
             "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
             "\\b[≤<=>]*\\s*\\d+[\\s-]*(?:line|file)s?\\s+threshold\\b|" +
             "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b|" +
-            // Rubric-mechanics / criteria-computation leaks observed reaching students (the model echoes the
+            // Rubric-mechanics / criteria-computation phrasings the model can echo (it repeats the
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
             "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" +
@@ -564,7 +589,7 @@ class DeliveryComposer {
             "\\bcarve-out\\b|" +
             "\\bthreshold\\s+for\\s+downgrade\\b|\\b\\d+%\\s+threshold\\b|" +
             "\\bis\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\s*(?:\\([^)]*\\)\\s*)?,?\\s+not\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "is MINOR, not MAJOR" — tolerate an intervening "(a decomposition nudge)," parenthetical
-            // Verdict-justification phrasings observed leaking verbatim to students: the grader narrating WHY a
+            // Verdict-justification phrasings the model can emit verbatim: the grader narrating WHY a
             // verdict/severity landed. Each lesson stands on the title + guidance + the severity icon without
             // this machinery — drop the whole sentence.
             "\\bverdict\\s+is\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // "the combined verdict is NOT_OBSERVED" (enum AFTER the noun)
@@ -579,7 +604,7 @@ class DeliveryComposer {
             // Raw snake_case API field tokens reaching prose, e.g. "sub_issues_total is null".
             "\\b[a-z]+(?:_[a-z]+)+\\s+(?:is|are)\\s+(?:null|present|set|empty)\\b|" +
             "\\bsub_issues_total\\b|" +
-            // Scoring-machinery leaks confirmed reaching students:
+            // Scoring-machinery phrasings the model can emit:
             // "noise fraction (2/14 ≈ 0.14) is ≤ 0.25, so the severity is INFO", "is_draft false, no WIP token",
             // "satisfying the categorizing-label requirement". Each lesson stands on the title + guidance alone.
             "\\bnoise\\s+fraction\\b|" + // space variant of noiseFraction
@@ -748,7 +773,9 @@ class DeliveryComposer {
         List<ValidatedFinding> inlinable,
         WorkArtifact artifact,
         int improvementOverflow,
-        Set<String> deliveredKeys
+        Set<String> deliveredKeys,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
     ) {
         var sb = new StringBuilder(4096);
 
@@ -785,7 +812,7 @@ class DeliveryComposer {
 
         // Non-inlinable findings (full detail) — these only exist in the summary
         for (int i = 0; i < nonInlinable.size(); i++) {
-            composeFinding(sb, nonInlinable.get(i));
+            composeFinding(sb, nonInlinable.get(i), whyBySlug, emittedWhy);
             if (i < nonInlinable.size() - 1 || !inlinable.isEmpty()) {
                 sb.append("---\n\n");
             }
@@ -890,7 +917,12 @@ class DeliveryComposer {
         }
     }
 
-    private static void composeFinding(StringBuilder sb, ValidatedFinding f) {
+    private static void composeFinding(
+        StringBuilder sb,
+        ValidatedFinding f,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
+    ) {
         appendFindingHeader(sb, f, true);
         sb.append("\n\n");
 
@@ -919,12 +951,72 @@ class DeliveryComposer {
             }
 
             appendStudentText(sb, f.reasoning());
+            appendPrinciple(sb, f, whyBySlug, emittedWhy);
             appendStudentText(sb, f.guidance());
         } else {
             // MINOR/INFO: combine reasoning + guidance naturally
             appendStudentText(sb, f.reasoning());
+            appendPrinciple(sb, f, whyBySlug, emittedWhy);
             appendStudentText(sb, f.guidance());
         }
+    }
+
+    /**
+     * Surfaces the catalogue-authored transferable principle ({@code Practice.whyItMatters}) as a single
+     * "Why this matters" line between the grounded observation and the forward step — completing Hattie's
+     * formative loop (feed-back → principle → feed-forward) that a task-level critique otherwise lacks.
+     *
+     * <p>Pulled VERBATIM from the catalogue (never model-generated), so it cannot fabricate or drift and
+     * carries no rubric vocabulary. Emitted at most once per practice slug per delivery (shared
+     * {@code emittedWhy}) so a multi-finding note never repeats it, and never on an INFO nudge.
+     *
+     * <p>Cognitive-load budget: a BLOCKING (CRITICAL/MAJOR) critique each keeps its principle — the stakes
+     * justify the why and the developer cannot simply ignore it. But ADVISORY (MINOR) critiques get at most
+     * ONE principle line across the whole delivery: a craft-heavy note (several suggestions) lands a single
+     * teaching moment rather than a wall of rationale that reads as preachy and dilutes the lesson (Shute
+     * 2008 "as simple as possible"; reactance to repeated unsolicited justification). An absent/blank entry
+     * (e.g. the empty default map) is a no-op, so a slug without an authored principle changes nothing.
+     */
+    private static void appendPrinciple(
+        StringBuilder sb,
+        ValidatedFinding f,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
+    ) {
+        sb.append(principleText(f, whyBySlug, emittedWhy));
+    }
+
+    /**
+     * Sentinel marker tracked in {@code emittedWhy} once a non-blocking (advisory) principle line has been
+     * surfaced this delivery, so only the lead advisory critique carries one. Not a valid practice slug
+     * (slugs match {@code WorkspaceAbi.PRACTICE_SLUG}), so it can never collide with a real entry.
+     */
+    private static final String ADVISORY_PRINCIPLE_SHOWN = " advisory-principle-shown";
+
+    /**
+     * The "Why this matters" line for {@code f}, or {@code ""} when it should not be surfaced (INFO nudge,
+     * no authored principle, already emitted this delivery, or a second advisory principle). Mutates
+     * {@code emittedWhy} on success. See {@link #appendPrinciple}.
+     */
+    private static String principleText(ValidatedFinding f, Map<String, String> whyBySlug, Set<String> emittedWhy) {
+        if (f.severity() == Severity.INFO) {
+            return "";
+        }
+        String why = whyBySlug.get(f.practiceSlug());
+        if (why == null || why.isBlank()) {
+            return "";
+        }
+        boolean blocking = f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR;
+        if (!blocking && emittedWhy.contains(ADVISORY_PRINCIPLE_SHOWN)) {
+            return ""; // an advisory teaching moment already landed this delivery — don't stack another
+        }
+        if (!emittedWhy.add(f.practiceSlug())) {
+            return ""; // this practice's principle already surfaced earlier in the same delivery
+        }
+        if (!blocking) {
+            emittedWhy.add(ADVISORY_PRINCIPLE_SHOWN);
+        }
+        return "_Why this matters:_ " + sanitizeStudentText(why).strip() + "\n\n";
     }
 
     /** True when {@code text} carries any internal grading-mechanics / pipeline-plumbing token. */
@@ -1042,7 +1134,11 @@ class DeliveryComposer {
      * Fall back to a synthesized note from the first evidence location + composed body when the
      * agent did not supply one.
      */
-    private static List<DiffNote> collectDiffNotes(List<ValidatedFinding> negatives) {
+    private static List<DiffNote> collectDiffNotes(
+        List<ValidatedFinding> negatives,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
+    ) {
         List<DiffNote> notes = new ArrayList<>();
 
         for (ValidatedFinding f : negatives) {
@@ -1060,12 +1156,17 @@ class DeliveryComposer {
                 DiffNote suggested = f.suggestedDiffNotes().get(0);
                 String clean = sanitizeStudentText(suggested.body());
                 if (clean.isBlank()) continue;
+                // Append the transferable principle so an inline note (the primary surface for an inlinable
+                // finding — its summary line collapses to a pointer once delivered) still completes the
+                // formative loop rather than landing as a bare terse fix.
+                String principle = principleText(f, whyBySlug, emittedWhy);
+                String body = principle.isEmpty() ? clean : clean + "\n\n" + principle.strip();
                 notes.add(
                     new DiffNote(
                         suggested.filePath(),
                         suggested.startLine(),
                         suggested.endLine(),
-                        clean,
+                        body,
                         f.findingFingerprint()
                     )
                 );
@@ -1093,7 +1194,7 @@ class DeliveryComposer {
                 endLine = endLineNode.asInt();
             }
 
-            String body = composeDiffNoteBody(f);
+            String body = composeDiffNoteBody(f, whyBySlug, emittedWhy);
             if (body != null && !body.isBlank()) {
                 // Synthesized note inherits the finding's correlation key, same as the suggested-note branch.
                 notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.findingFingerprint()));
@@ -1108,12 +1209,17 @@ class DeliveryComposer {
      * Since the MR summary only has a compact list, the diff note carries the full detail.
      */
     @Nullable
-    private static String composeDiffNoteBody(ValidatedFinding f) {
+    private static String composeDiffNoteBody(
+        ValidatedFinding f,
+        Map<String, String> whyBySlug,
+        Set<String> emittedWhy
+    ) {
         var sb = new StringBuilder();
         appendFindingHeader(sb, f, false);
         sb.append("\n\n");
 
         appendStudentText(sb, f.reasoning());
+        appendPrinciple(sb, f, whyBySlug, emittedWhy);
         appendStudentText(sb, f.guidance());
 
         String body = sb.toString().strip();

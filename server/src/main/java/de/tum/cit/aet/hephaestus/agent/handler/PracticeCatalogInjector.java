@@ -58,6 +58,22 @@ class PracticeCatalogInjector {
     }
 
     /**
+     * Resolve {@code slug -> whyItMatters} (the catalogue-authored transferable principle) for the
+     * {@code focus}-scoped active practices of a workspace. The delivery layer surfaces this verbatim as the
+     * "Why this matters" feed-forward line on critiques (see {@code DeliveryComposer#appendPrinciple}). It is
+     * deliberately NOT written into the model workspace — only {@code getCriteria()} reaches the agent — so the
+     * principle stays server-controlled and cannot be fabricated or drift in model prose. Practices with a
+     * blank principle are omitted, leaving their delivery unchanged.
+     */
+    Map<String, String> whyBySlug(Long workspaceId, WorkArtifact focus) {
+        return practiceRepository
+            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
+            .stream()
+            .filter(p -> p.getWhyItMatters() != null && !p.getWhyItMatters().isBlank())
+            .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
+    }
+
+    /**
      * The slugs of {@code focus}-scoped active practices that declare {@code DEFECT-DETECTOR DISCIPLINE} in
      * their criteria — i.e. practices with no legal OBSERVED verdict (a clean surface is NOT_APPLICABLE, never
      * OBSERVED). The delivery layer uses this to coerce a model-emitted OBSERVED to NOT_APPLICABLE before it

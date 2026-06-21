@@ -60,6 +60,33 @@ public class PracticeDetectionResultParser {
     /** Maximum length for a single diff note body. */
     static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
 
+    /**
+     * The practices whose {@code NOT_OBSERVED} gap may legitimately present as a merge-blocker
+     * ({@code CRITICAL}/{@code MAJOR}, "fix before merging") — i.e. a gap here can break CORRECTNESS,
+     * SECURITY, or DATA INTEGRITY. Every other (craft / process / authoring) practice is ADVISORY: the
+     * advisory ceiling in {@link ValidatedFinding#coerceCoherence(boolean, boolean)} caps its band to
+     * {@code MINOR} so it lands as a suggestion, never a merge-block.
+     *
+     * <p>This is a consequence-class delivery policy, general across project kinds (no language/project
+     * coupling), co-located with the other delivery-shaping rules. A confidence gate cannot separate
+     * advisory from blocking gaps — a craft critique and a real defect are emitted at the same high
+     * confidence — so the consequence class, not confidence, is the discriminator that keeps the
+     * "fix before merging" signal meaningful. Pinned by {@code PracticeDetectionResultParserTest}.
+     */
+    static final Set<String> BLOCKING_ELIGIBLE_PRACTICES = Set.of(
+        // Correctness: a swallowed error, an unguarded boundary, or a chosen crash on uncontrolled input
+        // is a real defect a reviewer should be able to block on.
+        "handles-errors-instead-of-swallowing-them",
+        "validates-inputs-and-edge-cases-at-the-boundary",
+        "avoids-unsafe-panics-and-chosen-crashes",
+        // Security / data integrity.
+        "validates-and-escapes-untrusted-input",
+        "avoids-insecure-defaults-and-over-broad-permissions",
+        // A dishonest test (always-green, asserting nothing, disabled) actively HIDES correctness defects —
+        // worse than a missing test, because it manufactures false safety — so it keeps blocking weight.
+        "keeps-the-test-suite-honest"
+    );
+
     /** Maximum number of inline delivery notes per job. This bounds comment API fan-out, not finding detection. */
     static final int MAX_DELIVERY_DIFF_NOTES = 30;
 
@@ -565,6 +592,19 @@ public class PracticeDetectionResultParser {
          * Idempotent: a no-op coercion returns {@code this}.
          */
         public ValidatedFinding coerceCoherence(boolean isDefectDetector) {
+            return coerceCoherence(isDefectDetector, false);
+        }
+
+        /**
+         * As {@link #coerceCoherence(boolean)}, plus the <b>advisory ceiling</b>: when {@code advisoryOnly}
+         * (the practice is craft/process/authoring, not in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a
+         * {@code NOT_OBSERVED} gap may never present as a merge-blocker, so its {@code CRITICAL}/{@code MAJOR}
+         * band is capped to {@code MINOR}. This lands the lesson as a suggestion rather than a "fix before
+         * merging" — reserving the blocking signal for correctness/security/data-integrity practices so the
+         * rare real blocker is not drowned out by the many high-confidence craft critiques. Severity is
+         * delivery-only here; the persisted band on the immutable finding is unchanged.
+         */
+        public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
             Observation v = verdict;
             String r = reasoning;
             if (isDefectDetector && v == Observation.OBSERVED) {
@@ -573,6 +613,9 @@ public class PracticeDetectionResultParser {
             }
             Severity s =
                 v == Observation.NOT_OBSERVED ? (severity == Severity.INFO ? Severity.MINOR : severity) : Severity.INFO;
+            if (advisoryOnly && v == Observation.NOT_OBSERVED && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
+                s = Severity.MINOR;
+            }
             if (v == verdict && s == severity) {
                 return this;
             }
@@ -603,7 +646,8 @@ public class PracticeDetectionResultParser {
     ) {
         List<ValidatedFinding> out = new ArrayList<>(findings.size());
         for (ValidatedFinding f : findings) {
-            out.add(f.coerceCoherence(defectDetectorSlugs.contains(f.practiceSlug())));
+            boolean advisoryOnly = !BLOCKING_ELIGIBLE_PRACTICES.contains(f.practiceSlug());
+            out.add(f.coerceCoherence(defectDetectorSlugs.contains(f.practiceSlug()), advisoryOnly));
         }
         return out;
     }

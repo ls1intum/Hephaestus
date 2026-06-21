@@ -815,5 +815,72 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(out.get(1).verdict()).isEqualTo(Observation.OBSERVED);
             assertThat(out.get(1).severity()).isEqualTo(Severity.INFO);
         }
+
+        // Advisory ceiling: craft/process critiques may not present as merge-blockers.
+
+        @Test
+        @DisplayName("advisory practice: NOT_OBSERVED MAJOR is capped to MINOR (no merge-block)")
+        void advisoryMajorCappedToMinor() {
+            var out = finding(Observation.NOT_OBSERVED, Severity.MAJOR).coerceCoherence(false, true);
+            assertThat(out.verdict()).isEqualTo(Observation.NOT_OBSERVED);
+            assertThat(out.severity()).isEqualTo(Severity.MINOR);
+        }
+
+        @Test
+        @DisplayName("advisory practice: NOT_OBSERVED CRITICAL is also capped to MINOR")
+        void advisoryCriticalCappedToMinor() {
+            var out = finding(Observation.NOT_OBSERVED, Severity.CRITICAL).coerceCoherence(false, true);
+            assertThat(out.severity()).isEqualTo(Severity.MINOR);
+        }
+
+        @Test
+        @DisplayName("blocking-eligible practice: NOT_OBSERVED MAJOR keeps its band")
+        void blockingEligibleMajorPreserved() {
+            var out = finding(Observation.NOT_OBSERVED, Severity.MAJOR).coerceCoherence(false, false);
+            assertThat(out.severity()).isEqualTo(Severity.MAJOR);
+        }
+
+        @Test
+        @DisplayName("list helper: a craft slug's MAJOR is capped, a correctness slug's MAJOR survives")
+        void listHelperAppliesAdvisoryCeilingBySlug() {
+            var craft = new ValidatedFinding(
+                "describe-what-and-why",
+                "t",
+                Observation.NOT_OBSERVED,
+                Severity.MAJOR,
+                0.98f,
+                null,
+                "r",
+                "g",
+                List.of()
+            );
+            var correctness = new ValidatedFinding(
+                "handles-errors-instead-of-swallowing-them",
+                "t",
+                Observation.NOT_OBSERVED,
+                Severity.MAJOR,
+                0.95f,
+                null,
+                "r",
+                "g",
+                List.of()
+            );
+            var out = PracticeDetectionResultParser.coerceCoherence(List.of(craft, correctness), Set.of());
+            assertThat(out.get(0).severity()).as("craft MAJOR -> MINOR").isEqualTo(Severity.MINOR);
+            assertThat(out.get(1).severity()).as("correctness MAJOR preserved").isEqualTo(Severity.MAJOR);
+        }
+
+        @Test
+        @DisplayName("blocking-eligible set is the curated correctness/security/data-integrity consequence class")
+        void blockingEligibleSetIsPinned() {
+            assertThat(PracticeDetectionResultParser.BLOCKING_ELIGIBLE_PRACTICES).containsExactlyInAnyOrder(
+                "handles-errors-instead-of-swallowing-them",
+                "validates-inputs-and-edge-cases-at-the-boundary",
+                "avoids-unsafe-panics-and-chosen-crashes",
+                "validates-and-escapes-untrusted-input",
+                "avoids-insecure-defaults-and-over-broad-permissions",
+                "keeps-the-test-suite-honest"
+            );
+        }
     }
 }
