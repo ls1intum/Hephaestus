@@ -59,7 +59,7 @@ orphan; that remap is the gating step (the SCD-2 `practice_revision` history —
 Each area carries a `standardsAnchor` — the body of knowledge that grounds the *grouping*. Anchors are
 attached as metadata (citations), not as renames: the R9 doctrine is "keep the slug, add the citation".
 
-### 2.1 `review-ready-work` — *Submitting review-ready work*
+### 2.1 `review-ready-work` — *Packaging work for review*
 **standardsAnchor:** Google Engineering Practices, *The CL Author's Guide / Writing good CL
 descriptions*; DORA *Working in small batches*. Grouping-level synthesis (no single canonical name owns
 "make your change cheap to review").
@@ -89,7 +89,7 @@ accountability, history).
 - Bacchelli & Bird (2013), ICSE — [https://sback.it/publications/icse2013.pdf](https://sback.it/publications/icse2013.pdf)
 - Sadowski, Söderberg, Church, Sipko & Bacchelli (2018), ICSE-SEIP — [https://sback.it/publications/icse2018seip.pdf](https://sback.it/publications/icse2018seip.pdf)
 
-### 2.5 `testing-discipline` — *Shipping tested changes*
+### 2.5 `testing-discipline` — *Testing your changes*
 **standardsAnchor:** SWEBOK v4.0 KA5 **Software Testing**; ISO/IEC 25010:2023 *Maintainability →
 Testability* (one of the five named sub-characteristics); DORA *Test automation*.
 - IEEE CS, *Guide to SWEBOK v4.0* (2024), KA5 Software Testing — [https://www.computer.org/education/bodies-of-knowledge/software-engineering](https://www.computer.org/education/bodies-of-knowledge/software-engineering)
@@ -106,14 +106,14 @@ characteristic.
 - SWEBOK v4.0 KA4 Software Construction — [https://www.computer.org/education/bodies-of-knowledge/software-engineering](https://www.computer.org/education/bodies-of-knowledge/software-engineering)
 - DORA, *Code maintainability* — [https://dora.dev/capabilities/code-maintainability/](https://dora.dev/capabilities/code-maintainability/)
 
-### 2.7 `robust-error-handling` — *Handling failure robustly*
+### 2.7 `robust-error-handling` — *Handling failure well*
 **standardsAnchor:** SWEBOK v4.0 KA4 *Software Construction* — the named sub-topics **"Error Handling,
 Exception Handling, and Fault Tolerance"** and **"Assertions, Design by Contract, and Defensive
 Programming"**; ISO/IEC 25010:2023 *Reliability* (fault tolerance, recoverability) + *Safety*.
 - SWEBOK v4.0 KA4 — [https://www.computer.org/education/bodies-of-knowledge/software-engineering](https://www.computer.org/education/bodies-of-knowledge/software-engineering)
 - ISO/IEC 25010:2023 — [https://www.iso.org/standard/78176.html](https://www.iso.org/standard/78176.html)
 
-### 2.8 `secure-by-default-changes` — *Making secure-by-default changes*
+### 2.8 `secure-by-default-changes` — *Making changes secure by default*
 **standardsAnchor:** OWASP ASVS v5.0.0 — **V1 Encoding and Sanitization** (output-side) and **V2
 Validation and Business Logic** (input-side), split into two top-level chapters in v5.0; SWEBOK v4.0
 **KA13 Software Security** (new in v4); OWASP Top 10 A03 Injection / A05 Misconfiguration / A06
@@ -122,7 +122,7 @@ Vulnerable Components.
 - SWEBOK v4.0 KA13 Software Security — [https://www.computer.org/education/bodies-of-knowledge/software-engineering](https://www.computer.org/education/bodies-of-knowledge/software-engineering)
 - OWASP Top 10:2021 — [https://owasp.org/Top10/2021/](https://owasp.org/Top10/2021/)
 
-### 2.9 `decisions-and-documentation` — *Recording decisions and documentation*
+### 2.9 `decisions-and-documentation` — *Recording decisions and documenting changes*
 **standardsAnchor:** Nygard (2011), *Documenting Architecture Decisions* (ADR — practitioner canon for
 the decisions half); DORA *Documentation quality* (empirically tied to performance); SWEBOK *Software
 Design / Construction* documentation. The decisions half is practitioner-canon, not peer-reviewed.

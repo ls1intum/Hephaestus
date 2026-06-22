@@ -86,7 +86,7 @@ export function PracticeAreasPanel({
 			{/* Add a practice area */}
 			<div className="flex items-center gap-2">
 				<Input
-					placeholder="New practice area name, e.g. Submitting review-ready work"
+					placeholder="New practice area name, e.g. Packaging work for review"
 					value={newName}
 					onChange={(e) => setNewName(e.target.value)}
 					onKeyDown={(e) => {

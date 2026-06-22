@@ -220,6 +220,16 @@ The port must match your `SERVER_PORT` environment variable (default: `8080` in 
 3. Link the practice to a **practice area** for grouping via `practice_area_id` (FK → `practice_area`, e.g. the seeded review-ready-work or testing-discipline areas)
 4. No code changes needed -- the handler generates `{slug}.md` from the DB criteria and the agent reads practices dynamically from `index.json`
 
+### Wording the human-facing strings
+
+`name`, `whyItMatters`, and `whatGoodLooksLike` are read by developers (and `whyItMatters` is posted verbatim as the "Why this matters" line on a real review comment), so keep them plain and human:
+
+- **`name`** — a short imperative verb phrase (≤ 8 words), parallel with the others ("Scope the change to one concern").
+- **`whyItMatters`** — 1–2 sentences: name the failure the habit prevents, then the payoff. No clichés, no hype.
+- **`whatGoodLooksLike`** — one concrete sentence picturing the good end state, general across languages and stacks (no per-framework examples).
+- Avoid AI-speak and clubby slang: drive em-dashes to near zero (prefer a period or comma); skip "ship", "hand off", "rubber-stamp", "leverage", "robust", "seamless"; gloss any unavoidable abbreviation on first use (WIP → work in progress). Keep precise domain terms (injection sink, idempotent, boundary) and let the sentence carry their meaning.
+- `criteria` is machine-facing (the developer never sees it) — write it for detection accuracy, not for prose.
+
 ## Extending to new languages
 
 The Pi orchestrator instructions (`pi-orchestrator.md`, mounted at `.pi/AGENTS.md`) are language-agnostic. Language-specific guidance lives in the practice criteria. To support a new language:
