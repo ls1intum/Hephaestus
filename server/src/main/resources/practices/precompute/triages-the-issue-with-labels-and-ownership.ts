@@ -1,6 +1,6 @@
 // Precompute HINTS for triages-the-issue-with-labels-and-ownership: surface the PRESENCE of routing
 // metadata — labels[], assignees[], milestone. Pure presence facts (never accuracy); the LLM decides
-// whether the issue is routable at a glance. No verdict.
+// whether the issue is routable at a glance. No observation.
 import type { Hint } from "../lib/types";
 
 interface IssueMeta {

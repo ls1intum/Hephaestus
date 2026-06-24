@@ -49,7 +49,7 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void rebuildsFromReviewState() {
         String reviewState = """
-            {"findings":[{"practiceSlug":"x","title":"t","verdict":"NOT_OBSERVED","severity":"MAJOR",
+            {"findings":[{"practiceSlug":"x","title":"t","observation":"NOT_OBSERVED","severity":"MAJOR",
             "confidence":0.9,"evidence":{"locations":[],"snippets":[]},"reasoning":"r","guidance":"g",
             "suggestedDiffNotes":[]}]}""";
         var result = parser.parse(
@@ -69,7 +69,7 @@ class PiResultParserTest extends BaseUnitTest {
     void extractsJsonFromMixedText() {
         String mixed =
             "Here:\n```json\n{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"a\"," +
-            "\"verdict\":\"NOT_OBSERVED\",\"severity\":\"MAJOR\",\"confidence\":0.8}]}\n```";
+            "\"observation\":\"NOT_OBSERVED\",\"severity\":\"MAJOR\",\"confidence\":0.8}]}\n```";
         var result = parser.parse(
             new SandboxResult(0, Map.of("result.json", mixed.getBytes()), "done", false, Duration.ofSeconds(10))
         );
@@ -79,7 +79,7 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void surfacesUsageAndRunnerDebug() {
         String findings =
-            "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"verdict\":\"OBSERVED\"," +
+            "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"observation\":\"OBSERVED\"," +
             "\"severity\":\"INFO\",\"confidence\":0.9}]}";
         String usage =
             "{\"model\":\"m\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20," +
@@ -113,7 +113,7 @@ class PiResultParserTest extends BaseUnitTest {
     void sanitizesSwiftEscapes() {
         String json =
             "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"line1\\nline2\"," +
-            "\"verdict\":\"OBSERVED\",\"severity\":\"INFO\",\"confidence\":0.9," +
+            "\"observation\":\"OBSERVED\",\"severity\":\"INFO\",\"confidence\":0.9," +
             "\"reasoning\":\"Text(\\\"\\(weather.temp)°\\\")\"}]}";
         var result = parser.parse(
             new SandboxResult(0, Map.of("result.json", json.getBytes()), "done", false, Duration.ofSeconds(10))

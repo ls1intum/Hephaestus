@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * already do well.
  *
  * <p>It is the conversational/in-context substance reorganised by practice — NOT a scoreboard. Counts and
- * verdict enums are deliberately absent; so is {@code criteria} (the {@code whyItMatters} /
+ * observation enums are deliberately absent; so is {@code criteria} (the {@code whyItMatters} /
  * {@code whatGoodLooksLike} learner framing is carried instead, preserving the "criteria never reaches a
  * learner" invariant). Items are the actual findings, deduped to each target's latest review and with the
  * "not applicable / no change needed" noise removed.
@@ -28,7 +28,7 @@ public record ReflectionPracticeDTO(
     @NonNull
     @Schema(
         description = "Where the developer stands on this practice",
-        allowableValues = { "NEEDS_WORK", "STRENGTH", "MIXED" }
+        allowableValues = { "DEVELOPING", "STRENGTH", "MIXED" }
     )
     Standing standing,
     @NonNull
@@ -39,7 +39,7 @@ public record ReflectionPracticeDTO(
     /** Coarse, human standing derived from the developer's latest-run feedback on this practice. */
     public enum Standing {
         /** Only problems, or problems outweigh strengths — the focus of attention. */
-        NEEDS_WORK,
+        DEVELOPING,
         /** Only strengths — a confirmed good habit. */
         STRENGTH,
         /** Both problems and strengths across the developer's work. */

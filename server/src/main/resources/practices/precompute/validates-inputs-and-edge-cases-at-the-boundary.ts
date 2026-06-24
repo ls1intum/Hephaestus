@@ -2,7 +2,7 @@
 // sites ADDED in the diff, across languages. These are places where a missing index/null/parse/division
 // guard could live — the LLM decides whether a guard is actually present. General by design: a per-language
 // pattern table keyed off the file extension, NOT a single-language scan. Adding a language = adding a row,
-// no engine change. NO verdict, severity, or "defect" — facts only.
+// no engine change. NO observation, severity, or "defect" — facts only.
 import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
 
 // Cross-language boundary/edge constructs. Most are language-agnostic enough to share, but the table is

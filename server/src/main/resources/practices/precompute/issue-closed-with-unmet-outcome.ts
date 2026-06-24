@@ -1,7 +1,7 @@
 // Precompute HINTS for issue-closed-with-unmet-outcome: at close time, surface whether the issue's own
 // stated definition-of-done was met — unchecked acceptance boxes and open sub-issues at the moment of
 // closing. FACTS only (rollup + checkbox counts + close metadata); the LLM decides whether the outcome was
-// confirmed before closing (an unticked box may simply never have been ticked). No verdict.
+// confirmed before closing (an unticked box may simply never have been ticked). No observation.
 import type { Hint } from "../lib/types";
 
 interface IssueMeta {

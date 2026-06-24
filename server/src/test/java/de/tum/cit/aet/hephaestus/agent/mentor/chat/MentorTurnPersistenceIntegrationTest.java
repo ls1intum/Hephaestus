@@ -409,7 +409,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // writer that loaded the entity at version=N can no longer overwrite a row the
         // reaper bumped to N+1. Hibernate detects the version mismatch on the SQL UPDATE
         // predicate (`WHERE id = ? AND version = ?`) and throws — the persistence service
-        // catches and skips, so the reaper's verdict survives.
+        // catches and skips, so the reaper's observation survives.
         ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, "hello");
         UUID assistantId = UUID.randomUUID();
         persistence.persistInFlight(thread, "hello", assistantId, null);
@@ -434,7 +434,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             chatMessageRepository.saveAndFlush(stale);
         }).isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
 
-        // After the failed save attempt, the row in the DB still reflects the reaper's verdict.
+        // After the failed save attempt, the row in the DB still reflects the reaper's observation.
         ChatMessage finalState = chatMessageRepository.findById(assistantId).orElseThrow();
         assertThat(finalState.getStatus()).isEqualTo(ChatMessage.Status.interrupted);
         assertThat(finalState.getMetadata().path("error").asString()).isEqualTo("server restart");

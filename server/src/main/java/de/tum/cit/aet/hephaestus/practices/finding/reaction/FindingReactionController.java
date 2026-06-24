@@ -41,7 +41,7 @@ public class FindingReactionController {
     @PostMapping("/{findingId}/reactions")
     @Operation(
         summary = "Submit a reaction to a practice finding",
-        description = "Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
+        description = "Records the developer's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
             "Append-only: submitting again creates a new record, preserving temporal history."
     )
     @ApiResponse(

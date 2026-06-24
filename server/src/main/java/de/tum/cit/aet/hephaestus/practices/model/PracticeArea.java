@@ -28,7 +28,7 @@ import lombok.ToString;
  *
  * <p>An area is a <b>read-model / organizing</b> concept only. Practices remain the unit of detection;
  * an area never enters {@code trigger_events}, {@code criteria}, the detector, or the
- * {@link PracticeFinding} schema. Areas organise a developer's own findings on their Reflection dashboard.
+ * {@link Observation} schema. Areas organise a developer's own findings on their Reflection dashboard.
  *
  * <p><b>Two orthogonal axes — do not conflate:</b> an area (this configurable learning-objective axis)
  * is distinct from the delivery channel. A practice belongs to at most one area
@@ -73,6 +73,22 @@ public class PracticeArea {
     /** Optional blurb shown on the area card. */
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
+    /**
+     * Optional lucide icon name (PascalCase, e.g. {@code "ShieldAlert"}) giving the area a glanceable
+     * identity on the dashboards. The webapp resolves the name to a component and falls back gracefully
+     * when unset or unknown, so this is presentation-only and never load-bearing.
+     */
+    @Column(name = "icon", length = 64)
+    private String icon;
+
+    /**
+     * Optional colour key (a palette family, e.g. {@code "rose"}) for the area's chip. Paired with the
+     * {@link #icon} and {@link #name} so colour is a redundant cue, never the only signal. The webapp
+     * maps the key to accessible classes and falls back when unset.
+     */
+    @Column(name = "color", length = 32)
+    private String color;
 
     /** Cohort-level toggle: which areas the dashboards surface. Independent of {@link Practice#isActive()}. */
     @Column(name = "is_active", nullable = false)

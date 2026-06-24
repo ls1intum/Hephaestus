@@ -10,7 +10,7 @@
 //   PIN_LOOSENED  — exact/narrower constraint became a range/caret/tilde (==1.2.3 -> >=1.2, 1.2.3 -> ^1.2.3)
 //   PIN_DROPPED   — a version constraint was present and is now entirely absent
 //   BUMPED        — same constraint shape, different version value
-// This removes the carve-out branch the model kept mis-taking (it flipped verdict on identical loosened pins).
+// This removes the carve-out branch the model kept mis-taking (it flipped observation on identical loosened pins).
 import { findFiles } from "../lib/grep";
 import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
 

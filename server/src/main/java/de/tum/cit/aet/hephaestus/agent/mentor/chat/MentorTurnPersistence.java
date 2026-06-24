@@ -193,13 +193,13 @@ public class MentorTurnPersistence {
             doFinalise(cookie, state, finish);
         } catch (OptimisticLockingFailureException stale) {
             // A concurrent writer (typically the in-flight reaper flipping the row to
-            // `interrupted`) bumped the @Version after we loaded the snapshot. Their verdict
+            // `interrupted`) bumped the @Version after we loaded the snapshot. Their observation
             // is the source of truth — we leave the row alone. The wire's Finish chunk was
             // already sent by the orchestrator; the client just sees a row whose persisted
             // status diverges from the streamed terminal state, which the webapp's refresh
             // reconciles.
             log.info(
-                "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior verdict in place",
+                "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
                 cookie.assistantMessageId()
             );
         }
@@ -268,10 +268,10 @@ public class MentorTurnPersistence {
             doInterrupt(cookie, state, cause);
         } catch (OptimisticLockingFailureException stale) {
             // Another writer (a successful finalise or reaper sweep) bumped the row's version
-            // after our snapshot. Their verdict wins; we don't downgrade a `completed` row to
+            // after our snapshot. Their observation wins; we don't downgrade a `completed` row to
             // `interrupted` or stomp the reaper's `interrupted`-with-context.
             log.info(
-                "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior verdict in place",
+                "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
                 cookie.assistantMessageId()
             );
         }

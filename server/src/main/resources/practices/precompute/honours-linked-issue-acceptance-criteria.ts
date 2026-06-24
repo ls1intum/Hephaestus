@@ -1,7 +1,7 @@
 // Precompute HINTS for honours-linked-issue-acceptance-criteria: surface the LINK between this change and a
 // tracker issue, plus (when the linked issue's body is projected into context) whether that issue carries a
 // checkable acceptance-criteria block. FACTS only — closing-ref candidates + AC-block presence. The LLM maps
-// each criterion to done/deferred. No verdict. This practice over-NAs when the linked-issue fact is absent, so
+// each criterion to done/deferred. No observation. This practice over-NAs when the linked-issue fact is absent, so
 // the point is to make BOTH the link and the issue's done-artifact visible when they exist.
 import type { DiffFile, PullRequestMetadata } from "../lib/types";
 

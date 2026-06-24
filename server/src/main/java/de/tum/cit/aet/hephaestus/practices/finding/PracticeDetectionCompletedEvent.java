@@ -16,7 +16,7 @@ import java.util.UUID;
  * @param developerId   the developer whose work was evaluated
  * @param findingsInserted number of new findings persisted
  * @param findingsDiscarded number of findings discarded (unknown slug, over cap, duplicate)
- * @param hasNegative     whether any NOT_OBSERVED verdict findings were present in agent output
+ * @param hasNegative     whether any NOT_OBSERVED observation findings were present in agent output
  */
 public record PracticeDetectionCompletedEvent(
     UUID agentJobId,

@@ -34,7 +34,7 @@ public class PracticeService {
     private final PracticeRevisionRepository practiceRevisionRepository;
     private final WorkspaceRepository workspaceRepository;
 
-    /** Detector verdict vocabulary that must never leak into learner-facing copy (the authoring guard). */
+    /** Detector observation vocabulary that must never leak into learner-facing copy (the authoring guard). */
     private static final Pattern DETECTOR_VOCAB = Pattern.compile("\\b(?:NOT_)?OBSERVED\\b|\\bNOT_APPLICABLE\\b");
 
     @Transactional(readOnly = true)
@@ -74,8 +74,8 @@ public class PracticeService {
         if (request.artifactType() != null) {
             practice.setArtifactType(request.artifactType());
         }
-        if (request.polarity() != null) {
-            practice.setPolarity(request.polarity());
+        if (request.kind() != null) {
+            practice.setKind(request.kind());
         }
         validateTriggerEventsForFocus(practice);
         validateLearnerContent(practice);
@@ -110,14 +110,14 @@ public class PracticeService {
 
     /**
      * Authoring guard for the learner-facing layer: {@code whatGoodLooksLike} is a concrete exemplar, so it
-     * must not leak the detector's verdict vocabulary — this keeps the learner view free of the rubric.
+     * must not leak the detector's observation vocabulary — this keeps the learner view free of the rubric.
      */
     private static void validateLearnerContent(Practice practice) {
         String exemplar = practice.getWhatGoodLooksLike();
         if (exemplar != null && DETECTOR_VOCAB.matcher(exemplar).find()) {
             throw new IllegalArgumentException(
                 "whatGoodLooksLike is learner-facing and must be a concrete exemplar — it must not contain" +
-                    " detector verdict vocabulary (OBSERVED / NOT_OBSERVED / NOT_APPLICABLE)."
+                    " detector observation vocabulary (OBSERVED / NOT_OBSERVED / NOT_APPLICABLE)."
             );
         }
     }
@@ -181,8 +181,8 @@ public class PracticeService {
             practice.setArtifactType(request.artifactType());
             changed = true;
         }
-        if (request.polarity() != null) {
-            practice.setPolarity(request.polarity());
+        if (request.kind() != null) {
+            practice.setKind(request.kind());
             changed = true;
         }
 

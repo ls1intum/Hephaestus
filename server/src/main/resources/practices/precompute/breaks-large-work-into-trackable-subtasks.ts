@@ -1,7 +1,7 @@
 // Precompute HINTS for breaks-large-work-into-trackable-subtasks: surface (a) whether the issue is
 // LEGITIMATELY large/multi-part and (b) whether it already carries an explicit breakdown (task checklist,
 // sub-issues, referenced child issues). FACTS only — the LLM decides whether large work is adequately
-// decomposed. No verdict.
+// decomposed. No observation.
 import type { Hint } from "../lib/types";
 
 interface IssueMeta {

@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  * listing is not exhaustive (so the absence of a match does NOT prove uniqueness).
  *
  * <p><b>EXTRACT+LOAD only.</b> Per the {@link ContentProvider} contract this connector emits raw native
- * rows and names no practice and no verdict — which artifacts overlap, duplicate, or trace is the agent's
+ * rows and names no practice and no observation — which artifacts overlap, duplicate, or trace is the agent's
  * (and the per-practice precompute's) Transform to compute.
  *
  * <p>Best-effort ({@link #required()} == {@code false}): a missing repository id or any failure degrades to

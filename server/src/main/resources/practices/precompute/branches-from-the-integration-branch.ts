@@ -16,7 +16,7 @@ export default async function (_r: string, _d: Map<string, DiffFile>, meta: Pull
 		);
 	} else if (targetIsIntegration) {
 		directions.push(
-			`This PR targets '${meta.target_branch}', a conventional integration branch — the concrete off-integration signal is FALSE (the practice's subject, branching off a non-integration branch, does not occur here). Decide the verdict from that fact; do NOT claim git history is unavailable — the full clone IS mounted at inputs/sources/scm/repo.`,
+			`This PR targets '${meta.target_branch}', a conventional integration branch — the concrete off-integration signal is FALSE (the practice's subject, branching off a non-integration branch, does not occur here). Decide the observation from that fact; do NOT claim git history is unavailable — the full clone IS mounted at inputs/sources/scm/repo.`,
 		);
 	}
 	if (prCommitCount >= 8) {

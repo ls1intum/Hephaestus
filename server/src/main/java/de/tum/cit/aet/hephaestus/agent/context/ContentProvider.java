@@ -15,14 +15,14 @@ import java.util.Map;
  * {@code inputs/sources/scm/repo}. If a grep / JGit walk over that mount, or a parse of {@code diff.patch},
  * reproduces it, it is NOT integration content — it is downstream Transform.
  *
- * <p><strong>A provider MUST NOT</strong> compute a practice-shaped feature, emit a verdict/note sentence,
+ * <p><strong>A provider MUST NOT</strong> compute a practice-shaped feature, emit a observation/note sentence,
  * carry a tuned threshold, or name a practice anywhere (field, file, javadoc). Such derivation is
  * practice-dependent TRANSFORM and belongs downstream — in the per-practice precompute script or the agent
  * (which has the mounted worktree). The single permitted in-connector transform is a practice-AGNOSTIC,
  * lossless structural reshape reused identically by every practice — the staging band: {@code diff_summary.md}
  * is a lossless re-chunking of {@code diff.patch} (passes the rule); a {@code test_presence.json} feature
  * file scanned from the worktree does not (it is Transform — deleted, ELT boundary). {@link #connectorId()}
- * is the enforcement seam: a provider stamped {@code "scm"} that emits a practice verdict is, by definition,
+ * is the enforcement seam: a provider stamped {@code "scm"} that emits a practice observation is, by definition,
  * code in the wrong layer. The SPI generalises verbatim to Slack/Outline/Jira — each LOADS its native
  * message/doc/ticket object, none pre-judges it.
  *

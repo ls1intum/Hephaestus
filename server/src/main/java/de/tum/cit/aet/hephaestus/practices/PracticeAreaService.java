@@ -70,7 +70,9 @@ public class PracticeAreaService {
         String slug,
         String name,
         @Nullable String description,
-        int displayOrder
+        int displayOrder,
+        @Nullable String icon,
+        @Nullable String color
     ) {
         if (practiceAreaRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeAreaSlugConflictException(
@@ -87,6 +89,8 @@ public class PracticeAreaService {
         area.setName(name);
         area.setDescription(description);
         area.setDisplayOrder(displayOrder);
+        area.setIcon(icon);
+        area.setColor(color);
 
         try {
             area = practiceAreaRepository.save(area);
@@ -107,7 +111,9 @@ public class PracticeAreaService {
         String slug,
         @Nullable String name,
         @Nullable String description,
-        @Nullable Integer displayOrder
+        @Nullable Integer displayOrder,
+        @Nullable String icon,
+        @Nullable String color
     ) {
         PracticeArea area = getArea(ctx, slug);
         if (name != null) {
@@ -118,6 +124,12 @@ public class PracticeAreaService {
         }
         if (displayOrder != null) {
             area.setDisplayOrder(displayOrder);
+        }
+        if (icon != null) {
+            area.setIcon(icon);
+        }
+        if (color != null) {
+            area.setColor(color);
         }
         return practiceAreaRepository.save(area);
     }

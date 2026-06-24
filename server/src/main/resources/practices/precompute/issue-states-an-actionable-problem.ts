@@ -1,7 +1,7 @@
 // Precompute HINTS for issue-states-an-actionable-problem: from the issue metadata ALONE (title, body,
 // labels) surface structural FACTS a maintainer-readiness judge needs — work-kind signals, presence of
 // reproduction / expected-vs-actual (BUG) or a value clause (STORY), and stub/empty/template bodies.
-// FACTS and DIRECTIONS only — the LLM decides whether the report is genuinely act-on-able. No verdict.
+// FACTS and DIRECTIONS only — the LLM decides whether the report is genuinely act-on-able. No observation.
 import type { Hint } from "../lib/types";
 import { readProjectInventory, type InventoryItem } from "../lib/context";
 

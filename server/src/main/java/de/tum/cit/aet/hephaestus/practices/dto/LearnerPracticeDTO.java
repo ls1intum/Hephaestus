@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
  * CONSTRUCTION</b> — this record has no field to carry it — making "criteria never reaches a learner" a
  * physical guarantee, not a UI convention. It carries only what a developer should see: the name, which
  * area it belongs to, why it matters, and what good looks like. NEVER widen this record with
- * {@code criteria}, {@code precomputeScript}, {@code polarity}, or a raw verdict.
+ * {@code criteria}, {@code precomputeScript}, {@code kind}, or a raw observation.
  */
 @Schema(description = "Learner-facing view of a practice — criteria absent by construction")
 public record LearnerPracticeDTO(

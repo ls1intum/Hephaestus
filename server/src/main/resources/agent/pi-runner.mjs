@@ -59,7 +59,7 @@ const reviewState = {
     findings: [],
     findingKeys: [],
 };
-const verdictSchema = { type: "string", enum: ["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"] };
+const observationSchema = { type: "string", enum: ["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
 const evidenceSchema = {
     type: "object",
@@ -96,11 +96,11 @@ const diffNoteSchema = {
 const findingSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["practiceSlug", "title", "verdict", "severity", "confidence", "evidence", "reasoning", "guidance"],
+    required: ["practiceSlug", "title", "observation", "severity", "confidence", "evidence", "reasoning", "guidance"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
         title: { type: "string", minLength: 1, maxLength: 120 },
-        verdict: verdictSchema,
+        observation: observationSchema,
         severity: severitySchema,
         confidence: { type: "number", minimum: 0, maximum: 1 },
         evidence: evidenceSchema,
@@ -138,7 +138,7 @@ function isValidFinding(f) {
     if (!f || typeof f !== "object") return false;
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
     if (typeof f.title !== "string" || !f.title.trim()) return false;
-    if (typeof f.verdict !== "string") return false;
+    if (typeof f.observation !== "string") return false;
     if (typeof f.severity !== "string") return false;
     // Number(null) === 0 — reject nullish before isNaN check.
     if (f.confidence == null || f.confidence === "") return false;
@@ -236,14 +236,14 @@ function normalizeFinding(finding) {
     if (!finding || typeof finding !== "object") throw new Error("finding must be an object");
     const practiceSlug = String(finding.practiceSlug ?? "").trim();
     const title = String(finding.title ?? "").trim();
-    const verdict = String(finding.verdict ?? "").trim();
+    const observation = String(finding.observation ?? "").trim();
     const severity = String(finding.severity ?? "").trim();
     const confidence = Number(finding.confidence);
     const reasoning = String(finding.reasoning ?? "").trim();
     const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");
     if (!title) throw new Error("title is required");
-    if (!["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"].includes(verdict)) throw new Error(`invalid verdict '${verdict}'`);
+    if (!["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"].includes(observation)) throw new Error(`invalid observation '${observation}'`);
     if (!["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(severity)) throw new Error(`invalid severity '${severity}'`);
     if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
         throw new Error("confidence must be between 0 and 1");
@@ -253,7 +253,7 @@ function normalizeFinding(finding) {
     const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
         ? finding.suggestedDiffNotes.map(normalizeDiffNote)
         : [];
-    return { practiceSlug, title, verdict, severity, confidence, evidence, reasoning, guidance, suggestedDiffNotes };
+    return { practiceSlug, title, observation, severity, confidence, evidence, reasoning, guidance, suggestedDiffNotes };
 }
 
 function dedupeKeyForFinding(finding) {
@@ -300,7 +300,7 @@ const reportFindingTool = defineTool({
     },
     execute: async (_toolCallId, params) => {
         const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.verdict === "NOT_OBSERVED" ? 1 : 0;
+        const negativeCount = params.finding.observation === "NOT_OBSERVED" ? 1 : 0;
         return {
             content: [
                 {
@@ -661,7 +661,7 @@ async function main() {
     // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
     // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
     // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
-    // practice gets a verdict. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
+    // practice gets a observation. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
     const groups = loadPracticeGroups();
@@ -699,14 +699,14 @@ async function main() {
             console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
 
-        // Coverage gate: every active practice must get a verdict. Re-prompt the ones no turn reported.
+        // Coverage gate: every active practice must get a observation. Re-prompt the ones no turn reported.
         if (!hardAborted && allSlugs.length > 0) {
             const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
             const missing = allSlugs.filter((s) => !covered.has(s));
             if (missing.length > 0) {
                 console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
                 const gatePrompt =
-                    `Coverage check. You have NOT yet reported a verdict for these practices: ${missing.join(", ")}. ` +
+                    `Coverage check. You have NOT yet reported a observation for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
                     `(do NOT re-read the diff). Persist a finding (OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE) for EVERY one ` +
                     `with report_finding, one call per finding.`;

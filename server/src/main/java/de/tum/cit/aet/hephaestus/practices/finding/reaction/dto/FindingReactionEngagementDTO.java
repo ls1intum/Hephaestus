@@ -8,8 +8,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * at all).
  *
  * <p><b>{@code notApplicable} is a VALIDITY/scope signal, not an uptake count</b> — it MUST NOT be folded
- * into a response/uptake ratio with {@code enacted}/{@code disputed}. The uptake denominator is
- * {@code enacted + disputed} (the findings the developer engaged with as feedback); a high
+ * into a response/uptake ratio with {@code addressed}/{@code disputed}. The uptake denominator is
+ * {@code addressed + disputed} (the findings the developer engaged with as feedback); a high
  * {@code notApplicable} means the detector is mis-scoped, which is a separate signal.
  *
  * <p>Zero counts are returned as 0, not omitted.
@@ -21,7 +21,7 @@ public record FindingReactionEngagementDTO(
         description = "RESPONSE: findings the developer acted on (the recipience act, not the outcome)",
         requiredMode = Schema.RequiredMode.REQUIRED
     )
-    long enacted,
+    long addressed,
     @Schema(
         description = "RESPONSE: findings the developer rejected with a reasoned explanation",
         requiredMode = Schema.RequiredMode.REQUIRED

@@ -997,4 +997,110 @@
         </rollback>
     </changeSet>
 
+    <!-- Presentation-only visual identity for a practice area: an optional lucide icon name and a palette
+         colour key. Both nullable, both webapp-resolved with a graceful fallback, neither enters the detector
+         or the finding schema. Lets an admin give each area a glanceable icon + colour on the dashboards. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-59">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_area.icon already present">
+            <not><columnExists tableName="practice_area" columnName="icon"/></not>
+        </preConditions>
+        <comment>Add practice_area.icon + practice_area.color (presentation-only, nullable).</comment>
+        <addColumn tableName="practice_area">
+            <column name="icon" type="VARCHAR(64)"/>
+            <column name="color" type="VARCHAR(32)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="practice_area" columnName="icon"/>
+            <dropColumn tableName="practice_area" columnName="color"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ============================================================================================
+         Plain-language terminology alignment (consistent vocabulary across code, DB, API, UI, prompts).
+         All-additive renames; values that are already standard (OBSERVED/NOT_OBSERVED, severities) keep.
+         ========================================================================================= -->
+
+    <!-- practice.polarity → practice.kind; PracticeKind {GOOD_PRACTICE, BAD_PRACTICE, CONTEXTUAL}. No CHECK (app-guarded). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-60">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice.kind already present">
+            <columnExists tableName="practice" columnName="polarity"/>
+        </preConditions>
+        <comment>Rename practice.polarity→kind; remap DESIRABLE→GOOD_PRACTICE, UNDESIRABLE→BAD_PRACTICE.</comment>
+        <renameColumn tableName="practice" oldColumnName="polarity" newColumnName="kind" columnDataType="VARCHAR(16)"/>
+        <sql>
+            UPDATE practice SET kind = 'GOOD_PRACTICE' WHERE kind = 'DESIRABLE';
+            UPDATE practice SET kind = 'BAD_PRACTICE' WHERE kind = 'UNDESIRABLE';
+        </sql>
+        <rollback>
+            <sql>
+                UPDATE practice SET kind = 'DESIRABLE' WHERE kind = 'GOOD_PRACTICE';
+                UPDATE practice SET kind = 'UNDESIRABLE' WHERE kind = 'BAD_PRACTICE';
+            </sql>
+            <renameColumn tableName="practice" oldColumnName="kind" newColumnName="polarity" columnDataType="VARCHAR(16)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- practice_finding.verdict → observation (converge the concept on one word). Values unchanged. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-61">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.observation already present">
+            <columnExists tableName="practice_finding" columnName="verdict"/>
+        </preConditions>
+        <comment>Rename practice_finding.verdict→observation and its CHECK constraint.</comment>
+        <renameColumn tableName="practice_finding" oldColumnName="verdict" newColumnName="observation" columnDataType="VARCHAR(16)"/>
+        <sql>ALTER TABLE practice_finding RENAME CONSTRAINT chk_practice_finding_verdict TO chk_practice_finding_observation;</sql>
+        <rollback>
+            <sql>ALTER TABLE practice_finding RENAME CONSTRAINT chk_practice_finding_observation TO chk_practice_finding_verdict;</sql>
+            <renameColumn tableName="practice_finding" oldColumnName="observation" newColumnName="verdict" columnDataType="VARCHAR(16)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- finding_reaction.action value ENACTED → ADDRESSED (plainer reaction word). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-62">
+        <preConditions onFail="MARK_RAN" onFailMessage="finding_reaction.action already uses ADDRESSED">
+            <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_finding_reaction_action' AND pg_get_constraintdef(oid) LIKE '%ENACTED%'</sqlCheck>
+        </preConditions>
+        <comment>Rename reaction action value ENACTED→ADDRESSED (data + CHECK).</comment>
+        <sql>
+            UPDATE finding_reaction SET action = 'ADDRESSED' WHERE action = 'ENACTED';
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
+            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_reaction_action CHECK (action IN ('ADDRESSED', 'DISPUTED', 'NOT_APPLICABLE'));
+        </sql>
+        <rollback>
+            UPDATE finding_reaction SET action = 'ENACTED' WHERE action = 'ADDRESSED';
+            ALTER TABLE finding_reaction DROP CONSTRAINT IF EXISTS chk_finding_reaction_action;
+            ALTER TABLE finding_reaction ADD CONSTRAINT chk_finding_reaction_action CHECK (action IN ('ENACTED', 'DISPUTED', 'NOT_APPLICABLE'));
+        </rollback>
+    </changeSet>
+
+    <!-- feedback.origin → provenance (type FeedbackProvenance; frees "author" for the human subject). -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-63">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback.provenance already present">
+            <columnExists tableName="feedback" columnName="origin"/>
+        </preConditions>
+        <comment>Rename feedback.origin→provenance and its CHECK constraint.</comment>
+        <renameColumn tableName="feedback" oldColumnName="origin" newColumnName="provenance" columnDataType="VARCHAR(16)"/>
+        <sql>ALTER TABLE feedback RENAME CONSTRAINT chk_feedback_origin TO chk_feedback_provenance;</sql>
+        <rollback>
+            <sql>ALTER TABLE feedback RENAME CONSTRAINT chk_feedback_provenance TO chk_feedback_origin;</sql>
+            <renameColumn tableName="feedback" oldColumnName="provenance" newColumnName="origin" columnDataType="VARCHAR(16)"/>
+        </rollback>
+    </changeSet>
+
+    <!-- New Observer axis: who made the observation (Observer {SELF, PEER, SYSTEM}). All current rows are system-made. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-64">
+        <preConditions onFail="MARK_RAN" onFailMessage="practice_finding.observer already present">
+            <not><columnExists tableName="practice_finding" columnName="observer"/></not>
+        </preConditions>
+        <comment>Add practice_finding.observer (assessment perspective); backfill SYSTEM; CHECK + NOT NULL.</comment>
+        <addColumn tableName="practice_finding">
+            <column name="observer" type="VARCHAR(16)"/>
+        </addColumn>
+        <sql>UPDATE practice_finding SET observer = 'SYSTEM' WHERE observer IS NULL;</sql>
+        <addNotNullConstraint tableName="practice_finding" columnName="observer" columnDataType="VARCHAR(16)"/>
+        <sql>ALTER TABLE practice_finding ADD CONSTRAINT chk_practice_finding_observer CHECK (observer IN ('SELF', 'PEER', 'SYSTEM'));</sql>
+        <rollback>
+            <dropColumn tableName="practice_finding" columnName="observer"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

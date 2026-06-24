@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Per-practice aggregation of findings for a developer. Used by dashboard practice cards
- * to display verdict counts and last activity.
+ * to display observation counts and last activity.
  */
 @Schema(description = "Per-practice finding summary for a developer")
 public record DeveloperPracticeSummaryDTO(

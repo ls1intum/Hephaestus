@@ -184,7 +184,7 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         assertThat(decisions.get(0).get("submittedAt").asString()).isEqualTo("2025-06-01T10:00:00Z");
         assertThat(decisions.get(1).get("state").asString()).isEqualTo("APPROVED");
         assertThat(decisions.get(1).get("submittedAt").asString()).isEqualTo("2025-06-01T12:00:00Z");
-        // ELT contract: this connector must NOT pre-compute the supersession verdict — no derived aggregate,
+        // ELT contract: this connector must NOT pre-compute the supersession observation — no derived aggregate,
         // no per-row "effective"/"superseded" flag. Raw rows only; the agent judges.
         assertThat(out.has("changesRequestedUnaddressed")).isFalse();
         assertThat(decisions.get(0).has("superseded")).isFalse();

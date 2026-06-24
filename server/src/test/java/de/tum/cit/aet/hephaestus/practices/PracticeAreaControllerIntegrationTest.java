@@ -60,7 +60,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     private CreatePracticeAreaRequestDTO validCreateRequest(String slug) {
-        return new CreatePracticeAreaRequestDTO(slug, "Area " + slug, "Develops " + slug, null);
+        return new CreatePracticeAreaRequestDTO(slug, "Area " + slug, "Develops " + slug, null, "Package", "sky");
     }
 
     /** Registers the current {@code @WithMentorUser} principal as a plain workspace MEMBER. */
@@ -211,7 +211,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
             asMember();
             persistArea("forbidden-update", "Original");
 
-            var request = new UpdatePracticeAreaRequestDTO("Hacked Name", null, null, null);
+            var request = new UpdatePracticeAreaRequestDTO("Hacked Name", null, null, null, null, null);
 
             webTestClient
                 .patch()
@@ -232,7 +232,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            var request = new UpdatePracticeAreaRequestDTO("Name", null, null, null);
+            var request = new UpdatePracticeAreaRequestDTO("Name", null, null, null, null, null);
 
             // Pass CSRF so the auth layer (not the CSRF filter) answers a cookie-style write → 401 (ADR 0017).
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);

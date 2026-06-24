@@ -25,5 +25,17 @@ public record UpdatePracticeAreaRequestDTO(
 
     @Schema(description = "Sort order within the workspace") @Nullable Integer displayOrder,
 
-    @Schema(description = "Whether this area is active") @Nullable Boolean active
+    @Schema(description = "Whether this area is active") @Nullable Boolean active,
+
+    @Size(max = 64, message = "Icon must be at most 64 characters")
+    @Pattern(regexp = "^[A-Za-z0-9]+$", message = "Icon must be a lucide icon name (letters and digits only)")
+    @Schema(description = "Optional lucide icon name giving the area a glanceable identity")
+    @Nullable
+    String icon,
+
+    @Size(max = 32, message = "Color must be at most 32 characters")
+    @Pattern(regexp = "^[a-z]+$", message = "Color must be a lowercase palette key")
+    @Schema(description = "Optional palette colour key for the area's chip")
+    @Nullable
+    String color
 ) {}

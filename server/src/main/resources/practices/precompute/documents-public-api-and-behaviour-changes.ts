@@ -1,6 +1,6 @@
 // Precompute HINTS for documents-public-api-and-behaviour-changes. Surfaces FACTS ONLY — the LLM judges.
 //
-// The verdict hinges on a STRUCTURAL fact a diff hunk alone cannot reveal: does the repo even SHIP a public
+// The observation hinges on a STRUCTURAL fact a diff hunk alone cannot reveal: does the repo even SHIP a public
 // product (library/framework), and are the symbols touched in the diff actually EXPORTED (part of that public
 // surface) or merely internal/private? An app-only repo with no library product has no public API to document,
 // and a modifier-less Swift declaration is INTERNAL — not public. We surface {hasPublicProduct,
@@ -13,7 +13,7 @@ import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
 
 // ── (1) Public-product manifest scan ──────────────────────────────────────────────────────────────────────
 // Each manifest filename maps to a predicate over its raw text that answers "does this declare a consumable
-// library/framework product?". One row per ecosystem; the predicate stays neutral (a structural test, no verdict).
+// library/framework product?". One row per ecosystem; the predicate stays neutral (a structural test, no observation).
 const PRODUCT_MANIFESTS: Array<[RegExp, (text: string) => boolean]> = [
 	// Swift Package Manager: a `.library(...)` product (executables/apps don't expose a public API surface).
 	[/(^|\/)Package\.swift$/, (t) => /\.library\s*\(/.test(t)],

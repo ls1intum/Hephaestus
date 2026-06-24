@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
  * Request DTO for submitting reaction on a practice finding.
  *
  * @param action      the reaction action (required)
- * @param explanation free-text explanation (optional for ENACTED/NOT_APPLICABLE, required for DISPUTED)
+ * @param explanation free-text explanation (optional for ADDRESSED/NOT_APPLICABLE, required for DISPUTED)
  */
 @Schema(description = "Submit a reaction to an AI-generated practice finding")
 public record CreateFindingReactionDTO(

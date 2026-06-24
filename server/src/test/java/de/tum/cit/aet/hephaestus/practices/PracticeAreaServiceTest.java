@@ -54,11 +54,21 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         when(workspaceRepository.findById(1L)).thenReturn(Optional.of(new Workspace()));
         when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeArea created = service.createArea(CTX, "review-comms", "Effective review communication", "blurb", 0);
+        PracticeArea created = service.createArea(
+            CTX,
+            "review-comms",
+            "Effective review communication",
+            "blurb",
+            0,
+            "MessageSquareReply",
+            "cyan"
+        );
 
         assertThat(created.getSlug()).isEqualTo("review-comms");
         assertThat(created.getName()).isEqualTo("Effective review communication");
         assertThat(created.getDescription()).isEqualTo("blurb");
+        assertThat(created.getIcon()).isEqualTo("MessageSquareReply");
+        assertThat(created.getColor()).isEqualTo("cyan");
         assertThat(created.isActive()).isTrue();
         verify(practiceAreaRepository).save(any(PracticeArea.class));
     }
@@ -68,7 +78,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         when(practiceAreaRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
         assertThatExceptionOfType(PracticeAreaSlugConflictException.class).isThrownBy(() ->
-            service.createArea(CTX, "dup", "Dup", null, 0)
+            service.createArea(CTX, "dup", "Dup", null, 0, null, null)
         );
         verify(practiceAreaRepository, never()).save(any());
     }
@@ -82,10 +92,12 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
         when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeArea updated = service.updateArea(CTX, "g", "New", null, 5);
+        PracticeArea updated = service.updateArea(CTX, "g", "New", null, 5, "Eye", "teal");
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getDisplayOrder()).isEqualTo(5);
+        assertThat(updated.getIcon()).isEqualTo("Eye");
+        assertThat(updated.getColor()).isEqualTo("teal");
     }
 
     @Test

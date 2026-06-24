@@ -9,7 +9,7 @@ package de.tum.cit.aet.hephaestus.practices.finding.reaction;
  * {@code FindingReactionEngagementDTO}).
  *
  * <ul>
- *   <li>RESPONSE · {@link #ENACTED} — the developer acted on the guidance ("I fixed / will fix this").
+ *   <li>RESPONSE · {@link #ADDRESSED} — the developer acted on the guidance ("I fixed / will fix this").
  *       Named for the recipience ACT, not its outcome: a later run may still find the locus NOT_OBSERVED,
  *       which the suppression filter ESCALATES rather than treating as done — so a value named "applied"
  *       (=outcome) would contradict that behaviour.</li>
@@ -25,7 +25,7 @@ package de.tum.cit.aet.hephaestus.practices.finding.reaction;
  */
 public enum FindingReactionAction {
     /** RESPONSE: the developer acted on the guidance. The act, not the outcome — a recurrence is escalated. */
-    ENACTED,
+    ADDRESSED,
     /** RESPONSE: a reasoned rejection of the finding. Requires an explanation (the evaluative judgement). */
     DISPUTED,
     /** VALIDITY: the finding is sound but out of scope here. A relevance signal — never an uptake count. */

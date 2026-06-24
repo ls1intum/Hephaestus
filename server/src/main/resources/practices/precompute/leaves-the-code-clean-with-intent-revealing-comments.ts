@@ -2,7 +2,7 @@
 // judges whether each is real residue. On a large diff the model under-scans length and misses obvious
 // debug traces / leftover markers sitting right there; this points it at the exact added lines. General by
 // design: a per-language debug-output token table keyed off file extension. Adding a language = a row.
-// CANDIDATES, never a verdict.
+// CANDIDATES, never a observation.
 import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
 
 // language key -> [human label, regex] of debug-output / residue constructs that, when ADDED, are worth a look.

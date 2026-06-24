@@ -2303,9 +2303,9 @@ paths:
         required: false
         schema:
           type: string
-      - description: Filter by verdict
+      - description: Filter by observation
         in: query
-        name: verdict
+        name: observation
         required: false
         schema:
           type: string
@@ -2423,7 +2423,7 @@ paths:
       - Practice Findings
   /workspaces/{workspaceSlug}/practices/findings/summary:
     get:
-      description: Aggregated verdict counts per practice for dashboard cards
+      description: Aggregated observation counts per practice for dashboard cards
       operationId: getSummary
       parameters:
       - description: Workspace slug
@@ -2510,7 +2510,7 @@ paths:
       tags:
       - Finding Reaction
     post:
-      description: "Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE)\
+      description: "Records the developer's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE)\
         \ to an AI-generated finding. Append-only: submitting again creates a new\
         \ record, preserving temporal history."
       operationId: submitReaction
@@ -4424,7 +4424,7 @@ components:
           type: string
           description: The reaction action to record
           enum:
-          - ENACTED
+          - ADDRESSED
           - DISPUTED
           - NOT_APPLICABLE
         explanation:
@@ -4473,6 +4473,13 @@ components:
       type: object
       description: Request to create a new practice area
       properties:
+        color:
+          type: string
+          description: Optional palette colour key for the area's chip
+          example: rose
+          maxLength: 32
+          minLength: 0
+          pattern: "^[a-z]+$"
         description:
           type: string
           description: What this area develops
@@ -4483,6 +4490,13 @@ components:
           format: int32
           description: Sort order within the workspace. Defaults to 0 when omitted.
           example: 1
+        icon:
+          type: string
+          description: Optional lucide icon name giving the area a glanceable identity
+          example: ShieldAlert
+          maxLength: 64
+          minLength: 0
+          pattern: "^[A-Za-z0-9]+$"
         name:
           type: string
           description: Human-readable name
@@ -4516,21 +4530,21 @@ components:
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
+        kind:
+          type: string
+          description: "Whether the practice is a good practice, a bad practice, or\
+            \ context-dependent. Defaults to GOOD_PRACTICE when omitted."
+          enum:
+          - GOOD_PRACTICE
+          - BAD_PRACTICE
+          - CONTEXTUAL
+          example: GOOD_PRACTICE
         name:
           type: string
           description: Human-readable name
           example: PR Description Quality
           maxLength: 128
           minLength: 3
-        polarity:
-          type: string
-          description: "Whether the practice is a desirable habit, an anti-pattern,\
-            \ or context-dependent. Defaults to DESIRABLE when omitted."
-          enum:
-          - DESIRABLE
-          - UNDESIRABLE
-          - CONTEXTUAL
-          example: DESIRABLE
         precomputeScript:
           type: string
           description: TypeScript/Bun precompute script for static analysis before
@@ -4764,7 +4778,7 @@ components:
           type: string
           description: The reaction action taken
           enum:
-          - ENACTED
+          - ADDRESSED
           - DISPUTED
           - NOT_APPLICABLE
         createdAt:
@@ -4792,24 +4806,24 @@ components:
       description: "Reaction engagement for a developer, split into the response (uptake)\
         \ and validity axes"
       properties:
+        addressed:
+          type: integer
+          format: int64
+          description: "RESPONSE: findings the developer acted on (the recipience\
+            \ act, not the outcome)"
         disputed:
           type: integer
           format: int64
           description: "RESPONSE: findings the developer rejected with a reasoned\
             \ explanation"
-        enacted:
-          type: integer
-          format: int64
-          description: "RESPONSE: findings the developer acted on (the recipience\
-            \ act, not the outcome)"
         notApplicable:
           type: integer
           format: int64
           description: "VALIDITY: findings marked out-of-scope — a detector-scope\
             \ signal, NOT an uptake count"
       required:
+      - addressed
       - disputed
-      - enacted
       - notApplicable
     GitHubProvider:
       type: object
@@ -5353,17 +5367,17 @@ components:
           type: integer
           format: int64
           description: Practice ID
+        kind:
+          type: string
+          description: "Whether the practice is a good practice, a bad practice, or\
+            \ context-dependent"
+          enum:
+          - GOOD_PRACTICE
+          - BAD_PRACTICE
+          - CONTEXTUAL
         name:
           type: string
           description: Human-readable name
-        polarity:
-          type: string
-          description: "Whether the practice is a desirable habit, an anti-pattern,\
-            \ or context-dependent"
-          enum:
-          - DESIRABLE
-          - UNDESIRABLE
-          - CONTEXTUAL
         precomputeScript:
           type: string
           description: TypeScript/Bun precompute script for static analysis before
@@ -5392,8 +5406,8 @@ components:
       - createdAt
       - criteria
       - id
+      - kind
       - name
-      - polarity
       - slug
       - triggerEvents
       - updatedAt
@@ -5404,6 +5418,9 @@ components:
         active:
           type: boolean
           description: Whether this area is active
+        color:
+          type: string
+          description: Optional palette colour key for the area's chip
         createdAt:
           type: string
           format: date-time
@@ -5415,6 +5432,9 @@ components:
           type: integer
           format: int32
           description: Sort order within the workspace
+        icon:
+          type: string
+          description: Optional lucide icon name for the area's chip
         id:
           type: integer
           format: int64
@@ -5471,6 +5491,13 @@ components:
           type: string
           format: uuid
           description: Finding ID
+        observation:
+          type: string
+          description: "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
+          enum:
+          - OBSERVED
+          - NOT_OBSERVED
+          - NOT_APPLICABLE
         practiceName:
           type: string
           description: Practice name
@@ -5479,7 +5506,7 @@ components:
           description: Practice slug
         reasoning:
           type: string
-          description: AI reasoning behind the verdict
+          description: AI reasoning behind the observation
         severity:
           type: string
           description: Severity level
@@ -5491,24 +5518,17 @@ components:
         title:
           type: string
           description: Finding title
-        verdict:
-          type: string
-          description: "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
-          enum:
-          - OBSERVED
-          - NOT_OBSERVED
-          - NOT_APPLICABLE
       required:
       - artifactId
       - artifactType
       - confidence
       - detectedAt
       - id
+      - observation
       - practiceName
       - practiceSlug
       - severity
       - title
-      - verdict
     PracticeFindingList:
       type: object
       description: Practice finding summary for list views
@@ -5535,6 +5555,13 @@ components:
           type: string
           format: uuid
           description: Finding ID
+        observation:
+          type: string
+          description: "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
+          enum:
+          - OBSERVED
+          - NOT_OBSERVED
+          - NOT_APPLICABLE
         practiceName:
           type: string
           description: Practice name
@@ -5552,24 +5579,17 @@ components:
         title:
           type: string
           description: Finding title
-        verdict:
-          type: string
-          description: "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
-          enum:
-          - OBSERVED
-          - NOT_OBSERVED
-          - NOT_APPLICABLE
       required:
       - artifactId
       - artifactType
       - confidence
       - detectedAt
       - id
+      - observation
       - practiceName
       - practiceSlug
       - severity
       - title
-      - verdict
     Profile:
       type: object
       description: "User profile header: identity, league standing, contribution surface,\
@@ -5999,7 +6019,7 @@ components:
           type: string
           description: Where the developer stands on this practice
           enum:
-          - NEEDS_WORK
+          - DEVELOPING
           - STRENGTH
           - MIXED
         strengths:
@@ -6394,6 +6414,12 @@ components:
         active:
           type: boolean
           description: Whether this area is active
+        color:
+          type: string
+          description: Optional palette colour key for the area's chip
+          maxLength: 32
+          minLength: 0
+          pattern: "^[a-z]+$"
         description:
           type: string
           description: What this area develops
@@ -6403,6 +6429,12 @@ components:
           type: integer
           format: int32
           description: Sort order within the workspace
+        icon:
+          type: string
+          description: Optional lucide icon name giving the area a glanceable identity
+          maxLength: 64
+          minLength: 0
+          pattern: "^[A-Za-z0-9]+$"
         name:
           type: string
           description: Human-readable name
@@ -6427,6 +6459,15 @@ components:
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
+        kind:
+          type: string
+          description: "Whether the practice is a good practice, a bad practice, or\
+            \ context-dependent"
+          enum:
+          - GOOD_PRACTICE
+          - BAD_PRACTICE
+          - CONTEXTUAL
+          example: BAD_PRACTICE
         name:
           type: string
           description: Human-readable name
@@ -6434,15 +6475,6 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
-        polarity:
-          type: string
-          description: "Whether the practice is a desirable habit, an anti-pattern,\
-            \ or context-dependent"
-          enum:
-          - DESIRABLE
-          - UNDESIRABLE
-          - CONTEXTUAL
-          example: UNDESIRABLE
         precomputeScript:
           type: string
           description: TypeScript/Bun precompute script for static analysis before

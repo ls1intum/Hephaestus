@@ -1,7 +1,7 @@
 // Precompute HINTS for issue-scoped-to-single-concern: surface signals that an issue may bundle more than
 // one independently-shippable deliverable — multiple distinct task sections, "and also"/enumerated asks,
 // many referenced child issues. FACTS only (counts + the sub-issue rollup); the LLM decides single vs
-// multi-concern. No verdict.
+// multi-concern. No observation.
 import type { Hint } from "../lib/types";
 import { readProjectInventory } from "../lib/context";
 
@@ -28,7 +28,7 @@ export default async function (
 		labels.some((l) => /support|question|discussion/.test(l)) || (/\?\s*$/.test(title) && body.length < 120);
 
 	// Empty-or-title-echo gate — the SAME blunt classification fact the well-engineered sibling
-	// (issue-has-checkable-outcome) keys its verdict off. When the body carries no content of its own, there is
+	// (issue-has-checkable-outcome) keys its observation off. When the body carries no content of its own, there is
 	// NO deliverable to scope, so the practice is NOT_APPLICABLE — never OBSERVED off the title alone. Kept
 	// byte-aligned with the sibling's computation on purpose (precompute scripts ship as standalone DB rows).
 	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
