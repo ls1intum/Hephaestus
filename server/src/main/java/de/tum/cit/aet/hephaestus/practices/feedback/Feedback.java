@@ -41,8 +41,8 @@ import org.hibernate.annotations.Immutable;
  * UUID PK assigned in {@code @PrePersist}, snake_case columns, string-stored enums.
  *
  * @see FeedbackDeliveryState for the delivery lifecycle
- * @see FeedbackChannel for the destination class
- * @see FeedbackOrigin for who authored the unit
+ * @see FeedbackSurface for the destination class
+ * @see FeedbackProvenance for how the unit was produced
  */
 @Entity
 @Immutable
@@ -56,7 +56,7 @@ import org.hibernate.annotations.Immutable;
         @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
         @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
         @Index(name = "idx_feedback_target", columnList = "artifact_type, artifact_id"),
-        @Index(name = "idx_feedback_continuity", columnList = "feedback_thread_key"),
+        @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
     }
 )
 @Getter
@@ -126,19 +126,19 @@ public class Feedback {
     @Column(name = "subject_user_id", nullable = false)
     private Long subjectUserId;
 
-    /** Destination class for this unit (in-context comment, conversation turn, reflection dashboard). */
+    /** Destination class for this unit (in-context comment, conversation turn, profile). */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "surface", nullable = false, length = 32)
-    private FeedbackChannel surface;
+    @Column(name = "channel", nullable = false, length = 32)
+    private FeedbackSurface channel;
 
     /**
      * 0-based position of this unit within its producing job's output. Pairs with {@code agent_job_id} to form
      * the idempotency key and gives a stable delivery order.
      */
     @NotNull
-    @Column(name = "unit_ordinal", nullable = false)
-    private Integer unitOrdinal;
+    @Column(name = "position", nullable = false)
+    private Integer position;
 
     /** Delivery lifecycle state (prepared → delivered / superseded / suppressed / failed). */
     @NotNull
@@ -152,14 +152,14 @@ public class Feedback {
     private FeedbackSuppressionReason suppressionReason;
 
     /** The final rendered, student-facing body. Null while still {@code PREPARED} or when suppressed. */
-    @Column(name = "rendered_body", columnDefinition = "TEXT")
-    private String renderedBody;
+    @Column(name = "body", columnDefinition = "TEXT")
+    private String body;
 
     /** Who authored this unit: the synthesis agent, a deterministic policy floor, or a fallback path. */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "origin", nullable = false, length = 16)
-    private FeedbackOrigin origin;
+    @Column(name = "source", nullable = false, length = 16)
+    private FeedbackProvenance source;
 
     /** Model id of the synthesiser (provenance). Null for non-agent origins. */
     @Column(name = "model_id", length = 255)
@@ -178,15 +178,15 @@ public class Feedback {
      * unit. Raw UUID self-FK (kept scalar for symmetry with the other ids); FK {@code fk_feedback_supersedes}
      * managed by Liquibase. Null for the first delivery of a unit.
      */
-    @Column(name = "supersedes_id", columnDefinition = "UUID")
-    private UUID supersedesId;
+    @Column(name = "replaces_id", columnDefinition = "UUID")
+    private UUID replacesId;
 
     /**
      * Cross-run continuity identity tying together successive deliveries of “the same” feedback as it evolves,
      * independent of which job produced it. Indexed for chain lookups. Null when continuity is not tracked.
      */
-    @Column(name = "feedback_thread_key", length = 64)
-    private String feedbackThreadKey;
+    @Column(name = "thread_key", length = 64)
+    private String threadKey;
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)

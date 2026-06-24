@@ -61,7 +61,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
     /**
      * The DELIVERED feedback body bound to each of the given findings — the developer's advice source for the
      * read surfaces (reflection dashboard, finding detail). Per ADR 0021 the immutable {@code PracticeFinding}
-     * carries evidence + verdict + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
+     * carries evidence + observation + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
      * and read back from {@code rendered_body} here.
      *
      * <p>A finding can be bound to more than one DELIVERED unit (e.g. successive re-deliveries), so this can
@@ -72,12 +72,12 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
     @Query(
         """
         SELECT ff.finding.id AS findingId,
-               ff.feedback.renderedBody AS body,
+               ff.feedback.body AS body,
                ff.feedback.createdAt AS feedbackCreatedAt
         FROM FeedbackFinding ff
         WHERE ff.finding.id IN :findingIds
           AND ff.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-          AND ff.feedback.renderedBody IS NOT NULL
+          AND ff.feedback.body IS NOT NULL
         """
     )
     List<DeliveredFindingBody> findDeliveredBodiesByFindingIds(@Param("findingIds") Collection<UUID> findingIds);

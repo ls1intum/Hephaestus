@@ -8,14 +8,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Deliv
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackOrigin;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackProvenance;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
@@ -113,7 +113,7 @@ public class FeedbackLedgerRecorder {
         if (findings.isEmpty()) {
             return;
         }
-        if (feedbackRepository.existsByAgentJobIdAndUnitOrdinal(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
             return; // already recorded (job retry)
         }
 
@@ -127,7 +127,7 @@ public class FeedbackLedgerRecorder {
         // one whose SUMMARY comment the delivery just edited in place. Flip it to SUPERSEDED and point this
         // new row's supersedes_id at it, preserving the temporal record of what the student saw each run.
         UUID supersedesId = feedbackRepository
-            .findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
+            .findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
                 feedbackThreadKey,
                 FeedbackDeliveryState.DELIVERED
             )
@@ -144,15 +144,15 @@ public class FeedbackLedgerRecorder {
                 .artifactId(artifactId)
                 .recipientUserId(recipientUserId)
                 .subjectUserId(any.getSubjectUserId())
-                .surface(FeedbackChannel.IN_CONTEXT)
-                .unitOrdinal(IN_CONTEXT_UNIT_ORDINAL)
+                .channel(FeedbackSurface.IN_CONTEXT)
+                .position(IN_CONTEXT_UNIT_ORDINAL)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .renderedBody(delivery.mrNote())
-                .origin(FeedbackOrigin.AGENT)
+                .body(delivery.mrNote())
+                .source(FeedbackProvenance.AGENT)
                 .modelId(job.getLlmModel())
                 .composerVersion(DeliveryComposer.COMPOSER_VERSION)
-                .feedbackThreadKey(feedbackThreadKey)
-                .supersedesId(supersedesId)
+                .threadKey(feedbackThreadKey)
+                .replacesId(supersedesId)
                 .createdAt(now)
                 .deliveredAt(now)
                 .build()
@@ -179,7 +179,9 @@ public class FeedbackLedgerRecorder {
             ? PolicyFloorSelector.partition(
                   findings
                       .stream()
-                      .filter(f -> f.getVerdict() == Observation.NOT_OBSERVED && !alreadySuppressed.contains(f.getId()))
+                      .filter(
+                          f -> f.getObservation() == Observation.NOT_OBSERVED && !alreadySuppressed.contains(f.getId())
+                      )
                       .toList(),
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
               ).dropped()
@@ -195,14 +197,14 @@ public class FeedbackLedgerRecorder {
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
         List<PracticeFinding> assessed = findings
             .stream()
-            .filter(f -> f.getVerdict() != Observation.NOT_APPLICABLE)
+            .filter(f -> f.getObservation() != Observation.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
             .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
             .toList();
         int ordinal = 0;
         for (PracticeFinding f : assessed) {
             EvidenceRole role =
-                f.getVerdict() == Observation.NOT_OBSERVED ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
+                f.getObservation() == Observation.NOT_OBSERVED ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
             feedbackFindingRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
@@ -210,8 +212,8 @@ public class FeedbackLedgerRecorder {
         feedbackPlacementRepository.save(
             FeedbackPlacement.builder()
                 .feedback(feedback)
-                .slot(PlacementSlot.SUMMARY)
-                .externalRef(job.getDeliveryCommentId())
+                .placementType(PlacementSlot.SUMMARY)
+                .postedCommentRef(job.getDeliveryCommentId())
                 .postedState(
                     job.getDeliveryCommentId() != null ? PlacementPostedState.POSTED : PlacementPostedState.FAILED
                 )
@@ -229,13 +231,13 @@ public class FeedbackLedgerRecorder {
                 feedbackPlacementRepository.save(
                     FeedbackPlacement.builder()
                         .feedback(feedback)
-                        .slot(PlacementSlot.INLINE)
+                        .placementType(PlacementSlot.INLINE)
                         .anchorKind(note.endLine() != null ? PlacementAnchorKind.RANGE : PlacementAnchorKind.LINE)
                         .anchorPath(note.filePath())
                         .anchorStartLine(note.startLine())
                         .anchorEndLine(note.endLine())
                         .anchorSide(PlacementAnchorSide.NEW)
-                        .externalRef(signal != null ? signal.externalRef() : null)
+                        .postedCommentRef(signal != null ? signal.externalRef() : null)
                         .threadExternalRef(signal != null ? signal.threadExternalRef() : null)
                         .postedState(
                             signal != null ? postedStateFor(signal.disposition()) : PlacementPostedState.POSTED
@@ -276,7 +278,7 @@ public class FeedbackLedgerRecorder {
         int index = 0;
         for (PracticeFinding droppedFinding : dropped) {
             int unitOrdinal = POLICY_FLOOR_UNIT_ORDINAL_BASE + index++;
-            if (feedbackRepository.existsByAgentJobIdAndUnitOrdinal(job.getId(), unitOrdinal)) {
+            if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), unitOrdinal)) {
                 continue;
             }
             Feedback unit = feedbackRepository.save(
@@ -288,11 +290,11 @@ public class FeedbackLedgerRecorder {
                     .artifactId(droppedFinding.getArtifactId())
                     .recipientUserId(droppedFinding.getDeveloper().getId())
                     .subjectUserId(droppedFinding.getSubjectUserId())
-                    .surface(FeedbackChannel.IN_CONTEXT)
-                    .unitOrdinal(unitOrdinal)
+                    .channel(FeedbackSurface.IN_CONTEXT)
+                    .position(unitOrdinal)
                     .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                     .suppressionReason(FeedbackSuppressionReason.POLICY_FLOOR_DROP)
-                    .origin(FeedbackOrigin.AGENT)
+                    .source(FeedbackProvenance.AGENT)
                     .modelId(job.getLlmModel())
                     .composerVersion(DeliveryComposer.COMPOSER_VERSION)
                     .createdAt(now)
@@ -326,7 +328,7 @@ public class FeedbackLedgerRecorder {
         }
         String feedbackThreadKey = feedbackThreadKeyFor(findings.get(0));
         return feedbackRepository
-            .findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
+            .findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
                 feedbackThreadKey,
                 FeedbackDeliveryState.DELIVERED
             )
@@ -334,8 +336,8 @@ public class FeedbackLedgerRecorder {
                 feedbackPlacementRepository
                     .findByFeedbackId(prior.getId())
                     .stream()
-                    .filter(p -> p.getSlot() == PlacementSlot.SUMMARY)
-                    .map(FeedbackPlacement::getExternalRef)
+                    .filter(p -> p.getPlacementType() == PlacementSlot.SUMMARY)
+                    .map(FeedbackPlacement::getPostedCommentRef)
                     .filter(ref -> ref != null && !ref.isBlank())
                     .findFirst()
             );
@@ -352,7 +354,7 @@ public class FeedbackLedgerRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuppressed(AgentJob job, PracticeFinding finding, FeedbackSuppressionReason reason, int index) {
         int unitOrdinal = SUPPRESSED_UNIT_ORDINAL_BASE + index;
-        if (feedbackRepository.existsByAgentJobIdAndUnitOrdinal(job.getId(), unitOrdinal)) {
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), unitOrdinal)) {
             return; // already recorded (job retry)
         }
         Instant now = Instant.now();
@@ -365,14 +367,14 @@ public class FeedbackLedgerRecorder {
                 .artifactId(finding.getArtifactId())
                 .recipientUserId(finding.getDeveloper().getId())
                 .subjectUserId(finding.getSubjectUserId())
-                .surface(FeedbackChannel.IN_CONTEXT)
-                .unitOrdinal(unitOrdinal)
+                .channel(FeedbackSurface.IN_CONTEXT)
+                .position(unitOrdinal)
                 .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                 .suppressionReason(reason)
-                .origin(FeedbackOrigin.AGENT)
+                .source(FeedbackProvenance.AGENT)
                 .modelId(job.getLlmModel())
                 .composerVersion(DeliveryComposer.COMPOSER_VERSION)
-                .feedbackThreadKey(feedbackThreadKeyFor(finding))
+                .threadKey(feedbackThreadKeyFor(finding))
                 .createdAt(now)
                 .build()
         );
@@ -431,7 +433,7 @@ public class FeedbackLedgerRecorder {
             any.getArtifactType().name(),
             any.getArtifactId(),
             any.getDeveloper().getId(),
-            FeedbackChannel.IN_CONTEXT
+            FeedbackSurface.IN_CONTEXT
         );
     }
 }

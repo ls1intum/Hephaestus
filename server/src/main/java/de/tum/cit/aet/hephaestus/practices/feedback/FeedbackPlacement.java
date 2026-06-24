@@ -48,7 +48,7 @@ import org.hibernate.annotations.OnDeleteAction;
     name = "feedback_placement",
     indexes = {
         @Index(name = "idx_feedback_placement_feedback", columnList = "feedback_id"),
-        @Index(name = "idx_feedback_placement_external_ref", columnList = "external_ref"),
+        @Index(name = "idx_feedback_placement_external_ref", columnList = "posted_comment_ref"),
     }
 )
 @Getter
@@ -85,8 +85,8 @@ public class FeedbackPlacement {
     /** Where this placement renders: SUMMARY, INLINE, or CONVERSATION_TURN. */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "slot", length = 32, nullable = false)
-    private PlacementSlot slot;
+    @Column(name = "placement_type", length = 32, nullable = false)
+    private PlacementSlot placementType;
 
     // --- Diff anchor coordinates (all nullable: only INLINE placements anchor to a diff) ---
 
@@ -132,8 +132,8 @@ public class FeedbackPlacement {
     // --- External delivery reconciliation ---
 
     /** External id of the posted comment/note (1:N — one per placement). */
-    @Column(name = "external_ref", columnDefinition = "TEXT")
-    private String externalRef;
+    @Column(name = "posted_comment_ref", columnDefinition = "TEXT")
+    private String postedCommentRef;
 
     /** External id of the thread/discussion the comment was posted in. */
     @Column(name = "thread_external_ref", columnDefinition = "TEXT")

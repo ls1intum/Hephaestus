@@ -19,7 +19,7 @@ import java.util.Locale;
  * same PR deliver the same in-context summary unit to the same author → same continuity key → the second
  * supersedes the first. The findings it references are the changing <em>content</em>, recorded separately.
  *
- * <p>Locale-safe (Locale.ROOT) lower-cased SHA-256 hex, 64 chars, matching {@code feedback.feedback_thread_key
+ * <p>Locale-safe (Locale.ROOT) lower-cased SHA-256 hex, 64 chars, matching {@code feedback.thread_key
  * VARCHAR(64)}. Pure and side-effect free.
  */
 public final class FeedbackThreadKey {
@@ -38,7 +38,7 @@ public final class FeedbackThreadKey {
      * @param surface the delivery surface (required)
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
-    public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackChannel surface) {
+    public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackSurface surface) {
         String canonical = new StringBuilder()
             .append(artifactType == null ? "" : artifactType)
             .append(SEP)

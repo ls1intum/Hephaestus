@@ -22,17 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Feedback is scoped by a raw workspace_id scalar (cross-module FK), not a Workspace association")
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     /**
-     * All feedback units produced by a given agent job, in insertion order via {@code unit_ordinal}.
+     * All feedback units produced by a given agent job, in insertion order via {@code position}.
      */
-    List<Feedback> findByAgentJobIdOrderByUnitOrdinalAsc(UUID agentJobId);
+    List<Feedback> findByAgentJobIdOrderByPositionAsc(UUID agentJobId);
 
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
-    boolean existsByAgentJobIdAndUnitOrdinal(UUID agentJobId, Integer unitOrdinal);
+    boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 
     /**
      * The feedback a developer actually RECEIVED in a workspace — only units that reached a surface
      * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback aspect so the coach
-     * references the exact words the student saw ({@link Feedback#getRenderedBody()}) instead of
+     * references the exact words the student saw ({@link Feedback#getBody()}) instead of
      * reconstructing from raw pre-delivery findings (which may have been suppressed, superseded, or never
      * postable). Bounded by the caller's {@code Pageable}.
      */
@@ -58,8 +58,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * supersedes and whose comment it edits in place. There is at most one live row per key by
      * construction (each new delivery flips the previous to {@code SUPERSEDED}).
      */
-    Optional<Feedback> findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
-        String feedbackThreadKey,
+    Optional<Feedback> findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(
+        String threadKey,
         FeedbackDeliveryState state
     );
 

@@ -57,10 +57,10 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     private FeedbackPlacementRepository feedbackPlacementRepository;
 
     private FeedbackLedgerRecorder recorder(boolean policyFloor) {
-        when(feedbackRepository.existsByAgentJobIdAndUnitOrdinal(any(), anyInt())).thenReturn(false);
+        when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
         when(feedbackRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(
-            feedbackRepository.findFirstByFeedbackThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())
+            feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())
         ).thenReturn(Optional.empty());
         when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of());
         when(feedbackPlacementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -152,10 +152,10 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackPlacement inline = placements
             .getAllValues()
             .stream()
-            .filter(p -> p.getSlot() == PlacementSlot.INLINE)
+            .filter(p -> p.getPlacementType() == PlacementSlot.INLINE)
             .findFirst()
             .orElseThrow();
-        assertThat(inline.getExternalRef()).isEqualTo("note-gid-42");
+        assertThat(inline.getPostedCommentRef()).isEqualTo("note-gid-42");
         assertThat(inline.getThreadExternalRef()).isEqualTo("discussion-gid-7");
         assertThat(inline.getPostedState()).isEqualTo(PlacementPostedState.POSTED);
     }
@@ -188,11 +188,11 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackPlacement inline = placements
             .getAllValues()
             .stream()
-            .filter(p -> p.getSlot() == PlacementSlot.INLINE)
+            .filter(p -> p.getPlacementType() == PlacementSlot.INLINE)
             .findFirst()
             .orElseThrow();
         assertThat(inline.getPostedState()).isEqualTo(PlacementPostedState.FAILED);
-        assertThat(inline.getExternalRef()).isNull();
+        assertThat(inline.getPostedCommentRef()).isNull();
     }
 
     @Test
@@ -250,7 +250,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         User developer = new User();
         developer.setId(7L);
         lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
-        lenient().when(pf.getVerdict()).thenReturn(Observation.NOT_OBSERVED);
+        lenient().when(pf.getObservation()).thenReturn(Observation.NOT_OBSERVED);
         lenient().when(pf.getSeverity()).thenReturn(Severity.MINOR);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
         lenient().when(pf.getDeveloper()).thenReturn(developer);

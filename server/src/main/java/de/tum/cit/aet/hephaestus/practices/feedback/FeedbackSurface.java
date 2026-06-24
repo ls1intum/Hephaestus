@@ -7,11 +7,11 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * <p>Every channel is <b>developer-facing</b>: a unit is delivered to the developer the feedback is about,
  * never to a mentor, instructor, or grader. The system has no facilitator/evaluative delivery channel.
  */
-public enum FeedbackChannel {
+public enum FeedbackSurface {
     /** Placed directly on the work artifact (PR summary / inline note, issue comment). */
     IN_CONTEXT,
     /** A turn in an ongoing mentor conversation with the recipient. */
     CONVERSATION,
-    /** Aggregated onto the recipient's private reflection dashboard. */
-    REFLECTION_DASHBOARD,
+    /** Aggregated onto the recipient's private profile. */
+    PROFILE,
 }

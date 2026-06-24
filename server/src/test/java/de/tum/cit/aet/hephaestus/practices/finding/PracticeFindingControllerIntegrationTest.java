@@ -6,11 +6,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackOrigin;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackProvenance;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -95,7 +95,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         Practice practice,
         User user,
         String title,
-        String verdict,
+        String observation,
         String severity,
         float confidence,
         String artifactType,
@@ -114,7 +114,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             user.getId(),
             user.getId(),
             title,
-            verdict,
+            observation,
             severity,
             confidence,
             null,
@@ -140,11 +140,11 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .artifactId(42L)
                 .recipientUserId(developer.getId())
                 .subjectUserId(developer.getId())
-                .surface(FeedbackChannel.IN_CONTEXT)
-                .unitOrdinal(0)
+                .channel(FeedbackSurface.IN_CONTEXT)
+                .position(0)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .renderedBody(body)
-                .origin(FeedbackOrigin.AGENT)
+                .body(body)
+                .source(FeedbackProvenance.AGENT)
                 .createdAt(createdAt)
                 .build()
         );
@@ -234,14 +234,14 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        void shouldFilterByVerdict() {
+        void shouldFilterByObservation() {
             Instant now = Instant.now();
             insertFinding(practiceA, developer, "Good", "OBSERVED", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
             insertFinding(practiceA, developer, "Bad", "NOT_OBSERVED", "MAJOR", 0.8f, "PULL_REQUEST", 2L, now);
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?verdict=NOT_OBSERVED", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?observation=NOT_OBSERVED", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -255,7 +255,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithUser
-        void shouldFilterByPracticeSlugAndVerdict() {
+        void shouldFilterByPracticeSlugAndObservation() {
             Instant now = Instant.now();
             insertFinding(practiceA, developer, "A pos", "OBSERVED", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
             insertFinding(practiceA, developer, "A neg", "NOT_OBSERVED", "MAJOR", 0.8f, "PULL_REQUEST", 2L, now);
@@ -264,7 +264,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
             webTestClient
                 .get()
                 .uri(
-                    BASE_URI + "?practiceSlug={slug}&verdict=NOT_OBSERVED",
+                    BASE_URI + "?practiceSlug={slug}&observation=NOT_OBSERVED",
                     workspace.getWorkspaceSlug(),
                     practiceA.getSlug()
                 )
@@ -279,7 +279,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo("A neg")
                 .jsonPath("$.content[0].practiceSlug")
                 .isEqualTo("pr-description-quality")
-                .jsonPath("$.content[0].verdict")
+                .jsonPath("$.content[0].observation")
                 .isEqualTo("NOT_OBSERVED");
         }
 
@@ -406,7 +406,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo(42)
                 .jsonPath("$.content[0].title")
                 .isEqualTo("Shape check")
-                .jsonPath("$.content[0].verdict")
+                .jsonPath("$.content[0].observation")
                 .isEqualTo("NOT_OBSERVED")
                 .jsonPath("$.content[0].severity")
                 .isEqualTo("MAJOR")
@@ -707,7 +707,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo(findingId.toString())
                 .jsonPath("$.title")
                 .isEqualTo("Detailed finding")
-                .jsonPath("$.verdict")
+                .jsonPath("$.observation")
                 .isEqualTo("NOT_OBSERVED")
                 .jsonPath("$.severity")
                 .isEqualTo("MAJOR")
@@ -933,11 +933,11 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isEqualTo(2)
                 .jsonPath("$[0].title")
                 .isEqualTo("My PR finding")
-                .jsonPath("$[0].verdict")
+                .jsonPath("$[0].observation")
                 .isEqualTo("OBSERVED")
                 .jsonPath("$[1].title")
                 .isEqualTo("Their PR finding")
-                .jsonPath("$[1].verdict")
+                .jsonPath("$[1].observation")
                 .isEqualTo("NOT_OBSERVED");
         }
 

@@ -28,7 +28,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p><b>Why this exists (fidelity of the coaching loop).</b> {@link FindingsHistoryAspectProvider} ships the
  * agent's <em>pre-delivery</em> findings (title/reasoning/guidance). But what the student actually SAW on
- * their MR/issue is the composed, student-facing {@link Feedback#getRenderedBody() rendered body} — which can
+ * their MR/issue is the composed, student-facing {@link Feedback#getBody() rendered body} — which can
  * differ: all-NA runs are suppressed, some findings aren't postable as diff notes, and summaries are edited /
  * superseded across re-reviews. A mentor that coaches against findings the student never received erodes
  * trust. This aspect lets the mentor reference the <em>exact words</em> the developer was given.
@@ -111,14 +111,14 @@ public class DeliveredFeedbackAspectProvider implements ContentProvider {
 
         ArrayNode arr = root.putArray("deliveredFeedback");
         for (Feedback f : delivered) {
-            String body = f.getRenderedBody();
+            String body = f.getBody();
             // A DELIVERED unit with no body is a data anomaly — skip it rather than ship an empty entry the
             // mentor might quote as "your feedback".
             if (body == null || body.isBlank()) {
                 continue;
             }
             ObjectNode node = arr.addObject();
-            node.put("surface", f.getSurface().name());
+            node.put("surface", f.getChannel().name());
             if (f.getArtifactType() != null) {
                 node.put("artifactType", f.getArtifactType().name());
             }
