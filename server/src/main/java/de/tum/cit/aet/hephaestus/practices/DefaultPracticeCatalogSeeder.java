@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -96,7 +96,9 @@ class DefaultPracticeCatalogSeeder {
                 areaSlug,
                 areaNode.path("name").asString(),
                 text(areaNode, "description"),
-                areaNode.path("displayOrder").asInt()
+                areaNode.path("displayOrder").asInt(),
+                text(areaNode, "icon"),
+                text(areaNode, "color")
             );
             seededAreas++;
 
@@ -128,10 +130,10 @@ class DefaultPracticeCatalogSeeder {
             preambleKey = focus.name();
         }
         String slug = practiceNode.path("slug").asString();
-        // Optional: a practice may declare itself an anti-pattern ("UNDESIRABLE") or context-dependent
-        // ("CONTEXTUAL"); absent → null → the entity default DESIRABLE (every catalogued practice today).
-        String polarityText = text(practiceNode, "polarity");
-        Polarity polarity = polarityText == null ? null : Polarity.valueOf(polarityText);
+        // Optional: a practice may declare itself an anti-pattern ("BAD_PRACTICE") or context-dependent
+        // ("CONTEXTUAL"); absent → null → the entity default GOOD_PRACTICE (every catalogued practice today).
+        String polarityText = text(practiceNode, "kind");
+        PracticeKind kind = polarityText == null ? null : PracticeKind.valueOf(polarityText);
         return new CreatePracticeRequestDTO(
             slug,
             practiceNode.path("name").asString(),
@@ -139,7 +141,7 @@ class DefaultPracticeCatalogSeeder {
             composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
             loadPrecomputeScript(slug),
             focus,
-            polarity,
+            kind,
             text(practiceNode, "whyItMatters"),
             text(practiceNode, "whatGoodLooksLike")
         );
@@ -150,7 +152,7 @@ class DefaultPracticeCatalogSeeder {
      * classpath. Returns {@code null} when a practice has no script — the common case (precompute is the
      * downstream Transform home only for practices whose grounding genuinely benefits from pre-staging facts
      * the runner can derive from {repo, diff, metadata}). The script emits hints/metrics/directions, never a
-     * verdict — the LLM still does the heavy lifting.
+     * observation — the LLM still does the heavy lifting.
      */
     @Nullable
     private String loadPrecomputeScript(String slug) {

@@ -4,8 +4,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -45,16 +45,16 @@ class PracticeCatalogInjector {
     }
 
     /**
-     * Resolve {@code slug -> }{@link Polarity} for the {@code focus}-scoped active practices of a workspace,
+     * Resolve {@code slug -> }{@link PracticeKind} for the {@code focus}-scoped active practices of a workspace,
      * so the delivery layer can decide "is this finding a problem?" sign-correctly per practice (ADR 0021,
      * F-6) instead of assuming every {@code NOT_OBSERVED} is a gap. A slug absent from the map is treated
-     * as {@link Polarity#DESIRABLE} by callers.
+     * as {@link PracticeKind#GOOD_PRACTICE} by callers.
      */
-    Map<String, Polarity> polarityBySlug(Long workspaceId, WorkArtifact focus) {
+    Map<String, PracticeKind> polarityBySlug(Long workspaceId, WorkArtifact focus) {
         return practiceRepository
             .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
             .stream()
-            .collect(Collectors.toMap(Practice::getSlug, Practice::getPolarity, (a, b) -> a));
+            .collect(Collectors.toMap(Practice::getSlug, Practice::getKind, (a, b) -> a));
     }
 
     /**
@@ -75,7 +75,7 @@ class PracticeCatalogInjector {
 
     /**
      * The slugs of {@code focus}-scoped active practices that declare {@code DEFECT-DETECTOR DISCIPLINE} in
-     * their criteria — i.e. practices with no legal OBSERVED verdict (a clean surface is NOT_APPLICABLE, never
+     * their criteria — i.e. practices with no legal OBSERVED observation (a clean surface is NOT_APPLICABLE, never
      * OBSERVED). The delivery layer uses this to coerce a model-emitted OBSERVED to NOT_APPLICABLE before it
      * ships to the student as a false strength (see {@code ValidatedFinding#coerceCoherence}).
      */

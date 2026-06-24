@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -56,12 +56,12 @@ public record CreatePracticeRequestDTO(
     WorkArtifact artifactType,
 
     @Schema(
-        description = "Whether the practice is a desirable habit, an anti-pattern, or context-dependent." +
-            " Defaults to DESIRABLE when omitted.",
-        example = "DESIRABLE"
+        description = "Whether the practice is a good practice, a bad practice, or context-dependent." +
+            " Defaults to GOOD_PRACTICE when omitted.",
+        example = "GOOD_PRACTICE"
     )
     @Nullable
-    Polarity polarity,
+    PracticeKind kind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")

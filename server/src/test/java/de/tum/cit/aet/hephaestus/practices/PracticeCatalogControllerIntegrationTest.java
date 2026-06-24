@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -360,13 +360,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
             assertThat(result.active()).isTrue();
-            // Polarity omitted on create → DB/entity default DESIRABLE round-trips through the DTO.
-            assertThat(result.polarity()).isEqualTo(Polarity.DESIRABLE);
+            // PracticeKind omitted on create → DB/entity default GOOD_PRACTICE round-trips through the DTO.
+            assertThat(result.kind()).isEqualTo(PracticeKind.GOOD_PRACTICE);
         }
 
         @Test
         @WithAdminUser
-        void shouldRoundTripUndesirablePolarity() {
+        void shouldRoundTripBadPracticeKind() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
@@ -376,7 +376,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 "Flag the anti-pattern",
                 null,
                 null,
-                Polarity.UNDESIRABLE,
+                PracticeKind.BAD_PRACTICE,
                 null,
                 null
             );
@@ -395,7 +395,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(created).isNotNull();
-            assertThat(created.polarity()).isEqualTo(Polarity.UNDESIRABLE);
+            assertThat(created.kind()).isEqualTo(PracticeKind.BAD_PRACTICE);
 
             // Re-read so the assertion proves persistence (EnumType.STRING), not just the create response.
             PracticeDTO fetched = webTestClient
@@ -410,7 +410,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(fetched).isNotNull();
-            assertThat(fetched.polarity()).isEqualTo(Polarity.UNDESIRABLE);
+            assertThat(fetched.kind()).isEqualTo(PracticeKind.BAD_PRACTICE);
         }
 
         @Test
