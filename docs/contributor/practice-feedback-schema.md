@@ -16,7 +16,7 @@ respond to targeted feedback?"* To answer that honestly the schema separates thr
 naive review tools fuse: the **raw observation** (a `PracticeFinding`, audience-neutral, append-only,
 deduplicated by a stable cross-run fingerprint), the **synthesised delivery** of one or more of those
 observations to one person (a `Feedback` unit, with its own provenance and delivery lifecycle), and
-the **rule metadata** that gives an observation meaning (a `Practice`, carrying polarity, subject
+the **rule metadata** that gives an observation meaning (a `Practice`, carrying kind, subject
 role, and trigger events, optionally rolled up into a `PracticeArea` learning bucket). Everything is
 append-only so the temporal record of *what a student was shown, and how they reacted* survives
 re-runs and supersession — the substrate the longitudinal research question depends on.
@@ -24,7 +24,7 @@ re-runs and supersession — the substrate the longitudinal research question de
 The vocabulary is deliberately aligned with finding-interchange standards (SARIF, SonarQube,
 GitHub code-scanning) where one exists, and with learning-analytics standards (xAPI, Caliper) for the
 actor/recipient distinction those finding standards lack — and it diverges from them only where the
-divergence is load-bearing (sign-neutral `Observation` × `Polarity`). The naming choices below are
+divergence is load-bearing (sign-neutral `Observation` × `PracticeKind`). The naming choices below are
 *grounded*, not asserted: each is justified against the standard it tracks or the reason it departs.
 
 ---
@@ -54,10 +54,17 @@ DDD *Ubiquitous Language* principle, model, code, schema, API and UI must share 
 ([Fowler, *UbiquitousLanguage*](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *DDD*).
 Synonyms are a defect, not a convenience.
 
+> [!NOTE]
+> A converged redesign is **decided but not yet implemented** ([ADR 0022](../decisions/0022-observation-presence-assessment-and-schema-cleanup.md)):
+> the evaluation splits into `presence` (`PRESENT`/`ABSENT`/`NOT_APPLICABLE`) × `assessment` (`GOOD`/`BAD`),
+> `Practice.kind` is dropped, the reaction anchors on feedback, and several columns are cut. The table and
+> per-entity sections below describe the **current** schema; they are reconciled to ADR 0022 when that
+> migration lands.
+
 | Concept (one canonical name) | Canonical term | Legacy term it replaced | Why the rename |
 | --- | --- | --- | --- |
 | Grouping bucket over practices | **PracticeArea** / `area` | `PracticeGoal` / `goal` | "goal" implies a *target state* to reach; the entity is a neutral grouping bucket (a SARIF *taxon*), not an objective — see §2 grounding below |
-| Sign-neutral presence verdict | **Observation** (`OBSERVED` / `NOT_OBSERVED` / `NOT_APPLICABLE`) | `Verdict` (the *type*; the field/column `verdict` is kept) | "verdict" implied a baked-in good/bad judgement; the value is now sign-free, direction lives on `Polarity` |
+| Sign-neutral presence observation | **Observation** (`OBSERVED` / `NOT_OBSERVED` / `NOT_APPLICABLE`) | `Observation` (the *type*; the field/column `observation` is kept) | "observation" implied a baked-in good/bad judgement; the value is now sign-free, direction lives on `PracticeKind` |
 | The person whose work is evaluated | **developer** | `contributor` | one word for the SCM author across the module |
 | The kind of work reviewed | **WorkArtifact** / `artifact_type` | `focus_artifact`, `target` | names the *work* (PR/issue), not a build artifact nor a vendor object |
 | Cross-run finding identity | **finding_fingerprint** (`FindingFingerprint`) | `correlation_key` | "fingerprint" states the hash purpose (SARIF `partialFingerprints`); "correlation_key" was opaque |
@@ -66,7 +73,7 @@ Synonyms are a defect, not a convenience.
 | One physical render of a unit | **FeedbackPlacement** / **PlacementSlot** | `placement` (as a slot word) | the slot enum is `PlacementSlot`; the row is the `FeedbackPlacement` |
 | Finding's weight inside a unit | **EvidenceRole** (`PRIMARY` / `SUPPORTING`) | `display_role` | it weights *evidence*, not display |
 | Whose conduct a practice judges | **SubjectRole** (`AUTHOR` / `REVIEWER`) | `audience_role`, `AUDIENCE_REVIEWER` | it is the *subject's* role; `AUDIENCE_REVIEWER` collapsed to `REVIEWER` (the side is `REVIEWER_SIDE`) |
-| Context-dependent polarity value | **CONTEXTUAL** | `MIXED` | "contextual" states *why* the direction is unfixed (context decides), not that it is merely mixed |
+| Context-dependent kind value | **CONTEXTUAL** | `MIXED` | "contextual" states *why* the direction is unfixed (context decides), not that it is merely mixed |
 
 ### Grounding the naming choices
 
@@ -82,13 +89,13 @@ Synonyms are a defect, not a convenience.
   is the defensible middle: a neutral grouping noun like a SARIF taxon, kept in our software-practice
   domain language rather than borrowing SonarQube's overloaded "profile" or education's over-claiming
   "competency". *goal* is therefore eliminated.
-- **Observation × Polarity (deliberate divergence from SARIF `kind`).** SARIF `result.kind`
-  (`pass`/`fail`/`notApplicable`) bakes the good/bad direction into the verdict, so a rule can only ever
-  "fail". We split that into sign-free `Observation` (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) × `Polarity`
+- **Observation × PracticeKind (deliberate divergence from SARIF `kind`).** SARIF `result.kind`
+  (`pass`/`fail`/`notApplicable`) bakes the good/bad direction into the observation, so a rule can only ever
+  "fail". We split that into sign-free `Observation` (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) × `PracticeKind`
   (direction, on the *Practice*). This is a defensible refinement, and lossless on SARIF export:
-  `(DESIRABLE,OBSERVED)→pass`, `(DESIRABLE,NOT_OBSERVED)→fail`, `(UNDESIRABLE,OBSERVED)→fail`,
-  `(UNDESIRABLE,NOT_OBSERVED)→pass`, `NOT_APPLICABLE→notApplicable`. `NOT_APPLICABLE` is a verbatim match
-  for SARIF `notApplicable`. Polarity is attached to the *Practice* (rule metadata), mirroring how SARIF
+  `(GOOD_PRACTICE,OBSERVED)→pass`, `(GOOD_PRACTICE,NOT_OBSERVED)→fail`, `(BAD_PRACTICE,OBSERVED)→fail`,
+  `(BAD_PRACTICE,NOT_OBSERVED)→pass`, `NOT_APPLICABLE→notApplicable`. `NOT_APPLICABLE` is a verbatim match
+  for SARIF `notApplicable`. PracticeKind is attached to the *Practice* (rule metadata), mirroring how SARIF
   attaches `defaultConfiguration` to the `reportingDescriptor` rather than to each result.
 - **finding_fingerprint.** Directly analogous to SARIF `partialFingerprints` + `result.baselineState`
   (`new`/`unchanged`/`updated`/`absent`), the mechanism by which a Results-Management System decides "is
@@ -102,7 +109,7 @@ Synonyms are a defect, not a convenience.
 
 ### 3.1 `Practice` — table `practice`
 
-Workspace-scoped rule definition. The `artifact_type` / `polarity` / `subject_role` triple is what lets
+Workspace-scoped rule definition. The `artifact_type` / `kind` / `subject_role` triple is what lets
 one detector schema serve PR and issue work, desirable and undesirable behaviour, and author- and
 reviewer-side conduct without per-case branching.
 
@@ -113,13 +120,13 @@ reviewer-side conduct without per-case branching.
 | slug | String(64) | `slug` | no | Stable machine key, unique per workspace (`uk_practice_workspace_slug`). | Survives a `name` rename; the routing/catalog key. |
 | name | String(128) | `name` | no | Display label. | Human-readable in dashboards/feedback. |
 | artifactType | WorkArtifact | `artifact_type` | no (default `PULL_REQUEST`) | Routes trigger gate, context builder, `AgentJobType`/handler, and delivery surface. | Single pipeline discriminator; default keeps existing rows behaviour-preserving. SARIF has no analogue — it is a file format, not a pipeline router. |
-| polarity | Polarity | `polarity` | no (default `DESIRABLE`) | Good/bad **direction** that `Observation` omits. | Promotes SARIF's implicit `pass`/`fail` direction to a first-class, orthogonal rule-metadata axis (ADR 0021, F-6); no mainstream standard models polarity explicitly. |
+| kind | PracticeKind | `kind` | no (default `GOOD_PRACTICE`) | Good/bad **direction** that `Observation` omits. | Promotes SARIF's implicit `pass`/`fail` direction to a first-class, orthogonal rule-metadata axis (ADR 0021, F-6); no mainstream standard models kind explicitly. |
 | subjectRole | SubjectRole | `subject_role` | no (default `AUTHOR`) | Whose conduct is judged; drives `subject_user_id` and delivery audience. | The firewall keeping reviewer-side lessons off the author. xAPI Actor semantics (the agent a statement is *about*) — [xAPI Statements 101](https://xapi.com/statements-101/). |
 | **area** | PracticeArea (`@ManyToOne`) | `practice_area_id` | yes | Optional roll-up bucket (NULL = ungrouped); 1:N. FK `fk_practice_area`, index `idx_practice_practice_area`. | Single owning bucket keeps per-area progress denominator unambiguous. SARIF `taxa`-style grouping. |
 | triggerEvents | JsonNode (jsonb) | `trigger_events` | no | Which domain events activate detection. | JSONB keeps the event set open without schema churn. |
 | criteria | String (TEXT) | `criteria` | no | NL spec passed to the detection agent. | The rule body the LLM evaluates against. Detector/admin **reference** register — never delivered to a learner (§3a). |
 | whyItMatters | String (TEXT) | `why_it_matters` | yes | Admin-authored learner-facing *explanation* — why this practice matters. Seeded for all 32 default practices; editable in the practices admin form. | Developer-facing Layer 1 (Nicol & Macfarlane-Dick 2006 P1 feed-up; Diátaxis *explanation*). Surfaced via `LearnerPracticeDTO` (§3a), never the detector. |
-| whatGoodLooksLike | String (TEXT) | `what_good_looks_like` | yes | Admin-authored learner-facing **exemplar** — what good looks like. Seeded for all 32 default practices; an authoring guard rejects detector verdict vocabulary (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in this field. | Developer-facing Layer 2 (Sadler 1989 exemplar; Hattie feed-forward). The guard keeps the rubric-leak/Goodhart vector physically closed. |
+| whatGoodLooksLike | String (TEXT) | `what_good_looks_like` | yes | Admin-authored learner-facing **exemplar** — what good looks like. Seeded for all 32 default practices; an authoring guard rejects detector observation vocabulary (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in this field. | Developer-facing Layer 2 (Sadler 1989 exemplar; Hattie feed-forward). The guard keeps the rubric-leak/Goodhart vector physically closed. |
 | precomputeScript | String (TEXT) | `precompute_script` | yes | Optional Bun/TS static-analysis producing *hints, not verdicts*. | Narrows the agent search space; hints never become verdicts (provenance-admission contract). |
 | active | boolean | `is_active` | no (default true) | Soft delete / feature flag for detection. | Toggle without losing history. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp. | Audit trail. |
@@ -154,8 +161,8 @@ a stable cross-run identity (`finding_fingerprint` ≈ `partialFingerprints`). "
 GitHub code-scanning term; our deduped-across-runs notion (their "alert" grain) lives in
 `finding_fingerprint`.
 
-The finding carries **evidence + verdict + reasoning** (the verdict justification) and **no advice**: it is
-immutable evidence (ADR 0021 — "a finding gives a verdict, but no advice"). Advice is *feedback*, so it is
+The finding carries **evidence + observation + reasoning** (the observation justification) and **no advice**: it is
+immutable evidence (ADR 0021 — "a finding gives a observation, but no advice"). Advice is *feedback*, so it is
 composed into the delivered `Feedback` (`rendered_body`, §3.5) and the developer-facing read surfaces
 (reflection dashboard, finding detail, mentor history) source it from there — never from the finding.
 
@@ -172,11 +179,11 @@ composed into the delivered `Feedback` (`rendered_body`, §3.5) and the develope
 | subjectUserId | Long | `subject_user_id` | **no (ALWAYS populated)** | Whose conduct the finding is *about*: equals `developer` for author-side, the reviewer for reviewer-side. Raw Long FK `fk_practice_finding_subject`. | xAPI Actor (the agent a statement is about) is mandatory and unambiguous — [xAPI](https://xapi.com/statements-101/). The former *null⇒developer* fallback was collapsed to an explicit value (§4). |
 | findingFingerprint | String(64) | `finding_fingerprint` | yes | Deterministic hash of what the finding is **about** (practice + target + subject + content anchor), never of *when* it was produced. | Enables supersession and reaction-continuity across re-detections. SARIF `partialFingerprints` — title excluded because the LLM re-words it every run. Nullable: backfill-free, new findings only. |
 | title | String(255) | `title` | no | Short headline. | SARIF `result.message`. |
-| **verdict** | Observation | `verdict` | no | Sign-neutral presence verdict. | Column name `verdict` intentionally kept; only the *type* became `Observation` (§5 — legitimate keep). SARIF `result.kind`. |
-| severity | Severity | `severity` | no | Impact level, orthogonal to verdict. | SARIF `kind ⟂ level`; SonarQube blocker..info ladder. |
+| **observation** | Observation | `observation` | no | Sign-neutral presence observation. | Column name `observation` intentionally kept; only the *type* became `Observation` (§5 — legitimate keep). SARIF `result.kind`. |
+| severity | Severity | `severity` | no | Impact level, orthogonal to observation. | SARIF `kind ⟂ level`; SonarQube blocker..info ladder. |
 | confidence | Float | `confidence` | no | Agent confidence 0.0–1.0. | Delivery filtering + quality; ≈ SARIF `result.rank` (diagnostic relevance). |
 | evidence | JsonNode (jsonb) | `evidence` | yes | `{locations:[{path,startLine,endLine}], snippets:[…], references:[…]}`. | Location is JSON, not columns, because many practices have no file location and findings can be multi-location. ≈ SARIF `result.locations`. |
-| reasoning | String (TEXT) | `reasoning` | yes | Agent's rationale for the verdict (the verdict justification, not advice). | Quality review + developer education. |
+| reasoning | String (TEXT) | `reasoning` | yes | Agent's rationale for the observation (the observation justification, not advice). | Quality review + developer education. |
 | detectedAt | Instant | `detected_at` | no | Detection timestamp; `@PrePersist` if null. | Temporal ordering for trends. |
 
 ### 3.4 `FindingReaction` — table `finding_reaction`
@@ -193,7 +200,7 @@ context (#895)** so prior disputes never contaminate detection accuracy. The lat
 | findingFingerprint | String(64) | `finding_fingerprint` | yes | Denormalised copy of the finding's fingerprint at reaction-write time. | The reacted finding is ephemeral (new row each run); the fingerprint is the stable locus that recurs, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE reaction. Index `idx_finding_reaction_correlation`. |
 | developer | User (`@ManyToOne`) | `developer_id` | no | Reacting developer; FK `RESTRICT`. | Reactions outlive users. |
 | developerId | Long | `developer_id` | no (read-only mirror) | Scalar access without lazy load. | Hot-read optimisation. |
-| action | FindingReactionAction | `action` | no | `ENACTED` / `DISPUTED` (RESPONSE axis) / `NOT_APPLICABLE` (VALIDITY axis). | Research signal (RQ1/RQ2/RQ4), not workflow. The value set is a *recipience act* (see note below). |
+| action | FindingReactionAction | `action` | no | `ADDRESSED` / `DISPUTED` (RESPONSE axis) / `NOT_APPLICABLE` (VALIDITY axis). | Research signal (RQ1/RQ2/RQ4), not workflow. The value set is a *recipience act* (see note below). |
 | explanation | String (TEXT) | `explanation` | yes | Free-text rationale (required for `DISPUTED`; the required explanation *is* the evaluative judgement). | Qualitative dispute signal. |
 | createdAt | Instant | `created_at` | no (immutable) | When the reaction was submitted. | Temporal "changed my mind" record. |
 
@@ -201,11 +208,11 @@ context (#895)** so prior disputes never contaminate detection accuracy. The lat
 > A `FindingReaction` is the learner's answer to Lipnevich & Smith's (2022) third question — *"What
 > am I going to do with the feedback?"* — i.e. a **behavioural recipience act** (Winstone et al.
 > 2017, "enacting"). The values therefore split:
-> - **RESPONSE sub-axis `{ENACTED, DISPUTED}`** — what the learner *did* about a finding they accept
->   is about them. `ENACTED` (renamed from `APPLIED`) records that the learner *acted to close the
+> - **RESPONSE sub-axis `{ADDRESSED, DISPUTED}`** — what the learner *did* about a finding they accept
+>   is about them. `ADDRESSED` (renamed from `APPLIED`) records that the learner *acted to close the
 >   gap* — a proxy inferred from a later artifact/self-report; it **does NOT assert the gap closed
 >   correctly** (Winstone et al. 2017; Sadler 1989, feedback "used to alter the gap"). The escalation
->   branch in `ReactionSuppressionFilter` re-nags an `ENACTED`-but-still-`NOT_OBSERVED` locus, which is
+>   branch in `ReactionSuppressionFilter` re-nags an `ADDRESSED`-but-still-`NOT_OBSERVED` locus, which is
 >   only sound *because* the value claims action, not verified closure. `DISPUTED` is narrowed to the
 >   *reasoned* rejection — the learner reason-rejects the assessment, and the enforced `explanation`
 >   is the evaluative judgement (Carless & Boud 2018, "making judgements"). Affective *dismissal*
@@ -251,7 +258,7 @@ chain.
 | deliveryState | FeedbackDeliveryState | `delivery_state` | no | Lifecycle: prepared → delivered / superseded / suppressed / failed. | Conventional delivery state machine; SUPPRESSED ≈ SARIF `result.suppressions`. |
 | suppressionReason | FeedbackSuppressionReason | `suppression_reason` | yes | Why a unit was withheld (set only when SUPPRESSED). | ≈ SARIF `suppression.justification`. |
 | renderedBody | String (TEXT) | `rendered_body` | yes | Final student-facing body. | Null while PREPARED or when suppressed. |
-| origin | FeedbackOrigin | `origin` | no | `AGENT` / `POLICY_FLOOR` / `FALLBACK`. | Provenance: policy/fallback units must not be scored as model output. |
+| origin | FeedbackProvenance | `origin` | no | `AGENT` / `POLICY_FLOOR` / `FALLBACK`. | Provenance: policy/fallback units must not be scored as model output. |
 | modelId | String(255) | `model_id` | yes | Synthesiser model id. | Provenance; null for non-agent origins. |
 | composerVersion | String(255) | `composer_version` | yes | Delivery-composer version. | Render-template provenance. |
 | synthesisPromptVersion | String(255) | `synthesis_prompt_version` | yes | Synthesis prompt version. | Provenance; null for non-agent origins. |
@@ -331,16 +338,16 @@ revision in force when it was detected, making *which criteria version fired thi
 | Enum | Values & meaning | Grounding |
 | --- | --- | --- |
 | **WorkArtifact** | `PULL_REQUEST` (code diff + commits + review thread, delivered in-PR), `ISSUE` (title, body, labels, assignees, comment thread, state-transition timeline — no diff). | Named for the *work*, not a tool; closed set grows in lockstep with a runtime that can build that artifact's context (design doc, chat thread). |
-| **Polarity** | `DESIRABLE` (OBSERVED=strength, NOT_OBSERVED=gap), `UNDESIRABLE` (OBSERVED=problem, NOT_OBSERVED=clean), `CONTEXTUAL` (per-finding severity carries the direction). | Orthogonal direction axis SARIF lacks (ADR 0021, F-6). `CONTEXTUAL` is a genuine extension — replaces legacy `MIXED`. |
+| **PracticeKind** | `GOOD_PRACTICE` (OBSERVED=strength, NOT_OBSERVED=gap), `BAD_PRACTICE` (OBSERVED=problem, NOT_OBSERVED=clean), `CONTEXTUAL` (per-finding severity carries the direction). | Orthogonal direction axis SARIF lacks (ADR 0021, F-6). `CONTEXTUAL` is a genuine extension — replaces legacy `MIXED`. |
 | **SubjectRole** | `AUTHOR` (subject == developer), `REVIEWER` (subject == reviewer, distinct from developer). | xAPI Actor. The firewall keeping reviewer-side lessons off the author. Replaces `audience_role`/`AUDIENCE_REVIEWER`. |
 | **Observation** | `OBSERVED` (present), `NOT_OBSERVED` (absent where expected), `NOT_APPLICABLE` (practice irrelevant to the work). | Sign-neutral; ≈ SARIF `result.kind` with the direction factored out. `NOT_APPLICABLE` is a verbatim SARIF match. |
-| **Severity** | `CRITICAL`, `MAJOR`, `MINOR`, `INFO` — impact, orthogonal to verdict. | SARIF `result.level` / SonarQube blocker..info. |
-| **FindingReactionAction** | **RESPONSE axis:** `ENACTED` ("acted to close the gap"; outcome unverified — RQ2), `DISPUTED` ("AI is wrong", reasoned rejection, requires explanation — RQ1/RQ4). **VALIDITY axis:** `NOT_APPLICABLE` ("valid but irrelevant" — RQ4; excluded from uptake ratios). | Recipience act (Winstone 2017 "enacting"); not workflow. `ENACTED` renamed from `APPLIED` (claimed action ≠ verified closure). No `DISMISSED`/`ACKNOWLEDGED` — non-action = absence of a row; affective dismissal deferred behind a UI affordance (§6). |
+| **Severity** | `CRITICAL`, `MAJOR`, `MINOR`, `INFO` — impact, orthogonal to observation. | SARIF `result.level` / SonarQube blocker..info. |
+| **FindingReactionAction** | **RESPONSE axis:** `ADDRESSED` ("acted to close the gap"; outcome unverified — RQ2), `DISPUTED` ("AI is wrong", reasoned rejection, requires explanation — RQ1/RQ4). **VALIDITY axis:** `NOT_APPLICABLE` ("valid but irrelevant" — RQ4; excluded from uptake ratios). | Recipience act (Winstone 2017 "enacting"); not workflow. `ADDRESSED` renamed from `APPLIED` (claimed action ≠ verified closure). No `DISMISSED`/`ACKNOWLEDGED` — non-action = absence of a row; affective dismissal deferred behind a UI affordance (§6). |
 | **EvidenceRole** | `PRIMARY` (anchors the headline), `SUPPORTING` (corroborates). | Synthesis-time weighting; replaces `display_role`. |
 | **FeedbackChannel** | `IN_CONTEXT` (on the PR/issue), `CONVERSATION` (mentor turn), `REFLECTION_DASHBOARD` (recipient's private dashboard). | Decouples message from channel. Every channel is developer-facing. |
 | **FeedbackDeliveryState** | `PREPARED`, `DELIVERED`, `SUPERSEDED` (replaced via `supersedes_id`), `SUPPRESSED` (withheld; see reason), `FAILED`. | Delivery state machine + review-tool edit-in-place (SUPERSEDED) + SARIF `suppressions` (SUPPRESSED). |
 | **FeedbackSuppressionReason** | `REVIEWER_SIDE`, `BELOW_THRESHOLD`, `LOW_CONFIDENCE`, `POLICY_FLOOR_DROP`, `REACTED_DISPUTED` (subject DISPUTED this locus earlier — B2), `REACTED_NOT_APPLICABLE` (subject marked N/A earlier — B2). | ≈ SARIF `suppression.justification`. `REVIEWER_SIDE` replaces legacy `AUDIENCE_REVIEWER`. |
-| **FeedbackOrigin** | `AGENT` (LLM), `POLICY_FLOOR` (deterministic guaranteed-coverage), `FALLBACK` (synthesis unavailable/failed). | Provenance for honest quality measurement. |
+| **FeedbackProvenance** | `AGENT` (LLM), `POLICY_FLOOR` (deterministic guaranteed-coverage), `FALLBACK` (synthesis unavailable/failed). | Provenance for honest quality measurement. |
 | **PlacementSlot** | `SUMMARY`, `INLINE`, `CONVERSATION_TURN`. | Where a placement renders. Replaces the `placement`-as-slot word. |
 | **PlacementPostedState** | `PENDING`, `POSTED`, `SNAPPED` (anchor moved to nearest valid line), `FELL_BACK` (posted as summary/thread instead of inline), `OUTDATED` (diff line changed), `ORPHANED` (anchored code/thread gone), `GONE` (comment deleted out-of-band), `FAILED`. | GitHub/GitLab review-comment lifecycle. |
 | **PlacementAnchorKind** | `LINE`, `RANGE`, `FILE`, `IMAGE`. | Diff-anchor granularity. |
@@ -373,8 +380,8 @@ learner-layer columns are **implemented** — admin-authored `Practice` columns 
 | area / area progress | yes — own | yes — own | yes — anonymised |
 | per-finding `Feedback` (task-framed) | yes — own only | yes — own only | yes — anonymised |
 | **`criteria`** | **NEVER** | **NEVER** | yes — edit (admin) |
-| `precomputeScript`, `triggerEvents`, `polarity`, `subjectRole` | no | no | yes — edit (admin) |
-| raw `OBSERVED`/`NOT_OBSERVED` verdict label | no — delivered as task-framed feedback | no | yes — anonymised |
+| `precomputeScript`, `triggerEvents`, `kind`, `subjectRole` | no | no | yes — edit (admin) |
+| raw `OBSERVED`/`NOT_OBSERVED` observation label | no — delivered as task-framed feedback | no | yes — anonymised |
 | reaction `NOT_APPLICABLE` (validity signal) | own — scope signal, **not** uptake | n/a | yes — anonymised |
 
 **Two hard rules from theory (not UX taste):**
@@ -386,7 +393,7 @@ learner-layer columns are **implemented** — admin-authored `Practice` columns 
    **physical**, not policy: `LearnerPracticeDTO` is a record with no `criteria` component, so the field
    cannot reach a learner even by accident (an integration test asserts the raw `GET /practices/learner`
    JSON contains no `"criteria"`) — mirroring how CodeQL physically separates the developer-facing
-   `.qhelp` from the `.ql` query metadata. An authoring guard additionally rejects detector verdict
+   `.qhelp` from the `.ql` query metadata. An authoring guard additionally rejects detector observation
    vocabulary (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in `whatGoodLooksLike`, keeping the rubric out
    of the learner copy at the source.
 2. **Visibility keys off the *finding's* `subjectRole`, not a static user role.** Reviewer-craft feedback
@@ -410,7 +417,7 @@ Hattie & Timperley (2007) feed-up/feed-back/feed-forward · CodeQL
 ## 4. What was removed and why
 
 - **`practice.category`** — removed. Static classification was redundant with the configurable
-  `PracticeArea` roll-up (SARIF-`taxon`-style grouping) and with `polarity`/`subject_role` for the
+  `PracticeArea` roll-up (SARIF-`taxon`-style grouping) and with `kind`/`subject_role` for the
   semantics it had tried to carry. A practice's grouping is now its *area*, not a frozen category.
 - **The `FeedbackPost` subsystem** — removed entirely (zero references remain in `server/src/main/java`).
   It was an earlier delivery ledger superseded by the `Feedback` + `FeedbackFinding` + `FeedbackPlacement`
@@ -425,7 +432,7 @@ Hattie & Timperley (2007) feed-up/feed-back/feed-forward · CodeQL
   a statement is about) be mandatory and unambiguous ([xAPI](https://xapi.com/statements-101/)).
 - **Legacy enum values** — `MIXED` → `CONTEXTUAL` (states *why* the direction is unfixed);
   `AUDIENCE_REVIEWER` → `REVIEWER` (the role) with `REVIEWER_SIDE` as the suppression reason. The old
-  `Verdict` enum *type* became `Observation` (sign-neutral); the `verdict` *column/field name* is kept
+  `Observation` enum *type* became `Observation` (sign-neutral); the `observation` *column/field name* is kept
   deliberately (the changelog never renamed it — a legitimate keep, not debt).
 - **Dead anchor/location columns on findings** — never introduced: location lives in the `evidence`
   JSONB, not as top-level columns, because many practices have no file location and findings can be
@@ -444,9 +451,9 @@ the bounded context, model to UI (DDD *Ubiquitous Language*:
 A few identifiers intentionally retain an older spelling — these are deliberate, not debt, and must NOT
 be "fixed":
 
-- The `verdict` **column/field name** on `PracticeFinding` — only the enum *type* is `Observation`; the
-  column stays `verdict` (so do `VerdictCount`, `countByVerdictForDeveloper`,
-  `priorVerdict`/`currentVerdict`).
+- The `observation` **column/field name** on `PracticeFinding` — only the enum *type* is `Observation`; the
+  column stays `observation` (so do `ObservationCount`, `countByObservationForDeveloper`,
+  `priorObservation`/`currentObservation`).
 - Index **names** `idx_practice_finding_correlation`, `idx_finding_reaction_correlation`,
   `idx_feedback_continuity` are stable while their column references are `finding_fingerprint` /
   `feedback_thread_key` — renaming an index is cosmetic churn with no schema benefit.
@@ -468,7 +475,7 @@ The schema also makes three larger decisions worth calling out:
   is queryable.
 - **Developer-facing layer + physical anti-leak projection** — `Practice.whyItMatters` /
   `whatGoodLooksLike` (§3.1, seeded for the default practices, editable in the admin form, guarded against
-  detector verdict vocabulary) are served through `LearnerPracticeDTO` / `GET /practices/learner`, which
+  detector observation vocabulary) are served through `LearnerPracticeDTO` / `GET /practices/learner`, which
   carries no `criteria` field **by construction** (§3a): "criteria never reaches a learner" is a physical
   guarantee, asserted by an integration test on the raw learner JSON.
 - **`Feedback.subjectUserId` NOT NULL** (§3.5, §4) — set equal to `recipient_user_id`, closing the
@@ -496,7 +503,7 @@ The schema also makes three larger decisions worth calling out:
   scope on purpose**: a moved locus is a *different* locus, and conflating the two would mis-merge
   unrelated findings. This is the SARIF `partialFingerprints` philosophy (stable against churn), applied
   to our domain.
-- **No first-class polarity in any standard — our orthogonal axis is the extension.** `Polarity` (esp.
+- **No first-class kind in any standard — our orthogonal axis is the extension.** `PracticeKind` (esp.
   `CONTEXTUAL`) has no analogue in SARIF, SonarQube, or code-scanning — all assume a rule fires only on
   something wrong. The orthogonal-axis design is defensible and lossless on SARIF export (the mapping in
   §2), but it is *our* extension; interoperability tooling needs that export mapping to understand
