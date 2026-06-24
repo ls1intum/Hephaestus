@@ -172,16 +172,6 @@ public class Observation {
     @Column(name = "severity", length = 16, nullable = false)
     private Severity severity;
 
-    /**
-     * Who made this observation — the assessment perspective. Distinct from {@link #subjectRole} (whose
-     * work it is about) and the delivered feedback's provenance (how the text was produced). Every
-     * observation today is system-made; {@link Observer#SELF}/{@link Observer#PEER} are schema-ready.
-     */
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "observer", length = 16, nullable = false)
-    private Observer observer = Observer.SYSTEM;
-
     @NotNull
     @Column(name = "confidence", nullable = false)
     private Float confidence;
