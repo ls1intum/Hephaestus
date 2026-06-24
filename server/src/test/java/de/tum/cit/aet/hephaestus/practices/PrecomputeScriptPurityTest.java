@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Enforces the precompute contract: scripts surface FACTS / metrics / directions for the LLM to judge — they
- * NEVER emit the verdict the agent is supposed to reach independently (telescope, not cage). Observation-laundering
+ * NEVER emit the observation the agent is supposed to reach independently (telescope, not cage). Presence-laundering
  * (a {@code directions} string that pre-decides POSITIVE / NEGATIVE / NOT_APPLICABLE) silently biases the grader
  * and has regressed twice; this test makes the boundary structural.
  */
@@ -25,25 +25,25 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
         "server/src/main/resources/practices/precompute"
     );
 
-    // The sign-neutral verdict vocabulary (ADR 0021, F-6). A precompute script produces hints, never
-    // verdicts, so it must launder none of these.
-    private static final List<String> VERDICT_TOKENS = List.of("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
+    // The sign-neutral observation vocabulary (ADR 0021, F-6). A precompute script produces hints, never
+    // observations, so it must launder none of these.
+    private static final List<String> OBSERVATION_TOKENS = List.of("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
 
     @Test
-    @DisplayName("no precompute script emits a verdict token outside its header comments")
-    void noScriptLaundersAVerdict() throws IOException {
+    @DisplayName("no precompute script emits a observation token outside its header comments")
+    void noScriptLaundersAObservation() throws IOException {
         for (Path script : scripts()) {
             for (String line : Files.readAllLines(script, StandardCharsets.UTF_8)) {
                 String trimmed = line.strip();
-                // Header comments legitimately state the "facts not verdicts" contract — skip them.
+                // Header comments legitimately state the "facts not observations" contract — skip them.
                 if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) {
                     continue;
                 }
-                for (String token : VERDICT_TOKENS) {
+                for (String token : OBSERVATION_TOKENS) {
                     assertThat(line)
                         .as(
-                            "%s emits the verdict token '%s' in code/directions — precompute surfaces facts, " +
-                                "the LLM decides the verdict",
+                            "%s emits the observation token '%s' in code/directions — precompute surfaces facts, " +
+                                "the LLM decides the observation",
                             script.getFileName(),
                             token
                         )

@@ -1,24 +1,224 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
+
 /**
- * Observation for a practice finding — whether the practice behaviour was <em>observed</em> in the
- * developer's work, was <em>not observed</em>, or whether the practice is irrelevant.
+ * Immutable record of a practice evaluation for a specific contribution.
  *
- * <p><b>Sign-neutral.</b> A verdict states only what the detector saw; it does NOT encode "good"
- * or "bad". The good/bad direction is supplied by {@link Practice#getPolarity()}: for a
- * {@code DESIRABLE} practice {@code OBSERVED} is the strength and {@code NOT_OBSERVED} the gap; for
- * an {@code UNDESIRABLE} practice the directions invert. Keeping verdict sign-free is what lets one
- * detector schema serve both desirable practices ({@code OBSERVED} = strength) and undesirable ones
- * ({@code NOT_OBSERVED} = strength) without overloading the verdict value (see ADR 0021, F-6).
+ * <p>Each finding represents an AI agent's assessment of whether a developer
+ * followed or violated a {@link Practice} in a specific target (pull request, commit, review).
+ * Findings are append-only and deduplicated by {@link #occurrenceKey}.
  *
- * <p>Orthogonal to {@link Severity}: verdict captures <em>presence</em> (observed vs not), severity
- * captures <em>impact</em> (critical vs informational).
+ * <p>Follows the {@code ActivityEvent} pattern: {@code @Immutable}, UUID PK with
+ * {@code @PrePersist}, and {@code insertIfAbsent} for race-condition-safe insertion.
+ *
+ * @see Practice for the practice definition being evaluated
+ * @see Severity for the impact level (orthogonal to observation)
  */
-public enum Observation {
-    /** The practice behaviour is present in the developer's changed work. */
-    OBSERVED,
-    /** The practice behaviour is absent where it was expected in the developer's changed work. */
-    NOT_OBSERVED,
-    /** The practice does not apply to the changed work (e.g., no network calls → error-state-handling is irrelevant). */
-    NOT_APPLICABLE,
+@Entity
+@Immutable
+@Table(
+    name = "observation",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_observation_occurrence", columnNames = { "occurrence_key" }),
+    },
+    indexes = {
+        @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
+        @Index(name = "idx_observation_developer_observed", columnList = "developer_id, observed_at DESC"),
+        @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
+        @Index(name = "idx_observation_target", columnList = "artifact_type, artifact_id"),
+        // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (FindingTrendService).
+        @Index(
+            name = "idx_observation_target_run",
+            columnList = "artifact_type, artifact_id, agent_job_id, observed_at DESC"
+        ),
+        // Cross-run identity (ADR 0021 C2): supersession + reaction-history follow one finding across re-detections.
+        @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
+        // Reviewer-side findings are filed against the subject, not the developer; index for subject dashboards.
+        @Index(name = "idx_observation_subject", columnList = "about_user_id"),
+    }
+)
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Observation {
+
+    @Id
+    @Column(columnDefinition = "UUID")
+    private UUID id;
+
+    @NotNull
+    @Column(name = "occurrence_key", nullable = false, length = 255)
+    private String occurrenceKey;
+
+    /**
+     * The agent job that produced this finding. Stored as a raw UUID to avoid a module
+     * cycle between {@code practices} and {@code agent}. The FK constraint
+     * {@code fk_observation_agent_job} is managed by Liquibase at the DB level.
+     *
+     * <p>Primary insert path is {@link de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository#insertIfAbsent}
+     * which bypasses {@code @PrePersist} — callers must supply the UUID explicitly.
+     */
+    @NotNull
+    @Column(name = "agent_job_id", nullable = false, columnDefinition = "UUID")
+    private UUID agentJobId;
+
+    /**
+     * The practice being evaluated. Uses DB-level {@code ON DELETE CASCADE} so that
+     * deleting a practice automatically cleans up its immutable findings without
+     * requiring Hibernate lifecycle callbacks (which don't fire for bulk/native deletes).
+     */
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "practice_id", nullable = false, foreignKey = @ForeignKey(name = "fk_observation_practice"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Practice practice;
+
+    /**
+     * The {@link PracticeRevision} (criteria snapshot) the detector evaluated this finding against, pinning
+     * it to the criteria as it was for reproducibility (SCD-2). NULL = the finding predates versioning
+     * (an honest "pre-versioning" marker). Written via the native insert; SET NULL on revision delete so a
+     * finding survives history pruning.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "practice_revision_id", foreignKey = @ForeignKey(name = "fk_observation_revision"))
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private PracticeRevision practiceRevision;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "artifact_type", length = 32, nullable = false)
+    private WorkArtifact artifactType;
+
+    @NotNull
+    @Column(name = "artifact_id", nullable = false)
+    private Long artifactId;
+
+    /**
+     * The developer whose work is being evaluated. No cascade — users are long-lived
+     * and findings must survive independently; deleting a user with existing findings
+     * is blocked by the FK constraint (RESTRICT).
+     */
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "developer_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "fk_observation_developer")
+    )
+    private User developer;
+
+    /**
+     * Whose conduct the finding is filed against — ALWAYS populated (ADR 0021, C2): equals {@link #developer}
+     * for author-side practices (the whole catalogue today), the reviewer for reviewer-side practices. The
+     * former "NULL means the subject is the developer" default was collapsed into an explicit value so every
+     * reader can trust the column without a fallback. Raw {@code Long} FK to {@code user} (no {@code @ManyToOne})
+     * to keep the cross-cutting identity columns scalar; the DB FK {@code fk_observation_subject} is
+     * Liquibase-managed.
+     */
+    @NotNull
+    @Column(name = "about_user_id", nullable = false)
+    private Long aboutUserId;
+
+    /**
+     * Stable cross-run identity (ADR 0021, C2): a deterministic hash of what the finding is ABOUT
+     * (practice + target + subject + a content anchor), NEVER of when it was produced (no job id, no line
+     * number). Lets later {@code Feedback} supersede rather than re-post, and lets a reaction follow one
+     * underlying problem across re-detections — the primitive the research question's "do practices change
+     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint}.
+     * Nullable: backfill-free, populated on new findings only.
+     */
+    @Column(name = "recurrence_key", length = 64)
+    private String recurrenceKey;
+
+    @NotNull
+    @Column(name = "title", nullable = false, length = 255)
+    private String title;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "observation", length = 16, nullable = false)
+    private Presence observation;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity", length = 16, nullable = false)
+    private Severity severity;
+
+    /**
+     * Who made this observation — the assessment perspective. Distinct from {@link #subjectRole} (whose
+     * work it is about) and the delivered feedback's provenance (how the text was produced). Every
+     * observation today is system-made; {@link Observer#SELF}/{@link Observer#PEER} are schema-ready.
+     */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "observer", length = 16, nullable = false)
+    private Observer observer = Observer.SYSTEM;
+
+    @NotNull
+    @Column(name = "confidence", nullable = false)
+    private Float confidence;
+
+    /**
+     * Structured evidence supporting the observation. Recommended shape:
+     *
+     * <pre>{@code
+     * {
+     *   "locations": [{"path": "src/Main.java", "startLine": 42, "endLine": 50}],
+     *   "snippets": ["try { ... } catch (Exception e) {}"],
+     *   "references": ["https://example.com/best-practices"]
+     * }
+     * }</pre>
+     *
+     * <p>Location data lives here (not as top-level columns) because many practices
+     * (PR description quality, review thoroughness) have no file location, and
+     * multi-location findings need arrays.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence", columnDefinition = "jsonb")
+    private JsonNode evidence;
+
+    @Column(name = "reasoning", columnDefinition = "TEXT")
+    private String reasoning;
+
+    @NotNull
+    @Column(name = "observed_at", nullable = false)
+    private Instant observedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (id == null) {
+            id = UUID.randomUUID();
+        }
+        if (observedAt == null) {
+            observedAt = Instant.now();
+        }
+    }
 }

@@ -15,11 +15,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReaction;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -65,7 +65,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void flagOff_passesThroughUnchanged_noRepoCalls() {
-        List<ValidatedFinding> in = List.of(vf(SLUG, Observation.NOT_OBSERVED));
+        List<ValidatedFinding> in = List.of(vf(SLUG, Presence.NOT_OBSERVED));
 
         var d = filter(false).evaluate(TestEntities.agentJob(), in);
 
@@ -78,7 +78,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void disputedLocus_isSuppressedAndLedgered() {
         stubPersistedAndReaction(FindingReactionAction.DISPUTED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.NOT_OBSERVED)));
 
         assertThat(d.deliverable()).isEmpty();
         assertThat(d.suppressedCount()).isEqualTo(1);
@@ -99,7 +99,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         var filter = filter(true);
         var job = TestEntities.agentJob();
-        var in = List.of(vf(SLUG, Observation.NOT_OBSERVED));
+        var in = List.of(vf(SLUG, Presence.NOT_OBSERVED));
 
         assertThatCode(() -> filter.evaluate(job, in)).doesNotThrowAnyException();
         assertThat(filter.evaluate(job, in).deliverable()).isEmpty(); // still suppressed despite the failed write
@@ -113,7 +113,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             List.of()
         );
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.NOT_OBSERVED)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -121,9 +121,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void appliedButStillNotObserved_isKeptWithStifferOpener() {
-        stubPersistedAndReaction(FindingReactionAction.ENACTED);
+        stubPersistedAndReaction(FindingReactionAction.ADDRESSED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.NOT_OBSERVED)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -132,11 +132,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void appliedAndNowObserved_isDeliveredPlainNotEscalated() {
-        // ENACTED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
-        // untouched (escalation is keyed on verdict == NOT_OBSERVED, not on the reaction alone).
-        stubPersistedAndReaction(FindingReactionAction.ENACTED);
+        // ADDRESSED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
+        // untouched (escalation is keyed on observation == NOT_OBSERVED, not on the reaction alone).
+        stubPersistedAndReaction(FindingReactionAction.ADDRESSED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Observation.OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.OBSERVED)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -154,11 +154,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
-    private static ValidatedFinding vf(String slug, Observation verdict) {
+    private static ValidatedFinding vf(String slug, Presence observation) {
         return new ValidatedFinding(
             slug,
             slug + " title",
-            verdict,
+            observation,
             Severity.MINOR,
             0.8f,
             null,
@@ -168,19 +168,19 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
-    private PracticeFinding pf(String findingFingerprint) {
-        PracticeFinding pf = org.mockito.Mockito.mock(PracticeFinding.class);
+    private Observation pf(String findingFingerprint) {
+        Observation pf = org.mockito.Mockito.mock(Observation.class);
         // subject_user_id is always populated; for author-side findings it equals the developer.
-        when(pf.getFindingFingerprint()).thenReturn(findingFingerprint);
-        when(pf.getSubjectUserId()).thenReturn(CONTRIBUTOR);
+        when(pf.getRecurrenceKey()).thenReturn(findingFingerprint);
+        when(pf.getAboutUserId()).thenReturn(CONTRIBUTOR);
         when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
         when(pf.getArtifactId()).thenReturn(TARGET);
         return pf;
     }
 
-    private static FindingReaction reaction(FindingReactionAction action) {
-        FindingReaction r = org.mockito.Mockito.mock(FindingReaction.class);
-        when(r.getFindingFingerprint()).thenReturn(CK);
+    private static Reaction reaction(FindingReactionAction action) {
+        Reaction r = org.mockito.Mockito.mock(Reaction.class);
+        when(r.getRecurrenceKey()).thenReturn(CK);
         when(r.getAction()).thenReturn(action);
         return r;
     }

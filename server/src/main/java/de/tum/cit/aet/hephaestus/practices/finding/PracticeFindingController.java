@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryD
 import de.tum.cit.aet.hephaestus.practices.finding.dto.PracticeFindingDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.PracticeFindingListDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionPracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,7 +57,7 @@ public class PracticeFindingController {
     public ResponseEntity<Page<PracticeFindingListDTO>> listFindings(
         WorkspaceContext workspaceContext,
         @Parameter(description = "Filter by practice slug") @RequestParam(required = false) String practiceSlug,
-        @Parameter(description = "Filter by verdict") @RequestParam(required = false) Observation verdict,
+        @Parameter(description = "Filter by observation") @RequestParam(required = false) Presence observation,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
@@ -66,7 +66,7 @@ public class PracticeFindingController {
         Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("detectedAt").descending());
 
         Page<PracticeFindingListDTO> findings = practiceFindingService
-            .getFindings(workspaceContext.id(), practiceSlug, verdict, pageable)
+            .getFindings(workspaceContext.id(), practiceSlug, observation, pageable)
             .map(PracticeFindingListDTO::from);
         return ResponseEntity.ok(findings);
     }
@@ -74,7 +74,7 @@ public class PracticeFindingController {
     @GetMapping("/summary")
     @Operation(
         summary = "Per-practice summary for current user",
-        description = "Aggregated verdict counts per practice for dashboard cards"
+        description = "Aggregated observation counts per practice for dashboard cards"
     )
     @ApiResponse(
         responseCode = "200",

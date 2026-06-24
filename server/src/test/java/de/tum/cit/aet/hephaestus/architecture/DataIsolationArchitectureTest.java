@@ -58,7 +58,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "TeamMembership",
         // Practice catalog entities
         "Practice", // has direct Workspace field
-        "PracticeFinding", // through Practice.workspace
+        "Observation", // through Practice.workspace
         // Through chat thread -> workspace
         "ChatMessage", // through ChatThread.workspace
         "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
@@ -80,9 +80,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "Connection", // has direct Workspace field
         "ConnectionAudit", // through Connection.workspace
         // ADR 0021 C2 findings↔feedback synthesis seam — scoped via a raw workspace_id scalar (cross-module
-        // FK to avoid a Modulith cycle, mirrors PracticeFinding.agentJobId).
+        // FK to avoid a Modulith cycle, mirrors Observation.agentJobId).
         "Feedback", // direct workspace_id scalar column (sfk_feedback_workspace)
-        "FeedbackFinding", // through Feedback.workspace_id (and finding -> Practice.workspace)
+        "FeedbackObservation", // through Feedback.workspace_id (and finding -> Practice.workspace)
         "FeedbackPlacement" // through Feedback.workspace_id
     );
 

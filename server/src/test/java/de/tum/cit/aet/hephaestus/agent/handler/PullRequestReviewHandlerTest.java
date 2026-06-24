@@ -25,7 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -367,14 +367,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingInDiff() {
-            var finding = finding("fatal-error-crash", Observation.NOT_OBSERVED, "Sources/View.swift");
+            var finding = finding("fatal-error-crash", Presence.NOT_OBSERVED, "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Observation.NOT_OBSERVED, "inputs/context/metadata.json");
+            var finding = finding("mr-description-quality", Presence.NOT_OBSERVED, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
@@ -383,23 +383,27 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void filtersFindingBackedByNonWhitelistedInternal() {
             // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
             // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
-            var finding = finding("review-noise", Observation.NOT_OBSERVED, "inputs/context/contributor_history.json");
+            var finding = finding("review-noise", Presence.NOT_OBSERVED, "inputs/context/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         @Test
         void filtersFindingOutsideDiff() {
-            var finding = finding("view-logic-separation", Observation.NOT_OBSERVED, "Sources/Other.swift");
+            var finding = finding("view-logic-separation", Presence.NOT_OBSERVED, "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Observation verdict, String path) {
+        private PracticeDetectionResultParser.ValidatedFinding finding(
+            String slug,
+            Presence observation,
+            String path
+        ) {
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "title",
-                verdict,
+                observation,
                 Severity.MINOR,
                 0.8f,
                 objectMapper
@@ -455,7 +459,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                   "findings": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Good PR description",
-                    "verdict": "OBSERVED",
+                    "observation": "OBSERVED",
                     "severity": "INFO",
                     "confidence": 0.95
                   }]
@@ -489,7 +493,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                   "findings": [{
                     "practiceSlug": "error-handling",
                     "title": "Unhandled error path",
-                    "verdict": "NOT_OBSERVED",
+                    "observation": "NOT_OBSERVED",
                     "severity": "MAJOR",
                     "confidence": 0.9,
                     "reasoning": "The error branch is swallowed.",

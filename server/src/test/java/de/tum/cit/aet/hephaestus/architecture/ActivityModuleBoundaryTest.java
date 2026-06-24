@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Note: Code health analysis is in the separate <b>practices</b> module:
  * <ul>
- *   <li><b>practices.model</b> - Practice and PracticeFinding entities</li>
+ *   <li><b>practices.model</b> - Practice and Observation entities</li>
  *   <li><b>practices.spi</b> - Service provider interfaces (UserRoleChecker)</li>
  *   <li><b>practices.finding</b> - Contributor findings, detection events, and finding API</li>
  *   <li><b>practices.review</b> - Detection and delivery gate decisions</li>

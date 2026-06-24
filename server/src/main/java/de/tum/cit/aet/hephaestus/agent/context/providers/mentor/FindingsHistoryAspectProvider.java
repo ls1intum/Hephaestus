@@ -8,10 +8,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.ObservationCount;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.VerdictCount;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -102,13 +102,17 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
-        List<PracticeFinding> recent = findingRepository.findRecentByDeveloperAndWorkspace(
+        List<Observation> recent = findingRepository.findRecentByDeveloperAndWorkspace(
             developerId,
             workspaceId,
             since,
             PageRequest.of(0, MAX_RECENT_FINDINGS)
         );
-        List<VerdictCount> byVerdict = findingRepository.countByVerdictForDeveloper(developerId, workspaceId, since);
+        List<ObservationCount> byObservation = findingRepository.countByObservationForDeveloper(
+            developerId,
+            workspaceId,
+            since
+        );
         List<SeverityCount> bySeverity = findingRepository.countBySeverityForDeveloper(developerId, workspaceId, since);
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
             workspaceId,
@@ -121,17 +125,17 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
 
         ObjectNode summary = root.putObject("summary");
-        // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the verdict aggregate is the
+        // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the observation aggregate is the
         // authoritative window total. Use it directly — no need to coalesce.
-        long verdictTotal = byVerdict.stream().mapToLong(VerdictCount::getCount).sum();
-        summary.put("totalFindings", verdictTotal);
+        long observationTotal = byObservation.stream().mapToLong(ObservationCount::getCount).sum();
+        summary.put("totalFindings", observationTotal);
 
-        ObjectNode verdictNode = summary.putObject("byVerdict");
-        for (Observation v : Observation.values()) {
-            verdictNode.put(v.name(), 0L);
+        ObjectNode observationNode = summary.putObject("byObservation");
+        for (Presence v : Presence.values()) {
+            observationNode.put(v.name(), 0L);
         }
-        for (VerdictCount row : byVerdict) {
-            verdictNode.put(row.getVerdict().name(), row.getCount());
+        for (ObservationCount row : byObservation) {
+            observationNode.put(row.getObservation().name(), row.getCount());
         }
 
         ObjectNode severityNode = summary.putObject("bySeverity");
@@ -143,16 +147,16 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         }
 
         ArrayNode findingsArr = root.putArray("recentFindings");
-        for (PracticeFinding f : recent) {
+        for (Observation f : recent) {
             ObjectNode node = findingsArr.addObject();
             node.put("id", f.getId().toString());
             node.put("title", f.getTitle());
             node.put("practiceSlug", f.getPractice().getSlug());
-            node.put("verdict", f.getVerdict().name());
+            node.put("observation", f.getObservation().name());
             node.put("severity", f.getSeverity().name());
             node.put("confidence", f.getConfidence());
-            node.put("detectedAt", f.getDetectedAt().toString());
-            // The finding-history node carries title + verdict + severity + reasoning only. Advice is NOT on the
+            node.put("detectedAt", f.getObservedAt().toString());
+            // The finding-history node carries title + observation + severity + reasoning only. Advice is NOT on the
             // finding (ADR 0021) — the mentor receives the sanitised delivered feedback body via
             // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
             // raw, unsanitised text DeliveryComposer would never post.

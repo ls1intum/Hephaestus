@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,7 +27,7 @@ public record PracticeFindingDetailDTO(
     @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
     @NonNull @Schema(description = "Target entity ID") Long artifactId,
     @NonNull @Schema(description = "Finding title") String title,
-    @NonNull @Schema(description = "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Observation verdict,
+    @NonNull @Schema(description = "Presence: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Presence observation,
     @NonNull @Schema(description = "Severity level") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @Nullable
@@ -35,14 +35,14 @@ public record PracticeFindingDetailDTO(
         description = "Structured evidence: {\"locations\":[{\"path\",\"startLine\",\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
     )
     Map<String, Object> evidence,
-    @Nullable @Schema(description = "AI reasoning behind the verdict") String reasoning,
+    @Nullable @Schema(description = "AI reasoning behind the observation") String reasoning,
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")
     String guidance,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
     public static PracticeFindingDetailDTO from(
-        PracticeFinding f,
+        Observation f,
         @Nullable String deliveredGuidance,
         tools.jackson.databind.ObjectMapper mapper
     ) {
@@ -54,13 +54,13 @@ public record PracticeFindingDetailDTO(
             f.getArtifactType(),
             f.getArtifactId(),
             f.getTitle(),
-            f.getVerdict(),
+            f.getObservation(),
             f.getSeverity(),
             f.getConfidence(),
             toMap(f.getEvidence(), mapper),
             f.getReasoning(),
             deliveredGuidance,
-            f.getDetectedAt()
+            f.getObservedAt()
         );
     }
 

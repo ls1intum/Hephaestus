@@ -40,7 +40,7 @@ import tools.jackson.databind.JsonNode;
  * <p>The {@link #triggerEvents} field (JSONB) specifies which domain events
  * should trigger detection for this practice (e.g., PullRequestCreated, ReviewSubmitted).
  *
- * @see PracticeFinding for detection results
+ * @see Observation for detection results
  */
 @Entity
 @Table(
@@ -89,15 +89,15 @@ public class Practice {
     private WorkArtifact artifactType = WorkArtifact.PULL_REQUEST;
 
     /**
-     * Whether this practice describes a desirable habit, an anti-pattern, or a context-dependent
-     * pattern. Supplies the good/bad direction that {@link Observation} omits, so {@code OBSERVED} can
+     * Whether this practice describes a good practice, a bad practice, or a context-dependent
+     * pattern. Supplies the good/bad direction that {@link Presence} omits, so {@code OBSERVED} can
      * mean "strength" for one practice and "problem" for another (see ADR 0021, F-6). NOT NULL;
-     * defaults to {@code DESIRABLE} — every catalogued practice today is a desirable habit.
+     * defaults to {@code GOOD_PRACTICE} — every catalogued practice today is a good practice.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "polarity", nullable = false, length = 16)
-    @ColumnDefault("'DESIRABLE'")
-    private Polarity polarity = Polarity.DESIRABLE;
+    @Column(name = "kind", nullable = false, length = 16)
+    @ColumnDefault("'GOOD_PRACTICE'")
+    private PracticeKind kind = PracticeKind.GOOD_PRACTICE;
 
     /**
      * Whose conduct this practice evaluates — the contribution author or its reviewer (ADR 0021, C2).
@@ -148,7 +148,7 @@ public class Practice {
 
     /**
      * Optional Bun/TypeScript static analysis script that runs before the AI agent.
-     * Produces structured hints (not verdicts) that the agent uses as starting points.
+     * Produces structured hints (not observations) that the agent uses as starting points.
      * When null, no precomputation runs for this practice.
      */
     @Column(name = "precompute_script", columnDefinition = "TEXT")
@@ -176,7 +176,7 @@ public class Practice {
 
     /**
      * Whether this practice is a defect-detector — its criteria declare {@code DEFECT-DETECTOR DISCIPLINE}, so it
-     * has no legal OBSERVED verdict (a clean surface is NOT_APPLICABLE, never a strength to endorse). The detection
+     * has no legal OBSERVED observation (a clean surface is NOT_APPLICABLE, never a strength to endorse). The detection
      * and delivery layers coerce/suppress accordingly; keeping the rule here keeps it in one place.
      */
     public boolean isDefectDetector() {

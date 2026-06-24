@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,7 +12,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * One piece of feedback on the reflective dashboard — a single finding rendered for a developer to READ:
  * the headline, the actionable guidance, where it is, and a handle to open the full finding. Deliberately
- * NOT the raw {@link PracticeFinding}: no verdict enum, no reasoning machinery, and never any criteria — the
+ * NOT the raw {@link Observation}: no observation enum, no reasoning machinery, and never any criteria — the
  * dashboard is a learner surface, so it carries only what helps the developer act.
  */
 @Schema(description = "A single piece of practice feedback to read and act on")
@@ -27,7 +27,7 @@ public record ReflectionItemDTO(
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator
 ) {
-    public static ReflectionItemDTO from(PracticeFinding f, @Nullable String deliveredGuidance) {
+    public static ReflectionItemDTO from(Observation f, @Nullable String deliveredGuidance) {
         return new ReflectionItemDTO(
             f.getId(),
             f.getTitle(),

@@ -29,9 +29,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -231,14 +231,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 {
                   "practiceSlug": "pr-description-quality",
                   "title": "Good PR description",
-                  "verdict": "OBSERVED",
+                  "observation": "OBSERVED",
                   "severity": "INFO",
                   "confidence": 0.95
                 },
                 {
                   "practiceSlug": "error-handling",
                   "title": "Missing null check",
-                  "verdict": "NOT_OBSERVED",
+                  "observation": "NOT_OBSERVED",
                   "severity": "MAJOR",
                   "confidence": 0.85,
                   "reasoning": "The method does not check for null input.",
@@ -266,11 +266,11 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // Verify findings persisted
-            List<PracticeFinding> findings = practiceFindingRepository.findAll();
+            List<Observation> findings = practiceFindingRepository.findAll();
             assertThat(findings).hasSize(2);
             assertThat(findings)
-                .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Observation.OBSERVED, Observation.NOT_OBSERVED);
+                .extracting(Observation::getObservation)
+                .containsExactlyInAnyOrder(Presence.OBSERVED, Presence.NOT_OBSERVED);
 
             // Verify completion event
             List<PracticeDetectionCompletedEvent> events = applicationEvents
@@ -301,14 +301,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "verdict": "OBSERVED",
+                      "observation": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Proper error handling",
-                      "verdict": "OBSERVED",
+                      "observation": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     }
@@ -353,21 +353,21 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "verdict": "OBSERVED",
+                      "observation": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
                       "title": "Unknown practice",
-                      "verdict": "OBSERVED",
+                      "observation": "OBSERVED",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Good handling",
-                      "verdict": "NOT_OBSERVED",
+                      "observation": "NOT_OBSERVED",
                       "severity": "MINOR",
                       "confidence": 0.8
                     }
@@ -379,7 +379,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // 2 persisted (known slugs), 1 discarded (unknown)
-            List<PracticeFinding> findings = practiceFindingRepository.findAll();
+            List<Observation> findings = practiceFindingRepository.findAll();
             assertThat(findings).hasSize(2);
 
             List<PracticeDetectionCompletedEvent> events = applicationEvents

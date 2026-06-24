@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -18,7 +18,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Builds aggregated developer practice history JSON for the review agent context.
  *
- * <p>Queries {@link PracticeFindingRepository} for verdict counts per practice and
+ * <p>Queries {@link PracticeFindingRepository} for observation counts per practice and
  * produces a compact JSON array suitable for injection into the agent sandbox as
  * {@code inputs/context/contributor_history.json}.
  *
@@ -58,7 +58,7 @@ public class DeveloperHistoryProvider {
             return Optional.empty();
         }
 
-        // Group by practice slug, accumulate verdict counts and track latest detection
+        // Group by practice slug, accumulate observation counts and track latest detection
         Map<String, PracticeAggregate> byPractice = new LinkedHashMap<>();
         for (DeveloperPracticeSummary row : summaries) {
             byPractice.computeIfAbsent(row.getPracticeSlug(), slug -> new PracticeAggregate()).add(row);
@@ -109,7 +109,7 @@ public class DeveloperHistoryProvider {
     }
 
     /**
-     * Mutable accumulator for per-practice verdict counts during aggregation.
+     * Mutable accumulator for per-practice observation counts during aggregation.
      */
     private static final class PracticeAggregate {
 
@@ -118,7 +118,7 @@ public class DeveloperHistoryProvider {
         Instant lastDetectedAt;
 
         void add(DeveloperPracticeSummary row) {
-            switch (row.getVerdict()) {
+            switch (row.getObservation()) {
                 case OBSERVED -> observed += row.getCount();
                 case NOT_OBSERVED -> notObserved += row.getCount();
                 case NOT_APPLICABLE -> {

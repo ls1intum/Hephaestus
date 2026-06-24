@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -66,7 +66,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             humanizeTitle(slug) + " (positive)",
-            Observation.OBSERVED,
+            Presence.OBSERVED,
             Severity.INFO,
             0.90f,
             null,
@@ -88,7 +88,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Observation.NOT_OBSERVED,
+            Presence.NOT_OBSERVED,
             severity,
             0.92f,
             buildEvidence(locations, snippets),
@@ -248,7 +248,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding withReasoning = new ValidatedFinding(
             "error-state-handling",
             "Error state handling (positive)",
-            Observation.OBSERVED,
+            Presence.OBSERVED,
             Severity.INFO,
             0.95f,
             null,
@@ -640,13 +640,13 @@ class DeliveryComposerTest extends BaseUnitTest {
         String leaked4 =
             "The title is descriptive but the body only lists what was done without a quoted sentence " +
             "that explains why. The practice requires a specific 'why' sentence to be present for a " +
-            "POSITIVE verdict; its absence leads to this point at the MINOR severity level.";
+            "POSITIVE observation; its absence leads to this point at the MINOR severity level.";
 
         for (String s : List.of(leaked1, leaked2, leaked3, leaked4)) {
             String clean = DeliveryComposer.sanitizeStudentText(s);
             assertThat(clean).doesNotContainIgnoringCase("NEGATIVE finding");
             assertThat(clean).doesNotContainIgnoringCase("POSITIVE finding");
-            assertThat(clean).doesNotContainIgnoringCase("POSITIVE verdict");
+            assertThat(clean).doesNotContainIgnoringCase("POSITIVE observation");
             assertThat(clean).doesNotContainIgnoringCase("severity band");
             assertThat(clean).doesNotContainIgnoringCase("severity level");
             assertThat(clean).doesNotContainIgnoringCase("MINOR severity");
@@ -761,18 +761,18 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void sanitizeStudentText_stripsVerdictJustificationLeaks() {
-        // Regression: the grader's verdict/severity JUSTIFICATION leaked verbatim to students — the
+    void sanitizeStudentText_stripsObservationJustificationLeaks() {
+        // Regression: the grader's observation/severity JUSTIFICATION leaked verbatim to students — the
         // developer "watches the rubric get scored" instead of hearing a colleague. Severity is carried by
         // the icon; these sentences are pure machinery and must drop, while the real lesson survives.
         String leak =
             "The body describes what changed but omits the why. Since the change touches only one file, the " +
-            "combined verdict is NOT_OBSERVED at MAJOR. Per the umbrella calibration this is MINOR " +
+            "combined observation is NOT_OBSERVED at MAJOR. Per the umbrella calibration this is MINOR " +
             "(a decomposition nudge), not MAJOR. Even a fully absent rationale would be capped at MINOR here. " +
             "No sentence uses a reason connective such as 'so that', 'because', or 'to avoid'. Add a short " +
             "Why section that states the problem this change solves.";
         String clean = DeliveryComposer.sanitizeStudentText(leak);
-        assertThat(clean).doesNotContain("verdict is NOT_OBSERVED");
+        assertThat(clean).doesNotContain("observation is NOT_OBSERVED");
         assertThat(clean).doesNotContain("umbrella calibration");
         assertThat(clean).doesNotContain("not MAJOR");
         assertThat(clean).doesNotContain("capped at MINOR");
@@ -872,18 +872,18 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Observation.OBSERVED,
+            Presence.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
-            "The practice requires a checkable outcome for a POSITIVE verdict.",
+            "The practice requires a checkable outcome for a POSITIVE observation.",
             null,
             List.of()
         );
         ValidatedFinding real = new ValidatedFinding(
             "issue-scoped-to-single-concern",
             "Single concern",
-            Observation.OBSERVED,
+            Presence.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
@@ -906,11 +906,11 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Observation.OBSERVED,
+            Presence.OBSERVED,
             Severity.INFO,
             0.9f,
             null,
-            "The practice requires a checkable outcome for a POSITIVE verdict.",
+            "The practice requires a checkable outcome for a POSITIVE observation.",
             null,
             List.of()
         );
@@ -962,7 +962,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding na1 = new ValidatedFinding(
             "issue-scoped-to-single-concern",
             "n/a",
-            Observation.NOT_APPLICABLE,
+            Presence.NOT_APPLICABLE,
             Severity.INFO,
             0.9f,
             null,
@@ -973,7 +973,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding na2 = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "n/a",
-            Observation.NOT_APPLICABLE,
+            Presence.NOT_APPLICABLE,
             Severity.INFO,
             0.9f,
             null,
@@ -1181,7 +1181,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Observation.NOT_OBSERVED,
+            Presence.NOT_OBSERVED,
             severity,
             confidence,
             buildEvidence(List.of(new LocationSpec(slug + ".swift", 10)), null),
@@ -1295,14 +1295,14 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void undesirablePracticeObservedVerdictIsTreatedAsAProblem() {
-        // An anti-pattern practice (polarity UNDESIRABLE) whose bad behaviour was OBSERVED is a problem,
-        // not a strength (ADR 0021, F-6). The same finding under the default DESIRABLE reading is a
-        // strength and surfaces no diff note — proving the partition consults polarity, not raw verdict.
+    void undesirablePracticeObservedObservationIsTreatedAsAProblem() {
+        // An anti-pattern practice (kind BAD_PRACTICE) whose bad behaviour was OBSERVED is a problem,
+        // not a strength (ADR 0021, F-6). The same finding under the default GOOD_PRACTICE reading is a
+        // strength and surfaces no diff note — proving the partition consults kind, not raw observation.
         ValidatedFinding observed = new ValidatedFinding(
             "uses-force-unwrap",
             "Force-unwrap present in changed code",
-            Observation.OBSERVED,
+            Presence.OBSERVED,
             Severity.MAJOR,
             0.92f,
             buildEvidence(List.of(new LocationSpec("Views/StockView.swift", 42)), List.of("let u = URL(s)!")),
@@ -1314,16 +1314,16 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent asProblem = DeliveryComposer.compose(
             List.of(observed),
             WorkArtifact.PULL_REQUEST,
-            Map.of("uses-force-unwrap", Polarity.UNDESIRABLE)
+            Map.of("uses-force-unwrap", PracticeKind.BAD_PRACTICE)
         );
         DeliveryContent asStrength = DeliveryComposer.compose(List.of(observed), WorkArtifact.PULL_REQUEST, Map.of());
 
         assertThat(asProblem).isNotNull();
-        assertThat(asProblem.diffNotes()).as("UNDESIRABLE+OBSERVED is a problem → inline diff note").isNotEmpty();
+        assertThat(asProblem.diffNotes()).as("BAD_PRACTICE+OBSERVED is a problem → inline diff note").isNotEmpty();
         assertThat(asProblem.mrNote()).contains("Force-unwrap present in changed code");
 
         assertThat(asStrength).isNotNull();
-        assertThat(asStrength.diffNotes()).as("DESIRABLE+OBSERVED is a strength → no problem diff note").isEmpty();
+        assertThat(asStrength.diffNotes()).as("GOOD_PRACTICE+OBSERVED is a strength → no problem diff note").isEmpty();
     }
 
     @Test
@@ -1564,7 +1564,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding stamped = new ValidatedFinding(
             "code-hygiene",
             "Long method",
-            Observation.NOT_OBSERVED,
+            Presence.NOT_OBSERVED,
             Severity.MINOR,
             0.9f,
             buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),
@@ -1591,12 +1591,12 @@ class DeliveryComposerTest extends BaseUnitTest {
             "Views/DashboardView.swift",
             20,
             null,
-            "Add a test for the parser. The practice requires coverage for a OBSERVED verdict."
+            "Add a test for the parser. The practice requires coverage for a OBSERVED observation."
         );
         ValidatedFinding stamped = new ValidatedFinding(
             "code-hygiene",
             "Missing test",
-            Observation.NOT_OBSERVED,
+            Presence.NOT_OBSERVED,
             Severity.MINOR,
             0.9f,
             buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),

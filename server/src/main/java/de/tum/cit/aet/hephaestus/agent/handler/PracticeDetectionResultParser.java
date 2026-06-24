@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -31,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
  *     {
  *       "practiceSlug": "pr-description-quality",
  *       "title": "Good PR description",
- *       "verdict": "OBSERVED",
+ *       "observation": "OBSERVED",
  *       "severity": "INFO",
  *       "confidence": 0.95,
  *       "evidence": { ... },
@@ -292,8 +292,8 @@ public class PracticeDetectionResultParser {
             title = title.substring(0, MAX_TITLE_LENGTH - 3) + "...";
         }
 
-        // Required: verdict
-        Observation verdict = parseEnum(entry, "verdict", Observation.class);
+        // Required: observation
+        Presence observation = parseEnum(entry, "observation", Presence.class);
 
         // Optional: severity. OBSERVED and NOT_APPLICABLE carry no coaching band (coerceCoherence forces INFO),
         // and the model routinely omits severity for them — the criteria literally say "OBSERVED (no severity)".
@@ -350,7 +350,7 @@ public class PracticeDetectionResultParser {
         return new ValidatedFinding(
             practiceSlug,
             title,
-            verdict,
+            observation,
             severity,
             confidence,
             evidence,
@@ -527,7 +527,7 @@ public class PracticeDetectionResultParser {
     public record ValidatedFinding(
         String practiceSlug,
         String title,
-        Observation verdict,
+        Presence observation,
         Severity severity,
         float confidence,
         JsonNode evidence,
@@ -540,7 +540,7 @@ public class PracticeDetectionResultParser {
         public ValidatedFinding(
             String practiceSlug,
             String title,
-            Observation verdict,
+            Presence observation,
             Severity severity,
             float confidence,
             JsonNode evidence,
@@ -551,7 +551,7 @@ public class PracticeDetectionResultParser {
             this(
                 practiceSlug,
                 title,
-                verdict,
+                observation,
                 severity,
                 confidence,
                 evidence,
@@ -567,7 +567,7 @@ public class PracticeDetectionResultParser {
             return new ValidatedFinding(
                 practiceSlug,
                 title,
-                verdict,
+                observation,
                 severity,
                 confidence,
                 evidence,
@@ -579,10 +579,10 @@ public class PracticeDetectionResultParser {
         }
 
         /**
-         * Returns a copy with {@code (verdict, severity)} coerced to the system's coherence invariants,
+         * Returns a copy with {@code (observation, severity)} coerced to the system's coherence invariants,
          * independent of what the (weak) model emitted:
          * <ol>
-         *   <li><b>Defect-detector has no OBSERVED verdict.</b> A practice declaring {@code DEFECT-DETECTOR
+         *   <li><b>Defect-detector has no OBSERVED observation.</b> A practice declaring {@code DEFECT-DETECTOR
          *       DISCIPLINE} flags a defect (NOT_OBSERVED) or abstains (NOT_APPLICABLE); a model-emitted OBSERVED
          *       there is a clean-bill-of-health that would ship as a false strength — coerce it to NOT_APPLICABLE.</li>
          *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a NOT_OBSERVED gap; OBSERVED and
@@ -605,18 +605,18 @@ public class PracticeDetectionResultParser {
          * delivery-only here; the persisted band on the immutable finding is unchanged.
          */
         public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
-            Observation v = verdict;
+            Presence v = observation;
             String r = reasoning;
-            if (isDefectDetector && v == Observation.OBSERVED) {
-                v = Observation.NOT_APPLICABLE;
-                r = "[auto-downgraded: defect-detector practice has no OBSERVED verdict] " + reasoning;
+            if (isDefectDetector && v == Presence.OBSERVED) {
+                v = Presence.NOT_APPLICABLE;
+                r = "[auto-downgraded: defect-detector practice has no OBSERVED observation] " + reasoning;
             }
             Severity s =
-                v == Observation.NOT_OBSERVED ? (severity == Severity.INFO ? Severity.MINOR : severity) : Severity.INFO;
-            if (advisoryOnly && v == Observation.NOT_OBSERVED && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
+                v == Presence.NOT_OBSERVED ? (severity == Severity.INFO ? Severity.MINOR : severity) : Severity.INFO;
+            if (advisoryOnly && v == Presence.NOT_OBSERVED && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
                 s = Severity.MINOR;
             }
-            if (v == verdict && s == severity) {
+            if (v == observation && s == severity) {
                 return this;
             }
             return new ValidatedFinding(

@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -60,9 +60,9 @@ public class FindingReactionService {
         UUID findingId,
         CreateFindingReactionDTO request
     ) {
-        PracticeFinding finding = findingRepository
+        Observation finding = findingRepository
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
+            .orElseThrow(() -> new EntityNotFoundException("Observation", findingId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
         if (!finding.getDeveloper().getId().equals(currentUser.getId())) {
@@ -76,17 +76,17 @@ public class FindingReactionService {
             throw new IllegalArgumentException("Explanation is required when disputing a finding");
         }
 
-        FindingReaction reaction = FindingReaction.builder()
+        Reaction reaction = Reaction.builder()
             .finding(finding)
             .findingId(findingId)
             .developer(currentUser)
             .developerId(currentUser.getId())
             .action(request.action())
             .explanation(request.explanation())
-            .findingFingerprint(finding.getFindingFingerprint()) // A2: denormalize the stable locus at write time
+            .recurrenceKey(finding.getRecurrenceKey()) // A2: denormalize the stable locus at write time
             .build();
 
-        FindingReaction saved = reactionRepository.save(reaction);
+        Reaction saved = reactionRepository.save(reaction);
         log.info(
             "Recorded reaction: findingId={}, action={}, developerId={}",
             findingId,
@@ -104,7 +104,7 @@ public class FindingReactionService {
         // Verify finding exists in this workspace
         findingRepository
             .findByIdAndWorkspaceId(findingId, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
+            .orElseThrow(() -> new EntityNotFoundException("Observation", findingId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
         return reactionRepository
@@ -123,7 +123,7 @@ public class FindingReactionService {
             .countByDeveloperAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
             .forEach(p -> counts.put(p.getAction(), p.getCount()));
         return new FindingReactionEngagementDTO(
-            counts.getOrDefault(FindingReactionAction.ENACTED, 0L),
+            counts.getOrDefault(FindingReactionAction.ADDRESSED, 0L),
             counts.getOrDefault(FindingReactionAction.DISPUTED, 0L),
             counts.getOrDefault(FindingReactionAction.NOT_APPLICABLE, 0L)
         );
@@ -143,6 +143,6 @@ public class FindingReactionService {
         return reactionRepository
             .findLatestByFindingIdsAndDeveloper(findingIds, developerId)
             .stream()
-            .collect(Collectors.toMap(FindingReaction::getFindingId, FindingReactionDTO::from));
+            .collect(Collectors.toMap(Reaction::getFindingId, FindingReactionDTO::from));
     }
 }

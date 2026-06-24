@@ -22,10 +22,10 @@ import org.hibernate.annotations.Immutable;
 /**
  * Immutable record of one synthesised unit of feedback delivered (or withheld) for a single recipient.
  *
- * <p>Where a {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding} is the raw, audience-neutral
+ * <p>Where a {@link de.tum.cit.aet.hephaestus.practices.model.Observation} is the raw, audience-neutral
  * observation an agent made, a {@code Feedback} is the author-facing (or reviewer-facing) <em>delivery</em> of
  * one or more of those findings: it carries the rendered body, the surface it was placed on, the synthesis
- * provenance, and its delivery {@link FeedbackDeliveryState}. Findings are linked through the {@code FeedbackFinding}
+ * provenance, and its delivery {@link FeedbackDeliveryState}. Findings are linked through the {@code FeedbackObservation}
  * join and physically placed through {@code FeedbackPlacement} rows — see ADR 0021 (findings↔feedback synthesis seam).
  *
  * <p>Append-only for research-data integrity: a re-run that re-synthesises the same delivery unit inserts a new
@@ -37,7 +37,7 @@ import org.hibernate.annotations.Immutable;
  * {@code @ManyToOne} — to avoid a Spring Modulith cycle between {@code practices} and the {@code agent} /
  * {@code workspace} / {@code scm} modules. The corresponding FK constraints are managed by Liquibase at the DB level.
  *
- * <p>Follows the {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding} pattern: {@code @Immutable},
+ * <p>Follows the {@link de.tum.cit.aet.hephaestus.practices.model.Observation} pattern: {@code @Immutable},
  * UUID PK assigned in {@code @PrePersist}, snake_case columns, string-stored enums.
  *
  * @see FeedbackDeliveryState for the delivery lifecycle
@@ -117,7 +117,7 @@ public class Feedback {
 
     /**
      * The user this feedback is <em>about</em> — ALWAYS populated (symmetry with
-     * {@code PracticeFinding.subjectUserId} and xAPI's mandatory, unambiguous Actor). Equals
+     * {@code Observation.subjectUserId} and xAPI's mandatory, unambiguous Actor). Equals
      * {@link #recipientUserId} for the common author-side case; differs when the unit is about someone other
      * than its recipient (e.g. reviewer-side feedback). The former "nullable defaulting to recipient" was
      * collapsed to an explicit value so every reader can trust the column without a fallback.

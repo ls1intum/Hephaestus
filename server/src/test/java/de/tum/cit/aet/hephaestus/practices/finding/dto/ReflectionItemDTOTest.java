@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -16,12 +16,12 @@ class ReflectionItemDTOTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private static PracticeFinding finding(String evidenceJson) {
-        return PracticeFinding.builder()
+    private static Observation finding(String evidenceJson) {
+        return Observation.builder()
             .id(UUID.randomUUID())
             .title("Distance-warning logic ships with no test")
             .severity(Severity.MAJOR)
-            .verdict(Observation.NOT_OBSERVED)
+            .observation(Presence.NOT_OBSERVED)
             .artifactType(WorkArtifact.PULL_REQUEST)
             .artifactId(575L)
             .evidence(evidenceJson == null ? null : MAPPER.readTree(evidenceJson))

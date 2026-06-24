@@ -11,7 +11,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.REPO_MOUNT_RE
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
@@ -97,14 +97,14 @@ class DeliveryComposer {
         PRECOMPUTE_OUT_PREFIX
     );
 
-    /** A finding is a problem when its practice's polarity says so (slug absent → {@link Polarity#DESIRABLE}). */
-    private static boolean isProblem(ValidatedFinding f, Map<String, Polarity> polarityBySlug) {
-        return polarityBySlug.getOrDefault(f.practiceSlug(), Polarity.DESIRABLE).isProblem(f.verdict());
+    /** A finding is a problem when its practice's kind says so (slug absent → {@link PracticeKind#GOOD_PRACTICE}). */
+    private static boolean isProblem(ValidatedFinding f, Map<String, PracticeKind> polarityBySlug) {
+        return polarityBySlug.getOrDefault(f.practiceSlug(), PracticeKind.GOOD_PRACTICE).isProblem(f.observation());
     }
 
-    /** A finding is a strength when its practice's polarity says so (slug absent → {@link Polarity#DESIRABLE}). */
-    private static boolean isStrength(ValidatedFinding f, Map<String, Polarity> polarityBySlug) {
-        return polarityBySlug.getOrDefault(f.practiceSlug(), Polarity.DESIRABLE).isStrength(f.verdict());
+    /** A finding is a strength when its practice's kind says so (slug absent → {@link PracticeKind#GOOD_PRACTICE}). */
+    private static boolean isStrength(ValidatedFinding f, Map<String, PracticeKind> polarityBySlug) {
+        return polarityBySlug.getOrDefault(f.practiceSlug(), PracticeKind.GOOD_PRACTICE).isStrength(f.observation());
     }
 
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
@@ -114,8 +114,8 @@ class DeliveryComposer {
     }
 
     /**
-     * Compose for a specific artifact, treating every practice as {@link Polarity#DESIRABLE}. Retained for
-     * call sites and tests that do not resolve per-practice polarity.
+     * Compose for a specific artifact, treating every practice as {@link PracticeKind#GOOD_PRACTICE}. Retained for
+     * call sites and tests that do not resolve per-practice kind.
      */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
@@ -126,9 +126,9 @@ class DeliveryComposer {
      * Compose feedback for a specific artifact. The blocking call-to-action is artifact-aware: a PR
      * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged).
      *
-     * <p>{@code polarityBySlug} supplies each practice's {@link Polarity} so "is this finding a problem
+     * <p>{@code polarityBySlug} supplies each practice's {@link PracticeKind} so "is this finding a problem
      * vs a strength?" is decided sign-correctly (ADR 0021, F-6) instead of assuming every
-     * {@code NOT_OBSERVED} is a gap. A slug absent from the map defaults to {@link Polarity#DESIRABLE},
+     * {@code NOT_OBSERVED} is a gap. A slug absent from the map defaults to {@link PracticeKind#GOOD_PRACTICE},
      * which — because every catalogued practice is desirable — keeps behaviour identical when no
      * map is supplied.
      */
@@ -136,7 +136,7 @@ class DeliveryComposer {
     static DeliveryContent compose(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, Polarity> polarityBySlug
+        Map<String, PracticeKind> polarityBySlug
     ) {
         return compose(findings, artifact, polarityBySlug, Map.of());
     }
@@ -152,7 +152,7 @@ class DeliveryComposer {
     static DeliveryContent compose(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, Polarity> polarityBySlug,
+        Map<String, PracticeKind> polarityBySlug,
         Map<String, String> whyBySlug
     ) {
         // First-pass compose: inline notes have not been posted yet, so NO finding is known-delivered.
@@ -173,7 +173,7 @@ class DeliveryComposer {
     static String recomposeMrNote(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, Polarity> polarityBySlug,
+        Map<String, PracticeKind> polarityBySlug,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
@@ -185,7 +185,7 @@ class DeliveryComposer {
     private static DeliveryContent compose(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, Polarity> polarityBySlug,
+        Map<String, PracticeKind> polarityBySlug,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
@@ -534,20 +534,20 @@ class DeliveryComposer {
      * Marks a sentence as pure grading-mechanics meta — if any of these appears, the whole sentence is
      * the grader explaining the rubric to itself, not feedback to the student, so it is dropped wholesale.
      * Catches grading-meta phrasings the detection model can emit: "the practice requires…", "for a OBSERVED
-     * verdict", "MINOR severity level/band", "acceptable upper band", "according to/violating the
+     * observation", "MINOR severity level/band", "acceptable upper band", "according to/violating the
      * practice", "…line threshold".
      */
     private static final Pattern GRADING_SENTENCE = Pattern.compile(
         "(?i)(" +
             "\\bthe\\s+practice\\s+(?:requires|defines|expects|mandates|deems|treats|considers|states|flags)\\b|" +
             "\\b(?:according to|per|under|following|violat\\w+|satisf\\w+|fail\\w*)\\s+the\\s+practice\\b|" +
-            "\\b(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding|result|rating)\\b|" +
-            "\\b(?:for|to|a|an|the)\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:verdict|finding)\\b|" +
+            "\\b(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:observation|finding|result|rating)\\b|" +
+            "\\b(?:for|to|a|an|the)\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\s+(?:observation|finding)\\b|" +
             "\\b(?:MINOR|MAJOR|INFO|CRITICAL)\\s+(?:severity|band|bucket|tier)\\b|" +
             "\\bseverity\\s+(?:level|band|bucket|rating)\\b|" +
             "\\b(?:upper|lower|acceptable)\\s+band\\b|" +
             "\\b[≤<=>]*\\s*\\d+[\\s-]*(?:line|file)s?\\s+threshold\\b|" +
-            "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:verdict|finding)\\b|" +
+            "\\bthreshold\\s+for\\s+a\\s+\\w+\\s+(?:observation|finding)\\b|" +
             // Rubric-mechanics / criteria-computation phrasings the model can echo (it repeats the
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
@@ -589,10 +589,10 @@ class DeliveryComposer {
             "\\bcarve-out\\b|" +
             "\\bthreshold\\s+for\\s+downgrade\\b|\\b\\d+%\\s+threshold\\b|" +
             "\\bis\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\s*(?:\\([^)]*\\)\\s*)?,?\\s+not\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // "is MINOR, not MAJOR" — tolerate an intervening "(a decomposition nudge)," parenthetical
-            // Verdict-justification phrasings the model can emit verbatim: the grader narrating WHY a
-            // verdict/severity landed. Each lesson stands on the title + guidance + the severity icon without
+            // Observation-justification phrasings the model can emit verbatim: the grader narrating WHY a
+            // observation/severity landed. Each lesson stands on the title + guidance + the severity icon without
             // this machinery — drop the whole sentence.
-            "\\bverdict\\s+is\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // "the combined verdict is NOT_OBSERVED" (enum AFTER the noun)
+            "\\bobservation\\s+is\\s+(?:OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // "the combined observation is NOT_OBSERVED" (enum AFTER the noun)
             "\\bcapped\\s+at\\s+(?:MINOR|MAJOR|INFO|CRITICAL)\\b|" + // severity-cap arithmetic: "even a fully absent rationale would be capped at MINOR"
             "\\bumbrella\\s+calibration\\b|" + // "Per the umbrella calibration … is MINOR"
             "\\breason\\s+connective\\b|" + // "no sentence uses a reason connective such as 'so that', 'because' …"

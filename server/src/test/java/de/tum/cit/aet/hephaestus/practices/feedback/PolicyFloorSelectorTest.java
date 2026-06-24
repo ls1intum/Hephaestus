@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
@@ -62,8 +62,8 @@ class PolicyFloorSelectorTest extends BaseUnitTest {
         assertThat(p.dropped()).isEmpty();
     }
 
-    private static PracticeFinding f(Severity severity, float confidence) {
-        PracticeFinding pf = mock(PracticeFinding.class);
+    private static Observation f(Severity severity, float confidence) {
+        Observation pf = mock(Observation.class);
         lenient().when(pf.getSeverity()).thenReturn(severity);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
         lenient().when(pf.getId()).thenReturn(UUID.randomUUID());

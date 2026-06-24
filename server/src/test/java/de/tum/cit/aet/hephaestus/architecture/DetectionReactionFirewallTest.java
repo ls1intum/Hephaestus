@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins the #895 research-integrity firewall: the detection-context assembly must be REACTION-BLIND.
  *
- * <p><b>Why this matters (ADR 0021, F-9).</b> {@code FindingReaction} records whether a contributor
+ * <p><b>Why this matters (ADR 0021, F-9).</b> {@code Reaction} records whether a contributor
  * previously {@code ENACTED}/{@code DISPUTED}/{@code NOT_APPLICABLE}'d a finding. If any of that
  * reaches the sandbox the detector reads, the AI could learn to agree with whatever the contributor
  * accepted and contaminate the accuracy measurement the thesis depends on — so a finding must be

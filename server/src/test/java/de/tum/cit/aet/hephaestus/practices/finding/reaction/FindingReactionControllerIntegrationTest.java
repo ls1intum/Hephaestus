@@ -11,9 +11,9 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -59,7 +59,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     private Workspace workspace;
     private User adminUser;
-    private PracticeFinding finding;
+    private Observation finding;
 
     @BeforeEach
     void setUpTestData() {
@@ -87,19 +87,19 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         agentJob = agentJobRepository.save(agentJob);
 
         // Create a practice finding with the admin user as developer
-        finding = PracticeFinding.builder()
-            .idempotencyKey("test-key-" + UUID.randomUUID())
+        finding = Observation.builder()
+            .occurrenceKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
             .practice(practice)
             .artifactType(WorkArtifact.PULL_REQUEST)
             .artifactId(42L)
             .developer(adminUser)
-            .subjectUserId(adminUser.getId())
+            .aboutUserId(adminUser.getId())
             .title("Missing error handling")
-            .verdict(Observation.NOT_OBSERVED)
+            .observation(Presence.NOT_OBSERVED)
             .severity(Severity.MAJOR)
             .confidence(0.85f)
-            .detectedAt(Instant.now())
+            .observedAt(Instant.now())
             .build();
         practiceFindingRepository.save(finding);
     }
@@ -113,7 +113,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @WithAdminUser
         void appliedReturns201() {
-            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
 
             FindingReactionDTO response = webTestClient
                 .post()
@@ -129,7 +129,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.action()).isEqualTo(FindingReactionAction.ENACTED);
+            assertThat(response.action()).isEqualTo(FindingReactionAction.ADDRESSED);
             assertThat(response.findingId()).isEqualTo(finding.getId());
             assertThat(response.id()).isNotNull();
             assertThat(response.createdAt()).isNotNull();
@@ -177,7 +177,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @WithAdminUser
         void appendOnlyCreatesNewRow() {
-            var request1 = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
+            var request1 = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
             var request2 = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "Changed my mind");
 
             // First feedback
@@ -209,7 +209,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @Test
         @WithAdminUser
         void nonExistentFindingReturns404() {
-            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
 
             webTestClient
                 .post()
@@ -229,7 +229,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
-            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
 
             webTestClient
                 .post()
@@ -244,7 +244,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         void unauthenticatedMutationRejected() {
-            var request = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
+            var request = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
 
             // Anonymous POST → the double-submit CSRF gate (ADR 0017) rejects it 403 before auth runs
             // (no X-XSRF-TOKEN). The mutation stays blocked for anonymous callers.
@@ -293,7 +293,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithAdminUser
         void returnsLatestAfterMultipleSubmissions() {
             // Submit two feedbacks
-            var request1 = new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null);
+            var request1 = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
             var request2 = new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "Actually wrong");
 
             webTestClient
@@ -349,7 +349,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null))
+                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null))
                 .exchange()
                 .expectStatus()
                 .isCreated();
@@ -372,7 +372,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.enacted()).isZero();
+            assertThat(response.addressed()).isZero();
             assertThat(response.disputed()).isZero();
             assertThat(response.notApplicable()).isZero();
         }
@@ -398,7 +398,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.enacted()).isZero();
+            assertThat(response.addressed()).isZero();
             assertThat(response.disputed()).isZero();
             assertThat(response.notApplicable()).isZero();
         }
@@ -412,7 +412,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.ENACTED, null))
+                .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null))
                 .exchange()
                 .expectStatus()
                 .isCreated();
@@ -439,7 +439,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.enacted()).isEqualTo(1);
+            assertThat(response.addressed()).isEqualTo(1);
             assertThat(response.disputed()).isEqualTo(1);
             assertThat(response.notApplicable()).isZero();
         }

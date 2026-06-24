@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -192,7 +192,7 @@ public class PracticeDetectionDeliveryService {
                 developerId,
                 subjectUserId,
                 finding.title(),
-                finding.verdict().name(),
+                finding.observation().name(),
                 finding.severity().name(),
                 finding.confidence(),
                 evidenceJson,
@@ -206,10 +206,10 @@ public class PracticeDetectionDeliveryService {
             } else {
                 discardedDuplicate++;
             }
-            // Track negative findings based on verdict, not insert result.
+            // Track negative findings based on observation, not insert result.
             // Critical for retry delivery: on retry, insertIfAbsent returns 0 for existing
             // findings, but we still need correct hasNegative for the delivery gate.
-            if (finding.verdict() == Observation.NOT_OBSERVED) {
+            if (finding.observation() == Presence.NOT_OBSERVED) {
                 hasNegative = true;
             }
         }

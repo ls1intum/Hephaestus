@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -76,8 +76,8 @@ class ProgressFooterRendererTest extends BaseUnitTest {
     }
 
     private static LocusTransition transition(String key, TransitionStatus status, String title, String slug) {
-        Observation prior = status == TransitionStatus.NEW ? null : Observation.NOT_OBSERVED;
-        Observation curr = status == TransitionStatus.RESOLVED ? null : Observation.NOT_OBSERVED;
+        Presence prior = status == TransitionStatus.NEW ? null : Presence.NOT_OBSERVED;
+        Presence curr = status == TransitionStatus.RESOLVED ? null : Presence.NOT_OBSERVED;
         return new LocusTransition(key, status, slug, title, prior, curr, Severity.MAJOR, 0.8f);
     }
 }

@@ -12,9 +12,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -114,10 +114,10 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result).isEqualTo(1);
 
-            PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
-            assertThat(found.getIdempotencyKey()).isEqualTo("key-1");
+            Observation found = practiceFindingRepository.findById(id).orElseThrow();
+            assertThat(found.getOccurrenceKey()).isEqualTo("key-1");
             assertThat(found.getTitle()).isEqualTo("Good PR description");
-            assertThat(found.getVerdict().name()).isEqualTo("OBSERVED");
+            assertThat(found.getObservation().name()).isEqualTo("OBSERVED");
             assertThat(found.getSeverity().name()).isEqualTo("INFO");
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
@@ -202,7 +202,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result).isEqualTo(1);
 
-            PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
+            Observation found = practiceFindingRepository.findById(id).orElseThrow();
             assertThat(found.getEvidence()).isNotNull();
             assertThat(found.getEvidence().get("files").get(0).asString()).isEqualTo("src/Main.java");
             assertThat(found.getEvidence().get("diff_lines").asInt()).isEqualTo(42);
@@ -310,9 +310,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceFindingRepository.deleteAllByPracticeWorkspaceId(workspace.getId());
 
             // Workspace B's finding must survive
-            List<PracticeFinding> remaining = practiceFindingRepository.findAll();
+            List<Observation> remaining = practiceFindingRepository.findAll();
             assertThat(remaining).hasSize(1);
-            assertThat(remaining.get(0).getIdempotencyKey()).isEqualTo("ws-b-key");
+            assertThat(remaining.get(0).getOccurrenceKey()).isEqualTo("ws-b-key");
         }
     }
 
@@ -376,9 +376,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             practiceRepository.flush();
 
             // Only the finding for the deleted practice should be gone
-            List<PracticeFinding> remaining = practiceFindingRepository.findAll();
+            List<Observation> remaining = practiceFindingRepository.findAll();
             assertThat(remaining).hasSize(1);
-            assertThat(remaining.get(0).getIdempotencyKey()).isEqualTo("cascade-key-2");
+            assertThat(remaining.get(0).getOccurrenceKey()).isEqualTo("cascade-key-2");
         }
     }
 
@@ -408,11 +408,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 workspace.getId()
             );
 
-            assertThat(result).hasSize(2); // One row per (slug, verdict) combination
+            assertThat(result).hasSize(2); // One row per (slug, observation) combination
 
             DeveloperPracticeSummary negative = result
                 .stream()
-                .filter(s -> s.getVerdict() == Observation.NOT_OBSERVED)
+                .filter(s -> s.getObservation() == Presence.NOT_OBSERVED)
                 .findFirst()
                 .orElseThrow();
             assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
@@ -421,7 +421,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             DeveloperPracticeSummary positive = result
                 .stream()
-                .filter(s -> s.getVerdict() == Observation.OBSERVED)
+                .filter(s -> s.getObservation() == Presence.OBSERVED)
                 .findFirst()
                 .orElseThrow();
             assertThat(positive.getCount()).isEqualTo(1);
@@ -561,7 +561,12 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         /** Helper to insert a finding with minimal boilerplate. */
-        private void insertFinding(String idempotencyKey, Practice targetPractice, String verdict, Instant detectedAt) {
+        private void insertFinding(
+            String idempotencyKey,
+            Practice targetPractice,
+            String observation,
+            Instant detectedAt
+        ) {
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 idempotencyKey,
@@ -573,7 +578,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 developer.getId(),
                 developer.getId(),
                 "Test finding",
-                verdict,
+                observation,
                 "INFO",
                 0.9f,
                 null,
@@ -595,7 +600,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             return agentJobRepository.save(job);
         }
 
-        private void insertForJob(String key, UUID jobId, long artifactId, String verdict, Instant detectedAt) {
+        private void insertForJob(String key, UUID jobId, long artifactId, String observation, Instant detectedAt) {
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 key,
@@ -607,7 +612,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 developer.getId(),
                 developer.getId(),
                 "finding",
-                verdict,
+                observation,
                 "INFO",
                 0.9f,
                 null,
@@ -687,7 +692,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 Instant.now()
             );
 
-            PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
+            Observation found = practiceFindingRepository.findById(id).orElseThrow();
             assertThat(found.getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
         }
     }

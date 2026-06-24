@@ -14,15 +14,15 @@ import org.springframework.stereotype.Repository;
  * Repository for immutable finding reaction with append-only semantics.
  *
  * <p>Workspace-agnostic: reaction is scoped through
- * {@code FindingReaction.finding → PracticeFinding.practice → Practice.workspace}.
+ * {@code Reaction.finding → Observation.practice → Practice.workspace}.
  */
 @Repository
-@WorkspaceAgnostic("Reaction scoped through PracticeFinding -> Practice.workspace relationship")
-public interface FindingReactionRepository extends JpaRepository<FindingReaction, UUID> {
+@WorkspaceAgnostic("Reaction scoped through Observation -> Practice.workspace relationship")
+public interface FindingReactionRepository extends JpaRepository<Reaction, UUID> {
     /**
      * Returns the most recent reaction for a specific finding by a specific developer.
      */
-    Optional<FindingReaction> findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(UUID findingId, Long developerId);
+    Optional<Reaction> findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(UUID findingId, Long developerId);
 
     /**
      * Returns the latest reaction per finding for a given developer, using PostgreSQL's
@@ -33,14 +33,14 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
     @Query(
         value = """
         SELECT DISTINCT ON (ff.finding_id) ff.*
-        FROM finding_reaction ff
+        FROM reaction ff
         WHERE ff.finding_id IN (:findingIds)
           AND ff.developer_id = :developerId
         ORDER BY ff.finding_id, ff.created_at DESC
         """,
         nativeQuery = true
     )
-    List<FindingReaction> findLatestByFindingIdsAndDeveloper(
+    List<Reaction> findLatestByFindingIdsAndDeveloper(
         @Param("findingIds") Collection<UUID> findingIds,
         @Param("developerId") Long developerId
     );
@@ -53,15 +53,15 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
      */
     @Query(
         value = """
-        SELECT DISTINCT ON (fr.finding_fingerprint) fr.*
-        FROM finding_reaction fr
-        WHERE fr.finding_fingerprint IN (:findingFingerprints)
+        SELECT DISTINCT ON (fr.recurrence_key) fr.*
+        FROM reaction fr
+        WHERE fr.recurrence_key IN (:findingFingerprints)
           AND fr.developer_id = :developerId
-        ORDER BY fr.finding_fingerprint, fr.created_at DESC
+        ORDER BY fr.recurrence_key, fr.created_at DESC
         """,
         nativeQuery = true
     )
-    List<FindingReaction> findLatestByFindingFingerprintsAndDeveloper(
+    List<Reaction> findLatestByFindingFingerprintsAndDeveloper(
         @Param("findingFingerprints") Collection<String> findingFingerprints,
         @Param("developerId") Long developerId
     );
@@ -75,7 +75,7 @@ public interface FindingReactionRepository extends JpaRepository<FindingReaction
     @Query(
         """
         SELECT ff.action AS action, COUNT(ff) AS count
-        FROM FindingReaction ff
+        FROM Reaction ff
         JOIN ff.finding f
         JOIN f.practice p
         WHERE ff.developerId = :developerId

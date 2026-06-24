@@ -31,7 +31,7 @@ import org.hibernate.annotations.OnDeleteAction;
  * edits were destructive, no past finding could be reproduced against the rubric that actually fired it.
  * This is Slowly-Changing-Dimension Type 2 over {@code criteria}: each edit appends a revision;
  * {@link Practice#getCriteria()} remains the current projection, so no read path breaks.
- * {@code PracticeFinding.practiceRevision} pins each finding to the revision the detector saw
+ * {@code Observation.practiceRevision} pins each finding to the revision the detector saw
  * (pre-versioning findings pin {@code null} — an honest "pre-versioning" marker).
  */
 @Entity

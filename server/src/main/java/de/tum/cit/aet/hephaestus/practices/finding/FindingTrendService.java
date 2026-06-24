@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.Loc
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -104,18 +104,18 @@ public class FindingTrendService {
             LocusFinding curr = currMap.get(key);
             if (prior == null) {
                 // present now, absent prior → NEW
-                transitions.add(transition(key, TransitionStatus.NEW, curr, null, curr.getVerdict()));
+                transitions.add(transition(key, TransitionStatus.NEW, curr, null, curr.getObservation()));
             } else if (curr == null) {
                 // present prior, absent now → RESOLVED (render the prior prose — it's what the student last saw)
-                transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getVerdict(), null));
+                transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getObservation(), null));
             } else {
                 // present in both — PERSISTED, unless it backslid OBSERVED→NOT_OBSERVED (REGRESSED).
-                // NOT_OBSERVED→OBSERVED is an IMPROVEMENT, not a regression: it stays PERSISTED but currentVerdict
+                // NOT_OBSERVED→OBSERVED is an IMPROVEMENT, not a regression: it stays PERSISTED but currentObservation
                 // carries OBSERVED so B1 can render "now satisfied".
                 boolean regressed =
-                    prior.getVerdict() == Observation.OBSERVED && curr.getVerdict() == Observation.NOT_OBSERVED;
+                    prior.getObservation() == Presence.OBSERVED && curr.getObservation() == Presence.NOT_OBSERVED;
                 TransitionStatus status = regressed ? TransitionStatus.REGRESSED : TransitionStatus.PERSISTED;
-                transitions.add(transition(key, status, curr, prior.getVerdict(), curr.getVerdict()));
+                transitions.add(transition(key, status, curr, prior.getObservation(), curr.getObservation()));
             }
         }
         transitions.sort(
@@ -130,16 +130,16 @@ public class FindingTrendService {
         String key,
         TransitionStatus status,
         LocusFinding represent,
-        Observation priorVerdict,
-        Observation currentVerdict
+        Presence priorObservation,
+        Presence currentObservation
     ) {
         return new LocusTransition(
             key,
             status,
             represent.getPracticeSlug(),
             represent.getTitle(),
-            priorVerdict,
-            currentVerdict,
+            priorObservation,
+            currentObservation,
             represent.getSeverity(),
             represent.getConfidence()
         );
@@ -149,7 +149,7 @@ public class FindingTrendService {
     private static Map<String, LocusFinding> collapse(List<LocusFinding> run) {
         Map<String, LocusFinding> map = new LinkedHashMap<>();
         for (LocusFinding lf : run) {
-            map.merge(lf.getFindingFingerprint(), lf, FindingTrendService::worse);
+            map.merge(lf.getRecurrenceKey(), lf, FindingTrendService::worse);
         }
         return map;
     }

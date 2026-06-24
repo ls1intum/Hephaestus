@@ -13,10 +13,10 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for the immutable {@link FeedbackFinding} M:N join binding a {@link Feedback} unit to the
- * {@link de.tum.cit.aet.hephaestus.practices.model.PracticeFinding}s it was composed from.
+ * Repository for the immutable {@link FeedbackObservation} M:N join binding a {@link Feedback} unit to the
+ * {@link de.tum.cit.aet.hephaestus.practices.model.Observation}s it was composed from.
  *
- * <p>Written via a native {@code ON CONFLICT DO NOTHING} upsert (mirrors {@code PracticeFinding
+ * <p>Written via a native {@code ON CONFLICT DO NOTHING} upsert (mirrors {@code Observation
  * .insertIfAbsent}) — the {@code @EmbeddedId}/{@code @MapsId} entity is awkward to build for a plain
  * {@code save()}, and the native path is race-safe on a recorder retry.
  *
@@ -24,15 +24,15 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link Feedback} (which holds {@code workspace_id}), so callers tenant-scope at the {@code Feedback} level.
  */
 @Repository
-@WorkspaceAgnostic("FeedbackFinding is a join row scoped through its parent Feedback's workspace_id, not its own")
-public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding, FeedbackFinding.Id> {
+@WorkspaceAgnostic("FeedbackObservation is a join row scoped through its parent Feedback's workspace_id, not its own")
+public interface FeedbackFindingRepository extends JpaRepository<FeedbackObservation, FeedbackObservation.Id> {
     @Modifying
     @Transactional
     @Query(
         value = """
-        INSERT INTO feedback_finding (feedback_id, finding_id, evidence_role, ordinal)
+        INSERT INTO feedback_observation (feedback_id, observation_id, role, ordinal)
         VALUES (:feedbackId, :findingId, :evidenceRole, :ordinal)
-        ON CONFLICT (feedback_id, finding_id) DO NOTHING
+        ON CONFLICT (feedback_id, observation_id) DO NOTHING
         """,
         nativeQuery = true
     )
@@ -50,7 +50,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
      */
     @Query(
         value = """
-        SELECT ff.finding_id FROM feedback_finding ff
+        SELECT ff.observation_id FROM feedback_observation ff
         JOIN feedback f ON f.id = ff.feedback_id
         WHERE f.agent_job_id = :agentJobId AND f.delivery_state = 'SUPPRESSED'
         """,
@@ -60,7 +60,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
 
     /**
      * The DELIVERED feedback body bound to each of the given findings — the developer's advice source for the
-     * read surfaces (reflection dashboard, finding detail). Per ADR 0021 the immutable {@code PracticeFinding}
+     * read surfaces (reflection dashboard, finding detail). Per ADR 0021 the immutable {@code Observation}
      * carries evidence + observation + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
      * and read back from {@code rendered_body} here.
      *
@@ -74,7 +74,7 @@ public interface FeedbackFindingRepository extends JpaRepository<FeedbackFinding
         SELECT ff.finding.id AS findingId,
                ff.feedback.body AS body,
                ff.feedback.createdAt AS feedbackCreatedAt
-        FROM FeedbackFinding ff
+        FROM FeedbackObservation ff
         WHERE ff.finding.id IN :findingIds
           AND ff.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
           AND ff.feedback.body IS NOT NULL

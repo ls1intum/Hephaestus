@@ -23,8 +23,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.time.Instant;
@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Records the delivered-feedback LEDGER (ADR 0021 C6): after the hardened delivery path posts the MR/issue
  * summary + inline notes, this persists ONE {@link Feedback} unit (surface IN_CONTEXT) describing what was
- * actually delivered, the {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFinding}s it fused,
+ * actually delivered, the {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservation}s it fused,
  * and a {@link FeedbackPlacement} per posted comment (SUMMARY + one per inline note).
  *
  * <p><b>Non-regressing by construction.</b> This is a pure write-through side-effect invoked AFTER the
@@ -109,7 +109,7 @@ public class FeedbackLedgerRecorder {
         if (delivery == null) {
             return;
         }
-        List<PracticeFinding> findings = practiceFindingRepository.findByAgentJobId(job.getId());
+        List<Observation> findings = practiceFindingRepository.findByAgentJobId(job.getId());
         if (findings.isEmpty()) {
             return;
         }
@@ -117,7 +117,7 @@ public class FeedbackLedgerRecorder {
             return; // already recorded (job retry)
         }
 
-        PracticeFinding any = findings.get(0);
+        Observation any = findings.get(0);
         long recipientUserId = any.getDeveloper().getId();
         WorkArtifact artifactType = any.getArtifactType();
         Long artifactId = any.getArtifactId();
@@ -143,7 +143,7 @@ public class FeedbackLedgerRecorder {
                 .artifactType(artifactType)
                 .artifactId(artifactId)
                 .recipientUserId(recipientUserId)
-                .subjectUserId(any.getSubjectUserId())
+                .subjectUserId(any.getAboutUserId())
                 .channel(FeedbackSurface.IN_CONTEXT)
                 .position(IN_CONTEXT_UNIT_ORDINAL)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
@@ -167,7 +167,7 @@ public class FeedbackLedgerRecorder {
 
         // Findings already withheld earlier in the flow as SUPPRESSED (B2 reaction suppression writes its
         // REACTED_* units before this runs). Computed first so neither the DELIVERED binding NOR the policy
-        // floor re-binds them — B2 does NOT delete the PracticeFinding row, so a disputed-yet-recurring locus
+        // floor re-binds them — B2 does NOT delete the Observation row, so a disputed-yet-recurring locus
         // would otherwise land in the policy-dropped tail and get a SECOND (POLICY_FLOOR_DROP) SUPPRESSED unit.
         Set<UUID> alreadySuppressed = new HashSet<>(
             feedbackFindingRepository.findFindingIdsSuppressedForJob(job.getId())
@@ -175,12 +175,12 @@ public class FeedbackLedgerRecorder {
 
         // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the DELIVERED
         // unit — it is recorded as SUPPRESSED below. Exclude anything already suppressed so it is dropped once.
-        List<PracticeFinding> policyDropped = reviewProperties.policyFloor()
+        List<Observation> policyDropped = reviewProperties.policyFloor()
             ? PolicyFloorSelector.partition(
                   findings
                       .stream()
                       .filter(
-                          f -> f.getObservation() == Observation.NOT_OBSERVED && !alreadySuppressed.contains(f.getId())
+                          f -> f.getObservation() == Presence.NOT_OBSERVED && !alreadySuppressed.contains(f.getId())
                       )
                       .toList(),
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
@@ -189,22 +189,22 @@ public class FeedbackLedgerRecorder {
         // The DELIVERED unit binds nothing that was withheld: policy-floor-dropped this run + already-suppressed.
         Set<UUID> excludedIds = policyDropped
             .stream()
-            .map(PracticeFinding::getId)
+            .map(Observation::getId)
             .collect(Collectors.toCollection(HashSet::new));
         excludedIds.addAll(alreadySuppressed);
 
         // Bind every DELIVERED finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
-        List<PracticeFinding> assessed = findings
+        List<Observation> assessed = findings
             .stream()
-            .filter(f -> f.getObservation() != Observation.NOT_APPLICABLE)
+            .filter(f -> f.getObservation() != Presence.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
             .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
             .toList();
         int ordinal = 0;
-        for (PracticeFinding f : assessed) {
+        for (Observation f : assessed) {
             EvidenceRole role =
-                f.getObservation() == Observation.NOT_OBSERVED ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
+                f.getObservation() == Presence.NOT_OBSERVED ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
             feedbackFindingRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
@@ -273,10 +273,10 @@ public class FeedbackLedgerRecorder {
      * POLICY_FLOOR_DROP unit so an eval can exclude it rather than score a model-correct-but-policy-withheld
      * finding as a miss.
      */
-    private void recordPolicyFloor(AgentJob job, List<PracticeFinding> dropped) {
+    private void recordPolicyFloor(AgentJob job, List<Observation> dropped) {
         Instant now = Instant.now();
         int index = 0;
-        for (PracticeFinding droppedFinding : dropped) {
+        for (Observation droppedFinding : dropped) {
             int unitOrdinal = POLICY_FLOOR_UNIT_ORDINAL_BASE + index++;
             if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), unitOrdinal)) {
                 continue;
@@ -289,7 +289,7 @@ public class FeedbackLedgerRecorder {
                     .artifactType(droppedFinding.getArtifactType())
                     .artifactId(droppedFinding.getArtifactId())
                     .recipientUserId(droppedFinding.getDeveloper().getId())
-                    .subjectUserId(droppedFinding.getSubjectUserId())
+                    .subjectUserId(droppedFinding.getAboutUserId())
                     .channel(FeedbackSurface.IN_CONTEXT)
                     .position(unitOrdinal)
                     .deliveryState(FeedbackDeliveryState.SUPPRESSED)
@@ -322,7 +322,7 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<String> priorLiveSummaryRef(AgentJob job) {
-        List<PracticeFinding> findings = practiceFindingRepository.findByAgentJobId(job.getId());
+        List<Observation> findings = practiceFindingRepository.findByAgentJobId(job.getId());
         if (findings.isEmpty()) {
             return Optional.empty();
         }
@@ -352,7 +352,7 @@ public class FeedbackLedgerRecorder {
      * Best-effort: REQUIRES_NEW, callers wrap in try/catch — a ledger failure never affects delivery.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordSuppressed(AgentJob job, PracticeFinding finding, FeedbackSuppressionReason reason, int index) {
+    public void recordSuppressed(AgentJob job, Observation finding, FeedbackSuppressionReason reason, int index) {
         int unitOrdinal = SUPPRESSED_UNIT_ORDINAL_BASE + index;
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), unitOrdinal)) {
             return; // already recorded (job retry)
@@ -366,7 +366,7 @@ public class FeedbackLedgerRecorder {
                 .artifactType(finding.getArtifactType())
                 .artifactId(finding.getArtifactId())
                 .recipientUserId(finding.getDeveloper().getId())
-                .subjectUserId(finding.getSubjectUserId())
+                .subjectUserId(finding.getAboutUserId())
                 .channel(FeedbackSurface.IN_CONTEXT)
                 .position(unitOrdinal)
                 .deliveryState(FeedbackDeliveryState.SUPPRESSED)
@@ -384,7 +384,7 @@ public class FeedbackLedgerRecorder {
             job.getId(),
             feedback.getId(),
             reason,
-            finding.getFindingFingerprint()
+            finding.getRecurrenceKey()
         );
     }
 
@@ -428,7 +428,7 @@ public class FeedbackLedgerRecorder {
     }
 
     /** The stable continuity line for a finding: (target, recipient, in-context surface). */
-    private static String feedbackThreadKeyFor(PracticeFinding any) {
+    private static String feedbackThreadKeyFor(Observation any) {
         return FeedbackThreadKey.compute(
             any.getArtifactType().name(),
             any.getArtifactId(),

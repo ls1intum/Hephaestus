@@ -25,8 +25,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -77,7 +77,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     void policyFloorOn_bindsEachFindingExactlyOnce_keptToDeliveredDroppedToSuppressed() {
         // 5 MINOR problems with the cap at 3 → 3 kept (DELIVERED), 2 dropped (each its own SUPPRESSED unit).
         // The bug this guards: record() used to bind the dropped findings to BOTH units (double-count).
-        List<PracticeFinding> findings = new ArrayList<>();
+        List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             findings.add(problem(0.9f - i * 0.1f)); // distinct confidences so the cap is deterministic
         }
@@ -109,7 +109,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     @Test
     void policyFloorOff_bindsAllProblems_noSuppressedUnits() {
-        List<PracticeFinding> findings = new ArrayList<>();
+        List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             findings.add(problem(0.9f - i * 0.1f));
         }
@@ -199,7 +199,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     void b2AndPolicyFloorBothOn_aSuppressedFindingIsNeverBoundTwice() {
         // B2 × C3 interaction: a finding B2 already suppressed must NOT also be written as a POLICY_FLOOR_DROP
         // unit — it does not re-enter the policy-dropped tail, and is bound exactly once across all units.
-        List<PracticeFinding> findings = new ArrayList<>();
+        List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
             findings.add(problem(0.9f - i * 0.1f));
         }
@@ -245,18 +245,18 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         return job;
     }
 
-    private PracticeFinding problem(float confidence) {
-        PracticeFinding pf = mock(PracticeFinding.class);
+    private Observation problem(float confidence) {
+        Observation pf = mock(Observation.class);
         User developer = new User();
         developer.setId(7L);
         lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
-        lenient().when(pf.getObservation()).thenReturn(Observation.NOT_OBSERVED);
+        lenient().when(pf.getObservation()).thenReturn(Presence.NOT_OBSERVED);
         lenient().when(pf.getSeverity()).thenReturn(Severity.MINOR);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
         lenient().when(pf.getDeveloper()).thenReturn(developer);
         lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
         lenient().when(pf.getArtifactId()).thenReturn(100L);
-        lenient().when(pf.getSubjectUserId()).thenReturn(null);
+        lenient().when(pf.getAboutUserId()).thenReturn(null);
         return pf;
     }
 }

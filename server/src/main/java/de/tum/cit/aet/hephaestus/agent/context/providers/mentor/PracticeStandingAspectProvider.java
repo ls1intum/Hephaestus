@@ -9,10 +9,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.AreaStandingRow;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -129,9 +129,9 @@ public class PracticeStandingAspectProvider implements ContentProvider {
             AreaAcc a = areas.computeIfAbsent(r.getAreaSlug(), k -> new AreaAcc(k, r.getAreaName()));
             long count = r.getCount() == null ? 0 : r.getCount();
             long recent = r.getRecentCount() == null ? 0 : r.getRecentCount();
-            Observation v = r.getVerdict();
-            Polarity pol = r.getPolarity();
-            if (v == Observation.NOT_APPLICABLE) {
+            Presence v = r.getObservation();
+            PracticeKind pol = r.getKind();
+            if (v == Presence.NOT_APPLICABLE) {
                 a.naCount += count;
             } else if (pol.isProblem(v)) {
                 a.flaggedCount += count;

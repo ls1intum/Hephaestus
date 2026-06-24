@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 /**
- * The role a {@code PracticeFinding} plays within a synthesized {@code Feedback} unit.
+ * The role a {@code Observation} plays within a synthesized {@code Feedback} unit.
  *
  * <p>A feedback unit is composed of one or more findings. Exactly which finding "leads"
  * the rendered narrative versus which merely reinforces it is a synthesis-time decision,

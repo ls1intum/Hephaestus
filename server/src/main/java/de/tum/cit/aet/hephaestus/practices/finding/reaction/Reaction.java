@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -36,28 +36,28 @@ import org.hibernate.annotations.OnDeleteAction;
  * <p>Explicitly excluded from agent context (#895) — the AI must not know whether
  * a developer previously disputed a finding, to avoid contaminating accuracy measurement.
  *
- * @see PracticeFinding for the finding being reacted to
+ * @see Observation for the finding being reacted to
  * @see FindingReactionAction for the action taxonomy
  */
 @Entity
 @Immutable
 @Table(
-    name = "finding_reaction",
+    name = "reaction",
     indexes = {
-        @Index(name = "idx_finding_reaction_developer_created", columnList = "developer_id, created_at DESC"),
+        @Index(name = "idx_reaction_developer_created", columnList = "developer_id, created_at DESC"),
         @Index(
-            name = "idx_finding_reaction_finding_developer",
+            name = "idx_reaction_finding_developer",
             columnList = "finding_id, developer_id, created_at DESC"
         ),
         // A2 (ADR 0021): find a reaction by its stable locus across the detector's per-run re-detections.
-        @Index(name = "idx_finding_reaction_correlation", columnList = "finding_fingerprint"),
+        @Index(name = "idx_reaction_correlation", columnList = "recurrence_key"),
     }
 )
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FindingReaction {
+public class Reaction {
 
     @Id
     @Column(columnDefinition = "UUID")
@@ -69,9 +69,9 @@ public class FindingReaction {
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "finding_id", nullable = false, foreignKey = @ForeignKey(name = "fk_finding_reaction_finding"))
+    @JoinColumn(name = "finding_id", nullable = false, foreignKey = @ForeignKey(name = "fk_reaction_finding"))
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private PracticeFinding finding;
+    private Observation finding;
 
     /**
      * Direct access to the finding ID without triggering a lazy load on the {@link #finding} proxy.
@@ -81,15 +81,15 @@ public class FindingReaction {
     private UUID findingId;
 
     /**
-     * Denormalized copy of {@link PracticeFinding#getFindingFingerprint()} (ADR 0021 C2), captured at
+     * Denormalized copy of {@link Observation#getRecurrenceKey()} (ADR 0021 C2), captured at
      * reaction-write time. The reacted finding is EPHEMERAL — a new row each run — so its FK alone cannot
-     * locate this reaction on a later run; the {@code finding_fingerprint} is the stable (practice, target,
+     * locate this reaction on a later run; the {@code recurrence_key} is the stable (practice, target,
      * subject, file) locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE
      * reaction against a re-detected finding. Nullable: a reaction whose source finding predates C2 (null
      * key) stays null and simply cannot participate in B2.
      */
-    @Column(name = "finding_fingerprint", length = 64)
-    private String findingFingerprint;
+    @Column(name = "recurrence_key", length = 64)
+    private String recurrenceKey;
 
     /**
      * The developer who submitted this reaction. No cascade — users are long-lived
@@ -101,7 +101,7 @@ public class FindingReaction {
     @JoinColumn(
         name = "developer_id",
         nullable = false,
-        foreignKey = @ForeignKey(name = "fk_finding_reaction_developer")
+        foreignKey = @ForeignKey(name = "fk_reaction_developer")
     )
     private User developer;
 

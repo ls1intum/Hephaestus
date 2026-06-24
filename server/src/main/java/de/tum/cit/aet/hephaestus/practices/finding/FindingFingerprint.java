@@ -9,7 +9,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Deterministic cross-run identity for a {@code PracticeFinding} (ADR 0021, C2).
+ * Deterministic cross-run identity for a {@code Observation} (ADR 0021, C2).
  *
  * <p>The correlation key answers "is this the <em>same</em> finding we surfaced on an earlier agent
  * run?" so feedback can supersede rather than re-post, and a developer's reaction history can follow

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -18,17 +18,17 @@ public final class PolicyFloorSelector {
     private PolicyFloorSelector() {}
 
     /** kept = surfaced this run; dropped = withheld by the volume cap (recorded SUPPRESSED, not delivered). */
-    public record Partition(List<PracticeFinding> kept, List<PracticeFinding> dropped) {}
+    public record Partition(List<Observation> kept, List<Observation> dropped) {}
 
     /**
      * Partition problem findings (NOT_OBSERVED) into kept vs dropped. {@code topK} bounds the non-blocking
      * tail; {@code topK <= 0} disables capping (everything kept).
      */
-    public static Partition partition(List<PracticeFinding> problemFindings, int topK) {
-        List<PracticeFinding> kept = new ArrayList<>();
-        List<PracticeFinding> dropped = new ArrayList<>();
-        List<PracticeFinding> nonBlocking = new ArrayList<>();
-        for (PracticeFinding f : problemFindings) {
+    public static Partition partition(List<Observation> problemFindings, int topK) {
+        List<Observation> kept = new ArrayList<>();
+        List<Observation> dropped = new ArrayList<>();
+        List<Observation> nonBlocking = new ArrayList<>();
+        for (Observation f : problemFindings) {
             if (isBlocking(f.getSeverity())) {
                 kept.add(f);
             } else {
@@ -40,7 +40,7 @@ public final class PolicyFloorSelector {
             return new Partition(kept, dropped);
         }
         nonBlocking.sort(
-            Comparator.comparingInt((PracticeFinding f) -> f.getSeverity().ordinal())
+            Comparator.comparingInt((Observation f) -> f.getSeverity().ordinal())
                 .thenComparing(Comparator.comparing(PolicyFloorSelector::confidence).reversed())
                 .thenComparing(f -> f.getId().toString())
         );
@@ -54,7 +54,7 @@ public final class PolicyFloorSelector {
         return s == Severity.CRITICAL || s == Severity.MAJOR;
     }
 
-    private static float confidence(PracticeFinding f) {
+    private static float confidence(Observation f) {
         return f.getConfidence() == null ? 0f : f.getConfidence();
     }
 }

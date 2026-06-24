@@ -21,7 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -605,7 +605,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             TrendDelta.TransitionStatus.RESOLVED,
             "code-hygiene",
             "Unused import removed",
-            Observation.NOT_OBSERVED,
+            Presence.NOT_OBSERVED,
             null,
             Severity.MINOR,
             0.8f

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding.reaction.dto;
 
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReaction;
+import de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -20,7 +20,7 @@ public record FindingReactionDTO(
     @Schema(description = "When the reaction was submitted", requiredMode = Schema.RequiredMode.REQUIRED)
     Instant createdAt
 ) {
-    public static FindingReactionDTO from(FindingReaction reaction) {
+    public static FindingReactionDTO from(Reaction reaction) {
         return new FindingReactionDTO(
             reaction.getId(),
             reaction.getFindingId(),

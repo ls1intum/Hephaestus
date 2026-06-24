@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository.De
 import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionPracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -58,10 +58,10 @@ public class PracticeFindingService {
      * @return empty page if user is not a synced developer
      */
     @Transactional(readOnly = true)
-    public Page<PracticeFinding> getFindings(
+    public Page<Observation> getFindings(
         Long workspaceId,
         String practiceSlug,
-        Observation verdict,
+        Presence observation,
         Pageable pageable
     ) {
         Optional<User> currentUser = userRepository.getCurrentUser();
@@ -72,7 +72,7 @@ public class PracticeFindingService {
             currentUser.get().getId(),
             workspaceId,
             practiceSlug,
-            verdict,
+            observation,
             pageable
         );
     }
@@ -108,7 +108,7 @@ public class PracticeFindingService {
      *
      * <p>Sourced from each target's LATEST review run with {@code NOT_APPLICABLE} already excluded (the
      * repository query), so the surface carries only feedback the developer can act on or be affirmed by.
-     * The problem/strength split is single-sourced through {@link Polarity}. Criteria never appears — only
+     * The problem/strength split is single-sourced through {@link PracticeKind}. Criteria never appears — only
      * the learner framing ({@code whyItMatters}/{@code whatGoodLooksLike}) does.
      *
      * @return empty list if the user is not a synced developer
@@ -120,7 +120,7 @@ public class PracticeFindingService {
             return List.of();
         }
         Instant since = Instant.now().minus(REFLECTION_LOOKBACK_DAYS, ChronoUnit.DAYS);
-        List<PracticeFinding> findings = practiceFindingRepository.findRecentByDeveloperAndWorkspace(
+        List<Observation> findings = practiceFindingRepository.findRecentByDeveloperAndWorkspace(
             currentUser.get().getId(),
             workspaceId,
             since,
@@ -131,28 +131,28 @@ public class PracticeFindingService {
         // finding-id → delivered-body map ONCE for every finding on this surface so each card's items can show
         // what was actually delivered (null when nothing was). One query, not N+1.
         Map<UUID, String> deliveredGuidance = deliveredGuidanceByFinding(
-            findings.stream().map(PracticeFinding::getId).collect(Collectors.toSet())
+            findings.stream().map(Observation::getId).collect(Collectors.toSet())
         );
 
         // Group by practice, preserving first-seen (recency) order from the query.
-        Map<String, List<PracticeFinding>> byPractice = new LinkedHashMap<>();
-        for (PracticeFinding f : findings) {
+        Map<String, List<Observation>> byPractice = new LinkedHashMap<>();
+        for (Observation f : findings) {
             byPractice.computeIfAbsent(f.getPractice().getSlug(), k -> new ArrayList<>()).add(f);
         }
 
         List<ReflectionPracticeDTO> cards = new ArrayList<>();
-        for (List<PracticeFinding> group : byPractice.values()) {
+        for (List<Observation> group : byPractice.values()) {
             Practice practice = group.get(0).getPractice();
-            Polarity polarity = practice.getPolarity();
+            PracticeKind kind = practice.getKind();
 
-            // A defect-detector practice has no OBSERVED verdict, so a persisted OBSERVED row predating the
+            // A defect-detector practice has no OBSERVED observation, so a persisted OBSERVED row predating the
             // write-time coercion must not surface here as a false "strength" — read-time guard for the dashboard.
             boolean isDefectDetector = practice.isDefectDetector();
 
             // CRITICAL (ordinal 0) first so the highest-impact item leads the card.
             List<ReflectionItemDTO> toWorkOn = group
                 .stream()
-                .filter(f -> polarity.isProblem(f.getVerdict()))
+                .filter(f -> kind.isProblem(f.getObservation()))
                 .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
@@ -161,7 +161,7 @@ public class PracticeFindingService {
                 ? List.of()
                 : group
                       .stream()
-                      .filter(f -> polarity.isStrength(f.getVerdict()))
+                      .filter(f -> kind.isStrength(f.getObservation()))
                       .limit(MAX_STRENGTHS_PER_PRACTICE)
                       .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                       .toList();
@@ -173,7 +173,7 @@ public class PracticeFindingService {
                 !toWorkOn.isEmpty() && !strengths.isEmpty()
                     ? ReflectionPracticeDTO.Standing.MIXED
                     : !toWorkOn.isEmpty()
-                        ? ReflectionPracticeDTO.Standing.NEEDS_WORK
+                        ? ReflectionPracticeDTO.Standing.DEVELOPING
                         : ReflectionPracticeDTO.Standing.STRENGTH;
 
             PracticeArea area = practice.getArea();
@@ -203,7 +203,7 @@ public class PracticeFindingService {
 
     private static int standingRank(ReflectionPracticeDTO.Standing s) {
         return switch (s) {
-            case NEEDS_WORK -> 0;
+            case DEVELOPING -> 0;
             case MIXED -> 1;
             case STRENGTH -> 2;
         };
@@ -226,14 +226,14 @@ public class PracticeFindingService {
      * @throws EntityNotFoundException if no user, or finding not found/not owned
      */
     @Transactional(readOnly = true)
-    public PracticeFinding getFinding(Long workspaceId, UUID findingId) {
+    public Observation getFinding(Long workspaceId, UUID findingId) {
         Optional<User> currentUser = userRepository.getCurrentUser();
         if (currentUser.isEmpty()) {
-            throw new EntityNotFoundException("PracticeFinding", findingId.toString());
+            throw new EntityNotFoundException("Observation", findingId.toString());
         }
         return practiceFindingRepository
             .findByIdAndDeveloperAndWorkspace(findingId, currentUser.get().getId(), workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("PracticeFinding", findingId.toString()));
+            .orElseThrow(() -> new EntityNotFoundException("Observation", findingId.toString()));
     }
 
     /**
@@ -272,7 +272,7 @@ public class PracticeFindingService {
      * Any workspace member can view PR findings (not restricted to the PR author).
      */
     @Transactional(readOnly = true)
-    public List<PracticeFinding> getFindingsForPullRequest(Long workspaceId, Long pullRequestId) {
+    public List<Observation> getFindingsForPullRequest(Long workspaceId, Long pullRequestId) {
         return practiceFindingRepository.findByPullRequestAndWorkspace(
             WorkArtifact.PULL_REQUEST,
             pullRequestId,

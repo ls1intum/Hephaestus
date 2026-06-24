@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EmbeddedId;
@@ -28,14 +28,14 @@ import org.hibernate.annotations.OnDeleteAction;
 
 /**
  * Immutable many-to-many join binding a synthesized {@code Feedback} unit to the
- * {@link PracticeFinding}s it was composed from.
+ * {@link Observation}s it was composed from.
  *
  * <p>A single feedback unit can fuse several findings (e.g. one {@link EvidenceRole#PRIMARY}
  * plus corroborating {@link EvidenceRole#SUPPORTING} ones), and a single finding can be
  * reused across feedback units that target different surfaces. The composite primary key
  * {@code (feedback_id, finding_id)} makes the binding idempotent.
  *
- * <p>Append-only: like {@link PracticeFinding}, this row is written via an {@code insertIfAbsent}
+ * <p>Append-only: like {@link Observation}, this row is written via an {@code insertIfAbsent}
  * native upsert that bypasses {@code @PrePersist}, so callers supply both halves of the
  * {@link Id} explicitly. The {@code @ManyToOne} navigations are read-only mirrors of the key
  * columns (mapped via {@link MapsId}) so loading the join never desynchronizes the PK.
@@ -44,21 +44,21 @@ import org.hibernate.annotations.OnDeleteAction;
  * sub-packages), so real {@code @ManyToOne} associations are used rather than raw-UUID FKs.
  *
  * @see Feedback for the synthesized unit being composed
- * @see PracticeFinding for the evidence being bound
+ * @see Observation for the evidence being bound
  * @see EvidenceRole for the PRIMARY/SUPPORTING weighting
  */
 @Entity
 @Immutable
 @Table(
-    name = "feedback_finding",
-    indexes = { @Index(name = "idx_feedback_finding_finding", columnList = "finding_id") }
+    name = "feedback_observation",
+    indexes = { @Index(name = "idx_feedback_observation_observation", columnList = "observation_id") }
 )
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class FeedbackFinding {
+public class FeedbackObservation {
 
     @EmbeddedId
     @EqualsAndHashCode.Include
@@ -72,26 +72,34 @@ public class FeedbackFinding {
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @MapsId("feedbackId")
-    @JoinColumn(name = "feedback_id", nullable = false, foreignKey = @ForeignKey(name = "fk_feedback_finding_feedback"))
+    @JoinColumn(
+        name = "feedback_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "fk_feedback_observation_feedback")
+    )
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Feedback feedback;
 
     /**
      * The finding bound into this feedback unit. Uses DB-level {@code ON DELETE CASCADE} so
-     * deleting a finding cleans up its composition rows. Read-only mirror of {@code id.findingId}.
+     * deleting a finding cleans up its composition rows. Read-only mirror of {@code id.observationId}.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @MapsId("findingId")
-    @JoinColumn(name = "finding_id", nullable = false, foreignKey = @ForeignKey(name = "fk_feedback_finding_finding"))
+    @MapsId("observationId")
+    @JoinColumn(
+        name = "observation_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "fk_feedback_observation_observation")
+    )
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private PracticeFinding finding;
+    private Observation finding;
 
     /** Whether this finding anchors the unit's headline ({@code PRIMARY}) or reinforces it ({@code SUPPORTING}). */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "evidence_role", length = 16, nullable = false)
-    private EvidenceRole evidenceRole;
+    @Column(name = "role", length = 16, nullable = false)
+    private EvidenceRole role;
 
     /** Stable ordering of findings within the unit (lower = earlier). */
     @NotNull
@@ -112,7 +120,7 @@ public class FeedbackFinding {
         @Column(name = "feedback_id", columnDefinition = "UUID")
         private UUID feedbackId;
 
-        @Column(name = "finding_id", columnDefinition = "UUID")
-        private UUID findingId;
+        @Column(name = "observation_id", columnDefinition = "UUID")
+        private UUID observationId;
     }
 }

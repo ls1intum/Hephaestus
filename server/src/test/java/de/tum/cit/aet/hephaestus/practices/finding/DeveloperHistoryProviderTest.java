@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,11 +56,11 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
                 List.of(
                     summary(
                         "pr-description-quality",
-                        Observation.NOT_OBSERVED,
+                        Presence.NOT_OBSERVED,
                         3,
                         Instant.parse("2026-03-20T14:30:00Z")
                     ),
-                    summary("pr-description-quality", Observation.OBSERVED, 1, Instant.parse("2026-03-18T10:00:00Z"))
+                    summary("pr-description-quality", Presence.OBSERVED, 1, Instant.parse("2026-03-18T10:00:00Z"))
                 )
             );
 
@@ -81,12 +81,12 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         void aggregatesMultiplePractices() throws Exception {
             when(practiceFindingRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("error-handling", Observation.NOT_OBSERVED, 2, Instant.parse("2026-03-18T10:15:00Z")),
-                    summary("error-handling", Observation.NOT_OBSERVED, 1, Instant.parse("2026-03-19T12:00:00Z")),
-                    summary("pr-description-quality", Observation.OBSERVED, 5, Instant.parse("2026-03-20T14:30:00Z")),
+                    summary("error-handling", Presence.NOT_OBSERVED, 2, Instant.parse("2026-03-18T10:15:00Z")),
+                    summary("error-handling", Presence.NOT_OBSERVED, 1, Instant.parse("2026-03-19T12:00:00Z")),
+                    summary("pr-description-quality", Presence.OBSERVED, 5, Instant.parse("2026-03-20T14:30:00Z")),
                     summary(
                         "pr-description-quality",
-                        Observation.NOT_OBSERVED,
+                        Presence.NOT_OBSERVED,
                         1,
                         Instant.parse("2026-03-15T08:00:00Z")
                     )
@@ -116,7 +116,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
             // Create 25 practices (exceeds MAX_PRACTICES=20)
             for (int i = 0; i < 25; i++) {
                 String slug = String.format("practice-%02d", i);
-                summaries.add(summary(slug, Observation.NOT_OBSERVED, i, Instant.parse("2026-03-20T10:00:00Z")));
+                summaries.add(summary(slug, Presence.NOT_OBSERVED, i, Instant.parse("2026-03-20T10:00:00Z")));
             }
             when(practiceFindingRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 summaries
@@ -139,8 +139,8 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         void alphabeticalTiebreaker() throws Exception {
             when(practiceFindingRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("zebra-practice", Observation.NOT_OBSERVED, 2, Instant.parse("2026-03-20T10:00:00Z")),
-                    summary("alpha-practice", Observation.NOT_OBSERVED, 2, Instant.parse("2026-03-20T10:00:00Z"))
+                    summary("zebra-practice", Presence.NOT_OBSERVED, 2, Instant.parse("2026-03-20T10:00:00Z")),
+                    summary("alpha-practice", Presence.NOT_OBSERVED, 2, Instant.parse("2026-03-20T10:00:00Z"))
                 )
             );
 
@@ -152,11 +152,11 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
-        void lastSeenReflectsMaxAcrossVerdicts() throws Exception {
+        void lastSeenReflectsMaxAcrossObservations() throws Exception {
             when(practiceFindingRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary("commit-quality", Observation.OBSERVED, 1, Instant.parse("2026-03-15T10:00:00Z")),
-                    summary("commit-quality", Observation.NOT_OBSERVED, 1, Instant.parse("2026-03-20T14:00:00Z"))
+                    summary("commit-quality", Presence.OBSERVED, 1, Instant.parse("2026-03-15T10:00:00Z")),
+                    summary("commit-quality", Presence.NOT_OBSERVED, 1, Instant.parse("2026-03-20T14:00:00Z"))
                 )
             );
 
@@ -182,7 +182,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
             );
 
             when(practiceFindingRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
-                List.of(summary("test-practice", Observation.NOT_OBSERVED, 1, Instant.parse("2026-03-20T10:00:00Z")))
+                List.of(summary("test-practice", Presence.NOT_OBSERVED, 1, Instant.parse("2026-03-20T10:00:00Z")))
             );
 
             Optional<byte[]> result = brokenProvider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID);
@@ -196,7 +196,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
      */
     private static DeveloperPracticeSummary summary(
         String practiceSlug,
-        Observation verdict,
+        Presence observation,
         long count,
         Instant lastDetectedAt
     ) {
@@ -207,8 +207,8 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
             }
 
             @Override
-            public Observation getVerdict() {
-                return verdict;
+            public Presence getObservation() {
+                return observation;
             }
 
             @Override

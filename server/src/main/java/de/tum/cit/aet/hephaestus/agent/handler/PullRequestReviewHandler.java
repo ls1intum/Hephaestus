@@ -21,8 +21,8 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Polarity;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.file.Path;
@@ -343,7 +343,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         boolean allNotApplicable = parsed
             .validFindings()
             .stream()
-            .allMatch(f -> f.verdict() == Observation.NOT_APPLICABLE);
+            .allMatch(f -> f.observation() == Presence.NOT_APPLICABLE);
         if (allNotApplicable && secretFindings.isEmpty()) {
             Set<String> diffFiles = computeDiffStatFiles(job);
             boolean hasDiffContent = !diffFiles.isEmpty();
@@ -390,7 +390,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        // Coherence coercion: keep (verdict, severity) coherent regardless of what the
+        // Coherence coercion: keep (observation, severity) coherent regardless of what the
         // weak model emitted. A defect-detector practice's OBSERVED becomes NOT_APPLICABLE (no false strength
         // ships to the student), and severity is pinned to the INFO sentinel except on a NOT_OBSERVED gap.
         // Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the posted comment.
@@ -432,7 +432,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
-        // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an ENACTED-but-recurring
+        // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an ADDRESSED-but-recurring
         // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
         // deliver() because finding_fingerprint is persisted there; before compose() so the drop reaches both the
         // summary and the inline notes.
@@ -446,7 +446,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             return;
         }
 
-        Map<String, Polarity> polarityBySlug =
+        Map<String, PracticeKind> polarityBySlug =
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
@@ -477,7 +477,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Recompose hook: after the inline notes post, the summary's inline section is demoted to a pointer
         // for every finding whose comment actually landed (its detail then lives on the diff). Binding the
-        // findings + polarity here keeps FeedbackDeliveryService free of the composition inputs — it only
+        // findings + kind here keeps FeedbackDeliveryService free of the composition inputs — it only
         // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
             DeliveryComposer.recomposeMrNote(
@@ -516,7 +516,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (var f : existing) {
             if (
                 !"hardcoded-secrets".equals(f.practiceSlug()) ||
-                f.verdict() != Observation.NOT_OBSERVED ||
+                f.observation() != Presence.NOT_OBSERVED ||
                 f.evidence() == null
             ) {
                 continue;
@@ -572,7 +572,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new PracticeDetectionResultParser.ValidatedFinding(
             "hardcoded-secrets",
             "Hardcoded secret on a changed line",
-            Observation.NOT_OBSERVED,
+            Presence.NOT_OBSERVED,
             severity,
             1.0f,
             evidence,
