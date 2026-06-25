@@ -29,8 +29,9 @@ import org.hibernate.annotations.Immutable;
  * join and physically placed through {@code FeedbackPlacement} rows — see ADR 0021 (findings↔feedback synthesis seam).
  *
  * <p>Append-only for research-data integrity: a re-run that re-synthesises the same delivery unit inserts a new
- * row (deduplicated by {@link #idempotencyKey}) and points {@link #supersedesId} at the prior row rather than
- * mutating it, so the temporal record of what a student actually saw is preserved. {@code baseline_state} is
+ * row (deduplicated by the {@code (agent_job_id, position)} unit grain) and points {@link #replacesId} at the
+ * prior row rather than mutating it, so the temporal record of what a student actually saw is preserved.
+ * {@code baseline_state} is
  * intentionally <em>not</em> a column — it is derived on read from the supersession chain.
  *
  * <p>Cross-module references (agent job, workspace, recipient/subject users) are stored as raw scalar ids — NOT
@@ -49,7 +50,7 @@ import org.hibernate.annotations.Immutable;
 @Table(
     name = "feedback",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_feedback_idempotency", columnNames = { "agent_job_id", "unit_ordinal" }),
+        @UniqueConstraint(name = "uk_feedback_unit", columnNames = { "agent_job_id", "position" }),
     },
     indexes = {
         @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
@@ -68,15 +69,6 @@ public class Feedback {
     @Id
     @Column(columnDefinition = "UUID")
     private UUID id;
-
-    /**
-     * Stable dedup key for this delivery unit, derived from {@code agent_job_id + unit_ordinal}. Enforced unique
-     * so a re-emitted job cannot double-insert the same unit; carried as an explicit column for the
-     * {@code insertIfAbsent}-style race-safe insert path used by findings.
-     */
-    @NotNull
-    @Column(name = "idempotency_key", nullable = false, length = 255)
-    private String idempotencyKey;
 
     /**
      * The agent job that produced this feedback unit. Raw UUID (not {@code @ManyToOne}) to avoid a module cycle
@@ -160,18 +152,6 @@ public class Feedback {
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 16)
     private FeedbackProvenance source;
-
-    /** Model id of the synthesiser (provenance). Null for non-agent origins. */
-    @Column(name = "model_id", length = 255)
-    private String modelId;
-
-    /** Version of the delivery composer that rendered the body (provenance). */
-    @Column(name = "composer_version", length = 255)
-    private String composerVersion;
-
-    /** Version of the synthesis prompt used by the agent (provenance). Null for non-agent origins. */
-    @Column(name = "synthesis_prompt_version", length = 255)
-    private String synthesisPromptVersion;
 
     /**
      * Self-reference to the prior feedback row this unit replaces, when a re-run re-synthesised the same delivery

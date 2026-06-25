@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * List-view DTO for practice findings. Omits large text fields (guidance, reasoning)
- * and internal fields (agentJobId, idempotencyKey, evidence) to keep payloads small.
+ * and internal fields (agentJobId, occurrenceKey, evidence) to keep payloads small.
  */
 @Schema(description = "Practice finding summary for list views")
 public record PracticeFindingListDTO(

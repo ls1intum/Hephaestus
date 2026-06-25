@@ -17,8 +17,8 @@ import tools.jackson.databind.JsonNode;
  * Detail-view DTO for a single practice finding. Includes guidance, reasoning,
  * and structured evidence that are omitted from the list view.
  *
- * <p>Intentionally omits internal fields: {@code agentJobId}, {@code idempotencyKey},
- * and raw {@code developerId}.
+ * <p>Intentionally omits internal fields: {@code agentJobId}, {@code occurrenceKey},
+ * and raw {@code aboutUserId}.
  */
 @Schema(description = "Full practice finding detail including guidance and evidence")
 public record PracticeFindingDetailDTO(

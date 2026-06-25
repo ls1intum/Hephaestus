@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -19,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
@@ -138,7 +136,6 @@ public class FeedbackLedgerRecorder {
         Instant now = Instant.now();
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
-                .idempotencyKey(job.getId() + ":" + IN_CONTEXT_UNIT_ORDINAL)
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
                 .artifactType(artifactType)
@@ -150,8 +147,6 @@ public class FeedbackLedgerRecorder {
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
                 .body(delivery.mrNote())
                 .source(FeedbackProvenance.AGENT)
-                .modelId(job.getLlmModel())
-                .composerVersion(DeliveryComposer.COMPOSER_VERSION)
                 .threadKey(feedbackThreadKey)
                 .replacesId(supersedesId)
                 .createdAt(now)
@@ -215,17 +210,14 @@ public class FeedbackLedgerRecorder {
                 .feedback(feedback)
                 .placementType(PlacementSlot.SUMMARY)
                 .postedCommentRef(job.getDeliveryCommentId())
-                .postedState(
-                    job.getDeliveryCommentId() != null ? PlacementPostedState.POSTED : PlacementPostedState.FAILED
-                )
                 .createdAt(now)
                 .build()
         );
 
         // INLINE placements (PR only) — the ANCHOR is always recoverable; the durable vendor handle
-        // (external_ref / thread_external_ref) and the real posted_state come from the per-note DeliveredSignal
-        // the channel emitted this run. A note with no matching signal (append-only GitHub, or a channel that
-        // emitted none) keeps the anchor-only fallback: POSTED with a null external_ref.
+        // (external_ref) comes from the per-note DeliveredSignal the channel emitted this run. A note with no
+        // matching signal (append-only GitHub, or a channel that emitted none) keeps the anchor-only fallback:
+        // a null external_ref.
         if (artifact == WorkArtifact.PULL_REQUEST) {
             for (DiffNote note : delivery.diffNotes()) {
                 DeliveredSignal signal = matchSignal(note, inlineSignals);
@@ -239,10 +231,6 @@ public class FeedbackLedgerRecorder {
                         .anchorEndLine(note.endLine())
                         .anchorSide(PlacementAnchorSide.NEW)
                         .postedCommentRef(signal != null ? signal.externalRef() : null)
-                        .threadExternalRef(signal != null ? signal.threadExternalRef() : null)
-                        .postedState(
-                            signal != null ? postedStateFor(signal.disposition()) : PlacementPostedState.POSTED
-                        )
                         .createdAt(now)
                         .build()
                 );
@@ -284,7 +272,6 @@ public class FeedbackLedgerRecorder {
             }
             Feedback unit = feedbackRepository.save(
                 Feedback.builder()
-                    .idempotencyKey(job.getId() + ":" + unitOrdinal)
                     .agentJobId(job.getId())
                     .workspaceId(job.getWorkspace().getId())
                     .artifactType(droppedFinding.getArtifactType())
@@ -296,8 +283,6 @@ public class FeedbackLedgerRecorder {
                     .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                     .suppressionReason(FeedbackSuppressionReason.POLICY_FLOOR_DROP)
                     .source(FeedbackProvenance.AGENT)
-                    .modelId(job.getLlmModel())
-                    .composerVersion(DeliveryComposer.COMPOSER_VERSION)
                     .createdAt(now)
                     .build()
             );
@@ -361,7 +346,6 @@ public class FeedbackLedgerRecorder {
         Instant now = Instant.now();
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
-                .idempotencyKey(job.getId() + ":" + unitOrdinal)
                 .agentJobId(job.getId())
                 .workspaceId(job.getWorkspace().getId())
                 .artifactType(finding.getArtifactType())
@@ -373,8 +357,6 @@ public class FeedbackLedgerRecorder {
                 .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                 .suppressionReason(reason)
                 .source(FeedbackProvenance.AGENT)
-                .modelId(job.getLlmModel())
-                .composerVersion(DeliveryComposer.COMPOSER_VERSION)
                 .threadKey(feedbackThreadKeyFor(finding))
                 .createdAt(now)
                 .build()
@@ -417,15 +399,6 @@ public class FeedbackLedgerRecorder {
             }
         }
         return null;
-    }
-
-    /**
-     * Map the channel's per-note {@link Disposition} onto the persisted {@link PlacementPostedState}: anything
-     * that left a durable note for the student (POSTED, fell back to a plain comment, or preserved an existing
-     * thread) is recorded as POSTED; only a terminal delivery failure is FAILED.
-     */
-    private static PlacementPostedState postedStateFor(Disposition disposition) {
-        return disposition == Disposition.FAILED ? PlacementPostedState.FAILED : PlacementPostedState.POSTED;
     }
 
     /** The stable continuity line for a finding: (target, recipient, in-context surface). */

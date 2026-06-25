@@ -22,7 +22,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -125,10 +124,10 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     }
 
     @Test
-    void inlinePlacement_persistsExternalRefAndThreadFromMatchingSignal() {
-        // A3: the INLINE placement must carry the durable vendor handles the channel reported, not a hardcoded
-        // POSTED + null. The note and its DeliveredSignal share a findingFingerprint, so the signal's externalRef /
-        // threadExternalRef land on the saved FeedbackPlacement. A no-op (the old hardcoded null) fails this.
+    void inlinePlacement_persistsExternalRefFromMatchingSignal() {
+        // A3: the INLINE placement must carry the durable vendor handle the channel reported, not a hardcoded
+        // null. The note and its DeliveredSignal share a findingFingerprint, so the signal's externalRef lands
+        // on the saved FeedbackPlacement. A no-op (the old hardcoded null) fails this.
         var finding = problem(0.9f);
         when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
@@ -157,14 +156,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             .findFirst()
             .orElseThrow();
         assertThat(inline.getPostedCommentRef()).isEqualTo("note-gid-42");
-        assertThat(inline.getThreadExternalRef()).isEqualTo("discussion-gid-7");
-        assertThat(inline.getPostedState()).isEqualTo(PlacementPostedState.POSTED);
     }
 
     @Test
-    void inlinePlacement_fallsBackToPathLineWhenNoFindingFingerprint_andFailedSignalMapsToFailed() {
+    void inlinePlacement_fallsBackToPathLineWhenNoFindingFingerprint_andFailedSignalHasNoRef() {
         // No findingFingerprint on the note (legacy/unkeyed) → match by path + terminal line. A FAILED disposition
-        // must persist as a FAILED placement with no external_ref, so a dead delivery is not recorded as POSTED.
+        // leaves no external_ref, so a dead delivery is not recorded with a vendor handle.
         var finding = problem(0.9f);
         when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
@@ -192,7 +189,6 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             .filter(p -> p.getPlacementType() == PlacementSlot.INLINE)
             .findFirst()
             .orElseThrow();
-        assertThat(inline.getPostedState()).isEqualTo(PlacementPostedState.FAILED);
         assertThat(inline.getPostedCommentRef()).isNull();
     }
 

@@ -138,7 +138,6 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private void deliverFeedbackFor(UUID findingId, String body, Instant createdAt) {
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
-                .idempotencyKey("fb-" + UUID.randomUUID())
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
                 .artifactType(WorkArtifact.PULL_REQUEST)

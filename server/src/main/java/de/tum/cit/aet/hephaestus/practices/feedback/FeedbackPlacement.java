@@ -28,19 +28,16 @@ import org.hibernate.annotations.OnDeleteAction;
  * delivery surface — a summary block, an inline diff anchor, or a conversation turn.
  *
  * <p>A single feedback unit can have multiple placements (1:N): for example a SUMMARY block
- * plus several INLINE anchors. Each placement carries the full diff-anchor coordinates (path,
- * line, side, pinned commit) and tracks its own {@link PlacementPostedState} lifecycle and
- * external comment/note id so re-delivery, snapping, and resolution can be reconciled per anchor.
+ * plus several INLINE anchors. Each placement carries the diff-anchor coordinates (path, line,
+ * side) and the external comment/note id so re-delivery can be reconciled per anchor.
  *
- * <p>Append-only / {@code @Immutable}: posting outcomes that change over time (snapped,
- * outdated, resolved) are represented by writing a new placement row or by the reconciler's
- * dedicated update path; the row itself is not mutated through the ORM. The parent
+ * <p>Append-only / {@code @Immutable}: posting outcomes that change over time are represented by
+ * writing a new placement row rather than mutating an existing one through the ORM. The parent
  * {@link Feedback} lives in the same {@code practices.feedback} module, so a real
  * {@code @ManyToOne} association is used with DB-level {@code ON DELETE CASCADE}.
  *
  * @see Feedback for the feedback unit being placed
  * @see PlacementSlot for SUMMARY/INLINE/CONVERSATION_TURN
- * @see PlacementPostedState for the posting lifecycle
  */
 @Entity
 @Immutable
@@ -99,10 +96,6 @@ public class FeedbackPlacement {
     @Column(name = "anchor_path", columnDefinition = "TEXT")
     private String anchorPath;
 
-    /** Path of the anchored file on the base side (set when the file was renamed). */
-    @Column(name = "anchor_old_path", columnDefinition = "TEXT")
-    private String anchorOldPath;
-
     /** First anchored line (1-based). */
     @Column(name = "anchor_start_line")
     private Integer anchorStartLine;
@@ -116,46 +109,11 @@ public class FeedbackPlacement {
     @Column(name = "anchor_side", length = 8)
     private PlacementAnchorSide anchorSide;
 
-    /** Diff side of the anchor start for a multi-side range (OLD or NEW). */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "anchor_start_side", length = 8)
-    private PlacementAnchorSide anchorStartSide;
-
-    /** The quoted source text the anchor refers to (content anchor, survives line drift). */
-    @Column(name = "anchor_quote", columnDefinition = "TEXT")
-    private String anchorQuote;
-
-    /** Commit SHA the anchor was pinned to when posted. */
-    @Column(name = "pinned_commit_sha", length = 64)
-    private String pinnedCommitSha;
-
     // --- External delivery reconciliation ---
 
     /** External id of the posted comment/note (1:N — one per placement). */
     @Column(name = "posted_comment_ref", columnDefinition = "TEXT")
     private String postedCommentRef;
-
-    /** External id of the thread/discussion the comment was posted in. */
-    @Column(name = "thread_external_ref", columnDefinition = "TEXT")
-    private String threadExternalRef;
-
-    /** Whether the placement's thread/note has been marked resolved on the surface. */
-    @Column(name = "resolved")
-    private Boolean resolved;
-
-    /** When the placement was resolved. */
-    @Column(name = "resolved_at")
-    private Instant resolvedAt;
-
-    /** External id of the resolving action/comment, if distinct from {@link #externalRef}. */
-    @Column(name = "resolved_external_ref", columnDefinition = "TEXT")
-    private String resolvedExternalRef;
-
-    /** The posting lifecycle of this placement against its external surface. */
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "posted_state", length = 16, nullable = false)
-    private PlacementPostedState postedState;
 
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)
