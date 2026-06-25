@@ -6,7 +6,7 @@
 // and a modifier-less Swift declaration is INTERNAL — not public. We surface {hasPublicProduct,
 // changedPublicSymbols, changedInternalSymbols} and let the model decide whether documentation was owed.
 //
-// 18 false NOT_OBSERVED came from treating modifier-less Swift as public on an app-only repo. The export-status
+// 18 false assessment=BAD findings came from treating modifier-less Swift as public on an app-only repo. The export-status
 // table is keyed off file extension so adding a language = one row, no engine change.
 import { findFiles, readFileLines } from "../lib/grep";
 import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";

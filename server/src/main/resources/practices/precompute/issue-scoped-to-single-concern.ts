@@ -29,7 +29,7 @@ export default async function (
 
 	// Empty-or-title-echo gate — the SAME blunt classification fact the well-engineered sibling
 	// (issue-has-checkable-outcome) keys its observation off. When the body carries no content of its own, there is
-	// NO deliverable to scope, so the practice is NOT_APPLICABLE — never OBSERVED off the title alone. Kept
+	// NO deliverable to scope, so the practice is NOT_APPLICABLE — never a PRESENT, GOOD reading off the title alone. Kept
 	// byte-aligned with the sibling's computation on purpose (precompute scripts ship as standalone DB rows).
 	const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 	const titleNorm = norm(title);
