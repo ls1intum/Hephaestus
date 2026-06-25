@@ -643,7 +643,10 @@ public class PracticeDetectionResultParser {
             if (p == Presence.NOT_APPLICABLE) {
                 a = null;
             }
-            Severity s = a == Assessment.BAD ? (severity == null || severity == Severity.INFO ? Severity.MINOR : severity) : null;
+            Severity s =
+                a == Assessment.BAD
+                    ? (severity == null || severity == Severity.INFO ? Severity.MINOR : severity)
+                    : null;
             if (advisoryOnly && a == Assessment.BAD && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
                 s = Severity.MINOR;
             }

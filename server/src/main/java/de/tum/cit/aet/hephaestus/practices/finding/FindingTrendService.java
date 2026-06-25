@@ -112,8 +112,7 @@ public class FindingTrendService {
                 // present in both — PERSISTED, unless it backslid GOOD→BAD (REGRESSED; ADR 0022).
                 // BAD→GOOD is an IMPROVEMENT, not a regression: it stays PERSISTED but currentAssessment
                 // carries GOOD so B1 can render "now satisfied".
-                boolean regressed =
-                    prior.getAssessment() == Assessment.GOOD && curr.getAssessment() == Assessment.BAD;
+                boolean regressed = prior.getAssessment() == Assessment.GOOD && curr.getAssessment() == Assessment.BAD;
                 TransitionStatus status = regressed ? TransitionStatus.REGRESSED : TransitionStatus.PERSISTED;
                 transitions.add(transition(key, status, curr, prior.getAssessment(), curr.getAssessment()));
             }

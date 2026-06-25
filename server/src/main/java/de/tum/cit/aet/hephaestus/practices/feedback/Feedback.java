@@ -49,9 +49,7 @@ import org.hibernate.annotations.Immutable;
 @Immutable
 @Table(
     name = "feedback",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_feedback_unit", columnNames = { "agent_job_id", "position" }),
-    },
+    uniqueConstraints = { @UniqueConstraint(name = "uk_feedback_unit", columnNames = { "agent_job_id", "position" }) },
     indexes = {
         @Index(name = "idx_feedback_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),

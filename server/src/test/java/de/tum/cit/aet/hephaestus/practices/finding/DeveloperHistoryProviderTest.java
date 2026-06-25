@@ -55,12 +55,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         void buildsSinglePracticeJson() throws Exception {
             when(practiceFindingRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(
-                    summary(
-                        "pr-description-quality",
-                        Presence.ABSENT,
-                        3,
-                        Instant.parse("2026-03-20T14:30:00Z")
-                    ),
+                    summary("pr-description-quality", Presence.ABSENT, 3, Instant.parse("2026-03-20T14:30:00Z")),
                     summary("pr-description-quality", Presence.PRESENT, 1, Instant.parse("2026-03-18T10:00:00Z"))
                 )
             );
@@ -85,12 +80,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
                     summary("error-handling", Presence.ABSENT, 2, Instant.parse("2026-03-18T10:15:00Z")),
                     summary("error-handling", Presence.ABSENT, 1, Instant.parse("2026-03-19T12:00:00Z")),
                     summary("pr-description-quality", Presence.PRESENT, 5, Instant.parse("2026-03-20T14:30:00Z")),
-                    summary(
-                        "pr-description-quality",
-                        Presence.ABSENT,
-                        1,
-                        Instant.parse("2026-03-15T08:00:00Z")
-                    )
+                    summary("pr-description-quality", Presence.ABSENT, 1, Instant.parse("2026-03-15T08:00:00Z"))
                 )
             );
 

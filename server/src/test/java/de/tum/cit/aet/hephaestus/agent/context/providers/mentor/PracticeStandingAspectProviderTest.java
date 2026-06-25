@@ -12,9 +12,9 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
@@ -132,7 +132,15 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         List<Practice> spine = List.of(practice("constructive-code-review", "Reviewing constructively"));
         List<AreaStandingRow> rows = List.of(
             // former GOOD practice + NOT_APPLICABLE -> (NOT_APPLICABLE, null)
-            row("constructive-code-review", "Reviewing constructively", Presence.NOT_APPLICABLE, null, Severity.INFO, 5, 0)
+            row(
+                "constructive-code-review",
+                "Reviewing constructively",
+                Presence.NOT_APPLICABLE,
+                null,
+                Severity.INFO,
+                5,
+                0
+            )
         );
         JsonNode root = build(spine, rows);
 
@@ -148,7 +156,15 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
         List<AreaStandingRow> rows = List.of(
             // former GOOD practice + NOT_OBSERVED -> (ABSENT, BAD) [a gap]
-            row("robust-error-handling", "Handling failure robustly", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, 3, 1)
+            row(
+                "robust-error-handling",
+                "Handling failure robustly",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MAJOR,
+                3,
+                1
+            )
         );
         JsonNode root = build(spine, rows);
 
@@ -165,7 +181,15 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         List<Practice> spine = List.of(practice("review-ready-work", "Submitting review-ready work"));
         List<AreaStandingRow> rows = List.of(
             // former GOOD practice + OBSERVED -> (PRESENT, GOOD) [a strength]
-            row("review-ready-work", "Submitting review-ready work", Presence.PRESENT, Assessment.GOOD, Severity.INFO, 2, 1)
+            row(
+                "review-ready-work",
+                "Submitting review-ready work",
+                Presence.PRESENT,
+                Assessment.GOOD,
+                Severity.INFO,
+                2,
+                1
+            )
         );
         JsonNode root = build(spine, rows);
 
@@ -248,7 +272,15 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         );
         when(findingRepository.findAreaStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
             List.of(
-                row("review-ready-work", "Submitting review-ready work", Presence.PRESENT, Assessment.GOOD, Severity.INFO, 2, 1)
+                row(
+                    "review-ready-work",
+                    "Submitting review-ready work",
+                    Presence.PRESENT,
+                    Assessment.GOOD,
+                    Severity.INFO,
+                    2,
+                    1
+                )
             )
         );
 
@@ -273,9 +305,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     private String trajectoryFor(long count, long recent) {
         JsonNode root = build(
             List.of(practice("g", "Area")),
-            List.of(
-                row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, count, recent)
-            )
+            List.of(row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, count, recent))
         );
         return area(root, "g").get("trajectory").asString();
     }

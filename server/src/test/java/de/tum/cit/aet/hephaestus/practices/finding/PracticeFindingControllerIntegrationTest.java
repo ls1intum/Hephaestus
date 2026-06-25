@@ -185,17 +185,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             // Other user's finding should NOT appear
             User otherUser = persistUser("other-user");
-            insertFinding(
-                practiceA,
-                otherUser,
-                "Other finding",
-                "ABSENT",
-                "MAJOR",
-                0.8f,
-                "PULL_REQUEST",
-                2L,
-                now
-            );
+            insertFinding(practiceA, otherUser, "Other finding", "ABSENT", "MAJOR", 0.8f, "PULL_REQUEST", 2L, now);
 
             webTestClient
                 .get()
@@ -345,17 +335,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithUser
         @DisplayName("normalizes negative page to 0 and zero/negative size to 1")
         void shouldNormalizeBoundaryPaginationValues() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Boundary",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "PULL_REQUEST",
-                1L,
-                Instant.now()
-            );
+            insertFinding(practiceA, developer, "Boundary", "PRESENT", "INFO", 0.9f, "PULL_REQUEST", 1L, Instant.now());
 
             webTestClient
                 .get()
@@ -377,17 +357,7 @@ class PracticeFindingControllerIntegrationTest extends AbstractWorkspaceIntegrat
         @WithUser
         void shouldReturnCorrectShapeWithoutInternalFields() {
             Instant now = Instant.now();
-            insertFinding(
-                practiceA,
-                developer,
-                "Shape check",
-                "ABSENT",
-                "MAJOR",
-                0.85f,
-                "PULL_REQUEST",
-                42L,
-                now
-            );
+            insertFinding(practiceA, developer, "Shape check", "ABSENT", "MAJOR", 0.85f, "PULL_REQUEST", 42L, now);
 
             webTestClient
                 .get()

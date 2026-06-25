@@ -24,24 +24,24 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * REST controller for developer reaction on AI-generated practice findings.
+ * REST controller for developer reactions to delivered units of feedback.
  *
  * <p>All endpoints are workspace-scoped and require authentication.
- * Reaction submission is restricted to the finding's developer.
+ * Reaction submission is restricted to the feedback's recipient.
  */
 @WorkspaceScopedController
-@RequestMapping("/practices/findings")
-@Tag(name = "Finding Reaction", description = "Developer reactions to AI-generated practice findings")
+@RequestMapping("/practices/feedback")
+@Tag(name = "Feedback Reaction", description = "Developer reactions to delivered feedback")
 @RequiredArgsConstructor
 @Validated
 public class FindingReactionController {
 
     private final FindingReactionService reactionService;
 
-    @PostMapping("/{findingId}/reactions")
+    @PostMapping("/{feedbackId}/reactions")
     @Operation(
-        summary = "Submit a reaction to a practice finding",
-        description = "Records the developer's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. " +
+        summary = "Submit a reaction to a feedback unit",
+        description = "Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to a delivered feedback unit. " +
             "Append-only: submitting again creates a new record, preserving temporal history."
     )
     @ApiResponse(
@@ -56,28 +56,28 @@ public class FindingReactionController {
     )
     @ApiResponse(
         responseCode = "403",
-        description = "Current user is not the finding's developer",
+        description = "Current user is not the feedback's recipient",
         content = @Content(schema = @Schema(hidden = true))
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Finding not found in this workspace",
+        description = "Feedback not found in this workspace",
         content = @Content(schema = @Schema(hidden = true))
     )
     public ResponseEntity<FindingReactionDTO> submitReaction(
         WorkspaceContext workspaceContext,
-        @PathVariable UUID findingId,
+        @PathVariable UUID feedbackId,
         @Valid @RequestBody CreateFindingReactionDTO request
     ) {
-        FindingReactionDTO reaction = reactionService.submitReaction(workspaceContext, findingId, request);
+        FindingReactionDTO reaction = reactionService.submitReaction(workspaceContext, feedbackId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).body(reaction);
     }
 
-    @GetMapping("/{findingId}/reactions")
+    @GetMapping("/{feedbackId}/reactions")
     @Operation(
-        summary = "Get the latest reaction to a finding",
-        description = "Returns the current user's most recent reaction to the specified finding, or 204 if none exists."
+        summary = "Get the latest reaction to a feedback unit",
+        description = "Returns the current user's most recent reaction to the specified feedback unit, or 204 if none exists."
     )
     @ApiResponse(
         responseCode = "200",
@@ -86,20 +86,20 @@ public class FindingReactionController {
     )
     @ApiResponse(
         responseCode = "204",
-        description = "No reaction exists for this finding",
+        description = "No reaction exists for this feedback unit",
         content = @Content(schema = @Schema(hidden = true))
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Finding not found in this workspace",
+        description = "Feedback not found in this workspace",
         content = @Content(schema = @Schema(hidden = true))
     )
     public ResponseEntity<FindingReactionDTO> getLatestReaction(
         WorkspaceContext workspaceContext,
-        @PathVariable UUID findingId
+        @PathVariable UUID feedbackId
     ) {
         return reactionService
-            .getLatestReaction(workspaceContext, findingId)
+            .getLatestReaction(workspaceContext, feedbackId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.noContent().build());
     }

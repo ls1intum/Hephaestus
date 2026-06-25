@@ -1488,12 +1488,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
         // Baseline (no signals yet): both findings keep their full summary lines, no pointer.
-        String firstPass = DeliveryComposer.recomposeMrNote(
-            findings,
-            WorkArtifact.PULL_REQUEST,
-            Map.of(),
-            Set.of()
-        );
+        String firstPass = DeliveryComposer.recomposeMrNote(findings, WorkArtifact.PULL_REQUEST, Map.of(), Set.of());
         assertThat(firstPass).contains("Dead code in view").contains("Non-descriptive name 'Data'");
         assertThat(firstPass).doesNotContain("see the");
 
@@ -1678,11 +1673,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         );
 
         String withoutMap = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST).mrNote();
-        String withEmptyMap = DeliveryComposer.compose(
-            List.of(f),
-            WorkArtifact.PULL_REQUEST,
-            Map.of()
-        ).mrNote();
+        String withEmptyMap = DeliveryComposer.compose(List.of(f), WorkArtifact.PULL_REQUEST, Map.of()).mrNote();
 
         assertThat(withEmptyMap).isEqualTo(withoutMap);
         assertThat(withEmptyMap).doesNotContain("Why this matters");

@@ -175,9 +175,7 @@ public class FeedbackLedgerRecorder {
             ? PolicyFloorSelector.partition(
                   findings
                       .stream()
-                      .filter(
-                          f -> f.getAssessment() == Assessment.BAD && !alreadySuppressed.contains(f.getId())
-                      )
+                      .filter(f -> f.getAssessment() == Assessment.BAD && !alreadySuppressed.contains(f.getId()))
                       .toList(),
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
               ).dropped()

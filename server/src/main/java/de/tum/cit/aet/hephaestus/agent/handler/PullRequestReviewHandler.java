@@ -475,12 +475,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // findings + kind here keeps FeedbackDeliveryService free of the composition inputs — it only
         // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
-            DeliveryComposer.recomposeMrNote(
-                deliverable,
-                WorkArtifact.PULL_REQUEST,
-                whyBySlug,
-                deliveredKeys
-            )
+            DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)
         );
     }
 

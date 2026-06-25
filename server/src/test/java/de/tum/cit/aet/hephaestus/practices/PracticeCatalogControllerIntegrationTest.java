@@ -592,16 +592,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForEmptyTriggerEvents() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO(
-                "no-events",
-                "Name",
-                List.of(),
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+            var request = new CreatePracticeRequestDTO("no-events", "Name", List.of(), null, null, null, null, null);
 
             webTestClient
                 .post()

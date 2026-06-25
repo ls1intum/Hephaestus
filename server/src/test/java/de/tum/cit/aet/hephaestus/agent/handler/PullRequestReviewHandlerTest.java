@@ -26,8 +26,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -396,11 +396,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(filtered).isEmpty();
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding finding(
-            String slug,
-            Presence presence,
-            String path
-        ) {
+        private PracticeDetectionResultParser.ValidatedFinding finding(String slug, Presence presence, String path) {
             // Former-GOOD practice convention: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
             Assessment assessment = switch (presence) {
                 case PRESENT -> Assessment.GOOD;

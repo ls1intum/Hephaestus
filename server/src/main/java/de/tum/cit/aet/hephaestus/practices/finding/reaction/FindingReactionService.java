@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -22,16 +22,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for managing developer reaction on AI-generated practice findings.
+ * Service for managing developer reactions to delivered units of feedback.
  *
  * <h2>Authorization</h2>
- * <p>Only the developer who is the subject of a finding may submit reaction on it.
- * This ensures research data integrity — reaction represents the developer's own
- * reaction, not a third party's assessment.
+ * <p>Only the recipient of a feedback unit may submit a reaction to it. This ensures research data
+ * integrity — a reaction represents the recipient's own response, not a third party's assessment.
  *
  * <h2>Append-only semantics</h2>
  * <p>Each call to {@link #submitReaction} creates a new row. There is no upsert.
- * The latest reaction per finding is the "current" state for dashboard display.
+ * The latest reaction per feedback unit is the "current" state for dashboard display.
  */
 @Service
 @Transactional
@@ -41,55 +40,55 @@ public class FindingReactionService {
     private static final Logger log = LoggerFactory.getLogger(FindingReactionService.class);
 
     private final FindingReactionRepository reactionRepository;
-    private final PracticeFindingRepository findingRepository;
+    private final FeedbackRepository feedbackRepository;
     private final UserRepository userRepository;
 
     /**
-     * Submits reaction on a practice finding. Creates a new append-only record.
+     * Submits a reaction to a feedback unit. Creates a new append-only record.
      *
-     * @param workspaceContext the workspace context (for scoping the finding lookup)
-     * @param findingId        the finding to submit a reaction on
+     * @param workspaceContext the workspace context (for scoping the feedback lookup)
+     * @param feedbackId       the feedback unit to react to
      * @param request          the reaction action and optional explanation
      * @return the created reaction DTO
-     * @throws EntityNotFoundException  if the finding does not exist in this workspace
-     * @throws AccessForbiddenException if the current user is not the finding's developer
+     * @throws EntityNotFoundException  if the feedback does not exist in this workspace
+     * @throws AccessForbiddenException if the current user is not the feedback's recipient
      * @throws IllegalArgumentException if DISPUTED without an explanation
      */
     public FindingReactionDTO submitReaction(
         WorkspaceContext workspaceContext,
-        UUID findingId,
+        UUID feedbackId,
         CreateFindingReactionDTO request
     ) {
-        Observation finding = findingRepository
-            .findByIdAndWorkspaceId(findingId, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("Observation", findingId.toString()));
+        Feedback feedback = feedbackRepository
+            .findByIdAndWorkspaceId(feedbackId, workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
-        if (!finding.getAboutUserId().equals(currentUser.getId())) {
-            throw new AccessForbiddenException("Only the developer the observation is about can submit a reaction");
+        if (!feedback.getRecipientUserId().equals(currentUser.getId())) {
+            throw new AccessForbiddenException("Only the recipient of the feedback can submit a reaction");
         }
 
         if (
             request.action() == FindingReactionAction.DISPUTED &&
             (request.explanation() == null || request.explanation().isBlank())
         ) {
-            throw new IllegalArgumentException("Explanation is required when disputing a finding");
+            throw new IllegalArgumentException("Explanation is required when disputing feedback");
         }
 
         Reaction reaction = Reaction.builder()
-            .finding(finding)
-            .findingId(findingId)
-            .developer(currentUser)
-            .developerId(currentUser.getId())
+            .feedback(feedback)
+            .feedbackId(feedbackId)
+            .reactorUserId(currentUser.getId())
             .action(request.action())
             .explanation(request.explanation())
-            .recurrenceKey(finding.getRecurrenceKey()) // A2: denormalize the stable locus at write time
+            // A2: denormalize the stable headline locus at write time so B2 can follow it across re-runs.
+            .recurrenceKey(feedbackRepository.findHeadlineRecurrenceKey(feedbackId).orElse(null))
             .build();
 
         Reaction saved = reactionRepository.save(reaction);
         log.info(
-            "Recorded reaction: findingId={}, action={}, developerId={}",
-            findingId,
+            "Recorded reaction: feedbackId={}, action={}, reactorUserId={}",
+            feedbackId,
             request.action(),
             currentUser.getId()
         );
@@ -97,18 +96,18 @@ public class FindingReactionService {
     }
 
     /**
-     * Returns the latest reaction by the current user for a specific finding.
+     * Returns the latest reaction by the current user for a specific feedback unit.
      */
     @Transactional(readOnly = true)
-    public Optional<FindingReactionDTO> getLatestReaction(WorkspaceContext workspaceContext, UUID findingId) {
-        // Verify finding exists in this workspace
-        findingRepository
-            .findByIdAndWorkspaceId(findingId, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("Observation", findingId.toString()));
+    public Optional<FindingReactionDTO> getLatestReaction(WorkspaceContext workspaceContext, UUID feedbackId) {
+        // Verify the feedback exists in this workspace
+        feedbackRepository
+            .findByIdAndWorkspaceId(feedbackId, workspaceContext.id())
+            .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
         return reactionRepository
-            .findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(findingId, currentUser.getId())
+            .findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDesc(feedbackId, currentUser.getId())
             .map(FindingReactionDTO::from);
     }
 
@@ -130,19 +129,22 @@ public class FindingReactionService {
     }
 
     /**
-     * Returns the latest reaction per finding for a given developer.
-     * Composable API for enriching finding lists (e.g., for issue #896).
+     * Returns the latest reaction per feedback unit for a given reactor.
+     * Composable API for enriching feedback lists.
      *
-     * @return map of findingId → latest reaction DTO
+     * @return map of feedbackId → latest reaction DTO
      */
     @Transactional(readOnly = true)
-    public Map<UUID, FindingReactionDTO> getLatestReactionByFindingIds(Collection<UUID> findingIds, Long developerId) {
-        if (findingIds.isEmpty()) {
+    public Map<UUID, FindingReactionDTO> getLatestReactionByFeedbackIds(
+        Collection<UUID> feedbackIds,
+        Long reactorUserId
+    ) {
+        if (feedbackIds.isEmpty()) {
             return Map.of();
         }
         return reactionRepository
-            .findLatestByFindingIdsAndDeveloper(findingIds, developerId)
+            .findLatestByFeedbackIdsAndReactor(feedbackIds, reactorUserId)
             .stream()
-            .collect(Collectors.toMap(Reaction::getFindingId, FindingReactionDTO::from));
+            .collect(Collectors.toMap(Reaction::getFeedbackId, FindingReactionDTO::from));
     }
 }

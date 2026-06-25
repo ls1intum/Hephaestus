@@ -44,9 +44,7 @@ import tools.jackson.databind.JsonNode;
 @Immutable
 @Table(
     name = "observation",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_observation_occurrence", columnNames = { "occurrence_key" }),
-    },
+    uniqueConstraints = { @UniqueConstraint(name = "uk_observation_occurrence", columnNames = { "occurrence_key" }) },
     indexes = {
         @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
         @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),

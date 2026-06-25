@@ -746,7 +746,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             Assessment assessment =
                 presence == Presence.NOT_APPLICABLE
                     ? null
-                    : presence == Presence.PRESENT ? Assessment.GOOD : Assessment.BAD;
+                    : presence == Presence.PRESENT
+                        ? Assessment.GOOD
+                        : Assessment.BAD;
             return new ValidatedFinding(
                 "p",
                 "t",

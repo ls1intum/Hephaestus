@@ -7,14 +7,19 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackProvenance;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -40,8 +45,8 @@ import tools.jackson.databind.ObjectMapper;
 class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions";
-    private static final String ENGAGEMENT_URI = "/workspaces/{workspaceSlug}/practices/findings/engagement";
+    private static final String FEEDBACK_URI = "/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions";
+    private static final String ENGAGEMENT_URI = "/workspaces/{workspaceSlug}/practices/feedback/engagement";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -53,6 +58,9 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
     private PracticeFindingRepository practiceFindingRepository;
 
     @Autowired
+    private FeedbackRepository feedbackRepository;
+
+    @Autowired
     private FindingReactionRepository reactionRepository;
 
     @Autowired
@@ -60,7 +68,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     private Workspace workspace;
     private User adminUser;
-    private Observation finding;
+    private Feedback feedbackUnit;
 
     @BeforeEach
     void setUpTestData() {
@@ -87,8 +95,8 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
 
-        // Create a practice finding with the admin user as developer
-        finding = Observation.builder()
+        // Create a practice finding with the admin user as subject
+        Observation finding = Observation.builder()
             .occurrenceKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
             .practice(practice)
@@ -103,12 +111,30 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .observedAt(Instant.now())
             .build();
         practiceFindingRepository.save(finding);
+
+        // Create the delivered feedback unit the admin user reacts to (recipient == subject).
+        feedbackUnit = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(agentJob.getId())
+                .workspaceId(workspace.getId())
+                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactId(42L)
+                .recipientUserId(adminUser.getId())
+                .subjectUserId(adminUser.getId())
+                .channel(FeedbackSurface.IN_CONTEXT)
+                .position(0)
+                .deliveryState(FeedbackDeliveryState.DELIVERED)
+                .source(FeedbackProvenance.AGENT)
+                .createdAt(Instant.now())
+                .deliveredAt(Instant.now())
+                .build()
+        );
     }
 
-    // POST /{findingId}/reactions
+    // POST /{feedbackId}/reactions
 
     @Nested
-    @DisplayName("POST /{findingId}/reactions")
+    @DisplayName("POST /{feedbackId}/reactions")
     class SubmitFeedback {
 
         @Test
@@ -118,7 +144,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             FindingReactionDTO response = webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -131,7 +157,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(response).isNotNull();
             assertThat(response.action()).isEqualTo(FindingReactionAction.ADDRESSED);
-            assertThat(response.findingId()).isEqualTo(finding.getId());
+            assertThat(response.feedbackId()).isEqualTo(feedbackUnit.getId());
             assertThat(response.id()).isNotNull();
             assertThat(response.createdAt()).isNotNull();
         }
@@ -143,7 +169,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             FindingReactionDTO response = webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -166,7 +192,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -184,7 +210,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // First feedback
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request1)
@@ -195,7 +221,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // Second feedback — should create new row, not upsert
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request2)
@@ -209,7 +235,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void nonExistentFindingReturns404() {
+        void nonExistentFeedbackReturns404() {
             var request = new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null);
 
             webTestClient
@@ -225,8 +251,8 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithMentorUser
-        void nonDeveloperReturns403() {
-            // "mentor" user exists in DB and has workspace membership, but is NOT the finding's developer
+        void nonRecipientReturns403() {
+            // "mentor" user exists in DB and has workspace membership, but is NOT the feedback's recipient
             User mentorUser = persistUser("mentor");
             ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
 
@@ -234,7 +260,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
@@ -251,7 +277,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // (no X-XSRF-TOKEN). The mutation stays blocked for anonymous callers.
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -260,7 +286,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
-    // GET /{findingId}/reactions
+    // GET /{feedbackId}/reactions
 
     @Nested
     class GetLatestFeedback {
@@ -271,7 +297,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void returns204WhenEmpty() {
             webTestClient
                 .get()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -280,7 +306,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void returns404ForNonExistentFinding() {
+        void returns404ForNonExistentFeedback() {
             webTestClient
                 .get()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), UUID.randomUUID())
@@ -299,7 +325,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request1)
@@ -309,7 +335,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request2)
@@ -320,7 +346,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // GET should return the latest (DISPUTED)
             FindingReactionDTO response = webTestClient
                 .get()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -347,7 +373,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // Submit feedback in the main workspace
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null))
@@ -410,7 +436,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             // Submit multiple feedbacks
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.ADDRESSED, null))
@@ -420,7 +446,7 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .post()
-                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), finding.getId())
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new CreateFindingReactionDTO(FindingReactionAction.DISPUTED, "Wrong detection"))

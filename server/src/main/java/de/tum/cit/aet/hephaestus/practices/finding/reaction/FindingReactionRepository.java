@@ -11,64 +11,63 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Repository for immutable finding reaction with append-only semantics.
+ * Repository for immutable feedback reaction with append-only semantics.
  *
- * <p>Workspace-agnostic: reaction is scoped through
- * {@code Reaction.finding → Observation.practice → Practice.workspace}.
+ * <p>Workspace-agnostic: reaction is scoped through {@code Reaction.feedback → Feedback.workspaceId}.
  */
 @Repository
-@WorkspaceAgnostic("Reaction scoped through Observation -> Practice.workspace relationship")
+@WorkspaceAgnostic("Reaction scoped through Feedback.workspaceId relationship")
 public interface FindingReactionRepository extends JpaRepository<Reaction, UUID> {
     /**
-     * Returns the most recent reaction for a specific finding by a specific developer.
+     * Returns the most recent reaction for a specific feedback unit by a specific reactor.
      */
-    Optional<Reaction> findFirstByFindingIdAndDeveloperIdOrderByCreatedAtDesc(UUID findingId, Long developerId);
+    Optional<Reaction> findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDesc(UUID feedbackId, Long reactorUserId);
 
     /**
-     * Returns the latest reaction per finding for a given developer, using PostgreSQL's
+     * Returns the latest reaction per feedback unit for a given reactor, using PostgreSQL's
      * {@code DISTINCT ON} for efficient "latest row per group" retrieval.
      *
-     * <p>Used to enrich finding lists with the developer's current reaction state.
+     * <p>Used to enrich feedback lists with the reactor's current reaction state.
      */
     @Query(
         value = """
-        SELECT DISTINCT ON (ff.finding_id) ff.*
+        SELECT DISTINCT ON (ff.feedback_id) ff.*
         FROM reaction ff
-        WHERE ff.finding_id IN (:findingIds)
-          AND ff.developer_id = :developerId
-        ORDER BY ff.finding_id, ff.created_at DESC
+        WHERE ff.feedback_id IN (:feedbackIds)
+          AND ff.reactor_user_id = :reactorUserId
+        ORDER BY ff.feedback_id, ff.created_at DESC
         """,
         nativeQuery = true
     )
-    List<Reaction> findLatestByFindingIdsAndDeveloper(
-        @Param("findingIds") Collection<UUID> findingIds,
-        @Param("developerId") Long developerId
+    List<Reaction> findLatestByFeedbackIdsAndReactor(
+        @Param("feedbackIds") Collection<UUID> feedbackIds,
+        @Param("reactorUserId") Long reactorUserId
     );
 
     /**
-     * Latest reaction per {@code finding_fingerprint} (stable locus) for the given keys, restricted to one
-     * reacting developer (the finding's subject — only the subject may react). Used by B2 to suppress
+     * Latest reaction per {@code recurrence_key} (stable locus) for the given keys, restricted to one
+     * reacting developer (the feedback's recipient — only the recipient may react). Used by B2 to suppress
      * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
-     * even though the per-run finding row (and its {@code finding_id}) is different this run.
+     * even though the per-run feedback row (and its {@code feedback_id}) is different this run.
      */
     @Query(
         value = """
         SELECT DISTINCT ON (fr.recurrence_key) fr.*
         FROM reaction fr
         WHERE fr.recurrence_key IN (:findingFingerprints)
-          AND fr.developer_id = :developerId
+          AND fr.reactor_user_id = :reactorUserId
         ORDER BY fr.recurrence_key, fr.created_at DESC
         """,
         nativeQuery = true
     )
     List<Reaction> findLatestByFindingFingerprintsAndDeveloper(
         @Param("findingFingerprints") Collection<String> findingFingerprints,
-        @Param("developerId") Long developerId
+        @Param("reactorUserId") Long reactorUserId
     );
 
     /**
      * Engagement statistics: count of reaction actions grouped by action type,
-     * scoped to a specific workspace through the finding → practice → workspace chain.
+     * scoped to a specific workspace through the feedback → workspace relationship.
      *
      * @see ActionCountProjection
      */
@@ -76,15 +75,14 @@ public interface FindingReactionRepository extends JpaRepository<Reaction, UUID>
         """
         SELECT ff.action AS action, COUNT(ff) AS count
         FROM Reaction ff
-        JOIN ff.finding f
-        JOIN f.practice p
-        WHERE ff.developerId = :developerId
-          AND p.workspace.id = :workspaceId
+        JOIN ff.feedback fb
+        WHERE ff.reactorUserId = :reactorUserId
+          AND fb.workspaceId = :workspaceId
         GROUP BY ff.action
         """
     )
     List<ActionCountProjection> countByDeveloperAndWorkspaceGroupByAction(
-        @Param("developerId") Long developerId,
+        @Param("reactorUserId") Long reactorUserId,
         @Param("workspaceId") Long workspaceId
     );
 

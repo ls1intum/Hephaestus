@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding.reaction;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -26,17 +25,18 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 /**
- * Immutable record of a developer's reaction to an AI-generated practice finding.
+ * Immutable record of a developer's reaction to a delivered unit of {@link Feedback}.
  *
- * <p>Append-only for research data integrity: a developer submitting a second reaction
- * creates a new row, preserving the temporal record of when they first saw and then
- * changed their mind about a finding. The latest row per (finding, developer) is
- * the "current" state for dashboard display.
+ * <p>A student reacts to the feedback they were shown — not to an internal {@code Observation} — so the
+ * reaction is anchored to the {@link Feedback} unit (ADR 0022). Append-only for research data integrity: a
+ * developer submitting a second reaction creates a new row, preserving the temporal record of when they first
+ * saw and then changed their mind about a unit. The latest row per (feedback, reactor) is the "current" state
+ * for dashboard display.
  *
- * <p>Explicitly excluded from agent context (#895) — the AI must not know whether
- * a developer previously disputed a finding, to avoid contaminating accuracy measurement.
+ * <p>Explicitly excluded from agent context (#895) — the AI must not know whether a developer previously
+ * disputed feedback, to avoid contaminating accuracy measurement.
  *
- * @see Observation for the finding being reacted to
+ * @see Feedback for the delivered feedback unit being reacted to
  * @see FindingReactionAction for the action taxonomy
  */
 @Entity
@@ -44,11 +44,8 @@ import org.hibernate.annotations.OnDeleteAction;
 @Table(
     name = "reaction",
     indexes = {
-        @Index(name = "idx_reaction_developer_created", columnList = "developer_id, created_at DESC"),
-        @Index(
-            name = "idx_reaction_finding_developer",
-            columnList = "finding_id, developer_id, created_at DESC"
-        ),
+        @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
+        @Index(name = "idx_reaction_feedback_reactor", columnList = "feedback_id, reactor_user_id, created_at DESC"),
         // A2 (ADR 0021): find a reaction by its stable locus across the detector's per-run re-detections.
         @Index(name = "idx_reaction_correlation", columnList = "recurrence_key"),
     }
@@ -64,53 +61,42 @@ public class Reaction {
     private UUID id;
 
     /**
-     * The finding this reaction is about. Uses DB-level {@code ON DELETE CASCADE}
-     * so that deleting a finding automatically cleans up its immutable reaction rows.
+     * The feedback unit this reaction is about. Uses DB-level {@code ON DELETE CASCADE}
+     * so that deleting a feedback unit automatically cleans up its immutable reaction rows.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "finding_id", nullable = false, foreignKey = @ForeignKey(name = "fk_reaction_finding"))
+    @JoinColumn(name = "feedback_id", nullable = false, foreignKey = @ForeignKey(name = "fk_reaction_feedback"))
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private Observation finding;
+    private Feedback feedback;
 
     /**
-     * Direct access to the finding ID without triggering a lazy load on the {@link #finding} proxy.
+     * Direct access to the feedback ID without triggering a lazy load on the {@link #feedback} proxy.
      * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
      */
-    @Column(name = "finding_id", nullable = false, insertable = false, updatable = false)
-    private UUID findingId;
+    @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
+    private UUID feedbackId;
 
     /**
-     * Denormalized copy of {@link Observation#getRecurrenceKey()} (ADR 0021 C2), captured at
-     * reaction-write time. The reacted finding is EPHEMERAL — a new row each run — so its FK alone cannot
-     * locate this reaction on a later run; the {@code recurrence_key} is the stable (practice, target,
-     * subject, file) locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE
-     * reaction against a re-detected finding. Nullable: a reaction whose source finding predates C2 (null
-     * key) stays null and simply cannot participate in B2.
+     * Denormalized copy of the reacted feedback's headline {@code Observation.recurrenceKey} (ADR 0021 C2),
+     * captured at reaction-write time. The reacted feedback is per-run; its FK alone cannot locate this
+     * reaction on a later run, but the {@code recurrence_key} is the stable (practice, target, subject, file)
+     * locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE reaction against
+     * a re-detected locus. Nullable: a reaction whose source locus predates C2 (null key) stays null and
+     * simply cannot participate in B2.
      */
     @Column(name = "recurrence_key", length = 64)
     private String recurrenceKey;
 
     /**
-     * The developer who submitted this reaction. No cascade — users are long-lived
-     * and reaction must survive independently; deleting a user with existing reaction
-     * is blocked by the FK constraint (RESTRICT).
+     * The user who submitted this reaction — the feedback's recipient (only the recipient may react). Raw
+     * {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns
+     * scalar, matching {@code Observation.aboutUserId}; the DB FK {@code fk_reaction_reactor} is
+     * Liquibase-managed (RESTRICT — a reaction must survive independently of user lifecycle).
      */
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-        name = "developer_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_reaction_developer")
-    )
-    private User developer;
-
-    /**
-     * Direct access to the developer ID without triggering a lazy load on the {@link #developer} proxy.
-     * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
-     */
-    @Column(name = "developer_id", nullable = false, insertable = false, updatable = false)
-    private Long developerId;
+    @Column(name = "reactor_user_id", nullable = false)
+    private Long reactorUserId;
 
     @NotNull
     @Enumerated(EnumType.STRING)

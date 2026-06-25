@@ -29,6 +29,28 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 
+    /** Workspace-scoped lookup of a single feedback unit (reaction authorization + tenancy isolation). */
+    Optional<Feedback> findByIdAndWorkspaceId(UUID id, Long workspaceId);
+
+    /**
+     * The headline locus of a feedback unit: the {@code recurrence_key} of its earliest {@code PRIMARY}-role
+     * bound observation. Denormalized onto a {@link de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction}
+     * at write time so B2 suppression (ADR 0021) can follow a reacted locus across the detector's per-run
+     * re-detections, even though the per-run feedback row differs each run. Empty when the unit binds no
+     * observation or the headline locus predates C2 (null key).
+     */
+    @Query(
+        """
+        SELECT fo.finding.recurrenceKey FROM FeedbackObservation fo
+        WHERE fo.feedback.id = :feedbackId
+          AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
+          AND fo.finding.recurrenceKey IS NOT NULL
+        ORDER BY fo.ordinal ASC
+        LIMIT 1
+        """
+    )
+    Optional<String> findHeadlineRecurrenceKey(@Param("feedbackId") UUID feedbackId);
+
     /**
      * The feedback a developer actually RECEIVED in a workspace — only units that reached a surface
      * ({@code DELIVERED}), newest first. Powers the mentor's delivered-feedback aspect so the coach

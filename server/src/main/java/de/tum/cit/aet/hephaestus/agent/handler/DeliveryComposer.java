@@ -213,10 +213,7 @@ class DeliveryComposer {
 
         // No problems → an observation note over the strength findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
-            List<ValidatedFinding> observed = findings
-                .stream()
-                .filter(DeliveryComposer::isStrength)
-                .toList();
+            List<ValidatedFinding> observed = findings.stream().filter(DeliveryComposer::isStrength).toList();
             if (observed.isEmpty()) {
                 // Every finding abstained (all NOT_APPLICABLE): the artifact could not be assessed against
                 // any active practice, so deliver nothing rather than a misleading "nothing to change here"
@@ -243,10 +240,7 @@ class DeliveryComposer {
 
         // Strength findings the same job produced — surfaced as a brief strengths line before the
         // critiques so the note acknowledges effort (task-level, not person-level praise).
-        List<ValidatedFinding> positives = findings
-            .stream()
-            .filter(DeliveryComposer::isStrength)
-            .toList();
+        List<ValidatedFinding> positives = findings.stream().filter(DeliveryComposer::isStrength).toList();
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview. The inline
         // overview is signal-driven (deliveredKeys): a finding whose inline comment landed collapses to a
