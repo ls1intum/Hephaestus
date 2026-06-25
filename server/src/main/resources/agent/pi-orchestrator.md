@@ -13,7 +13,7 @@ Each finding is described on TWO independent axes:
 2. **`assessment`** — is what you saw good or bad **for the developer**?
    - `GOOD` — reflects well; a strength to acknowledge.
    - `BAD` — a problem the developer should act on.
-   - **Omit `assessment` entirely when `presence` is `NOT_APPLICABLE`** (an inapplicable practice has no valence). For ANY other presence, `assessment` is REQUIRED.
+   - Required for every `PRESENT` or `ABSENT` finding; omitted only for `NOT_APPLICABLE` (see the COHERENCE RULE below).
 
 `presence` is measurement — what you saw. `assessment` is valence — whether it is good or bad. They are orthogonal; you decide each per finding by reading the practice criteria and `whatGoodLooksLike`. The 2×2 reads directly:
 
@@ -23,9 +23,9 @@ Each finding is described on TWO independent axes:
 | **ABSENT** | (does not occur — an absent thing has no positive valence) | gap — a good behaviour that should be here is missing (omission) |
 | **NOT_APPLICABLE** | — (no assessment) — the practice's subject is not in the change | |
 
-So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) or `ABSENT, BAD` (something good is missing) — you choose which fits. A strength is `PRESENT, GOOD`. An exempt practice is `NOT_APPLICABLE` with no assessment. **`severity` is meaningful only for a BAD finding** (the server nulls it otherwise); set it from the practice's severity table for a BAD finding and you may leave it off elsewhere.
+So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) or `ABSENT, BAD` (something good is missing) — you choose which fits. A strength is `PRESENT, GOOD`. An exempt practice is `NOT_APPLICABLE` with no assessment.
 
-**COHERENCE RULE (non-negotiable — the most common mistake).** `presence=NOT_APPLICABLE` means the practice does not apply, so it has NO good/bad valence: when `presence` is `NOT_APPLICABLE` you MUST omit `assessment` entirely — never pair `NOT_APPLICABLE` with `GOOD` or with `BAD`. An inapplicable practice is not a quiet strength and not a quiet defect; it is silence. Conversely, `assessment` is REQUIRED for `PRESENT` and `ABSENT`. And `severity` is set ONLY when `assessment=BAD` — never on a `GOOD` strength and never on a `NOT_APPLICABLE` finding (the server nulls it there regardless). If you catch yourself writing `NOT_APPLICABLE` together with an assessment or a severity, drop both: the clean baseline a defect-detector reports, and any practice whose subject is simply not in this change, is `NOT_APPLICABLE` alone.
+**COHERENCE RULE (non-negotiable — the most common mistake).** `presence=NOT_APPLICABLE` means the practice does not apply, so it has NO good/bad valence: when `presence` is `NOT_APPLICABLE` you MUST omit `assessment` entirely — never pair `NOT_APPLICABLE` with `GOOD` or with `BAD`. An inapplicable practice is not a quiet strength and not a quiet defect; it is silence. Conversely, `assessment` is REQUIRED for `PRESENT` and `ABSENT`. And `severity` is set ONLY when `assessment=BAD` — the server nulls it on a `GOOD` strength and on a `NOT_APPLICABLE` finding regardless; for a BAD finding, set it from the practice's severity table. If you catch yourself writing `NOT_APPLICABLE` together with an assessment or a severity, drop both: the clean baseline a defect-detector reports, and any practice whose subject is simply not in this change, is `NOT_APPLICABLE` alone.
 
 ## Grounding & reliability rules (MANDATORY — these override any practice prompt)
 

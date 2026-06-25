@@ -1,15 +1,9 @@
 # ADR 0022: Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup
 
-**Status:** Accepted — implementation pending (see "Implementation status")
+**Status:** Accepted
 **Date:** 2026-06-24
-**Authors:** (practice-mentoring owner)
+**Authors:** Felix T.J. Dietrich
 **Supersedes (in part):** [ADR 0021](0021-findings-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
-
-> [!NOTE]
-> This records the **decision and rationale**. The shipped schema and ubiquitous language still describe
-> the pre-migration state; see `docs/contributor/practice-feedback-schema.md` §2/§3. The detailed
-> per-row register and the snowball-research evidence live with the design work in
-> `one-for-all` `Projects/praxis-bench/DECISIONS.md` (v3).
 
 ## Context
 
@@ -91,6 +85,8 @@ reads the supersession chain.
 `feedback_thread_key`→`thread_key`, `slot`→`placement_type`, `external_ref`→`posted_comment_ref`,
 `evidence_role`→`role`, `artifact_type`→`applies_to`, `detected_at`→`observed_at`.
 
+`Practice.kind` and the observation `observer` column are transient migration scaffolding — intermediate columns that never ship in the final schema; direction is recomputed from `assessment` and the observer was always `SYSTEM`.
+
 ## Consequences
 
 - The schema speaks plainly and stops conflating measurement with evaluation; omission vs commission is
@@ -102,13 +98,6 @@ reads the supersession chain.
 - The reaction re-anchor is a build, not a rename: route, authorization (recipient via feedback), the
   tenancy join, and re-nag suppression all change.
 - One judgment call remains open: whether `replaces_id` has any reader beyond the thread-key path.
-
-## Implementation status
-
-Decided, not yet implemented. The migration folds into the single branch changelog, is validated with
-`mvn liquibase:update` + `:diff` against real Postgres (the suite uses `ddl-auto:create`, so Liquibase is
-not exercised by tests), and is followed by an ERD + OpenAPI + client regeneration. `practice-feedback-schema.md`
-§2/§3 is reconciled to this vocabulary as part of that migration.
 
 ## Evidence
 
