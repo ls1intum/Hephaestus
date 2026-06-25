@@ -63,7 +63,7 @@ public class ObservationController {
     ) {
         int safePage = Math.max(page, 0);
         int pageSize = Math.max(1, Math.min(size, 100));
-        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("detectedAt").descending());
+        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("observedAt").descending());
 
         Page<ObservationListDTO> observations = observationService
             .getObservations(workspaceContext.id(), practiceSlug, presence, pageable)
