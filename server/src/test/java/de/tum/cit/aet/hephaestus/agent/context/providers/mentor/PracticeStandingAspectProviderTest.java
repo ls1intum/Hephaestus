@@ -11,10 +11,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.AreaStandingRow;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
@@ -73,8 +73,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     private static AreaStandingRow row(
         String slug,
         String name,
-        PracticeKind pol,
         Presence v,
+        Assessment assessment,
         Severity sev,
         long count,
         long recent
@@ -91,13 +91,13 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
             }
 
             @Override
-            public PracticeKind getKind() {
-                return pol;
+            public Presence getPresence() {
+                return v;
             }
 
             @Override
-            public Presence getObservation() {
-                return v;
+            public Assessment getAssessment() {
+                return assessment;
             }
 
             @Override
@@ -131,15 +131,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void allNaAreaIsBlind() {
         List<Practice> spine = List.of(practice("constructive-code-review", "Reviewing constructively"));
         List<AreaStandingRow> rows = List.of(
-            row(
-                "constructive-code-review",
-                "Reviewing constructively",
-                PracticeKind.GOOD_PRACTICE,
-                Presence.NOT_APPLICABLE,
-                Severity.INFO,
-                5,
-                0
-            )
+            // former GOOD practice + NOT_APPLICABLE -> (NOT_APPLICABLE, null)
+            row("constructive-code-review", "Reviewing constructively", Presence.NOT_APPLICABLE, null, Severity.INFO, 5, 0)
         );
         JsonNode root = build(spine, rows);
 
@@ -154,15 +147,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void flagOnlyAreaHasPraiseChannelClosed() {
         List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
         List<AreaStandingRow> rows = List.of(
-            row(
-                "robust-error-handling",
-                "Handling failure robustly",
-                PracticeKind.GOOD_PRACTICE,
-                Presence.NOT_OBSERVED,
-                Severity.MAJOR,
-                3,
-                1
-            )
+            // former GOOD practice + NOT_OBSERVED -> (ABSENT, BAD) [a gap]
+            row("robust-error-handling", "Handling failure robustly", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, 3, 1)
         );
         JsonNode root = build(spine, rows);
 
@@ -178,15 +164,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void affirmedAreaOpensPraiseChannel() {
         List<Practice> spine = List.of(practice("review-ready-work", "Submitting review-ready work"));
         List<AreaStandingRow> rows = List.of(
-            row(
-                "review-ready-work",
-                "Submitting review-ready work",
-                PracticeKind.GOOD_PRACTICE,
-                Presence.OBSERVED,
-                Severity.INFO,
-                2,
-                1
-            )
+            // former GOOD practice + OBSERVED -> (PRESENT, GOOD) [a strength]
+            row("review-ready-work", "Submitting review-ready work", Presence.PRESENT, Assessment.GOOD, Severity.INFO, 2, 1)
         );
         JsonNode root = build(spine, rows);
 
@@ -196,19 +175,12 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("PracticeKind drives sign: an BAD_PRACTICE practice counts OBSERVED as a problem")
+    @DisplayName("assessment drives sign: a BAD-assessment observation counts as a problem")
     void polarityDrivesCounts() {
         List<Practice> spine = List.of(practice("anti-pattern", "Avoids anti-patterns"));
         List<AreaStandingRow> rows = List.of(
-            row(
-                "anti-pattern",
-                "Avoids anti-patterns",
-                PracticeKind.BAD_PRACTICE,
-                Presence.OBSERVED,
-                Severity.MAJOR,
-                4,
-                2
-            )
+            // former BAD practice + OBSERVED -> (PRESENT, BAD) [a problem]
+            row("anti-pattern", "Avoids anti-patterns", Presence.PRESENT, Assessment.BAD, Severity.MAJOR, 4, 2)
         );
         JsonNode root = build(spine, rows);
 
@@ -229,17 +201,9 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
             )
         );
         List<AreaStandingRow> rows = List.of(
-            row("minor-area", "Minor area", PracticeKind.GOOD_PRACTICE, Presence.NOT_OBSERVED, Severity.MINOR, 2, 0),
-            row(
-                "critical-area",
-                "Critical area",
-                PracticeKind.GOOD_PRACTICE,
-                Presence.NOT_OBSERVED,
-                Severity.CRITICAL,
-                1,
-                1
-            ),
-            row("blind-area", "Blind area", PracticeKind.GOOD_PRACTICE, Presence.NOT_APPLICABLE, Severity.INFO, 3, 0)
+            row("minor-area", "Minor area", Presence.ABSENT, Assessment.BAD, Severity.MINOR, 2, 0),
+            row("critical-area", "Critical area", Presence.ABSENT, Assessment.BAD, Severity.CRITICAL, 1, 1),
+            row("blind-area", "Blind area", Presence.NOT_APPLICABLE, null, Severity.INFO, 3, 0)
         );
         JsonNode root = build(spine, rows);
 
@@ -258,8 +222,8 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void worstSeverityIsMostSevere() {
         List<Practice> spine = List.of(practice("g", "Area"));
         List<AreaStandingRow> rows = List.of(
-            row("g", "Area", PracticeKind.GOOD_PRACTICE, Presence.NOT_OBSERVED, Severity.MINOR, 1, 0),
-            row("g", "Area", PracticeKind.GOOD_PRACTICE, Presence.NOT_OBSERVED, Severity.CRITICAL, 1, 0)
+            row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MINOR, 1, 0),
+            row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.CRITICAL, 1, 0)
         );
         JsonNode root = build(spine, rows);
         assertThat(area(root, "g").get("topSeverity").asString()).isEqualTo("CRITICAL");
@@ -284,15 +248,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         );
         when(findingRepository.findAreaStandingByDeveloperAndWorkspace(eq(7L), eq(1L), any(), any())).thenReturn(
             List.of(
-                row(
-                    "review-ready-work",
-                    "Submitting review-ready work",
-                    PracticeKind.GOOD_PRACTICE,
-                    Presence.OBSERVED,
-                    Severity.INFO,
-                    2,
-                    1
-                )
+                row("review-ready-work", "Submitting review-ready work", Presence.PRESENT, Assessment.GOOD, Severity.INFO, 2, 1)
             )
         );
 
@@ -318,7 +274,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         JsonNode root = build(
             List.of(practice("g", "Area")),
             List.of(
-                row("g", "Area", PracticeKind.GOOD_PRACTICE, Presence.NOT_OBSERVED, Severity.MAJOR, count, recent)
+                row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, count, recent)
             )
         );
         return area(root, "g").get("trajectory").asString();

@@ -231,14 +231,16 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 {
                   "practiceSlug": "pr-description-quality",
                   "title": "Good PR description",
-                  "observation": "OBSERVED",
+                  "presence": "PRESENT",
+                  "assessment": "GOOD",
                   "severity": "INFO",
                   "confidence": 0.95
                 },
                 {
                   "practiceSlug": "error-handling",
                   "title": "Missing null check",
-                  "observation": "NOT_OBSERVED",
+                  "presence": "ABSENT",
+                  "assessment": "BAD",
                   "severity": "MAJOR",
                   "confidence": 0.85,
                   "reasoning": "The method does not check for null input.",
@@ -269,8 +271,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             List<Observation> findings = practiceFindingRepository.findAll();
             assertThat(findings).hasSize(2);
             assertThat(findings)
-                .extracting(Observation::getObservation)
-                .containsExactlyInAnyOrder(Presence.OBSERVED, Presence.NOT_OBSERVED);
+                .extracting(Observation::getPresence)
+                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
 
             // Verify completion event
             List<PracticeDetectionCompletedEvent> events = applicationEvents
@@ -301,14 +303,16 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "observation": "OBSERVED",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Proper error handling",
-                      "observation": "OBSERVED",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     }
@@ -353,21 +357,24 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
-                      "observation": "OBSERVED",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
                       "title": "Unknown practice",
-                      "observation": "OBSERVED",
+                      "presence": "PRESENT",
+                      "assessment": "GOOD",
                       "severity": "INFO",
                       "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
                       "title": "Good handling",
-                      "observation": "NOT_OBSERVED",
+                      "presence": "ABSENT",
+                      "assessment": "BAD",
                       "severity": "MINOR",
                       "confidence": 0.8
                     }

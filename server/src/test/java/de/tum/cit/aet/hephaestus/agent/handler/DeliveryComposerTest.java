@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -66,7 +66,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             humanizeTitle(slug) + " (positive)",
-            Presence.OBSERVED,
+            Presence.PRESENT,
+            Assessment.GOOD,
             Severity.INFO,
             0.90f,
             null,
@@ -88,7 +89,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Presence.NOT_OBSERVED,
+            Presence.ABSENT,
+            Assessment.BAD,
             severity,
             0.92f,
             buildEvidence(locations, snippets),
@@ -248,7 +250,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding withReasoning = new ValidatedFinding(
             "error-state-handling",
             "Error state handling (positive)",
-            Presence.OBSERVED,
+            Presence.PRESENT,
+            Assessment.GOOD,
             Severity.INFO,
             0.95f,
             null,
@@ -872,7 +875,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Presence.OBSERVED,
+            Presence.PRESENT,
+            Assessment.GOOD,
             Severity.INFO,
             0.9f,
             null,
@@ -883,7 +887,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding real = new ValidatedFinding(
             "issue-scoped-to-single-concern",
             "Single concern",
-            Presence.OBSERVED,
+            Presence.PRESENT,
+            Assessment.GOOD,
             Severity.INFO,
             0.9f,
             null,
@@ -906,7 +911,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding scrubbed = new ValidatedFinding(
             "issue-has-checkable-outcome",
             "Checkable outcome",
-            Presence.OBSERVED,
+            Presence.PRESENT,
+            Assessment.GOOD,
             Severity.INFO,
             0.9f,
             null,
@@ -963,6 +969,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "issue-scoped-to-single-concern",
             "n/a",
             Presence.NOT_APPLICABLE,
+            null,
             Severity.INFO,
             0.9f,
             null,
@@ -974,6 +981,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "issue-has-checkable-outcome",
             "n/a",
             Presence.NOT_APPLICABLE,
+            null,
             Severity.INFO,
             0.9f,
             null,
@@ -1181,7 +1189,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         return new ValidatedFinding(
             slug,
             title,
-            Presence.NOT_OBSERVED,
+            Presence.ABSENT,
+            Assessment.BAD,
             severity,
             confidence,
             buildEvidence(List.of(new LocationSpec(slug + ".swift", 10)), null),
@@ -1296,34 +1305,47 @@ class DeliveryComposerTest extends BaseUnitTest {
 
     @Test
     void undesirablePracticeObservedObservationIsTreatedAsAProblem() {
-        // An anti-pattern practice (kind BAD_PRACTICE) whose bad behaviour was OBSERVED is a problem,
-        // not a strength (ADR 0021, F-6). The same finding under the default GOOD_PRACTICE reading is a
-        // strength and surfaces no diff note — proving the partition consults kind, not raw observation.
-        ValidatedFinding observed = new ValidatedFinding(
+        // The assessment now lives on the finding (ADR 0022): a present bad behaviour (PRESENT, BAD) is a
+        // problem and surfaces an inline diff note, while the same present behaviour read as a strength
+        // (PRESENT, GOOD) surfaces none — proving the partition consults assessment, not raw presence.
+        JsonNode evidence = buildEvidence(
+            List.of(new LocationSpec("Views/StockView.swift", 42)),
+            List.of("let u = URL(s)!")
+        );
+        ValidatedFinding asProblemFinding = new ValidatedFinding(
             "uses-force-unwrap",
             "Force-unwrap present in changed code",
-            Presence.OBSERVED,
+            Presence.PRESENT,
+            Assessment.BAD,
             Severity.MAJOR,
             0.92f,
-            buildEvidence(List.of(new LocationSpec("Views/StockView.swift", 42)), List.of("let u = URL(s)!")),
+            evidence,
+            "Force-unwrapping crashes on nil.",
+            "Use guard-let instead.",
+            List.of()
+        );
+        ValidatedFinding asStrengthFinding = new ValidatedFinding(
+            "uses-force-unwrap",
+            "Force-unwrap present in changed code",
+            Presence.PRESENT,
+            Assessment.GOOD,
+            Severity.MAJOR,
+            0.92f,
+            evidence,
             "Force-unwrapping crashes on nil.",
             "Use guard-let instead.",
             List.of()
         );
 
-        DeliveryContent asProblem = DeliveryComposer.compose(
-            List.of(observed),
-            WorkArtifact.PULL_REQUEST,
-            Map.of("uses-force-unwrap", PracticeKind.BAD_PRACTICE)
-        );
-        DeliveryContent asStrength = DeliveryComposer.compose(List.of(observed), WorkArtifact.PULL_REQUEST, Map.of());
+        DeliveryContent asProblem = DeliveryComposer.compose(List.of(asProblemFinding), WorkArtifact.PULL_REQUEST);
+        DeliveryContent asStrength = DeliveryComposer.compose(List.of(asStrengthFinding), WorkArtifact.PULL_REQUEST);
 
         assertThat(asProblem).isNotNull();
-        assertThat(asProblem.diffNotes()).as("BAD_PRACTICE+OBSERVED is a problem → inline diff note").isNotEmpty();
+        assertThat(asProblem.diffNotes()).as("(PRESENT, BAD) is a problem → inline diff note").isNotEmpty();
         assertThat(asProblem.mrNote()).contains("Force-unwrap present in changed code");
 
         assertThat(asStrength).isNotNull();
-        assertThat(asStrength.diffNotes()).as("GOOD_PRACTICE+OBSERVED is a strength → no problem diff note").isEmpty();
+        assertThat(asStrength.diffNotes()).as("(PRESENT, GOOD) is a strength → no problem diff note").isEmpty();
     }
 
     @Test
@@ -1470,7 +1492,6 @@ class DeliveryComposerTest extends BaseUnitTest {
             findings,
             WorkArtifact.PULL_REQUEST,
             Map.of(),
-            Map.of(),
             Set.of()
         );
         assertThat(firstPass).contains("Dead code in view").contains("Non-descriptive name 'Data'");
@@ -1480,7 +1501,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         String demoted = DeliveryComposer.recomposeMrNote(
             findings,
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of(),
             Set.of("corr-delivered")
         );
@@ -1521,7 +1541,6 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of(a, b),
             WorkArtifact.PULL_REQUEST,
             Map.of(),
-            Map.of(),
             Set.of("k-a", "k-b")
         );
 
@@ -1548,7 +1567,6 @@ class DeliveryComposerTest extends BaseUnitTest {
             List.of(keyless),
             WorkArtifact.PULL_REQUEST,
             Map.of(),
-            Map.of(),
             Set.of("some-other-key")
         );
 
@@ -1564,7 +1582,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding stamped = new ValidatedFinding(
             "code-hygiene",
             "Long method",
-            Presence.NOT_OBSERVED,
+            Presence.ABSENT,
+            Assessment.BAD,
             Severity.MINOR,
             0.9f,
             buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),
@@ -1596,7 +1615,8 @@ class DeliveryComposerTest extends BaseUnitTest {
         ValidatedFinding stamped = new ValidatedFinding(
             "code-hygiene",
             "Missing test",
-            Presence.NOT_OBSERVED,
+            Presence.ABSENT,
+            Assessment.BAD,
             Severity.MINOR,
             0.9f,
             buildEvidence(List.of(new LocationSpec("Views/DashboardView.swift", 20)), null),
@@ -1637,7 +1657,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent result = DeliveryComposer.compose(
             List.of(f),
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of("scope-one-reviewable-change", SCOPE_WHY)
         );
 
@@ -1662,7 +1681,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         String withEmptyMap = DeliveryComposer.compose(
             List.of(f),
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of()
         ).mrNote();
 
@@ -1695,7 +1713,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         String note = DeliveryComposer.compose(
             List.of(a, b),
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of("scope-one-reviewable-change", SCOPE_WHY)
         ).mrNote();
 
@@ -1718,7 +1735,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         DeliveryContent result = DeliveryComposer.compose(
             List.of(info),
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of(
                 "leaves-the-code-clean-with-intent-revealing-comments",
                 "Intent-revealing code lowers the next reader's cost."
@@ -1754,7 +1770,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         String note = DeliveryComposer.compose(
             List.of(a, b),
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of(
                 "describe-what-and-why",
                 "A clear description lets a reviewer orient before reading the diff.",
@@ -1791,7 +1806,6 @@ class DeliveryComposerTest extends BaseUnitTest {
         String note = DeliveryComposer.compose(
             List.of(blocking, advisory),
             WorkArtifact.PULL_REQUEST,
-            Map.of(),
             Map.of(
                 "handles-errors-instead-of-swallowing-them",
                 "A swallowed error turns a loud failure into a silent one nobody can debug.",

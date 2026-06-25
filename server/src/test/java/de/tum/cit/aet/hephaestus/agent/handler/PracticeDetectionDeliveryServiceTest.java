@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -127,7 +128,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyLong(),
                     any(),
                     anyString(),
-                    anyString(),
+                    any(), // assessment — null for NOT_APPLICABLE, so any() (anyString() would not match null)
                     anyString(),
                     anyFloat(),
                     any(),
@@ -139,11 +140,22 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             .thenReturn(1);
     }
 
-    private ValidatedFinding validFinding(String slug, Presence observation) {
+    /**
+     * Build a finding whose valence follows the former-GOOD practice convention used across these
+     * fixtures (pr-description-quality, error-handling): PRESENT→GOOD strength, ABSENT→BAD gap,
+     * NOT_APPLICABLE→null. The assessment slot sits right after presence on {@link ValidatedFinding}.
+     */
+    private ValidatedFinding validFinding(String slug, Presence presence) {
+        Assessment assessment = switch (presence) {
+            case PRESENT -> Assessment.GOOD;
+            case ABSENT -> Assessment.BAD;
+            case NOT_APPLICABLE -> null;
+        };
         return new ValidatedFinding(
             slug,
             "Test finding",
-            observation,
+            presence,
+            assessment,
             Severity.INFO,
             0.9f,
             null,
@@ -158,7 +170,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void persistsValidFinding() {
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -174,10 +186,10 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("PULL_REQUEST"),
                 eq(456L),
-                eq(789L),
-                eq(789L),
+                eq(789L), // subjectUserId
                 eq("Test finding"),
-                eq("OBSERVED"),
+                eq("PRESENT"), // presence (OBSERVED → PRESENT, ADR 0022)
+                eq("GOOD"), // assessment (former-GOOD practice OBSERVED → strength)
                 eq("INFO"),
                 eq(0.9f),
                 isNull(),
@@ -201,7 +213,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void unknownSlug() {
-            var findings = List.of(validFinding("unknown-practice", Presence.OBSERVED));
+            var findings = List.of(validFinding("unknown-practice", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -232,7 +244,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("returns 0 inserted when workspace has no practices")
         void emptyPracticeCatalog() {
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(1L)).thenReturn(List.of());
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -248,7 +260,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("throws when pull request not found")
         void prNotFound() {
             when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.empty());
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -259,7 +271,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @DisplayName("throws when pull request has no author")
         void prNoAuthor() {
             testPr.setAuthor(null);
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -273,7 +285,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void nullMetadata() {
             testJob.setMetadata(null);
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -283,7 +295,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void missingPullRequestId() {
             testJob.setMetadata(objectMapper.createObjectNode());
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> service.deliver(testJob, findings))
                 .isInstanceOf(JobDeliveryException.class)
@@ -298,7 +310,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsAllNegativesForPractice() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
-                findings.add(validFinding("pr-description-quality", Presence.NOT_OBSERVED));
+                findings.add(validFinding("pr-description-quality", Presence.ABSENT));
             }
 
             var result = service.deliver(testJob, findings);
@@ -311,7 +323,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         void persistsManyPositiveFindings() {
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 10; i++) {
-                findings.add(validFinding("pr-description-quality", Presence.OBSERVED));
+                findings.add(validFinding("pr-description-quality", Presence.PRESENT));
             }
 
             var result = service.deliver(testJob, findings);
@@ -331,8 +343,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             var findings = new java.util.ArrayList<ValidatedFinding>();
             for (int i = 0; i < 5; i++) {
-                findings.add(validFinding("pr-description-quality", Presence.NOT_OBSERVED));
-                findings.add(validFinding("error-handling", Presence.NOT_OBSERVED));
+                findings.add(validFinding("pr-description-quality", Presence.ABSENT));
+                findings.add(validFinding("error-handling", Presence.ABSENT));
             }
 
             var result = service.deliver(testJob, findings);
@@ -395,7 +407,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(0);
 
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             var result = service.deliver(testJob, findings);
 
@@ -405,7 +417,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         @Test
         void keyFormat() {
-            var findings = List.of(validFinding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.PRESENT));
 
             service.deliver(testJob, findings);
 
@@ -450,9 +462,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             var findings = List.of(
-                validFinding("pr-description-quality", Presence.OBSERVED),
-                validFinding("error-handling", Presence.NOT_OBSERVED),
-                validFinding("unknown-slug", Presence.OBSERVED)
+                validFinding("pr-description-quality", Presence.PRESENT),
+                validFinding("error-handling", Presence.ABSENT),
+                validFinding("unknown-slug", Presence.PRESENT)
             );
 
             service.deliver(testJob, findings);
@@ -484,7 +496,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             meta.put("issue_id", 999L);
             testJob.setMetadata(meta);
 
-            var findings = List.of(validFinding("pr-description-quality", Presence.NOT_OBSERVED));
+            var findings = List.of(validFinding("pr-description-quality", Presence.ABSENT));
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(1);
@@ -496,11 +508,11 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("ISSUE"),
                 eq(999L),
-                eq(789L),
-                eq(789L),
-                anyString(),
-                eq("NOT_OBSERVED"),
-                anyString(),
+                eq(789L), // subjectUserId
+                anyString(), // title
+                eq("ABSENT"), // presence (NOT_OBSERVED → ABSENT, ADR 0022)
+                eq("BAD"), // assessment (former-GOOD practice ABSENT → gap)
+                anyString(), // severity
                 anyFloat(),
                 any(),
                 any(),

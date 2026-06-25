@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -65,7 +66,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void flagOff_passesThroughUnchanged_noRepoCalls() {
-        List<ValidatedFinding> in = List.of(vf(SLUG, Presence.NOT_OBSERVED));
+        List<ValidatedFinding> in = List.of(vf(SLUG, Presence.ABSENT));
 
         var d = filter(false).evaluate(TestEntities.agentJob(), in);
 
@@ -78,7 +79,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void disputedLocus_isSuppressedAndLedgered() {
         stubPersistedAndReaction(FindingReactionAction.DISPUTED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).isEmpty();
         assertThat(d.suppressedCount()).isEqualTo(1);
@@ -99,7 +100,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         var filter = filter(true);
         var job = TestEntities.agentJob();
-        var in = List.of(vf(SLUG, Presence.NOT_OBSERVED));
+        var in = List.of(vf(SLUG, Presence.ABSENT));
 
         assertThatCode(() -> filter.evaluate(job, in)).doesNotThrowAnyException();
         assertThat(filter.evaluate(job, in).deliverable()).isEmpty(); // still suppressed despite the failed write
@@ -113,7 +114,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             List.of()
         );
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -123,7 +124,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void appliedButStillNotObserved_isKeptWithStifferOpener() {
         stubPersistedAndReaction(FindingReactionAction.ADDRESSED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.NOT_OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -136,7 +137,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         // untouched (escalation is keyed on observation == NOT_OBSERVED, not on the reaction alone).
         stubPersistedAndReaction(FindingReactionAction.ADDRESSED);
 
-        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.OBSERVED)));
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.PRESENT)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
@@ -154,11 +155,17 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         );
     }
 
-    private static ValidatedFinding vf(String slug, Presence observation) {
+    private static ValidatedFinding vf(String slug, Presence presence) {
+        // Former GOOD practice: PRESENT->GOOD (strength), ABSENT->BAD (gap), NA->null.
+        Assessment assessment =
+            presence == Presence.NOT_APPLICABLE
+                ? null
+                : presence == Presence.PRESENT ? Assessment.GOOD : Assessment.BAD;
         return new ValidatedFinding(
             slug,
             slug + " title",
-            observation,
+            presence,
+            assessment,
             Severity.MINOR,
             0.8f,
             null,

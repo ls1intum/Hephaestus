@@ -60,9 +60,7 @@ class FindingReactionServiceTest extends BaseUnitTest {
     }
 
     private Observation createFinding(Long developerId) {
-        User developer = new User();
-        developer.setId(developerId);
-        return Observation.builder().id(FINDING_ID).developer(developer).build();
+        return Observation.builder().id(FINDING_ID).aboutUserId(developerId).build();
     }
 
     private User createUser(Long id) {

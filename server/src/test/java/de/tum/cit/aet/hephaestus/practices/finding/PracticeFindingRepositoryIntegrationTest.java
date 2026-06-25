@@ -101,9 +101,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 42L,
                 developer.getId(),
-                developer.getId(),
                 "Good PR description",
-                "OBSERVED",
+                "PRESENT",
+                "GOOD",
                 "INFO",
                 0.95f,
                 null,
@@ -117,7 +117,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             Observation found = practiceFindingRepository.findById(id).orElseThrow();
             assertThat(found.getOccurrenceKey()).isEqualTo("key-1");
             assertThat(found.getTitle()).isEqualTo("Good PR description");
-            assertThat(found.getObservation().name()).isEqualTo("OBSERVED");
+            assertThat(found.getPresence().name()).isEqualTo("PRESENT");
             assertThat(found.getSeverity().name()).isEqualTo("INFO");
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
@@ -139,9 +139,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
-                developer.getId(),
                 "Duplicate test",
-                "OBSERVED",
+                "PRESENT",
+                "GOOD",
                 "INFO",
                 0.8f,
                 null,
@@ -159,9 +159,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
-                developer.getId(),
                 "Should not insert",
-                "NOT_OBSERVED",
+                "ABSENT",
+                "BAD",
                 "MAJOR",
                 0.5f,
                 null,
@@ -189,9 +189,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 99L,
                 developer.getId(),
-                developer.getId(),
                 "Missing error handling in Main.java",
-                "NOT_OBSERVED",
+                "ABSENT",
+                "BAD",
                 "MAJOR",
                 0.7f,
                 evidence,
@@ -225,9 +225,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
-                developer.getId(),
                 "Purge test finding",
-                "OBSERVED",
+                "PRESENT",
+                "GOOD",
                 "INFO",
                 0.9f,
                 null,
@@ -274,9 +274,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
-                developer.getId(),
                 "WS-A finding",
-                "OBSERVED",
+                "PRESENT",
+                "GOOD",
                 "INFO",
                 0.9f,
                 null,
@@ -294,9 +294,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
-                developer.getId(),
                 "WS-B finding",
-                "NOT_OBSERVED",
+                "ABSENT",
+                "BAD",
                 "MINOR",
                 0.5f,
                 null,
@@ -340,9 +340,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
-                developer.getId(),
                 "Cascade test 1",
-                "NOT_OBSERVED",
+                "ABSENT",
+                "BAD",
                 "MAJOR",
                 0.6f,
                 null,
@@ -360,9 +360,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
-                developer.getId(),
                 "Cascade test 2",
-                "OBSERVED",
+                "PRESENT",
+                "GOOD",
                 "INFO",
                 0.9f,
                 null,
@@ -398,10 +398,10 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         void aggregatesSinglePractice() {
             // Insert 3 NEGATIVE and 1 POSITIVE for the same practice
-            insertFinding("sum-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-18T10:00:00Z"));
-            insertFinding("sum-2", practice, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
-            insertFinding("sum-3", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T14:30:00Z"));
-            insertFinding("sum-4", practice, "OBSERVED", Instant.parse("2026-03-17T08:00:00Z"));
+            insertFinding("sum-1", practice, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
+            insertFinding("sum-2", practice, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
+            insertFinding("sum-3", practice, "ABSENT", Instant.parse("2026-03-20T14:30:00Z"));
+            insertFinding("sum-4", practice, "PRESENT", Instant.parse("2026-03-17T08:00:00Z"));
 
             List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
                 developer.getId(),
@@ -412,7 +412,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             DeveloperPracticeSummary negative = result
                 .stream()
-                .filter(s -> s.getObservation() == Presence.NOT_OBSERVED)
+                .filter(s -> s.getPresence() == Presence.ABSENT)
                 .findFirst()
                 .orElseThrow();
             assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
@@ -421,7 +421,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             DeveloperPracticeSummary positive = result
                 .stream()
-                .filter(s -> s.getObservation() == Presence.OBSERVED)
+                .filter(s -> s.getPresence() == Presence.PRESENT)
                 .findFirst()
                 .orElseThrow();
             assertThat(positive.getCount()).isEqualTo(1);
@@ -437,8 +437,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             secondPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
             secondPractice = practiceRepository.save(secondPractice);
 
-            insertFinding("multi-1", practice, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
-            insertFinding("multi-2", secondPractice, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
+            insertFinding("multi-1", practice, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("multi-2", secondPractice, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
 
             List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
                 developer.getId(),
@@ -469,7 +469,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherJob = agentJobRepository.save(otherJob);
 
             // Finding in target workspace
-            insertFinding("iso-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("iso-1", practice, "ABSENT", Instant.parse("2026-03-20T10:00:00Z"));
             // Finding in other workspace (same developer)
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -480,9 +480,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 2L,
                 developer.getId(),
-                developer.getId(),
                 "Other WS finding",
-                "NOT_OBSERVED",
+                "ABSENT",
+                "BAD",
                 "MAJOR",
                 0.8f,
                 null,
@@ -507,9 +507,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             Instant latest = Instant.parse("2026-03-20T14:30:00Z");
             Instant middle = Instant.parse("2026-03-18T12:00:00Z");
 
-            insertFinding("time-1", practice, "NOT_OBSERVED", earliest);
-            insertFinding("time-2", practice, "NOT_OBSERVED", latest);
-            insertFinding("time-3", practice, "NOT_OBSERVED", middle);
+            insertFinding("time-1", practice, "ABSENT", earliest);
+            insertFinding("time-2", practice, "ABSENT", latest);
+            insertFinding("time-3", practice, "ABSENT", middle);
 
             List<DeveloperPracticeSummary> result = practiceFindingRepository.findDeveloperPracticeSummary(
                 developer.getId(),
@@ -529,7 +529,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             otherDeveloper = userRepository.save(otherDeveloper);
 
             // Finding for target developer
-            insertFinding("contrib-iso-1", practice, "NOT_OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("contrib-iso-1", practice, "ABSENT", Instant.parse("2026-03-20T10:00:00Z"));
             // Finding for other developer (same practice, same workspace)
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -540,9 +540,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 2L,
                 otherDeveloper.getId(),
-                otherDeveloper.getId(),
                 "Other developer finding",
-                "NOT_OBSERVED",
+                "ABSENT",
+                "BAD",
                 "MAJOR",
                 0.8f,
                 null,
@@ -564,7 +564,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         private void insertFinding(
             String idempotencyKey,
             Practice targetPractice,
-            String observation,
+            String presence,
             Instant detectedAt
         ) {
             practiceFindingRepository.insertIfAbsent(
@@ -576,9 +576,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
-                developer.getId(),
                 "Test finding",
-                observation,
+                presence,
+                assessmentFor(presence),
                 "INFO",
                 0.9f,
                 null,
@@ -586,6 +586,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 detectedAt
             );
+        }
+
+        /** Former-GOOD practice valence: PRESENT is a strength (GOOD), ABSENT is a problem (BAD). */
+        private static String assessmentFor(String presence) {
+            return "PRESENT".equals(presence) ? "GOOD" : "BAD";
         }
     }
 
@@ -600,7 +605,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             return agentJobRepository.save(job);
         }
 
-        private void insertForJob(String key, UUID jobId, long artifactId, String observation, Instant detectedAt) {
+        private void insertForJob(String key, UUID jobId, long artifactId, String presence, Instant detectedAt) {
             practiceFindingRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 key,
@@ -610,9 +615,10 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 artifactId,
                 developer.getId(),
-                developer.getId(),
                 "finding",
-                observation,
+                presence,
+                // Former-GOOD practice valence: PRESENT -> GOOD (strength), ABSENT -> BAD (problem).
+                "PRESENT".equals(presence) ? "GOOD" : "BAD",
                 "INFO",
                 0.9f,
                 null,
@@ -625,12 +631,12 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("dashboard summary counts only the latest run per target (re-review dedup)")
         void countsOnlyLatestRunPerArtifact() {
-            // The SAME target (PR 42) reviewed twice: an earlier run said NOT_OBSERVED, a later run said OBSERVED.
+            // The SAME target (PR 42) reviewed twice: an earlier run said ABSENT/BAD, a later run said PRESENT/GOOD.
             // A naive COUNT would show 2 findings (1 observed, 1 not-observed); the dashboard must show the
             // target's CURRENT state only — 1 finding, observed.
             AgentJob laterJob = anotherJob();
-            insertForJob("dedup-old", agentJob.getId(), 42L, "NOT_OBSERVED", Instant.parse("2026-03-18T10:00:00Z"));
-            insertForJob("dedup-new", laterJob.getId(), 42L, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
+            insertForJob("dedup-old", agentJob.getId(), 42L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
+            insertForJob("dedup-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
 
             List<DeveloperPracticeSummaryProjection> result =
                 practiceFindingRepository.findSummaryByDeveloperAndWorkspace(developer.getId(), workspace.getId());
@@ -639,20 +645,20 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             DeveloperPracticeSummaryProjection row = result.get(0);
             assertThat(row.getPracticeSlug()).isEqualTo("test-practice");
             assertThat(row.getTotalFindings()).isEqualTo(1L);
-            assertThat(row.getObservedCount()).isEqualTo(1L);
-            assertThat(row.getNotObservedCount()).isEqualTo(0L);
+            assertThat(row.getGoodCount()).isEqualTo(1L);
+            assertThat(row.getBadCount()).isEqualTo(0L);
             assertThat(row.getLastFindingAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
         }
 
         @Test
         @DisplayName("each distinct target contributes its own latest run")
         void countsEachTargetIndependently() {
-            // Target 42 reviewed twice (latest = OBSERVED); target 43 reviewed once (NOT_OBSERVED). The dedup is
+            // Target 42 reviewed twice (latest = PRESENT/GOOD); target 43 reviewed once (ABSENT/BAD). The dedup is
             // per-target, so the older run survives for 43 while only the newer run survives for 42.
             AgentJob laterJob = anotherJob();
-            insertForJob("t42-old", agentJob.getId(), 42L, "NOT_OBSERVED", Instant.parse("2026-03-18T10:00:00Z"));
-            insertForJob("t42-new", laterJob.getId(), 42L, "OBSERVED", Instant.parse("2026-03-20T10:00:00Z"));
-            insertForJob("t43", agentJob.getId(), 43L, "NOT_OBSERVED", Instant.parse("2026-03-19T10:00:00Z"));
+            insertForJob("t42-old", agentJob.getId(), 42L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
+            insertForJob("t42-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
+            insertForJob("t43", agentJob.getId(), 43L, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
 
             List<DeveloperPracticeSummaryProjection> result =
                 practiceFindingRepository.findSummaryByDeveloperAndWorkspace(developer.getId(), workspace.getId());
@@ -660,8 +666,8 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(result).hasSize(1);
             DeveloperPracticeSummaryProjection row = result.get(0);
             assertThat(row.getTotalFindings()).isEqualTo(2L);
-            assertThat(row.getObservedCount()).isEqualTo(1L);
-            assertThat(row.getNotObservedCount()).isEqualTo(1L);
+            assertThat(row.getGoodCount()).isEqualTo(1L);
+            assertThat(row.getBadCount()).isEqualTo(1L);
         }
     }
 
@@ -681,9 +687,9 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PULL_REQUEST",
                 1L,
                 developer.getId(),
-                developer.getId(),
                 "Enum mapping test",
-                "OBSERVED",
+                "PRESENT",
+                "GOOD",
                 "INFO",
                 0.9f,
                 null,

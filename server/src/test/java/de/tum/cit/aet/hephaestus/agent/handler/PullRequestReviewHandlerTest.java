@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -367,14 +368,14 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingInDiff() {
-            var finding = finding("fatal-error-crash", Presence.NOT_OBSERVED, "Sources/View.swift");
+            var finding = finding("fatal-error-crash", Presence.ABSENT, "Sources/View.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Presence.NOT_OBSERVED, "inputs/context/metadata.json");
+            var finding = finding("mr-description-quality", Presence.ABSENT, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }
@@ -383,27 +384,34 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void filtersFindingBackedByNonWhitelistedInternal() {
             // contributor_history.json is an internal context file but NOT in ALLOWED_INTERNAL_CONTEXT_PATHS
             // (unlike comments.json, which reviewer practices legitimately cite as evidence and must survive).
-            var finding = finding("review-noise", Presence.NOT_OBSERVED, "inputs/context/contributor_history.json");
+            var finding = finding("review-noise", Presence.ABSENT, "inputs/context/contributor_history.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         @Test
         void filtersFindingOutsideDiff() {
-            var finding = finding("view-logic-separation", Presence.NOT_OBSERVED, "Sources/Other.swift");
+            var finding = finding("view-logic-separation", Presence.ABSENT, "Sources/Other.swift");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).isEmpty();
         }
 
         private PracticeDetectionResultParser.ValidatedFinding finding(
             String slug,
-            Presence observation,
+            Presence presence,
             String path
         ) {
+            // Former-GOOD practice convention: PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
+            Assessment assessment = switch (presence) {
+                case PRESENT -> Assessment.GOOD;
+                case ABSENT -> Assessment.BAD;
+                case NOT_APPLICABLE -> null;
+            };
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "title",
-                observation,
+                presence,
+                assessment,
                 Severity.MINOR,
                 0.8f,
                 objectMapper
@@ -459,7 +467,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                   "findings": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Good PR description",
-                    "observation": "OBSERVED",
+                    "presence": "PRESENT",
+                    "assessment": "GOOD",
                     "severity": "INFO",
                     "confidence": 0.95
                   }]
@@ -493,7 +502,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                   "findings": [{
                     "practiceSlug": "error-handling",
                     "title": "Unhandled error path",
-                    "observation": "NOT_OBSERVED",
+                    "presence": "ABSENT",
+                    "assessment": "BAD",
                     "severity": "MAJOR",
                     "confidence": 0.9,
                     "reasoning": "The error branch is swallowed.",

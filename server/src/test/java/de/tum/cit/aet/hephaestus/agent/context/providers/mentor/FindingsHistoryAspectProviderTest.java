@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.ObservationCount;
+import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -74,9 +74,9 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         JsonNode root = objectMapper.readTree(bytes);
         assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(0L);
-        // All observations present even when count is 0 — keeps the wire shape stable.
+        // All presence states present even when count is 0 — keeps the wire shape stable.
         for (Presence v : Presence.values()) {
-            assertThat(root.get("summary").get("byObservation").has(v.name())).isTrue();
+            assertThat(root.get("summary").get("byPresence").has(v.name())).isTrue();
         }
         for (Severity s : Severity.values()) {
             assertThat(root.get("summary").get("bySeverity").has(s.name())).isTrue();
@@ -94,8 +94,8 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         when(
             findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
-        ObservationCount positive = mockObservationCount(Presence.OBSERVED, 3L);
-        ObservationCount negative = mockObservationCount(Presence.NOT_OBSERVED, 1L);
+        PresenceCount positive = mockObservationCount(Presence.PRESENT, 3L);
+        PresenceCount negative = mockObservationCount(Presence.ABSENT, 1L);
         when(findingRepository.countByObservationForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(
             List.of(positive, negative)
         );
@@ -111,17 +111,17 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/findings_history.json"));
-        assertThat(root.get("summary").get("byObservation").get("OBSERVED").asLong()).isEqualTo(3L);
-        assertThat(root.get("summary").get("byObservation").get("NOT_OBSERVED").asLong()).isEqualTo(1L);
-        assertThat(root.get("summary").get("byObservation").get("NOT_APPLICABLE").asLong()).isEqualTo(0L);
+        assertThat(root.get("summary").get("byPresence").get("PRESENT").asLong()).isEqualTo(3L);
+        assertThat(root.get("summary").get("byPresence").get("ABSENT").asLong()).isEqualTo(1L);
+        assertThat(root.get("summary").get("byPresence").get("NOT_APPLICABLE").asLong()).isEqualTo(0L);
         assertThat(root.get("summary").get("bySeverity").get("MAJOR").asLong()).isEqualTo(2L);
         assertThat(root.get("summary").get("totalFindings").asLong()).isEqualTo(4L);
     }
 
-    private static ObservationCount mockObservationCount(Presence v, long c) {
-        return new ObservationCount() {
+    private static PresenceCount mockObservationCount(Presence v, long c) {
+        return new PresenceCount() {
             @Override
-            public Presence getObservation() {
+            public Presence getPresence() {
                 return v;
             }
 

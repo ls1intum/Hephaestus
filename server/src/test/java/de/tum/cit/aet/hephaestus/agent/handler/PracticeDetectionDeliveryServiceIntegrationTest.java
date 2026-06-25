@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -202,11 +203,21 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         return practiceRepository.save(p);
     }
 
-    private ValidatedFinding finding(String slug, Presence observation) {
+    /**
+     * Build a finding whose valence follows the former-GOOD practice convention used by these
+     * fixtures (pr-description-quality, error-handling): PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
+     */
+    private ValidatedFinding finding(String slug, Presence presence) {
+        Assessment assessment = switch (presence) {
+            case PRESENT -> Assessment.GOOD;
+            case ABSENT -> Assessment.BAD;
+            case NOT_APPLICABLE -> null;
+        };
         return new ValidatedFinding(
             slug,
             "Test: " + slug,
-            observation,
+            presence,
+            assessment,
             Severity.INFO,
             0.9f,
             null,
@@ -222,8 +233,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void validFindingsPersistedToDb() {
             var findings = List.of(
-                finding("pr-description-quality", Presence.OBSERVED),
-                finding("error-handling", Presence.NOT_OBSERVED)
+                finding("pr-description-quality", Presence.PRESENT),
+                finding("error-handling", Presence.ABSENT)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -235,8 +246,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             List<Observation> persisted = practiceFindingRepository.findAll();
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
-                .extracting(Observation::getObservation)
-                .containsExactlyInAnyOrder(Presence.OBSERVED, Presence.NOT_OBSERVED);
+                .extracting(Observation::getPresence)
+                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
             assertThat(persisted)
                 .extracting(Observation::getConfidence)
                 .allMatch(c -> c == 0.9f);
@@ -245,7 +256,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("re-delivering same job creates no duplicates")
         void idempotentRedelivery() {
-            var findings = List.of(finding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 
             var first = deliveryService.deliver(agentJob, findings);
             var second = deliveryService.deliver(agentJob, findings);
@@ -263,8 +274,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void unknownSlugsSkipped() {
             var findings = List.of(
-                finding("pr-description-quality", Presence.OBSERVED),
-                finding("nonexistent-practice", Presence.OBSERVED)
+                finding("pr-description-quality", Presence.PRESENT),
+                finding("nonexistent-practice", Presence.PRESENT)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -290,7 +301,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                 new PracticeRevision(practice, 1, practice.getCriteria())
             );
 
-            var findings = List.of(finding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 
             var result = deliveryService.deliver(agentJob, findings);
 
@@ -320,7 +331,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                     new ValidatedFinding(
                         "pr-description-quality",
                         "Negative finding " + i,
-                        Presence.NOT_OBSERVED,
+                        Presence.ABSENT,
+                        Assessment.BAD,
                         Severity.MINOR,
                         0.8f,
                         null,
@@ -344,7 +356,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         @Test
         void publishesEvent() {
-            var findings = List.of(finding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 
             deliveryService.deliver(agentJob, findings);
 
@@ -386,8 +398,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void positiveObservationsDoNotTriggerHasNegative() {
             var findings = List.of(
-                finding("pr-description-quality", Presence.OBSERVED),
-                finding("error-handling", Presence.OBSERVED)
+                finding("pr-description-quality", Presence.PRESENT),
+                finding("error-handling", Presence.PRESENT)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -398,8 +410,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             List<Observation> persisted = practiceFindingRepository.findAll();
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
-                .extracting(Observation::getObservation)
-                .containsExactlyInAnyOrder(Presence.OBSERVED, Presence.OBSERVED);
+                .extracting(Observation::getPresence)
+                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.PRESENT);
         }
     }
 
@@ -413,7 +425,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             agentJob.setMetadata(metadata);
             agentJob = agentJobRepository.save(agentJob);
 
-            var findings = List.of(finding("pr-description-quality", Presence.OBSERVED));
+            var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> deliveryService.deliver(agentJob, findings))
                 .isInstanceOf(JobDeliveryException.class)

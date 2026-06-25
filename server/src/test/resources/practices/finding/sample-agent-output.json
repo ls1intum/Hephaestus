@@ -3,7 +3,8 @@
     {
       "practiceSlug": "pr-description-quality",
       "title": "Well-structured PR description with context",
-      "observation": "OBSERVED",
+      "presence": "PRESENT",
+      "assessment": "GOOD",
       "severity": "INFO",
       "confidence": 0.92,
       "evidence": {
@@ -16,7 +17,8 @@
     {
       "practiceSlug": "error-handling",
       "title": "Missing error handling in Main.java",
-      "observation": "NOT_OBSERVED",
+      "presence": "ABSENT",
+      "assessment": "BAD",
       "severity": "MAJOR",
       "confidence": 0.85,
       "evidence": {
@@ -32,7 +34,8 @@
     {
       "practiceSlug": "commit-message-quality",
       "title": "Commit messages follow conventional format",
-      "observation": "OBSERVED",
+      "presence": "PRESENT",
+      "assessment": "GOOD",
       "severity": "INFO",
       "confidence": 0.88,
       "reasoning": "All commits follow the conventional commit format (feat:, fix:, etc.)."
@@ -40,7 +43,8 @@
     {
       "practiceSlug": "pr-scope",
       "title": "PR scope is appropriately sized",
-      "observation": "OBSERVED",
+      "presence": "PRESENT",
+      "assessment": "GOOD",
       "severity": "INFO",
       "confidence": 0.70,
       "reasoning": "Single-file documentation change is well-scoped and focused."
@@ -48,7 +52,8 @@
     {
       "practiceSlug": "review-thoroughness",
       "title": "Insufficient test coverage for new feature",
-      "observation": "NOT_OBSERVED",
+      "presence": "ABSENT",
+      "assessment": "BAD",
       "severity": "MINOR",
       "confidence": 0.55,
       "reasoning": "New utility class has no unit tests, but the change is small and well-understood.",

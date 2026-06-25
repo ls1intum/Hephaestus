@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.Loc
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -49,10 +50,10 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, "x", "X title"),
-                locus(JOB_PREV, "keyY", Presence.OBSERVED, Severity.MINOR, "y", "Y title"),
-                locus(JOB_CURR, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, "x", "X title v2"),
-                locus(JOB_CURR, "keyZ", Presence.NOT_OBSERVED, Severity.CRITICAL, "z", "Z title")
+                locus(JOB_PREV, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "X title"),
+                locus(JOB_PREV, "keyY", Presence.PRESENT, Severity.MINOR, "y", "Y title"),
+                locus(JOB_CURR, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "X title v2"),
+                locus(JOB_CURR, "keyZ", Presence.ABSENT, Severity.CRITICAL, "z", "Z title")
             )
         );
 
@@ -69,8 +70,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         // a RESOLVED locus carries the PRIOR run's prose (it is absent now; that is what the student last saw)
         LocusTransition resolved = transition(d, "keyY");
         assertThat(resolved.title()).isEqualTo("Y title");
-        assertThat(resolved.priorObservation()).isEqualTo(Presence.OBSERVED);
-        assertThat(resolved.currentObservation()).isNull();
+        assertThat(resolved.priorAssessment()).isEqualTo(Assessment.GOOD);
+        assertThat(resolved.currentAssessment()).isNull();
     }
 
     @Test
@@ -80,8 +81,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, "x", "still broken"),
-                locus(JOB_CURR, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, "x", "still broken")
+                locus(JOB_PREV, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "still broken"),
+                locus(JOB_CURR, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "still broken")
             )
         );
 
@@ -97,12 +98,12 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "kP", Presence.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
-                locus(JOB_CURR, "kP", Presence.NOT_OBSERVED, Severity.MAJOR, "p", "persists"),
-                locus(JOB_PREV, "kR", Presence.OBSERVED, Severity.MAJOR, "r", "was ok"),
-                locus(JOB_CURR, "kR", Presence.NOT_OBSERVED, Severity.MAJOR, "r", "regressed"),
-                locus(JOB_CURR, "kN", Presence.NOT_OBSERVED, Severity.MAJOR, "n", "new"),
-                locus(JOB_PREV, "kS", Presence.NOT_OBSERVED, Severity.MAJOR, "s", "resolved")
+                locus(JOB_PREV, "kP", Presence.ABSENT, Severity.MAJOR, "p", "persists"),
+                locus(JOB_CURR, "kP", Presence.ABSENT, Severity.MAJOR, "p", "persists"),
+                locus(JOB_PREV, "kR", Presence.PRESENT, Severity.MAJOR, "r", "was ok"),
+                locus(JOB_CURR, "kR", Presence.ABSENT, Severity.MAJOR, "r", "regressed"),
+                locus(JOB_CURR, "kN", Presence.ABSENT, Severity.MAJOR, "n", "new"),
+                locus(JOB_PREV, "kS", Presence.ABSENT, Severity.MAJOR, "s", "resolved")
             )
         );
 
@@ -130,8 +131,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Presence.OBSERVED, Severity.MAJOR, "x", "satisfied last run"),
-                locus(JOB_CURR, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, "x", "now broken")
+                locus(JOB_PREV, "keyX", Presence.PRESENT, Severity.MAJOR, "x", "satisfied last run"),
+                locus(JOB_CURR, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "now broken")
             )
         );
 
@@ -140,8 +141,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         assertThat(d.countRegressed()).isEqualTo(1);
         LocusTransition t = d.transitions().get(0);
         assertThat(t.status()).isEqualTo(TransitionStatus.REGRESSED);
-        assertThat(t.priorObservation()).isEqualTo(Presence.OBSERVED);
-        assertThat(t.currentObservation()).isEqualTo(Presence.NOT_OBSERVED);
+        assertThat(t.priorAssessment()).isEqualTo(Assessment.GOOD);
+        assertThat(t.currentAssessment()).isEqualTo(Assessment.BAD);
     }
 
     @Test
@@ -149,8 +150,8 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, "x", "was broken"),
-                locus(JOB_CURR, "keyX", Presence.OBSERVED, Severity.MAJOR, "x", "now satisfied")
+                locus(JOB_PREV, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "was broken"),
+                locus(JOB_CURR, "keyX", Presence.PRESENT, Severity.MAJOR, "x", "now satisfied")
             )
         );
 
@@ -160,7 +161,7 @@ class FindingTrendServiceTest extends BaseUnitTest {
         assertThat(d.countResolved()).isZero();
         LocusTransition t = d.transitions().get(0);
         assertThat(t.status()).isEqualTo(TransitionStatus.PERSISTED);
-        assertThat(t.currentObservation()).isEqualTo(Presence.OBSERVED);
+        assertThat(t.currentAssessment()).isEqualTo(Assessment.GOOD);
     }
 
     @Test
@@ -168,10 +169,10 @@ class FindingTrendServiceTest extends BaseUnitTest {
         stubTwoTargetRuns();
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
-                locus(JOB_PREV, "keyX", Presence.NOT_OBSERVED, Severity.MINOR, "x", "prior"),
+                locus(JOB_PREV, "keyX", Presence.ABSENT, Severity.MINOR, "x", "prior"),
                 // current run emits keyX twice: MAJOR/conf .6 and CRITICAL/conf .9 → CRITICAL must win (severity over confidence)
-                locusConf(JOB_CURR, "keyX", Presence.NOT_OBSERVED, Severity.MAJOR, 0.6f, "x", "dup a"),
-                locusConf(JOB_CURR, "keyX", Presence.NOT_OBSERVED, Severity.CRITICAL, 0.9f, "x", "dup b")
+                locusConf(JOB_CURR, "keyX", Presence.ABSENT, Severity.MAJOR, 0.6f, "x", "dup a"),
+                locusConf(JOB_CURR, "keyX", Presence.ABSENT, Severity.CRITICAL, 0.9f, "x", "dup b")
             )
         );
 
@@ -229,6 +230,12 @@ class FindingTrendServiceTest extends BaseUnitTest {
         String slug,
         String title
     ) {
+        // Former-GOOD practices: PRESENT -> GOOD (satisfied), ABSENT -> BAD (problem), NA -> null.
+        Assessment assessment = switch (v) {
+            case PRESENT -> Assessment.GOOD;
+            case ABSENT -> Assessment.BAD;
+            case NOT_APPLICABLE -> null;
+        };
         return new LocusFinding() {
             @Override
             public UUID getAgentJobId() {
@@ -241,8 +248,13 @@ class FindingTrendServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public Presence getObservation() {
+            public Presence getPresence() {
                 return v;
+            }
+
+            @Override
+            public Assessment getAssessment() {
+                return assessment;
             }
 
             @Override

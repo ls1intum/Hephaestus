@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -36,7 +37,8 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "Test Title",
-                Presence.NOT_OBSERVED,
+                Presence.ABSENT,
+                Assessment.BAD,
                 Severity.MINOR,
                 0.9f,
                 evidence,
@@ -50,7 +52,8 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             return new PracticeDetectionResultParser.ValidatedFinding(
                 slug,
                 "Test Title",
-                Presence.OBSERVED,
+                Presence.PRESENT,
+                Assessment.GOOD,
                 Severity.INFO,
                 0.9f,
                 null,

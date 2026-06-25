@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.CreateFindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.dto.FindingReactionEngagementDTO;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -93,10 +94,10 @@ class FindingReactionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .practice(practice)
             .artifactType(WorkArtifact.PULL_REQUEST)
             .artifactId(42L)
-            .developer(adminUser)
             .aboutUserId(adminUser.getId())
             .title("Missing error handling")
-            .observation(Presence.NOT_OBSERVED)
+            .presence(Presence.ABSENT)
+            .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
             .confidence(0.85f)
             .observedAt(Instant.now())

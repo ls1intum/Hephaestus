@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -247,16 +248,15 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     private Observation problem(float confidence) {
         Observation pf = mock(Observation.class);
-        User developer = new User();
-        developer.setId(7L);
         lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
-        lenient().when(pf.getObservation()).thenReturn(Presence.NOT_OBSERVED);
+        lenient().when(pf.getPresence()).thenReturn(Presence.ABSENT);
+        lenient().when(pf.getAssessment()).thenReturn(Assessment.BAD);
         lenient().when(pf.getSeverity()).thenReturn(Severity.MINOR);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
-        lenient().when(pf.getDeveloper()).thenReturn(developer);
         lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
         lenient().when(pf.getArtifactId()).thenReturn(100L);
-        lenient().when(pf.getAboutUserId()).thenReturn(null);
+        // about_user_id is the recipient the recorder binds feedback to (formerly the dropped developer, id 7).
+        lenient().when(pf.getAboutUserId()).thenReturn(7L);
         return pf;
     }
 }
