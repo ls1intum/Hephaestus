@@ -117,9 +117,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
-        when(areaService.createArea(any(), any(), any())).thenThrow(
-            new RuntimeException("boom")
-        );
+        when(areaService.createArea(any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
     }

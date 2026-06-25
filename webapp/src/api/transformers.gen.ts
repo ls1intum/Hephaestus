@@ -452,7 +452,7 @@ export const submitReactionResponseTransformer = async (data: any): Promise<Subm
 };
 
 const observationListSchemaResponseTransformer = (data: any) => {
-    data.detectedAt = new Date(data.detectedAt);
+    data.observedAt = new Date(data.observedAt);
     return data;
 };
 
@@ -486,7 +486,7 @@ export const getSummaryResponseTransformer = async (data: any): Promise<GetSumma
 };
 
 const observationDetailSchemaResponseTransformer = (data: any) => {
-    data.detectedAt = new Date(data.detectedAt);
+    data.observedAt = new Date(data.observedAt);
     return data;
 };
 

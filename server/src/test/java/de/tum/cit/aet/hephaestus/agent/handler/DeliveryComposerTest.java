@@ -1449,13 +1449,13 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove the commented-out block."
-        ).withObservationFingerprint("corr-synth-123");
+        ).withRecurrenceKey("corr-synth-123");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
         assertThat(result).isNotNull();
         assertThat(result.diffNotes()).hasSize(1);
-        assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-synth-123");
+        assertThat(result.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-synth-123");
     }
 
     // ----- Signal-driven inline-section demotion (C1) -----
@@ -1474,7 +1474,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove it."
-        ).withObservationFingerprint("corr-delivered");
+        ).withRecurrenceKey("corr-delivered");
         ValidatedFinding failed = negativeFinding(
             "meaningful-naming",
             "Non-descriptive name 'Data'",
@@ -1483,7 +1483,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Rename to a domain term.",
             "Use PortfolioSnapshot."
-        ).withObservationFingerprint("corr-failed");
+        ).withRecurrenceKey("corr-failed");
 
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
@@ -1521,7 +1521,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withObservationFingerprint("k-a");
+        ).withRecurrenceKey("k-a");
         ValidatedFinding b = negativeFinding(
             "code-hygiene",
             "Dead code B",
@@ -1530,7 +1530,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withObservationFingerprint("k-b");
+        ).withRecurrenceKey("k-b");
 
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(a, b),
@@ -1585,7 +1585,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withObservationFingerprint("corr-suggested-456");
+        ).withRecurrenceKey("corr-suggested-456");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1593,7 +1593,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes()).hasSize(1);
         // Body comes from the agent's suggestion; the key comes from the (stamped) finding.
         assertThat(result.diffNotes().get(0).body()).isEqualTo("Consider extracting this.");
-        assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-suggested-456");
+        assertThat(result.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-suggested-456");
     }
 
     @Test
@@ -1618,7 +1618,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withObservationFingerprint("corr-scrub-789");
+        ).withRecurrenceKey("corr-scrub-789");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1629,7 +1629,7 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(body).doesNotContainIgnoringCase("the practice requires");
         assertThat(body).doesNotContain("OBSERVED");
         // Key still propagates after the sanitize-and-rebuild.
-        assertThat(result.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-scrub-789");
+        assertThat(result.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-scrub-789");
     }
 
     // Transferable-principle ("Why this matters") surfacing — the catalogue whyItMatters wired into delivery.

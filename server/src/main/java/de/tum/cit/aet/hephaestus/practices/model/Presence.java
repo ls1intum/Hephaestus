@@ -8,8 +8,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
  * NOT encode "good" or "bad". The good/bad direction is a second, orthogonal axis carried by
  * {@link Assessment} and resolved per observation by the detector reading the practice criteria and
  * {@code what_good_looks_like}. The 2×2 of {@code (presence, assessment)} reads directly: a present
- * good behaviour is a strength, a present bad behaviour is a problem (commission), an absent good
- * behaviour is a gap (omission), an absent bad behaviour is clean.
+ * good behaviour is a strength, a present bad behaviour is a problem (commission), and an absent good
+ * behaviour is a gap (omission).
  *
  * <p>Orthogonal to {@link Severity}: presence captures whether the signal was seen, severity captures
  * impact (critical vs informational) and is meaningful only for a {@link Assessment#BAD} observation.

@@ -22,7 +22,7 @@ import tools.jackson.databind.node.ObjectNode;
  * produces a compact JSON array suitable for injection into the agent sandbox as
  * {@code inputs/context/contributor_history.json}.
  *
- * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by NOT_OBSERVED count
+ * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by BAD count
  * descending so the most problematic practices are always included when truncation occurs.
  */
 @Component

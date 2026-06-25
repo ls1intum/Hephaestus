@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation.reaction.dto;
 
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;

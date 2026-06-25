@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.LocusObservation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
-import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;

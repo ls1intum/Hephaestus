@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -65,7 +65,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             :artifactType, :artifactId, :subjectUserId,
             :title, :presence, :assessment, :severity, :confidence,
             CAST(:evidence AS jsonb), :reasoning,
-            :findingFingerprint, :detectedAt
+            :recurrenceKey, :detectedAt
         )
         ON CONFLICT (occurrence_key) DO NOTHING
         """,
@@ -87,7 +87,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("confidence") Float confidence,
         @Param("evidence") String evidence,
         @Param("reasoning") String reasoning,
-        @Param("findingFingerprint") String findingFingerprint,
+        @Param("recurrenceKey") String recurrenceKey,
         @Param("detectedAt") Instant detectedAt
     );
 
@@ -102,9 +102,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     // Read queries for the developer dashboard (Issue #896)
 
     /**
-     * Paginated findings for a developer within a workspace, with optional filters.
+     * Paginated findings for an about-user within a workspace, with optional filters.
      *
-     * <p>Workspace scoping is done via the {@code Practice.workspace} join. The developer is the
+     * <p>Workspace scoping is done via the {@code Practice.workspace} join. The about-user is the
      * {@code about_user_id} subject the finding is filed against (ADR 0022).
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
@@ -113,7 +113,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
-        WHERE f.aboutUserId = :developerId
+        WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
         AND (:presence IS NULL OR f.presence = :presence)
@@ -121,14 +121,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         countQuery = """
         SELECT COUNT(f) FROM Observation f
         JOIN f.practice p
-        WHERE f.aboutUserId = :developerId
+        WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
         AND (:presence IS NULL OR f.presence = :presence)
         """
     )
-    Page<Observation> findByDeveloperAndWorkspace(
-        @Param("developerId") Long developerId,
+    Page<Observation> findByAboutUserAndWorkspace(
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("practiceSlug") String practiceSlug,
         @Param("presence") Presence presence,
@@ -160,7 +160,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                MAX(f.observed_at) AS "lastFindingAt"
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :developerId
+        WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
@@ -175,12 +175,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         nativeQuery = true
     )
     List<DeveloperPracticeSummaryProjection> findSummaryByDeveloperAndWorkspace(
-        @Param("developerId") Long developerId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId
     );
 
     /**
-     * Single finding by ID within a workspace, restricted to a specific developer.
+     * Single finding by ID within a workspace, restricted to a specific about-user.
      *
      * <p>Ownership is enforced in the query (not in Java) to avoid lazy-load
      * fragility and to keep the auth check atomic with the fetch.
@@ -189,14 +189,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
-        WHERE f.id = :findingId
-        AND f.aboutUserId = :developerId
+        WHERE f.id = :observationId
+        AND f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         """
     )
     Optional<Observation> findByIdAndDeveloperAndWorkspace(
-        @Param("findingId") UUID findingId,
-        @Param("developerId") Long developerId,
+        @Param("observationId") UUID observationId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId
     );
 
@@ -227,9 +227,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * <p>Each row is one (practice slug, presence, assessment) combination with the total count and the
      * most recent detection timestamp. Callers group results by slug to build a per-practice
      * history summary. The {@code idx_observation_subject} index on {@code (about_user_id)} narrows the
-     * initial scan by developer.
+     * initial scan by about-user.
      *
-     * @param developerId the developer whose history to aggregate
+     * @param aboutUserId the about-user whose history to aggregate
      * @param workspaceId   the workspace scope (via practice → workspace relationship)
      * @return aggregated summary rows ordered by slug then presence, empty if no findings exist
      */
@@ -241,14 +241,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                COUNT(pf) AS count,
                MAX(pf.observedAt) AS lastDetectedAt
         FROM Observation pf
-        WHERE pf.aboutUserId = :developerId
+        WHERE pf.aboutUserId = :aboutUserId
           AND pf.practice.workspace.id = :workspaceId
         GROUP BY pf.practice.slug, pf.presence, pf.assessment
         ORDER BY pf.practice.slug, pf.presence
         """
     )
     List<DeveloperPracticeSummary> findDeveloperPracticeSummary(
-        @Param("developerId") Long developerId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId
     );
 
@@ -278,7 +278,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         SELECT f.* FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :developerId
+        WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
           AND f.presence <> 'NOT_APPLICABLE'
@@ -292,7 +292,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         nativeQuery = true
     )
     List<Observation> findRecentByDeveloperAndWorkspace(
-        @Param("developerId") Long developerId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
         org.springframework.data.domain.Pageable pageable
@@ -311,7 +311,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         SELECT f.severity AS severity, COUNT(f.id) AS count
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :developerId
+        WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
           AND f.severity IS NOT NULL
@@ -325,7 +325,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         nativeQuery = true
     )
     List<SeverityCount> countBySeverityForDeveloper(
-        @Param("developerId") Long developerId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since
     );
@@ -340,7 +340,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         SELECT f.presence AS presence, COUNT(f.id) AS count
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.about_user_id = :developerId
+        WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
           AND f.agent_job_id = (
@@ -353,7 +353,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         nativeQuery = true
     )
     List<PresenceCount> countByObservationForDeveloper(
-        @Param("developerId") Long developerId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since
     );
@@ -454,7 +454,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
         JOIN practice_area pa ON pa.id = p.practice_area_id
-        WHERE f.about_user_id = :developerId
+        WHERE f.about_user_id = :aboutUserId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
           AND p.practice_area_id IS NOT NULL
@@ -468,7 +468,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         nativeQuery = true
     )
     List<AreaStandingRow> findAreaStandingByDeveloperAndWorkspace(
-        @Param("developerId") Long developerId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
         @Param("recentSince") Instant recentSince

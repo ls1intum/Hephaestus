@@ -33,7 +33,7 @@ import org.hibernate.annotations.OnDeleteAction;
  * <p>A single feedback unit can fuse several findings (e.g. one {@link EvidenceRole#PRIMARY}
  * plus corroborating {@link EvidenceRole#SUPPORTING} ones), and a single finding can be
  * reused across feedback units that target different surfaces. The composite primary key
- * {@code (feedback_id, finding_id)} makes the binding idempotent.
+ * {@code (feedback_id, observation_id)} makes the binding idempotent.
  *
  * <p>Append-only: like {@link Observation}, this row is written via an {@code insertIfAbsent}
  * native upsert that bypasses {@code @PrePersist}, so callers supply both halves of the
@@ -107,7 +107,7 @@ public class FeedbackObservation {
     private Integer ordinal;
 
     /**
-     * Composite primary key {@code (feedback_id, finding_id)} for the join.
+     * Composite primary key {@code (feedback_id, observation_id)} for the join.
      */
     @Embeddable
     @Getter

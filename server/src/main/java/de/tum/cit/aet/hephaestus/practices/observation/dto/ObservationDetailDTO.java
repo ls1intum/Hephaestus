@@ -41,7 +41,7 @@ public record ObservationDetailDTO(
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")
     String guidance,
-    @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
+    @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     public static ObservationDetailDTO from(
         Observation f,

@@ -203,6 +203,46 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
+        void presentWithMissingAssessmentIsDiscarded() {
+            // A present/absent observation MUST carry a GOOD/BAD valence; a missing assessment is malformed.
+            ObjectNode finding = validFindingNode();
+            finding.put("presence", "PRESENT");
+            finding.remove("assessment");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
+        }
+
+        @Test
+        void presentWithAssessmentKeepsValence() {
+            ObjectNode finding = validFindingNode();
+            finding.put("presence", "ABSENT");
+            finding.put("assessment", "BAD");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.ABSENT);
+            assertThat(result.validFindings().get(0).assessment()).isEqualTo(Assessment.BAD);
+        }
+
+        @Test
+        void notApplicableForcesNullAssessmentEvenWhenSupplied() {
+            // NOT_APPLICABLE has no valence: any assessment supplied alongside it is ignored (forced null).
+            ObjectNode finding = validFindingNode();
+            finding.put("presence", "NOT_APPLICABLE");
+            finding.put("assessment", "GOOD");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
+            assertThat(result.validFindings().get(0).assessment()).isNull();
+        }
+
+        @Test
         void lowercaseObservation() {
             ObjectNode finding = validFindingNode();
             finding.put("presence", "present");
@@ -242,7 +282,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         void legacyObservationVocabularyIsRejected() {
             // Clean break (ADR 0022): the old OBSERVED/NOT_OBSERVED vocabulary no longer parses — it
-            // is discarded exactly like any other unknown presence, matching the DB CHECK.
+            // is discarded exactly like any other unknown presence.
             for (String legacy : new String[] { "OBSERVED", "NOT_OBSERVED" }) {
                 ObjectNode finding = validFindingNode();
                 finding.put("presence", legacy);
@@ -811,6 +851,29 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(true);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.severity()).isEqualTo(Severity.MAJOR);
+        }
+
+        @Test
+        @DisplayName("(ABSENT, GOOD) is void → coerced to NOT_APPLICABLE with a null assessment")
+        void absentGoodIsVoidCoercedToNa() {
+            // ABSENT + GOOD means "the practice is absent and that is good" — nothing to coach. The model can
+            // emit it, but it must not persist as a phantom observation: coerce to a clean abstention.
+            var voidFinding = new ValidatedFinding(
+                "p",
+                "t",
+                Presence.ABSENT,
+                Assessment.GOOD,
+                Severity.INFO,
+                0.9f,
+                null,
+                "reasoning",
+                "guidance",
+                List.of()
+            );
+            var out = voidFinding.coerceCoherence(false);
+            assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
+            assertThat(out.assessment()).isNull();
+            assertThat(out.severity()).isNull();
         }
 
         @Test

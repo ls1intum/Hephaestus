@@ -533,7 +533,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             PracticeDetectionResultParser.DeliveryContent delivered = captor.getValue();
             assertThat(delivered).isNotNull();
             assertThat(delivered.diffNotes()).hasSize(1);
-            assertThat(delivered.diffNotes().get(0).findingFingerprint()).isEqualTo("corr-error-handling");
+            assertThat(delivered.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-error-handling");
         }
     }
 }

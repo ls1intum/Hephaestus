@@ -11,11 +11,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -57,7 +58,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     private Workspace workspace;
     private Practice practice;
     private AgentJob agentJob;
-    private User developer;
+    private User aboutUser;
 
     @BeforeEach
     void setUp() {
@@ -82,8 +83,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
-        developer = TestUserFactory.createUser(100L, "test-developer", provider);
-        developer = userRepository.save(developer);
+        aboutUser = TestUserFactory.createUser(100L, "test-about-user", provider);
+        aboutUser = userRepository.save(aboutUser);
     }
 
     @Nested
@@ -100,7 +101,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 42L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Good PR description",
                 "PRESENT",
                 "GOOD",
@@ -118,6 +119,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getOccurrenceKey()).isEqualTo("key-1");
             assertThat(found.getTitle()).isEqualTo("Good PR description");
             assertThat(found.getPresence().name()).isEqualTo("PRESENT");
+            assertThat(found.getAssessment()).isEqualTo(Assessment.GOOD);
             assertThat(found.getSeverity().name()).isEqualTo("INFO");
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
@@ -138,7 +140,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Duplicate test",
                 "PRESENT",
                 "GOOD",
@@ -158,7 +160,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Should not insert",
                 "ABSENT",
                 "BAD",
@@ -188,7 +190,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 99L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Missing error handling in Main.java",
                 "ABSENT",
                 "BAD",
@@ -203,6 +205,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(result).isEqualTo(1);
 
             Observation found = observationRepository.findById(id).orElseThrow();
+            assertThat(found.getAssessment()).isEqualTo(Assessment.BAD);
             assertThat(found.getEvidence()).isNotNull();
             assertThat(found.getEvidence().get("files").get(0).asString()).isEqualTo("src/Main.java");
             assertThat(found.getEvidence().get("diff_lines").asInt()).isEqualTo(42);
@@ -224,7 +227,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Purge test finding",
                 "PRESENT",
                 "GOOD",
@@ -273,7 +276,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
-                developer.getId(),
+                aboutUser.getId(),
                 "WS-A finding",
                 "PRESENT",
                 "GOOD",
@@ -293,7 +296,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
-                developer.getId(),
+                aboutUser.getId(),
                 "WS-B finding",
                 "ABSENT",
                 "BAD",
@@ -339,7 +342,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Cascade test 1",
                 "ABSENT",
                 "BAD",
@@ -359,7 +362,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Cascade test 2",
                 "PRESENT",
                 "GOOD",
@@ -388,7 +391,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         @Test
         void returnsEmptyForNoFindings() {
             List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                developer.getId(),
+                aboutUser.getId(),
                 workspace.getId()
             );
 
@@ -404,7 +407,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             insertFinding("sum-4", practice, "PRESENT", Instant.parse("2026-03-17T08:00:00Z"));
 
             List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                developer.getId(),
+                aboutUser.getId(),
                 workspace.getId()
             );
 
@@ -441,7 +444,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             insertFinding("multi-2", secondPractice, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
 
             List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                developer.getId(),
+                aboutUser.getId(),
                 workspace.getId()
             );
 
@@ -470,7 +473,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             // Finding in target workspace
             insertFinding("iso-1", practice, "ABSENT", Instant.parse("2026-03-20T10:00:00Z"));
-            // Finding in other workspace (same developer)
+            // Finding in other workspace (same about-user)
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 "iso-2",
@@ -479,7 +482,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Other WS finding",
                 "ABSENT",
                 "BAD",
@@ -492,7 +495,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
 
             List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                developer.getId(),
+                aboutUser.getId(),
                 workspace.getId()
             );
 
@@ -512,7 +515,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             insertFinding("time-3", practice, "ABSENT", middle);
 
             List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                developer.getId(),
+                aboutUser.getId(),
                 workspace.getId()
             );
 
@@ -521,16 +524,16 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        void developerIsolation() {
+        void aboutUserIsolation() {
             GitProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
                 .orElseThrow();
-            User otherDeveloper = TestUserFactory.createUser(200L, "other-developer", provider);
-            otherDeveloper = userRepository.save(otherDeveloper);
+            User otherAboutUser = TestUserFactory.createUser(200L, "other-about-user", provider);
+            otherAboutUser = userRepository.save(otherAboutUser);
 
-            // Finding for target developer
+            // Observation for target about-user
             insertFinding("contrib-iso-1", practice, "ABSENT", Instant.parse("2026-03-20T10:00:00Z"));
-            // Finding for other developer (same practice, same workspace)
+            // Observation for other about-user (same practice, same workspace)
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 "contrib-iso-2",
@@ -539,8 +542,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 2L,
-                otherDeveloper.getId(),
-                "Other developer finding",
+                otherAboutUser.getId(),
+                "Other about-user observation",
                 "ABSENT",
                 "BAD",
                 "MAJOR",
@@ -552,7 +555,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
 
             List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                developer.getId(),
+                aboutUser.getId(),
                 workspace.getId()
             );
 
@@ -560,7 +563,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(result.get(0).getCount()).isEqualTo(1);
         }
 
-        /** Helper to insert a finding with minimal boilerplate. */
+        /** Helper to insert an observation with minimal boilerplate. */
         private void insertFinding(
             String idempotencyKey,
             Practice targetPractice,
@@ -575,8 +578,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
-                developer.getId(),
-                "Test finding",
+                aboutUser.getId(),
+                "Test observation",
                 presence,
                 assessmentFor(presence),
                 "INFO",
@@ -614,7 +617,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 "PULL_REQUEST",
                 artifactId,
-                developer.getId(),
+                aboutUser.getId(),
                 "finding",
                 presence,
                 // Former-GOOD practice valence: PRESENT -> GOOD (strength), ABSENT -> BAD (problem).
@@ -638,8 +641,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             insertForJob("dedup-old", agentJob.getId(), 42L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
             insertForJob("dedup-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
 
-            List<DeveloperPracticeSummaryProjection> result =
-                observationRepository.findSummaryByDeveloperAndWorkspace(developer.getId(), workspace.getId());
+            List<DeveloperPracticeSummaryProjection> result = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
 
             assertThat(result).hasSize(1);
             DeveloperPracticeSummaryProjection row = result.get(0);
@@ -660,8 +665,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             insertForJob("t42-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
             insertForJob("t43", agentJob.getId(), 43L, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
 
-            List<DeveloperPracticeSummaryProjection> result =
-                observationRepository.findSummaryByDeveloperAndWorkspace(developer.getId(), workspace.getId());
+            List<DeveloperPracticeSummaryProjection> result = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
 
             assertThat(result).hasSize(1);
             DeveloperPracticeSummaryProjection row = result.get(0);
@@ -686,7 +693,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null, // practiceRevisionId — pre-versioning marker
                 "PULL_REQUEST",
                 1L,
-                developer.getId(),
+                aboutUser.getId(),
                 "Enum mapping test",
                 "PRESENT",
                 "GOOD",

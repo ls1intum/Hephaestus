@@ -5,14 +5,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.LocusObservation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.RunRef;
-import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
-import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.LocusObservation;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.RunRef;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;

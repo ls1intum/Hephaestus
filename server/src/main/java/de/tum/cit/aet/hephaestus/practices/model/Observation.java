@@ -205,5 +205,17 @@ public class Observation {
         if (observedAt == null) {
             observedAt = Instant.now();
         }
+        // Mirror the DB CHECK chk_observation_presence_assessment: assessment is NULL exactly when the
+        // practice does not apply. A present/absent observation always carries a GOOD/BAD valence.
+        boolean notApplicable = presence == Presence.NOT_APPLICABLE;
+        if (notApplicable != (assessment == null)) {
+            throw new IllegalStateException(
+                "Observation coherence violation: assessment must be null iff presence is NOT_APPLICABLE (presence=" +
+                    presence +
+                    ", assessment=" +
+                    assessment +
+                    ")"
+            );
+        }
     }
 }

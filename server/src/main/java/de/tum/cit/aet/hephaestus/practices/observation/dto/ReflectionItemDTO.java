@@ -17,7 +17,7 @@ import tools.jackson.databind.JsonNode;
  */
 @Schema(description = "A single piece of practice feedback to read and act on")
 public record ReflectionItemDTO(
-    @NonNull @Schema(description = "Finding id — handle to open the full detail") UUID findingId,
+    @NonNull @Schema(description = "Observation id — handle to open the full detail") UUID observationId,
     @NonNull @Schema(description = "The headline of the feedback") String title,
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this finding (null if nothing was delivered)")

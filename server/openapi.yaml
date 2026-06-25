@@ -5186,10 +5186,6 @@ components:
           type: number
           format: float
           description: AI confidence score (0.0–1.0)
-        detectedAt:
-          type: string
-          format: date-time
-          description: When the finding was detected
         evidence:
           type: object
           additionalProperties: {}
@@ -5203,6 +5199,10 @@ components:
           type: string
           format: uuid
           description: Finding ID
+        observedAt:
+          type: string
+          format: date-time
+          description: When the observation was made
         practiceName:
           type: string
           description: Practice name
@@ -5234,8 +5234,8 @@ components:
       - artifactId
       - artifactType
       - confidence
-      - detectedAt
       - id
+      - observedAt
       - practiceName
       - practiceSlug
       - presence
@@ -5264,14 +5264,14 @@ components:
           type: number
           format: float
           description: AI confidence score (0.0–1.0)
-        detectedAt:
-          type: string
-          format: date-time
-          description: When the finding was detected
         id:
           type: string
           format: uuid
           description: Finding ID
+        observedAt:
+          type: string
+          format: date-time
+          description: When the observation was made
         practiceName:
           type: string
           description: Practice name
@@ -5300,8 +5300,8 @@ components:
       - artifactId
       - artifactType
       - confidence
-      - detectedAt
       - id
+      - observedAt
       - practiceName
       - practiceSlug
       - presence
@@ -5962,10 +5962,6 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
-        findingId:
-          type: string
-          format: uuid
-          description: Finding id — handle to open the full detail
         guidance:
           type: string
           description: What to do — the delivered feedback for this finding (null
@@ -5974,6 +5970,10 @@ components:
           type: string
           description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
             \ known"
+        observationId:
+          type: string
+          format: uuid
+          description: Observation id — handle to open the full detail
         severity:
           type: string
           description: Impact level
@@ -5988,7 +5988,7 @@ components:
       required:
       - artifactId
       - artifactType
-      - findingId
+      - observationId
       - severity
       - title
     ReflectionPractice:

@@ -13,7 +13,6 @@ export const mockPractices: Practice[] = [
 		whatGoodLooksLike:
 			"A PR opens with a one-paragraph summary, links the issue, and lists the exact steps a reviewer ran to verify it.",
 		artifactType: "PULL_REQUEST",
-		polarity: "DESIRABLE",
 		active: true,
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-15"),
@@ -26,7 +25,6 @@ export const mockPractices: Practice[] = [
 		criteria:
 			"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
 		artifactType: "PULL_REQUEST",
-		polarity: "DESIRABLE",
 		active: true,
 		createdAt: new Date("2025-06-02"),
 		updatedAt: new Date("2025-06-14"),
@@ -39,7 +37,6 @@ export const mockPractices: Practice[] = [
 		criteria:
 			"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
 		artifactType: "PULL_REQUEST",
-		polarity: "DESIRABLE",
 		active: false,
 		createdAt: new Date("2025-06-03"),
 		updatedAt: new Date("2025-06-10"),
@@ -55,7 +52,6 @@ export const mockPracticeNoCategory: Practice = {
 	criteria:
 		"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
 	artifactType: "PULL_REQUEST",
-	polarity: "DESIRABLE",
 	active: true,
 	createdAt: new Date("2025-06-05"),
 	updatedAt: new Date("2025-06-17"),
@@ -75,7 +71,6 @@ export const mockPracticeLongText: Practice = {
 	criteria:
 		"## Very Long Criteria\n\nThis is a multi-paragraph criteria block designed to test the line-clamp behavior on the card preview.\n\n### Section 1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n### Section 2\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n### Section 3\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
 	artifactType: "PULL_REQUEST",
-	polarity: "DESIRABLE",
 	active: true,
 	createdAt: new Date("2025-06-06"),
 	updatedAt: new Date("2025-06-18"),
@@ -110,7 +105,6 @@ export const mockPracticeWithAllTriggers: Practice = {
 		"export default { findings };",
 	].join("\n"),
 	artifactType: "PULL_REQUEST",
-	polarity: "DESIRABLE",
 	active: true,
 	createdAt: new Date("2025-06-04"),
 	updatedAt: new Date("2025-06-16"),

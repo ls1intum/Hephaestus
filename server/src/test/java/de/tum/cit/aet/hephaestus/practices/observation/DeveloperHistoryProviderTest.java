@@ -167,10 +167,7 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
                 new JacksonException("Simulated serialization failure") {}
             );
 
-            DeveloperHistoryProvider brokenProvider = new DeveloperHistoryProvider(
-                observationRepository,
-                brokenMapper
-            );
+            DeveloperHistoryProvider brokenProvider = new DeveloperHistoryProvider(observationRepository, brokenMapper);
 
             when(observationRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of(summary("test-practice", Presence.ABSENT, 1, Instant.parse("2026-03-20T10:00:00Z")))

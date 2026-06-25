@@ -803,7 +803,7 @@ class DeliveryComposer {
             // throws), so a keyless finding is always treated as undelivered → keeps its full summary line.
             List<ValidatedFinding> undelivered = inlinable
                 .stream()
-                .filter(f -> f.findingFingerprint() == null || !deliveredKeys.contains(f.findingFingerprint()))
+                .filter(f -> f.recurrenceKey() == null || !deliveredKeys.contains(f.recurrenceKey()))
                 .toList();
             long deliveredCount = inlinable.size() - undelivered.size();
             sb.append("**Inline comments on the diff:**");
@@ -1140,7 +1140,7 @@ class DeliveryComposer {
                         suggested.startLine(),
                         suggested.endLine(),
                         body,
-                        f.findingFingerprint()
+                        f.recurrenceKey()
                     )
                 );
                 continue;
@@ -1170,7 +1170,7 @@ class DeliveryComposer {
             String body = composeDiffNoteBody(f, whyBySlug, emittedWhy);
             if (body != null && !body.isBlank()) {
                 // Synthesized note inherits the finding's correlation key, same as the suggested-note branch.
-                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.findingFingerprint()));
+                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.recurrenceKey()));
             }
         }
 

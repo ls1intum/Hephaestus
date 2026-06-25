@@ -6,11 +6,11 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -386,7 +386,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo("MAJOR")
                 .jsonPath("$.content[0].confidence")
                 .isEqualTo(0.85)
-                .jsonPath("$.content[0].detectedAt")
+                .jsonPath("$.content[0].observedAt")
                 .isNotEmpty()
                 // Internal fields must not leak
                 .jsonPath("$.content[0].agentJobId")
@@ -699,7 +699,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo("Test reasoning for Detailed finding")
                 .jsonPath("$.guidance")
                 .isEqualTo("Split this PR so each change reviews on its own.")
-                .jsonPath("$.detectedAt")
+                .jsonPath("$.observedAt")
                 .isNotEmpty()
                 // Internal fields must not leak
                 .jsonPath("$.agentJobId")

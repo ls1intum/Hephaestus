@@ -540,7 +540,7 @@ public class PracticeDetectionResultParser {
     }
 
     /**
-     * @param findingFingerprint the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}
+     * @param recurrenceKey the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}
      *     identity, stamped by {@code PullRequestReviewHandler} from the value
      *     {@code PracticeDetectionDeliveryService.deliver} already computed (never recomputed downstream, so it
      *     cannot drift from the persisted finding). {@code null} until stamped — the parser leaves it unset.
@@ -556,7 +556,7 @@ public class PracticeDetectionResultParser {
         String reasoning,
         String guidance,
         List<DiffNote> suggestedDiffNotes,
-        @Nullable String findingFingerprint
+        @Nullable String recurrenceKey
     ) {
         /** Pre-correlation compatibility shape: a finding with no correlation key yet (the parser's output). */
         public ValidatedFinding(
@@ -587,7 +587,7 @@ public class PracticeDetectionResultParser {
         }
 
         /** Returns a copy stamped with {@code key}; all other components are preserved by reference. */
-        public ValidatedFinding withObservationFingerprint(@Nullable String key) {
+        public ValidatedFinding withRecurrenceKey(@Nullable String key) {
             return new ValidatedFinding(
                 practiceSlug,
                 title,
@@ -608,9 +608,11 @@ public class PracticeDetectionResultParser {
          * invariants, independent of what the (weak) model emitted:
          * <ol>
          *   <li><b>Defect-detector has no clean bill of health.</b> A practice declaring {@code DEFECT-DETECTOR
-         *       DISCIPLINE} either flags a defect ({@code ABSENT, BAD}) or abstains ({@code NOT_APPLICABLE}); a
+         *       DISCIPLINE} either flags a defect ({@code PRESENT, BAD}) or abstains ({@code NOT_APPLICABLE}); a
          *       model-emitted {@code PRESENT, GOOD} there is a clean bill of health that would ship as a false
          *       strength — coerce it to {@code NOT_APPLICABLE} (assessment null).</li>
+         *   <li><b>Void (ABSENT, GOOD).</b> A practice that is absent and that being absent is good has nothing
+         *       to coach — the combination is void — so it is coerced to {@code NOT_APPLICABLE} (assessment null).</li>
          *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a {@code BAD} finding; it is
          *       forced null otherwise, and a {@code BAD} that arrived as {@code INFO} (a defect with no band)
          *       is raised to {@code MINOR}.</li>
@@ -639,6 +641,13 @@ public class PracticeDetectionResultParser {
                 a = null;
                 r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
             }
+            // (ABSENT, GOOD) is representable but void: the practice is absent AND that is good means there is
+            // nothing to coach. The prompt names this combination "void", so remap it to a clean abstention
+            // rather than persisting a phantom good-but-absent observation.
+            if (p == Presence.ABSENT && a == Assessment.GOOD) {
+                p = Presence.NOT_APPLICABLE;
+                a = null;
+            }
             // assessment must be null exactly when presence is NOT_APPLICABLE.
             if (p == Presence.NOT_APPLICABLE) {
                 a = null;
@@ -664,7 +673,7 @@ public class PracticeDetectionResultParser {
                 r,
                 guidance,
                 suggestedDiffNotes,
-                findingFingerprint
+                recurrenceKey
             );
         }
     }
@@ -705,7 +714,7 @@ public class PracticeDetectionResultParser {
      * @param startLine first line number (1-based, must be positive)
      * @param endLine   optional last line number for multi-line (GitHub only; GitLab ignores)
      * @param body      markdown comment body (sanitized before posting)
-     * @param findingFingerprint the stable cross-run identity inherited from the finding this note belongs to, so a
+     * @param recurrenceKey the stable cross-run identity inherited from the finding this note belongs to, so a
      *     posted placement can be matched back across re-runs; {@code null} until {@link DeliveryComposer}
      *     carries it over from the stamped finding (the parser leaves it unset).
      */
@@ -714,7 +723,7 @@ public class PracticeDetectionResultParser {
         int startLine,
         @Nullable Integer endLine,
         String body,
-        @Nullable String findingFingerprint
+        @Nullable String recurrenceKey
     ) {
         /** Pre-correlation compatibility shape: a note with no correlation key yet (the parser's output). */
         public DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {
@@ -722,7 +731,7 @@ public class PracticeDetectionResultParser {
         }
 
         /** Returns a copy stamped with {@code key}; all other components are preserved. */
-        public DiffNote withObservationFingerprint(@Nullable String key) {
+        public DiffNote withRecurrenceKey(@Nullable String key) {
             return new DiffNote(filePath, startLine, endLine, body, key);
         }
     }

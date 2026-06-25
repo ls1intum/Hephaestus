@@ -54,11 +54,7 @@ public class ReactionService {
      * @throws AccessForbiddenException if the current user is not the feedback's recipient
      * @throws IllegalArgumentException if DISPUTED without an explanation
      */
-    public ReactionDTO submitReaction(
-        WorkspaceContext workspaceContext,
-        UUID feedbackId,
-        CreateReactionDTO request
-    ) {
+    public ReactionDTO submitReaction(WorkspaceContext workspaceContext, UUID feedbackId, CreateReactionDTO request) {
         Feedback feedback = feedbackRepository
             .findByIdAndWorkspaceId(feedbackId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
@@ -135,10 +131,7 @@ public class ReactionService {
      * @return map of feedbackId → latest reaction DTO
      */
     @Transactional(readOnly = true)
-    public Map<UUID, ReactionDTO> getLatestReactionByFeedbackIds(
-        Collection<UUID> feedbackIds,
-        Long reactorUserId
-    ) {
+    public Map<UUID, ReactionDTO> getLatestReactionByFeedbackIds(Collection<UUID> feedbackIds, Long reactorUserId) {
         if (feedbackIds.isEmpty()) {
             return Map.of();
         }

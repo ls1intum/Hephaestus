@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
-import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
-import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;

@@ -48,7 +48,7 @@ class ReactionServiceTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Captor
-    private ArgumentCaptor<Reaction> feedbackCaptor;
+    private ArgumentCaptor<Reaction> reactionCaptor;
 
     private ReactionService service;
     private WorkspaceContext workspaceContext;
@@ -72,7 +72,7 @@ class ReactionServiceTest extends BaseUnitTest {
     // Submit Reaction
 
     @Nested
-    class SubmitFeedback {
+    class SubmitReaction {
 
         @Test
         void appliedFeedbackSaves() {
@@ -82,9 +82,9 @@ class ReactionServiceTest extends BaseUnitTest {
             );
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(reactionRepository.save(any(Reaction.class))).thenAnswer(inv -> {
-                Reaction fb = inv.getArgument(0);
-                fb.onCreate();
-                return fb;
+                Reaction reaction = inv.getArgument(0);
+                reaction.onCreate();
+                return reaction;
             });
 
             var request = new CreateReactionDTO(ReactionAction.ADDRESSED, null);
@@ -93,8 +93,8 @@ class ReactionServiceTest extends BaseUnitTest {
             assertThat(result.action()).isEqualTo(ReactionAction.ADDRESSED);
             assertThat(result.explanation()).isNull();
 
-            verify(reactionRepository).save(feedbackCaptor.capture());
-            Reaction saved = feedbackCaptor.getValue();
+            verify(reactionRepository).save(reactionCaptor.capture());
+            Reaction saved = reactionCaptor.getValue();
             assertThat(saved.getReactorUserId()).isEqualTo(CONTRIBUTOR_ID);
             assertThat(saved.getAction()).isEqualTo(ReactionAction.ADDRESSED);
         }
@@ -107,9 +107,9 @@ class ReactionServiceTest extends BaseUnitTest {
             );
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(reactionRepository.save(any(Reaction.class))).thenAnswer(inv -> {
-                Reaction fb = inv.getArgument(0);
-                fb.onCreate();
-                return fb;
+                Reaction reaction = inv.getArgument(0);
+                reaction.onCreate();
+                return reaction;
             });
 
             var request = new CreateReactionDTO(ReactionAction.DISPUTED, "The AI is wrong about this");
@@ -127,15 +127,12 @@ class ReactionServiceTest extends BaseUnitTest {
             );
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(reactionRepository.save(any(Reaction.class))).thenAnswer(inv -> {
-                Reaction fb = inv.getArgument(0);
-                fb.onCreate();
-                return fb;
+                Reaction reaction = inv.getArgument(0);
+                reaction.onCreate();
+                return reaction;
             });
 
-            var request = new CreateReactionDTO(
-                ReactionAction.NOT_APPLICABLE,
-                "Not relevant to my use case"
-            );
+            var request = new CreateReactionDTO(ReactionAction.NOT_APPLICABLE, "Not relevant to my use case");
             ReactionDTO result = service.submitReaction(workspaceContext, FEEDBACK_ID, request);
 
             assertThat(result.action()).isEqualTo(ReactionAction.NOT_APPLICABLE);
@@ -197,7 +194,7 @@ class ReactionServiceTest extends BaseUnitTest {
     // Get Latest Reaction
 
     @Nested
-    class GetLatestFeedback {
+    class GetLatestReaction {
 
         @Test
         void returnsLatestWhenPresent() {
@@ -320,7 +317,7 @@ class ReactionServiceTest extends BaseUnitTest {
     // Get Latest Reaction By Feedback IDs
 
     @Nested
-    class GetLatestFeedbackByFeedbackIds {
+    class GetLatestReactionByFeedbackIds {
 
         @Test
         void returnsEmptyForEmptyInput() {
@@ -334,14 +331,14 @@ class ReactionServiceTest extends BaseUnitTest {
             UUID feedbackId1 = UUID.randomUUID();
             UUID feedbackId2 = UUID.randomUUID();
 
-            Reaction fb1 = Reaction.builder()
+            Reaction reaction1 = Reaction.builder()
                 .id(UUID.randomUUID())
                 .feedbackId(feedbackId1)
                 .reactorUserId(CONTRIBUTOR_ID)
                 .action(ReactionAction.ADDRESSED)
                 .createdAt(Instant.now())
                 .build();
-            Reaction fb2 = Reaction.builder()
+            Reaction reaction2 = Reaction.builder()
                 .id(UUID.randomUUID())
                 .feedbackId(feedbackId2)
                 .reactorUserId(CONTRIBUTOR_ID)
@@ -352,7 +349,7 @@ class ReactionServiceTest extends BaseUnitTest {
 
             when(
                 reactionRepository.findLatestByFeedbackIdsAndReactor(List.of(feedbackId1, feedbackId2), CONTRIBUTOR_ID)
-            ).thenReturn(List.of(fb1, fb2));
+            ).thenReturn(List.of(reaction1, reaction2));
 
             Map<UUID, ReactionDTO> result = service.getLatestReactionByFeedbackIds(
                 List.of(feedbackId1, feedbackId2),

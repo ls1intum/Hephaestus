@@ -13,16 +13,16 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -110,9 +110,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
-            List.of()
-        );
+        when(
+            findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))
+        ).thenReturn(List.of());
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -150,9 +150,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(CK);
         var reaction = reaction(action);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
-            List.of(reaction)
-        );
+        when(
+            findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))
+        ).thenReturn(List.of(reaction));
     }
 
     private static ValidatedFinding vf(String slug, Presence presence) {

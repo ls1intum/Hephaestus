@@ -27,7 +27,7 @@ public record ObservationListDTO(
     @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
-    @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
+    @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     /**
      * Maps a {@link Observation} entity (with eagerly fetched practice) to a list DTO.

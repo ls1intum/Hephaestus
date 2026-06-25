@@ -954,10 +954,6 @@ export type ReflectionItem = {
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**
-     * Finding id — handle to open the full detail
-     */
-    findingId: string;
-    /**
      * What to do — the delivered feedback for this finding (null if nothing was delivered)
      */
     guidance?: string;
@@ -965,6 +961,10 @@ export type ReflectionItem = {
      * Where in the work, e.g. "FrameRecorder.swift:212", when known
      */
     locator?: string;
+    /**
+     * Observation id — handle to open the full detail
+     */
+    observationId: string;
     /**
      * Impact level
      */
@@ -1457,13 +1457,13 @@ export type ObservationList = {
      */
     confidence: number;
     /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
      * Finding ID
      */
     id: string;
+    /**
+     * When the observation was made
+     */
+    observedAt: Date;
     /**
      * Practice name
      */
@@ -1673,10 +1673,6 @@ export type ObservationDetail = {
      */
     confidence: number;
     /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
      * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
      */
     evidence?: {
@@ -1690,6 +1686,10 @@ export type ObservationDetail = {
      * Finding ID
      */
     id: string;
+    /**
+     * When the observation was made
+     */
+    observedAt: Date;
     /**
      * Practice name
      */

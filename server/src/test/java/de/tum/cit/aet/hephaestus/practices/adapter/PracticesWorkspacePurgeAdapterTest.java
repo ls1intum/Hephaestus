@@ -27,11 +27,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new PracticesWorkspacePurgeAdapter(
-            observationRepository,
-            practiceRepository,
-            practiceAreaRepository
-        );
+        adapter = new PracticesWorkspacePurgeAdapter(observationRepository, practiceRepository, practiceAreaRepository);
     }
 
     @Test

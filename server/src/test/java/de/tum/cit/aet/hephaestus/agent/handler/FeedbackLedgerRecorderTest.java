@@ -23,12 +23,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -117,7 +117,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
         recorder(false).record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
-        verify(feedbackObservationRepository, org.mockito.Mockito.times(5)).insertIfAbsent(any(), any(), any(), anyInt());
+        verify(feedbackObservationRepository, org.mockito.Mockito.times(5)).insertIfAbsent(
+            any(),
+            any(),
+            any(),
+            anyInt()
+        );
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository).save(saved.capture());
         assertThat(saved.getValue().getDeliveryState()).isEqualTo(FeedbackDeliveryState.DELIVERED);
@@ -234,6 +239,29 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var bound = ArgumentCaptor.forClass(UUID.class);
         verify(feedbackObservationRepository).insertIfAbsent(any(), bound.capture(), any(), anyInt());
         assertThat(bound.getAllValues()).containsExactly(keptId);
+    }
+
+    @Test
+    void everySavedFeedback_isReSourcedToTheObservationSubject_recipientEqualsAbout() {
+        // The delivery firewall: the recorder must re-source both recipient AND subject from the
+        // observation's about_user_id (7L here), never from some other field. This pins that the saved
+        // Feedback always satisfies recipientUserId == subjectUserId == observation.aboutUserId.
+        List<Observation> findings = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            findings.add(problem(0.9f - i * 0.1f));
+        }
+        when(observationRepository.findByAgentJobId(any())).thenReturn(findings);
+
+        recorder(false).record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
+
+        var saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues())
+            .isNotEmpty()
+            .allSatisfy(f -> {
+                assertThat(f.getRecipientUserId()).isEqualTo(7L);
+                assertThat(f.getSubjectUserId()).isEqualTo(f.getRecipientUserId());
+            });
     }
 
     private AgentJob job() {

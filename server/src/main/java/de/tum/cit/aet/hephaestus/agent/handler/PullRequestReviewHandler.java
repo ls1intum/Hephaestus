@@ -427,7 +427,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (int i = 0; i < scopedFindings.size(); i++) {
             String key = findingFingerprints.get(scopedFindings.get(i));
             if (key != null) {
-                scopedFindings.set(i, scopedFindings.get(i).withObservationFingerprint(key));
+                scopedFindings.set(i, scopedFindings.get(i).withRecurrenceKey(key));
             }
         }
 

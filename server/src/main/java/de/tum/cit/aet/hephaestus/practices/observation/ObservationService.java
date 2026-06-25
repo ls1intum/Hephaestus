@@ -5,9 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFindingBody;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -15,6 +12,9 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ public class ObservationService {
         if (currentUser.isEmpty()) {
             return Page.empty(pageable);
         }
-        return observationRepository.findByDeveloperAndWorkspace(
+        return observationRepository.findByAboutUserAndWorkspace(
             currentUser.get().getId(),
             workspaceId,
             practiceSlug,
