@@ -30,7 +30,7 @@ public interface InlineFindingChannel {
 
     /**
      * One finding to post inline. {@code findingFingerprint} carries the stable
-     * {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} identity so a delivery can be matched
+     * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint} identity so a delivery can be matched
      * back to its placement across re-runs; it is {@code null} when the caller has no key for the finding. The
      * 3-arg constructor is the pre-correlation compatibility shape and defaults the key to null.
      */

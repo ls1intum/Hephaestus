@@ -7,9 +7,9 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.PresenceCount;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -63,7 +63,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
     private static final String CACHE_NAME = "mentor_findings_aspect";
 
     private final UserRepository userRepository;
-    private final PracticeFindingRepository findingRepository;
+    private final ObservationRepository findingRepository;
     private final MentorAspectQueryRepository queryRepository;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;

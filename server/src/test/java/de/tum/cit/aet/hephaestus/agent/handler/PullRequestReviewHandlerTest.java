@@ -92,9 +92,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             new SecretDiffScanner(),
             // Real flag-OFF filter: evaluate() returns the findings unchanged without touching the repos.
             new ReactionSuppressionFilter(
-                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.class),
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(
-                    de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository.class
+                    de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.class
                 ),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
@@ -489,7 +489,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         @SuppressWarnings("unchecked")
-        void stampsDeliveryFindingFingerprintOntoComposedDiffNote() {
+        void stampsDeliveryObservationFingerprintOntoComposedDiffNote() {
             // A NOT_OBSERVED finding with a code location synthesizes an inline diff note. The key deliver()
             // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the
             // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).

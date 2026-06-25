@@ -8,9 +8,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.PresenceCount;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -36,7 +36,7 @@ class FindingsHistoryAspectProviderTest extends BaseUnitTest {
     UserRepository userRepository;
 
     @Mock
-    PracticeFindingRepository findingRepository;
+    ObservationRepository findingRepository;
 
     @Mock
     MentorAspectQueryRepository queryRepository;

@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -40,23 +40,23 @@ class ReactionSuppressionFilter {
 
     private static final Logger log = LoggerFactory.getLogger(ReactionSuppressionFilter.class);
 
-    private static final Set<FindingReactionAction> SUPPRESS_ACTIONS = Set.of(
-        FindingReactionAction.DISPUTED,
-        FindingReactionAction.NOT_APPLICABLE
+    private static final Set<ReactionAction> SUPPRESS_ACTIONS = Set.of(
+        ReactionAction.DISPUTED,
+        ReactionAction.NOT_APPLICABLE
     );
 
-    private final PracticeFindingRepository practiceFindingRepository;
-    private final FindingReactionRepository findingReactionRepository;
+    private final ObservationRepository observationRepository;
+    private final ReactionRepository findingReactionRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeReviewProperties reviewProperties;
 
     ReactionSuppressionFilter(
-        PracticeFindingRepository practiceFindingRepository,
-        FindingReactionRepository findingReactionRepository,
+        ObservationRepository observationRepository,
+        ReactionRepository findingReactionRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeReviewProperties reviewProperties
     ) {
-        this.practiceFindingRepository = practiceFindingRepository;
+        this.observationRepository = observationRepository;
         this.findingReactionRepository = findingReactionRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.reviewProperties = reviewProperties;
@@ -72,7 +72,7 @@ class ReactionSuppressionFilter {
         if (!reviewProperties.reactionSuppression()) {
             return new ReactionDecision(scopedFindings, 0);
         }
-        List<Observation> persisted = practiceFindingRepository.findByAgentJobId(job.getId());
+        List<Observation> persisted = observationRepository.findByAgentJobId(job.getId());
         if (persisted.isEmpty()) {
             return new ReactionDecision(scopedFindings, 0);
         }
@@ -91,8 +91,8 @@ class ReactionSuppressionFilter {
                 persistedByKey.putIfAbsent(f.getRecurrenceKey(), f);
             }
         }
-        Map<String, FindingReactionAction> actionByKey = new HashMap<>();
-        for (Reaction r : findingReactionRepository.findLatestByFindingFingerprintsAndDeveloper(
+        Map<String, ReactionAction> actionByKey = new HashMap<>();
+        for (Reaction r : findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(
             persistedByKey.keySet(),
             aboutUserId
         )) {
@@ -107,15 +107,15 @@ class ReactionSuppressionFilter {
         int suppressedIndex = 0;
         for (ValidatedFinding vf : scopedFindings) {
             // Recompute the canonical locus key the same way deliver() did, so we match the persisted row a
-            // reaction is keyed to — without re-deriving identity (FindingFingerprint deliberately excludes the title).
-            String key = FindingFingerprint.compute(
+            // reaction is keyed to — without re-deriving identity (ObservationFingerprint deliberately excludes the title).
+            String key = ObservationFingerprint.compute(
                 vf.practiceSlug(),
                 artifactType,
                 artifactId,
                 aboutUserId,
                 firstLocationPath(vf.evidence())
             );
-            FindingReactionAction action = actionByKey.get(key);
+            ReactionAction action = actionByKey.get(key);
             if (action != null && SUPPRESS_ACTIONS.contains(action)) {
                 Observation pf = persistedByKey.get(key);
                 if (pf != null) {
@@ -128,7 +128,7 @@ class ReactionSuppressionFilter {
                 suppressed++;
                 continue;
             }
-            if (action == FindingReactionAction.ADDRESSED && vf.assessment() == Assessment.BAD) {
+            if (action == ReactionAction.ADDRESSED && vf.assessment() == Assessment.BAD) {
                 deliverable.add(withEscalatedReasoning(vf)); // student said "fixed", but it recurs
                 continue;
             }
@@ -167,8 +167,8 @@ class ReactionSuppressionFilter {
         );
     }
 
-    private static FeedbackSuppressionReason reasonFor(FindingReactionAction action) {
-        return action == FindingReactionAction.DISPUTED
+    private static FeedbackSuppressionReason reasonFor(ReactionAction action) {
+        return action == ReactionAction.DISPUTED
             ? FeedbackSuppressionReason.REACTED_DISPUTED
             : FeedbackSuppressionReason.REACTED_NOT_APPLICABLE;
     }

@@ -38,7 +38,7 @@ public final class FeedbackThreadKey {
      * @param surface the delivery surface (required)
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
-    public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackSurface surface) {
+    public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackChannel surface) {
         String canonical = new StringBuilder()
             .append(artifactType == null ? "" : artifactType)
             .append(SEP)

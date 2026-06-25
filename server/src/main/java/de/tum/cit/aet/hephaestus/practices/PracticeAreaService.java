@@ -65,15 +65,7 @@ public class PracticeAreaService {
     }
 
     @Transactional
-    public PracticeArea createArea(
-        WorkspaceContext ctx,
-        String slug,
-        String name,
-        @Nullable String description,
-        int displayOrder,
-        @Nullable String icon,
-        @Nullable String color
-    ) {
+    public PracticeArea createArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
         if (practiceAreaRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeAreaSlugConflictException(
                 "A practice area with slug '" + slug + "' already exists in this workspace."
@@ -86,11 +78,11 @@ public class PracticeAreaService {
         PracticeArea area = new PracticeArea();
         area.setWorkspace(workspace);
         area.setSlug(slug);
-        area.setName(name);
-        area.setDescription(description);
-        area.setDisplayOrder(displayOrder);
-        area.setIcon(icon);
-        area.setColor(color);
+        area.setName(attributes.name());
+        area.setDescription(attributes.description());
+        area.setDisplayOrder(attributes.displayOrder() != null ? attributes.displayOrder() : 0);
+        area.setIcon(attributes.icon());
+        area.setColor(attributes.color());
 
         try {
             area = practiceAreaRepository.save(area);
@@ -106,30 +98,22 @@ public class PracticeAreaService {
     }
 
     @Transactional
-    public PracticeArea updateArea(
-        WorkspaceContext ctx,
-        String slug,
-        @Nullable String name,
-        @Nullable String description,
-        @Nullable Integer displayOrder,
-        @Nullable String icon,
-        @Nullable String color
-    ) {
+    public PracticeArea updateArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
         PracticeArea area = getArea(ctx, slug);
-        if (name != null) {
-            area.setName(name);
+        if (attributes.name() != null) {
+            area.setName(attributes.name());
         }
-        if (description != null) {
-            area.setDescription(description);
+        if (attributes.description() != null) {
+            area.setDescription(attributes.description());
         }
-        if (displayOrder != null) {
-            area.setDisplayOrder(displayOrder);
+        if (attributes.displayOrder() != null) {
+            area.setDisplayOrder(attributes.displayOrder());
         }
-        if (icon != null) {
-            area.setIcon(icon);
+        if (attributes.icon() != null) {
+            area.setIcon(attributes.icon());
         }
-        if (color != null) {
-            area.setColor(color);
+        if (attributes.color() != null) {
+            area.setColor(attributes.color());
         }
         return practiceAreaRepository.save(area);
     }

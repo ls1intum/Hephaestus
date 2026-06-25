@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,16 +23,16 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
 
     private static final Logger log = LoggerFactory.getLogger(PracticesWorkspacePurgeAdapter.class);
 
-    private final PracticeFindingRepository practiceFindingRepository;
+    private final ObservationRepository observationRepository;
     private final PracticeRepository practiceRepository;
     private final PracticeAreaRepository practiceAreaRepository;
 
     public PracticesWorkspacePurgeAdapter(
-        PracticeFindingRepository practiceFindingRepository,
+        ObservationRepository observationRepository,
         PracticeRepository practiceRepository,
         PracticeAreaRepository practiceAreaRepository
     ) {
-        this.practiceFindingRepository = practiceFindingRepository;
+        this.observationRepository = observationRepository;
         this.practiceRepository = practiceRepository;
         this.practiceAreaRepository = practiceAreaRepository;
     }
@@ -40,7 +40,7 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     @Override
     public void deleteWorkspaceData(Long workspaceId) {
         // Delete practice findings explicitly (defense-in-depth; CASCADE would also handle this).
-        practiceFindingRepository.deleteAllByPracticeWorkspaceId(workspaceId);
+        observationRepository.deleteAllByPracticeWorkspaceId(workspaceId);
         // Delete practice definitions (CASCADE cleans up any remaining findings); this also clears the
         // practice → practice_area references, so areas can be removed next.
         practiceRepository.deleteAllByWorkspaceId(workspaceId);

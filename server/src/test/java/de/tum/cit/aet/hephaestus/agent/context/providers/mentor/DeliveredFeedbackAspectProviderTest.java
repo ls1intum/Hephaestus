@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -76,14 +76,14 @@ class DeliveredFeedbackAspectProviderTest extends BaseUnitTest {
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
 
         Feedback withBody = Feedback.builder()
-            .channel(FeedbackSurface.IN_CONTEXT)
+            .channel(FeedbackChannel.IN_CONTEXT)
             .artifactType(WorkArtifact.PULL_REQUEST)
             .artifactId(575L)
             .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
             .body("Nice work scoping this PR — one thing to tighten before merge.")
             .build();
         Feedback blank = Feedback.builder()
-            .channel(FeedbackSurface.IN_CONTEXT)
+            .channel(FeedbackChannel.IN_CONTEXT)
             .artifactType(WorkArtifact.ISSUE)
             .artifactId(574L)
             .deliveredAt(Instant.parse("2026-06-16T08:30:00Z"))

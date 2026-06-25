@@ -33,7 +33,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Reconciliation under GitHub's append-only review model differs from GitLab's edit-in-place: a review
  * thread cannot be deleted or edited, only minimized. So each finding's stable
- * {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} is embedded in the thread body as a
+ * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint} is embedded in the thread body as a
  * hidden HTML tag, and before posting we read the PR's existing review threads
  * ({@code GetPullRequestReviewThreads}) and index this reviewer's own prior threads by that key. A finding
  * whose key already has a live (non-outdated) bot thread is PRESERVED rather than re-posted, so a stable
@@ -71,7 +71,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
      * Hidden per-finding correlation tag embedded in a thread body so a prior thread can be matched back to the
      * finding that produced it across re-runs. Humans never type this HTML comment, so its presence in a thread's
      * first comment marks the thread as one of ours. The key is alnum/dash/underscore (a
-     * {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} digest), so no escaping is needed.
+     * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint} digest), so no escaping is needed.
      */
     private static final Pattern CK_TAG = Pattern.compile("<!-- hephaestus-diff-note-ck=([A-Za-z0-9_-]+) -->");
 
@@ -360,7 +360,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         if (body == null || commentId == null) {
             return;
         }
-        String key = parseFindingFingerprint(body);
+        String key = parseObservationFingerprint(body);
         if (key == null) {
             return; // human thread or a legacy bot note posted before keys existed — not ours to reconcile
         }
@@ -416,7 +416,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Nullable
-    private static String parseFindingFingerprint(String body) {
+    private static String parseObservationFingerprint(String body) {
         Matcher m = CK_TAG.matcher(body);
         return m.find() ? m.group(1) : null;
     }

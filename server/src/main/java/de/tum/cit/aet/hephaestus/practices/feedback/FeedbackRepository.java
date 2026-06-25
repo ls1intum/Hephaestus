@@ -34,17 +34,17 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /**
      * The headline locus of a feedback unit: the {@code recurrence_key} of its earliest {@code PRIMARY}-role
-     * bound observation. Denormalized onto a {@link de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction}
+     * bound observation. Denormalized onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction}
      * at write time so B2 suppression (ADR 0021) can follow a reacted locus across the detector's per-run
      * re-detections, even though the per-run feedback row differs each run. Empty when the unit binds no
      * observation or the headline locus predates C2 (null key).
      */
     @Query(
         """
-        SELECT fo.finding.recurrenceKey FROM FeedbackObservation fo
+        SELECT fo.observation.recurrenceKey FROM FeedbackObservation fo
         WHERE fo.feedback.id = :feedbackId
           AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
-          AND fo.finding.recurrenceKey IS NOT NULL
+          AND fo.observation.recurrenceKey IS NOT NULL
         ORDER BY fo.ordinal ASC
         LIMIT 1
         """

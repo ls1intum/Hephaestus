@@ -8,19 +8,19 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Deliv
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackProvenance;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSurface;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
+import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -68,22 +68,22 @@ public class FeedbackLedgerRecorder {
     /** Policy-floor SUPPRESSED units (C3) start here — clear of the live unit (0) and the B2 base (1000). */
     private static final int POLICY_FLOOR_UNIT_ORDINAL_BASE = 2000;
 
-    private final PracticeFindingRepository practiceFindingRepository;
+    private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
-    private final FeedbackFindingRepository feedbackFindingRepository;
+    private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final PracticeReviewProperties reviewProperties;
 
     FeedbackLedgerRecorder(
-        PracticeFindingRepository practiceFindingRepository,
+        ObservationRepository observationRepository,
         FeedbackRepository feedbackRepository,
-        FeedbackFindingRepository feedbackFindingRepository,
+        FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
         PracticeReviewProperties reviewProperties
     ) {
-        this.practiceFindingRepository = practiceFindingRepository;
+        this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
-        this.feedbackFindingRepository = feedbackFindingRepository;
+        this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.reviewProperties = reviewProperties;
     }
@@ -108,7 +108,7 @@ public class FeedbackLedgerRecorder {
         if (delivery == null) {
             return;
         }
-        List<Observation> findings = practiceFindingRepository.findByAgentJobId(job.getId());
+        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
         if (findings.isEmpty()) {
             return;
         }
@@ -142,11 +142,11 @@ public class FeedbackLedgerRecorder {
                 .artifactId(artifactId)
                 .recipientUserId(recipientUserId)
                 .subjectUserId(any.getAboutUserId())
-                .channel(FeedbackSurface.IN_CONTEXT)
+                .channel(FeedbackChannel.IN_CONTEXT)
                 .position(IN_CONTEXT_UNIT_ORDINAL)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
                 .body(delivery.mrNote())
-                .source(FeedbackProvenance.AGENT)
+                .source(FeedbackSource.AGENT)
                 .threadKey(feedbackThreadKey)
                 .replacesId(supersedesId)
                 .createdAt(now)
@@ -166,7 +166,7 @@ public class FeedbackLedgerRecorder {
         // floor re-binds them — B2 does NOT delete the Observation row, so a disputed-yet-recurring locus
         // would otherwise land in the policy-dropped tail and get a SECOND (POLICY_FLOOR_DROP) SUPPRESSED unit.
         Set<UUID> alreadySuppressed = new HashSet<>(
-            feedbackFindingRepository.findFindingIdsSuppressedForJob(job.getId())
+            feedbackObservationRepository.findFindingIdsSuppressedForJob(job.getId())
         );
 
         // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the DELIVERED
@@ -199,14 +199,14 @@ public class FeedbackLedgerRecorder {
         int ordinal = 0;
         for (Observation f : assessed) {
             EvidenceRole role = f.getAssessment() == Assessment.BAD ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
-            feedbackFindingRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
+            feedbackObservationRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
         // SUMMARY placement — fully recoverable: external_ref is the posted summary comment id.
         feedbackPlacementRepository.save(
             FeedbackPlacement.builder()
                 .feedback(feedback)
-                .placementType(PlacementSlot.SUMMARY)
+                .placementType(PlacementType.SUMMARY)
                 .postedCommentRef(job.getDeliveryCommentId())
                 .createdAt(now)
                 .build()
@@ -222,7 +222,7 @@ public class FeedbackLedgerRecorder {
                 feedbackPlacementRepository.save(
                     FeedbackPlacement.builder()
                         .feedback(feedback)
-                        .placementType(PlacementSlot.INLINE)
+                        .placementType(PlacementType.INLINE)
                         .anchorKind(note.endLine() != null ? PlacementAnchorKind.RANGE : PlacementAnchorKind.LINE)
                         .anchorPath(note.filePath())
                         .anchorStartLine(note.startLine())
@@ -276,15 +276,15 @@ public class FeedbackLedgerRecorder {
                     .artifactId(droppedFinding.getArtifactId())
                     .recipientUserId(droppedFinding.getAboutUserId())
                     .subjectUserId(droppedFinding.getAboutUserId())
-                    .channel(FeedbackSurface.IN_CONTEXT)
+                    .channel(FeedbackChannel.IN_CONTEXT)
                     .position(unitOrdinal)
                     .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                     .suppressionReason(FeedbackSuppressionReason.POLICY_FLOOR_DROP)
-                    .source(FeedbackProvenance.AGENT)
+                    .source(FeedbackSource.AGENT)
                     .createdAt(now)
                     .build()
             );
-            feedbackFindingRepository.insertIfAbsent(
+            feedbackObservationRepository.insertIfAbsent(
                 unit.getId(),
                 droppedFinding.getId(),
                 EvidenceRole.PRIMARY.name(),
@@ -306,7 +306,7 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<String> priorLiveSummaryRef(AgentJob job) {
-        List<Observation> findings = practiceFindingRepository.findByAgentJobId(job.getId());
+        List<Observation> findings = observationRepository.findByAgentJobId(job.getId());
         if (findings.isEmpty()) {
             return Optional.empty();
         }
@@ -320,7 +320,7 @@ public class FeedbackLedgerRecorder {
                 feedbackPlacementRepository
                     .findByFeedbackId(prior.getId())
                     .stream()
-                    .filter(p -> p.getPlacementType() == PlacementSlot.SUMMARY)
+                    .filter(p -> p.getPlacementType() == PlacementType.SUMMARY)
                     .map(FeedbackPlacement::getPostedCommentRef)
                     .filter(ref -> ref != null && !ref.isBlank())
                     .findFirst()
@@ -350,16 +350,16 @@ public class FeedbackLedgerRecorder {
                 .artifactId(finding.getArtifactId())
                 .recipientUserId(finding.getAboutUserId())
                 .subjectUserId(finding.getAboutUserId())
-                .channel(FeedbackSurface.IN_CONTEXT)
+                .channel(FeedbackChannel.IN_CONTEXT)
                 .position(unitOrdinal)
                 .deliveryState(FeedbackDeliveryState.SUPPRESSED)
                 .suppressionReason(reason)
-                .source(FeedbackProvenance.AGENT)
+                .source(FeedbackSource.AGENT)
                 .threadKey(feedbackThreadKeyFor(finding))
                 .createdAt(now)
                 .build()
         );
-        feedbackFindingRepository.insertIfAbsent(feedback.getId(), finding.getId(), EvidenceRole.PRIMARY.name(), 0);
+        feedbackObservationRepository.insertIfAbsent(feedback.getId(), finding.getId(), EvidenceRole.PRIMARY.name(), 0);
         log.info(
             "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, findingFingerprint={}",
             job.getId(),
@@ -405,7 +405,7 @@ public class FeedbackLedgerRecorder {
             any.getArtifactType().name(),
             any.getArtifactId(),
             any.getAboutUserId(),
-            FeedbackSurface.IN_CONTEXT
+            FeedbackChannel.IN_CONTEXT
         );
     }
 

@@ -566,7 +566,7 @@
         </rollback>
     </changeSet>
 
-    <!-- ============================ practice: drop kind (subject_role is retained by the entity) ============================ -->
+    <!-- ============================ practice: drop kind ============================ -->
     <changeSet id="1782375132775-30" author="felix">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="practice" columnName="kind"/>
@@ -576,6 +576,22 @@
         <rollback>
             <addColumn tableName="practice">
                 <column name="kind" type="VARCHAR(16)" defaultValue="DESIRABLE">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <!-- ============================ practice: drop subject_role (ADR 0022: no functional reader; the
+         reviewer-side firewall is enforced by Feedback.recipient != subject, not this column) ============================ -->
+    <changeSet id="1782375132775-31" author="felix">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="practice" columnName="subject_role"/>
+        </preConditions>
+        <dropColumn tableName="practice" columnName="subject_role"/>
+        <rollback>
+            <addColumn tableName="practice">
+                <column name="subject_role" type="VARCHAR(16)" defaultValue="AUTHOR">
                     <constraints nullable="false"/>
                 </column>
             </addColumn>

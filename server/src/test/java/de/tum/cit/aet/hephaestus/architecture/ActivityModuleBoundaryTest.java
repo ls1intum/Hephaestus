@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li><b>practices.model</b> - Practice and Observation entities</li>
  *   <li><b>practices.spi</b> - Service provider interfaces (UserRoleChecker)</li>
- *   <li><b>practices.finding</b> - Contributor findings, detection events, and finding API</li>
+ *   <li><b>practices.observation</b> - Contributor findings, detection events, and finding API</li>
  *   <li><b>practices.review</b> - Detection and delivery gate decisions</li>
  * </ul>
  *
@@ -202,7 +202,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
 
         /**
          * Only PracticeCatalogController (practice CRUD), PracticeAreaController (goal CRUD + binding),
-         * PracticeFindingController (contributor findings API), and FindingReactionController
+         * ObservationController (contributor findings API), and ReactionController
          * (contributor reactions) are allowed as REST entry points in the practices module.
          */
         @Test
@@ -217,12 +217,12 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .orShould()
                 .haveSimpleName("PracticeAreaController")
                 .orShould()
-                .haveSimpleName("PracticeFindingController")
+                .haveSimpleName("ObservationController")
                 .orShould()
-                .haveSimpleName("FindingReactionController")
+                .haveSimpleName("ReactionController")
                 .because(
-                    "Only PracticeCatalogController, PracticeAreaController, PracticeFindingController, and " +
-                        "FindingReactionController are allowed REST entry points"
+                    "Only PracticeCatalogController, PracticeAreaController, ObservationController, and " +
+                        "ReactionController are allowed REST entry points"
                 );
             rule.check(classes);
         }

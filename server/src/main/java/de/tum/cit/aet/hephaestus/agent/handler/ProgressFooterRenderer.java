@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
-import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
 import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;

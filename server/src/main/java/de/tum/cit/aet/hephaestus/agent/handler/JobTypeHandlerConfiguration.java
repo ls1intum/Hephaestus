@@ -77,7 +77,7 @@ public class JobTypeHandlerConfiguration {
         PullRequestRepository pullRequestRepository,
         WorkspaceRepository workspaceRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService findingTrendService
+        de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService observationTrendService
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
@@ -87,7 +87,7 @@ public class JobTypeHandlerConfiguration {
             workspaceRepository,
             reviewProperties,
             feedbackLedgerRecorder,
-            findingTrendService
+            observationTrendService
         );
     }
 

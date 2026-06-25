@@ -20,8 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -55,7 +55,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     private de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository practiceRevisionRepository;
 
     @Mock
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Mock
     private PullRequestRepository pullRequestRepository;
@@ -81,7 +81,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         service = new PracticeDetectionDeliveryService(
             practiceRepository,
             practiceRevisionRepository,
-            practiceFindingRepository,
+            observationRepository,
             pullRequestRepository,
             issueRepository,
             eventPublisher,
@@ -117,7 +117,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(pullRequestRepository.findByIdWithAuthor(456L)).thenReturn(Optional.of(testPr));
         lenient()
             .when(
-                practiceFindingRepository.insertIfAbsent(
+                observationRepository.insertIfAbsent(
                     any(),
                     anyString(),
                     any(),
@@ -178,7 +178,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(result.discardedUnknownSlug()).isZero();
             assertThat(result.discardedDuplicate()).isZero();
 
-            verify(practiceFindingRepository).insertIfAbsent(
+            verify(observationRepository).insertIfAbsent(
                 any(UUID.class),
                 eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
                 eq(testJob.getId()),
@@ -219,7 +219,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             assertThat(result.inserted()).isZero();
             assertThat(result.discardedUnknownSlug()).isEqualTo(1);
-            verify(practiceFindingRepository, never()).insertIfAbsent(
+            verify(observationRepository, never()).insertIfAbsent(
                 any(),
                 anyString(),
                 any(),
@@ -386,7 +386,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         @Test
         void duplicateKey() {
             when(
-                practiceFindingRepository.insertIfAbsent(
+                observationRepository.insertIfAbsent(
                     any(),
                     anyString(),
                     any(),
@@ -423,7 +423,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             @SuppressWarnings("unchecked")
             ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(practiceFindingRepository).insertIfAbsent(
+            verify(observationRepository).insertIfAbsent(
                 any(),
                 keyCaptor.capture(),
                 any(),
@@ -500,7 +500,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             var result = service.deliver(testJob, findings);
 
             assertThat(result.inserted()).isEqualTo(1);
-            verify(practiceFindingRepository).insertIfAbsent(
+            verify(observationRepository).insertIfAbsent(
                 any(),
                 eq("pr-description-quality:0:ISSUE:999:" + testJob.getId()),
                 eq(testJob.getId()),

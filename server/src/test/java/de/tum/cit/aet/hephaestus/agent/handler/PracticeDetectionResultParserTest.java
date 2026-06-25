@@ -707,7 +707,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
         @Test
         void parseSampleFixture() throws Exception {
-            InputStream is = getClass().getResourceAsStream("/practices/finding/sample-agent-output.json");
+            InputStream is = getClass().getResourceAsStream("/practices/observation/sample-agent-output.json");
             assertThat(is).as("sample fixture must exist").isNotNull();
 
             JsonNode fixture = objectMapper.readTree(is);

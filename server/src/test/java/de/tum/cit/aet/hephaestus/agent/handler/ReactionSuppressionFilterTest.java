@@ -13,11 +13,11 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -35,10 +35,10 @@ import org.mockito.Mock;
 class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Mock
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Mock
-    private FindingReactionRepository findingReactionRepository;
+    private ReactionRepository findingReactionRepository;
 
     @Mock
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
@@ -47,7 +47,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     private static final long CONTRIBUTOR = 7L;
     private static final long TARGET = 100L;
     // The canonical key the filter recomputes for a SLUG finding with no location — the SAME value deliver() persists.
-    private static final String CK = FindingFingerprint.compute(
+    private static final String CK = ObservationFingerprint.compute(
         SLUG,
         WorkArtifact.PULL_REQUEST.name(),
         TARGET,
@@ -57,7 +57,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     private ReactionSuppressionFilter filter(boolean enabled) {
         return new ReactionSuppressionFilter(
-            practiceFindingRepository,
+            observationRepository,
             findingReactionRepository,
             feedbackLedgerRecorder,
             new PracticeReviewProperties(false, true, false, "", 15, false, enabled, false)
@@ -72,12 +72,12 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).isEqualTo(in);
         assertThat(d.suppressedCount()).isZero();
-        verify(practiceFindingRepository, never()).findByAgentJobId(any());
+        verify(observationRepository, never()).findByAgentJobId(any());
     }
 
     @Test
     void disputedLocus_isSuppressedAndLedgered() {
-        stubPersistedAndReaction(FindingReactionAction.DISPUTED);
+        stubPersistedAndReaction(ReactionAction.DISPUTED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -93,7 +93,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void suppression_survivesLedgerWriteFailure() {
-        stubPersistedAndReaction(FindingReactionAction.NOT_APPLICABLE);
+        stubPersistedAndReaction(ReactionAction.NOT_APPLICABLE);
         doThrow(new RuntimeException("ledger down"))
             .when(feedbackLedgerRecorder)
             .recordSuppressed(any(), any(), any(), anyInt());
@@ -109,8 +109,8 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     @Test
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByFindingFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of()
         );
 
@@ -122,7 +122,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void appliedButStillNotObserved_isKeptWithStifferOpener() {
-        stubPersistedAndReaction(FindingReactionAction.ADDRESSED);
+        stubPersistedAndReaction(ReactionAction.ADDRESSED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -135,7 +135,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void appliedAndNowObserved_isDeliveredPlainNotEscalated() {
         // ADDRESSED only escalates a STILL-failing locus; if the practice is now OBSERVED the finding passes through
         // untouched (escalation is keyed on observation == NOT_OBSERVED, not on the reaction alone).
-        stubPersistedAndReaction(FindingReactionAction.ADDRESSED);
+        stubPersistedAndReaction(ReactionAction.ADDRESSED);
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.PRESENT)));
 
@@ -146,11 +146,11 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     // --- helpers ---
 
-    private void stubPersistedAndReaction(FindingReactionAction action) {
+    private void stubPersistedAndReaction(ReactionAction action) {
         var pf = pf(CK);
         var reaction = reaction(action);
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByFindingFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
+        when(findingReactionRepository.findLatestByObservationFingerprintsAndDeveloper(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of(reaction)
         );
     }
@@ -187,7 +187,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         return pf;
     }
 
-    private static Reaction reaction(FindingReactionAction action) {
+    private static Reaction reaction(ReactionAction action) {
         Reaction r = org.mockito.Mockito.mock(Reaction.class);
         when(r.getRecurrenceKey()).thenReturn(CK);
         when(r.getAction()).thenReturn(action);

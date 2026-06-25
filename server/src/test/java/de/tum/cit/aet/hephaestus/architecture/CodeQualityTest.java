@@ -160,7 +160,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "CommitRepository.updateEnrichmentMetadata",
                 "DiscussionCategoryRepository.upsertCategory",
                 "DiscussionRepository.upsertCore",
-                "PracticeFindingRepository.insertIfAbsent",
+                "ObservationRepository.insertIfAbsent",
                 // JPQL admin-audit query: each nullable filter needs its own @Param for the
                 // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
                 "AuthEventRepository.findForAdmin"

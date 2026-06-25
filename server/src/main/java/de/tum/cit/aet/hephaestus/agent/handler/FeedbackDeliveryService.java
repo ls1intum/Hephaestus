@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService;
-import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -46,7 +46,7 @@ class FeedbackDeliveryService {
     private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewProperties reviewProperties;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
-    private final FindingTrendService findingTrendService;
+    private final ObservationTrendService observationTrendService;
 
     FeedbackDeliveryService(
         PullRequestCommentPoster commentPoster,
@@ -56,7 +56,7 @@ class FeedbackDeliveryService {
         WorkspaceRepository workspaceRepository,
         PracticeReviewProperties reviewProperties,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        FindingTrendService findingTrendService
+        ObservationTrendService observationTrendService
     ) {
         this.commentPoster = commentPoster;
         this.diffNotePoster = diffNotePoster;
@@ -65,7 +65,7 @@ class FeedbackDeliveryService {
         this.workspaceRepository = workspaceRepository;
         this.reviewProperties = reviewProperties;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
-        this.findingTrendService = findingTrendService;
+        this.observationTrendService = observationTrendService;
     }
 
     /**
@@ -94,7 +94,7 @@ class FeedbackDeliveryService {
     interface SummaryRecomposer {
         /** @return the demoted summary body for the given delivered correlation keys, or {@code null} when there is none. */
         @Nullable
-        String recompose(Set<String> deliveredFindingFingerprints);
+        String recompose(Set<String> deliveredObservationFingerprints);
     }
 
     void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery, @Nullable SummaryRecomposer recomposer) {
@@ -162,7 +162,7 @@ class FeedbackDeliveryService {
         // Cross-run trend (ADR 0021, B1/B3/A4) — flag-gated; needs ≥2 runs to render anything. Computed here
         // (the target + workspace are known) and threaded into the summary so DeliveryComposer stays pure.
         TrendDelta trend = reviewProperties.progressFooter()
-            ? findingTrendService
+            ? observationTrendService
                   .computeForTarget(WorkArtifact.PULL_REQUEST, pullRequestId, job.getWorkspace().getId())
                   .orElse(null)
             : null;

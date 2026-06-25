@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -58,7 +57,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void noWorkspace_skips() {
         when(workspaceRepository.findAll()).thenReturn(List.of());
         seeder(true).seed();
-        verify(areaService, never()).createArea(any(), any(), any(), any(), anyInt(), any(), any());
+        verify(areaService, never()).createArea(any(), any(), any());
     }
 
     @Test
@@ -69,12 +68,12 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         seeder(true).seed();
 
         // The shipped catalog is eleven areas with thirty-two practices total, each bound to its area.
-        verify(areaService).createArea(any(), eq("review-ready-work"), any(), any(), anyInt(), any(), any());
-        verify(areaService).createArea(any(), eq("acting-on-review-feedback"), any(), any(), anyInt(), any(), any());
-        verify(areaService).createArea(any(), eq("actionable-issue-authoring"), any(), any(), anyInt(), any(), any());
-        verify(areaService).createArea(any(), eq("constructive-code-review"), any(), any(), anyInt(), any(), any());
-        verify(areaService).createArea(any(), eq("testing-discipline"), any(), any(), anyInt(), any(), any());
-        verify(areaService, times(11)).createArea(any(), any(), any(), any(), anyInt(), any(), any());
+        verify(areaService).createArea(any(), eq("review-ready-work"), any());
+        verify(areaService).createArea(any(), eq("acting-on-review-feedback"), any());
+        verify(areaService).createArea(any(), eq("actionable-issue-authoring"), any());
+        verify(areaService).createArea(any(), eq("constructive-code-review"), any());
+        verify(areaService).createArea(any(), eq("testing-discipline"), any());
+        verify(areaService, times(11)).createArea(any(), any(), any());
 
         var practiceCaptor = ArgumentCaptor.forClass(CreatePracticeRequestDTO.class);
         verify(practiceService, times(32)).createPractice(any(), practiceCaptor.capture());
@@ -110,7 +109,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
 
         seeder(true).seed();
 
-        verify(areaService, never()).createArea(any(), any(), any(), any(), anyInt(), any(), any());
+        verify(areaService, never()).createArea(any(), any(), any());
         verify(practiceService, never()).createPractice(any(), any());
     }
 
@@ -118,7 +117,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
-        when(areaService.createArea(any(), any(), any(), any(), anyInt(), any(), any())).thenThrow(
+        when(areaService.createArea(any(), any(), any())).thenThrow(
             new RuntimeException("boom")
         );
 

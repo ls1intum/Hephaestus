@@ -540,7 +540,7 @@ public class PracticeDetectionResultParser {
     }
 
     /**
-     * @param findingFingerprint the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint}
+     * @param findingFingerprint the stable cross-run {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}
      *     identity, stamped by {@code PullRequestReviewHandler} from the value
      *     {@code PracticeDetectionDeliveryService.deliver} already computed (never recomputed downstream, so it
      *     cannot drift from the persisted finding). {@code null} until stamped — the parser leaves it unset.
@@ -587,7 +587,7 @@ public class PracticeDetectionResultParser {
         }
 
         /** Returns a copy stamped with {@code key}; all other components are preserved by reference. */
-        public ValidatedFinding withFindingFingerprint(@Nullable String key) {
+        public ValidatedFinding withObservationFingerprint(@Nullable String key) {
             return new ValidatedFinding(
                 practiceSlug,
                 title,
@@ -722,7 +722,7 @@ public class PracticeDetectionResultParser {
         }
 
         /** Returns a copy stamped with {@code key}; all other components are preserved. */
-        public DiffNote withFindingFingerprint(@Nullable String key) {
+        public DiffNote withObservationFingerprint(@Nullable String key) {
             return new DiffNote(filePath, startLine, endLine, body, key);
         }
     }

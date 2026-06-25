@@ -27,8 +27,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -69,7 +69,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Autowired
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -268,7 +268,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // Verify findings persisted
-            List<Observation> findings = practiceFindingRepository.findAll();
+            List<Observation> findings = observationRepository.findAll();
             assertThat(findings).hasSize(2);
             assertThat(findings)
                 .extracting(Observation::getPresence)
@@ -324,7 +324,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // Findings still persisted
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
             // Approval comment posted (no negatives → approval summary). Inline notes are reconciled
             // unconditionally on an OPEN PR (bb92f0010) with an EMPTY list — clearing any prior run's stale
@@ -345,7 +345,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No valid findings");
 
-            assertThat(practiceFindingRepository.findAll()).isEmpty();
+            assertThat(observationRepository.findAll()).isEmpty();
             verify(commentPoster, never()).postFormattedBody(any(), any());
         }
 
@@ -386,7 +386,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // 2 persisted (known slugs), 1 discarded (unknown)
-            List<Observation> findings = practiceFindingRepository.findAll();
+            List<Observation> findings = observationRepository.findAll();
             assertThat(findings).hasSize(2);
 
             List<PracticeDetectionCompletedEvent> events = applicationEvents
@@ -442,7 +442,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
 
             // Findings ARE persisted (deliver() persists first, then posts)
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
             // Comment NOT posted (FeedbackDeliveryService skips closed PRs)
             verify(commentPoster, never()).postFormattedBody(any(), any());
@@ -468,13 +468,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             // First delivery
             handler.deliver(agentJob);
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
             // Second delivery — same job, same output
             handler.deliver(agentJob);
 
             // Still only 2 findings (ON CONFLICT DO NOTHING)
-            assertThat(practiceFindingRepository.findAll()).hasSize(2);
+            assertThat(observationRepository.findAll()).hasSize(2);
 
             // Event published twice (once per deliver() call)
             List<PracticeDetectionCompletedEvent> events = applicationEvents

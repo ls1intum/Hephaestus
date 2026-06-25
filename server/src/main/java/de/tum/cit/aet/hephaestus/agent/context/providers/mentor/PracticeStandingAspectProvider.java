@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.AreaStandingRow;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
@@ -66,7 +66,7 @@ public class PracticeStandingAspectProvider implements ContentProvider {
     private static final String CACHE_NAME = "mentor_practice_standing_aspect";
 
     private final UserRepository userRepository;
-    private final PracticeFindingRepository findingRepository;
+    private final ObservationRepository findingRepository;
     private final PracticeRepository practiceRepository;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;

@@ -49,7 +49,7 @@ import tools.jackson.databind.JsonNode;
         @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
         @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_observation_target", columnList = "artifact_type, artifact_id"),
-        // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (FindingTrendService).
+        // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (ObservationTrendService).
         @Index(
             name = "idx_observation_target_run",
             columnList = "artifact_type, artifact_id, agent_job_id, observed_at DESC"
@@ -79,7 +79,7 @@ public class Observation {
      * cycle between {@code practices} and {@code agent}. The FK constraint
      * {@code fk_observation_agent_job} is managed by Liquibase at the DB level.
      *
-     * <p>Primary insert path is {@link de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository#insertIfAbsent}
+     * <p>Primary insert path is {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository#insertIfAbsent}
      * which bypasses {@code @PrePersist} — callers must supply the UUID explicitly.
      */
     @NotNull
@@ -133,7 +133,7 @@ public class Observation {
      * (practice + target + subject + a content anchor), NEVER of when it was produced (no job id, no line
      * number). Lets later {@code Feedback} supersede rather than re-post, and lets a reaction follow one
      * underlying problem across re-detections — the primitive the research question's "do practices change
-     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint}.
+     * over time" depends on. Computed via {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}.
      * Nullable: backfill-free, populated on new findings only.
      */
     @Column(name = "recurrence_key", length = 64)

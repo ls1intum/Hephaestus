@@ -5,7 +5,7 @@ import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +15,7 @@ import org.mockito.Mock;
 class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @Mock
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Mock
     private PracticeRepository practiceRepository;
@@ -28,7 +28,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new PracticesWorkspacePurgeAdapter(
-            practiceFindingRepository,
+            observationRepository,
             practiceRepository,
             practiceAreaRepository
         );
@@ -41,7 +41,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         adapter.deleteWorkspaceData(workspaceId);
 
         // Then — findings, practices, and areas are all removed.
-        verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
+        verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
         verify(practiceAreaRepository).deleteAllByWorkspaceId(workspaceId);
     }

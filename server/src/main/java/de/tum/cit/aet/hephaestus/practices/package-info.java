@@ -9,9 +9,9 @@
  * same module.
  *
  * <p>Sub-packages expose narrow APIs via {@link org.springframework.modulith.NamedInterface}:
- * {@code model}, {@code spi}, {@code review}, {@code finding}, {@code feedback}, and
- * {@code finding.reaction}. The latter two let the {@code agent} delivery layer write the
- * delivered-feedback ledger and read reactions for re-nag suppression; the {@code finding.reaction}
+ * {@code model}, {@code spi}, {@code review}, {@code observation}, {@code feedback}, and
+ * {@code observation.reaction}. The latter two let the {@code agent} delivery layer write the
+ * delivered-feedback ledger and read reactions for re-nag suppression; the {@code observation.reaction}
  * boundary is also pinned reaction-blind for the detection context by {@code DetectionReactionFirewallTest}
  * (#895 / ADR 0021 F-9). Internal types (controllers, adapters, request DTOs) remain module-private.
  *

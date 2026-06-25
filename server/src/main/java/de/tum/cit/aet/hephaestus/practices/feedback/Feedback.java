@@ -42,8 +42,8 @@ import org.hibernate.annotations.Immutable;
  * UUID PK assigned in {@code @PrePersist}, snake_case columns, string-stored enums.
  *
  * @see FeedbackDeliveryState for the delivery lifecycle
- * @see FeedbackSurface for the destination class
- * @see FeedbackProvenance for how the unit was produced
+ * @see FeedbackChannel for the destination class
+ * @see FeedbackSource for how the unit was produced
  */
 @Entity
 @Immutable
@@ -120,7 +120,7 @@ public class Feedback {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "channel", nullable = false, length = 32)
-    private FeedbackSurface channel;
+    private FeedbackChannel channel;
 
     /**
      * 0-based position of this unit within its producing job's output. Pairs with {@code agent_job_id} to form
@@ -149,7 +149,7 @@ public class Feedback {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 16)
-    private FeedbackProvenance source;
+    private FeedbackSource source;
 
     /**
      * Self-reference to the prior feedback row this unit replaces, when a re-run re-synthesised the same delivery

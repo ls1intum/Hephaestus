@@ -22,8 +22,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -56,7 +56,7 @@ import tools.jackson.databind.node.ObjectNode;
  * observation classification, and {@link PracticeDetectionCompletedEvent} publication.
  *
  * <p>No mocks required — this service layer does not call external APIs. It resolves practice
- * slugs against the DB and persists findings via {@code PracticeFindingRepository.insertIfAbsent()}.
+ * slugs against the DB and persists findings via {@code ObservationRepository.insertIfAbsent()}.
  */
 @RecordApplicationEvents
 class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTest {
@@ -67,7 +67,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     private PracticeDetectionDeliveryService deliveryService;
 
     @Autowired
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -243,7 +243,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(result.discardedUnknownSlug()).isZero();
             assertThat(result.hasNegative()).isTrue();
 
-            List<Observation> persisted = practiceFindingRepository.findAll();
+            List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(Observation::getPresence)
@@ -264,7 +264,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(first.inserted()).isEqualTo(1);
             assertThat(second.inserted()).isZero();
             assertThat(second.discardedDuplicate()).isEqualTo(1);
-            assertThat(practiceFindingRepository.findAll()).hasSize(1);
+            assertThat(observationRepository.findAll()).hasSize(1);
         }
     }
 
@@ -282,7 +282,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             assertThat(result.inserted()).isEqualTo(1);
             assertThat(result.discardedUnknownSlug()).isEqualTo(1);
-            assertThat(practiceFindingRepository.findAll()).hasSize(1);
+            assertThat(observationRepository.findAll()).hasSize(1);
         }
     }
 
@@ -307,7 +307,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             assertThat(result.inserted()).isEqualTo(1);
 
-            List<Observation> persisted = practiceFindingRepository.findAll();
+            List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(1);
             // The delivery service looks up the current revision per practice and passes practiceRevisionId
             // to insertIfAbsent — so the finding must pin to exactly that revision, not null.
@@ -347,7 +347,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             assertThat(result.inserted()).isEqualTo(7);
             assertThat(result.discardedDuplicate()).isEqualTo(0);
-            assertThat(practiceFindingRepository.findAll()).hasSize(7);
+            assertThat(observationRepository.findAll()).hasSize(7);
         }
     }
 
@@ -407,7 +407,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(result.inserted()).isEqualTo(2);
             assertThat(result.hasNegative()).isFalse();
 
-            List<Observation> persisted = practiceFindingRepository.findAll();
+            List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(Observation::getPresence)

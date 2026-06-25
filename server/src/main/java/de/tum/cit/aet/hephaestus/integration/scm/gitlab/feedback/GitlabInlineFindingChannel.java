@@ -64,7 +64,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
      * Hidden per-finding correlation tag embedded in a note body so a prior thread can be matched back to the
      * finding that produced it across re-runs. Distinct from the run-level {@code marker} (which identifies all
      * hephaestus notes for the zero-note clear path); both coexist in the body. The key is alnum/dash/underscore
-     * (a {@link de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint} digest), so no escaping is needed.
+     * (a {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint} digest), so no escaping is needed.
      */
     private static final Pattern CK_TAG = Pattern.compile("<!-- hephaestus-diff-note-ck=([A-Za-z0-9_-]+) -->");
 
@@ -361,7 +361,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             }
             if (body.contains(marker)) {
                 botNoteId = noteId;
-                botKey = parseFindingFingerprint(body);
+                botKey = parseObservationFingerprint(body);
             } else {
                 humanReplied = true; // a person (or other tool) participated in this thread
             }
@@ -404,7 +404,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Nullable
-    private static String parseFindingFingerprint(String body) {
+    private static String parseObservationFingerprint(String body) {
         Matcher m = CK_TAG.matcher(body);
         return m.find() ? m.group(1) : null;
     }

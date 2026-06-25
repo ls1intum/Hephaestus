@@ -1438,7 +1438,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_synthesizedDiffNote_carriesFindingFindingFingerprint() {
+    void compose_synthesizedDiffNote_carriesFindingObservationFingerprint() {
         // A stamped finding (no agent suggestedDiffNotes) must propagate its correlation key onto the
         // synthesized diff note so the inline channel can match the placement back to the persisted finding.
         ValidatedFinding stamped = negativeFinding(
@@ -1449,7 +1449,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove the commented-out block."
-        ).withFindingFingerprint("corr-synth-123");
+        ).withObservationFingerprint("corr-synth-123");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1474,7 +1474,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Commented-out code adds noise.",
             "Remove it."
-        ).withFindingFingerprint("corr-delivered");
+        ).withObservationFingerprint("corr-delivered");
         ValidatedFinding failed = negativeFinding(
             "meaningful-naming",
             "Non-descriptive name 'Data'",
@@ -1483,7 +1483,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Rename to a domain term.",
             "Use PortfolioSnapshot."
-        ).withFindingFingerprint("corr-failed");
+        ).withObservationFingerprint("corr-failed");
 
         List<ValidatedFinding> findings = List.of(delivered, failed);
 
@@ -1521,7 +1521,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withFindingFingerprint("k-a");
+        ).withObservationFingerprint("k-a");
         ValidatedFinding b = negativeFinding(
             "code-hygiene",
             "Dead code B",
@@ -1530,7 +1530,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             null,
             "Noise.",
             "Remove."
-        ).withFindingFingerprint("k-b");
+        ).withObservationFingerprint("k-b");
 
         String demoted = DeliveryComposer.recomposeMrNote(
             List.of(a, b),
@@ -1570,7 +1570,7 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     @Test
-    void compose_agentSuggestedDiffNote_inheritsFindingFindingFingerprint() {
+    void compose_agentSuggestedDiffNote_inheritsFindingObservationFingerprint() {
         // When the agent supplied its own suggestedDiffNote (which carries no key of its own), the finding's
         // stamped key must still be carried over to the emitted note.
         DiffNote suggested = new DiffNote("Views/DashboardView.swift", 20, null, "Consider extracting this.");
@@ -1585,7 +1585,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withFindingFingerprint("corr-suggested-456");
+        ).withObservationFingerprint("corr-suggested-456");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 
@@ -1618,7 +1618,7 @@ class DeliveryComposerTest extends BaseUnitTest {
             "The method does too much.",
             "Extract the rendering branch.",
             List.of(suggested)
-        ).withFindingFingerprint("corr-scrub-789");
+        ).withObservationFingerprint("corr-scrub-789");
 
         DeliveryContent result = DeliveryComposer.compose(List.of(stamped));
 

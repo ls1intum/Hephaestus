@@ -81,8 +81,8 @@ public class FeedbackObservation {
     private Feedback feedback;
 
     /**
-     * The finding bound into this feedback unit. Uses DB-level {@code ON DELETE CASCADE} so
-     * deleting a finding cleans up its composition rows. Read-only mirror of {@code id.observationId}.
+     * The observation bound into this feedback unit. Uses DB-level {@code ON DELETE CASCADE} so
+     * deleting an observation cleans up its composition rows. Read-only mirror of {@code id.observationId}.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -93,9 +93,9 @@ public class FeedbackObservation {
         foreignKey = @ForeignKey(name = "fk_feedback_observation_observation")
     )
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private Observation finding;
+    private Observation observation;
 
-    /** Whether this finding anchors the unit's headline ({@code PRIMARY}) or reinforces it ({@code SUPPORTING}). */
+    /** Whether this observation anchors the unit's headline ({@code PRIMARY}) or reinforces it ({@code SUPPORTING}). */
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 16, nullable = false)

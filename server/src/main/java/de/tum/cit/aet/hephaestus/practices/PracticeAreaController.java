@@ -108,11 +108,13 @@ public class PracticeAreaController {
         PracticeArea area = areaService.createArea(
             workspaceContext,
             request.slug(),
-            request.name(),
-            request.description(),
-            request.displayOrder() != null ? request.displayOrder() : 0,
-            request.icon(),
-            request.color()
+            new AreaAttributes(
+                request.name(),
+                request.description(),
+                request.displayOrder(),
+                request.icon(),
+                request.color()
+            )
         );
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{slug}")
@@ -142,11 +144,13 @@ public class PracticeAreaController {
         PracticeArea area = areaService.updateArea(
             workspaceContext,
             areaSlug,
-            request.name(),
-            request.description(),
-            request.displayOrder(),
-            request.icon(),
-            request.color()
+            new AreaAttributes(
+                request.name(),
+                request.description(),
+                request.displayOrder(),
+                request.icon(),
+                request.color()
+            )
         );
         if (request.active() != null) {
             area = areaService.setActive(workspaceContext, areaSlug, request.active());

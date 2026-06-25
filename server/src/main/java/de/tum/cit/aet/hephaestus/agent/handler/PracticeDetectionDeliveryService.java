@@ -9,9 +9,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -44,7 +44,7 @@ public class PracticeDetectionDeliveryService {
 
     private final PracticeRepository practiceRepository;
     private final PracticeRevisionRepository practiceRevisionRepository;
-    private final PracticeFindingRepository practiceFindingRepository;
+    private final ObservationRepository observationRepository;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -53,7 +53,7 @@ public class PracticeDetectionDeliveryService {
     public PracticeDetectionDeliveryService(
         PracticeRepository practiceRepository,
         PracticeRevisionRepository practiceRevisionRepository,
-        PracticeFindingRepository practiceFindingRepository,
+        ObservationRepository observationRepository,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
         ApplicationEventPublisher eventPublisher,
@@ -61,7 +61,7 @@ public class PracticeDetectionDeliveryService {
     ) {
         this.practiceRepository = practiceRepository;
         this.practiceRevisionRepository = practiceRevisionRepository;
-        this.practiceFindingRepository = practiceFindingRepository;
+        this.observationRepository = observationRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
@@ -164,7 +164,7 @@ public class PracticeDetectionDeliveryService {
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
             // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
-            String findingFingerprint = FindingFingerprint.compute(
+            String findingFingerprint = ObservationFingerprint.compute(
                 finding.practiceSlug(),
                 artifactType.name(),
                 artifactId,
@@ -181,7 +181,7 @@ public class PracticeDetectionDeliveryService {
                     .orElse(null)
             );
 
-            int rows = practiceFindingRepository.insertIfAbsent(
+            int rows = observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 idempotencyKey,
                 job.getId(),
@@ -284,7 +284,7 @@ public class PracticeDetectionDeliveryService {
 
     /**
      * The file path of a finding's first evidence location, or {@code null} when it has none (a metadata
-     * practice like PR-description quality). Feeds {@link FindingFingerprint} — the PATH only, never a line
+     * practice like PR-description quality). Feeds {@link ObservationFingerprint} — the PATH only, never a line
      * number, so a finding that survives a few lines moving keeps one cross-run identity. Package-private so
      * {@code ReactionSuppressionFilter} (B2) recomputes the same locus the SAME way.
      */

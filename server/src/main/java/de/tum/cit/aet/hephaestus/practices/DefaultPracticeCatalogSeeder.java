@@ -93,11 +93,13 @@ class DefaultPracticeCatalogSeeder {
             areaService.createArea(
                 ctx,
                 areaSlug,
-                areaNode.path("name").asString(),
-                text(areaNode, "description"),
-                areaNode.path("displayOrder").asInt(),
-                text(areaNode, "icon"),
-                text(areaNode, "color")
+                new AreaAttributes(
+                    areaNode.path("name").asString(),
+                    text(areaNode, "description"),
+                    areaNode.path("displayOrder").asInt(),
+                    text(areaNode, "icon"),
+                    text(areaNode, "color")
+                )
             );
             seededAreas++;
 

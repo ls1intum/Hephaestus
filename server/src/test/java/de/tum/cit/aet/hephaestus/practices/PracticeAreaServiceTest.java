@@ -57,11 +57,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         PracticeArea created = service.createArea(
             CTX,
             "review-comms",
-            "Effective review communication",
-            "blurb",
-            0,
-            "MessageSquareReply",
-            "cyan"
+            new AreaAttributes("Effective review communication", "blurb", 0, "MessageSquareReply", "cyan")
         );
 
         assertThat(created.getSlug()).isEqualTo("review-comms");
@@ -78,7 +74,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         when(practiceAreaRepository.existsByWorkspaceIdAndSlug(1L, "dup")).thenReturn(true);
 
         assertThatExceptionOfType(PracticeAreaSlugConflictException.class).isThrownBy(() ->
-            service.createArea(CTX, "dup", "Dup", null, 0, null, null)
+            service.createArea(CTX, "dup", new AreaAttributes("Dup", null, 0, null, null))
         );
         verify(practiceAreaRepository, never()).save(any());
     }
@@ -92,7 +88,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
         when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeArea updated = service.updateArea(CTX, "g", "New", null, 5, "Eye", "teal");
+        PracticeArea updated = service.updateArea(CTX, "g", new AreaAttributes("New", null, 5, "Eye", "teal"));
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getDisplayOrder()).isEqualTo(5);

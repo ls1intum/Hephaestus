@@ -17,13 +17,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -45,13 +45,13 @@ import org.mockito.Mock;
 class FeedbackLedgerRecorderTest extends BaseUnitTest {
 
     @Mock
-    private PracticeFindingRepository practiceFindingRepository;
+    private ObservationRepository observationRepository;
 
     @Mock
     private FeedbackRepository feedbackRepository;
 
     @Mock
-    private FeedbackFindingRepository feedbackFindingRepository;
+    private FeedbackObservationRepository feedbackObservationRepository;
 
     @Mock
     private FeedbackPlacementRepository feedbackPlacementRepository;
@@ -62,12 +62,12 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())).thenReturn(
             Optional.empty()
         );
-        when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of());
         when(feedbackPlacementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return new FeedbackLedgerRecorder(
-            practiceFindingRepository,
+            observationRepository,
             feedbackRepository,
-            feedbackFindingRepository,
+            feedbackObservationRepository,
             feedbackPlacementRepository,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, policyFloor)
         );
@@ -81,13 +81,13 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         for (int i = 0; i < 5; i++) {
             findings.add(problem(0.9f - i * 0.1f)); // distinct confidences so the cap is deterministic
         }
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(findings);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(findings);
 
         recorder(true).record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
         // Every finding bound exactly once across ALL units (3 to DELIVERED + 1 each to the 2 SUPPRESSED units).
         var boundFindingIds = ArgumentCaptor.forClass(UUID.class);
-        verify(feedbackFindingRepository, org.mockito.Mockito.times(5)).insertIfAbsent(
+        verify(feedbackObservationRepository, org.mockito.Mockito.times(5)).insertIfAbsent(
             any(),
             boundFindingIds.capture(),
             any(),
@@ -113,11 +113,11 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         for (int i = 0; i < 5; i++) {
             findings.add(problem(0.9f - i * 0.1f));
         }
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(findings);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(findings);
 
         recorder(false).record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
-        verify(feedbackFindingRepository, org.mockito.Mockito.times(5)).insertIfAbsent(any(), any(), any(), anyInt());
+        verify(feedbackObservationRepository, org.mockito.Mockito.times(5)).insertIfAbsent(any(), any(), any(), anyInt());
         var saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository).save(saved.capture());
         assertThat(saved.getValue().getDeliveryState()).isEqualTo(FeedbackDeliveryState.DELIVERED);
@@ -129,7 +129,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         // null. The note and its DeliveredSignal share a findingFingerprint, so the signal's externalRef lands
         // on the saved FeedbackPlacement. A no-op (the old hardcoded null) fails this.
         var finding = problem(0.9f);
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
         var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo-10");
         var signal = new InlineFindingChannel.DeliveredSignal(
@@ -152,18 +152,18 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackPlacement inline = placements
             .getAllValues()
             .stream()
-            .filter(p -> p.getPlacementType() == PlacementSlot.INLINE)
+            .filter(p -> p.getPlacementType() == PlacementType.INLINE)
             .findFirst()
             .orElseThrow();
         assertThat(inline.getPostedCommentRef()).isEqualTo("note-gid-42");
     }
 
     @Test
-    void inlinePlacement_fallsBackToPathLineWhenNoFindingFingerprint_andFailedSignalHasNoRef() {
+    void inlinePlacement_fallsBackToPathLineWhenNoObservationFingerprint_andFailedSignalHasNoRef() {
         // No findingFingerprint on the note (legacy/unkeyed) → match by path + terminal line. A FAILED disposition
         // leaves no external_ref, so a dead delivery is not recorded with a vendor handle.
         var finding = problem(0.9f);
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
 
         var note = new DiffNote("src/Bar.java", 5, 8, "Range note"); // multi-line, no key
         var signal = new InlineFindingChannel.DeliveredSignal(
@@ -186,7 +186,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         FeedbackPlacement inline = placements
             .getAllValues()
             .stream()
-            .filter(p -> p.getPlacementType() == PlacementSlot.INLINE)
+            .filter(p -> p.getPlacementType() == PlacementType.INLINE)
             .findFirst()
             .orElseThrow();
         assertThat(inline.getPostedCommentRef()).isNull();
@@ -201,14 +201,14 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             findings.add(problem(0.9f - i * 0.1f));
         }
         UUID b2Id = findings.get(5).getId(); // the lowest-confidence one — would otherwise be in the dropped tail
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(findings);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(findings);
         var recorder = recorder(true); // policyFloor ON
-        when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
+        when(feedbackObservationRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
 
         recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
         var bound = ArgumentCaptor.forClass(UUID.class);
-        verify(feedbackFindingRepository, org.mockito.Mockito.atLeastOnce()).insertIfAbsent(
+        verify(feedbackObservationRepository, org.mockito.Mockito.atLeastOnce()).insertIfAbsent(
             any(),
             bound.capture(),
             any(),
@@ -225,14 +225,14 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         var b2Suppressed = problem(0.8f);
         UUID keptId = kept.getId();
         UUID b2Id = b2Suppressed.getId();
-        when(practiceFindingRepository.findByAgentJobId(any())).thenReturn(List.of(kept, b2Suppressed));
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(kept, b2Suppressed));
         var recorder = recorder(false);
-        when(feedbackFindingRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
+        when(feedbackObservationRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
 
         recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
         var bound = ArgumentCaptor.forClass(UUID.class);
-        verify(feedbackFindingRepository).insertIfAbsent(any(), bound.capture(), any(), anyInt());
+        verify(feedbackObservationRepository).insertIfAbsent(any(), bound.capture(), any(), anyInt());
         assertThat(bound.getAllValues()).containsExactly(keptId);
     }
 

@@ -82,7 +82,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // Hibernate emits composite-key lookups as
         //   (col1, workspace_id) IN ((?, ?))
         // The inspector MUST treat this as a legitimate workspace_id reference and not
-        // throw. Regression for false positive that broke PracticeFindingControllerIntegrationTest.
+        // throw. Regression for false positive that broke ObservationControllerIntegrationTest.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
         String sql =
             "select wm.user_id, wm.workspace_id from workspace_membership wm " +

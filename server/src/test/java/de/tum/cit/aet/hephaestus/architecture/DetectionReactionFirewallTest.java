@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 class DetectionReactionFirewallTest extends HephaestusArchitectureTest {
 
     private static final String CONTEXT_PROVIDERS = "..agent.context.providers..";
-    private static final String REACTION_PACKAGE = "..practices.finding.reaction..";
+    private static final String REACTION_PACKAGE = "..practices.observation.reaction..";
 
     @Test
     void detectionContextProvidersAreReactionBlind() {

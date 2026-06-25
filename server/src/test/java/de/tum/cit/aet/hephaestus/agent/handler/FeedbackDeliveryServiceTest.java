@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
@@ -64,7 +64,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
 
     @Mock
-    private de.tum.cit.aet.hephaestus.practices.finding.FindingTrendService findingTrendService;
+    private de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService observationTrendService;
 
     private FeedbackDeliveryService service;
 
@@ -86,7 +86,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             workspaceRepository,
             reviewProperties,
             feedbackLedgerRecorder,
-            findingTrendService
+            observationTrendService
         );
         // Inline reconciliation now runs on every OPEN-PR delivery — even with zero diff notes — to clear an
         // earlier run's stale notes. Default it to a benign result so tests that don't pin it don't NPE.
@@ -227,7 +227,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
             when(
-                findingTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
+                observationTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
 
             footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of()));
@@ -595,7 +595,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             workspaceRepository,
             props,
             feedbackLedgerRecorder,
-            findingTrendService
+            observationTrendService
         );
     }
 
