@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -130,10 +129,6 @@ class DefaultPracticeCatalogSeeder {
             preambleKey = focus.name();
         }
         String slug = practiceNode.path("slug").asString();
-        // Optional: a practice may declare itself an anti-pattern ("BAD_PRACTICE") or context-dependent
-        // ("CONTEXTUAL"); absent → null → the entity default GOOD_PRACTICE (every catalogued practice today).
-        String polarityText = text(practiceNode, "kind");
-        PracticeKind kind = polarityText == null ? null : PracticeKind.valueOf(polarityText);
         return new CreatePracticeRequestDTO(
             slug,
             practiceNode.path("name").asString(),
@@ -141,7 +136,6 @@ class DefaultPracticeCatalogSeeder {
             composeCriteria(catalog, preambleKey, practiceNode.path("criteria").asString()),
             loadPrecomputeScript(slug),
             focus,
-            kind,
             text(practiceNode, "whyItMatters"),
             text(practiceNode, "whatGoodLooksLike")
         );

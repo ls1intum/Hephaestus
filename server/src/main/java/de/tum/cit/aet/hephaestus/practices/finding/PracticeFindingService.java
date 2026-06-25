@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackFindingRepository.De
 import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.ReflectionPracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -108,8 +108,9 @@ public class PracticeFindingService {
      *
      * <p>Sourced from each target's LATEST review run with {@code NOT_APPLICABLE} already excluded (the
      * repository query), so the surface carries only feedback the developer can act on or be affirmed by.
-     * The problem/strength split is single-sourced through {@link PracticeKind}. Criteria never appears — only
-     * the learner framing ({@code whyItMatters}/{@code whatGoodLooksLike}) does.
+     * The problem/strength split is single-sourced through each observation's {@code assessment} ({@code BAD}
+     * = problem, {@code GOOD} = strength; ADR 0022). Criteria never appears — only the learner framing
+     * ({@code whyItMatters}/{@code whatGoodLooksLike}) does.
      *
      * @return empty list if the user is not a synced developer
      */
@@ -143,16 +144,15 @@ public class PracticeFindingService {
         List<ReflectionPracticeDTO> cards = new ArrayList<>();
         for (List<Observation> group : byPractice.values()) {
             Practice practice = group.get(0).getPractice();
-            PracticeKind kind = practice.getKind();
 
-            // A defect-detector practice has no OBSERVED observation, so a persisted OBSERVED row predating the
+            // A defect-detector practice has no GOOD observation, so a persisted GOOD row predating the
             // write-time coercion must not surface here as a false "strength" — read-time guard for the dashboard.
             boolean isDefectDetector = practice.isDefectDetector();
 
             // CRITICAL (ordinal 0) first so the highest-impact item leads the card.
             List<ReflectionItemDTO> toWorkOn = group
                 .stream()
-                .filter(f -> kind.isProblem(f.getObservation()))
+                .filter(f -> f.getAssessment() == Assessment.BAD)
                 .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
@@ -161,7 +161,7 @@ public class PracticeFindingService {
                 ? List.of()
                 : group
                       .stream()
-                      .filter(f -> kind.isStrength(f.getObservation()))
+                      .filter(f -> f.getAssessment() == Assessment.GOOD)
                       .limit(MAX_STRENGTHS_PER_PRACTICE)
                       .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                       .toList();

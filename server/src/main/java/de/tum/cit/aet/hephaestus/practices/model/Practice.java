@@ -79,25 +79,15 @@ public class Practice {
     private String name;
 
     /**
-     * The artifact this practice targets (PR vs ISSUE). The discriminator that routes the trigger
+     * The artifact this practice applies to (PR vs ISSUE). The discriminator that routes the trigger
      * gate, the case-context builder, the {@code AgentJobType}/handler, and the delivery surface.
-     * NOT NULL; defaults to {@code PULL_REQUEST} for backward compatibility.
+     * NOT NULL; defaults to {@code PULL_REQUEST} for backward compatibility. Column {@code applies_to}
+     * (ADR 0022 rename).
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "artifact_type", nullable = false, length = 32)
+    @Column(name = "applies_to", nullable = false, length = 32)
     @ColumnDefault("'PULL_REQUEST'")
     private WorkArtifact artifactType = WorkArtifact.PULL_REQUEST;
-
-    /**
-     * Whether this practice describes a good practice, a bad practice, or a context-dependent
-     * pattern. Supplies the good/bad direction that {@link Presence} omits, so {@code OBSERVED} can
-     * mean "strength" for one practice and "problem" for another (see ADR 0021, F-6). NOT NULL;
-     * defaults to {@code GOOD_PRACTICE} — every catalogued practice today is a good practice.
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "kind", nullable = false, length = 16)
-    @ColumnDefault("'GOOD_PRACTICE'")
-    private PracticeKind kind = PracticeKind.GOOD_PRACTICE;
 
     /**
      * Whose conduct this practice evaluates — the contribution author or its reviewer (ADR 0021, C2).
@@ -176,8 +166,9 @@ public class Practice {
 
     /**
      * Whether this practice is a defect-detector — its criteria declare {@code DEFECT-DETECTOR DISCIPLINE}, so it
-     * has no legal OBSERVED observation (a clean surface is NOT_APPLICABLE, never a strength to endorse). The detection
-     * and delivery layers coerce/suppress accordingly; keeping the rule here keeps it in one place.
+     * has no legal {@code (PRESENT, GOOD)} clean-bill-of-health observation (a clean surface is NOT_APPLICABLE, never
+     * a strength to endorse). The detection and delivery layers coerce/suppress accordingly; keeping the rule
+     * here keeps it in one place.
      */
     public boolean isDefectDetector() {
         return criteria != null && criteria.contains("DEFECT-DETECTOR DISCIPLINE");

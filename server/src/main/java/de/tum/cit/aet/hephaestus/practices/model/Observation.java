@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -50,7 +49,6 @@ import tools.jackson.databind.JsonNode;
     },
     indexes = {
         @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
-        @Index(name = "idx_observation_developer_observed", columnList = "developer_id, observed_at DESC"),
         @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
         @Index(name = "idx_observation_target", columnList = "artifact_type, artifact_id"),
         // A1 (ADR 0021): rank a target's review runs by recency without scanning the workspace (FindingTrendService).
@@ -122,26 +120,11 @@ public class Observation {
     private Long artifactId;
 
     /**
-     * The developer whose work is being evaluated. No cascade — users are long-lived
-     * and findings must survive independently; deleting a user with existing findings
-     * is blocked by the FK constraint (RESTRICT).
-     */
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-        name = "developer_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_observation_developer")
-    )
-    private User developer;
-
-    /**
-     * Whose conduct the finding is filed against — ALWAYS populated (ADR 0021, C2): equals {@link #developer}
-     * for author-side practices (the whole catalogue today), the reviewer for reviewer-side practices. The
-     * former "NULL means the subject is the developer" default was collapsed into an explicit value so every
-     * reader can trust the column without a fallback. Raw {@code Long} FK to {@code user} (no {@code @ManyToOne})
-     * to keep the cross-cutting identity columns scalar; the DB FK {@code fk_observation_subject} is
-     * Liquibase-managed.
+     * Whose conduct the finding is filed against — ALWAYS populated (ADR 0021, C2; ADR 0022 drops the
+     * redundant {@code developer} 3NF transitive dependency, leaving this the single identity): the author
+     * for author-side practices (the whole catalogue today), the reviewer for reviewer-side practices. Raw
+     * {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns
+     * scalar; the DB FK {@code fk_observation_subject} is Liquibase-managed.
      */
     @NotNull
     @Column(name = "about_user_id", nullable = false)
@@ -162,14 +145,28 @@ public class Observation {
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
+    /**
+     * Whether the practice's target signal was seen, expected-but-absent, or inapplicable (ADR 0022).
+     * Measurement only — the good/bad valence lives on {@link #assessment}.
+     */
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "observation", length = 16, nullable = false)
-    private Presence observation;
+    @Column(name = "presence", length = 16, nullable = false)
+    private Presence presence;
 
-    @NotNull
+    /**
+     * The good/bad valence of this observation, resolved per observation by the detector (ADR 0022).
+     * NULL iff {@link #presence} is {@link Presence#NOT_APPLICABLE}.
+     */
     @Enumerated(EnumType.STRING)
-    @Column(name = "severity", length = 16, nullable = false)
+    @Column(name = "assessment", length = 8)
+    private Assessment assessment;
+
+    /**
+     * Impact band — meaningful only for an {@link Assessment#BAD} observation; NULL otherwise (ADR 0022).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity", length = 16)
     private Severity severity;
 
     @NotNull

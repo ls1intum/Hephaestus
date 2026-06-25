@@ -2,8 +2,9 @@ package de.tum.cit.aet.hephaestus.practices.finding;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.finding.dto.DeveloperPracticeSummaryProjection;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -54,15 +55,15 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         value = """
         INSERT INTO observation (
             id, occurrence_key, agent_job_id, practice_id, practice_revision_id,
-            artifact_type, artifact_id, developer_id, about_user_id,
-            title, observation, severity, confidence,
+            artifact_type, artifact_id, about_user_id,
+            title, presence, assessment, severity, confidence,
             evidence, reasoning,
             recurrence_key, observed_at
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
-            :artifactType, :artifactId, :developerId, :subjectUserId,
-            :title, :observation, :severity, :confidence,
+            :artifactType, :artifactId, :subjectUserId,
+            :title, :presence, :assessment, :severity, :confidence,
             CAST(:evidence AS jsonb), :reasoning,
             :findingFingerprint, :detectedAt
         )
@@ -78,10 +79,10 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         @Param("practiceRevisionId") Long practiceRevisionId,
         @Param("artifactType") String artifactType,
         @Param("artifactId") Long artifactId,
-        @Param("developerId") Long developerId,
         @Param("subjectUserId") Long subjectUserId,
         @Param("title") String title,
-        @Param("observation") String observation,
+        @Param("presence") String presence,
+        @Param("assessment") String assessment,
         @Param("severity") String severity,
         @Param("confidence") Float confidence,
         @Param("evidence") String evidence,
@@ -103,7 +104,8 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
     /**
      * Paginated findings for a developer within a workspace, with optional filters.
      *
-     * <p>Workspace scoping is done via the {@code Practice.workspace} join.
+     * <p>Workspace scoping is done via the {@code Practice.workspace} join. The developer is the
+     * {@code about_user_id} subject the finding is filed against (ADR 0022).
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
      */
@@ -111,30 +113,30 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         value = """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
-        WHERE f.developer.id = :developerId
+        WHERE f.aboutUserId = :developerId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:observation IS NULL OR f.observation = :observation)
+        AND (:presence IS NULL OR f.presence = :presence)
         """,
         countQuery = """
         SELECT COUNT(f) FROM Observation f
         JOIN f.practice p
-        WHERE f.developer.id = :developerId
+        WHERE f.aboutUserId = :developerId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
-        AND (:observation IS NULL OR f.observation = :observation)
+        AND (:presence IS NULL OR f.presence = :presence)
         """
     )
     Page<Observation> findByDeveloperAndWorkspace(
         @Param("developerId") Long developerId,
         @Param("workspaceId") Long workspaceId,
         @Param("practiceSlug") String practiceSlug,
-        @Param("observation") Presence observation,
+        @Param("presence") Presence presence,
         Pageable pageable
     );
 
     /**
-     * Per-practice aggregation for the developer dashboard: observation counts and last finding date.
+     * Per-practice aggregation for the developer dashboard: present/good and bad counts, and last finding date.
      *
      * <p><b>Re-review dedup (ADR 0021):</b> a target gets re-detected on every push, and every run writes a
      * fresh {@link Observation} row — so a naive {@code COUNT} over all rows inflates the dashboard by the
@@ -145,19 +147,20 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
      * <p>Native (not JPQL) because the latest-run-per-target selection needs {@code ORDER BY ... LIMIT 1} in a
      * correlated subquery, which JPQL cannot express. Aliases are quoted so the JDBC column labels match the
      * {@link DeveloperPracticeSummaryProjection} getters exactly (Postgres folds unquoted identifiers to
-     * lower-case). Enum columns compare against their {@code STRING} storage form.
+     * lower-case). Enum columns compare against their {@code STRING} storage form. {@code goodCount} is
+     * the strengths ({@code assessment='GOOD'}); {@code badCount} is the problems ({@code assessment='BAD'}).
      */
     @Query(
         value = """
         SELECT p.slug AS "practiceSlug",
                p.name AS "practiceName",
                COUNT(f.id) AS "totalFindings",
-               SUM(CASE WHEN f.observation = 'OBSERVED' THEN 1 ELSE 0 END) AS "observedCount",
-               SUM(CASE WHEN f.observation = 'NOT_OBSERVED' THEN 1 ELSE 0 END) AS "notObservedCount",
+               SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
+               SUM(CASE WHEN f.assessment = 'BAD' THEN 1 ELSE 0 END) AS "badCount",
                MAX(f.observed_at) AS "lastFindingAt"
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.developer_id = :developerId
+        WHERE f.about_user_id = :developerId
           AND p.workspace_id = :workspaceId
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
@@ -187,7 +190,7 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
         WHERE f.id = :findingId
-        AND f.developer.id = :developerId
+        AND f.aboutUserId = :developerId
         AND p.workspace.id = :workspaceId
         """
     )
@@ -207,7 +210,7 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         WHERE f.artifactType = :artifactType
         AND f.artifactId = :pullRequestId
         AND p.workspace.id = :workspaceId
-        ORDER BY f.detectedAt DESC
+        ORDER BY f.observedAt DESC
         """
     )
     List<Observation> findByPullRequestAndWorkspace(
@@ -219,28 +222,29 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
     // Aggregation for agent context (Issue #895)
 
     /**
-     * Returns aggregated observation counts per practice for a developer within a workspace.
+     * Returns aggregated counts per (practice, presence, assessment) for a developer within a workspace.
      *
-     * <p>Each row is one (practice slug, observation) combination with the total count and the
+     * <p>Each row is one (practice slug, presence, assessment) combination with the total count and the
      * most recent detection timestamp. Callers group results by slug to build a per-practice
-     * history summary. The {@code idx_observation_developer_observed} index on
-     * {@code (developer_id, observed_at DESC)} narrows the initial scan by developer.
+     * history summary. The {@code idx_observation_subject} index on {@code (about_user_id)} narrows the
+     * initial scan by developer.
      *
      * @param developerId the developer whose history to aggregate
      * @param workspaceId   the workspace scope (via practice → workspace relationship)
-     * @return aggregated summary rows ordered by slug then observation, empty if no findings exist
+     * @return aggregated summary rows ordered by slug then presence, empty if no findings exist
      */
     @Query(
         """
         SELECT pf.practice.slug AS practiceSlug,
-               pf.observation AS observation,
+               pf.presence AS presence,
+               pf.assessment AS assessment,
                COUNT(pf) AS count,
-               MAX(pf.detectedAt) AS lastDetectedAt
+               MAX(pf.observedAt) AS lastDetectedAt
         FROM Observation pf
-        WHERE pf.developer.id = :developerId
+        WHERE pf.aboutUserId = :developerId
           AND pf.practice.workspace.id = :workspaceId
-        GROUP BY pf.practice.slug, pf.observation
-        ORDER BY pf.practice.slug, pf.observation
+        GROUP BY pf.practice.slug, pf.presence, pf.assessment
+        ORDER BY pf.practice.slug, pf.presence
         """
     )
     List<DeveloperPracticeSummary> findDeveloperPracticeSummary(
@@ -266,18 +270,18 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
      * per finding (bounded by the page size) rather than JOIN-fetched.
      *
      * <p>{@code NOT_APPLICABLE} is excluded: it dominates the list (the bulk are "no change needed / awaiting review" rows) and spent the page budget on findings the mentor cannot
-     * coach from, burying the actionable {@code NOT_OBSERVED} defects and {@code OBSERVED} strengths. The
-     * NA total still reaches the mentor via the observation-count summary; this is the drill-down list only,
-     * and stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
+     * coach from, burying the actionable {@code BAD} problems and {@code GOOD} strengths. The NA total still
+     * reaches the mentor via the presence-count summary; this is the drill-down list only, and stays
+     * recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
      */
     @Query(
         value = """
         SELECT f.* FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.developer_id = :developerId
+        WHERE f.about_user_id = :developerId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
-          AND f.observation <> 'NOT_APPLICABLE'
+          AND f.presence <> 'NOT_APPLICABLE'
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
@@ -299,16 +303,18 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
      * Returns {@code [severityName, count]} rows — caller maps to a name→count map.
      *
      * <p>Re-review deduped to each target's latest run (see {@link #findRecentByDeveloperAndWorkspace}) so
-     * the mentor's "how am I doing" histogram reflects current state, not the re-push multiplier.
+     * the mentor's "how am I doing" histogram reflects current state, not the re-push multiplier. Only
+     * {@code BAD} findings carry a non-null severity, so the histogram is over problems.
      */
     @Query(
         value = """
         SELECT f.severity AS severity, COUNT(f.id) AS count
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.developer_id = :developerId
+        WHERE f.about_user_id = :developerId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
+          AND f.severity IS NOT NULL
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
@@ -331,10 +337,10 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
      */
     @Query(
         value = """
-        SELECT f.observation AS observation, COUNT(f.id) AS count
+        SELECT f.presence AS presence, COUNT(f.id) AS count
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
-        WHERE f.developer_id = :developerId
+        WHERE f.about_user_id = :developerId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
           AND f.agent_job_id = (
@@ -342,11 +348,11 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
-        GROUP BY f.observation
+        GROUP BY f.presence
         """,
         nativeQuery = true
     )
-    List<ObservationCount> countByObservationForDeveloper(
+    List<PresenceCount> countByObservationForDeveloper(
         @Param("developerId") Long developerId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since
@@ -361,12 +367,12 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
      */
     @Query(
         """
-        SELECT f.agentJobId AS agentJobId, MAX(f.detectedAt) AS runAt
+        SELECT f.agentJobId AS agentJobId, MAX(f.observedAt) AS runAt
         FROM Observation f JOIN f.practice p
         WHERE f.artifactType = :artifactType AND f.artifactId = :artifactId AND p.workspace.id = :workspaceId
-          AND f.findingFingerprint IS NOT NULL
+          AND f.recurrenceKey IS NOT NULL
         GROUP BY f.agentJobId
-        ORDER BY MAX(f.detectedAt) DESC, f.agentJobId DESC
+        ORDER BY MAX(f.observedAt) DESC, f.agentJobId DESC
         """
     )
     List<RunRef> findRecentRunRefsForTarget(
@@ -379,13 +385,13 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
     /** All correlation-keyed findings for the given (already-resolved) run job-ids, with the trend fields. */
     @Query(
         """
-        SELECT f.agentJobId AS agentJobId, f.findingFingerprint AS findingFingerprint, f.observation AS observation,
-               f.severity AS severity, f.confidence AS confidence, p.slug AS practiceSlug,
-               f.title AS title, f.detectedAt AS detectedAt
+        SELECT f.agentJobId AS agentJobId, f.recurrenceKey AS recurrenceKey, f.presence AS presence,
+               f.assessment AS assessment, f.severity AS severity, f.confidence AS confidence, p.slug AS practiceSlug,
+               f.title AS title, f.observedAt AS observedAt
         FROM Observation f JOIN f.practice p
-        WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.findingFingerprint IS NOT NULL
-          AND f.observation <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
-        ORDER BY f.detectedAt DESC
+        WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.recurrenceKey IS NOT NULL
+          AND f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
+        ORDER BY f.observedAt DESC
         """
     )
     List<LocusFinding> findLociByAgentJobs(
@@ -403,7 +409,8 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
     interface LocusFinding {
         UUID getAgentJobId();
         String getRecurrenceKey();
-        Presence getObservation();
+        Presence getPresence();
+        Assessment getAssessment();
         Severity getSeverity();
         Float getConfidence();
         String getPracticeSlug();
@@ -417,30 +424,29 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         Long getCount();
     }
 
-    /** Projection: observation → count. */
-    interface ObservationCount {
-        de.tum.cit.aet.hephaestus.practices.model.Presence getObservation();
+    /** Projection: presence → count. */
+    interface PresenceCount {
+        de.tum.cit.aet.hephaestus.practices.model.Presence getPresence();
         Long getCount();
     }
 
     /**
      * Per-area standing rows for the mentor prepared-context aspect: one row per
-     * (area, kind, observation, severity) for a developer in the look-back window, with the
+     * (area, presence, assessment, severity) for a developer in the look-back window, with the
      * recent-window sub-count and the most-recent detection. The sign decision (problem vs strength)
-     * is deliberately left to {@link de.tum.cit.aet.hephaestus.practices.model.PracticeKind} in Java —
-     * this query only projects the raw observation + kind so the rule stays single-sourced.
+     * is the per-observation {@code assessment} (ADR 0022): {@code BAD} is a problem, {@code GOOD} a strength.
      * Ungrouped practices ({@code p.area IS NULL}) are excluded; they remain visible in
      * {@code findings_history.json}.
      */
     @Query(
         value = """
-        SELECT pa.slug AS "areaSlug", pa.name AS "areaName", p.kind AS "kind",
-               f.observation AS "observation", f.severity AS "severity", COUNT(f.id) AS "count",
+        SELECT pa.slug AS "areaSlug", pa.name AS "areaName",
+               f.presence AS "presence", f.assessment AS "assessment", f.severity AS "severity", COUNT(f.id) AS "count",
                SUM(CASE WHEN f.observed_at >= :recentSince THEN 1 ELSE 0 END) AS "recentCount"
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
         JOIN practice_area pa ON pa.id = p.practice_area_id
-        WHERE f.developer_id = :developerId
+        WHERE f.about_user_id = :developerId
           AND p.workspace_id = :workspaceId
           AND f.observed_at >= :since
           AND p.practice_area_id IS NOT NULL
@@ -449,7 +455,7 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
               WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
               ORDER BY f2.observed_at DESC LIMIT 1
           )
-        GROUP BY pa.slug, pa.name, p.kind, f.observation, f.severity
+        GROUP BY pa.slug, pa.name, f.presence, f.assessment, f.severity
         """,
         nativeQuery = true
     )
@@ -460,12 +466,12 @@ public interface PracticeFindingRepository extends JpaRepository<Observation, UU
         @Param("recentSince") Instant recentSince
     );
 
-    /** Projection: per (area, kind, observation, severity) standing for a developer. */
+    /** Projection: per (area, presence, assessment, severity) standing for a developer. */
     interface AreaStandingRow {
         String getAreaSlug();
         String getAreaName();
-        de.tum.cit.aet.hephaestus.practices.model.PracticeKind getKind();
-        de.tum.cit.aet.hephaestus.practices.model.Presence getObservation();
+        de.tum.cit.aet.hephaestus.practices.model.Presence getPresence();
+        de.tum.cit.aet.hephaestus.practices.model.Assessment getAssessment();
         de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
         Long getCount();
         Long getRecentCount();

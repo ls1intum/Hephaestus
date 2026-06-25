@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -68,12 +68,12 @@ public class DeveloperHistoryProvider {
             return Optional.empty();
         }
 
-        // Sort by NOT_OBSERVED count desc, then slug for deterministic ordering
+        // Sort by problem (BAD) count desc, then slug for deterministic ordering
         List<Map.Entry<String, PracticeAggregate>> sorted = byPractice
             .entrySet()
             .stream()
             .sorted(
-                Comparator.<Map.Entry<String, PracticeAggregate>>comparingLong(e -> e.getValue().notObserved)
+                Comparator.<Map.Entry<String, PracticeAggregate>>comparingLong(e -> e.getValue().bad)
                     .reversed()
                     .thenComparing(Map.Entry::getKey)
             )
@@ -85,8 +85,8 @@ public class DeveloperHistoryProvider {
             ObjectNode node = objectMapper.createObjectNode();
             PracticeAggregate agg = entry.getValue();
             node.put("practice", entry.getKey());
-            node.put("observed", agg.observed);
-            node.put("notObserved", agg.notObserved);
+            node.put("good", agg.good);
+            node.put("bad", agg.bad);
             node.put("lastSeen", agg.lastDetectedAt.toString());
             array.add(node);
         }
@@ -109,22 +109,24 @@ public class DeveloperHistoryProvider {
     }
 
     /**
-     * Mutable accumulator for per-practice observation counts during aggregation.
+     * Mutable accumulator for per-practice assessment counts during aggregation (ADR 0022): {@code good} =
+     * strengths ({@code assessment=GOOD}), {@code bad} = problems ({@code assessment=BAD}). NOT_APPLICABLE
+     * rows carry a null assessment and are not counted.
      */
     private static final class PracticeAggregate {
 
-        long observed;
-        long notObserved;
+        long good;
+        long bad;
         Instant lastDetectedAt;
 
         void add(DeveloperPracticeSummary row) {
-            switch (row.getObservation()) {
-                case OBSERVED -> observed += row.getCount();
-                case NOT_OBSERVED -> notObserved += row.getCount();
-                case NOT_APPLICABLE -> {
-                    /* not counted in history */
-                }
+            Assessment assessment = row.getAssessment();
+            if (assessment == Assessment.GOOD) {
+                good += row.getCount();
+            } else if (assessment == Assessment.BAD) {
+                bad += row.getCount();
             }
+            // NOT_APPLICABLE (null assessment) is not counted in history.
             if (lastDetectedAt == null || row.getLastDetectedAt().isAfter(lastDetectedAt)) {
                 lastDetectedAt = row.getLastDetectedAt();
             }

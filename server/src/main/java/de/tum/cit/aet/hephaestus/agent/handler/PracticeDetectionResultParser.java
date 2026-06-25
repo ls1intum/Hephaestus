@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
  *     {
  *       "practiceSlug": "pr-description-quality",
  *       "title": "Good PR description",
- *       "observation": "OBSERVED",
+ *       "presence": "PRESENT",
+ *       "assessment": "GOOD",
  *       "severity": "INFO",
  *       "confidence": 0.95,
  *       "evidence": { ... },
@@ -61,8 +63,8 @@ public class PracticeDetectionResultParser {
     static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
 
     /**
-     * The practices whose {@code NOT_OBSERVED} gap may legitimately present as a merge-blocker
-     * ({@code CRITICAL}/{@code MAJOR}, "fix before merging") — i.e. a gap here can break CORRECTNESS,
+     * The practices whose {@code BAD} finding may legitimately present as a merge-blocker
+     * ({@code CRITICAL}/{@code MAJOR}, "fix before merging") — i.e. a problem here can break CORRECTNESS,
      * SECURITY, or DATA INTEGRITY. Every other (craft / process / authoring) practice is ADVISORY: the
      * advisory ceiling in {@link ValidatedFinding#coerceCoherence(boolean, boolean)} caps its band to
      * {@code MINOR} so it lands as a suggestion, never a merge-block.
@@ -292,13 +294,18 @@ public class PracticeDetectionResultParser {
             title = title.substring(0, MAX_TITLE_LENGTH - 3) + "...";
         }
 
-        // Required: observation
-        Presence observation = parseEnum(entry, "observation", Presence.class);
+        // Required: presence
+        Presence presence = parseEnum(entry, "presence", Presence.class);
 
-        // Optional: severity. OBSERVED and NOT_APPLICABLE carry no coaching band (coerceCoherence forces INFO),
-        // and the model routinely omits severity for them — the criteria literally say "OBSERVED (no severity)".
-        // A missing/null severity defaults to INFO rather than discarding an otherwise-valid finding;
-        // coerceCoherence then re-derives the band (e.g. a NOT_OBSERVED with no severity floors to MINOR).
+        // Required (unless NOT_APPLICABLE): assessment. The detector decides GOOD/BAD per observation by
+        // reading the criteria + what_good_looks_like. NOT_APPLICABLE has no valence (forced null); any other
+        // presence with a missing/blank assessment is genuinely malformed and the entry is discarded.
+        Assessment assessment = parseAssessment(entry, presence);
+
+        // Optional: severity. Severity is a coaching band only for a BAD finding (coerceCoherence forces null
+        // otherwise), and the model routinely omits it elsewhere. A missing/null severity defaults to INFO
+        // rather than discarding an otherwise-valid finding; coerceCoherence then re-derives the final band
+        // (e.g. a BAD with no severity floors to MINOR, and a non-BAD finding's severity is nulled out).
         Severity severity = parseSeverityOrDefault(entry);
 
         // Required: confidence
@@ -350,7 +357,8 @@ public class PracticeDetectionResultParser {
         return new ValidatedFinding(
             practiceSlug,
             title,
-            observation,
+            presence,
+            assessment,
             severity,
             confidence,
             evidence,
@@ -358,6 +366,19 @@ public class PracticeDetectionResultParser {
             guidance,
             suggestedDiffNotes
         );
+    }
+
+    /**
+     * Parses the {@code assessment} valence. NULL iff presence is {@link Presence#NOT_APPLICABLE} (an
+     * inapplicable practice has no valence — any assessment supplied there is ignored). For any other
+     * presence the detector must supply a recognised {@code GOOD}/{@code BAD}; a missing or unrecognised
+     * value discards the entry (genuinely malformed output worth surfacing).
+     */
+    private static Assessment parseAssessment(JsonNode entry, Presence presence) {
+        if (presence == Presence.NOT_APPLICABLE) {
+            return null;
+        }
+        return parseEnum(entry, "assessment", Assessment.class);
     }
 
     private static String textField(JsonNode entry, String field) {
@@ -379,10 +400,10 @@ public class PracticeDetectionResultParser {
 
     /**
      * Parses the optional {@code severity}. A missing, null, or non-text value defaults to
-     * {@link Severity#INFO} — the model commonly omits severity on OBSERVED / NOT_APPLICABLE findings, and
-     * {@link ValidatedFinding#coerceCoherence(boolean)} re-derives the final band regardless, so discarding
-     * such a finding would silently drop valid coaching. A present but unrecognised value still fails the
-     * entry (genuinely malformed output worth surfacing).
+     * {@link Severity#INFO} — the model commonly omits severity on non-BAD findings, and
+     * {@link ValidatedFinding#coerceCoherence(boolean)} re-derives the final band regardless (nulling it
+     * out unless {@code assessment == BAD}), so discarding such a finding would silently drop valid
+     * coaching. A present but unrecognised value still fails the entry (genuinely malformed output).
      */
     private static Severity parseSeverityOrDefault(JsonNode entry) {
         JsonNode node = entry.get("severity");
@@ -527,8 +548,9 @@ public class PracticeDetectionResultParser {
     public record ValidatedFinding(
         String practiceSlug,
         String title,
-        Presence observation,
-        Severity severity,
+        Presence presence,
+        @Nullable Assessment assessment,
+        @Nullable Severity severity,
         float confidence,
         JsonNode evidence,
         String reasoning,
@@ -540,8 +562,9 @@ public class PracticeDetectionResultParser {
         public ValidatedFinding(
             String practiceSlug,
             String title,
-            Presence observation,
-            Severity severity,
+            Presence presence,
+            @Nullable Assessment assessment,
+            @Nullable Severity severity,
             float confidence,
             JsonNode evidence,
             String reasoning,
@@ -551,7 +574,8 @@ public class PracticeDetectionResultParser {
             this(
                 practiceSlug,
                 title,
-                observation,
+                presence,
+                assessment,
                 severity,
                 confidence,
                 evidence,
@@ -567,7 +591,8 @@ public class PracticeDetectionResultParser {
             return new ValidatedFinding(
                 practiceSlug,
                 title,
-                observation,
+                presence,
+                assessment,
                 severity,
                 confidence,
                 evidence,
@@ -579,15 +604,16 @@ public class PracticeDetectionResultParser {
         }
 
         /**
-         * Returns a copy with {@code (observation, severity)} coerced to the system's coherence invariants,
-         * independent of what the (weak) model emitted:
+         * Returns a copy with {@code (presence, assessment, severity)} coerced to the system's coherence
+         * invariants, independent of what the (weak) model emitted:
          * <ol>
-         *   <li><b>Defect-detector has no OBSERVED observation.</b> A practice declaring {@code DEFECT-DETECTOR
-         *       DISCIPLINE} flags a defect (NOT_OBSERVED) or abstains (NOT_APPLICABLE); a model-emitted OBSERVED
-         *       there is a clean-bill-of-health that would ship as a false strength — coerce it to NOT_APPLICABLE.</li>
-         *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a NOT_OBSERVED gap; OBSERVED and
-         *       NOT_APPLICABLE carry the {@code INFO} sentinel, and a NOT_OBSERVED that arrived as {@code INFO}
-         *       (a defect with no band) is raised to {@code MINOR}.</li>
+         *   <li><b>Defect-detector has no clean bill of health.</b> A practice declaring {@code DEFECT-DETECTOR
+         *       DISCIPLINE} either flags a defect ({@code ABSENT, BAD}) or abstains ({@code NOT_APPLICABLE}); a
+         *       model-emitted {@code PRESENT, GOOD} there is a clean bill of health that would ship as a false
+         *       strength — coerce it to {@code NOT_APPLICABLE} (assessment null).</li>
+         *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a {@code BAD} finding; it is
+         *       forced null otherwise, and a {@code BAD} that arrived as {@code INFO} (a defect with no band)
+         *       is raised to {@code MINOR}.</li>
          * </ol>
          * Idempotent: a no-op coercion returns {@code this}.
          */
@@ -598,31 +624,37 @@ public class PracticeDetectionResultParser {
         /**
          * As {@link #coerceCoherence(boolean)}, plus the <b>advisory ceiling</b>: when {@code advisoryOnly}
          * (the practice is craft/process/authoring, not in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a
-         * {@code NOT_OBSERVED} gap may never present as a merge-blocker, so its {@code CRITICAL}/{@code MAJOR}
+         * {@code BAD} finding may never present as a merge-blocker, so its {@code CRITICAL}/{@code MAJOR}
          * band is capped to {@code MINOR}. This lands the lesson as a suggestion rather than a "fix before
          * merging" — reserving the blocking signal for correctness/security/data-integrity practices so the
          * rare real blocker is not drowned out by the many high-confidence craft critiques. Severity is
          * delivery-only here; the persisted band on the immutable finding is unchanged.
          */
         public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
-            Presence v = observation;
+            Presence p = presence;
+            Assessment a = assessment;
             String r = reasoning;
-            if (isDefectDetector && v == Presence.OBSERVED) {
-                v = Presence.NOT_APPLICABLE;
-                r = "[auto-downgraded: defect-detector practice has no OBSERVED observation] " + reasoning;
+            if (isDefectDetector && p == Presence.PRESENT && a == Assessment.GOOD) {
+                p = Presence.NOT_APPLICABLE;
+                a = null;
+                r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
             }
-            Severity s =
-                v == Presence.NOT_OBSERVED ? (severity == Severity.INFO ? Severity.MINOR : severity) : Severity.INFO;
-            if (advisoryOnly && v == Presence.NOT_OBSERVED && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
+            // assessment must be null exactly when presence is NOT_APPLICABLE.
+            if (p == Presence.NOT_APPLICABLE) {
+                a = null;
+            }
+            Severity s = a == Assessment.BAD ? (severity == null || severity == Severity.INFO ? Severity.MINOR : severity) : null;
+            if (advisoryOnly && a == Assessment.BAD && (s == Severity.CRITICAL || s == Severity.MAJOR)) {
                 s = Severity.MINOR;
             }
-            if (v == observation && s == severity) {
+            if (p == presence && a == assessment && s == severity) {
                 return this;
             }
             return new ValidatedFinding(
                 practiceSlug,
                 title,
-                v,
+                p,
+                a,
                 s,
                 confidence,
                 evidence,

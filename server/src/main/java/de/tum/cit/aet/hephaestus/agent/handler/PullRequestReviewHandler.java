@@ -21,8 +21,8 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.file.Path;
@@ -343,7 +343,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         boolean allNotApplicable = parsed
             .validFindings()
             .stream()
-            .allMatch(f -> f.observation() == Presence.NOT_APPLICABLE);
+            .allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
         if (allNotApplicable && secretFindings.isEmpty()) {
             Set<String> diffFiles = computeDiffStatFiles(job);
             boolean hasDiffContent = !diffFiles.isEmpty();
@@ -446,10 +446,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             return;
         }
 
-        Map<String, PracticeKind> polarityBySlug =
-            job.getWorkspace() == null
-                ? Map.of()
-                : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
@@ -457,7 +453,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
             WorkArtifact.PULL_REQUEST,
-            polarityBySlug,
             whyBySlug
         );
         if (delivery != null) {
@@ -483,7 +478,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             DeliveryComposer.recomposeMrNote(
                 deliverable,
                 WorkArtifact.PULL_REQUEST,
-                polarityBySlug,
                 whyBySlug,
                 deliveredKeys
             )
@@ -516,7 +510,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (var f : existing) {
             if (
                 !"hardcoded-secrets".equals(f.practiceSlug()) ||
-                f.observation() != Presence.NOT_OBSERVED ||
+                f.assessment() != Assessment.BAD ||
                 f.evidence() == null
             ) {
                 continue;
@@ -572,7 +566,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new PracticeDetectionResultParser.ValidatedFinding(
             "hardcoded-secrets",
             "Hardcoded secret on a changed line",
-            Presence.NOT_OBSERVED,
+            Presence.PRESENT,
+            Assessment.BAD,
             severity,
             1.0f,
             evidence,

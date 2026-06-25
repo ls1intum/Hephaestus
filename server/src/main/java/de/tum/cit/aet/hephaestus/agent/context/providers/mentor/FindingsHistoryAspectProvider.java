@@ -8,10 +8,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.ObservationCount;
+import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.SeverityCount;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -108,7 +109,7 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             since,
             PageRequest.of(0, MAX_RECENT_FINDINGS)
         );
-        List<ObservationCount> byObservation = findingRepository.countByObservationForDeveloper(
+        List<PresenceCount> byPresence = findingRepository.countByObservationForDeveloper(
             developerId,
             workspaceId,
             since
@@ -125,17 +126,17 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
 
         ObjectNode summary = root.putObject("summary");
-        // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the observation aggregate is the
+        // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the presence aggregate is the
         // authoritative window total. Use it directly — no need to coalesce.
-        long observationTotal = byObservation.stream().mapToLong(ObservationCount::getCount).sum();
-        summary.put("totalFindings", observationTotal);
+        long presenceTotal = byPresence.stream().mapToLong(PresenceCount::getCount).sum();
+        summary.put("totalFindings", presenceTotal);
 
-        ObjectNode observationNode = summary.putObject("byObservation");
+        ObjectNode presenceSummary = summary.putObject("byPresence");
         for (Presence v : Presence.values()) {
-            observationNode.put(v.name(), 0L);
+            presenceSummary.put(v.name(), 0L);
         }
-        for (ObservationCount row : byObservation) {
-            observationNode.put(row.getObservation().name(), row.getCount());
+        for (PresenceCount row : byPresence) {
+            presenceSummary.put(row.getPresence().name(), row.getCount());
         }
 
         ObjectNode severityNode = summary.putObject("bySeverity");
@@ -152,11 +153,14 @@ public class FindingsHistoryAspectProvider implements ContentProvider {
             node.put("id", f.getId().toString());
             node.put("title", f.getTitle());
             node.put("practiceSlug", f.getPractice().getSlug());
-            node.put("observation", f.getObservation().name());
-            node.put("severity", f.getSeverity().name());
+            node.put("presence", f.getPresence().name());
+            Assessment assessment = f.getAssessment();
+            node.put("assessment", assessment == null ? null : assessment.name());
+            Severity severity = f.getSeverity();
+            node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", f.getConfidence());
             node.put("detectedAt", f.getObservedAt().toString());
-            // The finding-history node carries title + observation + severity + reasoning only. Advice is NOT on the
+            // The finding-history node carries title + presence + assessment + severity + reasoning only. Advice is NOT on the
             // finding (ADR 0021) — the mentor receives the sanitised delivered feedback body via
             // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
             // raw, unsanitised text DeliveryComposer would never post.

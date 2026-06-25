@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionAction;
 import de.tum.cit.aet.hephaestus.practices.finding.reaction.FindingReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.util.ArrayList;
@@ -129,7 +129,7 @@ class ReactionSuppressionFilter {
                 suppressed++;
                 continue;
             }
-            if (action == FindingReactionAction.ADDRESSED && vf.observation() == Presence.NOT_OBSERVED) {
+            if (action == FindingReactionAction.ADDRESSED && vf.assessment() == Assessment.BAD) {
                 deliverable.add(withEscalatedReasoning(vf)); // student said "fixed", but it recurs
                 continue;
             }
@@ -156,7 +156,8 @@ class ReactionSuppressionFilter {
         return new ValidatedFinding(
             vf.practiceSlug(),
             vf.title(),
-            vf.observation(),
+            vf.presence(),
+            vf.assessment(),
             vf.severity(),
             vf.confidence(),
             vf.evidence(),

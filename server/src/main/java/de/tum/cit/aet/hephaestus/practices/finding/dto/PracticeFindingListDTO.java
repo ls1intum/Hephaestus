@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.finding.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,8 +23,9 @@ public record PracticeFindingListDTO(
     @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
     @NonNull @Schema(description = "Target entity ID") Long artifactId,
     @NonNull @Schema(description = "Finding title") String title,
-    @NonNull @Schema(description = "Presence: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE") Presence observation,
-    @NonNull @Schema(description = "Severity level") Severity severity,
+    @NonNull @Schema(description = "Presence: PRESENT, ABSENT, or NOT_APPLICABLE") Presence presence,
+    @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
+    @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
@@ -39,7 +41,8 @@ public record PracticeFindingListDTO(
             f.getArtifactType(),
             f.getArtifactId(),
             f.getTitle(),
-            f.getObservation(),
+            f.getPresence(),
+            f.getAssessment(),
             f.getSeverity(),
             f.getConfidence(),
             f.getObservedAt()

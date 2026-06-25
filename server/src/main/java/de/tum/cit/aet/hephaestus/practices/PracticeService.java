@@ -74,9 +74,6 @@ public class PracticeService {
         if (request.artifactType() != null) {
             practice.setArtifactType(request.artifactType());
         }
-        if (request.kind() != null) {
-            practice.setKind(request.kind());
-        }
         validateTriggerEventsForFocus(practice);
         validateLearnerContent(practice);
 
@@ -179,10 +176,6 @@ public class PracticeService {
         }
         if (request.artifactType() != null) {
             practice.setArtifactType(request.artifactType());
-            changed = true;
-        }
-        if (request.kind() != null) {
-            practice.setKind(request.kind());
             changed = true;
         }
 

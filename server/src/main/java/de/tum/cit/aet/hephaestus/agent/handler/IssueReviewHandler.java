@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -191,10 +190,6 @@ public class IssueReviewHandler implements JobTypeHandler {
             job.getId()
         );
 
-        Map<String, PracticeKind> polarityBySlug =
-            job.getWorkspace() == null
-                ? Map.of()
-                : practiceCatalogInjector.polarityBySlug(job.getWorkspace().getId(), WorkArtifact.ISSUE);
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
@@ -202,7 +197,6 @@ public class IssueReviewHandler implements JobTypeHandler {
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             coercedFindings,
             WorkArtifact.ISSUE,
-            polarityBySlug,
             whyBySlug
         );
         postIssueNote(job, delivery);

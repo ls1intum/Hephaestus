@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.finding.FindingFingerprint;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -189,11 +189,11 @@ public class PracticeDetectionDeliveryService {
                 practiceRevisionId,
                 artifactType.name(),
                 artifactId,
-                developerId,
                 subjectUserId,
                 finding.title(),
-                finding.observation().name(),
-                finding.severity().name(),
+                finding.presence().name(),
+                finding.assessment() == null ? null : finding.assessment().name(),
+                finding.severity() == null ? null : finding.severity().name(),
                 finding.confidence(),
                 evidenceJson,
                 finding.reasoning(),
@@ -206,10 +206,10 @@ public class PracticeDetectionDeliveryService {
             } else {
                 discardedDuplicate++;
             }
-            // Track negative findings based on observation, not insert result.
+            // Track problem findings based on assessment, not insert result.
             // Critical for retry delivery: on retry, insertIfAbsent returns 0 for existing
             // findings, but we still need correct hasNegative for the delivery gate.
-            if (finding.observation() == Presence.NOT_OBSERVED) {
+            if (finding.assessment() == Assessment.BAD) {
                 hasNegative = true;
             }
         }

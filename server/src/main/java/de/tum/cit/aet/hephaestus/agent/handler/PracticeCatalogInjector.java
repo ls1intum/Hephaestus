@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -45,19 +44,6 @@ class PracticeCatalogInjector {
     }
 
     /**
-     * Resolve {@code slug -> }{@link PracticeKind} for the {@code focus}-scoped active practices of a workspace,
-     * so the delivery layer can decide "is this finding a problem?" sign-correctly per practice (ADR 0021,
-     * F-6) instead of assuming every {@code NOT_OBSERVED} is a gap. A slug absent from the map is treated
-     * as {@link PracticeKind#GOOD_PRACTICE} by callers.
-     */
-    Map<String, PracticeKind> polarityBySlug(Long workspaceId, WorkArtifact focus) {
-        return practiceRepository
-            .findByWorkspaceIdAndActiveTrueAndArtifactType(workspaceId, focus)
-            .stream()
-            .collect(Collectors.toMap(Practice::getSlug, Practice::getKind, (a, b) -> a));
-    }
-
-    /**
      * Resolve {@code slug -> whyItMatters} (the catalogue-authored transferable principle) for the
      * {@code focus}-scoped active practices of a workspace. The delivery layer surfaces this verbatim as the
      * "Why this matters" feed-forward line on critiques (see {@code DeliveryComposer#appendPrinciple}). It is
@@ -75,9 +61,10 @@ class PracticeCatalogInjector {
 
     /**
      * The slugs of {@code focus}-scoped active practices that declare {@code DEFECT-DETECTOR DISCIPLINE} in
-     * their criteria — i.e. practices with no legal OBSERVED observation (a clean surface is NOT_APPLICABLE, never
-     * OBSERVED). The delivery layer uses this to coerce a model-emitted OBSERVED to NOT_APPLICABLE before it
-     * ships to the student as a false strength (see {@code ValidatedFinding#coerceCoherence}).
+     * their criteria — i.e. practices with no legal {@code (PRESENT, GOOD)} clean-bill-of-health observation
+     * (a clean surface is {@code NOT_APPLICABLE}, never a good reading). The delivery layer uses this to coerce
+     * a model-emitted {@code (PRESENT, GOOD)} to {@code NOT_APPLICABLE} before it ships to the student as a
+     * false strength (see {@code ValidatedFinding#coerceCoherence}).
      */
     Set<String> defectDetectorSlugs(Long workspaceId, WorkArtifact focus) {
         return practiceRepository

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.finding;
 
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
@@ -37,11 +37,11 @@ public record TrendDelta(
     public enum TransitionStatus {
         /** Present this run, absent the prior run. */
         NEW,
-        /** Present in both runs (still recurring — not necessarily unfixed; see {@link LocusTransition#currentObservation}). */
+        /** Present in both runs (still recurring — not necessarily unfixed; see {@link LocusTransition#currentAssessment}). */
         PERSISTED,
         /** Present the prior run, absent this run — the concern is gone (positive reinforcement of the act of fixing). */
         RESOLVED,
-        /** Was satisfied (OBSERVED) the prior run, now unsatisfied (NOT_OBSERVED) — a backslide. */
+        /** Was a strength ({@code GOOD}) the prior run, now a problem ({@code BAD}) — a backslide (ADR 0022). */
         REGRESSED,
     }
 
@@ -49,7 +49,7 @@ public record TrendDelta(
      * One locus's movement. {@code title}/{@code currentSeverity}/{@code currentConfidence} come from the
      * CURRENT run for {@link TransitionStatus#NEW}/{@link TransitionStatus#PERSISTED}/{@link TransitionStatus#REGRESSED},
      * and from the PRIOR run for {@link TransitionStatus#RESOLVED} (the locus is absent now, so the prior
-     * prose is what the student last saw). {@code currentObservation} is null for RESOLVED; {@code priorObservation}
+     * prose is what the student last saw). {@code currentAssessment} is null for RESOLVED; {@code priorAssessment}
      * is null for NEW.
      */
     public record LocusTransition(
@@ -57,8 +57,8 @@ public record TrendDelta(
         TransitionStatus status,
         String practiceSlug,
         @Nullable String title,
-        @Nullable Presence priorObservation,
-        @Nullable Presence currentObservation,
+        @Nullable Assessment priorAssessment,
+        @Nullable Assessment currentAssessment,
         @Nullable Severity currentSeverity,
         @Nullable Float currentConfidence
     ) {}

@@ -1,24 +1,24 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 /**
- * Presence for a practice finding — whether the practice behaviour was <em>observed</em> in the
- * developer's work, was <em>not observed</em>, or whether the practice is irrelevant.
+ * Whether the target signal a practice looks for was seen in the developer's work, was expected but
+ * absent, or whether the practice does not apply at all (ADR 0022).
  *
- * <p><b>Sign-neutral.</b> A observation states only what the detector saw; it does NOT encode "good"
- * or "bad". The good/bad direction is supplied by {@link Practice#getKind()}: for a
- * {@code GOOD_PRACTICE} practice {@code OBSERVED} is the strength and {@code NOT_OBSERVED} the gap; for
- * an {@code BAD_PRACTICE} practice the directions invert. Keeping observation sign-free is what lets one
- * detector schema serve both good practices ({@code OBSERVED} = strength) and bad practices
- * ({@code NOT_OBSERVED} = strength) without overloading the observation value (see ADR 0021, F-6).
+ * <p><b>Measurement, not evaluation.</b> Presence states only what the detector <em>saw</em>; it does
+ * NOT encode "good" or "bad". The good/bad direction is a second, orthogonal axis carried by
+ * {@link Assessment} and resolved per observation by the detector reading the practice criteria and
+ * {@code what_good_looks_like}. The 2×2 of {@code (presence, assessment)} reads directly: a present
+ * good behaviour is a strength, a present bad behaviour is a problem (commission), an absent good
+ * behaviour is a gap (omission), an absent bad behaviour is clean.
  *
- * <p>Orthogonal to {@link Severity}: observation captures <em>presence</em> (observed vs not), severity
- * captures <em>impact</em> (critical vs informational).
+ * <p>Orthogonal to {@link Severity}: presence captures whether the signal was seen, severity captures
+ * impact (critical vs informational) and is meaningful only for a {@link Assessment#BAD} observation.
  */
 public enum Presence {
-    /** The practice behaviour is present in the developer's changed work. */
-    OBSERVED,
-    /** The practice behaviour is absent where it was expected in the developer's changed work. */
-    NOT_OBSERVED,
+    /** The target signal is present in the developer's changed work. */
+    PRESENT,
+    /** The target signal is absent where it was expected in the developer's changed work. */
+    ABSENT,
     /** The practice does not apply to the changed work (e.g., no network calls → error-state-handling is irrelevant). */
     NOT_APPLICABLE,
 }

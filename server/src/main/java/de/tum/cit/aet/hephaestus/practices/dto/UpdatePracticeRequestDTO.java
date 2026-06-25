@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Pattern;
@@ -35,13 +34,6 @@ public record UpdatePracticeRequestDTO(
     String precomputeScript,
 
     @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact artifactType,
-
-    @Schema(
-        description = "Whether the practice is a good practice, a bad practice, or context-dependent",
-        example = "BAD_PRACTICE"
-    )
-    @Nullable
-    PracticeKind kind,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")

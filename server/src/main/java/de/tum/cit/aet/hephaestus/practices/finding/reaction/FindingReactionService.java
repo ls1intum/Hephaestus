@@ -65,8 +65,8 @@ public class FindingReactionService {
             .orElseThrow(() -> new EntityNotFoundException("Observation", findingId.toString()));
 
         var currentUser = userRepository.getCurrentUserElseThrow();
-        if (!finding.getDeveloper().getId().equals(currentUser.getId())) {
-            throw new AccessForbiddenException("Only the finding's developer can submit a reaction");
+        if (!finding.getAboutUserId().equals(currentUser.getId())) {
+            throw new AccessForbiddenException("Only the developer the observation is about can submit a reaction");
         }
 
         if (

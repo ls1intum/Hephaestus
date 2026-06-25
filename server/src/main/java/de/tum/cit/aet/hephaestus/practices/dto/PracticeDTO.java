@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -23,9 +22,6 @@ public record PracticeDTO(
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
     String precomputeScript,
     @NonNull @Schema(description = "Artifact this practice evaluates") WorkArtifact artifactType,
-    @NonNull
-    @Schema(description = "Whether the practice is a good practice, a bad practice, or context-dependent")
-    PracticeKind kind,
     @Nullable @Schema(description = "Slug of the practice area this practice is bound to, if any") String areaSlug,
     @Nullable @Schema(description = "Developer-facing rationale (learner layer)") String whyItMatters,
     @Nullable @Schema(description = "Developer-facing exemplar (learner layer)") String whatGoodLooksLike,
@@ -42,7 +38,6 @@ public record PracticeDTO(
             practice.getCriteria(),
             practice.getPrecomputeScript(),
             practice.getArtifactType(),
-            practice.getKind(),
             practice.getArea() != null ? practice.getArea().getSlug() : null,
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),

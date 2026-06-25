@@ -23,8 +23,9 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PlacementPostedState;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementSlot;
 import de.tum.cit.aet.hephaestus.practices.feedback.PolicyFloorSelector;
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import java.time.Instant;
@@ -118,7 +119,7 @@ public class FeedbackLedgerRecorder {
         }
 
         Observation any = findings.get(0);
-        long recipientUserId = any.getDeveloper().getId();
+        long recipientUserId = any.getAboutUserId();
         WorkArtifact artifactType = any.getArtifactType();
         Long artifactId = any.getArtifactId();
         String feedbackThreadKey = feedbackThreadKeyFor(any);
@@ -180,7 +181,7 @@ public class FeedbackLedgerRecorder {
                   findings
                       .stream()
                       .filter(
-                          f -> f.getObservation() == Presence.NOT_OBSERVED && !alreadySuppressed.contains(f.getId())
+                          f -> f.getAssessment() == Assessment.BAD && !alreadySuppressed.contains(f.getId())
                       )
                       .toList(),
                   DeliveryComposer.MAX_IMPROVEMENT_SUGGESTIONS
@@ -193,18 +194,18 @@ public class FeedbackLedgerRecorder {
             .collect(Collectors.toCollection(HashSet::new));
         excludedIds.addAll(alreadySuppressed);
 
-        // Bind every DELIVERED finding: NOT_OBSERVED (the problems surfaced) lead as PRIMARY, OBSERVED
+        // Bind every DELIVERED finding: BAD (the problems surfaced) lead as PRIMARY, GOOD
         // strengths as SUPPORTING; NOT_APPLICABLE abstentions and withheld findings are excluded.
+        // Severity is null for a GOOD strength (ADR 0022) — sort it after any problem (least severe).
         List<Observation> assessed = findings
             .stream()
-            .filter(f -> f.getObservation() != Presence.NOT_APPLICABLE)
+            .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
-            .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
+            .sorted(Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal))
             .toList();
         int ordinal = 0;
         for (Observation f : assessed) {
-            EvidenceRole role =
-                f.getObservation() == Presence.NOT_OBSERVED ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
+            EvidenceRole role = f.getAssessment() == Assessment.BAD ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
             feedbackFindingRepository.insertIfAbsent(feedback.getId(), f.getId(), role.name(), ordinal++);
         }
 
@@ -288,7 +289,7 @@ public class FeedbackLedgerRecorder {
                     .workspaceId(job.getWorkspace().getId())
                     .artifactType(droppedFinding.getArtifactType())
                     .artifactId(droppedFinding.getArtifactId())
-                    .recipientUserId(droppedFinding.getDeveloper().getId())
+                    .recipientUserId(droppedFinding.getAboutUserId())
                     .subjectUserId(droppedFinding.getAboutUserId())
                     .channel(FeedbackSurface.IN_CONTEXT)
                     .position(unitOrdinal)
@@ -365,7 +366,7 @@ public class FeedbackLedgerRecorder {
                 .workspaceId(job.getWorkspace().getId())
                 .artifactType(finding.getArtifactType())
                 .artifactId(finding.getArtifactId())
-                .recipientUserId(finding.getDeveloper().getId())
+                .recipientUserId(finding.getAboutUserId())
                 .subjectUserId(finding.getAboutUserId())
                 .channel(FeedbackSurface.IN_CONTEXT)
                 .position(unitOrdinal)
@@ -432,8 +433,16 @@ public class FeedbackLedgerRecorder {
         return FeedbackThreadKey.compute(
             any.getArtifactType().name(),
             any.getArtifactId(),
-            any.getDeveloper().getId(),
+            any.getAboutUserId(),
             FeedbackSurface.IN_CONTEXT
         );
+    }
+
+    /**
+     * Severity ordinal for sorting, treating a null severity (a GOOD strength under ADR 0022) as the
+     * least severe so problems always sort ahead of strengths.
+     */
+    private static int severityOrdinal(Observation f) {
+        return f.getSeverity() == null ? Integer.MAX_VALUE : f.getSeverity().ordinal();
     }
 }

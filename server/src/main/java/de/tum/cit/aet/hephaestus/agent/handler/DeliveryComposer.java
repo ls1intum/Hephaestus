@@ -11,7 +11,7 @@ import static de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.REPO_MOUNT_RE
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeKind;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
@@ -97,48 +97,30 @@ class DeliveryComposer {
         PRECOMPUTE_OUT_PREFIX
     );
 
-    /** A finding is a problem when its practice's kind says so (slug absent → {@link PracticeKind#GOOD_PRACTICE}). */
-    private static boolean isProblem(ValidatedFinding f, Map<String, PracticeKind> polarityBySlug) {
-        return polarityBySlug.getOrDefault(f.practiceSlug(), PracticeKind.GOOD_PRACTICE).isProblem(f.observation());
+    /** A finding is a problem when its detector-resolved assessment is {@link Assessment#BAD} (ADR 0022). */
+    private static boolean isProblem(ValidatedFinding f) {
+        return f.assessment() == Assessment.BAD;
     }
 
-    /** A finding is a strength when its practice's kind says so (slug absent → {@link PracticeKind#GOOD_PRACTICE}). */
-    private static boolean isStrength(ValidatedFinding f, Map<String, PracticeKind> polarityBySlug) {
-        return polarityBySlug.getOrDefault(f.practiceSlug(), PracticeKind.GOOD_PRACTICE).isStrength(f.observation());
+    /** A finding is a strength when its detector-resolved assessment is {@link Assessment#GOOD} (ADR 0022). */
+    private static boolean isStrength(ValidatedFinding f) {
+        return f.assessment() == Assessment.GOOD;
     }
 
     /** Compose for a pull request (the default artifact; CTA reads "to fix before merging"). */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
-        return compose(findings, WorkArtifact.PULL_REQUEST, Map.of());
-    }
-
-    /**
-     * Compose for a specific artifact, treating every practice as {@link PracticeKind#GOOD_PRACTICE}. Retained for
-     * call sites and tests that do not resolve per-practice kind.
-     */
-    @Nullable
-    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
-        return compose(findings, artifact, Map.of());
+        return compose(findings, WorkArtifact.PULL_REQUEST);
     }
 
     /**
      * Compose feedback for a specific artifact. The blocking call-to-action is artifact-aware: a PR
-     * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged).
-     *
-     * <p>{@code polarityBySlug} supplies each practice's {@link PracticeKind} so "is this finding a problem
-     * vs a strength?" is decided sign-correctly (ADR 0021, F-6) instead of assuming every
-     * {@code NOT_OBSERVED} is a gap. A slug absent from the map defaults to {@link PracticeKind#GOOD_PRACTICE},
-     * which — because every catalogued practice is desirable — keeps behaviour identical when no
-     * map is supplied.
+     * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged). "Is this finding a
+     * problem vs a strength?" is decided per finding by its {@code assessment} (ADR 0022).
      */
     @Nullable
-    static DeliveryContent compose(
-        List<ValidatedFinding> findings,
-        WorkArtifact artifact,
-        Map<String, PracticeKind> polarityBySlug
-    ) {
-        return compose(findings, artifact, polarityBySlug, Map.of());
+    static DeliveryContent compose(List<ValidatedFinding> findings, WorkArtifact artifact) {
+        return compose(findings, artifact, Map.of());
     }
 
     /**
@@ -152,13 +134,12 @@ class DeliveryComposer {
     static DeliveryContent compose(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, PracticeKind> polarityBySlug,
         Map<String, String> whyBySlug
     ) {
         // First-pass compose: inline notes have not been posted yet, so NO finding is known-delivered.
         // An empty delivered-key set makes every inlinable finding render its full summary line — the
         // safe pre-delivery state, and the permanent fallback for any finding whose inline note never lands.
-        return compose(findings, artifact, polarityBySlug, whyBySlug, Set.of());
+        return compose(findings, artifact, whyBySlug, Set.of());
     }
 
     /**
@@ -173,11 +154,10 @@ class DeliveryComposer {
     static String recomposeMrNote(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, PracticeKind> polarityBySlug,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
-        DeliveryContent recomposed = compose(findings, artifact, polarityBySlug, whyBySlug, deliveredKeys);
+        DeliveryContent recomposed = compose(findings, artifact, whyBySlug, deliveredKeys);
         return recomposed == null ? null : recomposed.mrNote();
     }
 
@@ -185,7 +165,6 @@ class DeliveryComposer {
     private static DeliveryContent compose(
         List<ValidatedFinding> findings,
         WorkArtifact artifact,
-        Map<String, PracticeKind> polarityBySlug,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
     ) {
@@ -198,7 +177,7 @@ class DeliveryComposer {
 
         List<ValidatedFinding> negatives = findings
             .stream()
-            .filter(f -> isProblem(f, polarityBySlug))
+            .filter(DeliveryComposer::isProblem)
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
@@ -236,7 +215,7 @@ class DeliveryComposer {
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings
                 .stream()
-                .filter(f -> isStrength(f, polarityBySlug))
+                .filter(DeliveryComposer::isStrength)
                 .toList();
             if (observed.isEmpty()) {
                 // Every finding abstained (all NOT_APPLICABLE): the artifact could not be assessed against
@@ -266,7 +245,7 @@ class DeliveryComposer {
         // critiques so the note acknowledges effort (task-level, not person-level praise).
         List<ValidatedFinding> positives = findings
             .stream()
-            .filter(f -> isStrength(f, polarityBySlug))
+            .filter(DeliveryComposer::isStrength)
             .toList();
 
         // MR summary note: opening + non-inlinable findings expanded + brief inline overview. The inline

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.Loc
 import de.tum.cit.aet.hephaestus.practices.finding.PracticeFindingRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.finding.TrendDelta.TransitionStatus;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -104,18 +104,18 @@ public class FindingTrendService {
             LocusFinding curr = currMap.get(key);
             if (prior == null) {
                 // present now, absent prior → NEW
-                transitions.add(transition(key, TransitionStatus.NEW, curr, null, curr.getObservation()));
+                transitions.add(transition(key, TransitionStatus.NEW, curr, null, curr.getAssessment()));
             } else if (curr == null) {
                 // present prior, absent now → RESOLVED (render the prior prose — it's what the student last saw)
-                transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getObservation(), null));
+                transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getAssessment(), null));
             } else {
-                // present in both — PERSISTED, unless it backslid OBSERVED→NOT_OBSERVED (REGRESSED).
-                // NOT_OBSERVED→OBSERVED is an IMPROVEMENT, not a regression: it stays PERSISTED but currentObservation
-                // carries OBSERVED so B1 can render "now satisfied".
+                // present in both — PERSISTED, unless it backslid GOOD→BAD (REGRESSED; ADR 0022).
+                // BAD→GOOD is an IMPROVEMENT, not a regression: it stays PERSISTED but currentAssessment
+                // carries GOOD so B1 can render "now satisfied".
                 boolean regressed =
-                    prior.getObservation() == Presence.OBSERVED && curr.getObservation() == Presence.NOT_OBSERVED;
+                    prior.getAssessment() == Assessment.GOOD && curr.getAssessment() == Assessment.BAD;
                 TransitionStatus status = regressed ? TransitionStatus.REGRESSED : TransitionStatus.PERSISTED;
-                transitions.add(transition(key, status, curr, prior.getObservation(), curr.getObservation()));
+                transitions.add(transition(key, status, curr, prior.getAssessment(), curr.getAssessment()));
             }
         }
         transitions.sort(
@@ -130,16 +130,16 @@ public class FindingTrendService {
         String key,
         TransitionStatus status,
         LocusFinding represent,
-        Presence priorObservation,
-        Presence currentObservation
+        Assessment priorAssessment,
+        Assessment currentAssessment
     ) {
         return new LocusTransition(
             key,
             status,
             represent.getPracticeSlug(),
             represent.getTitle(),
-            priorObservation,
-            currentObservation,
+            priorAssessment,
+            currentAssessment,
             represent.getSeverity(),
             represent.getConfidence()
         );
@@ -155,13 +155,19 @@ public class FindingTrendService {
     }
 
     private static LocusFinding worse(LocusFinding a, LocusFinding b) {
-        int sev = Integer.compare(a.getSeverity().ordinal(), b.getSeverity().ordinal());
+        // Severity is null for a GOOD (strength) observation (ADR 0022): treat absent as least-severe
+        // (ordinal beyond INFO) so a BAD finding always wins the representative slot.
+        int sev = Integer.compare(severityOrdinal(a), severityOrdinal(b));
         if (sev != 0) {
             return sev < 0 ? a : b; // lower ordinal = more severe (CRITICAL=0)
         }
         float ca = a.getConfidence() == null ? 0f : a.getConfidence();
         float cb = b.getConfidence() == null ? 0f : b.getConfidence();
         return ca >= cb ? a : b;
+    }
+
+    private static int severityOrdinal(LocusFinding f) {
+        return f.getSeverity() == null ? Integer.MAX_VALUE : f.getSeverity().ordinal();
     }
 
     /** Render/priority order: backslides and new problems first, then wins, then the unchanged tail. */
