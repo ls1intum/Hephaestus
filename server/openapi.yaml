@@ -37,6 +37,8 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Read-only access to practice evaluation observations
+  name: Practice Observations
 - description: Instance-admin account management
   name: Admin
 - description: Team management within workspace
@@ -67,8 +69,6 @@ tags:
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
-- description: Read-only access to practice evaluation findings
-  name: Practice Findings
 - description: Workspace integration connection management
   name: Connections
 - description: Up/down votes on mentor assistant messages
@@ -2302,7 +2302,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingReactionEngagement"
+                $ref: "#/components/schemas/ReactionEngagement"
           description: Engagement statistics returned
       summary: Get engagement statistics
       tags:
@@ -2331,7 +2331,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingReaction"
+                $ref: "#/components/schemas/Reaction"
           description: Latest reaction returned
         "204":
           description: No reaction exists for this feedback unit
@@ -2363,14 +2363,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateFindingReaction"
+              $ref: "#/components/schemas/CreateReaction"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FindingReaction"
+                $ref: "#/components/schemas/Reaction"
           description: Reaction recorded
         "400":
           description: "Invalid request (e.g., DISPUTED without explanation)"
@@ -2381,175 +2381,6 @@ paths:
       summary: Submit a reaction to a feedback unit
       tags:
       - Feedback Reaction
-  /workspaces/{workspaceSlug}/practices/findings:
-    get:
-      description: Paginated findings for the authenticated developer with optional
-        filters
-      operationId: listFindings
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Filter by practice slug
-        in: query
-        name: practiceSlug
-        required: false
-        schema:
-          type: string
-      - description: Filter by observation
-        in: query
-        name: observation
-        required: false
-        schema:
-          type: string
-          enum:
-          - PRESENT
-          - ABSENT
-          - NOT_APPLICABLE
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PagePracticeFindingList"
-          description: Paginated findings returned
-      security: []
-      summary: List findings for current user
-      tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}:
-    get:
-      description: All findings for a specific pull request within the workspace
-      operationId: getFindingsForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: prId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PracticeFindingList"
-          description: PR findings returned
-      security: []
-      summary: List findings for a pull request
-      tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/reflection:
-    get:
-      description: "Per-practice cards a developer can READ — why the practice matters,\
-        \ what good looks like, where they stand, the specific feedback to act on,\
-        \ and what they already do well. The third feedback channel alongside in-context\
-        \ SCM notes and the conversational mentor; the same findings reorganised by\
-        \ practice for self-paced reflection, not a scoreboard of counts."
-      operationId: getReflection
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ReflectionPractice"
-          description: Per-practice reflection cards returned
-      security: []
-      summary: Reflective dashboard feedback for the current developer
-      tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/summary:
-    get:
-      description: Aggregated observation counts per practice for dashboard cards
-      operationId: getSummary
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/DeveloperPracticeSummary"
-          description: Practice summaries returned
-      security: []
-      summary: Per-practice summary for current user
-      tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/{findingId}:
-    get:
-      operationId: getFinding
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: findingId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeFindingDetail"
-          description: Finding detail returned
-        "404":
-          description: Finding not found or not owned by current user
-      security: []
-      summary: Get finding detail
-      tags:
-      - Practice Findings
   /workspaces/{workspaceSlug}/practices/learner:
     get:
       description: "Active practices projected for a developer: name, area, why-it-matters,\
@@ -2577,6 +2408,175 @@ paths:
       summary: "List active practices, learner-facing"
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/observations:
+    get:
+      description: Paginated observations for the authenticated developer with optional
+        filters
+      operationId: listObservations
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Filter by practice slug
+        in: query
+        name: practiceSlug
+        required: false
+        schema:
+          type: string
+      - description: Filter by presence
+        in: query
+        name: presence
+        required: false
+        schema:
+          type: string
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageObservationList"
+          description: Paginated observations returned
+      security: []
+      summary: List observations for current user
+      tags:
+      - Practice Observations
+  /workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}:
+    get:
+      description: All observations for a specific pull request within the workspace
+      operationId: getObservationsForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: prId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ObservationList"
+          description: PR observations returned
+      security: []
+      summary: List observations for a pull request
+      tags:
+      - Practice Observations
+  /workspaces/{workspaceSlug}/practices/observations/reflection:
+    get:
+      description: "Per-practice cards a developer can READ — why the practice matters,\
+        \ what good looks like, where they stand, the specific feedback to act on,\
+        \ and what they already do well. The third feedback channel alongside in-context\
+        \ SCM notes and the conversational mentor; the same findings reorganised by\
+        \ practice for self-paced reflection, not a scoreboard of counts."
+      operationId: getReflection
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReflectionPractice"
+          description: Per-practice reflection cards returned
+      security: []
+      summary: Reflective dashboard feedback for the current developer
+      tags:
+      - Practice Observations
+  /workspaces/{workspaceSlug}/practices/observations/summary:
+    get:
+      description: Aggregated observation counts per practice for dashboard cards
+      operationId: getSummary
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeveloperPracticeSummary"
+          description: Practice summaries returned
+      security: []
+      summary: Per-practice summary for current user
+      tags:
+      - Practice Observations
+  /workspaces/{workspaceSlug}/practices/observations/{observationId}:
+    get:
+      operationId: getObservation
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: observationId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObservationDetail"
+          description: Observation detail returned
+        "404":
+          description: Observation not found or not owned by current user
+      security: []
+      summary: Get observation detail
+      tags:
+      - Practice Observations
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -4416,24 +4416,6 @@ components:
       required:
       - llmProvider
       - name
-    CreateFindingReaction:
-      type: object
-      description: Submit a reaction to an AI-generated practice finding
-      properties:
-        action:
-          type: string
-          description: The reaction action to record
-          enum:
-          - ADDRESSED
-          - DISPUTED
-          - NOT_APPLICABLE
-        explanation:
-          type: string
-          description: Explanation for the reaction. Required when action is DISPUTED.
-          maxLength: 2000
-          minLength: 0
-      required:
-      - action
     CreateLoginProviderRequest:
       type: object
       properties:
@@ -4576,6 +4558,24 @@ components:
       - name
       - slug
       - triggerEvents
+    CreateReaction:
+      type: object
+      description: Submit a reaction to an AI-generated practice finding
+      properties:
+        action:
+          type: string
+          description: The reaction action to record
+          enum:
+          - ADDRESSED
+          - DISPUTED
+          - NOT_APPLICABLE
+        explanation:
+          type: string
+          description: Explanation for the reaction. Required when action is DISPUTED.
+          maxLength: 2000
+          minLength: 0
+      required:
+      - action
     CreateWorkspaceRequest:
       type: object
       description: Request to create a new workspace
@@ -4761,61 +4761,6 @@ components:
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
-    FindingReaction:
-      type: object
-      description: Developer reaction to a delivered unit of feedback
-      properties:
-        action:
-          type: string
-          description: The reaction action taken
-          enum:
-          - ADDRESSED
-          - DISPUTED
-          - NOT_APPLICABLE
-        createdAt:
-          type: string
-          format: date-time
-          description: When the reaction was submitted
-        explanation:
-          type: string
-          description: Optional explanation for the reaction
-        feedbackId:
-          type: string
-          format: uuid
-          description: ID of the feedback unit this reaction is about
-        id:
-          type: string
-          format: uuid
-          description: Unique reaction ID
-      required:
-      - action
-      - createdAt
-      - feedbackId
-      - id
-    FindingReactionEngagement:
-      type: object
-      description: "Reaction engagement for a developer, split into the response (uptake)\
-        \ and validity axes"
-      properties:
-        addressed:
-          type: integer
-          format: int64
-          description: "RESPONSE: findings the developer acted on (the recipience\
-            \ act, not the outcome)"
-        disputed:
-          type: integer
-          format: int64
-          description: "RESPONSE: findings the developer rejected with a reasoned\
-            \ explanation"
-        notApplicable:
-          type: integer
-          format: int64
-          description: "VALIDITY: findings marked out-of-scope — a detector-scope\
-            \ signal, NOT an uptake count"
-      required:
-      - addressed
-      - disputed
-      - notApplicable
     GitHubProvider:
       type: object
       description: GitHub provider configuration
@@ -5217,6 +5162,150 @@ components:
       - scopes
       - type
       - updatedAt
+    ObservationDetail:
+      type: object
+      description: Full practice finding detail including guidance and evidence
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Target entity ID
+        artifactType:
+          type: string
+          description: Target type (e.g. PULL_REQUEST)
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
+        confidence:
+          type: number
+          format: float
+          description: AI confidence score (0.0–1.0)
+        detectedAt:
+          type: string
+          format: date-time
+          description: When the finding was detected
+        evidence:
+          type: object
+          additionalProperties: {}
+          description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
+            ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
+        guidance:
+          type: string
+          description: What to do — the delivered feedback for this finding (null
+            if nothing was delivered)
+        id:
+          type: string
+          format: uuid
+          description: Finding ID
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        presence:
+          type: string
+          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+        reasoning:
+          type: string
+          description: AI reasoning behind the observation
+        severity:
+          type: string
+          description: Severity level (null unless assessment is BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+          description: Finding title
+      required:
+      - artifactId
+      - artifactType
+      - confidence
+      - detectedAt
+      - id
+      - practiceName
+      - practiceSlug
+      - presence
+      - title
+    ObservationList:
+      type: object
+      description: Practice finding summary for list views
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Target entity ID
+        artifactType:
+          type: string
+          description: Target type (e.g. PULL_REQUEST)
+          enum:
+          - PULL_REQUEST
+          - ISSUE
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
+        confidence:
+          type: number
+          format: float
+          description: AI confidence score (0.0–1.0)
+        detectedAt:
+          type: string
+          format: date-time
+          description: When the finding was detected
+        id:
+          type: string
+          format: uuid
+          description: Finding ID
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        presence:
+          type: string
+          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+        severity:
+          type: string
+          description: Severity level (null unless assessment is BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+          description: Finding title
+      required:
+      - artifactId
+      - artifactType
+      - confidence
+      - detectedAt
+      - id
+      - practiceName
+      - practiceSlug
+      - presence
+      - title
     PageAgentJob:
       type: object
       properties:
@@ -5281,13 +5370,13 @@ components:
         totalPages:
           type: integer
           format: int32
-    PagePracticeFindingList:
+    PageObservationList:
       type: object
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/PracticeFindingList"
+            $ref: "#/components/schemas/ObservationList"
         empty:
           type: boolean
         first:
@@ -5438,150 +5527,6 @@ components:
       - id
       - name
       - slug
-    PracticeFindingDetail:
-      type: object
-      description: Full practice finding detail including guidance and evidence
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Target entity ID
-        artifactType:
-          type: string
-          description: Target type (e.g. PULL_REQUEST)
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-        assessment:
-          type: string
-          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
-          enum:
-          - GOOD
-          - BAD
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
-        detectedAt:
-          type: string
-          format: date-time
-          description: When the finding was detected
-        evidence:
-          type: object
-          additionalProperties: {}
-          description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
-            ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
-        guidance:
-          type: string
-          description: What to do — the delivered feedback for this finding (null
-            if nothing was delivered)
-        id:
-          type: string
-          format: uuid
-          description: Finding ID
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        presence:
-          type: string
-          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
-          enum:
-          - PRESENT
-          - ABSENT
-          - NOT_APPLICABLE
-        reasoning:
-          type: string
-          description: AI reasoning behind the observation
-        severity:
-          type: string
-          description: Severity level (null unless assessment is BAD)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        title:
-          type: string
-          description: Finding title
-      required:
-      - artifactId
-      - artifactType
-      - confidence
-      - detectedAt
-      - id
-      - practiceName
-      - practiceSlug
-      - presence
-      - title
-    PracticeFindingList:
-      type: object
-      description: Practice finding summary for list views
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Target entity ID
-        artifactType:
-          type: string
-          description: Target type (e.g. PULL_REQUEST)
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-        assessment:
-          type: string
-          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
-          enum:
-          - GOOD
-          - BAD
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
-        detectedAt:
-          type: string
-          format: date-time
-          description: When the finding was detected
-        id:
-          type: string
-          format: uuid
-          description: Finding ID
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        presence:
-          type: string
-          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
-          enum:
-          - PRESENT
-          - ABSENT
-          - NOT_APPLICABLE
-        severity:
-          type: string
-          description: Severity level (null unless assessment is BAD)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        title:
-          type: string
-          description: Finding title
-      required:
-      - artifactId
-      - artifactType
-      - confidence
-      - detectedAt
-      - id
-      - practiceName
-      - practiceSlug
-      - presence
-      - title
     Profile:
       type: object
       description: "User profile header: identity, league standing, contribution surface,\
@@ -5948,6 +5893,61 @@ components:
       - number
       - state
       - title
+    Reaction:
+      type: object
+      description: Developer reaction to a delivered unit of feedback
+      properties:
+        action:
+          type: string
+          description: The reaction action taken
+          enum:
+          - ADDRESSED
+          - DISPUTED
+          - NOT_APPLICABLE
+        createdAt:
+          type: string
+          format: date-time
+          description: When the reaction was submitted
+        explanation:
+          type: string
+          description: Optional explanation for the reaction
+        feedbackId:
+          type: string
+          format: uuid
+          description: ID of the feedback unit this reaction is about
+        id:
+          type: string
+          format: uuid
+          description: Unique reaction ID
+      required:
+      - action
+      - createdAt
+      - feedbackId
+      - id
+    ReactionEngagement:
+      type: object
+      description: "Reaction engagement for a developer, split into the response (uptake)\
+        \ and validity axes"
+      properties:
+        addressed:
+          type: integer
+          format: int64
+          description: "RESPONSE: findings the developer acted on (the recipience\
+            \ act, not the outcome)"
+        disputed:
+          type: integer
+          format: int64
+          description: "RESPONSE: findings the developer rejected with a reasoned\
+            \ explanation"
+        notApplicable:
+          type: integer
+          format: int64
+          description: "VALIDITY: findings marked out-of-scope — a detector-scope\
+            \ signal, NOT an uptake count"
+      required:
+      - addressed
+      - disputed
+      - notApplicable
     ReflectionItem:
       type: object
       description: A single piece of practice feedback to read and act on

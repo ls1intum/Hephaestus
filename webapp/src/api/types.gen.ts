@@ -976,6 +976,50 @@ export type ReflectionItem = {
 };
 
 /**
+ * Reaction engagement for a developer, split into the response (uptake) and validity axes
+ */
+export type ReactionEngagement = {
+    /**
+     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
+     */
+    addressed: number;
+    /**
+     * RESPONSE: findings the developer rejected with a reasoned explanation
+     */
+    disputed: number;
+    /**
+     * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
+     */
+    notApplicable: number;
+};
+
+/**
+ * Developer reaction to a delivered unit of feedback
+ */
+export type Reaction = {
+    /**
+     * The reaction action taken
+     */
+    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * When the reaction was submitted
+     */
+    createdAt: Date;
+    /**
+     * Optional explanation for the reaction
+     */
+    explanation?: string;
+    /**
+     * ID of the feedback unit this reaction is about
+     */
+    feedbackId: string;
+    /**
+     * Unique reaction ID
+     */
+    id: string;
+};
+
+/**
  * Detailed information about a pull request
  */
 export type PullRequestInfo = {
@@ -1266,120 +1310,6 @@ export type Profile = {
 };
 
 /**
- * Practice finding summary for list views
- */
-export type PracticeFindingList = {
-    /**
-     * Target entity ID
-     */
-    artifactId: number;
-    /**
-     * Target type (e.g. PULL_REQUEST)
-     */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
-    /**
-     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
-     */
-    assessment?: 'GOOD' | 'BAD';
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
-     */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
-    /**
-     * Severity level (null unless assessment is BAD)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Finding title
-     */
-    title: string;
-};
-
-/**
- * Full practice finding detail including guidance and evidence
- */
-export type PracticeFindingDetail = {
-    /**
-     * Target entity ID
-     */
-    artifactId: number;
-    /**
-     * Target type (e.g. PULL_REQUEST)
-     */
-    artifactType: 'PULL_REQUEST' | 'ISSUE';
-    /**
-     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
-     */
-    assessment?: 'GOOD' | 'BAD';
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
-     */
-    evidence?: {
-        [key: string]: unknown;
-    };
-    /**
-     * What to do — the delivered feedback for this finding (null if nothing was delivered)
-     */
-    guidance?: string;
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
-     */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
-    /**
-     * AI reasoning behind the observation
-     */
-    reasoning?: string;
-    /**
-     * Severity level (null unless assessment is BAD)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Finding title
-     */
-    title: string;
-};
-
-/**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
@@ -1492,8 +1422,8 @@ export type PageableObject = {
     unpaged?: boolean;
 };
 
-export type PagePracticeFindingList = {
-    content?: Array<PracticeFindingList>;
+export type PageObservationList = {
+    content?: Array<ObservationList>;
     empty?: boolean;
     first?: boolean;
     last?: boolean;
@@ -1504,6 +1434,56 @@ export type PagePracticeFindingList = {
     sort?: SortObject;
     totalElements?: number;
     totalPages?: number;
+};
+
+/**
+ * Practice finding summary for list views
+ */
+export type ObservationList = {
+    /**
+     * Target entity ID
+     */
+    artifactId: number;
+    /**
+     * Target type (e.g. PULL_REQUEST)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * When the finding was detected
+     */
+    detectedAt: Date;
+    /**
+     * Finding ID
+     */
+    id: string;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     */
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Severity level (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Finding title
+     */
+    title: string;
 };
 
 export type PageAuthEventView = {
@@ -1670,6 +1650,70 @@ export type AgentJob = {
      * Current job status
      */
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+};
+
+/**
+ * Full practice finding detail including guidance and evidence
+ */
+export type ObservationDetail = {
+    /**
+     * Target entity ID
+     */
+    artifactId: number;
+    /**
+     * Target type (e.g. PULL_REQUEST)
+     */
+    artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * When the finding was detected
+     */
+    detectedAt: Date;
+    /**
+     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
+     */
+    evidence?: {
+        [key: string]: unknown;
+    };
+    /**
+     * What to do — the delivered feedback for this finding (null if nothing was delivered)
+     */
+    guidance?: string;
+    /**
+     * Finding ID
+     */
+    id: string;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     */
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * AI reasoning behind the observation
+     */
+    reasoning?: string;
+    /**
+     * Severity level (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Finding title
+     */
+    title: string;
 };
 
 /**
@@ -1956,50 +2000,6 @@ export type GitLabGroup = {
 };
 
 /**
- * Reaction engagement for a developer, split into the response (uptake) and validity axes
- */
-export type FindingReactionEngagement = {
-    /**
-     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
-     */
-    addressed: number;
-    /**
-     * RESPONSE: findings the developer rejected with a reasoned explanation
-     */
-    disputed: number;
-    /**
-     * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
-     */
-    notApplicable: number;
-};
-
-/**
- * Developer reaction to a delivered unit of feedback
- */
-export type FindingReaction = {
-    /**
-     * The reaction action taken
-     */
-    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * When the reaction was submitted
-     */
-    createdAt: Date;
-    /**
-     * Optional explanation for the reaction
-     */
-    explanation?: string;
-    /**
-     * ID of the feedback unit this reaction is about
-     */
-    feedbackId: string;
-    /**
-     * Unique reaction ID
-     */
-    id: string;
-};
-
-/**
  * Feature flags evaluated for the current user
  */
 export type FeatureFlags = {
@@ -2138,6 +2138,20 @@ export type CreateWorkspaceRequest = {
 };
 
 /**
+ * Submit a reaction to an AI-generated practice finding
+ */
+export type CreateReaction = {
+    /**
+     * The reaction action to record
+     */
+    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * Explanation for the reaction. Required when action is DISPUTED.
+     */
+    explanation?: string;
+};
+
+/**
  * Request to create a new practice definition
  */
 export type CreatePracticeRequest = {
@@ -2228,20 +2242,6 @@ export type CreateLoginProviderRequest = {
      */
     scopes?: string;
     type: 'GITHUB' | 'GITLAB';
-};
-
-/**
- * Submit a reaction to an AI-generated practice finding
- */
-export type CreateFindingReaction = {
-    /**
-     * The reaction action to record
-     */
-    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    /**
-     * Explanation for the reaction. Required when action is DISPUTED.
-     */
-    explanation?: string;
 };
 
 /**
@@ -4542,7 +4542,7 @@ export type GetEngagementResponses = {
     /**
      * Engagement statistics returned
      */
-    200: FindingReactionEngagement;
+    200: ReactionEngagement;
 };
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
@@ -4571,7 +4571,7 @@ export type GetLatestReactionResponses = {
     /**
      * Latest reaction returned
      */
-    200: FindingReaction;
+    200: Reaction;
     /**
      * No reaction exists for this feedback unit
      */
@@ -4581,7 +4581,7 @@ export type GetLatestReactionResponses = {
 export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
 
 export type SubmitReactionData = {
-    body: CreateFindingReaction;
+    body: CreateReaction;
     path: {
         /**
          * Workspace slug
@@ -4612,135 +4612,10 @@ export type SubmitReactionResponses = {
     /**
      * Reaction recorded
      */
-    201: FindingReaction;
+    201: Reaction;
 };
 
 export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
-
-export type ListFindingsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        /**
-         * Filter by practice slug
-         */
-        practiceSlug?: string;
-        /**
-         * Filter by observation
-         */
-        observation?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
-        page?: number;
-        size?: number;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/findings';
-};
-
-export type ListFindingsResponses = {
-    /**
-     * Paginated findings returned
-     */
-    200: PagePracticeFindingList;
-};
-
-export type ListFindingsResponse = ListFindingsResponses[keyof ListFindingsResponses];
-
-export type GetFindingsForPullRequestData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        prId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}';
-};
-
-export type GetFindingsForPullRequestResponses = {
-    /**
-     * PR findings returned
-     */
-    200: Array<PracticeFindingList>;
-};
-
-export type GetFindingsForPullRequestResponse = GetFindingsForPullRequestResponses[keyof GetFindingsForPullRequestResponses];
-
-export type GetReflectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/reflection';
-};
-
-export type GetReflectionResponses = {
-    /**
-     * Per-practice reflection cards returned
-     */
-    200: Array<ReflectionPractice>;
-};
-
-export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
-
-export type GetSummaryData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/summary';
-};
-
-export type GetSummaryResponses = {
-    /**
-     * Practice summaries returned
-     */
-    200: Array<DeveloperPracticeSummary>;
-};
-
-export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
-
-export type GetFindingData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        findingId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}';
-};
-
-export type GetFindingErrors = {
-    /**
-     * Finding not found or not owned by current user
-     */
-    404: unknown;
-};
-
-export type GetFindingResponses = {
-    /**
-     * Finding detail returned
-     */
-    200: PracticeFindingDetail;
-};
-
-export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
 
 export type ListLearnerPracticesData = {
     body?: never;
@@ -4762,6 +4637,131 @@ export type ListLearnerPracticesResponses = {
 };
 
 export type ListLearnerPracticesResponse = ListLearnerPracticesResponses[keyof ListLearnerPracticesResponses];
+
+export type ListObservationsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Filter by practice slug
+         */
+        practiceSlug?: string;
+        /**
+         * Filter by presence
+         */
+        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/observations';
+};
+
+export type ListObservationsResponses = {
+    /**
+     * Paginated observations returned
+     */
+    200: PageObservationList;
+};
+
+export type ListObservationsResponse = ListObservationsResponses[keyof ListObservationsResponses];
+
+export type GetObservationsForPullRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        prId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/observations/pull-request/{prId}';
+};
+
+export type GetObservationsForPullRequestResponses = {
+    /**
+     * PR observations returned
+     */
+    200: Array<ObservationList>;
+};
+
+export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
+
+export type GetReflectionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/observations/reflection';
+};
+
+export type GetReflectionResponses = {
+    /**
+     * Per-practice reflection cards returned
+     */
+    200: Array<ReflectionPractice>;
+};
+
+export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
+
+export type GetSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/observations/summary';
+};
+
+export type GetSummaryResponses = {
+    /**
+     * Practice summaries returned
+     */
+    200: Array<DeveloperPracticeSummary>;
+};
+
+export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
+
+export type GetObservationData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        observationId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}';
+};
+
+export type GetObservationErrors = {
+    /**
+     * Observation not found or not owned by current user
+     */
+    404: unknown;
+};
+
+export type GetObservationResponses = {
+    /**
+     * Observation detail returned
+     */
+    200: ObservationDetail;
+};
+
+export type GetObservationResponse = GetObservationResponses[keyof GetObservationResponses];
 
 export type DeletePracticeData = {
     body?: never;
