@@ -278,65 +278,42 @@ erDiagram
 
     Feedback {
         UUID id PK
-        VARCHAR(255) idempotency_key "NOT NULL"
         UUID agent_job_id FK,UK "NOT NULL"
         BIGINT workspace_id FK "NOT NULL"
         VARCHAR(32) artifact_type
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
         BIGINT subject_user_id FK "NOT NULL"
-        VARCHAR(32) surface "NOT NULL"
-        INTEGER unit_ordinal UK "NOT NULL"
+        VARCHAR(32) channel "NOT NULL"
+        INTEGER position UK "NOT NULL"
         VARCHAR(16) delivery_state "NOT NULL"
         VARCHAR(32) suppression_reason
-        TEXT rendered_body
-        VARCHAR(16) origin "NOT NULL"
-        VARCHAR(255) model_id
-        VARCHAR(255) composer_version
-        VARCHAR(255) synthesis_prompt_version
-        UUID supersedes_id FK
-        VARCHAR(64) feedback_thread_key
+        TEXT body
+        VARCHAR(16) source "NOT NULL"
+        UUID replaces_id FK
+        VARCHAR(64) thread_key
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ delivered_at
     }
 
-    FeedbackFinding {
+    FeedbackObservation {
         UUID feedback_id PK,FK
-        UUID finding_id PK,FK
-        VARCHAR(16) evidence_role "NOT NULL"
+        UUID observation_id PK,FK
+        VARCHAR(16) role "NOT NULL"
         INTEGER ordinal "NOT NULL"
     }
 
     FeedbackPlacement {
         UUID id PK
         UUID feedback_id FK "NOT NULL"
-        VARCHAR(32) slot "NOT NULL"
+        VARCHAR(32) placement_type "NOT NULL"
         VARCHAR(16) anchor_kind
         TEXT anchor_path
-        TEXT anchor_old_path
         INTEGER anchor_start_line
         INTEGER anchor_end_line
         VARCHAR(8) anchor_side
-        VARCHAR(8) anchor_start_side
-        TEXT anchor_quote
-        VARCHAR(64) pinned_commit_sha
-        TEXT external_ref
-        TEXT thread_external_ref
-        BOOLEAN resolved
-        TIMESTAMPTZ resolved_at
-        TEXT resolved_external_ref
-        VARCHAR(16) posted_state "NOT NULL"
+        TEXT posted_comment_ref
         TIMESTAMPTZ created_at "NOT NULL"
-    }
-
-    FindingReaction {
-        UUID id PK
-        UUID finding_id FK "NOT NULL"
-        BIGINT developer_id FK "NOT NULL"
-        VARCHAR(16) action "NOT NULL"
-        TEXT explanation
-        TIMESTAMPTZ created_at "NOT NULL"
-        VARCHAR(64) finding_fingerprint
     }
 
     GitCommit {
@@ -563,6 +540,26 @@ erDiagram
         TIMESTAMPTZ consumed_at
     }
 
+    Observation {
+        UUID id PK
+        VARCHAR(255) occurrence_key UK "NOT NULL"
+        UUID agent_job_id "NOT NULL"
+        BIGINT practice_id FK "NOT NULL"
+        VARCHAR(32) artifact_type "NOT NULL"
+        BIGINT artifact_id "NOT NULL"
+        VARCHAR(255) title "NOT NULL"
+        VARCHAR(16) presence "NOT NULL"
+        VARCHAR(16) severity
+        REAL confidence "NOT NULL"
+        JSONB evidence
+        TEXT reasoning
+        TIMESTAMPTZ observed_at "NOT NULL"
+        VARCHAR(64) recurrence_key
+        BIGINT about_user_id FK "NOT NULL"
+        BIGINT practice_revision_id FK
+        VARCHAR(8) assessment
+    }
+
     Organization {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -594,8 +591,7 @@ erDiagram
         TIMESTAMPTZ updated_at
         TEXT precompute_script
         BIGINT practice_area_id FK
-        VARCHAR(32) artifact_type "NOT NULL"
-        VARCHAR(16) polarity "NOT NULL"
+        VARCHAR(32) applies_to "NOT NULL"
         VARCHAR(16) subject_role "NOT NULL"
         TEXT why_it_matters
         TEXT what_good_looks_like
@@ -611,26 +607,8 @@ erDiagram
         INTEGER display_order "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
-    }
-
-    PracticeFinding {
-        UUID id PK
-        VARCHAR(255) idempotency_key UK "NOT NULL"
-        UUID agent_job_id "NOT NULL"
-        BIGINT practice_id FK "NOT NULL"
-        VARCHAR(32) artifact_type "NOT NULL"
-        BIGINT artifact_id "NOT NULL"
-        BIGINT developer_id FK "NOT NULL"
-        VARCHAR(255) title "NOT NULL"
-        VARCHAR(16) verdict "NOT NULL"
-        VARCHAR(16) severity "NOT NULL"
-        REAL confidence "NOT NULL"
-        JSONB evidence
-        TEXT reasoning
-        TIMESTAMPTZ detected_at "NOT NULL"
-        VARCHAR(64) finding_fingerprint
-        BIGINT subject_user_id FK "NOT NULL"
-        BIGINT practice_revision_id FK
+        VARCHAR(64) icon
+        VARCHAR(32) color
     }
 
     PracticeRevision {
@@ -793,6 +771,16 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
         VARCHAR(64) commit_sha
         VARCHAR(64) original_commit_sha
+    }
+
+    Reaction {
+        UUID id PK
+        BIGINT reactor_user_id "NOT NULL"
+        VARCHAR(16) action "NOT NULL"
+        TEXT explanation
+        TIMESTAMPTZ created_at "NOT NULL"
+        VARCHAR(64) recurrence_key
+        UUID feedback_id FK "NOT NULL"
     }
 
     Repository {
@@ -1070,8 +1058,6 @@ erDiagram
     User ||--o{ Feedback : subject_user_id
     Feedback ||--o{ Feedback : references
     Feedback ||--o{ FeedbackPlacement : has
-    PracticeFinding ||--o{ FindingReaction : has
-    User ||--o{ FindingReaction : references
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     Account ||--o{ IdentityLink : has
@@ -1086,11 +1072,10 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     User ||--o{ Milestone : created_by
+    Practice ||--o{ Observation : has
+    User ||--o{ Observation : has
+    PracticeRevision ||--o{ Observation : has
     PracticeArea ||--o{ Practice : has
-    Practice ||--o{ PracticeFinding : has
-    User ||--o{ PracticeFinding : references
-    User ||--o{ PracticeFinding : has
-    PracticeRevision ||--o{ PracticeFinding : has
     User ||--o{ Project : created_by
     Issue ||--o{ ProjectItem : has
     User ||--o{ ProjectItem : created_by
@@ -1105,6 +1090,7 @@ erDiagram
     PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
+    Feedback ||--o{ Reaction : has
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
     AgentConfig ||--o{ Workspace : practice_config_id
@@ -1116,8 +1102,8 @@ erDiagram
     Issue }o--o{ CommitPullRequest : references
     Discussion }o--o{ DiscussionLabel : labeled
     Label }o--o{ DiscussionLabel : labeled
-    Feedback }o--o{ FeedbackFinding : has
-    PracticeFinding }o--o{ FeedbackFinding : has
+    Feedback }o--o{ FeedbackObservation : has
+    Observation }o--o{ FeedbackObservation : has
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : blocked_issue_id

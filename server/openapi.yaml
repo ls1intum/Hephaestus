@@ -62,8 +62,6 @@ tags:
   name: Auth
 - description: Active sessions
   name: Account
-- description: Developer reactions to AI-generated practice findings
-  name: Finding Reaction
 - description: |-
     Workspace registry endpoints that operate outside of a specific workspace slug.
      These routes stay under the classic /workspaces base path while slugged routes
@@ -89,6 +87,8 @@ tags:
   name: Practice Catalog
 - description: Workspace-scoped team settings management
   name: Team Settings
+- description: Developer reactions to delivered feedback
+  name: Feedback Reaction
 - description: Identity provider discovery (public)
   name: Auth discovery
 - description: |-
@@ -2284,6 +2284,103 @@ paths:
       summary: Create a new practice definition
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/feedback/engagement:
+    get:
+      description: Returns the current user's reaction action counts across all findings
+        in this workspace.
+      operationId: getEngagement
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingReactionEngagement"
+          description: Engagement statistics returned
+      summary: Get engagement statistics
+      tags:
+      - Feedback Reaction
+  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
+    get:
+      description: "Returns the current user's most recent reaction to the specified\
+        \ feedback unit, or 204 if none exists."
+      operationId: getLatestReaction
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingReaction"
+          description: Latest reaction returned
+        "204":
+          description: No reaction exists for this feedback unit
+        "404":
+          description: Feedback not found in this workspace
+      summary: Get the latest reaction to a feedback unit
+      tags:
+      - Feedback Reaction
+    post:
+      description: "Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE)\
+        \ to a delivered feedback unit. Append-only: submitting again creates a new\
+        \ record, preserving temporal history."
+      operationId: submitReaction
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFindingReaction"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingReaction"
+          description: Reaction recorded
+        "400":
+          description: "Invalid request (e.g., DISPUTED without explanation)"
+        "403":
+          description: Current user is not the feedback's recipient
+        "404":
+          description: Feedback not found in this workspace
+      summary: Submit a reaction to a feedback unit
+      tags:
+      - Feedback Reaction
   /workspaces/{workspaceSlug}/practices/findings:
     get:
       description: Paginated findings for the authenticated developer with optional
@@ -2310,8 +2407,8 @@ paths:
         schema:
           type: string
           enum:
-          - OBSERVED
-          - NOT_OBSERVED
+          - PRESENT
+          - ABSENT
           - NOT_APPLICABLE
       - in: query
         name: page
@@ -2338,29 +2435,6 @@ paths:
       summary: List findings for current user
       tags:
       - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/engagement:
-    get:
-      description: Returns the current user's reaction action counts across all findings
-        in this workspace.
-      operationId: getEngagement
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FindingReactionEngagement"
-          description: Engagement statistics returned
-      summary: Get engagement statistics
-      tags:
-      - Finding Reaction
   /workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}:
     get:
       description: All findings for a specific pull request within the workspace
@@ -2476,80 +2550,6 @@ paths:
       summary: Get finding detail
       tags:
       - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions:
-    get:
-      description: "Returns the current user's most recent reaction to the specified\
-        \ finding, or 204 if none exists."
-      operationId: getLatestReaction
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: findingId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FindingReaction"
-          description: Latest reaction returned
-        "204":
-          description: No reaction exists for this finding
-        "404":
-          description: Finding not found in this workspace
-      summary: Get the latest reaction to a finding
-      tags:
-      - Finding Reaction
-    post:
-      description: "Records the developer's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE)\
-        \ to an AI-generated finding. Append-only: submitting again creates a new\
-        \ record, preserving temporal history."
-      operationId: submitReaction
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: findingId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateFindingReaction"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FindingReaction"
-          description: Reaction recorded
-        "400":
-          description: "Invalid request (e.g., DISPUTED without explanation)"
-        "403":
-          description: Current user is not the finding's developer
-        "404":
-          description: Finding not found in this workspace
-      summary: Submit a reaction to a practice finding
-      tags:
-      - Finding Reaction
   /workspaces/{workspaceSlug}/practices/learner:
     get:
       description: "Active practices projected for a developer: name, area, why-it-matters,\
@@ -4530,15 +4530,6 @@ components:
           description: Practice evaluation criteria
           maxLength: 50000
           minLength: 0
-        kind:
-          type: string
-          description: "Whether the practice is a good practice, a bad practice, or\
-            \ context-dependent. Defaults to GOOD_PRACTICE when omitted."
-          enum:
-          - GOOD_PRACTICE
-          - BAD_PRACTICE
-          - CONTEXTUAL
-          example: GOOD_PRACTICE
         name:
           type: string
           description: Human-readable name
@@ -4692,18 +4683,18 @@ components:
       type: object
       description: Per-practice finding summary for a developer
       properties:
+        badCount:
+          type: integer
+          format: int64
+          description: Number of BAD (problem) findings
+        goodCount:
+          type: integer
+          format: int64
+          description: Number of GOOD (strength) findings
         lastFindingAt:
           type: string
           format: date-time
           description: Timestamp of most recent finding
-        notObservedCount:
-          type: integer
-          format: int64
-          description: Number of NOT_OBSERVED findings
-        observedCount:
-          type: integer
-          format: int64
-          description: Number of OBSERVED findings
         practiceName:
           type: string
           description: Practice name
@@ -4715,8 +4706,8 @@ components:
           format: int64
           description: Total number of findings
       required:
-      - notObservedCount
-      - observedCount
+      - badCount
+      - goodCount
       - practiceName
       - practiceSlug
       - totalFindings
@@ -4772,7 +4763,7 @@ components:
           description: User's PRs trigger practice review
     FindingReaction:
       type: object
-      description: Developer reaction to an AI-generated practice finding
+      description: Developer reaction to a delivered unit of feedback
       properties:
         action:
           type: string
@@ -4788,10 +4779,10 @@ components:
         explanation:
           type: string
           description: Optional explanation for the reaction
-        findingId:
+        feedbackId:
           type: string
           format: uuid
-          description: ID of the finding this reaction is about
+          description: ID of the feedback unit this reaction is about
         id:
           type: string
           format: uuid
@@ -4799,7 +4790,7 @@ components:
       required:
       - action
       - createdAt
-      - findingId
+      - feedbackId
       - id
     FindingReactionEngagement:
       type: object
@@ -5367,14 +5358,6 @@ components:
           type: integer
           format: int64
           description: Practice ID
-        kind:
-          type: string
-          description: "Whether the practice is a good practice, a bad practice, or\
-            \ context-dependent"
-          enum:
-          - GOOD_PRACTICE
-          - BAD_PRACTICE
-          - CONTEXTUAL
         name:
           type: string
           description: Human-readable name
@@ -5406,7 +5389,6 @@ components:
       - createdAt
       - criteria
       - id
-      - kind
       - name
       - slug
       - triggerEvents
@@ -5470,6 +5452,12 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
         confidence:
           type: number
           format: float
@@ -5491,25 +5479,25 @@ components:
           type: string
           format: uuid
           description: Finding ID
-        observation:
-          type: string
-          description: "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
-          enum:
-          - OBSERVED
-          - NOT_OBSERVED
-          - NOT_APPLICABLE
         practiceName:
           type: string
           description: Practice name
         practiceSlug:
           type: string
           description: Practice slug
+        presence:
+          type: string
+          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
         reasoning:
           type: string
           description: AI reasoning behind the observation
         severity:
           type: string
-          description: Severity level
+          description: Severity level (null unless assessment is BAD)
           enum:
           - CRITICAL
           - MAJOR
@@ -5524,10 +5512,9 @@ components:
       - confidence
       - detectedAt
       - id
-      - observation
       - practiceName
       - practiceSlug
-      - severity
+      - presence
       - title
     PracticeFindingList:
       type: object
@@ -5543,6 +5530,12 @@ components:
           enum:
           - PULL_REQUEST
           - ISSUE
+        assessment:
+          type: string
+          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          enum:
+          - GOOD
+          - BAD
         confidence:
           type: number
           format: float
@@ -5555,22 +5548,22 @@ components:
           type: string
           format: uuid
           description: Finding ID
-        observation:
-          type: string
-          description: "Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE"
-          enum:
-          - OBSERVED
-          - NOT_OBSERVED
-          - NOT_APPLICABLE
         practiceName:
           type: string
           description: Practice name
         practiceSlug:
           type: string
           description: Practice slug
+        presence:
+          type: string
+          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
         severity:
           type: string
-          description: Severity level
+          description: Severity level (null unless assessment is BAD)
           enum:
           - CRITICAL
           - MAJOR
@@ -5585,10 +5578,9 @@ components:
       - confidence
       - detectedAt
       - id
-      - observation
       - practiceName
       - practiceSlug
-      - severity
+      - presence
       - title
     Profile:
       type: object
@@ -6459,15 +6451,6 @@ components:
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
-        kind:
-          type: string
-          description: "Whether the practice is a good practice, a bad practice, or\
-            \ context-dependent"
-          enum:
-          - GOOD_PRACTICE
-          - BAD_PRACTICE
-          - CONTEXTUAL
-          example: BAD_PRACTICE
         name:
           type: string
           description: Human-readable name

@@ -559,10 +559,6 @@ export type UpdatePracticeRequest = {
      */
     name?: string;
     /**
-     * Whether the practice is a desirable habit, an anti-pattern, or context-dependent
-     */
-    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'CONTEXTUAL';
-    /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
     precomputeScript?: string;
@@ -589,6 +585,10 @@ export type UpdatePracticeAreaRequest = {
      */
     active?: boolean;
     /**
+     * Optional palette colour key for the area's chip
+     */
+    color?: string;
+    /**
      * What this area develops
      */
     description?: string;
@@ -596,6 +596,10 @@ export type UpdatePracticeAreaRequest = {
      * Sort order within the workspace
      */
     displayOrder?: number;
+    /**
+     * Optional lucide icon name giving the area a glanceable identity
+     */
+    icon?: string;
     /**
      * Human-readable name
      */
@@ -918,7 +922,7 @@ export type ReflectionPractice = {
     /**
      * Where the developer stands on this practice
      */
-    standing: 'NEEDS_WORK' | 'STRENGTH' | 'MIXED';
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
     /**
      * What the developer already does well here
      */
@@ -1274,6 +1278,10 @@ export type PracticeFindingList = {
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
+    /**
      * AI confidence score (0.0–1.0)
      */
     confidence: number;
@@ -1294,17 +1302,17 @@ export type PracticeFindingList = {
      */
     practiceSlug: string;
     /**
-     * Severity level
+     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
      */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * Severity level (null unless assessment is BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
      * Finding title
      */
     title: string;
-    /**
-     * Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
-     */
-    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1319,6 +1327,10 @@ export type PracticeFindingDetail = {
      * Target type (e.g. PULL_REQUEST)
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
+    /**
+     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     */
+    assessment?: 'GOOD' | 'BAD';
     /**
      * AI confidence score (0.0–1.0)
      */
@@ -1350,21 +1362,21 @@ export type PracticeFindingDetail = {
      */
     practiceSlug: string;
     /**
-     * AI reasoning behind the verdict
+     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     */
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    /**
+     * AI reasoning behind the observation
      */
     reasoning?: string;
     /**
-     * Severity level
+     * Severity level (null unless assessment is BAD)
      */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
      * Finding title
      */
     title: string;
-    /**
-     * Observation: OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE
-     */
-    verdict: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1375,6 +1387,10 @@ export type PracticeArea = {
      * Whether this area is active
      */
     active: boolean;
+    /**
+     * Optional palette colour key for the area's chip
+     */
+    color?: string;
     /**
      * Timestamp when the area was created
      */
@@ -1387,6 +1403,10 @@ export type PracticeArea = {
      * Sort order within the workspace
      */
     displayOrder: number;
+    /**
+     * Optional lucide icon name for the area's chip
+     */
+    icon?: string;
     /**
      * Area ID
      */
@@ -1437,10 +1457,6 @@ export type Practice = {
      * Human-readable name
      */
     name: string;
-    /**
-     * Whether the practice is a desirable habit, an anti-pattern, or context-dependent
-     */
-    polarity: 'DESIRABLE' | 'UNDESIRABLE' | 'CONTEXTUAL';
     /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
@@ -1944,13 +1960,13 @@ export type GitLabGroup = {
  */
 export type FindingReactionEngagement = {
     /**
+     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
+     */
+    addressed: number;
+    /**
      * RESPONSE: findings the developer rejected with a reasoned explanation
      */
     disputed: number;
-    /**
-     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
-     */
-    enacted: number;
     /**
      * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
      */
@@ -1958,13 +1974,13 @@ export type FindingReactionEngagement = {
 };
 
 /**
- * Developer reaction to an AI-generated practice finding
+ * Developer reaction to a delivered unit of feedback
  */
 export type FindingReaction = {
     /**
      * The reaction action taken
      */
-    action: 'ENACTED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
     /**
      * When the reaction was submitted
      */
@@ -1974,9 +1990,9 @@ export type FindingReaction = {
      */
     explanation?: string;
     /**
-     * ID of the finding this reaction is about
+     * ID of the feedback unit this reaction is about
      */
-    findingId: string;
+    feedbackId: string;
     /**
      * Unique reaction ID
      */
@@ -2037,17 +2053,17 @@ export type ExportCreated = {
  */
 export type DeveloperPracticeSummary = {
     /**
+     * Number of BAD (problem) findings
+     */
+    badCount: number;
+    /**
+     * Number of GOOD (strength) findings
+     */
+    goodCount: number;
+    /**
      * Timestamp of most recent finding
      */
     lastFindingAt?: Date;
-    /**
-     * Number of NOT_OBSERVED findings
-     */
-    notObservedCount: number;
-    /**
-     * Number of OBSERVED findings
-     */
-    observedCount: number;
     /**
      * Practice name
      */
@@ -2138,10 +2154,6 @@ export type CreatePracticeRequest = {
      */
     name: string;
     /**
-     * Whether the practice is a desirable habit, an anti-pattern, or context-dependent. Defaults to DESIRABLE when omitted.
-     */
-    polarity?: 'DESIRABLE' | 'UNDESIRABLE' | 'CONTEXTUAL';
-    /**
      * TypeScript/Bun precompute script for static analysis before AI review
      */
     precomputeScript?: string;
@@ -2168,6 +2180,10 @@ export type CreatePracticeRequest = {
  */
 export type CreatePracticeAreaRequest = {
     /**
+     * Optional palette colour key for the area's chip
+     */
+    color?: string;
+    /**
      * What this area develops
      */
     description?: string;
@@ -2175,6 +2191,10 @@ export type CreatePracticeAreaRequest = {
      * Sort order within the workspace. Defaults to 0 when omitted.
      */
     displayOrder?: number;
+    /**
+     * Optional lucide icon name giving the area a glanceable identity
+     */
+    icon?: string;
     /**
      * Human-readable name
      */
@@ -2217,7 +2237,7 @@ export type CreateFindingReaction = {
     /**
      * The reaction action to record
      */
-    action: 'ENACTED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    action: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
     /**
      * Explanation for the reaction. Required when action is DISPUTED.
      */
@@ -4506,6 +4526,97 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
+export type GetEngagementData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/engagement';
+};
+
+export type GetEngagementResponses = {
+    /**
+     * Engagement statistics returned
+     */
+    200: FindingReactionEngagement;
+};
+
+export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
+
+export type GetLatestReactionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
+};
+
+export type GetLatestReactionErrors = {
+    /**
+     * Feedback not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetLatestReactionResponses = {
+    /**
+     * Latest reaction returned
+     */
+    200: FindingReaction;
+    /**
+     * No reaction exists for this feedback unit
+     */
+    204: void;
+};
+
+export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
+
+export type SubmitReactionData = {
+    body: CreateFindingReaction;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions';
+};
+
+export type SubmitReactionErrors = {
+    /**
+     * Invalid request (e.g., DISPUTED without explanation)
+     */
+    400: unknown;
+    /**
+     * Current user is not the feedback's recipient
+     */
+    403: unknown;
+    /**
+     * Feedback not found in this workspace
+     */
+    404: unknown;
+};
+
+export type SubmitReactionResponses = {
+    /**
+     * Reaction recorded
+     */
+    201: FindingReaction;
+};
+
+export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
+
 export type ListFindingsData = {
     body?: never;
     path: {
@@ -4520,9 +4631,9 @@ export type ListFindingsData = {
          */
         practiceSlug?: string;
         /**
-         * Filter by verdict
+         * Filter by observation
          */
-        verdict?: 'OBSERVED' | 'NOT_OBSERVED' | 'NOT_APPLICABLE';
+        observation?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
         page?: number;
         size?: number;
     };
@@ -4537,27 +4648,6 @@ export type ListFindingsResponses = {
 };
 
 export type ListFindingsResponse = ListFindingsResponses[keyof ListFindingsResponses];
-
-export type GetEngagementData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/engagement';
-};
-
-export type GetEngagementResponses = {
-    /**
-     * Engagement statistics returned
-     */
-    200: FindingReactionEngagement;
-};
-
-export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
 
 export type GetFindingsForPullRequestData = {
     body?: never;
@@ -4651,76 +4741,6 @@ export type GetFindingResponses = {
 };
 
 export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
-
-export type GetLatestReactionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        findingId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions';
-};
-
-export type GetLatestReactionErrors = {
-    /**
-     * Finding not found in this workspace
-     */
-    404: unknown;
-};
-
-export type GetLatestReactionResponses = {
-    /**
-     * Latest reaction returned
-     */
-    200: FindingReaction;
-    /**
-     * No reaction exists for this finding
-     */
-    204: void;
-};
-
-export type GetLatestReactionResponse = GetLatestReactionResponses[keyof GetLatestReactionResponses];
-
-export type SubmitReactionData = {
-    body: CreateFindingReaction;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        findingId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions';
-};
-
-export type SubmitReactionErrors = {
-    /**
-     * Invalid request (e.g., DISPUTED without explanation)
-     */
-    400: unknown;
-    /**
-     * Current user is not the finding's developer
-     */
-    403: unknown;
-    /**
-     * Finding not found in this workspace
-     */
-    404: unknown;
-};
-
-export type SubmitReactionResponses = {
-    /**
-     * Reaction recorded
-     */
-    201: FindingReaction;
-};
-
-export type SubmitReactionResponse = SubmitReactionResponses[keyof SubmitReactionResponses];
 
 export type ListLearnerPracticesData = {
     body?: never;

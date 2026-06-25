@@ -1732,6 +1732,65 @@ export const createPracticeMutation = (options?: Partial<Options<CreatePracticeD
     return mutationOptions;
 };
 
+export const getEngagementQueryKey = (options: Options<GetEngagementData>) => createQueryKey('getEngagement', options);
+
+/**
+ * Get engagement statistics
+ *
+ * Returns the current user's reaction action counts across all findings in this workspace.
+ */
+export const getEngagementOptions = (options: Options<GetEngagementData>) => queryOptions<GetEngagementResponse, DefaultError, GetEngagementResponse, ReturnType<typeof getEngagementQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getEngagement({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getEngagementQueryKey(options)
+});
+
+export const getLatestReactionQueryKey = (options: Options<GetLatestReactionData>) => createQueryKey('getLatestReaction', options);
+
+/**
+ * Get the latest reaction to a feedback unit
+ *
+ * Returns the current user's most recent reaction to the specified feedback unit, or 204 if none exists.
+ */
+export const getLatestReactionOptions = (options: Options<GetLatestReactionData>) => queryOptions<GetLatestReactionResponse, DefaultError, GetLatestReactionResponse, ReturnType<typeof getLatestReactionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getLatestReaction({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getLatestReactionQueryKey(options)
+});
+
+/**
+ * Submit a reaction to a feedback unit
+ *
+ * Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to a delivered feedback unit. Append-only: submitting again creates a new record, preserving temporal history.
+ */
+export const submitReactionMutation = (options?: Partial<Options<SubmitReactionData>>): UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> => {
+    const mutationOptions: UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await submitReaction({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const listFindingsQueryKey = (options: Options<ListFindingsData>) => createQueryKey('listFindings', options);
 
 /**
@@ -1781,26 +1840,6 @@ export const listFindingsInfiniteOptions = (options: Options<ListFindingsData>) 
     queryKey: listFindingsInfiniteQueryKey(options)
 });
 
-export const getEngagementQueryKey = (options: Options<GetEngagementData>) => createQueryKey('getEngagement', options);
-
-/**
- * Get engagement statistics
- *
- * Returns the current user's reaction action counts across all findings in this workspace.
- */
-export const getEngagementOptions = (options: Options<GetEngagementData>) => queryOptions<GetEngagementResponse, DefaultError, GetEngagementResponse, ReturnType<typeof getEngagementQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getEngagement({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getEngagementQueryKey(options)
-});
-
 export const getFindingsForPullRequestQueryKey = (options: Options<GetFindingsForPullRequestData>) => createQueryKey('getFindingsForPullRequest', options);
 
 /**
@@ -1846,7 +1885,7 @@ export const getSummaryQueryKey = (options: Options<GetSummaryData>) => createQu
 /**
  * Per-practice summary for current user
  *
- * Aggregated verdict counts per practice for dashboard cards
+ * Aggregated observation counts per practice for dashboard cards
  */
 export const getSummaryOptions = (options: Options<GetSummaryData>) => queryOptions<GetSummaryResponse, DefaultError, GetSummaryResponse, ReturnType<typeof getSummaryQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -1878,45 +1917,6 @@ export const getFindingOptions = (options: Options<GetFindingData>) => queryOpti
     },
     queryKey: getFindingQueryKey(options)
 });
-
-export const getLatestReactionQueryKey = (options: Options<GetLatestReactionData>) => createQueryKey('getLatestReaction', options);
-
-/**
- * Get the latest reaction to a finding
- *
- * Returns the current user's most recent reaction to the specified finding, or 204 if none exists.
- */
-export const getLatestReactionOptions = (options: Options<GetLatestReactionData>) => queryOptions<GetLatestReactionResponse, DefaultError, GetLatestReactionResponse, ReturnType<typeof getLatestReactionQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getLatestReaction({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getLatestReactionQueryKey(options)
-});
-
-/**
- * Submit a reaction to a practice finding
- *
- * Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
- */
-export const submitReactionMutation = (options?: Partial<Options<SubmitReactionData>>): UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> => {
-    const mutationOptions: UseMutationOptions<SubmitReactionResponse, DefaultError, Options<SubmitReactionData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await submitReaction({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
 
 export const listLearnerPracticesQueryKey = (options: Options<ListLearnerPracticesData>) => createQueryKey('listLearnerPractices', options);
 

@@ -863,22 +863,48 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * List findings for current user
- *
- * Paginated findings for the authenticated developer with optional filters
- */
-export const listFindings = <ThrowOnError extends boolean = false>(options: Options<ListFindingsData, ThrowOnError>) => (options.client ?? client).get<ListFindingsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings', ...options });
-
-/**
  * Get engagement statistics
  *
  * Returns the current user's reaction action counts across all findings in this workspace.
  */
 export const getEngagement = <ThrowOnError extends boolean = false>(options: Options<GetEngagementData, ThrowOnError>) => (options.client ?? client).get<GetEngagementResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/findings/engagement',
+    url: '/workspaces/{workspaceSlug}/practices/feedback/engagement',
     ...options
 });
+
+/**
+ * Get the latest reaction to a feedback unit
+ *
+ * Returns the current user's most recent reaction to the specified feedback unit, or 204 if none exists.
+ */
+export const getLatestReaction = <ThrowOnError extends boolean = false>(options: Options<GetLatestReactionData, ThrowOnError>) => (options.client ?? client).get<GetLatestReactionResponses, GetLatestReactionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions',
+    ...options
+});
+
+/**
+ * Submit a reaction to a feedback unit
+ *
+ * Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE) to a delivered feedback unit. Append-only: submitting again creates a new record, preserving temporal history.
+ */
+export const submitReaction = <ThrowOnError extends boolean = false>(options: Options<SubmitReactionData, ThrowOnError>) => (options.client ?? client).post<SubmitReactionResponses, SubmitReactionErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List findings for current user
+ *
+ * Paginated findings for the authenticated developer with optional filters
+ */
+export const listFindings = <ThrowOnError extends boolean = false>(options: Options<ListFindingsData, ThrowOnError>) => (options.client ?? client).get<ListFindingsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings', ...options });
 
 /**
  * List findings for a pull request
@@ -897,7 +923,7 @@ export const getReflection = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Per-practice summary for current user
  *
- * Aggregated verdict counts per practice for dashboard cards
+ * Aggregated observation counts per practice for dashboard cards
  */
 export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/summary', ...options });
 
@@ -905,32 +931,6 @@ export const getSummary = <ThrowOnError extends boolean = false>(options: Option
  * Get finding detail
  */
 export const getFinding = <ThrowOnError extends boolean = false>(options: Options<GetFindingData, ThrowOnError>) => (options.client ?? client).get<GetFindingResponses, GetFindingErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}', ...options });
-
-/**
- * Get the latest reaction to a finding
- *
- * Returns the current user's most recent reaction to the specified finding, or 204 if none exists.
- */
-export const getLatestReaction = <ThrowOnError extends boolean = false>(options: Options<GetLatestReactionData, ThrowOnError>) => (options.client ?? client).get<GetLatestReactionResponses, GetLatestReactionErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions',
-    ...options
-});
-
-/**
- * Submit a reaction to a practice finding
- *
- * Records the developer's reaction (ENACTED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
- */
-export const submitReaction = <ThrowOnError extends boolean = false>(options: Options<SubmitReactionData, ThrowOnError>) => (options.client ?? client).post<SubmitReactionResponses, SubmitReactionErrors, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/reactions',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
 
 /**
  * List active practices, learner-facing

@@ -434,6 +434,23 @@ export const createPracticeResponseTransformer = async (data: any): Promise<Crea
     return data;
 };
 
+const findingReactionSchemaResponseTransformer = (data: any) => {
+    data.createdAt = new Date(data.createdAt);
+    return data;
+};
+
+export const getLatestReactionResponseTransformer = async (data: any): Promise<GetLatestReactionResponse> => {
+    if (data) {
+        data = findingReactionSchemaResponseTransformer(data);
+    }
+    return data;
+};
+
+export const submitReactionResponseTransformer = async (data: any): Promise<SubmitReactionResponse> => {
+    data = findingReactionSchemaResponseTransformer(data);
+    return data;
+};
+
 const practiceFindingListSchemaResponseTransformer = (data: any) => {
     data.detectedAt = new Date(data.detectedAt);
     return data;
@@ -475,23 +492,6 @@ const practiceFindingDetailSchemaResponseTransformer = (data: any) => {
 
 export const getFindingResponseTransformer = async (data: any): Promise<GetFindingResponse> => {
     data = practiceFindingDetailSchemaResponseTransformer(data);
-    return data;
-};
-
-const findingReactionSchemaResponseTransformer = (data: any) => {
-    data.createdAt = new Date(data.createdAt);
-    return data;
-};
-
-export const getLatestReactionResponseTransformer = async (data: any): Promise<GetLatestReactionResponse> => {
-    if (data) {
-        data = findingReactionSchemaResponseTransformer(data);
-    }
-    return data;
-};
-
-export const submitReactionResponseTransformer = async (data: any): Promise<SubmitReactionResponse> => {
-    data = findingReactionSchemaResponseTransformer(data);
     return data;
 };
 
