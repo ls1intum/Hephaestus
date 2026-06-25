@@ -59,7 +59,8 @@ const reviewState = {
     findings: [],
     findingKeys: [],
 };
-const observationSchema = { type: "string", enum: ["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"] };
+const presenceSchema = { type: "string", enum: ["PRESENT", "ABSENT", "NOT_APPLICABLE"] };
+const assessmentSchema = { type: "string", enum: ["GOOD", "BAD"] };
 const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
 const evidenceSchema = {
     type: "object",
@@ -93,14 +94,18 @@ const diffNoteSchema = {
         body: { type: "string", minLength: 1 },
     },
 };
+// `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
+// conditional cleanly across all validators the SDK may use, so we keep it out of `required`
+// here and enforce the (presence, assessment) coupling in normalizeFinding().
 const findingSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["practiceSlug", "title", "observation", "severity", "confidence", "evidence", "reasoning", "guidance"],
+    required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning", "guidance"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
         title: { type: "string", minLength: 1, maxLength: 120 },
-        observation: observationSchema,
+        presence: presenceSchema,
+        assessment: assessmentSchema,
         severity: severitySchema,
         confidence: { type: "number", minimum: 0, maximum: 1 },
         evidence: evidenceSchema,
@@ -138,8 +143,9 @@ function isValidFinding(f) {
     if (!f || typeof f !== "object") return false;
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
     if (typeof f.title !== "string" || !f.title.trim()) return false;
-    if (typeof f.observation !== "string") return false;
-    if (typeof f.severity !== "string") return false;
+    if (typeof f.presence !== "string") return false;
+    // assessment is required unless presence=NOT_APPLICABLE (which has no valence).
+    if (f.presence !== "NOT_APPLICABLE" && typeof f.assessment !== "string") return false;
     // Number(null) === 0 — reject nullish before isNaN check.
     if (f.confidence == null || f.confidence === "") return false;
     if (Number.isNaN(Number(f.confidence))) return false;
@@ -236,14 +242,19 @@ function normalizeFinding(finding) {
     if (!finding || typeof finding !== "object") throw new Error("finding must be an object");
     const practiceSlug = String(finding.practiceSlug ?? "").trim();
     const title = String(finding.title ?? "").trim();
-    const observation = String(finding.observation ?? "").trim();
-    const severity = String(finding.severity ?? "").trim();
+    const presence = String(finding.presence ?? "").trim();
+    // assessment has no valence when presence=NOT_APPLICABLE; the parser ignores/nulls it there.
+    const isNa = presence === "NOT_APPLICABLE";
+    const assessment = isNa ? null : String(finding.assessment ?? "").trim();
+    // severity is meaningful only for assessment=BAD; default INFO when absent (parser re-derives it).
+    const severity = finding.severity == null ? "INFO" : String(finding.severity).trim() || "INFO";
     const confidence = Number(finding.confidence);
     const reasoning = String(finding.reasoning ?? "").trim();
     const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");
     if (!title) throw new Error("title is required");
-    if (!["OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE"].includes(observation)) throw new Error(`invalid observation '${observation}'`);
+    if (!["PRESENT", "ABSENT", "NOT_APPLICABLE"].includes(presence)) throw new Error(`invalid presence '${presence}'`);
+    if (!isNa && !["GOOD", "BAD"].includes(assessment)) throw new Error(`invalid assessment '${assessment}'`);
     if (!["CRITICAL", "MAJOR", "MINOR", "INFO"].includes(severity)) throw new Error(`invalid severity '${severity}'`);
     if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
         throw new Error("confidence must be between 0 and 1");
@@ -253,7 +264,9 @@ function normalizeFinding(finding) {
     const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
         ? finding.suggestedDiffNotes.map(normalizeDiffNote)
         : [];
-    return { practiceSlug, title, observation, severity, confidence, evidence, reasoning, guidance, suggestedDiffNotes };
+    const out = { practiceSlug, title, presence, severity, confidence, evidence, reasoning, guidance, suggestedDiffNotes };
+    if (!isNa) out.assessment = assessment;
+    return out;
 }
 
 function dedupeKeyForFinding(finding) {
@@ -300,7 +313,7 @@ const reportFindingTool = defineTool({
     },
     execute: async (_toolCallId, params) => {
         const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.observation === "NOT_OBSERVED" ? 1 : 0;
+        const negativeCount = params.finding.assessment === "BAD" ? 1 : 0;
         return {
             content: [
                 {
@@ -474,8 +487,8 @@ function loadPracticeSlugs() {
 // cannot drift between the five sites that previously copy-pasted it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
-    `For OBSERVED or NOT_APPLICABLE findings, guidance can simply be "No change needed." ` +
-    `Only keep OBSERVED findings that add real review value. ` +
+    `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
+    `Only keep GOOD findings that add real review value. ` +
     `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
 
@@ -485,7 +498,7 @@ function buildRetryScaffold(slugs) {
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
         `Persist every justified finding with report_finding, one finding per call. ` +
         `There is no target count and no quota. ` +
-        `Only report OBSERVED findings that add real review value. ` +
+        `Only report GOOD findings that add real review value. ` +
         `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
     );
 }
@@ -661,7 +674,7 @@ async function main() {
     // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
     // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
     // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
-    // practice gets a observation. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
+    // practice gets a finding. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
     const groups = loadPracticeGroups();
@@ -699,17 +712,17 @@ async function main() {
             console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
 
-        // Coverage gate: every active practice must get a observation. Re-prompt the ones no turn reported.
+        // Coverage gate: every active practice must get a finding. Re-prompt the ones no turn reported.
         if (!hardAborted && allSlugs.length > 0) {
             const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
             const missing = allSlugs.filter((s) => !covered.has(s));
             if (missing.length > 0) {
                 console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
                 const gatePrompt =
-                    `Coverage check. You have NOT yet reported a observation for these practices: ${missing.join(", ")}. ` +
+                    `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
-                    `(do NOT re-read the diff). Persist a finding (OBSERVED, NOT_OBSERVED, or NOT_APPLICABLE) for EVERY one ` +
-                    `with report_finding, one call per finding.`;
+                    `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
+                    `— set presence (PRESENT/ABSENT/NOT_APPLICABLE) and, unless NOT_APPLICABLE, assessment (GOOD/BAD).`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {
