@@ -547,6 +547,7 @@ erDiagram
         BIGINT practice_id FK "NOT NULL"
         VARCHAR(32) artifact_type "NOT NULL"
         BIGINT artifact_id "NOT NULL"
+        BIGINT about_user_id FK "NOT NULL"
         VARCHAR(255) title "NOT NULL"
         VARCHAR(16) presence "NOT NULL"
         VARCHAR(16) severity
@@ -555,7 +556,6 @@ erDiagram
         TEXT reasoning
         TIMESTAMPTZ observed_at "NOT NULL"
         VARCHAR(64) recurrence_key
-        BIGINT about_user_id FK "NOT NULL"
         BIGINT practice_revision_id FK
         VARCHAR(8) assessment
     }
@@ -774,12 +774,12 @@ erDiagram
 
     Reaction {
         UUID id PK
-        BIGINT reactor_user_id "NOT NULL"
+        BIGINT reactor_user_id FK "NOT NULL"
         VARCHAR(16) action "NOT NULL"
         TEXT explanation
         TIMESTAMPTZ created_at "NOT NULL"
-        VARCHAR(64) recurrence_key
         UUID feedback_id FK "NOT NULL"
+        VARCHAR(64) recurrence_key
     }
 
     Repository {
@@ -1089,6 +1089,7 @@ erDiagram
     PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
+    User ||--o{ Reaction : has
     Feedback ||--o{ Reaction : has
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
