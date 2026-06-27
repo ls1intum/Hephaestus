@@ -1527,6 +1527,35 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
+        @DisplayName("create with detector vocab in whyItMatters → 400 (whyItMatters is also learner-facing)")
+        void rejectsVocabInWhyItMatters() {
+            ensureAdminMembership(workspace);
+
+            var dto = new CreatePracticeRequestDTO(
+                "guard-why",
+                "Guard Practice",
+                List.of("PullRequestCreated"),
+                "Detect prompt",
+                null,
+                null,
+                "The error handler is PRESENT in every case.", // whyItMatters leaks detector vocab
+                "A clean exemplar." // whatGoodLooksLike is clean
+            );
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(dto)
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "guard-why")).isEmpty();
+        }
+
+        @Test
+        @WithAdminUser
         @DisplayName("create with NOT_APPLICABLE in whatGoodLooksLike → 400")
         void rejectsNotApplicableTokenOnCreate() {
             ensureAdminMembership(workspace);

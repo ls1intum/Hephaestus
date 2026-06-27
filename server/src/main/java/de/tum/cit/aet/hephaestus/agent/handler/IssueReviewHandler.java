@@ -173,7 +173,7 @@ public class IssueReviewHandler implements JobTypeHandler {
             );
         }
         // No diff-scope filtering: issue findings reference the thread/metadata, not diff files.
-        // Coherence coercion: defect-detector OBSERVED -> NOT_APPLICABLE, severity sentinel.
+        // Coherence coercion: defect-detector GOOD assessment -> NOT_APPLICABLE, severity sentinel.
         // Applied once so the SAME coerced list reaches both deliver() (DB) and compose() (posted note).
         Set<String> defectDetectorSlugs =
             job.getWorkspace() == null

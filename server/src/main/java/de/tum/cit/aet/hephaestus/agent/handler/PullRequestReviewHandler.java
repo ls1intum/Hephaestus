@@ -333,7 +333,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Deterministic, LLM-independent secret pre-pass over the raw diff. This catches a committed
         // credential even when the model abstains, the precompute crashes, or the clone is checked
-        // out at the merge base (so a working-tree grep finds nothing). The synthetic NOT_OBSERVED
+        // out at the merge base (so a working-tree grep finds nothing). The synthetic PRESENT/BAD
         // findings flow through the normal persist+compose+deliver path and force the green→red flip.
         List<PracticeDetectionResultParser.ValidatedFinding> secretFindings = scanForSecrets(
             job,
@@ -374,7 +374,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!secretFindings.isEmpty()) {
             scopedFindings.addAll(secretFindings);
             log.warn(
-                "Secret pre-pass injected {} hardcoded-secrets NOT_OBSERVED finding(s); blocking any all-clear comment: jobId={}",
+                "Secret pre-pass injected {} hardcoded-secrets PRESENT/BAD finding(s); blocking any all-clear comment: jobId={}",
                 secretFindings.size(),
                 job.getId()
             );
@@ -391,8 +391,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         // Coherence coercion: keep (observation, severity) coherent regardless of what the
-        // weak model emitted. A defect-detector practice's OBSERVED becomes NOT_APPLICABLE (no false strength
-        // ships to the student), and severity is pinned to the INFO sentinel except on a NOT_OBSERVED gap.
+        // weak model emitted. A defect-detector practice's GOOD assessment becomes NOT_APPLICABLE (no false strength
+        // ships to the student), and severity is pinned to the INFO sentinel except on a BAD finding.
         // Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the posted comment.
         Set<String> defectDetectorSlugs =
             job.getWorkspace() == null
@@ -483,7 +483,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /**
      * Run the deterministic secret pre-pass over the job's raw diff and map each hit to a synthetic
-     * {@code hardcoded-secrets} NOT_OBSERVED finding. Hits already covered by an LLM-produced
+     * {@code hardcoded-secrets} PRESENT/BAD finding. Hits already covered by an LLM-produced
      * hardcoded-secrets finding (same matched token already quoted) are skipped to avoid double-posting.
      */
     private List<PracticeDetectionResultParser.ValidatedFinding> scanForSecrets(

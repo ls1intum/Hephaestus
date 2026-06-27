@@ -634,14 +634,16 @@ public class PracticeDetectionResultParser {
             Presence p = presence;
             Assessment a = assessment;
             String r = reasoning;
-            if (isDefectDetector && p == Presence.PRESENT && a == Assessment.GOOD) {
+            if (isDefectDetector && a == Assessment.GOOD) {
+                // A defect-detector practice only ever emits a problem (PRESENT, BAD) or NOT_APPLICABLE; it has
+                // no clean-bill-of-health strength. Any GOOD it emits — at either presence — is off-contract
+                // model noise, so downgrade to NOT_APPLICABLE rather than ship a false strength to the student.
                 p = Presence.NOT_APPLICABLE;
                 a = null;
                 r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
             }
-            // (ABSENT, GOOD) is a legitimate strength per ADR 0022 §1 — "bad behaviour avoided → clean" — so it
-            // is preserved, NOT collapsed to NOT_APPLICABLE: a harmful behaviour that could have appeared and did
-            // not is worth acknowledging, distinct from a practice that simply does not apply.
+            // For a normal practice, (ABSENT, GOOD) is a legitimate strength per ADR 0022 §1 — "bad behaviour
+            // avoided → clean" — and is preserved, NOT collapsed to NOT_APPLICABLE.
             // assessment must be null exactly when presence is NOT_APPLICABLE.
             if (p == Presence.NOT_APPLICABLE) {
                 a = null;

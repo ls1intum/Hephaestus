@@ -83,7 +83,7 @@ derivation and the on-read `baseline_state`.
 `about_user_id`, `rendered_body`→`body`, `surface`→`channel` (and `REFLECTION_DASHBOARD`→`PROFILE`),
 `provenance`→`source`, `unit_ordinal`→`position`, `supersedes_id`→`replaces_id`,
 `feedback_thread_key`→`thread_key`, `slot`→`placement_type`, `external_ref`→`posted_comment_ref`,
-`evidence_role`→`role`, `artifact_type`→`applies_to`, `detected_at`→`observed_at`.
+`evidence_role`→`role`, `detected_at`→`observed_at`.
 
 `Practice.kind` and the observation `observer` column are transient migration scaffolding — intermediate columns that never ship in the final schema; direction is recomputed from `assessment` and the observer was always `SYSTEM`.
 

@@ -878,6 +878,30 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("defect-detector (ABSENT, GOOD) is off-contract → coerced to NOT_APPLICABLE")
+        void defectDetectorAbsentGoodCoercedToNa() {
+            // A defect-detector only ever emits PRESENT/BAD or NOT_APPLICABLE; an ABSENT/GOOD it produces is
+            // off-contract model noise and must NOT ship as a false strength (it is a real strength only for a
+            // normal practice — see absentGoodIsPreservedAsStrength).
+            var offContract = new ValidatedFinding(
+                "p",
+                "t",
+                Presence.ABSENT,
+                Assessment.GOOD,
+                Severity.INFO,
+                0.9f,
+                null,
+                "reasoning",
+                "guidance",
+                List.of()
+            );
+            var out = offContract.coerceCoherence(true);
+            assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
+            assertThat(out.assessment()).isNull();
+            assertThat(out.reasoning()).startsWith("[auto-downgraded");
+        }
+
+        @Test
         @DisplayName("list helper applies the per-slug defect-detector flag")
         void listHelperPerSlug() {
             var dd = new ValidatedFinding(

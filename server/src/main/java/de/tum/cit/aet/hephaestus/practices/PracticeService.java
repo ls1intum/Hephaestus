@@ -114,15 +114,21 @@ public class PracticeService {
     }
 
     /**
-     * Authoring guard for the learner-facing layer: {@code whatGoodLooksLike} is a concrete exemplar, so it
-     * must not leak the detector's observation vocabulary — this keeps the learner view free of the rubric.
+     * Authoring guard for the learner-facing layer: both {@code whatGoodLooksLike} (a concrete exemplar) and
+     * {@code whyItMatters} (the rationale) are shown to the learner, so neither may leak the detector's
+     * presence/assessment vocabulary — this keeps the learner view free of the rubric.
      */
     private static void validateLearnerContent(Practice practice) {
-        String exemplar = practice.getWhatGoodLooksLike();
-        if (exemplar != null && DETECTOR_VOCAB.matcher(exemplar).find()) {
+        rejectDetectorVocab("whatGoodLooksLike", practice.getWhatGoodLooksLike());
+        rejectDetectorVocab("whyItMatters", practice.getWhyItMatters());
+    }
+
+    private static void rejectDetectorVocab(String field, String value) {
+        if (value != null && DETECTOR_VOCAB.matcher(value).find()) {
             throw new IllegalArgumentException(
-                "whatGoodLooksLike is learner-facing and must be a concrete exemplar — it must not contain" +
-                    " detector presence/assessment vocabulary (PRESENT / ABSENT / GOOD / BAD / NOT_APPLICABLE)."
+                field +
+                    " is learner-facing and must not contain detector presence/assessment vocabulary" +
+                    " (PRESENT / ABSENT / GOOD / BAD / NOT_APPLICABLE)."
             );
         }
     }

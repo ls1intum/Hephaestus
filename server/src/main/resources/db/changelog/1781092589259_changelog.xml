@@ -681,7 +681,7 @@
     </changeSet>
 
     <!-- feedback_observation (M:N composition, Immutable). Greenfield → final names. -->
-    <changeSet author="hephaestus-feedback" id="1781092589259-39">
+    <changeSet author="hephaestus-feedback" id="1781092589259-58">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_observation table already present">
             <not><tableExists tableName="feedback_observation"/></not>
         </preConditions>
