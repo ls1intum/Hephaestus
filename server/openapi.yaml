@@ -4681,36 +4681,36 @@ components:
           type: string
     DeveloperPracticeSummary:
       type: object
-      description: Per-practice finding summary for a developer
+      description: Per-practice observation summary for a developer
       properties:
         badCount:
           type: integer
           format: int64
-          description: Number of BAD (problem) findings
+          description: Number of BAD (problem) observations
         goodCount:
           type: integer
           format: int64
-          description: Number of GOOD (strength) findings
-        lastFindingAt:
+          description: Number of GOOD (strength) observations
+        lastObservedAt:
           type: string
           format: date-time
-          description: Timestamp of most recent finding
+          description: Timestamp of most recent observation
         practiceName:
           type: string
           description: Practice name
         practiceSlug:
           type: string
           description: Practice slug
-        totalFindings:
+        totalObservations:
           type: integer
           format: int64
-          description: Total number of findings
+          description: Total number of observations
       required:
       - badCount
       - goodCount
       - practiceName
       - practiceSlug
-      - totalFindings
+      - totalObservations
     ExportCreated:
       type: object
       description: Acknowledgement returned when a data export is requested.
@@ -5164,7 +5164,7 @@ components:
       - updatedAt
     ObservationDetail:
       type: object
-      description: Full practice finding detail including guidance and evidence
+      description: Full practice observation detail including guidance and evidence
       properties:
         artifactId:
           type: integer
@@ -5198,7 +5198,7 @@ components:
         id:
           type: string
           format: uuid
-          description: Finding ID
+          description: Observation ID
         observedAt:
           type: string
           format: date-time
@@ -5229,7 +5229,7 @@ components:
           - INFO
         title:
           type: string
-          description: Finding title
+          description: Observation title
       required:
       - artifactId
       - artifactType
@@ -5242,7 +5242,7 @@ components:
       - title
     ObservationList:
       type: object
-      description: Practice finding summary for list views
+      description: Practice observation summary for list views
       properties:
         artifactId:
           type: integer
@@ -5267,7 +5267,7 @@ components:
         id:
           type: string
           format: uuid
-          description: Finding ID
+          description: Observation ID
         observedAt:
           type: string
           format: date-time
@@ -5295,7 +5295,7 @@ components:
           - INFO
         title:
           type: string
-          description: Finding title
+          description: Observation title
       required:
       - artifactId
       - artifactType

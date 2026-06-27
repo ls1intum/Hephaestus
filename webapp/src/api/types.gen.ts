@@ -1437,7 +1437,7 @@ export type PageObservationList = {
 };
 
 /**
- * Practice finding summary for list views
+ * Practice observation summary for list views
  */
 export type ObservationList = {
     /**
@@ -1457,7 +1457,7 @@ export type ObservationList = {
      */
     confidence: number;
     /**
-     * Finding ID
+     * Observation ID
      */
     id: string;
     /**
@@ -1481,7 +1481,7 @@ export type ObservationList = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Finding title
+     * Observation title
      */
     title: string;
 };
@@ -1653,7 +1653,7 @@ export type AgentJob = {
 };
 
 /**
- * Full practice finding detail including guidance and evidence
+ * Full practice observation detail including guidance and evidence
  */
 export type ObservationDetail = {
     /**
@@ -1683,7 +1683,7 @@ export type ObservationDetail = {
      */
     guidance?: string;
     /**
-     * Finding ID
+     * Observation ID
      */
     id: string;
     /**
@@ -1711,7 +1711,7 @@ export type ObservationDetail = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Finding title
+     * Observation title
      */
     title: string;
 };
@@ -2049,21 +2049,21 @@ export type ExportCreated = {
 };
 
 /**
- * Per-practice finding summary for a developer
+ * Per-practice observation summary for a developer
  */
 export type DeveloperPracticeSummary = {
     /**
-     * Number of BAD (problem) findings
+     * Number of BAD (problem) observations
      */
     badCount: number;
     /**
-     * Number of GOOD (strength) findings
+     * Number of GOOD (strength) observations
      */
     goodCount: number;
     /**
-     * Timestamp of most recent finding
+     * Timestamp of most recent observation
      */
-    lastFindingAt?: Date;
+    lastObservedAt?: Date;
     /**
      * Practice name
      */
@@ -2073,9 +2073,9 @@ export type DeveloperPracticeSummary = {
      */
     practiceSlug: string;
     /**
-     * Total number of findings
+     * Total number of observations
      */
-    totalFindings: number;
+    totalObservations: number;
 };
 
 export type CurrentUserView = {

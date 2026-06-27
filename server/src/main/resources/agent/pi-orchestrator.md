@@ -8,7 +8,7 @@ Each finding is described on TWO independent axes:
 
 1. **`presence`** — was the target signal this practice looks for actually in the change?
    - `PRESENT` — the signal is there (the practice's subject occurs in the changed work).
-   - `ABSENT` — the signal was expected here but is missing (a good behaviour that should be present is not).
+   - `ABSENT` — the signal this practice looks for is not in the change. Its valence depends on the practice: a *good* behaviour that should be present and is missing is a gap (`ABSENT, BAD`); a *bad* behaviour that could have appeared and did not is clean (`ABSENT, GOOD`).
    - `NOT_APPLICABLE` — the practice's subject genuinely does not occur in this change at all.
 2. **`assessment`** — is what you saw good or bad **for the developer**?
    - `GOOD` — reflects well; a strength to acknowledge.
@@ -20,10 +20,10 @@ Each finding is described on TWO independent axes:
 | presence \ assessment | GOOD | BAD |
 | --- | --- | --- |
 | **PRESENT** | strength — a good behaviour is present (acknowledge it) | problem — a bad behaviour is present (commission) |
-| **ABSENT** | (does not occur — an absent thing has no positive valence) | gap — a good behaviour that should be here is missing (omission) |
+| **ABSENT** | clean — a bad behaviour that could have appeared was avoided (acknowledge it) | gap — a good behaviour that should be here is missing (omission) |
 | **NOT_APPLICABLE** | — (no assessment) — the practice's subject is not in the change | |
 
-So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) or `ABSENT, BAD` (something good is missing) — you choose which fits. A strength is `PRESENT, GOOD`. An exempt practice is `NOT_APPLICABLE` with no assessment.
+So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) or `ABSENT, BAD` (something good is missing) — you choose which fits. A GOOD finding is either `PRESENT, GOOD` (a good behaviour is in the change) or `ABSENT, GOOD` (a bad behaviour that could have appeared was avoided — clean). An exempt practice is `NOT_APPLICABLE` with no assessment.
 
 **COHERENCE RULE (non-negotiable — the most common mistake).** `presence=NOT_APPLICABLE` means the practice does not apply, so it has NO good/bad valence: when `presence` is `NOT_APPLICABLE` you MUST omit `assessment` entirely — never pair `NOT_APPLICABLE` with `GOOD` or with `BAD`. An inapplicable practice is not a quiet strength and not a quiet defect; it is silence. Conversely, `assessment` is REQUIRED for `PRESENT` and `ABSENT`. And `severity` is set ONLY when `assessment=BAD` — the server nulls it on a `GOOD` strength and on a `NOT_APPLICABLE` finding regardless; for a BAD finding, set it from the practice's severity table. If you catch yourself writing `NOT_APPLICABLE` together with an assessment or a severity, drop both: the clean baseline a defect-detector reports, and any practice whose subject is simply not in this change, is `NOT_APPLICABLE` alone.
 

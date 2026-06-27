@@ -245,7 +245,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
     void everySavedFeedback_isReSourcedToTheObservationSubject_recipientEqualsAbout() {
         // The delivery firewall: the recorder must re-source both recipient AND subject from the
         // observation's about_user_id (7L here), never from some other field. This pins that the saved
-        // Feedback always satisfies recipientUserId == subjectUserId == observation.aboutUserId.
+        // Feedback always satisfies recipientUserId == aboutUserId == observation.aboutUserId.
         List<Observation> findings = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             findings.add(problem(0.9f - i * 0.1f));
@@ -260,7 +260,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             .isNotEmpty()
             .allSatisfy(f -> {
                 assertThat(f.getRecipientUserId()).isEqualTo(7L);
-                assertThat(f.getSubjectUserId()).isEqualTo(f.getRecipientUserId());
+                assertThat(f.getAboutUserId()).isEqualTo(f.getRecipientUserId());
             });
     }
 

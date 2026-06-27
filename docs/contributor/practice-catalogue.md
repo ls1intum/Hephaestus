@@ -46,7 +46,7 @@ over-claim its evidence basis:
 **Two deferred slug renames.** Two practices carry a human `name`/`summary` that intentionally differs
 from their slug, to remove a label↔source contradiction: the civility practice (slug reads *"ask rather
 than demand"*) and the injection practice (slug reads *"validate and escape"*). Their **slugs are left
-unchanged** — a slug is a finding fingerprint key (`FindingFingerprint.compute()` hashes `practiceSlug`),
+unchanged** — a slug is a finding fingerprint key (`ObservationFingerprint.compute()` hashes `practiceSlug`),
 so renaming it would orphan every prior finding, reaction, and feedback correlated through it. A slug
 rename needs an explicit **fingerprint-remap migration** so prior findings re-correlate rather than
 orphan; that remap is the gating step (the SCD-2 `practice_revision` history — see
@@ -257,8 +257,8 @@ or metadata — never a slug (identity key), a stored enum, or a DB CHECK.
    (a learner-facing *explanation* — why the practice matters) and `whatGoodLooksLike` (a concrete
    **exemplar** — what good looks like). These feed the developer-facing layer served through
    `LearnerPracticeDTO` / `GET /practices/learner`; that projection is **criteria-free by construction**
-   (it has no `criteria` field), and an authoring guard rejects detector verdict vocabulary
-   (`OBSERVED`/`NOT_OBSERVED`/`NOT_APPLICABLE`) in `whatGoodLooksLike`, so the detection rubric never
+   (it has no `criteria` field), and an authoring guard rejects detector presence/assessment vocabulary
+   (`PRESENT`/`ABSENT`/`GOOD`/`BAD`/`NOT_APPLICABLE`) in `whatGoodLooksLike`, so the detection rubric never
    leaks into learner copy. See `practice-feedback-schema.md` §3.1 / §3a / §6.
 
 **Rejected curation (named overreach):** an architecture/design area (§1.1 — out of scope by design); a

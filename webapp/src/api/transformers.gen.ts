@@ -474,8 +474,8 @@ export const getObservationsForPullRequestResponseTransformer = async (data: any
 };
 
 const developerPracticeSummarySchemaResponseTransformer = (data: any) => {
-    if (data.lastFindingAt) {
-        data.lastFindingAt = new Date(data.lastFindingAt);
+    if (data.lastObservedAt) {
+        data.lastObservedAt = new Date(data.lastObservedAt);
     }
     return data;
 };

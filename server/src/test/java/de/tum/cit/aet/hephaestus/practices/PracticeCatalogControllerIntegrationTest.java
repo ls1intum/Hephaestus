@@ -1483,8 +1483,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("create with OBSERVED in whatGoodLooksLike → 400")
-        void rejectsObservedTokenOnCreate() {
+        @DisplayName("create with PRESENT in whatGoodLooksLike → 400")
+        void rejectsPresentTokenOnCreate() {
             ensureAdminMembership(workspace);
 
             ProblemDetail problem = webTestClient
@@ -1492,7 +1492,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(createWithExemplar("guard-observed", "The result is OBSERVED in every case."))
+                .bodyValue(createWithExemplar("guard-present", "The error handler is PRESENT in every case."))
                 .exchange()
                 .expectStatus()
                 .isBadRequest()
@@ -1505,13 +1505,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(problem.getStatus()).isEqualTo(400);
             assertThat(problem.getTitle()).isEqualTo("Invalid workspace request");
             // Nothing persisted.
-            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "guard-observed")).isEmpty();
+            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "guard-present")).isEmpty();
         }
 
         @Test
         @WithAdminUser
-        @DisplayName("create with NOT_OBSERVED in whatGoodLooksLike → 400")
-        void rejectsNotObservedTokenOnCreate() {
+        @DisplayName("create with GOOD/BAD/ABSENT in whatGoodLooksLike → 400")
+        void rejectsAssessmentTokensOnCreate() {
             ensureAdminMembership(workspace);
 
             webTestClient
@@ -1519,7 +1519,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(createWithExemplar("guard-not-observed", "Flagged as NOT_OBSERVED by the detector."))
+                .bodyValue(createWithExemplar("guard-assessment", "Flagged GOOD, BAD, or ABSENT by the detector."))
                 .exchange()
                 .expectStatus()
                 .isBadRequest();
@@ -1544,8 +1544,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        @DisplayName("update that introduces OBSERVED into whatGoodLooksLike → 400")
-        void rejectsObservedTokenOnUpdate() {
+        @DisplayName("update that introduces PRESENT into whatGoodLooksLike → 400")
+        void rejectsPresentTokenOnUpdate() {
             ensureAdminMembership(workspace);
             persistPractice("guard-update", "Guard Update", true);
 
@@ -1556,7 +1556,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 null,
                 null,
                 null,
-                "This is OBSERVED behaviour."
+                "This behaviour is PRESENT."
             );
 
             webTestClient
@@ -1584,7 +1584,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue(
                     createWithExemplar(
                         "guard-clean",
-                        "A PR description that states the problem, the change, and how it was verified."
+                        // Ordinary lowercase prose using "good" and "bad" as English words must NOT be rejected —
+                        // the guard matches only standalone ALL-CAPS enum tokens.
+                        "A good PR description states the problem, the change, and how it was verified, so a bad surprise is avoided."
                     )
                 )
                 .exchange()

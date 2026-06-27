@@ -186,7 +186,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("PULL_REQUEST"),
                 eq(456L),
-                eq(789L), // subjectUserId
+                eq(789L), // aboutUserId
                 eq("Test finding"),
                 eq("PRESENT"), // presence (OBSERVED → PRESENT, ADR 0022)
                 eq("GOOD"), // assessment (former-GOOD practice OBSERVED → strength)
@@ -508,7 +508,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 isNull(), // practiceRevisionId — no revision in the mocked repo
                 eq("ISSUE"),
                 eq(999L),
-                eq(789L), // subjectUserId
+                eq(789L), // aboutUserId
                 anyString(), // title
                 eq("ABSENT"), // presence (NOT_OBSERVED → ABSENT, ADR 0022)
                 eq("BAD"), // assessment (former-GOOD practice ABSENT → gap)

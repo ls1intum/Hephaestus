@@ -59,8 +59,8 @@ withheld-but-recurring locus has no other cross-run key.
 ### 3. Identity collapses to the minimal correct set
 
 - Observation keeps `about_user_id` only; `developer` (a 3NF transitive dependency on the contribution's
-  author) is dropped. **Prerequisite:** the recipient currently derived from `finding.getDeveloper()` in
-  `FeedbackLedgerRecorder` must be re-sourced first, or the reviewer-side firewall is silently reopened.
+  author) is dropped. The feedback recipient is re-sourced from `about_user_id`, so dropping `developer`
+  does not reopen the reviewer-side firewall.
 - Feedback keeps `about_user_id` (who it is about) **and** `recipient_user_id` (who it is delivered to);
   equal today, but the split is the firewall and `recipient_user_id` is read by the thread-key derivation.
 - Reaction keeps one identity, `reactor_user_id`.
@@ -72,8 +72,8 @@ Drop `observer` (always `SYSTEM`, zero readers); feedback `idempotency_key` (dup
 (dead); placement `anchor_old_path` / `anchor_start_side` / `anchor_quote` / `pinned_commit_sha`
 (never written), `posted_state` / `thread_external_ref` (written, no reader), `resolved*` (dead).
 Keep the observation `occurrence_key` (per-occurrence dedup grain, distinct from the `recurrence_key`
-locus grain). `replaces_id` and `thread_key` are kept pending a check that nothing but the thread-key path
-reads the supersession chain.
+locus grain). `replaces_id` and `thread_key` are kept: the supersession chain backs the thread-key
+derivation and the on-read `baseline_state`.
 
 ### 5. Human-readable names + entity renames
 
@@ -89,15 +89,12 @@ reads the supersession chain.
 
 ## Consequences
 
-- The schema speaks plainly and stops conflating measurement with evaluation; omission vs commission is
+- The schema speaks plainly and stops conflating measurement with evaluation: omission vs commission is
   recoverable from `(presence, assessment)`, and mixed-aspect practices are expressible.
-- Dropping `kind` is a multi-reader migration: the readers in `PracticeFindingService`,
-  `PullRequestReviewHandler`, `IssueReviewHandler`, `PracticeCatalogInjector`,
-  `PracticeStandingAspectProvider`, the repository projection, the DTOs, and the seeder move onto
-  `assessment` before the column is removed; OpenAPI spec + webapp client regenerate.
-- The reaction re-anchor is a build, not a rename: route, authorization (recipient via feedback), the
-  tenancy join, and re-nag suppression all change.
-- One judgment call remains open: whether `replaces_id` has any reader beyond the thread-key path.
+- Direction is no longer a rule column; every former reader of `Practice.kind` recomputes "is this a
+  problem?" as `assessment = BAD`.
+- A developer reacts to delivered feedback, never to a private observation: authorization derives the
+  recipient through `feedback`, and re-nag suppression matches on the `recurrence_key` kept on the reaction.
 
 ## Evidence
 

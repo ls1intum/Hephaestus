@@ -107,14 +107,14 @@ public class Feedback {
 
     /**
      * The user this feedback is <em>about</em> — ALWAYS populated (symmetry with
-     * {@code Observation.subjectUserId} and xAPI's mandatory, unambiguous Actor). Equals
+     * {@code Observation.aboutUserId} and xAPI's mandatory, unambiguous Actor). Equals
      * {@link #recipientUserId} for the common author-side case; differs when the unit is about someone other
      * than its recipient (e.g. reviewer-side feedback). The former "nullable defaulting to recipient" was
      * collapsed to an explicit value so every reader can trust the column without a fallback.
      */
     @NotNull
-    @Column(name = "subject_user_id", nullable = false)
-    private Long subjectUserId;
+    @Column(name = "about_user_id", nullable = false)
+    private Long aboutUserId;
 
     /** Destination class for this unit (in-context comment, conversation turn, profile). */
     @NotNull

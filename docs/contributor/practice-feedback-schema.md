@@ -50,10 +50,8 @@ The full literature rationale lives in ADR 0021
 
 This is the **single source of truth for naming**. Each concept has exactly one canonical name; the
 "Legacy term it replaced" column names the spelling that must no longer appear in new code. Per the
-DDD *Ubiquitous Language* principle, model, code, schema, API and UI must share one word per concept —
-"a language structured around the domain model and used by all team members within a bounded context"
+DDD *Ubiquitous Language* principle, model, code, schema, API and UI share one word per concept
 ([Fowler, *UbiquitousLanguage*](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *DDD*).
-Synonyms are a defect, not a convenience.
 
 > The evaluation model is the `presence` × `assessment` split of
 > [ADR 0022](../decisions/0022-observation-presence-assessment-and-schema-cleanup.md): `presence`
@@ -206,35 +204,13 @@ detection accuracy. The latest row per `(feedback, developer)` is the current st
 | explanation | String (TEXT) | `explanation` | yes | Free-text rationale (required for `DISPUTED`; the required explanation *is* the evaluative judgement). | Qualitative dispute signal. |
 | createdAt | Instant | `created_at` | no (immutable) | When the reaction was submitted. | Temporal "changed my mind" record. |
 
-> **`ReactionAction` partitions into two orthogonal sub-axes** (recipience theory).
-> A `Reaction` is the learner's answer to Lipnevich & Smith's (2022) third question — *"What
-> am I going to do with the feedback?"* — i.e. a **behavioural recipience act** (Winstone et al.
-> 2017, "enacting"). The values therefore split:
-> - **RESPONSE sub-axis `{ADDRESSED, DISPUTED}`** — what the learner *did* about feedback they accept
->   is about them. `ADDRESSED` (renamed from `APPLIED`) records that the learner *acted to close the
->   gap* — a proxy inferred from a later artifact/self-report; it **does NOT assert the gap closed
->   correctly** (Winstone et al. 2017; Sadler 1989, feedback "used to alter the gap"). The escalation
->   branch in `ReactionSuppressionFilter` re-nags an `ADDRESSED`-but-still-`ABSENT` locus, which is
->   only sound *because* the value claims action, not verified closure. `DISPUTED` is narrowed to the
->   *reasoned* rejection — the learner reason-rejects the assessment, and the enforced `explanation`
->   is the evaluative judgement (Carless & Boud 2018, "making judgements"). Affective *dismissal*
->   (reject-without-reason) is currently absorbed as silence (an absent row) pending a UI affordance —
->   a `DISMISSED` value is deliberately deferred (see §6).
-> - **VALIDITY sub-axis `{NOT_APPLICABLE}`** — *"is this feedback valid/relevant here?"* is a
->   validity judgement, not a recipience act (Lipnevich & Smith 2022, Q3). The engagement DTO
->   (`ReactionEngagementDTO`) therefore **excludes `NOT_APPLICABLE` from every uptake / non-uptake
->   ratio** and reports it separately as a validity/scope signal on the developer's own reflection view
->   (Nicol & Macfarlane-Dick 2006, principle 7). The value stays in the enum for migration safety and
->   keeps its suppression co-location (do not re-nag a credibly scoped-out locus).
->
-> *Sources:* Winstone, Nash, Parker & Rowntree (2017), *Supporting Learners' Agentic Engagement With
-> Feedback*, Educational Psychologist 52(1):17–37 ·
-> [link](https://www.tandfonline.com/doi/abs/10.1080/00461520.2016.1207538) · Carless & Boud (2018),
-> *The development of student feedback literacy*, Assessment & Evaluation in HE 43(8):1315–1325 ·
-> [link](https://www.tandfonline.com/doi/full/10.1080/02602938.2018.1463354) · Lipnevich & Smith
-> (2022), *Student–Feedback Interaction Model: Revised*, Studies in Educational Evaluation 75:101208 ·
-> [link](https://www.sciencedirect.com/science/article/abs/pii/S0191491X22000852) ·
-> Nicol & Macfarlane-Dick (2006), Studies in Higher Education 31(2):199–218.
+> **`ReactionAction` partitions into two orthogonal sub-axes.** RESPONSE `{ADDRESSED, DISPUTED}` is what
+> the learner *did*: `ADDRESSED` records action to close the gap (a proxy, not verified closure — so
+> `ReactionSuppressionFilter` may re-nag an `ADDRESSED`-but-still-`ABSENT` locus); `DISPUTED` is the
+> reasoned rejection and requires an `explanation`. VALIDITY `{NOT_APPLICABLE}` is a relevance judgement,
+> not an uptake act, so `ReactionEngagementDTO` excludes it from every uptake / non-uptake ratio and
+> reports it as a separate scope signal. The recipience-literature grounding for this split lives in
+> [ADR 0022](../decisions/0022-observation-presence-assessment-and-schema-cleanup.md) § Evidence.
 
 ### 3.5 `Feedback` — table `feedback`
 
@@ -440,8 +416,7 @@ The grouping bucket is named **area** throughout (code, schema, API, UI) — one
 the bounded context, model to UI (DDD *Ubiquitous Language*:
 [Fowler](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *Domain-Driven Design*).
 
-A few identifiers intentionally retain an older spelling — these are deliberate, not debt, and must NOT
-be "fixed":
+A few identifiers intentionally retain an older spelling:
 
 - The entity is `Observation` (table `observation`); its outcome is the two columns `presence` and
   `assessment`. There is no longer a single `observation` outcome column — that signed enum was split
@@ -453,11 +428,10 @@ be "fixed":
 
 ## 6. Standards-divergence design decisions
 
-This section records where the schema **deliberately diverges from** SARIF and the learning-analytics
-standards, and *why each divergence is the right call* — not a backlog. Each is a documented decision,
-not an open TODO.
+This section records where the schema deliberately diverges from SARIF and the learning-analytics
+standards, and why.
 
-The schema also makes three larger decisions worth calling out:
+The schema makes three larger decisions worth calling out:
 
 - **Practice criteria versioning (SCD-2)** — `PracticeRevision` / `practice_revision` (§3.8) +
   `Observation.practice_revision_id` (§3.3). `PracticeService` appends revision 1 on create and a new

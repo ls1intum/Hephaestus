@@ -34,8 +34,16 @@ public class PracticeService {
     private final PracticeRevisionRepository practiceRevisionRepository;
     private final WorkspaceRepository workspaceRepository;
 
-    /** Detector observation vocabulary that must never leak into learner-facing copy (the authoring guard). */
-    private static final Pattern DETECTOR_VOCAB = Pattern.compile("\\b(?:NOT_)?OBSERVED\\b|\\bNOT_APPLICABLE\\b");
+    /**
+     * The detector's current presence/assessment vocabulary that must never leak into learner-facing copy (the
+     * authoring guard). Matched case-sensitively as standalone ALL-CAPS tokens so ordinary prose ("good", "bad",
+     * "absent") is not rejected — only the literal enum tokens the detector emits. Mirrors how the parser
+     * tokenizes (uppercase enum names: {@link de.tum.cit.aet.hephaestus.practices.model.Presence} /
+     * {@link de.tum.cit.aet.hephaestus.practices.model.Assessment}).
+     */
+    private static final Pattern DETECTOR_VOCAB = Pattern.compile(
+        "\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b"
+    );
 
     @Transactional(readOnly = true)
     public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
@@ -114,7 +122,7 @@ public class PracticeService {
         if (exemplar != null && DETECTOR_VOCAB.matcher(exemplar).find()) {
             throw new IllegalArgumentException(
                 "whatGoodLooksLike is learner-facing and must be a concrete exemplar — it must not contain" +
-                    " detector observation vocabulary (OBSERVED / NOT_OBSERVED / NOT_APPLICABLE)."
+                    " detector presence/assessment vocabulary (PRESENT / ABSENT / GOOD / BAD / NOT_APPLICABLE)."
             );
         }
     }

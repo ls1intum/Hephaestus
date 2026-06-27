@@ -159,7 +159,7 @@ public class PracticeDetectionDeliveryService {
             // Whose conduct the finding is filed against — always explicit (never null): the developer for
             // author-side practices (the whole catalogue today), the reviewer for reviewer-audience practices
             // once they ship (ADR 0021 C2).
-            Long subjectUserId = developerId;
+            Long aboutUserId = developerId;
 
             // Cross-run identity (ADR 0021 C2): a content-derived key that is STABLE across re-detections —
             // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
@@ -168,7 +168,7 @@ public class PracticeDetectionDeliveryService {
                 finding.practiceSlug(),
                 artifactType.name(),
                 artifactId,
-                subjectUserId,
+                aboutUserId,
                 firstLocationPath(finding.evidence())
             );
             findingFingerprints.put(finding, findingFingerprint);
@@ -189,7 +189,7 @@ public class PracticeDetectionDeliveryService {
                 practiceRevisionId,
                 artifactType.name(),
                 artifactId,
-                subjectUserId,
+                aboutUserId,
                 finding.title(),
                 finding.presence().name(),
                 finding.assessment() == null ? null : finding.assessment().name(),

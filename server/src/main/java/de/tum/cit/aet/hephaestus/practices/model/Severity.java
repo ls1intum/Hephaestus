@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 /**
- * Severity level for a practice finding — orthogonal to {@link Presence}.
+ * Severity level for a practice observation — the coaching band of a {@code BAD} observation.
  *
- * <p>Presence captures <em>presence</em> (observed/not observed); severity captures
- * <em>how important</em> the finding is. An OBSERVED finding can be INFO ("good job")
- * or MAJOR ("correctly handled critical security pattern"). A NOT_OBSERVED finding can be
- * MINOR (style nit) or CRITICAL (security vulnerability).
+ * <p>{@link Presence} captures whether the signal was PRESENT/ABSENT and {@link Assessment} its GOOD/BAD
+ * valence; severity captures <em>how important</em> a BAD observation is. It is set only when
+ * {@code assessment = BAD} (null on a GOOD strength or a NOT_APPLICABLE observation): an {@code ABSENT, BAD}
+ * gap can be MINOR (style nit) or CRITICAL (security vulnerability).
  */
 public enum Severity {
     CRITICAL,

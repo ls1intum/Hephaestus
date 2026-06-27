@@ -611,8 +611,6 @@ public class PracticeDetectionResultParser {
          *       DISCIPLINE} either flags a defect ({@code PRESENT, BAD}) or abstains ({@code NOT_APPLICABLE}); a
          *       model-emitted {@code PRESENT, GOOD} there is a clean bill of health that would ship as a false
          *       strength — coerce it to {@code NOT_APPLICABLE} (assessment null).</li>
-         *   <li><b>Void (ABSENT, GOOD).</b> A practice that is absent and that being absent is good has nothing
-         *       to coach — the combination is void — so it is coerced to {@code NOT_APPLICABLE} (assessment null).</li>
          *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a {@code BAD} finding; it is
          *       forced null otherwise, and a {@code BAD} that arrived as {@code INFO} (a defect with no band)
          *       is raised to {@code MINOR}.</li>
@@ -641,13 +639,9 @@ public class PracticeDetectionResultParser {
                 a = null;
                 r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
             }
-            // (ABSENT, GOOD) is representable but void: the practice is absent AND that is good means there is
-            // nothing to coach. The prompt names this combination "void", so remap it to a clean abstention
-            // rather than persisting a phantom good-but-absent observation.
-            if (p == Presence.ABSENT && a == Assessment.GOOD) {
-                p = Presence.NOT_APPLICABLE;
-                a = null;
-            }
+            // (ABSENT, GOOD) is a legitimate strength per ADR 0022 §1 — "bad behaviour avoided → clean" — so it
+            // is preserved, NOT collapsed to NOT_APPLICABLE: a harmful behaviour that could have appeared and did
+            // not is worth acknowledging, distinct from a practice that simply does not apply.
             // assessment must be null exactly when presence is NOT_APPLICABLE.
             if (p == Presence.NOT_APPLICABLE) {
                 a = null;

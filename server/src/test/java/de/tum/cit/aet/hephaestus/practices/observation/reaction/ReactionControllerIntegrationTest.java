@@ -120,7 +120,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .artifactType(WorkArtifact.PULL_REQUEST)
                 .artifactId(42L)
                 .recipientUserId(adminUser.getId())
-                .subjectUserId(adminUser.getId())
+                .aboutUserId(adminUser.getId())
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .position(0)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)

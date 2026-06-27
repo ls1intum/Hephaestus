@@ -317,8 +317,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
         @Test
         void missingSeverityDefaultsToInfoNotDiscarded() {
-            // Regression: the model routinely omits severity on OBSERVED/NOT_APPLICABLE findings (the criteria
-            // literally say "OBSERVED (no severity)"). Such a finding must be KEPT with severity INFO, never
+            // Regression: the model routinely omits severity on GOOD/NOT_APPLICABLE findings (severity is a
+            // coaching band only for a BAD finding). Such a finding must be KEPT with severity INFO, never
             // discarded — coerceCoherence re-derives the band anyway, so dropping it silently loses coaching.
             ObjectNode finding = validFindingNode();
             finding.remove("severity");
@@ -854,11 +854,12 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("(ABSENT, GOOD) is void → coerced to NOT_APPLICABLE with a null assessment")
-        void absentGoodIsVoidCoercedToNa() {
-            // ABSENT + GOOD means "the practice is absent and that is good" — nothing to coach. The model can
-            // emit it, but it must not persist as a phantom observation: coerce to a clean abstention.
-            var voidFinding = new ValidatedFinding(
+        @DisplayName("(ABSENT, GOOD) is a legitimate strength → preserved, NOT coerced to NOT_APPLICABLE")
+        void absentGoodIsPreservedAsStrength() {
+            // ADR 0022 §1: (ABSENT, GOOD) is "bad behaviour avoided → clean" — a real strength, distinct from a
+            // practice that simply does not apply. It MUST persist as (ABSENT, GOOD); only its severity is
+            // nulled (a coaching band is reserved for a BAD finding).
+            var strength = new ValidatedFinding(
                 "p",
                 "t",
                 Presence.ABSENT,
@@ -870,9 +871,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "guidance",
                 List.of()
             );
-            var out = voidFinding.coerceCoherence(false);
-            assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
-            assertThat(out.assessment()).isNull();
+            var out = strength.coerceCoherence(false);
+            assertThat(out.presence()).isEqualTo(Presence.ABSENT);
+            assertThat(out.assessment()).isEqualTo(Assessment.GOOD);
             assertThat(out.severity()).isNull();
         }
 

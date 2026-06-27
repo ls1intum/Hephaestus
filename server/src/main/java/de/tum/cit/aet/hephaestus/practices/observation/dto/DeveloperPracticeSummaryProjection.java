@@ -13,7 +13,7 @@ public interface DeveloperPracticeSummaryProjection {
 
     String getPracticeName();
 
-    Long getTotalFindings();
+    Long getTotalObservations();
 
     /** Count of present-or-absent observations the detector judged GOOD (a strength). */
     Long getGoodCount();
@@ -21,5 +21,5 @@ public interface DeveloperPracticeSummaryProjection {
     /** Count of observations the detector judged BAD (a problem). */
     Long getBadCount();
 
-    Instant getLastFindingAt();
+    Instant getLastObservedAt();
 }

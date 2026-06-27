@@ -4,6 +4,7 @@
 **Date:** 2026-06-14
 **Authors:** (practice-mentoring owner)
 **Builds on:** [ADR 0020](0020-context-fabric-everything-is-an-integration.md) (the content-fabric / `ContentProvider` seam and history-in-sandbox), [ADR 0007](0007-sandbox-spi-shape.md) (the Pi agent sandbox)
+**Partially superseded by:** [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) (F-6 / F-13 / F-24)
 
 > [!NOTE]
 > This ADR captures the **decision and rationale**. Some field/enum names below were renamed during

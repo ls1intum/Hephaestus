@@ -21,8 +21,8 @@ public final class PolicyFloorSelector {
     public record Partition(List<Observation> kept, List<Observation> dropped) {}
 
     /**
-     * Partition problem findings (NOT_OBSERVED) into kept vs dropped. {@code topK} bounds the non-blocking
-     * tail; {@code topK <= 0} disables capping (everything kept).
+     * Partition problem observations (assessment = BAD) into kept vs dropped. {@code topK} bounds the
+     * non-blocking tail; {@code topK <= 0} disables capping (everything kept).
      */
     public static Partition partition(List<Observation> problemFindings, int topK) {
         List<Observation> kept = new ArrayList<>();

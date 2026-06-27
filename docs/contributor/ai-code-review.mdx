@@ -94,7 +94,8 @@ The agent returns a JSON object with a `findings` array:
     {
       "practiceSlug": "hardcoded-secrets",
       "title": "API key exposed in source",
-      "verdict": "NEGATIVE",
+      "presence": "PRESENT",
+      "assessment": "BAD",
       "severity": "CRITICAL",
       "confidence": 0.95,
       "evidence": {
@@ -116,7 +117,7 @@ The agent returns a JSON object with a `findings` array:
 }
 ```
 
-**Verdicts**: `POSITIVE` (good practice), `NEGATIVE` (violation), `NOT_APPLICABLE` (practice irrelevant to this diff).
+**Presence** (`presence`): `PRESENT` (the practice's signal is in the change), `ABSENT` (it is missing), `NOT_APPLICABLE` (the practice does not apply to this change). **Assessment** (`assessment`): `GOOD` (a strength) or `BAD` (a problem) — required for `PRESENT`/`ABSENT`, omitted (null) for `NOT_APPLICABLE`.
 
 **Severities**: `CRITICAL`, `MAJOR`, `MINOR`, `INFO` -- defined per practice in the criteria files.
 
@@ -136,16 +137,16 @@ The current deployment uses 13 practices (12 software engineering + `hardcoded-s
 
 After the agent returns findings, the server runs a 6-step delivery pipeline in `PullRequestReviewHandler.deliver()`:
 
-1. **Parse** -- `PracticeDetectionResultParser` validates all fields, normalizes slugs (`toLowerCase` + replace `_` with `-`), deduplicates by practice (highest confidence wins), and collects `suggestedDiffNotes` from NEGATIVE findings. Malformed entries are captured in a `discarded` list (never throws).
+1. **Parse** -- `PracticeDetectionResultParser` validates all fields, normalizes slugs (`toLowerCase` + replace `_` with `-`), deduplicates by practice (highest confidence wins), and collects `suggestedDiffNotes` from `BAD` findings. Malformed entries are captured in a `discarded` list (never throws).
 
 2. **Filter by diff scope** -- `filterByDiffScope` removes findings whose evidence locations don't intersect the actual diff. Prevents hallucinated findings about unchanged code.
 
-3. **Persist** -- Validated findings are saved as `PracticeFinding` entities in the database.
+3. **Persist** -- Validated findings are saved as `Observation` entities in the database.
 
 4. **Compose** -- `DeliveryComposer` partitions findings into:
    - **Inlinable** (have file locations, not in internal paths like `context/target/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
    - **Non-inlinable** (`mr-description-quality`, `commit-discipline`, or no file location) -- full detail in MR summary
-   - When all findings are positive, composes a short approval comment naming top positive practices
+   - When all findings are `GOOD` strengths, composes a short approval comment naming the top strengths
 
 5. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
 
@@ -168,8 +169,8 @@ Key tables for code review:
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `agent_config`     | `name`, `agent_type`, `model_name`, `model_version`, `enabled`, `llm_api_key` (encrypted), `llm_provider`, `credential_mode`, `timeout_seconds`, `max_concurrent_jobs`, `allow_internet` | LLM backend configuration per workspace                                                      |
 | `agent_job`        | `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
-| `practice`         | `slug`, `name`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `practice_area_id` (FK → `practice_area`), `artifact_type`, `polarity`, `why_it_matters`, `what_good_looks_like`, `is_active`, `workspace_id` | Practice definitions, each linked to a practice area. Unique constraint on `(workspace_id, slug)` |
-| `practice_finding` | `idempotency_key`, `title`, `verdict`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `guidance`, `agent_job_id`, `practice_id`, `target_type`, `target_id`, `contributor_id`, `detected_at` | Individual findings per target (PR) per practice                                             |
+| `practice`         | `slug`, `name`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `practice_area_id` (FK → `practice_area`), `artifact_type`, `why_it_matters`, `what_good_looks_like`, `is_active`, `workspace_id` | Practice definitions, each linked to a practice area. Unique constraint on `(workspace_id, slug)` |
+| `observation`      | `occurrence_key`, `title`, `presence`, `assessment`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `recurrence_key`, `agent_job_id`, `practice_id`, `artifact_type`, `artifact_id`, `about_user_id`, `observed_at` | Individual observations per target (PR) per practice                                          |
 
 ## Configuration
 

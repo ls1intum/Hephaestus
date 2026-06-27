@@ -449,7 +449,7 @@
         <rollback><dropColumn tableName="practice" columnName="applies_to"/></rollback>
     </changeSet>
 
-    <!-- Transient scaffolding: practice.polarity (DESIRABLE | UNDESIRABLE | CONTEXTUAL) is the valence source
+    <!-- Transient scaffolding: practice.polarity (DESIRABLE | UNDESIRABLE) is the valence source
          the observation assessment backfill reads. Every catalogued practice is a desirable habit, so it
          defaults to DESIRABLE. Dropped in changeSet -65 once the backfill has run — it never ships. -->
     <changeSet author="hephaestus-feedback" id="1781092589259-24">
@@ -668,6 +668,18 @@
         <rollback><dropNotNullConstraint tableName="feedback" columnName="subject_user_id" columnDataType="BIGINT"/></rollback>
     </changeSet>
 
+    <!-- ADR 0022 §5: rename feedback.subject_user_id -> about_user_id (the person the feedback is ABOUT),
+         matching Observation.about_user_id. The FK (sfk_feedback_subject) and NOT NULL follow the column. -->
+    <changeSet author="hephaestus-practice-goals" id="1781092589259-39">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback.about_user_id already present">
+            <columnExists tableName="feedback" columnName="subject_user_id"/>
+            <not><columnExists tableName="feedback" columnName="about_user_id"/></not>
+        </preConditions>
+        <comment>ADR 0022 §5: feedback.subject_user_id -> about_user_id.</comment>
+        <renameColumn tableName="feedback" oldColumnName="subject_user_id" newColumnName="about_user_id" columnDataType="BIGINT"/>
+        <rollback><renameColumn tableName="feedback" oldColumnName="about_user_id" newColumnName="subject_user_id" columnDataType="BIGINT"/></rollback>
+    </changeSet>
+
     <!-- feedback_observation (M:N composition, Immutable). Greenfield → final names. -->
     <changeSet author="hephaestus-feedback" id="1781092589259-39">
         <preConditions onFail="MARK_RAN" onFailMessage="feedback_observation table already present">
@@ -804,7 +816,7 @@
             <column name="practice_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="revision_number" type="INT"><constraints nullable="false"/></column>
             <column name="criteria" type="TEXT"><constraints nullable="false"/></column>
-            <column name="created_at" type="TIMESTAMP WITHOUT TIME ZONE"><constraints nullable="false"/></column>
+            <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE"><constraints nullable="false"/></column>
         </createTable>
         <rollback><dropTable tableName="practice_revision"/></rollback>
     </changeSet>

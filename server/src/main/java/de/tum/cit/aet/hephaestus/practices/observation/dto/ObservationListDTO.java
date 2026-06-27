@@ -12,17 +12,17 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * List-view DTO for practice findings. Omits large text fields (guidance, reasoning)
+ * List-view DTO for practice observations. Omits large text fields (guidance, reasoning)
  * and internal fields (agentJobId, occurrenceKey, evidence) to keep payloads small.
  */
-@Schema(description = "Practice finding summary for list views")
+@Schema(description = "Practice observation summary for list views")
 public record ObservationListDTO(
-    @NonNull @Schema(description = "Finding ID") UUID id,
+    @NonNull @Schema(description = "Observation ID") UUID id,
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
     @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
     @NonNull @Schema(description = "Target entity ID") Long artifactId,
-    @NonNull @Schema(description = "Finding title") String title,
+    @NonNull @Schema(description = "Observation title") String title,
     @NonNull @Schema(description = "Presence: PRESENT, ABSENT, or NOT_APPLICABLE") Presence presence,
     @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,

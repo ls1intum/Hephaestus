@@ -120,7 +120,7 @@ public class Practice {
     /**
      * Developer-facing exemplar: a short, concrete picture of what doing this well looks like (an instance,
      * not the rubric). MUST NOT restate the {@link #criteria} or leak detection vocabulary
-     * (OBSERVED/NOT_OBSERVED); enforced by an authoring guard. Nullable; learner-facing only.
+     * (PRESENT/ABSENT/GOOD/BAD/NOT_APPLICABLE); enforced by an authoring guard. Nullable; learner-facing only.
      */
     @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
     private String whatGoodLooksLike;

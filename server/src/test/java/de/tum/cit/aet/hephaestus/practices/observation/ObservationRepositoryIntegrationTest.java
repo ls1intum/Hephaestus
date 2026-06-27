@@ -649,10 +649,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(result).hasSize(1);
             DeveloperPracticeSummaryProjection row = result.get(0);
             assertThat(row.getPracticeSlug()).isEqualTo("test-practice");
-            assertThat(row.getTotalFindings()).isEqualTo(1L);
+            assertThat(row.getTotalObservations()).isEqualTo(1L);
             assertThat(row.getGoodCount()).isEqualTo(1L);
             assertThat(row.getBadCount()).isEqualTo(0L);
-            assertThat(row.getLastFindingAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
+            assertThat(row.getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
         }
 
         @Test
@@ -672,7 +672,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result).hasSize(1);
             DeveloperPracticeSummaryProjection row = result.get(0);
-            assertThat(row.getTotalFindings()).isEqualTo(2L);
+            assertThat(row.getTotalObservations()).isEqualTo(2L);
             assertThat(row.getGoodCount()).isEqualTo(1L);
             assertThat(row.getBadCount()).isEqualTo(1L);
         }

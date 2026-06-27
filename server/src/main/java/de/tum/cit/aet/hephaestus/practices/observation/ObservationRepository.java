@@ -62,10 +62,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
-            :artifactType, :artifactId, :subjectUserId,
+            :artifactType, :artifactId, :aboutUserId,
             :title, :presence, :assessment, :severity, :confidence,
             CAST(:evidence AS jsonb), :reasoning,
-            :recurrenceKey, :detectedAt
+            :recurrenceKey, :observedAt
         )
         ON CONFLICT (occurrence_key) DO NOTHING
         """,
@@ -79,7 +79,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("practiceRevisionId") Long practiceRevisionId,
         @Param("artifactType") String artifactType,
         @Param("artifactId") Long artifactId,
-        @Param("subjectUserId") Long subjectUserId,
+        @Param("aboutUserId") Long aboutUserId,
         @Param("title") String title,
         @Param("presence") String presence,
         @Param("assessment") String assessment,
@@ -88,7 +88,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("evidence") String evidence,
         @Param("reasoning") String reasoning,
         @Param("recurrenceKey") String recurrenceKey,
-        @Param("detectedAt") Instant detectedAt
+        @Param("observedAt") Instant observedAt
     );
 
     @Modifying
@@ -154,10 +154,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         SELECT p.slug AS "practiceSlug",
                p.name AS "practiceName",
-               COUNT(f.id) AS "totalFindings",
+               COUNT(f.id) AS "totalObservations",
                SUM(CASE WHEN f.assessment = 'GOOD' THEN 1 ELSE 0 END) AS "goodCount",
                SUM(CASE WHEN f.assessment = 'BAD' THEN 1 ELSE 0 END) AS "badCount",
-               MAX(f.observed_at) AS "lastFindingAt"
+               MAX(f.observed_at) AS "lastObservedAt"
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId

@@ -77,9 +77,9 @@ class ReactionSuppressionFilter {
             return new ReactionDecision(scopedFindings, 0);
         }
 
-        // All findings of one job share the recipient + target. The reacting party is the subject
+        // All observations of one job share the recipient + target. The reacting party is the subject
         // (== the developer for the author-side catalogue today) — the same aboutUserId deliver() folded
-        // into each finding_fingerprint. subject_user_id is always populated, so no fallback is needed.
+        // into each recurrence_key. about_user_id is always populated, so no fallback is needed.
         Observation any = persisted.get(0);
         long aboutUserId = any.getAboutUserId();
         String artifactType = any.getArtifactType().name();
