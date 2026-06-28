@@ -58,30 +58,34 @@ The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a
 
 Every agent container gets this file structure (agent-specific files noted):
 
+The layout is split by **location**, not lore (ADR 0020): `inputs/` is read-only (the path-guard whitelists exactly this subtree), `work/` is writable scratch that is never collected, and `out/` is the only directory collected back into SQL. The constants live in `WorkspaceAbi`; see `docs/developer/agent/workspace-abi.mdx` for the full ABI.
+
 ```
 /workspace/
-  repo/                              # Git repository (read-only bind mount)
-  context/target/
-    metadata.json                    # PR title, body, author, branches, stats
-    comments.json                    # Latest 500 review comments
-    diff.patch                       # Unified diff with [L<n>] annotations
-    diff_stat.txt                    # Changed files summary
-    diff_summary.md                  # Per-file diff chunks with index table
-    contributor_history.json         # Prior findings for this author (optional)
-  .practices/
-    index.json                       # [{slug, name, area}]
-    {slug}.md                        # Per-practice criteria (generated from DB)
-    all-criteria.md                  # All criteria bundled (reduces tool calls)
-  .precompute/practices/{slug}.ts    # Precompute scripts (from DB, if present)
-  .precompute-out/                   # Precompute output (summary.md + per-practice JSON)
-  task.json                          # TaskEnvelope<PracticeReviewTask> — prompt, jobId, workspaceId
-  .pi/                               # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
-    AGENTS.md                        #   Pi orchestrator instructions
-    settings.json                    #   Pi SDK configuration (provider, model, compaction)
-    extensions/                      #   Custom provider extensions (auto-discovered)
-  .run-pi.mjs                        # Runner script
-  .analysis/practices/.gitkeep       # Directory for intermediate findings
-  .output/                           # Agent writes final results here
+  inputs/                              # read-only — the path-guard whitelists exactly this subtree
+    manifest.json                      #   telescope: integration-agnostic index (path/connector/sha256)
+    sources/scm/repo/                  #   the SCM connector's source — git checkout (read-only mount)
+    context/                           #   workspace context (WorkspaceContextBuilder populates this)
+      metadata.json                    #     PR metadata + commits
+      comments.json                    #     review comments
+      diff.patch                       #     diff with [L<n>] annotations
+      diff_summary.md                  #     per-file diff chunks with index table
+      contributor_history.json         #     prior findings for this author (optional)
+    practices/                         #   per-practice catalog (generated from the DB)
+      index.json                       #     [{slug, name, area}]
+      {slug}.md                        #     per-practice criteria
+      all-criteria.md                  #     all criteria bundled (reduces tool calls)
+  work/                                # scratch the agent + precompute write; NEVER collected
+    precompute/practices/{slug}.ts     #   precompute scripts (from DB, if present)
+    precompute-out/                    #   precompute output (summary.md + per-practice JSON)
+    analysis/practices/                #   directory for intermediate findings markers
+  out/                                 # the ONLY directory collected back into SQL
+  task.json                            # TaskEnvelope around Task.PracticeReview — prompt, jobId, workspaceId
+  .pi/                                 # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
+    AGENTS.md                          #   Pi orchestrator instructions
+    settings.json                      #   Pi SDK configuration (provider, model, compaction)
+    extensions/                        #   custom provider extensions (auto-discovered)
+  .run-pi.mjs                          # runner entry point
 ```
 
 ### Output schema
@@ -144,7 +148,7 @@ After the agent returns findings, the server runs a 6-step delivery pipeline in 
 3. **Persist** -- Validated findings are saved as `Observation` entities in the database.
 
 4. **Compose** -- `DeliveryComposer` partitions findings into:
-   - **Inlinable** (have file locations, not in internal paths like `context/target/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
+   - **Inlinable** (have file locations, not in internal paths like `inputs/context/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
    - **Non-inlinable** (`mr-description-quality`, `commit-discipline`, or no file location) -- full detail in MR summary
    - When all findings are `GOOD` strengths, composes a short approval comment naming the top strengths
 
