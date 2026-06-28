@@ -196,7 +196,11 @@ class FeedbackDeliveryService {
         // durable handle (external_ref / thread_external_ref / disposition) so the placement rows record
         // what actually landed rather than an assumed POSTED + null.
         try {
-            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.PULL_REQUEST, inlineSignals);
+            // On a TRANSIENT no-op the summary edit did NOT land — the live comment is still the prior run's
+            // summary. Recording a fresh DELIVERED unit here (and superseding the real prior) would log feedback
+            // the student never saw, so gate the ledger write on the summary actually landing this run.
+            boolean summaryDelivered = summaryOutcome != SummaryOutcome.TRANSIENT_NOOP;
+            feedbackLedgerRecorder.record(job, delivery, WorkArtifact.PULL_REQUEST, inlineSignals, summaryDelivered);
         } catch (RuntimeException e) {
             log.warn(
                 "Feedback ledger record failed (delivery unaffected): jobId={}, error={}",

@@ -264,10 +264,128 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             });
     }
 
+    @Test
+    void reReview_priorDeliveredUnit_isSupersededAndNewRowReplacesIt() {
+        // B1: the re-review SUPERSEDED branch (every other test stubs the prior lookup to Optional.empty()).
+        // A prior live DELIVERED unit on this continuity line → the new row's replacesId points at it AND the
+        // prior is flipped to SUPERSEDED via the native updateState, AFTER the new row lands (never zero live).
+        var finding = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+        var recorder = recorder(false);
+        UUID priorId = UUID.randomUUID();
+        Feedback prior = mock(Feedback.class);
+        when(prior.getId()).thenReturn(priorId);
+        when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())).thenReturn(
+            Optional.of(prior)
+        );
+
+        recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
+
+        // The prior is superseded by id+name.
+        verify(feedbackRepository).updateState(priorId, FeedbackDeliveryState.SUPERSEDED.name());
+        // The freshly saved DELIVERED unit carries replacesId = the prior id.
+        var saved = ArgumentCaptor.forClass(Feedback.class);
+        verify(feedbackRepository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        Feedback delivered = saved
+            .getAllValues()
+            .stream()
+            .filter(f -> f.getDeliveryState() == FeedbackDeliveryState.DELIVERED)
+            .findFirst()
+            .orElseThrow();
+        assertThat(delivered.getReplacesId()).isEqualTo(priorId);
+    }
+
+    @Test
+    void goodStrengthBoundAsSupporting_afterProblems_naExcluded() {
+        // B1: a GOOD strength binds as SUPPORTING and sorts LAST (null severity = least severe); a
+        // NOT_APPLICABLE abstention is excluded entirely.
+        var problem = problem(0.9f);
+        var strength = strength();
+        var na = notApplicable();
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(strength, problem, na));
+
+        recorder(false).record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
+
+        // Two bindings (problem PRIMARY + strength SUPPORTING); the NA is never bound.
+        var boundId = ArgumentCaptor.forClass(UUID.class);
+        var role = ArgumentCaptor.forClass(String.class);
+        var ordinal = ArgumentCaptor.forClass(Integer.class);
+        verify(feedbackObservationRepository, org.mockito.Mockito.times(2)).insertIfAbsent(
+            any(),
+            boundId.capture(),
+            role.capture(),
+            ordinal.capture()
+        );
+        assertThat(boundId.getAllValues()).containsExactly(problem.getId(), strength.getId());
+        // The problem leads (PRIMARY, ordinal 0); the strength is SUPPORTING and sorts last (ordinal 1).
+        assertThat(role.getAllValues()).containsExactly("PRIMARY", "SUPPORTING");
+        assertThat(ordinal.getAllValues()).containsExactly(0, 1);
+        assertThat(boundId.getAllValues()).doesNotContain(na.getId());
+    }
+
+    @Test
+    void transientNoop_writesNoPhantomDelivered_andDoesNotSupersedePrior() {
+        // A3: a TRANSIENT no-op (summaryDelivered=false) kept the prior run's summary live and posted nothing.
+        // The recorder must write NO fresh DELIVERED unit and must NOT supersede the still-live prior — else the
+        // mentor coaches against words the student never saw.
+        var finding = problem(0.9f);
+        when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(finding));
+        var recorder = recorder(false);
+        UUID priorId = UUID.randomUUID();
+        Feedback prior = mock(Feedback.class);
+        lenient().when(prior.getId()).thenReturn(priorId);
+        lenient()
+            .when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any()))
+            .thenReturn(Optional.of(prior));
+
+        recorder.record(
+            job(),
+            new DeliveryContent("body", List.of()),
+            WorkArtifact.PULL_REQUEST,
+            List.of(),
+            /* summaryDelivered */ false
+        );
+
+        verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
+        verify(feedbackRepository, org.mockito.Mockito.never()).updateState(any(), any());
+        verify(feedbackObservationRepository, org.mockito.Mockito.never()).insertIfAbsent(
+            any(),
+            any(),
+            any(),
+            anyInt()
+        );
+    }
+
     private AgentJob job() {
         AgentJob job = TestEntities.agentJob();
         job.setWorkspace(TestEntities.workspace(1L));
         return job;
+    }
+
+    private Observation strength() {
+        Observation pf = mock(Observation.class);
+        lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
+        lenient().when(pf.getPresence()).thenReturn(Presence.PRESENT);
+        lenient().when(pf.getAssessment()).thenReturn(Assessment.GOOD);
+        lenient().when(pf.getSeverity()).thenReturn(null); // GOOD strengths carry no severity (ADR 0022)
+        lenient().when(pf.getConfidence()).thenReturn(0.95f);
+        lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(pf.getArtifactId()).thenReturn(100L);
+        lenient().when(pf.getAboutUserId()).thenReturn(7L);
+        return pf;
+    }
+
+    private Observation notApplicable() {
+        Observation pf = mock(Observation.class);
+        lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
+        lenient().when(pf.getPresence()).thenReturn(Presence.NOT_APPLICABLE);
+        lenient().when(pf.getAssessment()).thenReturn(null); // NA carries no valence (ADR 0022)
+        lenient().when(pf.getSeverity()).thenReturn(null);
+        lenient().when(pf.getConfidence()).thenReturn(0.5f);
+        lenient().when(pf.getArtifactType()).thenReturn(WorkArtifact.PULL_REQUEST);
+        lenient().when(pf.getArtifactId()).thenReturn(100L);
+        lenient().when(pf.getAboutUserId()).thenReturn(7L);
+        return pf;
     }
 
     private Observation problem(float confidence) {

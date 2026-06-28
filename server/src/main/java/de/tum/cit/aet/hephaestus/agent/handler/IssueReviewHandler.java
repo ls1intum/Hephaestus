@@ -225,11 +225,13 @@ public class IssueReviewHandler implements JobTypeHandler {
             log.debug("Issue note empty after sanitization, skipping post: jobId={}", job.getId());
             return;
         }
+        boolean posted = false;
         try {
             String formatted = FeedbackDeliveryService.formatPracticeNote(sanitized, job);
             String commentId = commentPoster.postIssueFormattedBody(job, formatted);
             if (commentId != null) {
                 job.setDeliveryCommentId(commentId);
+                posted = true;
                 log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
             } else {
                 // Best-effort issue post returned no comment id (vendor returned nothing without raising).
@@ -244,8 +246,14 @@ public class IssueReviewHandler implements JobTypeHandler {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
 
-        // Record the delivered-feedback ledger (ADR 0021 C6) — best-effort, REQUIRES_NEW + try/catch so it
-        // can never affect the issue note the developer already received. Issues have no inline placements.
+        // Record the delivered-feedback ledger (ADR 0021 C6) ONLY when the note actually landed. A null /
+        // swallowed post means the student saw nothing — recording a DELIVERED unit (and superseding the real
+        // prior) would corrupt the ledger exactly like the PR TRANSIENT no-op (A3). Best-effort, REQUIRES_NEW +
+        // try/catch so it can never affect the issue note the developer already received. Issues have no inline
+        // placements.
+        if (!posted) {
+            return;
+        }
         try {
             feedbackLedgerRecorder.record(job, delivery, WorkArtifact.ISSUE, List.of());
         } catch (RuntimeException e) {

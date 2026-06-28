@@ -98,14 +98,38 @@ public class FeedbackLedgerRecorder {
      * @param inlineSignals the per-inline-note delivery outcomes (vendor note id, thread id, disposition)
      *     emitted by the inline channel; empty for issues and for channels that cannot reconcile per-thread
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(
         AgentJob job,
         DeliveryContent delivery,
         WorkArtifact artifact,
         List<DeliveredSignal> inlineSignals
     ) {
+        record(job, delivery, artifact, inlineSignals, true);
+    }
+
+    /**
+     * Record the ledger, gated on whether the summary actually landed this run.
+     *
+     * <p>When {@code summaryDelivered} is {@code false} — a TRANSIENT no-op kept the PRIOR run's summary live
+     * and posted nothing this run — the recorder writes NOTHING: no fresh DELIVERED unit and (critically) no
+     * supersession of the still-live prior unit. Recording a phantom DELIVERED row for words the student never
+     * saw, while flipping the real prior to SUPERSEDED, corrupts {@code findRecentDeliveredForRecipient} so the
+     * mentor would coach against feedback that was never delivered.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void record(
+        AgentJob job,
+        DeliveryContent delivery,
+        WorkArtifact artifact,
+        List<DeliveredSignal> inlineSignals,
+        boolean summaryDelivered
+    ) {
         if (delivery == null) {
+            return;
+        }
+        if (!summaryDelivered) {
+            // Nothing landed this run: the prior summary (and its DELIVERED ledger unit) is still what the
+            // student sees. Do not write a phantom DELIVERED row or supersede the live prior.
             return;
         }
         List<Observation> findings = observationRepository.findByAgentJobId(job.getId());

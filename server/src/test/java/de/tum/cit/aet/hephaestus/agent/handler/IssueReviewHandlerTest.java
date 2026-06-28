@@ -44,6 +44,9 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     @Mock
     private PullRequestCommentPoster commentPoster;
 
+    @Mock
+    private FeedbackLedgerRecorder feedbackLedgerRecorder;
+
     private IssueReviewHandler handler;
 
     @BeforeEach
@@ -56,7 +59,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             new PracticeDetectionResultParser(objectMapper),
             deliveryService,
             commentPoster,
-            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
+            feedbackLedgerRecorder
         );
     }
 
@@ -159,6 +162,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
             verify(commentPoster).postIssueFormattedBody(eq(job), any());
             assertThat(job.getDeliveryCommentId()).isEqualTo("gid://gitlab/Note/9");
+            // C12: a confirmed post records the ledger.
+            verify(feedbackLedgerRecorder).record(eq(job), any(), any(), any());
         }
 
         @Test
@@ -168,6 +173,22 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
             assertThatCode(() -> handler.postIssueNote(job, note())).doesNotThrowAnyException();
             assertThat(job.getDeliveryCommentId()).isNull();
+            // C12: a swallowed delivery failure means the student saw nothing — the ledger must NOT record a
+            // phantom DELIVERED unit (which would also supersede the real prior, corrupting it like A3).
+            verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+        }
+
+        @Test
+        void nullCommentId_doesNotRecordPhantomDelivered() {
+            // C12: a best-effort post that returns no comment id (vendor returned nothing without raising) means
+            // nothing landed — the ledger must NOT record a DELIVERED unit for feedback the student never saw.
+            AgentJob job = issueJob("OPEN");
+            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenReturn(null);
+
+            handler.postIssueNote(job, note());
+
+            assertThat(job.getDeliveryCommentId()).isNull();
+            verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
         }
 
         @Test
