@@ -1183,7 +1183,12 @@ class DeliveryComposer {
                 String body = principle.isEmpty() ? clean : clean + "\n\n" + principle.strip();
                 notes.add(
                     new DiffNote(
-                        suggested.filePath(),
+                        // Repo-relativise the anchor path so the inline note targets the same file path the
+                        // summary line shows. The agent's suggested path can carry the raw repo-mount prefix
+                        // (inputs/sources/scm/repo/…); the downstream poster anchors on a repo-relative diff
+                        // path, so a raw-prefixed anchor mis-anchors or is dropped while the summary still
+                        // names the finding.
+                        repoRelative(suggested.filePath()),
                         suggested.startLine(),
                         suggested.endLine(),
                         body,
@@ -1223,7 +1228,9 @@ class DeliveryComposer {
             String body = composeDiffNoteBody(f, whyBySlug, emittedWhy);
             if (body != null && !body.isBlank()) {
                 // Synthesized note inherits the finding's correlation key, same as the suggested-note branch.
-                notes.add(new DiffNote(pathNode.asString(), startLine, endLine, body, f.recurrenceKey()));
+                // Repo-relativise the anchor path (mirrors extractPrimaryLocation and the grounding guard) so
+                // the inline note targets the same repo-relative path the summary shows.
+                notes.add(new DiffNote(repoRelative(pathNode.asString()), startLine, endLine, body, f.recurrenceKey()));
             }
         }
 

@@ -1651,6 +1651,63 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.diffNotes().get(0).recurrenceKey()).isEqualTo("corr-scrub-789");
     }
 
+    @Test
+    void compose_synthesizedDiffNote_anchorPathIsRepoRelativised() {
+        // A1: the synthesized inline note's filePath must be stripped of the repo-mount prefix
+        // (inputs/sources/scm/repo/…) so it anchors on the same repo-relative path the summary shows —
+        // a raw-prefixed anchor mis-anchors/drops the note downstream while the summary still names the finding.
+        var f = negativeFinding(
+            "code-hygiene",
+            "Unused import",
+            Severity.MINOR,
+            List.of(new LocationSpec("inputs/sources/scm/repo/src/components/Button.tsx", 1)),
+            null,
+            "Remove unused imports.",
+            "Delete the import."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(f));
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).filePath()).isEqualTo("src/components/Button.tsx");
+    }
+
+    @Test
+    void compose_agentSuggestedDiffNote_anchorPathIsRepoRelativised() {
+        // A1: the agent's suggested note carries a raw repo-mount path; the emitted note must be repo-relative.
+        // A grounding diff (b/ side = repo-relative path) admits the anchor so the suggested branch runs.
+        DiffNote suggested = new DiffNote(
+            "inputs/sources/scm/repo/src/components/Button.tsx",
+            1,
+            null,
+            "Remove this unused import."
+        );
+        ValidatedFinding stamped = new ValidatedFinding(
+            "code-hygiene",
+            "Unused import",
+            Presence.ABSENT,
+            Assessment.BAD,
+            Severity.MINOR,
+            0.9f,
+            buildEvidence(List.of(new LocationSpec("inputs/sources/scm/repo/src/components/Button.tsx", 1)), null),
+            "Remove unused imports.",
+            "Delete the import.",
+            List.of(suggested)
+        ).withRecurrenceKey("corr-relativise-1");
+
+        String diff =
+            "diff --git a/src/components/Button.tsx b/src/components/Button.tsx\n" +
+            "@@ -1,1 +1,1 @@\n" +
+            "+import React from 'react';\n";
+
+        DeliveryContent result = DeliveryComposer.compose(List.of(stamped), WorkArtifact.PULL_REQUEST, Map.of(), diff);
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).filePath()).isEqualTo("src/components/Button.tsx");
+    }
+
     // Transferable-principle ("Why this matters") surfacing — the catalogue whyItMatters wired into delivery.
 
     private static final String SCOPE_WHY =

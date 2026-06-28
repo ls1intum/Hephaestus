@@ -269,6 +269,42 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         verify(client, never()).documentName("CreateMergeRequestNote");
     }
 
+    /**
+     * A2: a mid-batch rate limit must NOT reap still-current threads. The un-processed remainder never
+     * registered its key in seenKeys, so destroyVanishedThreads would see a still-current finding as
+     * "vanished" and delete its live thread. The fix skips the destroy entirely on a rate-limited run.
+     */
+    @Test
+    void rateLimitMidBatchDoesNotDeleteStillCurrentThreads() {
+        stubResolvedMr();
+        // Prior bot thread for ck-keep — STILL CURRENT (the batch below still contains ck-keep).
+        Map<String, Object> keepDisc = discussion(
+            "gid://Disc/KEEP",
+            List.of(note("gid://Note/KEEP", "kept finding " + MARKER + "\n" + ckTag("ck-keep"), false))
+        );
+        stubDiscussionsReturning(List.of(keepDisc));
+
+        // CreateDiffNote throws a rate-limit error on the FIRST finding (ck-a) → the batch stops before ck-keep
+        // is processed, so ck-keep never reaches seenKeys.
+        HttpGraphQlClient.RequestSpec diffSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("CreateDiffNote")).thenReturn(diffSpec);
+        when(diffSpec.variable(any(), any())).thenReturn(diffSpec);
+        when(diffSpec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(
+                new InlineFinding(new DiffAnchor("src/A.java", 10, null), "fix-a", MARKER, "ck-a"),
+                new InlineFinding(new DiffAnchor("src/Keep.java", 20, null), "fix-keep", MARKER, "ck-keep")
+            )
+        );
+
+        // The rate-limited run must skip the destroy ENTIRELY (no DestroyNote document is even requested), so the
+        // still-current ck-keep thread cannot be reaped despite never reaching seenKeys this run.
+        verify(client, never()).documentName("DestroyNote");
+        assertThat(result.failed()).isEqualTo(2);
+    }
+
     @Test
     void clearStalePreservesHumanRepliedThreads() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);

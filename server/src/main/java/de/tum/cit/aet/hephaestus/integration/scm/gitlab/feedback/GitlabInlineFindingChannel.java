@@ -135,6 +135,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         int posted = 0;
         int failed = 0;
         int remaining = findings.size();
+        boolean rateLimited = false;
         Set<String> seenKeys = new HashSet<>();
         List<DeliveredSignal> signals = new ArrayList<>(findings.size());
 
@@ -188,6 +189,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 log.warn("GitLab rate limit hit during diff note posting — stopping: workspaceId={}", scopeId);
                 failed += remaining + 1;
                 signals.add(failedSignal(finding));
+                rateLimited = true;
                 break;
             }
         }
@@ -195,7 +197,12 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         // Delete only the prior bot threads that this run did NOT re-emit and that no developer touched — the
         // findings that genuinely went away. Edited/preserved threads are excluded by key; human-replied ones
         // are never destroyed.
-        int deletedGone = destroyVanishedThreads(scopeId, priorByKey, seenKeys);
+        //
+        // NEVER reap on a mid-batch rate limit: a 429 abandons the loop before the un-processed findings could
+        // register their keys in seenKeys, so destroyVanishedThreads would see still-current findings as
+        // "vanished" and delete their live threads. Skip the destroy entirely this run; the next reconcile
+        // (with a full seenKeys) reaps anything genuinely gone.
+        int deletedGone = rateLimited ? 0 : destroyVanishedThreads(scopeId, priorByKey, seenKeys);
 
         log.info(
             "Reconciled GitLab inline findings: posted/edited={}, failed={}, deleted-gone={}, workspaceId={}",
