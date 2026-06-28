@@ -10,12 +10,15 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderReposito
 import de.tum.cit.aet.hephaestus.integration.core.connection.GitProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -42,6 +45,9 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeAreaRepository practiceAreaRepository;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -756,6 +762,79 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             Observation found = observationRepository.findById(id).orElseThrow();
             assertThat(found.getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
+        }
+    }
+
+    @Nested
+    class AreaStandingCorroborationTests {
+
+        /**
+         * The native COUNT(DISTINCT artifact_id) / MAX(confidence) the standing floor (P4) keys on must be
+         * computed correctly against real Postgres — a unit test mocks the row, so the SQL itself is only
+         * exercised here. Two distinct PRs flagged BAD on the same area → distinctTargets=2; the max
+         * confidence across the group is surfaced for the quarantine floor.
+         */
+        @Test
+        @DisplayName("area-standing row carries COUNT(DISTINCT target) and MAX(confidence) for the P4 floor")
+        void areaStandingExposesDistinctTargetsAndMaxConfidence() {
+            PracticeArea area = new PracticeArea();
+            area.setWorkspace(workspace);
+            area.setSlug("robust-error-handling");
+            area.setName("Handling failure robustly");
+            area = practiceAreaRepository.save(area);
+            practice.setArea(area);
+            practice = practiceRepository.save(practice);
+
+            Instant since = Instant.parse("2026-01-01T00:00:00Z");
+            // Same BAD/MAJOR gap on two distinct PRs (artifact 10 and 11), differing confidence.
+            insertAreaFinding("as-1", 10L, "ABSENT", "BAD", "MAJOR", 0.4f, Instant.parse("2026-03-20T10:00:00Z"));
+            insertAreaFinding("as-2", 11L, "ABSENT", "BAD", "MAJOR", 0.7f, Instant.parse("2026-03-21T10:00:00Z"));
+
+            List<AreaStandingRow> rows = observationRepository.findAreaStandingByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                since,
+                since
+            );
+
+            AreaStandingRow bad = rows
+                .stream()
+                .filter(r -> r.getAssessment() == Assessment.BAD)
+                .findFirst()
+                .orElseThrow();
+            assertThat(bad.getCount()).isEqualTo(2L);
+            assertThat(bad.getDistinctTargets()).isEqualTo(2L);
+            assertThat(bad.getMaxConfidence()).isEqualTo(0.7f);
+        }
+
+        private void insertAreaFinding(
+            String key,
+            long artifactId,
+            String presence,
+            String assessment,
+            String severity,
+            float confidence,
+            Instant at
+        ) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                agentJob.getId(),
+                practice.getId(),
+                null,
+                "PULL_REQUEST",
+                artifactId,
+                aboutUser.getId(),
+                "Area standing finding",
+                presence,
+                assessment,
+                severity,
+                confidence,
+                null,
+                null,
+                null,
+                at
+            );
         }
     }
 }

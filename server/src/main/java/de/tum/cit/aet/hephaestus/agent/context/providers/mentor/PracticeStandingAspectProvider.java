@@ -63,6 +63,38 @@ public class PracticeStandingAspectProvider implements ContentProvider {
     /** Number of priority areas the mentor should lead with. */
     private static final int MAX_PRIORITIES = 3;
 
+    // Upstream-quality floor (P4). A gap must clear these before it can set a MAJOR area-priority or be named
+    // as a corroborated theme — otherwise a single low-confidence BAD on one artifact could become the
+    // student's #1 "growth priority", nagging hardest about a habit they may have exemplified. For a
+    // non-blocking formative system that is the trust-killer.
+
+    /**
+     * Distinct targets (artifact_id) a gap must appear on before it counts as a corroborated, MAJOR-eligible
+     * priority. Below this it stays visible in {@code flaggedCount} but is held out of {@code priorities}
+     * unless the practice's confidence is high (see {@link #CONFIDENT}). Two distinct artifacts is the
+     * minimum at which "this is a habit, not a one-off" is defensible.
+     */
+    private static final int CORROBORATION_TARGETS = 2;
+
+    /**
+     * Confidence at/above which a single-target gap is still trusted enough to prioritise (the detector is
+     * sure even if it only saw it once). Below {@link #QUARANTINE} a gap is too speculative to headline at
+     * all. The 0.5 quarantine floor is the midpoint of the [0,1] confidence scale: a coin-flip hunch is not
+     * a basis to nag a learner; 0.8 marks the detector's well-calibrated "confident" band (matching the
+     * trend classifier's default-confidence fixtures).
+     */
+    private static final float CONFIDENT = 0.8f;
+
+    /** Below this confidence a gap is quarantined: counted, but never a headline priority. */
+    private static final float QUARANTINE = 0.5f;
+
+    /**
+     * Minimum flagged observations in the window before an area may be reported as {@code regressing}. A
+     * trajectory verdict off one or two observations is noise, not a trend (P4: "never a verdict off ≤2
+     * observations").
+     */
+    private static final int MIN_FLAGS_FOR_TREND = 3;
+
     private static final String CACHE_NAME = "mentor_practice_standing_aspect";
 
     private final UserRepository userRepository;
@@ -129,6 +161,8 @@ public class PracticeStandingAspectProvider implements ContentProvider {
             AreaAcc a = areas.computeIfAbsent(r.getAreaSlug(), k -> new AreaAcc(k, r.getAreaName()));
             long count = r.getCount() == null ? 0 : r.getCount();
             long recent = r.getRecentCount() == null ? 0 : r.getRecentCount();
+            long distinct = r.getDistinctTargets() == null ? 0 : r.getDistinctTargets();
+            float conf = r.getMaxConfidence() == null ? 0f : r.getMaxConfidence();
             Presence v = r.getPresence();
             Assessment assessment = r.getAssessment();
             if (v == Presence.NOT_APPLICABLE) {
@@ -138,8 +172,13 @@ public class PracticeStandingAspectProvider implements ContentProvider {
                 a.recentFlagged += recent;
                 a.priorFlagged += (count - recent);
                 a.topSeverity = worst(a.topSeverity, r.getSeverity());
+                // Corroboration/confidence are tracked against the WORST-severity flagged row so the floor
+                // decision (does this gap deserve to headline?) keys on the same signal that sets topSeverity.
+                a.flaggedDistinctTargets = Math.max(a.flaggedDistinctTargets, distinct);
+                a.flaggedMaxConfidence = Math.max(a.flaggedMaxConfidence, conf);
             } else if (assessment == Assessment.GOOD) {
                 a.affirmedCount += count;
+                a.affirmedDistinctTargets = Math.max(a.affirmedDistinctTargets, distinct);
             }
         }
 
@@ -152,10 +191,23 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         List<AreaAcc> priorityCandidates = new ArrayList<>();
         for (AreaAcc a : areas.values()) {
             boolean assessed = (a.flaggedCount + a.affirmedCount) > 0;
+            // A gap clears the upstream-quality floor (P4) when it is corroborated across enough distinct
+            // targets, OR the detector is confident about the single sighting. Below the quarantine floor it
+            // is too speculative to act on at all. This is the gate for "is this a real theme to coach?".
+            boolean gapCorroborated = a.flaggedCount > 0 && corroborated(a);
+            // An ASSESSED-but-uncorroborated area (only quarantined/single-target gaps, no affirmations) is
+            // NOT_MEASURED, not a gap: the work didn't surface enough signal to judge it. Distinct from BLIND
+            // (the area cannot be exercised by this kind of work at all). Matches mentor system.md.
+            String assessmentState = !assessed
+                ? "BLIND"
+                : (gapCorroborated || a.affirmedCount > 0)
+                    ? "ASSESSED"
+                    : "NOT_MEASURED";
+
             ObjectNode g = areasArr.addObject();
             g.put("areaSlug", a.slug);
             g.put("areaName", a.name);
-            g.put("assessmentState", assessed ? "ASSESSED" : "BLIND");
+            g.put("assessmentState", assessmentState);
             g.put("flaggedCount", a.flaggedCount);
             g.put("affirmedCount", a.affirmedCount);
             g.put("naCount", a.naCount);
@@ -165,7 +217,9 @@ public class PracticeStandingAspectProvider implements ContentProvider {
             }
             g.put("recentFlagged", a.recentFlagged);
             g.put("trajectory", trajectory(a));
-            if (assessed && a.flaggedCount > 0) {
+            // Only a corroborated gap may set an area priority — a single low-confidence BAD stays counted
+            // but never becomes a headline the mentor steers toward.
+            if (gapCorroborated) {
                 priorityCandidates.add(a);
             }
         }
@@ -188,7 +242,65 @@ public class PracticeStandingAspectProvider implements ContentProvider {
             n.put("flaggedCount", a.flaggedCount);
             n.put("recentFlagged", a.recentFlagged);
         }
+
+        // P6: one synthesized cross-artifact theme — the one durable corroborated strength and the one
+        // durable corroborated gap (each spanning the most distinct targets), single-artifact/low-confidence
+        // findings excluded. Turns the sorted area list into the longitudinal headline a standing view is for.
+        writeHeadline(root, areas.values(), priorityCandidates);
         return root;
+    }
+
+    /**
+     * A flagged area clears the corroboration/quarantine floor (P4) when its worst gap appears on
+     * {@link #CORROBORATION_TARGETS}+ distinct targets, OR the detector is {@link #CONFIDENT} about it on a
+     * single target. A gap below the {@link #QUARANTINE} confidence floor never clears, regardless of count.
+     */
+    private static boolean corroborated(AreaAcc a) {
+        if (a.flaggedMaxConfidence < QUARANTINE) {
+            return false;
+        }
+        return a.flaggedDistinctTargets >= CORROBORATION_TARGETS || a.flaggedMaxConfidence >= CONFIDENT;
+    }
+
+    /**
+     * Synthesizes the {@code headline} object: the most-corroborated durable strength and gap, each excluding
+     * single-artifact / low-confidence findings, so the mentor can name the cross-artifact theme rather than
+     * just the top of a sorted checklist. Either side may be absent (null) when nothing durable qualifies.
+     */
+    private static void writeHeadline(ObjectNode root, Iterable<AreaAcc> areas, List<AreaAcc> corroboratedGaps) {
+        AreaAcc strength = null;
+        for (AreaAcc a : areas) {
+            // A durable strength: affirmed across the MOST distinct targets (≥ corroboration threshold).
+            if (a.affirmedCount > 0 && a.affirmedDistinctTargets >= CORROBORATION_TARGETS) {
+                if (strength == null || a.affirmedDistinctTargets > strength.affirmedDistinctTargets) {
+                    strength = a;
+                }
+            }
+        }
+        // The durable gap: most distinct targets among the already-corroborated gaps (worst severity breaks ties).
+        AreaAcc gap = corroboratedGaps
+            .stream()
+            .max(
+                Comparator.<AreaAcc>comparingLong(a -> a.flaggedDistinctTargets).thenComparingInt(a ->
+                    a.topSeverity == null ? -1 : (Severity.values().length - a.topSeverity.ordinal())
+                )
+            )
+            .orElse(null);
+
+        ObjectNode headline = root.putObject("headline");
+        if (strength != null) {
+            headline.putObject("durableStrength").put("areaSlug", strength.slug).put("areaName", strength.name);
+        } else {
+            headline.putNull("durableStrength");
+        }
+        if (gap != null) {
+            ObjectNode g = headline.putObject("durableGap").put("areaSlug", gap.slug).put("areaName", gap.name);
+            if (gap.topSeverity != null) {
+                g.put("topSeverity", gap.topSeverity.name());
+            }
+        } else {
+            headline.putNull("durableGap");
+        }
     }
 
     @Nullable
@@ -206,8 +318,12 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         if (a.flaggedCount == 0) {
             return "none";
         }
+        // Trend safety (P4): never broadcast "regressing" off too few observations — a verdict on ≤2 flags is
+        // noise, not a trend, and a false "you're getting worse" is corrosive in a formative system. Below the
+        // floor we report "steady" (honest: not enough to claim a direction). Easing (improving) is safe to
+        // surface at any count — it never nags.
         if (a.recentFlagged > a.priorFlagged) {
-            return "regressing";
+            return a.flaggedCount >= MIN_FLAGS_FOR_TREND ? "regressing" : "steady";
         }
         if (a.recentFlagged < a.priorFlagged) {
             return "improving";
@@ -224,6 +340,13 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         long naCount;
         long recentFlagged;
         long priorFlagged;
+
+        /** Distinct targets the WORST flagged signal spans, and its strongest confidence — the P4 floor inputs. */
+        long flaggedDistinctTargets;
+        float flaggedMaxConfidence;
+
+        /** Distinct targets the affirmations span — the durable-strength signal for the P6 headline. */
+        long affirmedDistinctTargets;
 
         @Nullable
         Severity topSeverity;

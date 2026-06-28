@@ -467,7 +467,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         value = """
         SELECT pa.slug AS "areaSlug", pa.name AS "areaName",
                f.presence AS "presence", f.assessment AS "assessment", f.severity AS "severity", COUNT(f.id) AS "count",
-               SUM(CASE WHEN f.observed_at >= :recentSince THEN 1 ELSE 0 END) AS "recentCount"
+               SUM(CASE WHEN f.observed_at >= :recentSince THEN 1 ELSE 0 END) AS "recentCount",
+               COUNT(DISTINCT f.artifact_id) AS "distinctTargets",
+               MAX(f.confidence) AS "maxConfidence"
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
         JOIN practice_area pa ON pa.id = p.practice_area_id
@@ -500,5 +502,19 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         de.tum.cit.aet.hephaestus.practices.model.Severity getSeverity();
         Long getCount();
         Long getRecentCount();
+
+        /**
+         * Distinct review targets (artifact_id) contributing to this row — the corroboration signal the
+         * standing floor keys on (P4). One BAD on one PR is {@code 1}; the same gap on two distinct PRs is
+         * {@code 2}. A single-target gap must not set MAJOR area-priority on its own (see
+         * {@code PracticeStandingAspectProvider}).
+         */
+        Long getDistinctTargets();
+
+        /**
+         * The strongest (highest) confidence in this row's group — the quarantine signal (P4). A very
+         * low-confidence BAD must not become a headline priority on the detector's hunch alone.
+         */
+        Float getMaxConfidence();
     }
 }

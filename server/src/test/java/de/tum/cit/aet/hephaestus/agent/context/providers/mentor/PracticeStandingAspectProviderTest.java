@@ -70,6 +70,10 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         return p;
     }
 
+    /**
+     * Legacy 7-arg row: corroborated by construction (2 distinct targets, high confidence) so the existing
+     * floor-agnostic assertions keep passing. New floor tests use the 9-arg overload to set the P4 inputs.
+     */
     private static AreaStandingRow row(
         String slug,
         String name,
@@ -78,6 +82,20 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
         Severity sev,
         long count,
         long recent
+    ) {
+        return row(slug, name, v, assessment, sev, count, recent, 2L, 0.9f);
+    }
+
+    private static AreaStandingRow row(
+        String slug,
+        String name,
+        Presence v,
+        Assessment assessment,
+        Severity sev,
+        long count,
+        long recent,
+        long distinctTargets,
+        float maxConfidence
     ) {
         return new AreaStandingRow() {
             @Override
@@ -113,6 +131,16 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
             @Override
             public Long getRecentCount() {
                 return recent;
+            }
+
+            @Override
+            public Long getDistinctTargets() {
+                return distinctTargets;
+            }
+
+            @Override
+            public Float getMaxConfidence() {
+                return maxConfidence;
             }
         };
     }
@@ -325,5 +353,178 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
             List.of(row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, count, recent))
         );
         return area(root, "g").get("trajectory").asString();
+    }
+
+    // --- P4/P6 upstream-quality floor ---
+
+    @Test
+    @DisplayName("a single low-confidence BAD does NOT set an area priority and reads NOT_MEASURED")
+    void singleLowConfidenceBadIsQuarantined() {
+        List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
+        // one MAJOR gap, one target, confidence 0.4 (below the 0.5 quarantine floor)
+        List<AreaStandingRow> rows = List.of(
+            row(
+                "robust-error-handling",
+                "Handling failure robustly",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MAJOR,
+                1,
+                1,
+                1L,
+                0.4f
+            )
+        );
+        JsonNode root = build(spine, rows);
+
+        JsonNode g = area(root, "robust-error-handling");
+        assertThat(g.get("assessmentState").asString()).isEqualTo("NOT_MEASURED");
+        assertThat(g.get("flaggedCount").asInt()).isEqualTo(1); // still visible, just not a headline
+        assertThat(root.get("priorities")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a corroborated BAD (>=2 distinct targets) DOES set an area priority and reads ASSESSED")
+    void corroboratedBadIsPrioritised() {
+        List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
+        // same MAJOR gap seen on TWO distinct targets, modest confidence (above quarantine, below CONFIDENT)
+        // — corroboration across targets carries it past the floor where confidence alone would not.
+        List<AreaStandingRow> rows = List.of(
+            row(
+                "robust-error-handling",
+                "Handling failure robustly",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MAJOR,
+                2,
+                1,
+                2L,
+                0.6f
+            )
+        );
+        JsonNode root = build(spine, rows);
+
+        JsonNode g = area(root, "robust-error-handling");
+        assertThat(g.get("assessmentState").asString()).isEqualTo("ASSESSED");
+        assertThat(root.get("priorities")).hasSize(1);
+        assertThat(root.get("priorities").get(0).get("areaSlug").asString()).isEqualTo("robust-error-handling");
+    }
+
+    @Test
+    @DisplayName("a confident single-target BAD still prioritises (confidence substitutes for corroboration)")
+    void confidentSingleTargetBadIsPrioritised() {
+        List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
+        List<AreaStandingRow> rows = List.of(
+            row(
+                "robust-error-handling",
+                "Handling failure robustly",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MAJOR,
+                1,
+                1,
+                1L,
+                0.95f
+            )
+        );
+        JsonNode root = build(spine, rows);
+
+        assertThat(area(root, "robust-error-handling").get("assessmentState").asString()).isEqualTo("ASSESSED");
+        assertThat(root.get("priorities")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("regressing requires >=3 flagged observations; below the floor it reads steady")
+    void regressingNeedsThreeFlags() {
+        // recent (2) > prior (0) but only 2 flagged total → too few to claim a direction
+        JsonNode below = build(
+            List.of(practice("g", "Area")),
+            List.of(row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, 2, 2, 2L, 0.9f))
+        );
+        assertThat(area(below, "g").get("trajectory").asString()).isEqualTo("steady");
+
+        // recent (3) > prior (0), 3 flagged → regressing is allowed
+        JsonNode at = build(
+            List.of(practice("g", "Area")),
+            List.of(row("g", "Area", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, 3, 3, 2L, 0.9f))
+        );
+        assertThat(area(at, "g").get("trajectory").asString()).isEqualTo("regressing");
+    }
+
+    @Test
+    @DisplayName("headline names the durable corroborated strength and gap, excluding single-target noise")
+    void headlineNamesDurableStrengthAndGap() {
+        List<Practice> spine = new ArrayList<>(
+            List.of(
+                practice("review-ready-work", "Submitting review-ready work"),
+                practice("robust-error-handling", "Handling failure robustly"),
+                practice("noise-area", "Noisy single-target gap")
+            )
+        );
+        List<AreaStandingRow> rows = List.of(
+            // durable strength: affirmed across 3 distinct targets
+            row(
+                "review-ready-work",
+                "Submitting review-ready work",
+                Presence.PRESENT,
+                Assessment.GOOD,
+                null,
+                3,
+                1,
+                3L,
+                0.9f
+            ),
+            // durable gap: flagged across 2 distinct targets
+            row(
+                "robust-error-handling",
+                "Handling failure robustly",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.MAJOR,
+                2,
+                1,
+                2L,
+                0.9f
+            ),
+            // single-target low-confidence gap: must NOT win the headline
+            row(
+                "noise-area",
+                "Noisy single-target gap",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.CRITICAL,
+                1,
+                1,
+                1L,
+                0.3f
+            )
+        );
+        JsonNode root = build(spine, rows);
+
+        JsonNode headline = root.get("headline");
+        assertThat(headline.get("durableStrength").get("areaSlug").asString()).isEqualTo("review-ready-work");
+        assertThat(headline.get("durableGap").get("areaSlug").asString()).isEqualTo("robust-error-handling");
+    }
+
+    @Test
+    @DisplayName("headline gap is null when no gap is corroborated")
+    void headlineGapNullWhenNoneCorroborated() {
+        List<Practice> spine = List.of(practice("noise-area", "Noisy single-target gap"));
+        List<AreaStandingRow> rows = List.of(
+            row(
+                "noise-area",
+                "Noisy single-target gap",
+                Presence.ABSENT,
+                Assessment.BAD,
+                Severity.CRITICAL,
+                1,
+                1,
+                1L,
+                0.3f
+            )
+        );
+        JsonNode root = build(spine, rows);
+        assertThat(root.get("headline").get("durableGap").isNull()).isTrue();
+        assertThat(root.get("headline").get("durableStrength").isNull()).isTrue();
     }
 }
