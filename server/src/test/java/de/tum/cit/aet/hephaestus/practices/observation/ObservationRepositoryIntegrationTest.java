@@ -431,6 +431,55 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
+        @DisplayName("M6: a twice-reviewed target is not double-counted (latest-run dedup)")
+        void countsOnlyLatestRunPerTarget() {
+            // The SAME target (PR 7) reviewed in two runs: an earlier run said ABSENT/BAD, a later run said
+            // PRESENT/GOOD. A naive COUNT/GROUP BY would surface 2 rows (1 ABSENT, 1 PRESENT); the dedup must
+            // keep only the target's CURRENT state — a single PRESENT finding, count 1.
+            AgentJob laterJob = new AgentJob();
+            laterJob.setWorkspace(workspace);
+            laterJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            laterJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            laterJob = agentJobRepository.save(laterJob);
+
+            insertFindingForJob("m6-old", agentJob.getId(), 7L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
+            insertFindingForJob("m6-new", laterJob.getId(), 7L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
+
+            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).hasSize(1);
+            DeveloperPracticeSummary row = result.get(0);
+            assertThat(row.getPresence()).isEqualTo(Presence.PRESENT);
+            assertThat(row.getCount()).isEqualTo(1);
+            assertThat(row.getLastDetectedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
+        }
+
+        private void insertFindingForJob(String key, UUID jobId, long artifactId, String presence, Instant at) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                jobId,
+                practice.getId(),
+                null,
+                "PULL_REQUEST",
+                artifactId,
+                aboutUser.getId(),
+                "Test observation",
+                presence,
+                "PRESENT".equals(presence) ? "GOOD" : "BAD",
+                "INFO",
+                0.9f,
+                null,
+                null,
+                null,
+                at
+            );
+        }
+
+        @Test
         void groupsByPracticeSlug() {
             Practice secondPractice = new Practice();
             secondPractice.setWorkspace(workspace);

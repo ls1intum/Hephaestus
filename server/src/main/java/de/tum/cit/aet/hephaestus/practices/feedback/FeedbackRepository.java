@@ -21,11 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Feedback is scoped by a raw workspace_id scalar (cross-module FK), not a Workspace association")
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
-    /**
-     * All feedback units produced by a given agent job, in insertion order via {@code position}.
-     */
-    List<Feedback> findByAgentJobIdOrderByPositionAsc(UUID agentJobId);
-
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 
@@ -94,4 +89,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Transactional
     @Query(value = "UPDATE feedback SET delivery_state = :state WHERE id = :id", nativeQuery = true)
     int updateState(@Param("id") UUID id, @Param("state") String state);
+
+    /**
+     * Purge all feedback for a workspace. The soft-delete that drives a workspace purge never fires the
+     * RESTRICT FK on {@code feedback}, so feedback (and its CASCADE children {@code feedback_observation},
+     * {@code feedback_placement}, {@code feedback_reaction}) would otherwise persist indefinitely. Called
+     * first by the practices purge contributor.
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
+    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

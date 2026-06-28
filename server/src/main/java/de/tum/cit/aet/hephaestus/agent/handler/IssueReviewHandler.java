@@ -230,7 +230,15 @@ public class IssueReviewHandler implements JobTypeHandler {
             if (commentId != null) {
                 job.setDeliveryCommentId(commentId);
                 log.info("Issue feedback posted: jobId={}, commentId={}", job.getId(), commentId);
+            } else {
+                // Best-effort issue post returned no comment id (vendor returned nothing without raising).
+                // Issue delivery is intentionally best-effort, so this is not fatal — but log it for diagnosis.
+                log.warn("Issue feedback post returned no comment id (best-effort): jobId={}", job.getId());
             }
+        } catch (JobDeliveryException e) {
+            // A genuine delivery failure (the agent ran, but the student saw nothing) must NOT be reported
+            // as DELIVERED — re-throw so the job is recorded as failed, matching the PR path.
+            throw e;
         } catch (RuntimeException e) {
             log.warn("Issue feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }

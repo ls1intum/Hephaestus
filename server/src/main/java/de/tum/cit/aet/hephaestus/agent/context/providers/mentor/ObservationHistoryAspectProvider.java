@@ -160,7 +160,9 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
             node.put("severity", severity == null ? null : severity.name());
             node.put("confidence", f.getConfidence());
             node.put("observedAt", f.getObservedAt().toString());
-            // The observation-history node carries title + presence + assessment + severity + reasoning only. Advice is NOT on the
+            node.put("reasoning", f.getReasoning());
+            // The observation-history node carries title + presence + assessment + severity + reasoning only.
+            // The mentor (system.md) pulls a finding's reasoning from here. Advice/guidance is NOT on the
             // finding (ADR 0021) — the mentor receives the sanitised delivered feedback body via
             // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
             // raw, unsanitised text DeliveryComposer would never post.

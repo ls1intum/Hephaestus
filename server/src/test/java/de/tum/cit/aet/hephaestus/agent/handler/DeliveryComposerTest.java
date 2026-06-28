@@ -735,6 +735,25 @@ class DeliveryComposerTest extends BaseUnitTest {
                 "Metadata lists 13 non-merge commits (T = 13). Three commit subjects combine distinct concerns with \"and\", giving K = 3. Separate each logical change into its own commit.",
                 List.of("T = 13", "K = 3"),
                 "Separate each logical change into its own commit."
+            ),
+            // ADR-0022 presence/assessment rubric vocabulary the model is now prompted on.
+            Arguments.of(
+                "adr-0022 presence/assessment 'is' phrasing",
+                "The PR body omits any rationale. The presence is ABSENT so the assessment is BAD. Add a short Why section.",
+                List.of("presence is ABSENT", "assessment is BAD"),
+                "Add a short Why section."
+            ),
+            Arguments.of(
+                "adr-0022 presence/assessment tuple",
+                "The error path is swallowed silently. This lands as (PRESENT, BAD) in the rubric. Rethrow or log the failure so it is visible.",
+                List.of("(PRESENT, BAD)"),
+                "Rethrow or log the failure so it is visible."
+            ),
+            Arguments.of(
+                "adr-0022 assessment band-routing arrow",
+                "No tests accompany the change. presence ABSENT -> BAD per the criteria. Add a test that exercises the new branch.",
+                List.of("-> BAD"),
+                "Add a test that exercises the new branch."
             )
         );
     }

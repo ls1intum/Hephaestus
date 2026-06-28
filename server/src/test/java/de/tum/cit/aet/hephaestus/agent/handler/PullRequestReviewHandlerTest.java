@@ -489,6 +489,43 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         @SuppressWarnings("unchecked")
+        void hardcodedSecretCriticalSurvivesCoercion() {
+            // M1 guard: hardcoded-secrets is blocking-eligible, so a CRITICAL secret finding must NOT be capped
+            // to MINOR by the advisory ceiling in coerceCoherence. The band the handler hands to deliver() is
+            // what persists + delivers, so assert it there.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "hardcoded-secrets",
+                    "title": "Hard-coded credential",
+                    "presence": "PRESENT",
+                    "assessment": "BAD",
+                    "severity": "CRITICAL",
+                    "confidence": 0.99,
+                    "reasoning": "A live API key is committed.",
+                    "evidence": { "locations": [{ "path": "Sources/Config.swift", "startLine": 3 }] }
+                  }]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
+
+            handler.deliver(job);
+
+            List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
+            var secret = delivered
+                .stream()
+                .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
+                .findFirst()
+                .orElseThrow();
+            assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
         void stampsDeliveryObservationFingerprintOntoComposedDiffNote() {
             // A NOT_OBSERVED finding with a code location synthesizes an inline diff note. The key deliver()
             // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the

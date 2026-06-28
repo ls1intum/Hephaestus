@@ -229,23 +229,34 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * history summary. The {@code idx_observation_subject} index on {@code (about_user_id)} narrows the
      * initial scan by about-user.
      *
+     * <p>Re-review deduped to each target's latest run (same grain as the sibling histogram queries), so a
+     * twice-reviewed target contributes only its current state rather than inflating the good/bad counts that
+     * drive the contributor-history ranking.
+     *
      * @param aboutUserId the about-user whose history to aggregate
      * @param workspaceId   the workspace scope (via practice → workspace relationship)
      * @return aggregated summary rows ordered by slug then presence, empty if no findings exist
      */
     @Query(
-        """
-        SELECT pf.practice.slug AS practiceSlug,
-               pf.presence AS presence,
-               pf.assessment AS assessment,
-               COUNT(pf) AS count,
-               MAX(pf.observedAt) AS lastDetectedAt
-        FROM Observation pf
-        WHERE pf.aboutUserId = :aboutUserId
-          AND pf.practice.workspace.id = :workspaceId
-        GROUP BY pf.practice.slug, pf.presence, pf.assessment
-        ORDER BY pf.practice.slug, pf.presence
-        """
+        value = """
+        SELECT p.slug AS practiceSlug,
+               f.presence AS presence,
+               f.assessment AS assessment,
+               COUNT(f.id) AS count,
+               MAX(f.observed_at) AS lastDetectedAt
+        FROM observation f
+        JOIN practice p ON p.id = f.practice_id
+        WHERE f.about_user_id = :aboutUserId
+          AND p.workspace_id = :workspaceId
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM observation f2
+              WHERE f2.artifact_type = f.artifact_type AND f2.artifact_id = f.artifact_id
+              ORDER BY f2.observed_at DESC LIMIT 1
+          )
+        GROUP BY p.slug, f.presence, f.assessment
+        ORDER BY p.slug, f.presence
+        """,
+        nativeQuery = true
     )
     List<DeveloperPracticeSummary> findDeveloperPracticeSummary(
         @Param("aboutUserId") Long aboutUserId,

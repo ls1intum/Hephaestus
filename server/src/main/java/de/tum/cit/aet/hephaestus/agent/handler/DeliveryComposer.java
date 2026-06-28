@@ -524,7 +524,12 @@ class DeliveryComposer {
             // Rubric-mechanics / criteria-computation phrasings the model can echo (it repeats the
             // criteria's internal bucket maths and preamble tags into the reasoning). Drop the whole sentence.
             "\\braw\\s+bucket\\b|" +
-            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" +
+            "->\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE|PRESENT|ABSENT|GOOD|BAD)\\b|" +
+            // ADR-0022 presence/assessment rubric vocabulary the model is now prompted on. "the presence is
+            // ABSENT", "the assessment is BAD", or the tuple "(PRESENT, GOOD)" are the grader narrating the
+            // rubric to itself — drop the whole sentence.
+            "\\b(?:presence|assessment)\\s+is\\s+(?:PRESENT|ABSENT|NOT[_ ]APPLICABLE|GOOD|BAD)\\b|" +
+            "\\((?:PRESENT|ABSENT|NOT[_ ]APPLICABLE)\\s*,\\s*(?:GOOD|BAD)\\)|" +
             "\\b(?:DEFECT-DETECTOR|OBSERVED\\s+DISCIPLINE|GROUNDING\\s+GATE|EPIC\\s+EXCEPTION|EPIC/CORE-REQUIREMENT)\\b|" +
             "\\benriched\\s*[=:]|" +
             "\\b[AUDFN]\\s*\\+\\s*[AUDFN]\\s*==?\\s*\\d|" + // grader bucket arithmetic e.g. A+D=4420 (two-operand)
@@ -550,7 +555,7 @@ class DeliveryComposer {
             // The model echoes the criteria's classifier flowchart into student-facing reasoning — band maths,
             // gate predicates, catalogue names, and pipeline plumbing. Each lesson survives in the title +
             // guidance without any of this, so drop the sentence.
-            "→\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE)\\b|" + // unicode-arrow band routing
+            "→\\s*(?:MAJOR|MINOR|INFO|CRITICAL|OBSERVED|NOT[_ ]OBSERVED|NOT[_ ]APPLICABLE|PRESENT|ABSENT|GOOD|BAD)\\b|" + // unicode-arrow band routing
             "\\bPer\\s+the\\s+(?:fixed\\s+)?(?:bucketing|criteria|severity\\s+rules?)\\b|" +
             "\\bunder\\s+the\\s+criteria\\b|" +
             "\\b(?:largeness|coherence|spread|epic|significance)\\s+gate\\b|" +
@@ -1096,7 +1101,11 @@ class DeliveryComposer {
         if (evidence == null || evidence.isNull()) return null;
         JsonNode snippets = evidence.get("snippets");
         if (snippets == null || !snippets.isArray() || snippets.isEmpty()) return null;
-        String snippet = snippets.get(0).asString();
+        JsonNode first = snippets.get(0);
+        // Jackson 3 asString() throws on a container node; an off-contract object/array snippet must not abort
+        // the whole job's delivery. Only a textual scalar yields a snippet.
+        if (first == null || !first.isString()) return null;
+        String snippet = first.asString();
         return (snippet != null && !snippet.isBlank()) ? snippet.strip() : null;
     }
 

@@ -84,6 +84,9 @@ public class PracticeDetectionResultParser {
         // Security / data integrity.
         "validates-and-escapes-untrusted-input",
         "avoids-insecure-defaults-and-over-broad-permissions",
+        // A hard-coded credential / secret is a security defect a reviewer must be able to block on; the
+        // synthetic secret finding is injected at CRITICAL/MAJOR and must keep that band through coercion.
+        "hardcoded-secrets",
         // A dishonest test (always-green, asserting nothing, disabled) actively HIDES correctness defects —
         // worse than a missing test, because it manufactures false safety — so it keeps blocking weight.
         "keeps-the-test-suite-honest"
@@ -627,8 +630,9 @@ public class PracticeDetectionResultParser {
          * {@code BAD} finding may never present as a merge-blocker, so its {@code CRITICAL}/{@code MAJOR}
          * band is capped to {@code MINOR}. This lands the lesson as a suggestion rather than a "fix before
          * merging" — reserving the blocking signal for correctness/security/data-integrity practices so the
-         * rare real blocker is not drowned out by the many high-confidence craft critiques. Severity is
-         * delivery-only here; the persisted band on the immutable finding is unchanged.
+         * rare real blocker is not drowned out by the many high-confidence craft critiques. The coerced band
+         * is carried by the returned finding and is what persists (and delivers) — the original instance is
+         * left untouched only because this returns a fresh value, not because the band is delivery-only.
          */
         public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
             Presence p = presence;

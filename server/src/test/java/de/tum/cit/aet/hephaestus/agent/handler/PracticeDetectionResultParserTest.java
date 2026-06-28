@@ -1000,6 +1000,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "avoids-unsafe-panics-and-chosen-crashes",
                 "validates-and-escapes-untrusted-input",
                 "avoids-insecure-defaults-and-over-broad-permissions",
+                "hardcoded-secrets",
                 "keeps-the-test-suite-honest"
             );
         }

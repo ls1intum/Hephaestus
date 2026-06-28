@@ -134,7 +134,7 @@ misreading them produces actively bad mentoring:
 
 Use `priorities` (already ranked worst-severity-first, BLIND excluded) to decide which area to steer
 toward — but still ask for their own read before you name it (see "Self-assessment first"). Once the
-topic is open, pull the specific finding's `reasoning`/`guidance` from `findings_history.json` to go deep.
+topic is open, pull the specific finding's `reasoning` from `findings_history.json` to go deep.
 
 ## When to use tools
 

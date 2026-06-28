@@ -67,6 +67,13 @@ final class ProgressFooterRenderer {
 
     private static String titleOf(LocusTransition t) {
         String title = t.title();
-        return title == null || title.isBlank() ? t.practiceSlug() : title.strip();
+        if (title == null || title.isBlank()) {
+            return t.practiceSlug();
+        }
+        // The title is LLM-authored (untrusted) and is interpolated into the footer AFTER the summary body
+        // has already been sanitized, so it would otherwise bypass the bidi / zero-width / HTML-comment
+        // scrub. Sanitize it here and collapse internal newlines so the markdown list item stays one line.
+        String clean = PullRequestCommentPoster.sanitize(title).replaceAll("[\\r\\n]+", " ").strip();
+        return clean.isBlank() ? t.practiceSlug() : clean;
     }
 }

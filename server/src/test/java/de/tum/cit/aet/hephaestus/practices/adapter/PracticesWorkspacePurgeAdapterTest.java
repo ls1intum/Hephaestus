@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
+
+    @Mock
+    private FeedbackRepository feedbackRepository;
 
     @Mock
     private ObservationRepository observationRepository;
@@ -27,7 +31,12 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new PracticesWorkspacePurgeAdapter(observationRepository, practiceRepository, practiceAreaRepository);
+        adapter = new PracticesWorkspacePurgeAdapter(
+            feedbackRepository,
+            observationRepository,
+            practiceRepository,
+            practiceAreaRepository
+        );
     }
 
     @Test
@@ -36,7 +45,8 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then — findings, practices, and areas are all removed.
+        // Then — feedback (and its CASCADE children), findings, practices, and areas are all removed.
+        verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
         verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
         verify(practiceAreaRepository).deleteAllByWorkspaceId(workspaceId);
