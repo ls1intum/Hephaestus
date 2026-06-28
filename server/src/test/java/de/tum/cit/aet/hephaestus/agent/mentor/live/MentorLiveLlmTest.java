@@ -614,15 +614,16 @@ class MentorLiveLlmTest {
     private Path stageWorkspaceWithRepo(LiveLlmCredentials creds) throws IOException {
         Path workspace = stageWorkspace(creds);
 
-        // Overwrite the minimal system prompt with the production one that lists available tools.
-        Path productionPrompt = Path.of("src", "main", "resources", "agent", "mentor", "system.md").toAbsolutePath();
-        if (Files.exists(productionPrompt)) {
-            Files.copy(
-                productionPrompt,
-                workspace.resolve("agent").resolve("mentor").resolve("system.md"),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING
-            );
-        }
+        // Overwrite the minimal prompt with a small repo-aware one. NOTE: we deliberately do NOT
+        // copy the production system.md here — the production mentor sandbox has no repo checkout,
+        // so that prompt forbids /workspace/repo/. This test exercises the read/bash/grep tools
+        // against a staged repo, which requires a prompt that knows the repo exists.
+        Files.writeString(
+            workspace.resolve("agent").resolve("mentor").resolve("system.md"),
+            "You are a software engineering mentor. You have read/bash/grep tools and can explore " +
+                "the read-only repo checkout at /workspace/repo/ (file contents, git log, diffs). " +
+                "edit/write are denied. Answer concisely.\n"
+        );
 
         // Stage a small git repo with a known file the agent can read.
         Path repoDir = workspace.resolve("repo");

@@ -111,7 +111,10 @@ const findingSchema = {
         presence: presenceSchema,
         assessment: assessmentSchema,
         severity: severitySchema,
-        confidence: { type: "number", minimum: 0, maximum: 1 },
+        // Upper bound is 100, not 1, so a model emitting percentage-style confidence (e.g. 85)
+        // is not rejected at the SDK boundary; normalizeFinding rescales (1,100] -> /100 to
+        // mirror the Java consumer PracticeDetectionResultParser.parseConfidence.
+        confidence: { type: "number", minimum: 0, maximum: 100 },
         evidence: evidenceSchema,
         reasoning: { type: "string", minLength: 1 },
         guidance: { type: "string", minLength: 1 },
@@ -252,7 +255,10 @@ function normalizeFinding(finding) {
     const assessment = isNa ? null : String(finding.assessment ?? "").trim();
     // severity is meaningful only for assessment=BAD; default INFO when absent (parser re-derives it).
     const severity = finding.severity == null ? "INFO" : String(finding.severity).trim() || "INFO";
-    const confidence = Number(finding.confidence);
+    // Salvage percentage-style confidence (value in (1,100] -> /100), mirroring the Java consumer
+    // PracticeDetectionResultParser.parseConfidence; weak models commonly emit e.g. 85 for 0.85.
+    const rawConfidence = Number(finding.confidence);
+    const confidence = rawConfidence > 1 && rawConfidence <= 100 ? rawConfidence / 100 : rawConfidence;
     const reasoning = String(finding.reasoning ?? "").trim();
     const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");

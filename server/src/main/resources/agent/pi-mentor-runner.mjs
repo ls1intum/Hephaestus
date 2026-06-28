@@ -323,9 +323,9 @@ async function ensureRuntime() {
                   })
                 : new DefaultResourceLoader({ cwd, agentDir: agentDir });
             await loader.reload();
-            // Built-in read/bash/grep let the mentor explore the read-only repo checkout
-            // at /workspace/repo/ (git log, diffs, file contents). edit/write are denied —
-            // the mentor is an observer, not a code author.
+            // Built-in read/bash/grep let the mentor inspect the read-only aspect JSON
+            // under inputs/context/*.json (there is no repo checkout in the mentor sandbox).
+            // edit/write are denied — the mentor is an observer, not a code author.
             const result = await createAgentSessionFromServices({
                 services,
                 sessionManager,

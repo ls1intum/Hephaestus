@@ -15,7 +15,7 @@ Each finding is described on TWO independent axes:
    - `BAD` — a problem the developer should act on.
    - Required for every `PRESENT` or `ABSENT` finding; omitted only for `NOT_APPLICABLE` (see the COHERENCE RULE below).
 
-`presence` is measurement — what you saw. `assessment` is valence — whether it is good or bad. They are orthogonal; you decide each per finding by reading the practice criteria and `whatGoodLooksLike`. The 2×2 reads directly:
+`presence` is measurement — what you saw. `assessment` is valence — whether it is good or bad. They are orthogonal; you decide each per finding by reading the practice criteria (in `inputs/practices/all-criteria.md`). The 2×2 reads directly:
 
 | presence \ assessment | GOOD | BAD |
 | --- | --- | --- |
