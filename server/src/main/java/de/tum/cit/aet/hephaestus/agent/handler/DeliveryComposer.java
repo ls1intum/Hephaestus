@@ -56,8 +56,17 @@ class DeliveryComposer {
     /** Non-blocking (MINOR/INFO) suggestions surfaced in full before the rest collapse into an overflow line; blocking findings are never capped. */
     static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
 
-    /** Practices that are inherently non-inlinable (no file-level location). */
-    static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
+    /**
+     * Author-side process practices whose finding critiques the PR as a whole (its description, its commit
+     * series) rather than any single changed line — they have no meaningful diff anchor and must be delivered
+     * in the summary, never as an inline note. Replaces the pre-ADR-0022 phantom slugs
+     * {@code mr-description-quality} / {@code commit-discipline} with the real catalogue slugs.
+     */
+    static final Set<String> NON_INLINABLE_PRACTICES = Set.of(
+        "describe-what-and-why",
+        "commits-are-atomic-and-cohesive",
+        "commit-subjects-explain-each-change"
+    );
 
     /**
      * The "is this single issue well-formed?" near-duplicate pair — scoped-to-one-concern and
