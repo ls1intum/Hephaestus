@@ -99,7 +99,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         assertThat(result.signals())
             .singleElement()
             .satisfies(s -> {
-                assertThat(s.findingFingerprint()).isEqualTo("ck-new");
+                assertThat(s.recurrenceKey()).isEqualTo("ck-new");
                 assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
                 assertThat(s.externalRef()).isEqualTo("gid://Note/NEW");
                 assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/NEW");

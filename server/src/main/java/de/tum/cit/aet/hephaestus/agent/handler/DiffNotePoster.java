@@ -77,9 +77,11 @@ class DiffNotePoster {
 
         List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes == null ? List.of() : diffNotes);
 
-        // Zero-note re-run: nothing to reconcile against, so clear this run's prior inline notes outright —
-        // the empty-diff pathology where a re-reviewed PR keeps line-numbered notes on code no longer in the
-        // diff. When there ARE findings we DON'T clear-then-post; postInlineFindings reconciles by correlation
+        // No inline findings this run — reached when the model emitted no diff notes OR every note's body
+        // sanitized to blank in mapFindings — so there is nothing to reconcile against and any prior inline
+        // notes are stale: clear this run's prior inline notes outright (the empty-diff pathology where a
+        // re-reviewed PR keeps line-numbered notes on code no longer in the diff). When there ARE findings we
+        // DON'T clear-then-post; postInlineFindings reconciles by correlation
         // key (edit-in-place / preserve-human / delete-truly-gone), so a stable finding keeps its one thread
         // instead of being destroyed and re-created every run. On GitHub (append-only threads) clearStaleFindings
         // does not delete — it minimizes the vanished threads as OUTDATED — so it is NOT a no-op there.

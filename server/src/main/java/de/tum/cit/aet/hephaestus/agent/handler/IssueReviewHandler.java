@@ -203,8 +203,9 @@ public class IssueReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Posts the composed student-facing note as a comment on the GitLab issue. Best-effort: a posting
-     * failure is logged, not thrown, so a transient delivery error never marks an otherwise-successful
+     * Posts the composed student-facing note as a comment on the issue (via the integration-resolved
+     * FeedbackChannel). Best-effort: a posting failure is logged, not thrown, so a transient delivery error
+     * never marks an otherwise-successful
      * detection job FAILED (mirrors {@code FeedbackDeliveryService}'s soft-failure stance). Findings are
      * already persisted above, so the formative loop is intact even if the comment does not land.
      */

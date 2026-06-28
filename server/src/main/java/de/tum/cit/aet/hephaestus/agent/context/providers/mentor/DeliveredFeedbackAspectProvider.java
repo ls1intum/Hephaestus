@@ -56,6 +56,9 @@ public class DeliveredFeedbackAspectProvider implements ContentProvider {
     /** Cap on delivered units shipped per turn — enough to ground the conversation, bounded for envelope size. */
     private static final int MAX_DELIVERED = 30;
 
+    // Delivery freshness is TTL-bounded (MENTOR_ASPECT_TTL): no domain event tracks a feedback delivery,
+    // so this cache is not in MentorContextInvalidator.PER_USER_CACHES and a freshly DELIVERED unit only
+    // becomes visible to the mentor after the TTL elapses (matches the practice-cache note in CacheConfig).
     private static final String CACHE_NAME = "mentor_delivered_feedback_aspect";
 
     private final UserRepository userRepository;

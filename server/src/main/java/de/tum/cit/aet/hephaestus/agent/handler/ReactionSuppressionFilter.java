@@ -46,18 +46,18 @@ class ReactionSuppressionFilter {
     );
 
     private final ObservationRepository observationRepository;
-    private final ReactionRepository findingReactionRepository;
+    private final ReactionRepository reactionRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final PracticeReviewProperties reviewProperties;
 
     ReactionSuppressionFilter(
         ObservationRepository observationRepository,
-        ReactionRepository findingReactionRepository,
+        ReactionRepository reactionRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeReviewProperties reviewProperties
     ) {
         this.observationRepository = observationRepository;
-        this.findingReactionRepository = findingReactionRepository;
+        this.reactionRepository = reactionRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.reviewProperties = reviewProperties;
     }
@@ -98,7 +98,7 @@ class ReactionSuppressionFilter {
             return new ReactionDecision(scopedFindings, 0);
         }
         Map<String, ReactionAction> actionByKey = new HashMap<>();
-        for (Reaction r : findingReactionRepository.findLatestByRecurrenceKeysAndReactor(
+        for (Reaction r : reactionRepository.findLatestByRecurrenceKeysAndReactor(
             persistedByKey.keySet(),
             aboutUserId
         )) {

@@ -59,7 +59,7 @@ class DeliveryComposer {
 
     /**
      * The "is this single issue well-formed?" near-duplicate pair — scoped-to-one-concern and
-     * has-a-checkable-outcome critique the SAME framing, so when both fire NOT_OBSERVED we keep only the
+     * has-a-checkable-outcome critique the SAME framing, so when both fire as a gap (ABSENT, BAD) we keep only the
      * highest-severity one. {@code breaks-large-work-into-trackable-subtasks} is excluded on purpose:
      * "decompose this epic" is a distinct, independently-actionable lesson that must survive on its own.
      */
@@ -69,11 +69,11 @@ class DeliveryComposer {
     );
 
     /**
-     * Process-level practices whose OBSERVED is a named good ACT (engaging with review, revealing intent),
+     * Process-level practices whose GOOD strength is a named good ACT (engaging with review, revealing intent),
      * not a correctness claim — only these may surface as the subordinate reinforcement line alongside
      * blocking issues, so a correctness positive can never leak into a blocking note.
      */
-    private static final Set<String> PROCESS_OBSERVED_PRACTICES = Set.of(
+    private static final Set<String> PROCESS_STRENGTH_PRACTICES = Set.of(
         "engaging-with-inline-review-comments",
         "acting-on-review-feedback",
         "intent-revealing-comments"
@@ -264,7 +264,7 @@ class DeliveryComposer {
     }
 
     /**
-     * Collapses overlapping epic issue-structure NOT_OBSERVED findings. Keeps the FIRST
+     * Collapses overlapping epic issue-structure gap (BAD) findings. Keeps the FIRST
      * {@link #EPIC_STRUCTURE_PRACTICES} finding encountered (the list is severity-sorted, so that is the
      * highest-severity lead) and drops the rest; every non-epic-structure finding passes through
      * untouched and in order. No-op when fewer than two epic-structure findings are present.
@@ -335,10 +335,10 @@ class DeliveryComposer {
     }
 
     /** Positives a learner can act on at once — kept to 1-3 (deliberate practice). */
-    private static final int MAX_OBSERVED_REINFORCEMENTS = 3;
+    private static final int MAX_STRENGTH_REINFORCEMENTS = 3;
 
     /** Whole-sentence budget for a positive observation/forward-prompt — generous enough not to clip an enumeration. */
-    private static final int OBSERVED_BUDGET = 280;
+    private static final int STRENGTH_BUDGET = 280;
 
     /**
      * Compose the note posted when no issues were found — reports what was reviewed and, where the agent
@@ -361,9 +361,9 @@ class DeliveryComposer {
         var bullets = new StringBuilder(1024);
         int shown = 0;
         for (ValidatedFinding f : withReasoning) {
-            if (shown >= MAX_OBSERVED_REINFORCEMENTS) break;
+            if (shown >= MAX_STRENGTH_REINFORCEMENTS) break;
             // Whole-sentence budget clamp: never clip a multi-clause observation mid-enumeration.
-            String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), OBSERVED_BUDGET);
+            String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), STRENGTH_BUDGET);
             if (summary.isBlank()) {
                 // The reasoning was entirely grading-meta and scrubbed to nothing — skip it rather than
                 // emit a bare "- **Practice:** " bullet with no observation behind it.
@@ -375,7 +375,7 @@ class DeliveryComposer {
             // empty, or "No change needed." guidance degrades gracefully to just the observation.
             String forward = clampToSentenceBudget(
                 sanitizeStudentText(f.guidance() == null ? "" : f.guidance()).strip(),
-                OBSERVED_BUDGET
+                STRENGTH_BUDGET
             );
             if (!forward.isBlank() && !forward.replace(".", "").equalsIgnoreCase("No change needed")) {
                 bullets.append(' ').append(forward);
@@ -441,7 +441,7 @@ class DeliveryComposer {
     );
 
     /**
-     * Builds a one-sentence strengths acknowledgement from up to two OBSERVED findings, e.g.
+     * Builds a one-sentence strengths acknowledgement from up to two GOOD (strength) findings, e.g.
      * "Nice work keeping the change focused and reviewable and linking the change to its issue — a
      * couple of things to tighten:". Returns "" when there are no positives. Strictly task-level: it
      * names what the work does, never grades the author.
@@ -464,7 +464,7 @@ class DeliveryComposer {
         // strength in front of two suggestions reads "one thing to tighten:" above a list of two.
         String tail = improvementCount > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
         if (phrases.isEmpty()) {
-            // C2: a real OBSERVED strength exists but none has a curated gerund phrase. Acknowledge it
+            // C2: a real GOOD strength exists but none has a curated gerund phrase. Acknowledge it
             // GENERICALLY rather than (a) silently dropping the whole opener — a real positive then vanishes —
             // or (b) dumping an ungrammatical raw slug into the "Nice work <gerund>" frame. "Nice work here"
             // is grammatical and never drops the acknowledgement.
@@ -476,7 +476,7 @@ class DeliveryComposer {
 
     /**
      * Builds the single subordinate process-positive line allowed alongside blocking issues.
-     * Picks the first OBSERVED whose practice is in {@link #PROCESS_OBSERVED_PRACTICES} (a named good
+     * Picks the first GOOD strength whose practice is in {@link #PROCESS_STRENGTH_PRACTICES} (a named good
      * process act, never code-correctness) and renders it as one short subordinate line. Returns "" when
      * no eligible process positive exists — keeping the blocking note free of any hollow reinforcement.
      */
@@ -486,7 +486,7 @@ class DeliveryComposer {
         }
         return positives
             .stream()
-            .filter(f -> PROCESS_OBSERVED_PRACTICES.contains(f.practiceSlug()))
+            .filter(f -> PROCESS_STRENGTH_PRACTICES.contains(f.practiceSlug()))
             .map(f -> STRENGTH_PHRASES.getOrDefault(f.practiceSlug(), humanisePracticeSlug(f.practiceSlug())))
             .filter(p -> p != null && !p.isBlank())
             .findFirst()
@@ -779,7 +779,7 @@ class DeliveryComposer {
         // When blocking issues exist the cheerful opener is suppressed (anti-feedback-sandwich), but
         // a WARRANTED, specific PROCESS-level positive (a named good act — engaging with review, revealing
         // intent) should still land. Surface AT MOST ONE, subordinate: a short single line AFTER the issue
-        // count, never a sandwich opener, and only from PROCESS_OBSERVED_PRACTICES so a code-correctness
+        // count, never a sandwich opener, and only from PROCESS_STRENGTH_PRACTICES so a code-correctness
         // positive can never leak into a blocking note.
         if (hasBlocking) {
             String reinforcement = composeSubordinateProcessPositive(positives);
@@ -1110,7 +1110,7 @@ class DeliveryComposer {
     }
 
     /**
-     * Collect inline diff notes from NOT_OBSERVED findings.
+     * Collect inline diff notes from BAD (problem) findings.
      *
      * <p>Prefer the agent's per-finding {@code suggestedDiffNotes} (richer, explicit lines/body).
      * Fall back to a synthesized note from the first evidence location + composed body when the

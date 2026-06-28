@@ -15,7 +15,7 @@ import java.util.Map;
  * {@code inputs/sources/scm/repo}. If a grep / JGit walk over that mount, or a parse of {@code diff.patch},
  * reproduces it, it is NOT integration content — it is downstream Transform.
  *
- * <p><strong>A provider MUST NOT</strong> compute a practice-shaped feature, emit a observation/note sentence,
+ * <p><strong>A provider MUST NOT</strong> compute a practice-shaped feature, emit an observation/note sentence,
  * carry a tuned threshold, or name a practice anywhere (field, file, javadoc). Such derivation is
  * practice-dependent TRANSFORM and belongs downstream — in the per-practice precompute script or the agent
  * (which has the mounted worktree). The single permitted in-connector transform is a practice-AGNOSTIC,

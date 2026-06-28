@@ -472,7 +472,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Recompose hook: after the inline notes post, the summary's inline section is demoted to a pointer
         // for every finding whose comment actually landed (its detail then lives on the diff). Binding the
-        // findings + kind here keeps FeedbackDeliveryService free of the composition inputs — it only
+        // findings + work artifact here keeps FeedbackDeliveryService free of the composition inputs — it only
         // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
             DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)

@@ -149,6 +149,9 @@ public class WorkspaceInventoryContentProvider implements ContentProvider {
             ObjectNode counts = root.putObject("counts");
             counts.put("issuesListed", issuesEmitted);
             counts.put("pullRequestsListed", prsEmitted);
+            // Conservative upper bound: a listing of exactly MAX_PER_TYPE rows reports truncated=true even
+            // when it happens to be exhaustive (page size == count). This only ever over-claims non-exhaustive,
+            // never the dangerous direction (the contract is that absence-of-match must not prove uniqueness).
             boolean truncated = issues.size() >= MAX_PER_TYPE || pullRequests.size() >= MAX_PER_TYPE;
             root.put("truncated", truncated);
 

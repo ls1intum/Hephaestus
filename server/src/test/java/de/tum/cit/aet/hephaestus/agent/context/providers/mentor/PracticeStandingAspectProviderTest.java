@@ -131,23 +131,40 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void allNaAreaIsBlind() {
         List<Practice> spine = List.of(practice("constructive-code-review", "Reviewing constructively"));
         List<AreaStandingRow> rows = List.of(
-            // former GOOD practice + NOT_APPLICABLE -> (NOT_APPLICABLE, null)
-            row(
-                "constructive-code-review",
-                "Reviewing constructively",
-                Presence.NOT_APPLICABLE,
-                null,
-                Severity.INFO,
-                5,
-                0
-            )
+            // (NOT_APPLICABLE, null): the model nulls severity for an NA observation.
+            row("constructive-code-review", "Reviewing constructively", Presence.NOT_APPLICABLE, null, null, 5, 0)
         );
         JsonNode root = build(spine, rows);
 
         JsonNode g = area(root, "constructive-code-review");
         assertThat(g.get("assessmentState").asString()).isEqualTo("BLIND");
         assertThat(g.get("flaggedCount").asInt()).isZero();
+        assertThat(g.get("naCount").asInt()).isEqualTo(5);
         assertThat(root.get("priorities")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an (ABSENT, GOOD) clean observation still opens the praise channel")
+    void absenceIsGoodOpensPraiseChannel() {
+        List<Practice> spine = List.of(practice("secure-by-default-changes", "Keeping changes secure by default"));
+        List<AreaStandingRow> rows = List.of(
+            // (ABSENT, GOOD) [a clean baseline: a bad behaviour that could have appeared was avoided]
+            row(
+                "secure-by-default-changes",
+                "Keeping changes secure by default",
+                Presence.ABSENT,
+                Assessment.GOOD,
+                null,
+                2,
+                1
+            )
+        );
+        JsonNode root = build(spine, rows);
+
+        JsonNode g = area(root, "secure-by-default-changes");
+        assertThat(g.get("praiseChannelOpen").asBoolean()).isTrue();
+        assertThat(g.get("affirmedCount").asInt()).isEqualTo(2);
+        assertThat(g.get("flaggedCount").asInt()).isZero();
     }
 
     @Test

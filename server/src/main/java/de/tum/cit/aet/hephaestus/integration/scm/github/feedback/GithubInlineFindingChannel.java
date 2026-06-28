@@ -129,7 +129,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             if (finding.body() == null || finding.body().isBlank()) {
                 continue;
             }
-            String key = finding.findingFingerprint();
+            String key = finding.recurrenceKey();
             PriorThread prior = key == null ? null : priorByKey.get(key);
             if (prior != null && !prior.outdated()) {
                 // The finding still holds and already has a live thread — leave it, don't duplicate.
@@ -164,9 +164,9 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         List<String> postedKeys = new ArrayList<>(toPost.size());
         for (InlineFinding finding : toPost) {
             FindingAnchor.DiffAnchor diff = (FindingAnchor.DiffAnchor) finding.anchor();
-            threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.findingFingerprint())));
+            threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.recurrenceKey())));
             postedAnchors.add(diff);
-            postedKeys.add(finding.findingFingerprint());
+            postedKeys.add(finding.recurrenceKey());
         }
         seenKeys.addAll(postedKeys);
 
@@ -440,11 +440,11 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     }
 
     /** Appends the hidden per-finding correlation tag; a null key (pre-correlation finding) appends nothing. */
-    private static String appendCorrelationTag(String body, @Nullable String findingFingerprint) {
-        if (findingFingerprint == null || findingFingerprint.isBlank()) {
+    private static String appendCorrelationTag(String body, @Nullable String recurrenceKey) {
+        if (recurrenceKey == null || recurrenceKey.isBlank()) {
             return body;
         }
-        return body + "\n<!-- hephaestus-diff-note-ck=" + findingFingerprint + " -->";
+        return body + "\n<!-- hephaestus-diff-note-ck=" + recurrenceKey + " -->";
     }
 
     /** A prior review thread we posted, matched by the correlation key in its first comment. */

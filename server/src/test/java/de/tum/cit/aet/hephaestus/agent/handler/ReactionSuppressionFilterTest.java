@@ -38,7 +38,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     private ObservationRepository observationRepository;
 
     @Mock
-    private ReactionRepository findingReactionRepository;
+    private ReactionRepository reactionRepository;
 
     @Mock
     private FeedbackLedgerRecorder feedbackLedgerRecorder;
@@ -58,7 +58,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     private ReactionSuppressionFilter filter(boolean enabled) {
         return new ReactionSuppressionFilter(
             observationRepository,
-            findingReactionRepository,
+            reactionRepository,
             feedbackLedgerRecorder,
             new PracticeReviewProperties(false, true, false, "", 15, false, enabled, false)
         );
@@ -110,9 +110,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     void unreactedLocus_isDelivered() {
         var pf = pf(CK);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
-            List.of()
-        );
+        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(List.of());
 
         var d = filter(true).evaluate(TestEntities.agentJob(), List.of(vf(SLUG, Presence.ABSENT)));
 
@@ -150,7 +148,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var pf = pf(CK);
         var reaction = reaction(action);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
-        when(findingReactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
+        when(reactionRepository.findLatestByRecurrenceKeysAndReactor(any(), eq(CONTRIBUTOR))).thenReturn(
             List.of(reaction)
         );
     }

@@ -140,8 +140,10 @@ public class FeedbackLedgerRecorder {
                 .workspaceId(job.getWorkspace().getId())
                 .artifactType(artifactType)
                 .artifactId(artifactId)
+                // recipient == about for the author-side catalogue today (single source); they diverge only
+                // once reviewer-audience practices ship (ADR 0021 C2).
                 .recipientUserId(recipientUserId)
-                .aboutUserId(any.getAboutUserId())
+                .aboutUserId(recipientUserId)
                 .channel(FeedbackChannel.IN_CONTEXT)
                 .position(IN_CONTEXT_UNIT_ORDINAL)
                 .deliveryState(FeedbackDeliveryState.DELIVERED)
@@ -361,7 +363,7 @@ public class FeedbackLedgerRecorder {
         );
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), finding.getId(), EvidenceRole.PRIMARY.name(), 0);
         log.info(
-            "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, findingFingerprint={}",
+            "Feedback suppressed (reaction-aware): jobId={}, unit={}, reason={}, recurrenceKey={}",
             job.getId(),
             feedback.getId(),
             reason,
@@ -370,7 +372,7 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Find the delivery signal for a posted note. Primary match is the stable {@code findingFingerprint} (the
+     * Find the delivery signal for a posted note. Primary match is the stable {@code recurrenceKey} (the
      * cross-run identity); when it is absent on either side (legacy / unkeyed notes) we fall back to the diff
      * coordinates the signal anchored at — path + the note's terminal line, which for a single-line note is its
      * start and for a range its end. Returns {@code null} when nothing matches (no signal was emitted).
@@ -381,7 +383,7 @@ public class FeedbackLedgerRecorder {
         }
         if (note.recurrenceKey() != null) {
             for (DeliveredSignal s : signals) {
-                if (note.recurrenceKey().equals(s.findingFingerprint())) {
+                if (note.recurrenceKey().equals(s.recurrenceKey())) {
                     return s;
                 }
             }
@@ -399,7 +401,14 @@ public class FeedbackLedgerRecorder {
         return null;
     }
 
-    /** The stable continuity line for a finding: (target, recipient, in-context surface). */
+    /**
+     * The stable continuity line for a finding: (target, recipient, in-context surface).
+     *
+     * <p>The recipient arg is intentionally {@code getAboutUserId()}: recipient == about for the author-side
+     * catalogue today. If reviewer-audience practices ever ship (recipient != about, ADR 0021 C2), this MUST
+     * switch to the recipient id, or supersession continuity would key off the subject and mis-thread —
+     * {@link FeedbackThreadKey#compute} documents that arg as the user the unit is delivered to.
+     */
     private static String feedbackThreadKeyFor(Observation any) {
         return FeedbackThreadKey.compute(
             any.getArtifactType().name(),

@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
@@ -25,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.data.domain.Pageable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -104,5 +107,33 @@ class DeliveredFeedbackAspectProviderTest extends BaseUnitTest {
         assertThat(only.get("surface").asString()).isEqualTo("IN_CONTEXT");
         assertThat(only.get("artifactType").asString()).isEqualTo("PULL_REQUEST");
         assertThat(only.get("artifactId").asLong()).isEqualTo(575L);
+    }
+
+    @Test
+    @DisplayName("warm cache: a second turn with the same key reuses the payload without rebuilding")
+    void warmCacheReusesPayload() throws Exception {
+        // Stub a REAL cache so the compute-if-absent branch is exercised — without this, getCache returns null
+        // and only the uncached path runs (the unregistered-cache bug this test would have caught).
+        when(cacheManager.getCache(eq("mentor_delivered_feedback_aspect"))).thenReturn(
+            new ConcurrentMapCache("mentor_delivered_feedback_aspect")
+        );
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+        when(
+            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of());
+
+        var request = new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID());
+        provider.contribute(request, new HashMap<>());
+        provider.contribute(request, new HashMap<>());
+
+        // The query (the heart of buildPayload) ran once; the second turn hit the warm cache.
+        verify(feedbackRepository, times(1)).findRecentDeliveredForRecipient(
+            eq(1L),
+            eq(2L),
+            any(Instant.class),
+            any(Pageable.class)
+        );
     }
 }

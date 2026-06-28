@@ -55,7 +55,7 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
     private static final int LOOKBACK_DAYS = 90;
 
     /** Cap on findings shipped per turn. The aggregations are unbounded — the list is the budget. */
-    private static final int MAX_RECENT_FINDINGS = 50;
+    private static final int MAX_RECENT_OBSERVATIONS = 50;
 
     /** Cap on review entries — enough to spot patterns, bounded for envelope size. */
     private static final int MAX_RECENT_REVIEWS = 20;
@@ -63,7 +63,7 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
     private static final String CACHE_NAME = "mentor_findings_aspect";
 
     private final UserRepository userRepository;
-    private final ObservationRepository findingRepository;
+    private final ObservationRepository observationRepository;
     private final MentorAspectQueryRepository queryRepository;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
@@ -92,7 +92,7 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize findings history aspect", e);
+            throw new IllegalStateException("Failed to serialize observation history aspect", e);
         }
     }
 
@@ -103,14 +103,22 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
             .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
-        List<Observation> recent = findingRepository.findRecentByDeveloperAndWorkspace(
+        List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             developerId,
             workspaceId,
             since,
-            PageRequest.of(0, MAX_RECENT_FINDINGS)
+            PageRequest.of(0, MAX_RECENT_OBSERVATIONS)
         );
-        List<PresenceCount> byPresence = findingRepository.countByPresenceForDeveloper(developerId, workspaceId, since);
-        List<SeverityCount> bySeverity = findingRepository.countBySeverityForDeveloper(developerId, workspaceId, since);
+        List<PresenceCount> byPresence = observationRepository.countByPresenceForDeveloper(
+            developerId,
+            workspaceId,
+            since
+        );
+        List<SeverityCount> bySeverity = observationRepository.countBySeverityForDeveloper(
+            developerId,
+            workspaceId,
+            since
+        );
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
             workspaceId,
             developerId,
@@ -122,7 +130,7 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
 
         ObjectNode summary = root.putObject("summary");
-        // `recent` is a paged tail (size <= MAX_RECENT_FINDINGS); the presence aggregate is the
+        // `recent` is a paged tail (size <= MAX_RECENT_OBSERVATIONS); the presence aggregate is the
         // authoritative window total. Use it directly — no need to coalesce.
         long presenceTotal = byPresence.stream().mapToLong(PresenceCount::getCount).sum();
         summary.put("totalObservations", presenceTotal);
@@ -144,22 +152,21 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
         }
 
         ArrayNode findingsArr = root.putArray("recentObservations");
-        for (Observation f : recent) {
+        for (Observation o : recent) {
             ObjectNode node = findingsArr.addObject();
-            node.put("id", f.getId().toString());
-            node.put("title", f.getTitle());
-            node.put("practiceSlug", f.getPractice().getSlug());
-            node.put("presence", f.getPresence().name());
-            Assessment assessment = f.getAssessment();
+            node.put("id", o.getId().toString());
+            node.put("title", o.getTitle());
+            node.put("practiceSlug", o.getPractice().getSlug());
+            node.put("presence", o.getPresence().name());
+            Assessment assessment = o.getAssessment();
             node.put("assessment", assessment == null ? null : assessment.name());
-            Severity severity = f.getSeverity();
+            Severity severity = o.getSeverity();
             node.put("severity", severity == null ? null : severity.name());
-            node.put("confidence", f.getConfidence());
-            node.put("observedAt", f.getObservedAt().toString());
-            node.put("reasoning", f.getReasoning());
-            // The observation-history node carries title + presence + assessment + severity + reasoning only.
-            // The mentor (system.md) pulls a finding's reasoning from here. Advice/guidance is NOT on the
-            // finding (ADR 0021) — the mentor receives the sanitised delivered feedback body via
+            node.put("confidence", o.getConfidence());
+            node.put("observedAt", o.getObservedAt().toString());
+            node.put("reasoning", o.getReasoning());
+            // The mentor (system.md) pulls an observation's reasoning from here. Advice/guidance is NOT on the
+            // observation (ADR 0021) — the mentor receives the sanitised delivered feedback body via
             // DeliveredFeedbackAspectProvider, so re-deriving advice here would duplicate it and risk leaking the
             // raw, unsanitised text DeliveryComposer would never post.
         }

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -52,7 +53,7 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    public PracticeDetectionResultParser practiceDetectionResultParser() {
+    PracticeDetectionResultParser practiceDetectionResultParser() {
         return new PracticeDetectionResultParser(objectMapper);
     }
 
@@ -77,7 +78,7 @@ public class JobTypeHandlerConfiguration {
         PullRequestRepository pullRequestRepository,
         WorkspaceRepository workspaceRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService observationTrendService
+        ObservationTrendService observationTrendService
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
@@ -102,7 +103,7 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    public JobTypeHandler pullRequestReviewHandler(
+    JobTypeHandler pullRequestReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
@@ -126,7 +127,7 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    public JobTypeHandler issueReviewHandler(
+    JobTypeHandler issueReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
@@ -146,7 +147,7 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    public JobTypeHandlerRegistry jobTypeHandlerRegistry(List<JobTypeHandler> handlers) {
+    JobTypeHandlerRegistry jobTypeHandlerRegistry(List<JobTypeHandler> handlers) {
         return new JobTypeHandlerRegistry(handlers);
     }
 }
