@@ -332,6 +332,30 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         verify(minimizeSpec, never()).variable("subjectId", "RC_c");
     }
 
+    @Test
+    void blankBodyFindingDoesNotReapItsOwnStillCurrentThread() {
+        // SYSTEMIC #4 parity: a finding that is still present this run but has a blank body must NOT have its own
+        // live prior thread minimized. Its key has to register as "seen" BEFORE the blank-body skip, mirroring
+        // GitLab. Otherwise the blank-body finding silently retires its own still-current thread.
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+
+        // ck-foo has a live prior thread; this run still emits ck-foo but with a blank body (nothing to re-post).
+        stubReviewThreads(List.of(thread("THREAD_foo", "RC_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
+        HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "  ", "marker", "ck-foo"))
+        );
+
+        // Nothing posted (blank body) and — crucially — the still-current thread is NOT minimized.
+        verify(client, never()).documentName("AddPullRequestReviewWithThreads");
+        verify(minimizeSpec, never()).variable("subjectId", "RC_foo");
+        assertThat(result.signals()).isEmpty();
+    }
+
     // --- stubbing helpers ----------------------------------------------------------------------------------
 
     /** Stubs GetPullRequestReviewThreads to return a single page of the given thread nodes. */

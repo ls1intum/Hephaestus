@@ -46,8 +46,9 @@ import org.springframework.stereotype.Component;
  * delete-stale-notes path. {@code clearStaleFindings} covers the zero-note re-run; {@code postInlineFindings}
  * covers the partial-vanish case (some findings still hold, others went away).
  *
- * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed and logged;
- * GitHub has no analogue for document/channel/issue anchors on a PR review.
+ * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed, logged, and emitted as a
+ * {@code FAILED} {@link DeliveredSignal} (GitHub has no analogue for document/channel/issue anchors on a PR
+ * review) so the SPI invariant {@code posted + failed == signals.size()} holds, matching GitLab.
  *
  * <p>The commit SHA the review is anchored to is read from the {@link FeedbackChannel.FeedbackTarget#resourceUrl}
  * field — the agent layer encodes the head commit there so the channel doesn't need
@@ -116,31 +117,41 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         // Partition findings: those whose key already has a live prior thread are preserved; the rest are posted.
         List<InlineFinding> toPost = new ArrayList<>(findings.size());
         List<DeliveredSignal> preservedSignals = new ArrayList<>();
+        // Per-finding FAILED signals for anchors GitHub cannot place (non-diff). Counted in `failed` AND carried
+        // in `signals` so the SPI invariant posted + failed == signals.size() holds (GitLab parity).
+        List<DeliveredSignal> unsupportedSignals = new ArrayList<>();
         // Keys still backed by a finding this run (preserved now, posted below). Prior threads outside this set
         // belong to findings that vanished and must be retired.
         Set<String> seenKeys = new HashSet<>();
-        int unsupportedAnchorCount = 0;
         for (InlineFinding finding : findings) {
             if (!(finding.anchor() instanceof FindingAnchor.DiffAnchor diff)) {
                 log.warn("Skipping non-diff anchor on GitHub inline finding: anchor={}", finding.anchor());
-                unsupportedAnchorCount++;
+                unsupportedSignals.add(
+                    new DeliveredSignal(finding.recurrenceKey(), finding.anchor(), Disposition.FAILED, null, null)
+                );
                 continue;
+            }
+            // Register the key as seen BEFORE the blank-body guard: a finding whose key is still present this run
+            // must never be reaped by minimizeVanishedThreads, regardless of body content (GitLab parity).
+            // Otherwise a valid-key, blank-body finding would silently minimize its own still-current thread.
+            String key = finding.recurrenceKey();
+            if (key != null) {
+                seenKeys.add(key);
             }
             if (finding.body() == null || finding.body().isBlank()) {
                 continue;
             }
-            String key = finding.recurrenceKey();
             PriorThread prior = key == null ? null : priorByKey.get(key);
             if (prior != null && !prior.outdated()) {
                 // The finding still holds and already has a live thread — leave it, don't duplicate.
                 preservedSignals.add(
                     new DeliveredSignal(key, diff, Disposition.PRESERVED_EXISTING, prior.commentId(), prior.threadId())
                 );
-                seenKeys.add(key);
                 continue;
             }
             toPost.add(finding);
         }
+        int unsupportedAnchorCount = unsupportedSignals.size();
 
         if (toPost.isEmpty()) {
             // Nothing new to post, but findings that vanished since the last run still have live bot threads —
@@ -152,7 +163,9 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
                 preservedSignals.size(),
                 minimized
             );
-            return new InlineResult(preservedSignals.size(), unsupportedAnchorCount, List.copyOf(preservedSignals));
+            List<DeliveredSignal> all = new ArrayList<>(preservedSignals);
+            all.addAll(unsupportedSignals);
+            return new InlineResult(preservedSignals.size(), unsupportedAnchorCount, List.copyOf(all));
         }
 
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
@@ -195,6 +208,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
                 );
                 List<DeliveredSignal> failed = failedSignals(postedAnchors, postedKeys);
                 failed.addAll(preservedSignals);
+                failed.addAll(unsupportedSignals);
                 return new InlineResult(preservedSignals.size(), threads.size() + unsupportedAnchorCount, failed);
             }
 
@@ -214,6 +228,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             );
             List<DeliveredSignal> all = new ArrayList<>(postedSignals);
             all.addAll(preservedSignals);
+            all.addAll(unsupportedSignals);
             return new InlineResult(threads.size() + preservedSignals.size(), unsupportedAnchorCount, List.copyOf(all));
         } catch (FeedbackDeliveryException e) {
             throw e;
@@ -221,6 +236,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             log.warn("GitHub inline finding batch failed: workspaceId={}, threadCount={}", scopeId, threads.size(), e);
             List<DeliveredSignal> failed = failedSignals(postedAnchors, postedKeys);
             failed.addAll(preservedSignals);
+            failed.addAll(unsupportedSignals);
             return new InlineResult(preservedSignals.size(), threads.size() + unsupportedAnchorCount, failed);
         }
     }
