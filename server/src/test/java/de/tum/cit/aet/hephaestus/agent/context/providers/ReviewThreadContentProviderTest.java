@@ -198,9 +198,7 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         // "merged past unresolved request-changes" finding).
         java.util.List<PullRequestReview> newestFirst = new java.util.ArrayList<>();
         // The latest decision: an APPROVE at the most recent timestamp.
-        newestFirst.add(
-            review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z"))
-        );
+        newestFirst.add(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z")));
         // Followed by MAX_DECISIONS + 5 older CHANGES_REQUESTED rows (descending timestamps).
         for (int i = 0; i < ReviewThreadContentProvider.MAX_DECISIONS + 5; i++) {
             newestFirst.add(

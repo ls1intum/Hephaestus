@@ -535,7 +535,6 @@ class DeliveryComposer {
         return slug.replace('-', ' ');
     }
 
-
     /**
      * Matches the whitespace run that separates two sentences (a sentence-ending [.!?] then whitespace).
      * Used to tokenise student text while preserving the original separator, so Markdown lists and

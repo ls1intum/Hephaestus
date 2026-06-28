@@ -103,7 +103,12 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
             .expectStatus()
             .isForbidden();
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), java.util.Set.of(visitor.getId())))
+        assertThat(
+            workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(
+                workspace.getId(),
+                java.util.Set.of(visitor.getId())
+            )
+        )
             .as("auto-seed disabled must not create a membership")
             .isEmpty();
     }

@@ -305,10 +305,7 @@ public class WorkspaceContextFilter implements Filter {
             // Gated behind a non-prod flag — seeding ADMIN to an arbitrary first visitor in production is a
             // privilege-escalation on org-sync-churned / admin-only-seeded empty-membership state. Disabled by
             // default (prod); enabled only in dev/e2e via hephaestus.workspace.auto-seed-membership=true.
-            if (
-                autoSeedMembership &&
-                workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()
-            ) {
+            if (autoSeedMembership && workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
                 User primary = users.iterator().next();
                 try {
                     var created = workspaceMembershipService.createMembership(
