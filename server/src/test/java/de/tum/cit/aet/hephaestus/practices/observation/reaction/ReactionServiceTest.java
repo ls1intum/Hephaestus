@@ -60,7 +60,12 @@ class ReactionServiceTest extends BaseUnitTest {
     }
 
     private Feedback createFeedback(Long recipientUserId) {
-        return Feedback.builder().id(FEEDBACK_ID).recipientUserId(recipientUserId).workspaceId(WORKSPACE_ID).build();
+        return Feedback.builder()
+            .id(FEEDBACK_ID)
+            .recipientUserId(recipientUserId)
+            .workspaceId(WORKSPACE_ID)
+            .deliveryState(de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED)
+            .build();
     }
 
     private User createUser(Long id) {
@@ -81,6 +86,7 @@ class ReactionServiceTest extends BaseUnitTest {
                 Optional.of(feedback)
             );
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+            when(feedbackRepository.findHeadlineRecurrenceKey(FEEDBACK_ID)).thenReturn(Optional.of("ck-abc123"));
             when(reactionRepository.save(any(Reaction.class))).thenAnswer(inv -> {
                 Reaction reaction = inv.getArgument(0);
                 reaction.onCreate();
@@ -97,6 +103,28 @@ class ReactionServiceTest extends BaseUnitTest {
             Reaction saved = reactionCaptor.getValue();
             assertThat(saved.getReactorUserId()).isEqualTo(CONTRIBUTOR_ID);
             assertThat(saved.getAction()).isEqualTo(ReactionAction.ADDRESSED);
+            // B2 denormalization (ADR 0021): the saved reaction must carry the headline recurrence key so
+            // suppression can follow the reacted locus across the detector's per-run re-detections.
+            assertThat(saved.getRecurrenceKey()).isEqualTo("ck-abc123");
+        }
+
+        @Test
+        void nonDeliveredFeedbackThrows() {
+            Feedback feedback = Feedback.builder()
+                .id(FEEDBACK_ID)
+                .recipientUserId(CONTRIBUTOR_ID)
+                .workspaceId(WORKSPACE_ID)
+                .deliveryState(de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.SUPPRESSED)
+                .build();
+            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
+                Optional.of(feedback)
+            );
+            when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
+
+            var request = new CreateReactionDTO(ReactionAction.ADDRESSED, null);
+            assertThatThrownBy(() -> service.submitReaction(workspaceContext, FEEDBACK_ID, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("delivered");
         }
 
         @Test

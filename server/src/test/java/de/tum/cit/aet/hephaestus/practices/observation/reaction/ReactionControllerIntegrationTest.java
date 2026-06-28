@@ -64,7 +64,12 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private ReactionRepository reactionRepository;
 
     @Autowired
+    private de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository feedbackObservationRepository;
+
+    @Autowired
     private AgentJobRepository agentJobRepository;
+
+    private static final String HEADLINE_RECURRENCE_KEY = "ck-integration-headline";
 
     private Workspace workspace;
     private User adminUser;
@@ -108,9 +113,10 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
             .confidence(0.85f)
+            .recurrenceKey(HEADLINE_RECURRENCE_KEY)
             .observedAt(Instant.now())
             .build();
-        observationRepository.save(finding);
+        finding = observationRepository.save(finding);
 
         // Create the delivered feedback unit the admin user reacts to (recipient == subject).
         feedbackUnit = feedbackRepository.save(
@@ -128,6 +134,15 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .createdAt(Instant.now())
                 .deliveredAt(Instant.now())
                 .build()
+        );
+
+        // Bind the observation as the feedback's PRIMARY evidence so findHeadlineRecurrenceKey resolves the
+        // headline locus the reaction must denormalize (B2).
+        feedbackObservationRepository.insertIfAbsent(
+            feedbackUnit.getId(),
+            finding.getId(),
+            de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY.name(),
+            0
         );
     }
 
@@ -160,6 +175,10 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(response.feedbackId()).isEqualTo(feedbackUnit.getId());
             assertThat(response.id()).isNotNull();
             assertThat(response.createdAt()).isNotNull();
+
+            // B2 denormalization: the persisted reaction carries the feedback's headline recurrence key.
+            Reaction saved = reactionRepository.findById(response.id()).orElseThrow();
+            assertThat(saved.getRecurrenceKey()).isEqualTo(HEADLINE_RECURRENCE_KEY);
         }
 
         @Test

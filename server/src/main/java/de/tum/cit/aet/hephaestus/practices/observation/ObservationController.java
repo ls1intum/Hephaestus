@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
@@ -146,6 +147,12 @@ public class ObservationController {
         WorkspaceContext workspaceContext,
         @PathVariable Long prId
     ) {
+        // Unlike the per-developer endpoints, this returns EVERY developer's BAD/ABSENT findings on the PR,
+        // unscoped to the caller. On a public-read workspace an anonymous (membership-less) request would
+        // otherwise expose them — require workspace membership.
+        if (!workspaceContext.hasMembership()) {
+            throw new AccessForbiddenException("Workspace membership is required to view pull-request observations");
+        }
         List<ObservationListDTO> observations = observationService
             .getObservationsForPullRequest(workspaceContext.id(), prId)
             .stream()

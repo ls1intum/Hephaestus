@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
@@ -60,6 +61,13 @@ public class ReactionService {
         var currentUser = userRepository.getCurrentUserElseThrow();
         if (!feedback.getRecipientUserId().equals(currentUser.getId())) {
             throw new AccessForbiddenException("Only the recipient of the feedback can submit a reaction");
+        }
+
+        // A reaction is the recipient's response to feedback they actually SAW. Reacting to a unit that was
+        // never delivered (PREPARED / SUPPRESSED / FAILED) or has since been SUPERSEDED would contaminate the
+        // research-uptake signal with responses to feedback that was never on a surface.
+        if (feedback.getDeliveryState() != FeedbackDeliveryState.DELIVERED) {
+            throw new IllegalArgumentException("Only delivered feedback can be reacted to");
         }
 
         if (
