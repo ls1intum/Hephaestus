@@ -123,7 +123,7 @@ public class Observation {
      * redundant {@code developer} 3NF transitive dependency, leaving this the single identity): the author
      * for author-side practices (the whole catalogue today), the reviewer for reviewer-side practices. Raw
      * {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns
-     * scalar; the DB FK {@code fk_observation_subject} is Liquibase-managed.
+     * scalar; the DB FK {@code sfk_observation_subject} is Liquibase-managed.
      */
     @NotNull
     @Column(name = "about_user_id", nullable = false)

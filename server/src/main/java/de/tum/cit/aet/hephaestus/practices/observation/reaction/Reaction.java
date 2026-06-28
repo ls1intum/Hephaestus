@@ -97,7 +97,7 @@ public class Reaction {
     /**
      * The user who submitted this reaction — the feedback's recipient (only the recipient may react). Raw
      * {@code Long} FK to {@code user} (no {@code @ManyToOne}) to keep the cross-cutting identity columns
-     * scalar, matching {@code Observation.aboutUserId}; the DB FK {@code fk_reaction_reactor} is
+     * scalar, matching {@code Observation.aboutUserId}; the DB FK {@code sfk_reaction_reactor} is
      * Liquibase-managed (RESTRICT — a reaction must survive independently of user lifecycle).
      */
     @NotNull
