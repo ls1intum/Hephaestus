@@ -80,6 +80,24 @@ class SecretDiffScannerTest extends BaseUnitTest {
             List<SecretHit> hits = scanner.scan(diff("server.js", "const secret = \"" + HIGH_ENTROPY + "\";"));
             assertThat(hits).anyMatch(h -> h.ruleId().equals("generic-entropy") && !h.isCritical());
         }
+
+        @Test
+        @DisplayName("C8: a structural-prefix literal in an env-ref FALLBACK is NOT vetoed by the line-wide env ref")
+        void hybridEnvFallbackWithRealLiteral() {
+            // `process.env.KEY || "sk-…"` references an env var AND commits a real structural-prefix literal.
+            // The line-wide env-reference veto must not suppress the committed secret on the fallback.
+            List<SecretHit> hits = scanner.scan(
+                diff("config.ts", "const key = process.env.OPENAI_KEY || \"" + OPENAI_KEY + "\";")
+            );
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("openai-key") && h.addedLine().contains(OPENAI_KEY));
+        }
+
+        @Test
+        @DisplayName("C8: a connection-string literal in an env-ref fallback is also not vetoed")
+        void hybridEnvFallbackWithConnectionString() {
+            List<SecretHit> hits = scanner.scan(diff("db.ts", "const url = process.env.DB_URL || \"" + PG_URL + "\";"));
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("connection-string") && h.isCritical());
+        }
     }
 
     @Nested

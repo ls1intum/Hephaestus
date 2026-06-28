@@ -306,6 +306,104 @@ class PullRequestContentProviderTest extends BaseUnitTest {
     }
 
     @Nested
+    class DiffPrecompute {
+
+        private final String repoPath = "/tmp/hephaestus-git-repos/123";
+
+        @Test
+        void computeAndStoreDiffSummary_parsesPerFileChunks() throws Exception {
+            // B4: the diff_summary.md parser is driven directly from an annotated diff.patch (no git needed).
+            String annotated =
+                "[L1] diff --git a/src/A.java b/src/A.java\n" +
+                "[L1] +line a1\n" +
+                "[L2] +line a2\n" +
+                "[L1] diff --git a/src/B.java b/src/B.java\n" +
+                "[L1] +line b1\n";
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            files.put("inputs/context/diff.patch", annotated.getBytes(StandardCharsets.UTF_8));
+
+            provider.computeAndStoreDiffSummary(files);
+
+            assertThat(files).containsKey("inputs/context/diff_summary.md");
+            String summary = new String(files.get("inputs/context/diff_summary.md"), StandardCharsets.UTF_8);
+            assertThat(summary).contains("**2 files changed**");
+            assertThat(summary).contains("`src/A.java`");
+            assertThat(summary).contains("`src/B.java`");
+        }
+
+        @Test
+        void computeAndStoreDiffSummary_emptyDiffPatch_writesNothing() {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.computeAndStoreDiffSummary(files); // no diff.patch present at all
+            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
+
+            files.put("inputs/context/diff.patch", new byte[0]); // present but empty
+            provider.computeAndStoreDiffSummary(files);
+            assertThat(files).doesNotContainKey("inputs/context/diff_summary.md");
+        }
+
+        @Test
+        void emptyDiff_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            // A resolvable range but a blank diff → "Empty diff: no changed files…".
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(new String[] { "main", "abc123def456" });
+            when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456")).thenReturn("");
+            when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenReturn("   ");
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("Empty diff");
+        }
+
+        @Test
+        void headVerifiedButRangeUnresolvable_abortsWithJobPreparationException() {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            lenient()
+                .when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L))
+                .thenReturn(List.of());
+            // headVerified = true (commit present) but every range-resolution strategy fails → hard abort.
+            when(gitRepositoryManager.commitExists(123L, "abc123def456")).thenReturn(true);
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(null);
+
+            assertThatThrownBy(() -> provider.contribute(request(sampleMetadata()), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("all resolution strategies failed");
+        }
+
+        @Test
+        void realDiff_writesAnnotatedPatchAndSummary() throws Exception {
+            stubGit();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
+            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
+            when(
+                gitDiffOperations.resolveDiffRange(Path.of(repoPath), "main", "feature/auth-fix", "abc123def456")
+            ).thenReturn(new String[] { "main", "abc123def456" });
+            when(gitDiffOperations.diffStat(Path.of(repoPath), "main", "abc123def456")).thenReturn("1 file changed");
+            when(gitDiffOperations.diff(Path.of(repoPath), "main", "abc123def456")).thenReturn(
+                "diff --git a/src/A.java b/src/A.java\n@@ -1,1 +1,2 @@\n context\n+added\n"
+            );
+
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.contribute(request(sampleMetadata()), files);
+
+            assertThat(files).containsKey("inputs/context/diff.patch");
+            assertThat(files).containsKey("inputs/context/diff_stat.txt");
+            assertThat(files).containsKey("inputs/context/diff_summary.md");
+            String patch = new String(files.get("inputs/context/diff.patch"), StandardCharsets.UTF_8);
+            assertThat(patch).contains("[L2] +added");
+        }
+    }
+
+    @Nested
     class RepositoryAvailability {
 
         @Test

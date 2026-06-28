@@ -138,6 +138,11 @@ final class SecretDiffScanner {
                 newLine = Integer.parseInt(hunk.group(1));
                 continue;
             }
+            if (raw.startsWith("\\")) {
+                // "\ No newline at end of file" marker — diff metadata, not a source line. It must NOT advance
+                // the new-side counter, or every subsequent secret hit reports a line number off by one.
+                continue;
+            }
             if (raw.startsWith("+") && !raw.startsWith("+++")) {
                 String content = raw.substring(1);
                 if (currentPath != null) {
@@ -166,11 +171,16 @@ final class SecretDiffScanner {
         boolean envRef = ENV_REFERENCE.matcher(content).find();
 
         // 1) Structural prefix rules (the prefix is the signal — entropy gate bypassed).
+        // The line-wide env-reference veto must NOT apply here: a hybrid `process.env.KEY || "sk-live-…"`
+        // fallback references an env var AND commits a real structural-prefix literal. Vetoing the whole line
+        // because `process.env` appears anywhere on it would suppress that committed secret. A structural prefix
+        // match is a literal regardless of any env reference elsewhere on the line — only the doc-example /
+        // placeholder guards (the token IS the example) apply.
         for (PrefixRule rule : PREFIX_RULES) {
             Matcher m = rule.pattern().matcher(content);
             if (m.find()) {
                 String token = m.group();
-                if (envRef || isDocExample(token) || isPlaceholder(token)) {
+                if (isDocExample(token) || isPlaceholder(token)) {
                     continue;
                 }
                 hits.add(new SecretHit(path, line, content.strip(), rule.id(), token));
@@ -180,9 +190,11 @@ final class SecretDiffScanner {
         if (PRIVATE_KEY.matcher(content).find()) {
             hits.add(new SecretHit(path, line, content.strip(), "private-key", "-----BEGIN PRIVATE KEY-----"));
         }
-        // 3) Connection string with inline credentials.
+        // 3) Connection string with inline credentials — a concrete `scheme://user:pw@host` is a structural
+        // literal, so (like the prefix rules) the line-wide env-reference veto does not apply: a
+        // `process.env.DB_URL || "postgres://user:pw@host"` fallback still commits real credentials.
         Matcher conn = CONNECTION_STRING.matcher(content);
-        if (conn.find() && !envRef) {
+        if (conn.find()) {
             hits.add(new SecretHit(path, line, content.strip(), "connection-string", conn.group()));
         }
         // 4) Generic secret-named assignment gated by entropy + allowlist.

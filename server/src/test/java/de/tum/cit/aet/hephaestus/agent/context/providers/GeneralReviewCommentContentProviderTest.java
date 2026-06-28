@@ -164,6 +164,49 @@ class GeneralReviewCommentContentProviderTest extends BaseUnitTest {
     }
 
     @Test
+    void contribute_overCap_keepsNewestAndFlagsTruncated() throws Exception {
+        // A6: the query is ORDER BY createdAt ASC (oldest first). On truncation the provider must keep the MOST
+        // RECENT MAX_COMMENTS — keeping the oldest head would drop the late approval/resolution and manufacture a
+        // false "rubber-stamp" verdict. Build MAX_COMMENTS + 5 comments; only the newest MAX_COMMENTS survive.
+        int total = GeneralReviewCommentContentProvider.MAX_COMMENTS + 5;
+        java.util.List<IssueComment> comments = new java.util.ArrayList<>();
+        Instant base = Instant.parse("2025-06-01T00:00:00Z");
+        for (int i = 0; i < total; i++) {
+            // body encodes the sequence index so we can assert WHICH comments survived.
+            comments.add(comment("reviewer-" + i, "comment-" + i, base.plusSeconds(i)));
+        }
+        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(comments);
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("count").asInt()).isEqualTo(GeneralReviewCommentContentProvider.MAX_COMMENTS);
+        assertThat(out.get("truncated").asBoolean()).isTrue();
+        // The oldest (comment-0) is dropped; the newest (last index) survives and leads the kept tail.
+        JsonNode bodies = out.get("comments");
+        assertThat(bodies.get(0).get("body").asString()).isEqualTo("comment-5"); // first kept = total-MAX
+        assertThat(bodies.get(bodies.size() - 1).get("body").asString()).isEqualTo("comment-" + (total - 1));
+        // The dropped oldest must not appear anywhere.
+        for (JsonNode c : bodies) {
+            assertThat(c.get("body").asString()).isNotEqualTo("comment-0");
+        }
+    }
+
+    @Test
+    void contribute_underCap_flagsNotTruncated() throws Exception {
+        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+            List.of(comment("reviewer-a", "looks good", Instant.parse("2025-06-01T10:00:00Z")))
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("truncated").asBoolean()).isFalse();
+    }
+
+    @Test
     void required_isFalse_bestEffort() {
         assertThat(provider.required()).isFalse();
     }

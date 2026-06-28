@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -121,8 +122,12 @@ public class GeneralReviewCommentContentProvider implements ContentProvider {
                 return;
             }
 
-            ArrayNode commentArray = objectMapper.createArrayNode();
-            int emitted = 0;
+            // Collect the eligible (non-blank, non-bot) comments first, then — when over the cap — keep the
+            // MOST RECENT MAX_COMMENTS (tail-slice, mirroring PullRequestContentProvider#buildReviewComments).
+            // The query is ORDER BY createdAt ASC (oldest first); keeping the head would drop the LATEST
+            // approval/resolution on a chatty MR and manufacture a false "rubber-stamp" verdict — the exact
+            // failure this provider exists to prevent.
+            List<IssueComment> eligible = new ArrayList<>();
             int skippedSelf = 0;
             for (IssueComment c : comments) {
                 if (c == null) {
@@ -136,22 +141,30 @@ public class GeneralReviewCommentContentProvider implements ContentProvider {
                     skippedSelf++;
                     continue;
                 }
-                if (emitted >= MAX_COMMENTS) {
-                    break;
-                }
-                commentArray.add(toComment(c, body));
-                emitted++;
+                eligible.add(c);
             }
 
-            if (emitted == 0) {
+            if (eligible.isEmpty()) {
                 // Only the bot's own comment(s) were present — emit nothing so the reviewer-craft
                 // practices keep their empty-context abstention rather than seeing a hollow file.
                 return;
             }
 
+            boolean truncated = eligible.size() > MAX_COMMENTS;
+            List<IssueComment> kept = truncated
+                ? eligible.subList(eligible.size() - MAX_COMMENTS, eligible.size())
+                : eligible;
+
+            ArrayNode commentArray = objectMapper.createArrayNode();
+            for (IssueComment c : kept) {
+                commentArray.add(toComment(c, c.getBody()));
+            }
+            int emitted = commentArray.size();
+
             ObjectNode root = objectMapper.createObjectNode();
             root.set("comments", commentArray);
             root.put("count", emitted);
+            root.put("truncated", truncated);
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
             log.info("GeneralReviewComments: prId={} emitted={} skippedSelf={}", pullRequestId, emitted, skippedSelf);
         } catch (Exception e) {

@@ -305,6 +305,15 @@ public class GitDiffOperations {
         Integer newLineNum = null;
 
         for (String line : lines) {
+            // A new file's header resets the counter: without this, the metadata + first lines of the SECOND
+            // file in a multi-file diff inherit the FIRST file's trailing line number until that file's first
+            // hunk header is reached, mis-stamping every [L<n>] marker. Emit the header verbatim.
+            if (line.startsWith("diff --git")) {
+                newLineNum = null;
+                out.append(line).append('\n');
+                continue;
+            }
+
             Matcher m = HUNK_HEADER.matcher(line);
             if (m.find()) {
                 newLineNum = Integer.parseInt(m.group(1));
@@ -313,6 +322,13 @@ public class GitDiffOperations {
             }
 
             if (newLineNum == null) {
+                out.append(line).append('\n');
+                continue;
+            }
+
+            // The "\ No newline at end of file" marker is diff metadata, not source content — emit it verbatim
+            // and do NOT advance the line counter (it does not correspond to a new-side source line).
+            if (line.startsWith("\\")) {
                 out.append(line).append('\n');
                 continue;
             }
