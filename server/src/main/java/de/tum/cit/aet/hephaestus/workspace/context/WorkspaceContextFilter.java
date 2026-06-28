@@ -69,6 +69,13 @@ public class WorkspaceContextFilter implements Filter {
     private final ConnectionService connectionService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Gates the empty-membership ADMIN auto-seed. Defaults to {@code false} so production NEVER grants
+     * ADMIN to the first authenticated visitor of an admin-only-seeded / org-sync-churned workspace
+     * (a privilege-escalation path). Enabled only in dev/e2e profiles via {@code application-*.yml}.
+     */
+    private final boolean autoSeedMembership;
+
     public WorkspaceContextFilter(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
@@ -76,7 +83,10 @@ public class WorkspaceContextFilter implements Filter {
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
         ConnectionService connectionService,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        @org.springframework.beans.factory.annotation.Value(
+            "${hephaestus.workspace.auto-seed-membership:false}"
+        ) boolean autoSeedMembership
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
@@ -85,6 +95,7 @@ public class WorkspaceContextFilter implements Filter {
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.connectionService = connectionService;
         this.objectMapper = objectMapper;
+        this.autoSeedMembership = autoSeedMembership;
     }
 
     @Override
@@ -291,7 +302,13 @@ public class WorkspaceContextFilter implements Filter {
             }
 
             // Auto-heal only when workspace has zero memberships (fresh dev DB): seed the first identity.
-            if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
+            // Gated behind a non-prod flag — seeding ADMIN to an arbitrary first visitor in production is a
+            // privilege-escalation on org-sync-churned / admin-only-seeded empty-membership state. Disabled by
+            // default (prod); enabled only in dev/e2e via hephaestus.workspace.auto-seed-membership=true.
+            if (
+                autoSeedMembership &&
+                workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()
+            ) {
                 User primary = users.iterator().next();
                 try {
                     var created = workspaceMembershipService.createMembership(

@@ -24,6 +24,8 @@ hephaestus:
     cookie-name: HEPHAESTUS_AT
   workspace:
     creation-policy: SELF_SERVICE
+    # E2E runs against fresh DBs with admin-only seeding; auto-seed the first visitor as ADMIN.
+    auto-seed-membership: true
   features:
     flags:
       gitlab-workspace-creation: true

@@ -82,6 +82,33 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     @Test
+    @WithMentorUser
+    void autoSeedDisabledDoesNotGrantAdminToFirstVisitorOfEmptyMembershipWorkspace() {
+        // SECURITY (A5): with auto-seed disabled (the production default), the first authenticated
+        // visitor of a zero-membership workspace must NOT be silently seeded as ADMIN. A non-member,
+        // non-super-admin visitor is forbidden, and no membership row is created.
+        User visitor = persistUser("mentor");
+        User workspaceOwner = persistUser("empty-membership-owner");
+        Workspace workspace = createWorkspace("empty-seed", "Empty", "emptyseed", AccountType.ORG, workspaceOwner);
+        // createWorkspace seeds an OWNER membership; strip it so the workspace is genuinely
+        // zero-membership — the exact org-sync-churn / admin-only-seeded state A5 guards against.
+        workspaceMembershipRepository.deleteAll(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()));
+        assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId())).isEmpty();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), java.util.Set.of(visitor.getId())))
+            .as("auto-seed disabled must not create a membership")
+            .isEmpty();
+    }
+
+    @Test
     @WithAdminUser
     void instanceSuperAdminWithoutMembershipIsElevatedToAdmin() {
         // An instance super-admin (APP_ADMIN, app_admin authority) reaches ANY workspace as ADMIN even

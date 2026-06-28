@@ -320,6 +320,10 @@ hephaestus:
     # validation live on WorkspaceProperties (IDE-surfaced via spring-configuration-processor).
     workspace:
         init-default: true
+        # Dev-only convenience: seed ADMIN membership to the first authenticated visitor of a
+        # zero-membership workspace (fresh dev DB). MUST stay false in production (prod overrides
+        # it) — otherwise it is a privilege-escalation on org-sync-churned empty-membership state.
+        auto-seed-membership: true
         slug:
             # TTL (days) for slug redirects; 0 disables redirects while preserving history.
             redirect:
