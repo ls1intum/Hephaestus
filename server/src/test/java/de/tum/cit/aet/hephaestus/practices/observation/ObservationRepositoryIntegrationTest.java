@@ -420,7 +420,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
             assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
             assertThat(negative.getCount()).isEqualTo(3);
-            assertThat(negative.getLastDetectedAt()).isEqualTo(Instant.parse("2026-03-20T14:30:00Z"));
+            assertThat(negative.getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T14:30:00Z"));
 
             DeveloperPracticeSummary positive = result
                 .stream()
@@ -454,7 +454,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             DeveloperPracticeSummary row = result.get(0);
             assertThat(row.getPresence()).isEqualTo(Presence.PRESENT);
             assertThat(row.getCount()).isEqualTo(1);
-            assertThat(row.getLastDetectedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
+            assertThat(row.getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
         }
 
         private void insertFindingForJob(String key, UUID jobId, long artifactId, String presence, Instant at) {
@@ -569,7 +569,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
 
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getLastDetectedAt()).isEqualTo(latest);
+            assertThat(result.get(0).getLastObservedAt()).isEqualTo(latest);
         }
 
         @Test

@@ -121,7 +121,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         return d
             .transitions()
             .stream()
-            .filter(t -> t.findingFingerprint().equals(key))
+            .filter(t -> t.recurrenceKey().equals(key))
             .findFirst()
             .orElseThrow();
     }
@@ -183,6 +183,31 @@ class ObservationTrendServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void computeForTarget_mixedValenceInOneRun_collapsesToBadRepresentative_regressed() {
+        // ADR 0022 permits one practice to emit both GOOD and BAD at the same locus in one run. worse()
+        // prefers the BAD (non-null severity beats the GOOD's null severity), so a run that contains both
+        // collapses to the BAD representative — and a prior all-GOOD run therefore reads as REGRESSED.
+        stubTwoTargetRuns();
+        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
+            List.of(
+                // prior run: the locus was a clean strength
+                locusFull(JOB_PREV, "keyM", Presence.PRESENT, Assessment.GOOD, null, 0.9f, "m", "satisfied"),
+                // current run emits the SAME key as both a GOOD (null severity) and a BAD (MAJOR)
+                locusFull(JOB_CURR, "keyM", Presence.PRESENT, Assessment.GOOD, null, 0.9f, "m", "still ok"),
+                locusFull(JOB_CURR, "keyM", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, 0.7f, "m", "regressed")
+            )
+        );
+
+        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+
+        assertThat(d.transitions()).hasSize(1);
+        LocusTransition t = d.transitions().get(0);
+        assertThat(t.status()).isEqualTo(TransitionStatus.REGRESSED);
+        assertThat(t.currentAssessment()).isEqualTo(Assessment.BAD);
+        assertThat(t.currentSeverity()).isEqualTo(Severity.MAJOR);
+    }
+
+    @Test
     void computeForTarget_singleRun_returnsEmpty() {
         when(repo.findRecentRunRefsForTarget(eq(WorkArtifact.PULL_REQUEST), eq(TARGET), eq(WS), any())).thenReturn(
             List.of(runRef(JOB_CURR, Instant.parse("2026-06-15T10:00:00Z")))
@@ -195,7 +220,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         return d
             .transitions()
             .stream()
-            .filter(t -> t.findingFingerprint().equals(key))
+            .filter(t -> t.recurrenceKey().equals(key))
             .findFirst()
             .orElseThrow()
             .status();
@@ -236,6 +261,23 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             case ABSENT -> Assessment.BAD;
             case NOT_APPLICABLE -> null;
         };
+        return locusFull(job, key, v, assessment, sev, conf, slug, title);
+    }
+
+    /**
+     * Decoupled locus builder: presence and assessment are set independently, so a test can express the
+     * ADR-0022 quadrants the presence-coupled helpers cannot (a single locus emitting both a GOOD and a BAD).
+     */
+    private static LocusObservation locusFull(
+        UUID job,
+        String key,
+        Presence v,
+        Assessment assessment,
+        Severity sev,
+        float conf,
+        String slug,
+        String title
+    ) {
         return new LocusObservation() {
             @Override
             public UUID getAgentJobId() {

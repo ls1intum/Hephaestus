@@ -91,7 +91,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findDeliveredBodiesByFindingIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 

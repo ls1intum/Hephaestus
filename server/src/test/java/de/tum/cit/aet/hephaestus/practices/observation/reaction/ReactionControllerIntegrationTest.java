@@ -289,6 +289,47 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         }
 
         @Test
+        @WithMentorUser
+        void subjectButNotRecipientReturns403() {
+            // Reviewer-side firewall: the gate is the RECIPIENT (who was delivered to), not the SUBJECT
+            // (who the feedback is ABOUT). Build a unit delivered to the admin but ABOUT the mentor, then
+            // authenticate as the mentor (the subject, a workspace member) — the subject must NOT be able
+            // to react to feedback they were never shown.
+            User mentorUser = persistUser("mentor");
+            ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
+
+            Feedback aboutMentorDeliveredToAdmin = feedbackRepository.save(
+                Feedback.builder()
+                    .agentJobId(feedbackUnit.getAgentJobId())
+                    .workspaceId(workspace.getId())
+                    .artifactType(WorkArtifact.PULL_REQUEST)
+                    .artifactId(43L)
+                    .recipientUserId(adminUser.getId())
+                    .aboutUserId(mentorUser.getId())
+                    .channel(FeedbackChannel.IN_CONTEXT)
+                    // position 1: distinct unit within the same job (uk_feedback_unit is (agent_job_id, position)).
+                    .position(1)
+                    .deliveryState(FeedbackDeliveryState.DELIVERED)
+                    .source(FeedbackSource.AGENT)
+                    .createdAt(Instant.now())
+                    .deliveredAt(Instant.now())
+                    .build()
+            );
+
+            var request = new CreateReactionDTO(ReactionAction.ADDRESSED, null);
+
+            webTestClient
+                .post()
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), aboutMentorDeliveredToAdmin.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isForbidden();
+        }
+
+        @Test
         void unauthenticatedMutationRejected() {
             var request = new CreateReactionDTO(ReactionAction.ADDRESSED, null);
 
@@ -312,7 +353,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithAdminUser
-        @DisplayName("returns 204 when no feedback exists")
+        @DisplayName("returns 204 when no reaction has been submitted yet")
         void returns204WhenEmpty() {
             webTestClient
                 .get()

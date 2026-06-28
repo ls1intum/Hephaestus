@@ -62,7 +62,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         when(feedbackRepository.findFirstByThreadKeyAndDeliveryStateOrderByCreatedAtDesc(any(), any())).thenReturn(
             Optional.empty()
         );
-        when(feedbackObservationRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any())).thenReturn(List.of());
         when(feedbackPlacementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return new FeedbackLedgerRecorder(
             observationRepository,
@@ -208,7 +208,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         UUID b2Id = findings.get(5).getId(); // the lowest-confidence one — would otherwise be in the dropped tail
         when(observationRepository.findByAgentJobId(any())).thenReturn(findings);
         var recorder = recorder(true); // policyFloor ON
-        when(feedbackObservationRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
+        when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
 
         recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 
@@ -232,7 +232,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         UUID b2Id = b2Suppressed.getId();
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(kept, b2Suppressed));
         var recorder = recorder(false);
-        when(feedbackObservationRepository.findFindingIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
+        when(feedbackObservationRepository.findObservationIdsSuppressedForJob(any())).thenReturn(List.of(b2Id));
 
         recorder.record(job(), new DeliveryContent("body", List.of()), WorkArtifact.PULL_REQUEST, List.of());
 

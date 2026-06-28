@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.DisplayName;
@@ -64,6 +65,17 @@ class ObservationFingerprintTest extends BaseUnitTest {
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift\t"))
             .as("internal/trailing whitespace collapses to the same key")
             .isEqualTo(canonical);
+    }
+
+    @Test
+    @DisplayName("required args fail fast at the guard, not deep in the digest builder")
+    void requiredArgsFailFast() {
+        assertThatThrownBy(() -> ObservationFingerprint.compute(null, TYPE, 1L, 1L, null))
+            .isInstanceOf(NullPointerException.class)
+            .hasMessage("practiceSlug");
+        assertThatThrownBy(() -> ObservationFingerprint.compute(SLUG, null, 1L, 1L, null))
+            .isInstanceOf(NullPointerException.class)
+            .hasMessage("artifactType");
     }
 
     @Test

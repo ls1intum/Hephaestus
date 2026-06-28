@@ -80,7 +80,7 @@ class ReactionServiceTest extends BaseUnitTest {
     class SubmitReaction {
 
         @Test
-        void appliedFeedbackSaves() {
+        void addressedFeedbackSaves() {
             Feedback feedback = createFeedback(CONTRIBUTOR_ID);
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
@@ -241,7 +241,7 @@ class ReactionServiceTest extends BaseUnitTest {
                 .createdAt(Instant.now())
                 .build();
             when(
-                reactionRepository.findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDesc(
+                reactionRepository.findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDescIdDesc(
                     FEEDBACK_ID,
                     CONTRIBUTOR_ID
                 )
@@ -262,7 +262,7 @@ class ReactionServiceTest extends BaseUnitTest {
             );
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
             when(
-                reactionRepository.findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDesc(
+                reactionRepository.findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDescIdDesc(
                     FEEDBACK_ID,
                     CONTRIBUTOR_ID
                 )
@@ -292,7 +292,7 @@ class ReactionServiceTest extends BaseUnitTest {
         void returnsCorrectCounts() {
             when(userRepository.getCurrentUserElseThrow()).thenReturn(createUser(CONTRIBUTOR_ID));
 
-            var appliedProjection = new ReactionRepository.ActionCountProjection() {
+            var addressedProjection = new ReactionRepository.ActionCountProjection() {
                 @Override
                 public ReactionAction getAction() {
                     return ReactionAction.ADDRESSED;
@@ -316,7 +316,7 @@ class ReactionServiceTest extends BaseUnitTest {
             };
 
             when(reactionRepository.countByReactorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
-                List.of(appliedProjection, disputedProjection)
+                List.of(addressedProjection, disputedProjection)
             );
 
             ReactionEngagementDTO result = service.getEngagement(workspaceContext);

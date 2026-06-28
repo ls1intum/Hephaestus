@@ -62,11 +62,46 @@ class PolicyFloorSelectorTest extends BaseUnitTest {
         assertThat(p.dropped()).isEmpty();
     }
 
-    private static Observation f(Severity severity, float confidence) {
+    @Test
+    void negativeTopK_disablesCapLikeZero() {
+        var p = PolicyFloorSelector.partition(List.of(f(Severity.MINOR, 0.5f), f(Severity.INFO, 0.4f)), -1);
+        assertThat(p.kept()).hasSize(2);
+        assertThat(p.dropped()).isEmpty();
+    }
+
+    @Test
+    void nullConfidence_sortsLastWithinSeverityBand() {
+        // Within one severity band, confidence DESC orders; a null confidence maps to 0f, so it sorts last
+        // and is the one dropped when topK=1.
+        Observation withConf = f(Severity.MINOR, 0.5f);
+        Observation nullConf = f(Severity.MINOR, null);
+        var p = PolicyFloorSelector.partition(List.of(nullConf, withConf), 1);
+        assertThat(p.kept()).containsExactly(withConf);
+        assertThat(p.dropped()).containsExactly(nullConf);
+    }
+
+    @Test
+    void deterministicIdTiebreak_whenSeverityAndConfidenceEqual() {
+        // Equal severity AND confidence: the getId().toString() tie-break decides keep vs drop deterministically.
+        UUID lower = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID higher = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        Observation a = f(Severity.MINOR, 0.5f, higher);
+        Observation b = f(Severity.MINOR, 0.5f, lower);
+        var p = PolicyFloorSelector.partition(List.of(a, b), 1);
+        // ascending by id string: the lower id is kept, the higher dropped — regardless of input order.
+        assertThat(p.kept()).containsExactly(b);
+        assertThat(p.dropped()).containsExactly(a);
+    }
+
+    private static Observation f(Severity severity, Float confidence) {
+        return f(severity, confidence, UUID.randomUUID());
+    }
+
+    private static Observation f(Severity severity, Float confidence, UUID id) {
         Observation pf = mock(Observation.class);
         lenient().when(pf.getSeverity()).thenReturn(severity);
         lenient().when(pf.getConfidence()).thenReturn(confidence);
-        lenient().when(pf.getId()).thenReturn(UUID.randomUUID());
+        lenient().when(pf.getId()).thenReturn(id);
         return pf;
     }
 }

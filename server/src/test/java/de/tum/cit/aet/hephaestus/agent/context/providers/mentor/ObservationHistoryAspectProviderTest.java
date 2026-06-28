@@ -58,9 +58,7 @@ class ObservationHistoryAspectProviderTest extends BaseUnitTest {
         when(
             findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
-        when(findingRepository.countByObservationForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(
-            List.of()
-        );
+        when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
         when(
             queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
@@ -96,7 +94,7 @@ class ObservationHistoryAspectProviderTest extends BaseUnitTest {
         ).thenReturn(List.of());
         PresenceCount positive = mockObservationCount(Presence.PRESENT, 3L);
         PresenceCount negative = mockObservationCount(Presence.ABSENT, 1L);
-        when(findingRepository.countByObservationForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(
+        when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(
             List.of(positive, negative)
         );
         SeverityCount major = mockSeverityCount(Severity.MAJOR, 2L);
