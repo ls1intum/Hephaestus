@@ -9,14 +9,14 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The cross-run change at a review target (ADR 0021, A1) — for each stable {@code finding_fingerprint} locus,
+ * The cross-run change at a review target (ADR 0021, A1) — for each stable {@code recurrence_key} locus,
  * how it moved between the prior review run and the current one. This is the measurement primitive the
  * research question ("do practices change over time?") reads, and the substrate the delivery layer renders
  * as a progress-delta footer (B3) and "Resolved since last review" lines (B1), and that the re-review
  * notification (A4) consults to decide whether anything actually changed.
  *
  * <p>Carries NO rendered prose — rendering belongs to {@code DeliveryComposer}. A locus is identified by
- * its {@code finding_fingerprint} (the (practice, target, subject, file) locus), which is
+ * its {@code recurrence_key} (the (practice, target, subject, file) locus), which is
  * stable across the non-deterministic detector, so "the same concern recurring" is observable even when the
  * LLM re-words its title every run.
  */

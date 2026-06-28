@@ -19,8 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Computes the cross-run {@link TrendDelta} for a review target by diffing the two most-recent review runs
- * at the {@code finding_fingerprint} locus grain (ADR 0021, A1). This is the READ side of the behavior-change
- * loop — the write side ({@code finding_fingerprint} on every finding) has existed since C2, but nothing read
+ * at the {@code recurrence_key} locus grain (ADR 0021, A1). This is the READ side of the behavior-change
+ * loop — the write side ({@code recurrence_key} on every finding) has existed since C2, but nothing read
  * it back, so "did the practice at this locus resolve, persist, or recur?" had no answer. This service is
  * that answer, and the substrate the delivery layer renders (B1/B3) and the re-review notification (A4)
  * consults.
@@ -82,7 +82,7 @@ public class ObservationTrendService {
     }
 
     /**
-     * Diff two runs' loci. Each run is collapsed to one representative finding per finding_fingerprint (a run can
+     * Diff two runs' loci. Each run is collapsed to one representative finding per recurrence_key (a run can
      * emit the same locus twice — ObservationFingerprint deliberately collapses two findings of one practice in one
      * file); the representative is the highest-severity, then highest-confidence, finding so the rendered
      * severity is the worst the run saw.
@@ -144,7 +144,7 @@ public class ObservationTrendService {
         );
     }
 
-    /** Collapse a run to one representative finding per finding_fingerprint (worst severity, then highest confidence). */
+    /** Collapse a run to one representative finding per recurrence_key (worst severity, then highest confidence). */
     private static Map<String, LocusObservation> collapse(List<LocusObservation> run) {
         Map<String, LocusObservation> map = new LinkedHashMap<>();
         for (LocusObservation lf : run) {

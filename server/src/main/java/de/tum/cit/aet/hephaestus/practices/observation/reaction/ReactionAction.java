@@ -10,7 +10,7 @@ package de.tum.cit.aet.hephaestus.practices.observation.reaction;
  *
  * <ul>
  *   <li>RESPONSE · {@link #ADDRESSED} — the developer acted on the guidance ("I fixed / will fix this").
- *       Named for the recipience ACT, not its outcome: a later run may still find the locus NOT_OBSERVED,
+ *       Named for the recipience ACT, not its outcome: a later run may still find the locus ABSENT,
  *       which the suppression filter ESCALATES rather than treating as done — so a value named "applied"
  *       (=outcome) would contradict that behaviour.</li>
  *   <li>RESPONSE · {@link #DISPUTED} — a REASONED rejection of the finding; the required explanation IS the

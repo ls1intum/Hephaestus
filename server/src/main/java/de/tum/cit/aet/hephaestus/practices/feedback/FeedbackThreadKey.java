@@ -12,12 +12,12 @@ import java.util.Locale;
  * fresh one.
  *
  * <p><strong>Identity is the destination, NOT the content.</strong> A subtle early design hashed the set
- * of finding {@code finding_fingerprint}s that composed the body — but that set churns between reviews (a
- * finding is fixed, a new one appears), which would change the unit's identity exactly when supersession
+ * of observation {@code recurrence_key}s that composed the body — but that set churns between reviews (an
+ * observation is fixed, a new one appears), which would change the unit's identity exactly when supersession
  * is most wanted. The unit is therefore keyed by <em>where it is delivered</em>: the artifact
  * {@code (artifact_type, artifact_id)}, the {@code recipient}, and the {@code surface}. Two reviews of the
  * same PR deliver the same in-context summary unit to the same author → same continuity key → the second
- * supersedes the first. The findings it references are the changing <em>content</em>, recorded separately.
+ * supersedes the first. The observations it references are the changing <em>content</em>, recorded separately.
  *
  * <p>Locale-safe (Locale.ROOT) lower-cased SHA-256 hex, 64 chars, matching {@code feedback.thread_key
  * VARCHAR(64)}. Pure and side-effect free.

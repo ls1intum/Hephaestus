@@ -34,8 +34,8 @@ import tools.jackson.databind.JsonNode;
  * Workspace-scoped practice definition for evaluating developer contributions.
  *
  * <p>A practice represents a specific coding or process standard that can be
- * detected in pull requests, commits, or reviews. Each practice belongs to a
- * workspace and is identified by a unique slug within that workspace.
+ * detected in a {@link WorkArtifact} (a pull request or an issue today). Each practice
+ * belongs to a workspace and is identified by a unique slug within that workspace.
  *
  * <p>The {@link #triggerEvents} field (JSONB) specifies which domain events
  * should trigger detection for this practice (e.g., PullRequestCreated, ReviewSubmitted).
@@ -51,7 +51,7 @@ import tools.jackson.databind.JsonNode;
     ),
     indexes = {
         @Index(name = "idx_practice_workspace_active", columnList = "workspace_id, is_active"),
-        // Area-scoped reads (the developer's Reflection dashboard) join finding→practice→area; index the FK.
+        // Area-scoped reads (the developer's Reflection dashboard) join observation→practice→area; index the FK.
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
     }
 )
