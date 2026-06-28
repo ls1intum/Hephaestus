@@ -643,6 +643,98 @@ class AgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
+    class RetrospectivePullRequestTests {
+
+        /** A merged PR keeps its branch refs; the retrospective path must NOT short-circuit on merged state. */
+        private PullRequest mergedPullRequest() {
+            PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
+            pr.setState(Issue.State.MERGED);
+            pr.setMerged(true);
+            return pr;
+        }
+
+        @Test
+        void onPullRequestMerged_routesThroughGateDespiteMergedState() {
+            // The merged terminal state IS the reason this trigger runs — it must reach the gate, unlike the
+            // live create/ready/sync handlers that short-circuit on merged.
+            PullRequest pr = mergedPullRequest();
+            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+            Workspace workspace = new Workspace();
+            workspace.setId(WORKSPACE_ID);
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_MERGED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Detect(workspace, List.of()));
+            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+
+            var prData = createPrData(Issue.State.MERGED, false, true);
+            listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, webhookContext(1L)));
+
+            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_MERGED, TriggerMode.AUTO);
+            verify(agentJobService).submit(
+                eq(WORKSPACE_ID),
+                eq(AgentJobType.PULL_REQUEST_REVIEW),
+                any(PullRequestReviewSubmissionRequest.class)
+            );
+        }
+
+        @Test
+        void onPullRequestMerged_skipsSyncEvents() {
+            // A sync replays EVERY historical merge — retrospective detection is for real-time transitions only.
+            var prData = createPrData(Issue.State.MERGED, false, true);
+            listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, syncContext()));
+
+            verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
+            verify(agentJobService, never()).submit(any(), any(), any());
+        }
+
+        @Test
+        void onPullRequestClosed_routesAbandonedCloseThroughGate() {
+            PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
+            pr.setState(Issue.State.CLOSED);
+            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+            Workspace workspace = new Workspace();
+            workspace.setId(WORKSPACE_ID);
+            when(
+                practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CLOSED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Detect(workspace, List.of()));
+            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+
+            var prData = createPrData(Issue.State.CLOSED, false, false);
+            // wasMerged=false → abandoned close, routed under PULL_REQUEST_CLOSED.
+            listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, false, webhookContext(1L)));
+
+            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CLOSED, TriggerMode.AUTO);
+            verify(agentJobService).submit(
+                eq(WORKSPACE_ID),
+                eq(AgentJobType.PULL_REQUEST_REVIEW),
+                any(PullRequestReviewSubmissionRequest.class)
+            );
+        }
+
+        @Test
+        void onPullRequestClosed_doesNotDoubleFireWhenWasMerged() {
+            // On a merge the processors publish BOTH PullRequestClosed(wasMerged=true) AND PullRequestMerged.
+            // The merge is owned by onPullRequestMerged, so the closed handler must short-circuit before any DB
+            // work to avoid submitting a duplicate job for the same landing.
+            var prData = createPrData(Issue.State.MERGED, false, true);
+            listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, true, webhookContext(1L)));
+
+            verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any());
+        }
+
+        @Test
+        void onPullRequestClosed_skipsSyncEvents() {
+            var prData = createPrData(Issue.State.CLOSED, false, false);
+            listener.onPullRequestClosed(new ScmDomainEvent.PullRequestClosed(prData, false, syncContext()));
+
+            verify(pullRequestRepository, never()).findByIdWithAllForGate(any());
+            verify(agentJobService, never()).submit(any(), any(), any());
+        }
+    }
+
+    @Nested
     class CollaborationTests {
 
         /**

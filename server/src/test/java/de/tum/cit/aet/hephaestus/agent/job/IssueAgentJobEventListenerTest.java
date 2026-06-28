@@ -360,6 +360,46 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     }
 
     @Nested
+    class RetrospectiveIssueClosedTests {
+
+        @Test
+        void onIssueClosed_routesClosedIssueThroughGateDespiteClosedState() {
+            // The closed terminal state IS this trigger's reason to run — it must reach the gate, unlike the
+            // live create/labeled handlers that short-circuit on a closed issue.
+            Issue issue = createIssue(Issue.State.CLOSED);
+            when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
+            Workspace workspace = new Workspace();
+            workspace.setId(WORKSPACE_ID);
+            when(
+                practiceReviewDetectionGate.evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO)
+            ).thenReturn(new GateDecision.Detect(workspace, List.of()));
+            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
+
+            var issueData = createIssueData(Issue.State.CLOSED);
+            listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", webhookContext(1L)));
+
+            verify(practiceReviewDetectionGate).evaluateIssue(issue, TriggerEventNames.ISSUE_CLOSED, TriggerMode.AUTO);
+            verify(agentJobService).submit(
+                eq(WORKSPACE_ID),
+                eq(AgentJobType.ISSUE_REVIEW),
+                any(IssueReviewSubmissionRequest.class)
+            );
+        }
+
+        @Test
+        void onIssueClosed_skipsSyncEventsToAvoidMassReplayStorm() {
+            // The sync-skip guard: a history replay must NOT fire a retrospective review for every issue the
+            // repository ever closed. Without it, one sync = a mass-replay job storm.
+            var issueData = createIssueData(Issue.State.CLOSED);
+            listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", syncContext()));
+
+            verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
+            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any());
+        }
+    }
+
+    @Nested
     class IssueLabeledTests {
 
         @Test
