@@ -30,8 +30,8 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
     private static final List<String> OBSERVATION_TOKENS = List.of("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
 
     @Test
-    @DisplayName("no precompute script emits a observation token outside its header comments")
-    void noScriptLaundersAObservation() throws IOException {
+    @DisplayName("no precompute script emits an observation token outside its header comments")
+    void noScriptLaundersAnObservation() throws IOException {
         for (Path script : scripts()) {
             for (String line : Files.readAllLines(script, StandardCharsets.UTF_8)) {
                 String trimmed = line.strip();

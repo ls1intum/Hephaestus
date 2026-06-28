@@ -214,7 +214,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123def456");
             // The MR title + description are the only inputs for the process practices
-            // (mr-description-quality, commit-discipline); a regression here makes them silently un-evaluable.
+            // (describe-what-and-why, commit-subjects-explain-each-change); a regression here makes them
+            // silently un-evaluable.
             assertThat(metadata.get("title").asString()).isEqualTo("Fix authentication bug");
             assertThat(metadata.get("body").asString()).isEqualTo("This PR fixes the login issue");
             // No triggerEvent in sampleRequest() → phase segment is "manual"; head SHA stays the trailing
@@ -375,7 +376,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void keepsFindingBackedByMetadata() {
-            var finding = finding("mr-description-quality", Presence.ABSENT, "inputs/context/metadata.json");
+            var finding = finding("describe-what-and-why", Presence.ABSENT, "inputs/context/metadata.json");
             var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
             assertThat(filtered).containsExactly(finding);
         }

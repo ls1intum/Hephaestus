@@ -128,7 +128,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         @Test
         @WithMentorUser
-        @DisplayName("allows a plain workspace member to get a area")
+        @DisplayName("allows a plain workspace member to get an area")
         void shouldAllowMemberToGet() {
             asMember();
             persistArea("member-get", "Member Get");
@@ -165,7 +165,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from creating a area")
+        @DisplayName("forbids a plain workspace member from creating an area")
         void shouldReturn403ForNonAdmin() {
             asMember();
 
@@ -206,7 +206,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from updating a area")
+        @DisplayName("forbids a plain workspace member from updating an area")
         void shouldReturn403ForNonAdmin() {
             asMember();
             persistArea("forbidden-update", "Original");
@@ -335,7 +335,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from deleting a area")
+        @DisplayName("forbids a plain workspace member from deleting an area")
         void shouldReturn403ForNonAdmin() {
             asMember();
             persistArea("forbidden-delete", "Keep Me");

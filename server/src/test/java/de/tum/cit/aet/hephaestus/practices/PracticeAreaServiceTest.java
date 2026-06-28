@@ -129,7 +129,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
     @Test
     void bindPractice_unresolvedArea_throwsNotFound() {
-        // A area slug the workspace-scoped finder does not resolve → EntityNotFoundException. This unit
+        // An area slug the workspace-scoped finder does not resolve → EntityNotFoundException. This unit
         // covers the not-found mapping only; it stubs the scoped finder and does not prove tenant isolation.
         when(practiceRepository.findByWorkspaceIdAndSlug(1L, "p")).thenReturn(Optional.of(new Practice()));
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "foreign")).thenReturn(Optional.empty());
@@ -167,5 +167,14 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
             service.reorder(CTX, List.of("ghost"))
         );
+    }
+
+    @Test
+    void reorder_duplicateSlug_throwsAndWritesNothing() {
+        // A duplicate slug would silently assign two display_order indices to one area — rejected up front.
+        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() ->
+            service.reorder(CTX, List.of("a", "a"))
+        );
+        verify(practiceAreaRepository, never()).save(any());
     }
 }

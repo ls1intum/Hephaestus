@@ -45,7 +45,6 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then — feedback (and its CASCADE children), findings, practices, and areas are all removed.
         verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
         verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
@@ -53,9 +52,8 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("runs before default-order developers")
+    @DisplayName("runs before default-order purge contributors")
     void getOrder_returnsNegativeValue() {
-        // The adapter should run early, before other developers
         assertThat(adapter.getOrder()).isLessThan(0);
     }
 }
