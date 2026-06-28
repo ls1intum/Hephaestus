@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -62,17 +63,34 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
+        return bad(practice, severity, 0.9f, 42L);
+    }
+
+    private Observation bad(
+        Practice practice,
+        @org.jspecify.annotations.Nullable Severity severity,
+        float confidence,
+        long artifactId
+    ) {
         return Observation.builder()
             .id(UUID.randomUUID())
             .practice(practice)
             .artifactType(WorkArtifact.PULL_REQUEST)
-            .artifactId(42L)
+            .artifactId(artifactId)
             .title("a problem")
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(severity)
-            .confidence(0.9f)
+            .confidence(confidence)
             .build();
+    }
+
+    private static Practice practice(String slug) {
+        Practice practice = new Practice();
+        practice.setSlug(slug);
+        practice.setName("Handling failure robustly");
+        practice.setCriteria("ordinary criteria"); // not a defect-detector
+        return practice;
     }
 
     @Test
@@ -104,5 +122,59 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
             .toList();
         // CRITICAL leads; the null-severity item sorts last (treated as least-severe).
         assertThat(order).containsExactly(Severity.CRITICAL, null);
+    }
+
+    @Test
+    @DisplayName("a single low-confidence BAD does NOT lead the card; a confident lower-severity one does (P4)")
+    void lowConfidenceSingleTargetGapDoesNotHeadline() {
+        Practice practice = practice("robust-error-handling");
+
+        // CRITICAL but coin-flip confidence on a single target (quarantined) vs MINOR but confident.
+        Observation lowConfCritical = bad(practice, Severity.CRITICAL, 0.3f, 42L);
+        Observation confidentMinor = bad(practice, Severity.MINOR, 0.95f, 42L);
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(lowConfCritical, confidentMinor));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
+        // The confident MINOR leads; the quarantined low-confidence CRITICAL is pushed last (still present).
+        assertThat(items.get(0).observationId()).isEqualTo(confidentMinor.getId());
+        assertThat(items.get(items.size() - 1).observationId()).isEqualTo(lowConfCritical.getId());
+    }
+
+    @Test
+    @DisplayName("a low-confidence BAD corroborated across >=2 targets is NOT quarantined and leads on severity")
+    void corroboratedLowConfidenceGapStillHeadlines() {
+        Practice practice = practice("robust-error-handling");
+
+        // Same low confidence but seen on TWO distinct targets → corroborated, so severity rules again.
+        Observation criticalTargetA = bad(practice, Severity.CRITICAL, 0.4f, 42L);
+        Observation minorTargetB = bad(practice, Severity.MINOR, 0.4f, 43L);
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(minorTargetB, criticalTargetA));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        // Neither is quarantined (2 distinct targets) → the CRITICAL leads on severity-weight.
+        assertThat(cards.get(0).toWorkOn().get(0).observationId()).isEqualTo(criticalTargetA.getId());
     }
 }

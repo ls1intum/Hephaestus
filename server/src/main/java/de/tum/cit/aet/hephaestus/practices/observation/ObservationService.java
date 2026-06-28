@@ -102,6 +102,16 @@ public class ObservationService {
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
     /**
+     * Upstream-quality floor (P4) for the reflective surface, mirroring the live mentor standing path. Below
+     * this confidence a single-target BAD is quarantined from the headline {@code toWorkOn} slot: a coin-flip
+     * detector hunch seen on one artifact must not become the developer's #1 thing-to-work-on. Quarantined
+     * items still surface in the card (capped by {@code MAX_ITEMS_PER_PRACTICE}), just never first.
+     */
+    private static final float QUARANTINE_CONFIDENCE = 0.5f;
+    /** Distinct targets at which a low-confidence gap is corroborated enough to rank as a normal priority. */
+    private static final int CORROBORATION_TARGETS = 2;
+
+    /**
      * The reflective-dashboard read-model for the current developer: per-practice cards they can READ —
      * why the practice matters, what good looks like, where they stand, what to act on, and what they
      * already do well. This is the third feedback channel (alongside in-context SCM notes and the mentor),
@@ -150,13 +160,21 @@ public class ObservationService {
             // write-time coercion must not surface here as a false "strength" — read-time guard for the dashboard.
             boolean isDefectDetector = practice.isDefectDetector();
 
-            // CRITICAL (ordinal 0) first so the highest-impact item leads the card.
-            List<ReflectionItemDTO> toWorkOn = group
+            // The "to work on" headline must be the highest-impact CORROBORATED item, not just the highest
+            // severity (P4): a single low-confidence BAD on one artifact must sink below a confident or
+            // multi-target gap so it never leads the card. Rank a gap that is quarantined (low confidence on a
+            // single target) last, then by (confidence × severity-weight) descending.
+            List<Observation> bad = group
                 .stream()
                 .filter(f -> f.getAssessment() == Assessment.BAD)
+                .toList();
+            Set<Long> distinctTargets = bad.stream().map(Observation::getArtifactId).collect(Collectors.toSet());
+            boolean singleTarget = distinctTargets.size() < CORROBORATION_TARGETS;
+            List<ReflectionItemDTO> toWorkOn = bad
+                .stream()
                 .sorted(
-                    Comparator.comparingInt(f ->
-                        f.getSeverity() == null ? Severity.values().length : f.getSeverity().ordinal()
+                    Comparator.comparing((Observation f) -> quarantined(f, singleTarget)).thenComparing(
+                        Comparator.comparingDouble(ObservationService::priorityScore).reversed()
                     )
                 )
                 .limit(MAX_ITEMS_PER_PRACTICE)
@@ -224,6 +242,27 @@ public class ObservationService {
             .mapToInt(i -> i.severity() == null ? Severity.values().length : i.severity().ordinal())
             .min()
             .orElse(Severity.values().length); // strengths-only cards sort after any with problems
+    }
+
+    /**
+     * A gap is quarantined from the headline slot when it is low-confidence AND uncorroborated (only seen on a
+     * single target). Returns {@code true} for quarantined items so a stable sort ranks them after every
+     * non-quarantined gap. A confident gap, or one corroborated across ≥2 targets, is never quarantined.
+     */
+    private static boolean quarantined(Observation f, boolean singleTarget) {
+        float conf = f.getConfidence() == null ? 0f : f.getConfidence();
+        return singleTarget && conf < QUARANTINE_CONFIDENCE;
+    }
+
+    /**
+     * Ranking weight for a BAD gap: {@code confidence × severity-weight}, so a low-confidence gap sinks below
+     * a corroborated/confident one of the same severity, and a high-severity-but-uncertain gap does not
+     * automatically outrank a confident lower-severity one. Severity weight is CRITICAL=4..INFO=1, null=0.
+     */
+    private static double priorityScore(Observation f) {
+        float conf = f.getConfidence() == null ? 0f : f.getConfidence();
+        int sevWeight = f.getSeverity() == null ? 0 : (Severity.values().length - f.getSeverity().ordinal());
+        return conf * sevWeight;
     }
 
     /**
