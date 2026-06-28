@@ -6,6 +6,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -96,6 +99,86 @@ public class GithubFeedbackChannel implements FeedbackChannel {
             commentNodeId
         );
         return new SummaryHandle(commentNodeId);
+    }
+
+    /**
+     * Edit an already-posted summary comment in place via the {@code updateIssueComment} mutation (ADR 0021
+     * re-review UX). GitHub addresses both PR-level and issue comments as {@code IssueComment}s, so the same
+     * mutation edits either. No subject resolution is needed — the comment's own node id ({@code externalId},
+     * returned by a prior {@link #postSummary}) addresses it directly.
+     *
+     * <p>Mirrors the GitLab channel's typed outcome: a rate-limit / transport / unknown error is
+     * {@code TRANSIENT} (keep the prior summary, do NOT re-post — a flaky update must not double-post a second
+     * summary); a confirmed not-found comment is {@code GONE} (re-post); only a blank external id — a data bug —
+     * throws.
+     */
+    @Override
+    public UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
+        long scopeId = target.ref().workspaceId();
+        if (externalId == null || externalId.isBlank()) {
+            throw new FeedbackDeliveryException(
+                "Cannot edit a GitHub comment in place: external comment id is missing"
+            );
+        }
+        if (gitHubProvider.isRateLimitCritical(scopeId)) {
+            return UpdateOutcome.transientFailure("GitHub rate limit critical for scope " + scopeId);
+        }
+
+        ClientGraphQlResponse response;
+        try {
+            response = gitHubProvider
+                .forScope(scopeId)
+                .documentName("UpdateIssueComment")
+                .variable("id", externalId)
+                .variable("body", content.body())
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+        } catch (RuntimeException e) {
+            return UpdateOutcome.transientFailure("updateIssueComment transport error: " + e.getMessage());
+        }
+
+        if (response == null) {
+            return UpdateOutcome.transientFailure("Null response from updateIssueComment mutation");
+        }
+        gitHubProvider.trackRateLimit(scopeId, response);
+
+        // A DELETED comment surfaces as a top-level GraphQL error (the node id resolves to nothing). A NOT_FOUND
+        // is GONE (re-post); any other error is TRANSIENT (keep the prior summary, do not double-post).
+        if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+            List<String> errors = response
+                .getErrors()
+                .stream()
+                .map(e -> e.getMessage())
+                .filter(Objects::nonNull)
+                .toList();
+            return looksGone(errors)
+                ? UpdateOutcome.gone("GitHub updateIssueComment: " + errors)
+                : UpdateOutcome.transientFailure("GitHub updateIssueComment failed: " + errors);
+        }
+
+        String commentNodeId = response.field("updateIssueComment.issueComment.id").getValue();
+        if (commentNodeId == null) {
+            // Neither confirmed gone nor returned an id — transient, don't double-post.
+            return UpdateOutcome.transientFailure("No comment id in updateIssueComment response");
+        }
+        log.info("Edited GitHub comment in place: workspaceId={}, commentId={}", scopeId, commentNodeId);
+        return UpdateOutcome.edited(new SummaryHandle(commentNodeId));
+    }
+
+    /** Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level error. */
+    static boolean looksGone(List<String> errors) {
+        return errors
+            .stream()
+            .filter(Objects::nonNull)
+            .map(e -> e.toLowerCase(Locale.ROOT))
+            .anyMatch(
+                e ->
+                    e.contains("not found") ||
+                    e.contains("does not exist") ||
+                    e.contains("could not be found") ||
+                    e.contains("couldn't be found") ||
+                    e.contains("could not resolve")
+            );
     }
 
     /** A GitHub issue subject is the distinct {@code owner/repo/issues/N} form (see formatIssueSubjectId). */

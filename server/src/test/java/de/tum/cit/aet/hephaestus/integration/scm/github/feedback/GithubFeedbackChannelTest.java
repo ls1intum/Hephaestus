@@ -123,6 +123,91 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
             .hasMessageContaining("addComment failed");
     }
 
+    @Test
+    void updateSummary_editsInPlace_returnsEdited() {
+        // C3: GitHub re-review must edit the persistent summary in place (updateIssueComment) instead of
+        // posting a duplicate. A successful mutation returns EDITED carrying the comment node id.
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo#42",
+            null
+        );
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = mockGraphQlResponse("updateIssueComment.issueComment.id", "IC_edited");
+        when(spec.execute()).thenReturn(Mono.just(response));
+
+        var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("new body", "marker"));
+
+        assertThat(outcome.kind()).isEqualTo(
+            de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.UpdateOutcome.Kind.EDITED
+        );
+        assertThat(outcome.handle().externalId()).isEqualTo("IC_edited");
+        verify(spec).variable("id", "IC_prior");
+    }
+
+    @Test
+    void updateSummary_blankExternalId_throws() {
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo#42",
+            null
+        );
+        assertThatThrownBy(() -> channel.updateSummary(target, "  ", new FeedbackContent("body", "marker")))
+            .isInstanceOf(FeedbackDeliveryException.class)
+            .hasMessageContaining("external comment id is missing");
+    }
+
+    @Test
+    void updateSummary_rateLimitCritical_isTransient_notRepost() {
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo#42",
+            null
+        );
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
+
+        var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
+
+        assertThat(outcome.kind()).isEqualTo(
+            de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.UpdateOutcome.Kind.TRANSIENT
+        );
+    }
+
+    @Test
+    void updateSummary_deletedComment_isGone_soCallerReposts() {
+        // A human-deleted comment surfaces as a NOT_FOUND top-level error → GONE (re-post), not TRANSIENT.
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo#42",
+            null
+        );
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+
+        ClientGraphQlResponse errorResponse = mock(ClientGraphQlResponse.class);
+        org.springframework.graphql.ResponseError err = mock(org.springframework.graphql.ResponseError.class);
+        when(err.getMessage()).thenReturn("Could not resolve to a node with the global id of 'IC_prior'");
+        when(errorResponse.getErrors()).thenReturn(List.of(err));
+        when(spec.execute()).thenReturn(Mono.just(errorResponse));
+
+        var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
+
+        assertThat(outcome.kind()).isEqualTo(
+            de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.UpdateOutcome.Kind.GONE
+        );
+    }
+
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockGraphQlResponse(String fieldPath, String value) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
