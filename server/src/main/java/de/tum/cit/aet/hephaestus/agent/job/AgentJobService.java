@@ -18,10 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -58,7 +55,6 @@ public class AgentJobService {
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
-    private final PracticeReviewDetectionGate detectionGate;
     private final @Nullable SandboxManager sandboxManager;
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
 
@@ -73,7 +69,6 @@ public class AgentJobService {
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
-        PracticeReviewDetectionGate detectionGate,
         @Nullable SandboxManager sandboxManager,
         Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher
     ) {
@@ -87,7 +82,6 @@ public class AgentJobService {
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
-        this.detectionGate = detectionGate;
         this.sandboxManager = sandboxManager;
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
     }
@@ -118,107 +112,59 @@ public class AgentJobService {
     // Submit
 
     /**
-     * Outcome of the session-bound dev-trigger preparation phase: either a fully-built, detached
-     * {@link JobSubmissionRequest} ready to submit outside any transaction, or a terminal human-readable
-     * {@code message} (not-found / missing-branch-info / gate-skip) that needs no submission.
+     * Build a detached PR review submission request from an already-loaded entity. Reads the PR's lazy
+     * associations (repository/author via {@link ScmEventPayload.PullRequestData#from}), so it MUST be called
+     * inside the caller's open session/transaction. Returns {@code null} when the branch refs needed to
+     * clone/diff are absent (a merged PR retains them). Used by the dev-trigger path, where the controller
+     * keeps load + gate + this build inside one {@link TransactionTemplate} and then submits OUTSIDE it via
+     * {@link #submitPrepared} — because {@link #submit} forbids an outer transaction (SYSTEMIC #5).
      */
-    private record PreparedDevSubmission(@Nullable JobSubmissionRequest request, @Nullable String message) {
-        static PreparedDevSubmission ready(JobSubmissionRequest request) {
-            return new PreparedDevSubmission(request, null);
+    @Nullable
+    PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable String triggerEvent) {
+        if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
+            return null;
         }
-
-        static PreparedDevSubmission done(String message) {
-            return new PreparedDevSubmission(null, message);
-        }
+        log.info("Dev trigger: building review request for PR {} ({})", pr.getId(), pr.getHtmlUrl());
+        return new PullRequestReviewSubmissionRequest(
+            ScmEventPayload.PullRequestData.from(pr),
+            pr.getHeadRefName(),
+            pr.getHeadRefOid(),
+            pr.getBaseRefName(),
+            triggerEvent
+        );
     }
 
     /**
-     * Dev/manual trigger: load a PR, optionally run the detection gate ({@code triggerEvent} non-null), and
-     * submit a review job. Bypasses NATS.
-     *
-     * <p><strong>Transaction boundary (SYSTEMIC #5):</strong> {@link #submit} contracts that it MUST NOT run
-     * inside an outer transaction (each config gets its own transaction for isolation). So the session-bound
-     * work — loading the PR, the gate's lazy {@code Workspace.reviewSettings} access, and building the
-     * detached request via {@link ScmEventPayload.PullRequestData#from} — happens inside a
-     * {@link TransactionTemplate} block, and {@link #submit} is invoked only AFTER that block returns. This
-     * replaces the former controller-level {@code @Transactional}, which wrapped {@code submit} and silently
-     * violated the contract.
+     * Build a detached issue-detection submission request from an already-loaded entity. Reads the issue's
+     * lazy repository, so it MUST be called inside the caller's open session/transaction. Returns
+     * {@code null} when the issue has no repository. Companion to {@link #buildReviewRequest}.
      */
-    public String devTriggerReview(Long workspaceId, Long prId, @Nullable String triggerEvent) {
-        PreparedDevSubmission prepared = transactionTemplate.execute(status -> {
-            PullRequest pr = artifactLoader.findPullRequestForGate(prId).orElse(null);
-            if (pr == null) {
-                return PreparedDevSubmission.done("PR not found: " + prId);
-            }
-            if (triggerEvent != null && !triggerEvent.isBlank()) {
-                GateDecision decision = detectionGate.evaluate(pr, triggerEvent, TriggerMode.AUTO);
-                if (decision instanceof GateDecision.Skip skip) {
-                    return PreparedDevSubmission.done("Gate skipped (" + triggerEvent + "): " + skip.reason());
-                }
-            }
-            if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-                return PreparedDevSubmission.done("PR missing branch info: prId=" + pr.getId());
-            }
-            log.info("Dev trigger: submitting review for PR {} ({})", pr.getId(), pr.getHtmlUrl());
-            return PreparedDevSubmission.ready(
-                new PullRequestReviewSubmissionRequest(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    pr.getHeadRefName(),
-                    pr.getHeadRefOid(),
-                    pr.getBaseRefName(),
-                    triggerEvent
-                )
-            );
-        });
-        return submitPrepared(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, prepared);
-    }
-
-    /**
-     * Dev/manual trigger: load an issue, optionally run the detection gate, and submit an issue-detection
-     * job. Mirrors {@link #devTriggerReview} (including the submit-outside-the-transaction contract).
-     */
-    public String devTriggerIssueDetection(Long workspaceId, Long issueId, @Nullable String triggerEvent) {
-        PreparedDevSubmission prepared = transactionTemplate.execute(status -> {
-            Issue issue = artifactLoader.findIssueForGate(issueId).orElse(null);
-            if (issue == null) {
-                return PreparedDevSubmission.done("Issue not found: " + issueId);
-            }
-            if (triggerEvent != null && !triggerEvent.isBlank()) {
-                GateDecision decision = detectionGate.evaluateIssue(issue, triggerEvent, TriggerMode.AUTO);
-                if (decision instanceof GateDecision.Skip skip) {
-                    return PreparedDevSubmission.done("Gate skipped (" + triggerEvent + "): " + skip.reason());
-                }
-            }
-            if (issue.getRepository() == null) {
-                return PreparedDevSubmission.done("Issue missing repository: issueId=" + issue.getId());
-            }
-            log.info("Dev trigger: submitting issue detection for issue {} ({})", issue.getId(), issue.getHtmlUrl());
-            return PreparedDevSubmission.ready(
-                new IssueReviewSubmissionRequest(
-                    issue.getId(),
-                    issue.getNumber(),
-                    issue.getRepository().getId(),
-                    issue.getRepository().getNameWithOwner(),
-                    issue.getTitle(),
-                    issue.getBody() != null ? issue.getBody() : "",
-                    issue.getState() != null ? issue.getState().name() : "OPEN",
-                    issue.getUpdatedAt(),
-                    triggerEvent
-                )
-            );
-        });
-        return submitPrepared(workspaceId, AgentJobType.ISSUE_REVIEW, prepared);
-    }
-
-    /**
-     * Submit a prepared dev request OUTSIDE the preparation transaction (honouring {@link #submit}'s
-     * no-outer-transaction contract), or return the terminal message when nothing was prepared.
-     */
-    private String submitPrepared(Long workspaceId, AgentJobType jobType, @Nullable PreparedDevSubmission prepared) {
-        if (prepared == null || prepared.request() == null) {
-            return prepared == null ? "No submission prepared" : prepared.message();
+    @Nullable
+    IssueReviewSubmissionRequest buildIssueRequest(Issue issue, @Nullable String triggerEvent) {
+        if (issue.getRepository() == null) {
+            return null;
         }
-        Optional<AgentJob> job = submit(workspaceId, jobType, prepared.request());
+        log.info("Dev trigger: building issue request for issue {} ({})", issue.getId(), issue.getHtmlUrl());
+        return new IssueReviewSubmissionRequest(
+            issue.getId(),
+            issue.getNumber(),
+            issue.getRepository().getId(),
+            issue.getRepository().getNameWithOwner(),
+            issue.getTitle(),
+            issue.getBody() != null ? issue.getBody() : "",
+            issue.getState() != null ? issue.getState().name() : "OPEN",
+            issue.getUpdatedAt(),
+            triggerEvent
+        );
+    }
+
+    /**
+     * Submit a prepared dev request and render the result message. Invoked by the dev-trigger controller
+     * AFTER the load/gate/build transaction has committed, so {@link #submit}'s no-outer-transaction contract
+     * (SYSTEMIC #5) is honoured.
+     */
+    public String submitPrepared(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
+        Optional<AgentJob> job = submit(workspaceId, jobType, request);
         return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
     }
 

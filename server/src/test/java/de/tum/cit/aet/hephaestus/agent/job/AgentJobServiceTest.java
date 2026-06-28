@@ -76,9 +76,6 @@ class AgentJobServiceTest extends BaseUnitTest {
     @Mock
     private SandboxManager sandboxManager;
 
-    @Mock
-    private de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate detectionGate;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AgentJobService service;
@@ -99,7 +96,6 @@ class AgentJobServiceTest extends BaseUnitTest {
             eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, false),
-            detectionGate,
             sandboxManager,
             java.util.Optional.empty()
         );
@@ -698,58 +694,67 @@ class AgentJobServiceTest extends BaseUnitTest {
     }
 
     @Nested
-    class DevTrigger {
+    class DevTriggerSupport {
 
-        @BeforeEach
+        @Test
+        void buildReviewRequestReturnsNullWhenBranchInfoMissing() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            pr.setId(5L);
+            // headRefOid/headRefName/baseRefName all null → nothing to clone or diff.
+            assertThat(service.buildReviewRequest(pr, "PullRequestMerged")).isNull();
+        }
+
+        @Test
+        void buildReviewRequestBuildsDetachedRequestWhenBranchInfoPresent() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            pr.setId(5L);
+            pr.setHeadRefOid("abc123");
+            pr.setHeadRefName("feature/test");
+            pr.setBaseRefName("main");
+            de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository repo =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository();
+            repo.setId(100L);
+            repo.setNameWithOwner("owner/repo");
+            pr.setRepository(repo);
+
+            var request = service.buildReviewRequest(pr, "PullRequestMerged");
+
+            assertThat(request).isNotNull();
+            assertThat(request.headRefOid()).isEqualTo("abc123");
+            assertThat(request.triggerEvent()).isEqualTo("PullRequestMerged");
+        }
+
+        @Test
+        void buildIssueRequestReturnsNullWhenRepositoryMissing() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue issue =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue();
+            issue.setId(7L);
+            assertThat(service.buildIssueRequest(issue, "IssueClosed")).isNull();
+        }
+
+        @Test
         @SuppressWarnings("unchecked")
-        void setUpPrepTransaction() {
-            // The dev-trigger preparation runs load + gate + request-building inside transactionTemplate.execute;
-            // make the mock actually invoke that callback so the path is exercised.
+        void submitPreparedRunsSubmitAndRendersNoConfigMessage() {
+            // submitPrepared is invoked by the controller AFTER the prep transaction commits, so submit() runs
+            // outside any outer transaction (SYSTEMIC #5). With no enabled config it renders the no-job message.
             lenient()
                 .when(transactionTemplate.execute(any()))
                 .thenAnswer(inv -> {
                     TransactionCallback<?> callback = inv.getArgument(0);
                     return callback.doInTransaction(mock(TransactionStatus.class));
                 });
-        }
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
-        @Test
-        void reviewReturnsNotFoundWhenPrAbsent() {
-            when(artifactLoader.findPullRequestForGate(99L)).thenReturn(Optional.empty());
-
-            String result = service.devTriggerReview(1L, 99L, null);
-
-            assertThat(result).isEqualTo("PR not found: 99");
-            // submit() never reached → no workspace lookup, no job persisted.
-            verify(workspaceRepository, never()).findById(anyLong());
-        }
-
-        @Test
-        void gateRoutedReviewSkipDoesNotReachSubmit() {
-            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
-                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
-            pr.setId(5L);
-            when(artifactLoader.findPullRequestForGate(5L)).thenReturn(Optional.of(pr));
-            when(detectionGate.evaluate(eq(pr), eq("PullRequestMerged"), any())).thenReturn(
-                new de.tum.cit.aet.hephaestus.practices.review.GateDecision.Skip("no matching practices")
+            String result = service.submitPrepared(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
             );
 
-            String result = service.devTriggerReview(1L, 5L, "PullRequestMerged");
-
-            assertThat(result).isEqualTo("Gate skipped (PullRequestMerged): no matching practices");
-            // The gate ran inside the prep transaction and short-circuited BEFORE submit() — which must run
-            // outside any outer transaction (SYSTEMIC #5). No workspace resolution means submit() was skipped.
-            verify(workspaceRepository, never()).findById(anyLong());
-        }
-
-        @Test
-        void issueDetectionReturnsNotFoundWhenIssueAbsent() {
-            when(artifactLoader.findIssueForGate(7L)).thenReturn(Optional.empty());
-
-            String result = service.devTriggerIssueDetection(1L, 7L, "IssueClosed");
-
-            assertThat(result).isEqualTo("Issue not found: 7");
-            verify(workspaceRepository, never()).findById(anyLong());
+            assertThat(result).isEqualTo("No job created (no enabled agent config?)");
         }
     }
 }
