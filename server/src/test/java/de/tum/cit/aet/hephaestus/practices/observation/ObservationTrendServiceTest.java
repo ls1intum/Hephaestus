@@ -51,7 +51,8 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
             List.of(
                 locus(JOB_PREV, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "X title"),
-                locus(JOB_PREV, "keyY", Presence.PRESENT, Severity.MINOR, "y", "Y title"),
+                // keyY was a PROBLEM (BAD) prior and is gone now → a genuine RESOLVED ("you fixed X").
+                locus(JOB_PREV, "keyY", Presence.ABSENT, Severity.MINOR, "y", "Y title"),
                 locus(JOB_CURR, "keyX", Presence.ABSENT, Severity.MAJOR, "x", "X title v2"),
                 locus(JOB_CURR, "keyZ", Presence.ABSENT, Severity.CRITICAL, "z", "Z title")
             )
@@ -70,8 +71,66 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         // a RESOLVED locus carries the PRIOR run's prose (it is absent now; that is what the student last saw)
         LocusTransition resolved = transition(d, "keyY");
         assertThat(resolved.title()).isEqualTo("Y title");
-        assertThat(resolved.priorAssessment()).isEqualTo(Assessment.GOOD);
+        assertThat(resolved.priorAssessment()).isEqualTo(Assessment.BAD);
         assertThat(resolved.currentAssessment()).isNull();
+    }
+
+    @Test
+    void computeForTarget_vanishedGoodStrengthIsNotRenderedAsResolved() {
+        // C10: a GOOD strength that simply was not re-observed this run must NOT render as "Resolved ✓"
+        // ("you fixed X" for something already right). It produces no transition at all.
+        stubTwoTargetRuns();
+        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
+            List.of(
+                // keyG: a satisfied strength (GOOD) prior, absent now → must NOT be RESOLVED.
+                locus(JOB_PREV, "keyG", Presence.PRESENT, Severity.MINOR, "g", "was already satisfied"),
+                // keyB: a real problem (BAD) prior, gone now → a genuine RESOLVED.
+                locus(JOB_PREV, "keyB", Presence.ABSENT, Severity.MAJOR, "b", "was broken")
+            )
+        );
+
+        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+
+        assertThat(d.countResolved()).isEqualTo(1);
+        assertThat(d.resolved().get(0).recurrenceKey()).isEqualTo("keyB");
+        assertThat(d.transitions().stream().map(LocusTransition::recurrenceKey)).doesNotContain("keyG");
+    }
+
+    @Test
+    void computeForTarget_newStrengthIsNotCountedAsNewProblem() {
+        // C10: a newly-observed GOOD strength must not inflate countNew (the "N new" problems count).
+        stubTwoTargetRuns();
+        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
+            List.of(
+                // keyN1: a new strength (GOOD) — present now, absent prior.
+                locus(JOB_CURR, "keyN1", Presence.PRESENT, Severity.MINOR, "g", "newly satisfied"),
+                // keyN2: a new problem (BAD).
+                locus(JOB_CURR, "keyN2", Presence.ABSENT, Severity.MAJOR, "b", "newly broken")
+            )
+        );
+
+        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+
+        // Only the BAD-new counts as a "new problem"; the new strength does not.
+        assertThat(d.countNew()).isEqualTo(1);
+    }
+
+    @Test
+    void computeForTarget_nowSatisfiedPersistedLocusIsNotStillOpen() {
+        // C10: a BAD->GOOD improvement persists as PERSISTED with currentAssessment=GOOD, and must NOT be
+        // counted "still open".
+        stubTwoTargetRuns();
+        when(repo.findLociByAgentJobs(any(), eq(WS))).thenReturn(
+            List.of(
+                locus(JOB_PREV, "keyS", Presence.ABSENT, Severity.MAJOR, "s", "was broken"),
+                locus(JOB_CURR, "keyS", Presence.PRESENT, Severity.MAJOR, "s", "now satisfied")
+            )
+        );
+
+        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+
+        assertThat(status(d, "keyS")).isEqualTo(TransitionStatus.PERSISTED);
+        assertThat(d.countPersisted()).isZero(); // now satisfied → not "still open"
     }
 
     @Test

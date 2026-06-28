@@ -103,11 +103,16 @@ public class ObservationTrendService {
             LocusObservation prior = prevMap.get(key);
             LocusObservation curr = currMap.get(key);
             if (prior == null) {
-                // present now, absent prior → NEW
+                // present now, absent prior → NEW (carries curr.getAssessment() so the footer can tell a new
+                // PROBLEM from a newly-observed strength; only a BAD-new is a "new problem" — C10).
                 transitions.add(transition(key, TransitionStatus.NEW, curr, null, curr.getAssessment()));
             } else if (curr == null) {
-                // present prior, absent now → RESOLVED (render the prior prose — it's what the student last saw)
-                transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getAssessment(), null));
+                // present prior, absent now. Only a vanished PROBLEM is RESOLVED ("you fixed X"). A GOOD strength
+                // that simply was not re-observed this run is NOT a fix — emitting RESOLVED would credit the
+                // student with fixing something that was already right (C10). Drop it: no transition.
+                if (prior.getAssessment() == Assessment.BAD) {
+                    transitions.add(transition(key, TransitionStatus.RESOLVED, prior, prior.getAssessment(), null));
+                }
             } else {
                 // present in both — PERSISTED, unless it backslid GOOD→BAD (REGRESSED; ADR 0022).
                 // BAD→GOOD is an IMPROVEMENT, not a regression: it stays PERSISTED but currentAssessment

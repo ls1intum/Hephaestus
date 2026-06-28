@@ -63,17 +63,27 @@ public record TrendDelta(
         @Nullable Float currentConfidence
     ) {}
 
+    /**
+     * Count of NEW PROBLEMS — newly-appeared loci that are currently {@code BAD}. A newly-observed strength
+     * ({@code GOOD}) is not a "new problem" and must not inflate this count (C10); the footer renders it as
+     * "N new".
+     */
     public int countNew() {
         return (int) transitions
             .stream()
-            .filter(t -> t.status() == TransitionStatus.NEW)
+            .filter(t -> t.status() == TransitionStatus.NEW && t.currentAssessment() == Assessment.BAD)
             .count();
     }
 
+    /**
+     * Count of loci still open — present in both runs and currently {@code BAD}. A locus that recurred but is
+     * now satisfied (a BAD→GOOD improvement, carried as PERSISTED with {@code currentAssessment == GOOD}) is
+     * NOT "still open" and must not be counted here (C10).
+     */
     public int countPersisted() {
         return (int) transitions
             .stream()
-            .filter(t -> t.status() == TransitionStatus.PERSISTED)
+            .filter(t -> t.status() == TransitionStatus.PERSISTED && t.currentAssessment() == Assessment.BAD)
             .count();
     }
 
