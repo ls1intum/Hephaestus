@@ -53,6 +53,12 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     @Mock
     Cache findingsCache;
 
+    @Mock
+    Cache standingCache;
+
+    @Mock
+    Cache authoredWorkCache;
+
     @InjectMocks
     MentorContextInvalidator invalidator;
 
@@ -61,6 +67,8 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         when(cacheManager.getCache("mentor_user_aspect")).thenReturn(userCache);
         when(cacheManager.getCache("mentor_workspace_aspect")).thenReturn(workspaceCache);
         when(cacheManager.getCache("mentor_findings_aspect")).thenReturn(findingsCache);
+        when(cacheManager.getCache("mentor_practice_standing_aspect")).thenReturn(standingCache);
+        when(cacheManager.getCache("mentor_authored_work_aspect")).thenReturn(authoredWorkCache);
     }
 
     @Test
@@ -72,6 +80,34 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
         verify(userCache).evict(eq("7:9"));
         verify(workspaceCache).evict(eq("7:9"));
         verify(findingsCache).evict(eq("7:9"));
+        verify(standingCache).evict(eq("7:9"));
+        // C11: the authored-work aspect is now in the per-user eviction set.
+        verify(authoredWorkCache).evict(eq("7:9"));
+    }
+
+    @Test
+    void practiceDetectionCompletedEvictsFindingsAndStandingForDeveloper() {
+        // C11: a completed detection run wrote new observations → the findings + standing aspects must be
+        // evicted for the evaluated developer. SCM-only caches stay untouched (this is not an SCM event).
+        invalidator.onPracticeDetectionCompleted(
+            new de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent(
+                UUID.randomUUID(),
+                7L,
+                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST,
+                42L,
+                9L,
+                3,
+                0,
+                true
+            )
+        );
+
+        verify(findingsCache).evict(eq("7:9"));
+        verify(standingCache).evict(eq("7:9"));
+        // The user / workspace / authored-work aspects are SCM-driven, not detection-driven — untouched here.
+        verify(userCache, never()).evict(org.mockito.ArgumentMatchers.any());
+        verify(workspaceCache, never()).evict(org.mockito.ArgumentMatchers.any());
+        verify(authoredWorkCache, never()).evict(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
