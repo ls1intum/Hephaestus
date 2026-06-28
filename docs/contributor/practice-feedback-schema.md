@@ -56,7 +56,7 @@ DDD *Ubiquitous Language* principle, model, code, schema, API and UI share one w
 ([Fowler, *UbiquitousLanguage*](https://martinfowler.com/bliki/UbiquitousLanguage.html); Evans, *DDD*).
 
 > The evaluation model is the `presence` × `assessment` split of
-> [ADR 0022](../decisions/0022-observation-presence-assessment-and-schema-cleanup.md): `presence`
+> [ADR 0022](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md): `presence`
 > (`PRESENT`/`ABSENT`/`NOT_APPLICABLE`) × `assessment` (`GOOD`/`BAD`, NULL iff
 > `presence = NOT_APPLICABLE`). There is no `Practice.kind` and no `subject_role`; direction is recomputed
 > as `assessment = BAD`, and the reaction anchors on the delivered feedback.
@@ -99,7 +99,7 @@ DDD *Ubiquitous Language* principle, model, code, schema, API and UI share one w
   `(ABSENT,BAD)→fail`, `(PRESENT,BAD)→fail`, `(ABSENT,GOOD)→pass`, `NOT_APPLICABLE→notApplicable`.
   `NOT_APPLICABLE` is a verbatim match for SARIF `notApplicable`. There is no rule-direction column: the
   good/bad meaning lives in `criteria` + `what_good_looks_like`, and readers recompute "is this a problem?"
-  as `assessment = BAD`. See [ADR 0022](../decisions/0022-observation-presence-assessment-and-schema-cleanup.md).
+  as `assessment = BAD`. See [ADR 0022](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md).
 - **recurrence_key.** Directly analogous to SARIF `partialFingerprints` + `result.baselineState`
   (`new`/`unchanged`/`updated`/`absent`), the mechanism by which a Results-Management System decides "is
   this the *same* observation as last run?" ([SARIF issue #615](https://github.com/oasis-tcs/sarif-spec/issues/615)).
@@ -212,7 +212,7 @@ detection accuracy. The latest row per `(feedback, developer)` is the current st
 > reasoned rejection and requires an `explanation`. VALIDITY `{NOT_APPLICABLE}` is a relevance judgement,
 > not an uptake act, so `ReactionEngagementDTO` excludes it from every uptake / non-uptake ratio and
 > reports it as a separate scope signal. The recipience-literature grounding for this split lives in
-> [ADR 0022](../decisions/0022-observation-presence-assessment-and-schema-cleanup.md) § Evidence.
+> [ADR 0022](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md) § Evidence.
 
 ### 3.5 `Feedback` — table `feedback`
 
