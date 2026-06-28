@@ -20,8 +20,8 @@ public record ObservationListDTO(
     @NonNull @Schema(description = "Observation ID") UUID id,
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
-    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
-    @NonNull @Schema(description = "Target entity ID") Long artifactId,
+    @NonNull @Schema(description = "Artifact type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
+    @NonNull @Schema(description = "Artifact entity ID") Long artifactId,
     @NonNull @Schema(description = "Observation title") String title,
     @NonNull @Schema(description = "Presence: PRESENT, ABSENT, or NOT_APPLICABLE") Presence presence,
     @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
@@ -32,20 +32,20 @@ public record ObservationListDTO(
     /**
      * Maps a {@link Observation} entity (with eagerly fetched practice) to a list DTO.
      */
-    public static ObservationListDTO from(Observation f) {
-        var practice = f.getPractice();
+    public static ObservationListDTO from(Observation observation) {
+        var practice = observation.getPractice();
         return new ObservationListDTO(
-            f.getId(),
+            observation.getId(),
             practice.getSlug(),
             practice.getName(),
-            f.getArtifactType(),
-            f.getArtifactId(),
-            f.getTitle(),
-            f.getPresence(),
-            f.getAssessment(),
-            f.getSeverity(),
-            f.getConfidence(),
-            f.getObservedAt()
+            observation.getArtifactType(),
+            observation.getArtifactId(),
+            observation.getTitle(),
+            observation.getPresence(),
+            observation.getAssessment(),
+            observation.getSeverity(),
+            observation.getConfidence(),
+            observation.getObservedAt()
         );
     }
 }

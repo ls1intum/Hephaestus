@@ -103,9 +103,11 @@ public class Practice {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
+    @ToString.Exclude
     private JsonNode triggerEvents;
 
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
+    @ToString.Exclude
     private String criteria;
 
     /**
@@ -115,6 +117,7 @@ public class Practice {
      * {@link #criteria}.
      */
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
+    @ToString.Exclude
     private String whyItMatters;
 
     /**
@@ -123,6 +126,7 @@ public class Practice {
      * (PRESENT/ABSENT/GOOD/BAD/NOT_APPLICABLE); enforced by an authoring guard. Nullable; learner-facing only.
      */
     @Column(name = "what_good_looks_like", columnDefinition = "TEXT")
+    @ToString.Exclude
     private String whatGoodLooksLike;
 
     /**
@@ -131,6 +135,7 @@ public class Practice {
      * When null, no precomputation runs for this practice.
      */
     @Column(name = "precompute_script", columnDefinition = "TEXT")
+    @ToString.Exclude
     private String precomputeScript;
 
     @Column(name = "is_active", nullable = false)

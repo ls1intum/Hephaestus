@@ -1441,11 +1441,11 @@ export type PageObservationList = {
  */
 export type ObservationList = {
     /**
-     * Target entity ID
+     * Artifact entity ID
      */
     artifactId: number;
     /**
-     * Target type (e.g. PULL_REQUEST)
+     * Artifact type (e.g. PULL_REQUEST)
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**
@@ -1657,11 +1657,11 @@ export type AgentJob = {
  */
 export type ObservationDetail = {
     /**
-     * Target entity ID
+     * Artifact entity ID
      */
     artifactId: number;
     /**
-     * Target type (e.g. PULL_REQUEST)
+     * Artifact type (e.g. PULL_REQUEST)
      */
     artifactType: 'PULL_REQUEST' | 'ISSUE';
     /**

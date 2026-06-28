@@ -53,7 +53,7 @@ public record TrendDelta(
      * is null for NEW.
      */
     public record LocusTransition(
-        String findingFingerprint,
+        String recurrenceKey,
         TransitionStatus status,
         String practiceSlug,
         @Nullable String title,

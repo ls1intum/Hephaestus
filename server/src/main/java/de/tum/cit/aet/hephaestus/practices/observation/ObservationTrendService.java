@@ -120,7 +120,7 @@ public class ObservationTrendService {
         transitions.sort(
             Comparator.comparingInt((LocusTransition t) -> statusOrder(t.status()))
                 .thenComparing(t -> t.currentSeverity() == null ? Integer.MAX_VALUE : t.currentSeverity().ordinal())
-                .thenComparing(LocusTransition::findingFingerprint)
+                .thenComparing(LocusTransition::recurrenceKey)
         );
         return transitions;
     }

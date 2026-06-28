@@ -5169,10 +5169,10 @@ components:
         artifactId:
           type: integer
           format: int64
-          description: Target entity ID
+          description: Artifact entity ID
         artifactType:
           type: string
-          description: Target type (e.g. PULL_REQUEST)
+          description: Artifact type (e.g. PULL_REQUEST)
           enum:
           - PULL_REQUEST
           - ISSUE
@@ -5247,10 +5247,10 @@ components:
         artifactId:
           type: integer
           format: int64
-          description: Target entity ID
+          description: Artifact entity ID
         artifactType:
           type: string
-          description: Target type (e.g. PULL_REQUEST)
+          description: Artifact type (e.g. PULL_REQUEST)
           enum:
           - PULL_REQUEST
           - ISSUE

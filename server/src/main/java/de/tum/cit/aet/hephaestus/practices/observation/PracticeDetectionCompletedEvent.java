@@ -6,8 +6,10 @@ import java.util.UUID;
 /**
  * Published after practice observations are persisted for a completed agent job.
  *
- * <p>Carries only scalar/immutable data, safe for {@code @Async}
- * {@code @TransactionalEventListener(phase = AFTER_COMMIT)} subscribers.
+ * <p>Carries only scalar/immutable data, so it is safe for an {@code @Async}
+ * {@code @TransactionalEventListener(phase = AFTER_COMMIT)} subscriber if one is added. NOTE: there is
+ * currently NO subscriber in production — this is intentionally-unconsumed scaffolding for a future
+ * consumer (e.g. notifications / analytics). The empty-practices early-return path does not publish it.
  *
  * @param agentJobId      the agent job that produced these observations
  * @param workspaceId     the workspace context

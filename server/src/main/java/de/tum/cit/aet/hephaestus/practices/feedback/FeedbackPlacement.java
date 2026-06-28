@@ -75,6 +75,10 @@ public class FeedbackPlacement {
     /**
      * Direct access to the feedback ID without triggering a lazy load on the {@link #feedback} proxy.
      * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
+     *
+     * @implNote {@code insertable=false/updatable=false}: a builder-set {@code .feedbackId(...)} is NOT
+     *     persisted. Callers MUST set {@link #feedback}; a row built with only {@code feedbackId} would
+     *     persist a NULL {@code feedback_id} and violate the NOT NULL FK.
      */
     @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
     private UUID feedbackId;
@@ -86,6 +90,9 @@ public class FeedbackPlacement {
     private PlacementType placementType;
 
     // --- Diff anchor coordinates (all nullable: only INLINE placements anchor to a diff) ---
+    // These are an append-only forensic/research record: nothing currently READS the anchor coordinates back
+    // (only placementType + postedCommentRef are read on the reconcile path). Do not assume reconciliation
+    // consumes them.
 
     /** Granularity of the anchor (LINE / RANGE / FILE / IMAGE). Null for non-inline placements. */
     @Enumerated(EnumType.STRING)

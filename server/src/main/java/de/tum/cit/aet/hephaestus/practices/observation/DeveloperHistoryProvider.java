@@ -58,14 +58,10 @@ public class DeveloperHistoryProvider {
             return Optional.empty();
         }
 
-        // Group by practice slug, accumulate observation counts and track latest detection
+        // Group by practice slug, accumulate observation counts and track latest observation
         Map<String, PracticeAggregate> byPractice = new LinkedHashMap<>();
         for (DeveloperPracticeSummary row : summaries) {
             byPractice.computeIfAbsent(row.getPracticeSlug(), slug -> new PracticeAggregate()).add(row);
-        }
-
-        if (byPractice.isEmpty()) {
-            return Optional.empty();
         }
 
         // Sort by problem (BAD) count desc, then slug for deterministic ordering
@@ -87,7 +83,7 @@ public class DeveloperHistoryProvider {
             node.put("practice", entry.getKey());
             node.put("good", agg.good);
             node.put("bad", agg.bad);
-            node.put("lastSeen", agg.lastDetectedAt.toString());
+            node.put("lastSeen", agg.lastObservedAt.toString());
             array.add(node);
         }
 
@@ -117,7 +113,7 @@ public class DeveloperHistoryProvider {
 
         long good;
         long bad;
-        Instant lastDetectedAt;
+        Instant lastObservedAt;
 
         void add(DeveloperPracticeSummary row) {
             Assessment assessment = row.getAssessment();
@@ -127,8 +123,8 @@ public class DeveloperHistoryProvider {
                 bad += row.getCount();
             }
             // NOT_APPLICABLE (null assessment) is not counted in history.
-            if (lastDetectedAt == null || row.getLastDetectedAt().isAfter(lastDetectedAt)) {
-                lastDetectedAt = row.getLastDetectedAt();
+            if (lastObservedAt == null || row.getLastObservedAt().isAfter(lastObservedAt)) {
+                lastObservedAt = row.getLastObservedAt();
             }
         }
     }

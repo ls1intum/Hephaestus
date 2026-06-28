@@ -30,10 +30,11 @@ import org.hibernate.annotations.OnDeleteAction;
  * Immutable many-to-many join binding a synthesized {@code Feedback} unit to the
  * {@link Observation}s it was composed from.
  *
- * <p>A single feedback unit can fuse several findings (e.g. one {@link EvidenceRole#PRIMARY}
- * plus corroborating {@link EvidenceRole#SUPPORTING} ones), and a single finding can be
- * reused across feedback units that target different surfaces. The composite primary key
- * {@code (feedback_id, observation_id)} makes the binding idempotent.
+ * <p>A single feedback unit can fuse several observations: each problem ({@code BAD}) leads as a
+ * {@link EvidenceRole#PRIMARY} row (so a unit routinely carries several PRIMARYs, one per problem),
+ * and each strength ({@code GOOD}) is bound as a {@link EvidenceRole#SUPPORTING} row. A single
+ * observation can be reused across feedback units that target different surfaces. The composite primary
+ * key {@code (feedback_id, observation_id)} makes the binding idempotent.
  *
  * <p>Append-only: like {@link Observation}, this row is written via an {@code insertIfAbsent}
  * native upsert that bypasses {@code @PrePersist}, so callers supply both halves of the

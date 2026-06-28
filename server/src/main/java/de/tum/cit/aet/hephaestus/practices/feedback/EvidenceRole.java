@@ -8,8 +8,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * captured here so delivery and dashboards can weight the evidence consistently.
  *
  * <ul>
- *   <li>{@link #PRIMARY} — the observation that anchors the feedback's headline message.</li>
- *   <li>{@link #SUPPORTING} — corroborating evidence folded into the same unit.</li>
+ *   <li>{@link #PRIMARY} — a problem the unit leads with; a unit may carry several (one per problem).</li>
+ *   <li>{@link #SUPPORTING} — a corroborating or strength observation folded into the same unit.</li>
  * </ul>
  */
 public enum EvidenceRole {

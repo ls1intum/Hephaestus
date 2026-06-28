@@ -166,7 +166,7 @@ public class FeedbackLedgerRecorder {
         // floor re-binds them — B2 does NOT delete the Observation row, so a disputed-yet-recurring locus
         // would otherwise land in the policy-dropped tail and get a SECOND (POLICY_FLOOR_DROP) SUPPRESSED unit.
         Set<UUID> alreadySuppressed = new HashSet<>(
-            feedbackObservationRepository.findFindingIdsSuppressedForJob(job.getId())
+            feedbackObservationRepository.findObservationIdsSuppressedForJob(job.getId())
         );
 
         // The policy floor (C3) caps the volume surfaced this run; the dropped tail is NOT part of the DELIVERED

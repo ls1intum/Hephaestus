@@ -38,7 +38,7 @@ public record ReflectionPracticeDTO(
 ) {
     /** Coarse, human standing derived from the developer's latest-run feedback on this practice. */
     public enum Standing {
-        /** Only problems, or problems outweigh strengths — the focus of attention. */
+        /** Only problems (no strengths surfaced) — the focus of attention. */
         DEVELOPING,
         /** Only strengths — a confirmed good habit. */
         STRENGTH,

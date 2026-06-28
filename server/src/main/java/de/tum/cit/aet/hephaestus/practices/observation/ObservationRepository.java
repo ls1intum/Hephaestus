@@ -243,7 +243,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                f.presence AS presence,
                f.assessment AS assessment,
                COUNT(f.id) AS count,
-               MAX(f.observed_at) AS lastDetectedAt
+               MAX(f.observed_at) AS lastObservedAt
         FROM observation f
         JOIN practice p ON p.id = f.practice_id
         WHERE f.about_user_id = :aboutUserId
@@ -363,7 +363,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """,
         nativeQuery = true
     )
-    List<PresenceCount> countByObservationForDeveloper(
+    List<PresenceCount> countByPresenceForDeveloper(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since

@@ -109,7 +109,7 @@ public class ReactionService {
 
         var currentUser = userRepository.getCurrentUserElseThrow();
         return reactionRepository
-            .findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDesc(feedbackId, currentUser.getId())
+            .findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDescIdDesc(feedbackId, currentUser.getId())
             .map(ReactionDTO::from);
     }
 

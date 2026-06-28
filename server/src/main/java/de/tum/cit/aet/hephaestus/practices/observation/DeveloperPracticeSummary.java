@@ -8,7 +8,7 @@ import java.time.Instant;
  * Spring Data projection for aggregated practice finding summaries per developer.
  *
  * <p>Each row represents one (practice, presence, assessment) combination with the total count
- * and the most recent detection timestamp. Used by
+ * and the most recent observation timestamp. Used by
  * {@link ObservationRepository#findDeveloperPracticeSummary} to build
  * developer history context for the review agent.
  */
@@ -21,5 +21,5 @@ public interface DeveloperPracticeSummary {
 
     long getCount();
 
-    Instant getLastDetectedAt();
+    Instant getLastObservedAt();
 }

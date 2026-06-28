@@ -154,7 +154,7 @@ public class Feedback {
 
     /**
      * Self-reference to the prior feedback row this unit replaces, when a re-run re-synthesised the same delivery
-     * unit. Raw UUID self-FK (kept scalar for symmetry with the other ids); FK {@code fk_feedback_supersedes}
+     * unit. Raw UUID self-FK (kept scalar for symmetry with the other ids); FK {@code sfk_feedback_replaces}
      * managed by Liquibase. Null for the first delivery of a unit.
      */
     @Column(name = "replaces_id", columnDefinition = "UUID")

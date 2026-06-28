@@ -71,6 +71,7 @@ public class PracticeRevision {
 
     /** The {@code criteria} text exactly as it was at this revision. */
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
+    @ToString.Exclude
     private String criteria;
 
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -31,8 +33,9 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * The headline locus of a feedback unit: the {@code recurrence_key} of its earliest {@code PRIMARY}-role
      * bound observation. Denormalized onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction}
      * at write time so B2 suppression (ADR 0021) can follow a reacted locus across the detector's per-run
-     * re-detections, even though the per-run feedback row differs each run. Empty when the unit binds no
-     * observation or the headline locus predates C2 (null key).
+     * re-detections, even though the per-run feedback row differs each run. Null-key PRIMARY rows are
+     * SKIPPED (the {@code recurrenceKey IS NOT NULL} filter): this returns the earliest PRIMARY observation
+     * that HAS a non-null key. Empty only when the unit binds no PRIMARY observation with a recurrence_key.
      */
     @Query(
         """
@@ -66,8 +69,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     List<Feedback> findRecentDeliveredForRecipient(
         @Param("workspaceId") Long workspaceId,
         @Param("recipientUserId") Long recipientUserId,
-        @Param("since") java.time.Instant since,
-        org.springframework.data.domain.Pageable pageable
+        @Param("since") Instant since,
+        Pageable pageable
     );
 
     /**
@@ -84,6 +87,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * Flip a delivered unit to {@code SUPERSEDED} when a newer delivery for the same continuity line lands.
      * Native (not JPQL) because the {@code @Immutable} entity forbids ORM updates; the row's {@code state}
      * is the one lifecycle column and is transitioned only through this explicit statement.
+     *
+     * <p>{@code state} is written verbatim into the {@code delivery_state varchar(16)} column with no enum
+     * binding or DB CHECK, so callers MUST pass a {@link FeedbackDeliveryState#name()} value — an arbitrary
+     * string would persist and only fail later when Hibernate maps the {@code @Enumerated(STRING)} column.
      */
     @Modifying
     @Transactional

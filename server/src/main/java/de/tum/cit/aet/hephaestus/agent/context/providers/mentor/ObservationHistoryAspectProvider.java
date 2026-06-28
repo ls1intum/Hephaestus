@@ -109,11 +109,7 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
             since,
             PageRequest.of(0, MAX_RECENT_FINDINGS)
         );
-        List<PresenceCount> byPresence = findingRepository.countByObservationForDeveloper(
-            developerId,
-            workspaceId,
-            since
-        );
+        List<PresenceCount> byPresence = findingRepository.countByPresenceForDeveloper(developerId, workspaceId, since);
         List<SeverityCount> bySeverity = findingRepository.countBySeverityForDeveloper(developerId, workspaceId, since);
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
             workspaceId,

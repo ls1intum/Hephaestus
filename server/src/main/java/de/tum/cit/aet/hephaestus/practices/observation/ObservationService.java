@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFindingBody;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredObservationBody;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,7 @@ public class ObservationService {
     public Page<Observation> getObservations(
         Long workspaceId,
         String practiceSlug,
-        Presence observation,
+        Presence presence,
         Pageable pageable
     ) {
         Optional<User> currentUser = userRepository.getCurrentUser();
@@ -72,7 +73,7 @@ public class ObservationService {
             currentUser.get().getId(),
             workspaceId,
             practiceSlug,
-            observation,
+            presence,
             pageable
         );
     }
@@ -263,13 +264,15 @@ public class ObservationService {
         if (findingIds.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, DeliveredFindingBody> latest = new java.util.HashMap<>();
-        for (DeliveredFindingBody row : feedbackObservationRepository.findDeliveredBodiesByFindingIds(findingIds)) {
-            latest.merge(row.getFindingId(), row, (existing, candidate) ->
+        Map<UUID, DeliveredObservationBody> latest = new HashMap<>();
+        for (DeliveredObservationBody row : feedbackObservationRepository.findDeliveredBodiesByObservationIds(
+            findingIds
+        )) {
+            latest.merge(row.getObservationId(), row, (existing, candidate) ->
                 candidate.getFeedbackCreatedAt().isAfter(existing.getFeedbackCreatedAt()) ? candidate : existing
             );
         }
-        Map<UUID, String> result = new java.util.HashMap<>();
+        Map<UUID, String> result = new HashMap<>();
         latest.forEach((id, row) -> result.put(id, row.getBody()));
         return result;
     }

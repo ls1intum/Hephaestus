@@ -5,19 +5,19 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Stable cross-run identity of a {@link Feedback} delivery <em>unit</em> (ADR 0021, F-16) — the join key
  * that lets a re-review SUPERSEDE the prior delivery and edit its comment in place instead of posting a
  * fresh one.
  *
- * <p><strong>Identity is the destination, NOT the content.</strong> A subtle early design hashed the set
- * of observation {@code recurrence_key}s that composed the body — but that set churns between reviews (an
- * observation is fixed, a new one appears), which would change the unit's identity exactly when supersession
- * is most wanted. The unit is therefore keyed by <em>where it is delivered</em>: the artifact
- * {@code (artifact_type, artifact_id)}, the {@code recipient}, and the {@code surface}. Two reviews of the
- * same PR deliver the same in-context summary unit to the same author → same continuity key → the second
- * supersedes the first. The observations it references are the changing <em>content</em>, recorded separately.
+ * <p><strong>Identity is the destination, NOT the content.</strong> The unit is keyed by <em>where it is
+ * delivered</em>: the artifact {@code (artifact_type, artifact_id)}, the {@code recipient}, and the
+ * {@code surface}. Two reviews of the same PR deliver the same in-context summary unit to the same author →
+ * same continuity key → the second supersedes the first. The observations it references are the changing
+ * <em>content</em>, recorded separately, so the unit's identity is stable even as its body churns between
+ * reviews.
  *
  * <p>Locale-safe (Locale.ROOT) lower-cased SHA-256 hex, 64 chars, matching {@code feedback.thread_key
  * VARCHAR(64)}. Pure and side-effect free.
@@ -39,6 +39,7 @@ public final class FeedbackThreadKey {
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
     public static String compute(String artifactType, Long artifactId, long recipientUserId, FeedbackChannel surface) {
+        Objects.requireNonNull(surface, "surface");
         String canonical = new StringBuilder()
             .append(artifactType == null ? "" : artifactType)
             .append(SEP)

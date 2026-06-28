@@ -10,8 +10,9 @@ import java.util.List;
  * The per-run volume cap (ADR 0021, C3): keep every blocking finding (CRITICAL/MAJOR) plus the top-K
  * non-blocking (MINOR/INFO) ones; the rest are "dropped" — surfaced to no one this run so the student is not
  * flooded into inaction. Pure and deterministic. The ledger records each dropped finding as SUPPRESSED so an
- * eval excludes it (a dropped finding is model-correct, just policy-withheld — NOT a model miss). Applies the
- * same keep-blocking-plus-top-K policy as {@code DeliveryComposer}'s improvement-tail cap.
+ * eval excludes it (a dropped finding is model-correct, just policy-withheld — NOT a model miss). Mirrors the
+ * same keep-blocking-plus-top-K ordering/cap parameters as {@code DeliveryComposer}'s improvement-tail cap
+ * (it does not re-use the exact same input set — it caps the persisted Observations, not the MR-note tail).
  */
 public final class PolicyFloorSelector {
 

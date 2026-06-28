@@ -31,22 +31,22 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     @Query(
         value = """
         INSERT INTO feedback_observation (feedback_id, observation_id, role, ordinal)
-        VALUES (:feedbackId, :findingId, :evidenceRole, :ordinal)
+        VALUES (:feedbackId, :observationId, :evidenceRole, :ordinal)
         ON CONFLICT (feedback_id, observation_id) DO NOTHING
         """,
         nativeQuery = true
     )
     int insertIfAbsent(
         @Param("feedbackId") UUID feedbackId,
-        @Param("findingId") UUID findingId,
+        @Param("observationId") UUID observationId,
         @Param("evidenceRole") String evidenceRole,
         @Param("ordinal") int ordinal
     );
 
     /**
-     * Finding ids already bound to a SUPPRESSED unit of this job — i.e. withheld earlier in the flow (B2
+     * Observation ids already bound to a SUPPRESSED unit of this job — i.e. withheld earlier in the flow (B2
      * reaction suppression writes its {@code REACTED_*} units before the DELIVERED unit is recorded). The
-     * DELIVERED binding excludes these so a withheld finding is never also counted as delivered.
+     * DELIVERED binding excludes these so a withheld observation is never also counted as delivered.
      */
     @Query(
         value = """
@@ -56,35 +56,37 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         """,
         nativeQuery = true
     )
-    List<UUID> findFindingIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
+    List<UUID> findObservationIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 
     /**
-     * The DELIVERED feedback body bound to each of the given findings — the developer's advice source for the
-     * read surfaces (reflection dashboard, finding detail). Per ADR 0021 the immutable {@code Observation}
+     * The DELIVERED feedback body bound to each of the given observations — the developer's advice source for
+     * the read surfaces (reflection dashboard, observation detail). Per ADR 0021 the immutable {@code Observation}
      * carries evidence + observation + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
      * and read back from {@code rendered_body} here.
      *
-     * <p>A finding can be bound to more than one DELIVERED unit (e.g. successive re-deliveries), so this can
-     * return multiple rows per finding id; callers keep the most recent by {@code feedbackCreatedAt}. Only
+     * <p>An observation can be bound to more than one DELIVERED unit (e.g. successive re-deliveries), so this can
+     * return multiple rows per observation id; callers keep the most recent by {@code feedbackCreatedAt}. Only
      * {@code DELIVERED} units with a non-null body are returned (PREPARED/SUPPRESSED/FAILED carry no body the
      * developer ever saw).
      */
     @Query(
         """
-        SELECT ff.observation.id AS findingId,
+        SELECT ff.observation.id AS observationId,
                ff.feedback.body AS body,
                ff.feedback.createdAt AS feedbackCreatedAt
         FROM FeedbackObservation ff
-        WHERE ff.observation.id IN :findingIds
+        WHERE ff.observation.id IN :observationIds
           AND ff.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
           AND ff.feedback.body IS NOT NULL
         """
     )
-    List<DeliveredFindingBody> findDeliveredBodiesByFindingIds(@Param("findingIds") Collection<UUID> findingIds);
+    List<DeliveredObservationBody> findDeliveredBodiesByObservationIds(
+        @Param("observationIds") Collection<UUID> observationIds
+    );
 
-    /** Projection: a finding id paired with a DELIVERED feedback body and that feedback's creation time. */
-    interface DeliveredFindingBody {
-        UUID getFindingId();
+    /** Projection: an observation id paired with a DELIVERED feedback body and that feedback's creation time. */
+    interface DeliveredObservationBody {
+        UUID getObservationId();
         String getBody();
         Instant getFeedbackCreatedAt();
     }

@@ -73,6 +73,12 @@ public class Reaction {
     /**
      * Direct access to the feedback ID without triggering a lazy load on the {@link #feedback} proxy.
      * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
+     *
+     * @implNote Because this column is {@code insertable=false/updatable=false}, a builder-set
+     *     {@code .feedbackId(...)} is NOT persisted and is NOT repopulated from the association after
+     *     {@code save()}. Callers MUST set {@link #feedback}; the in-memory {@code feedbackId} is only
+     *     reliable when it was set in sync with {@code feedback} (as {@code ReactionService.submitReaction}
+     *     does). Never rely on a builder-set {@code feedbackId} alone post-persist.
      */
     @Column(name = "feedback_id", nullable = false, insertable = false, updatable = false, columnDefinition = "UUID")
     private UUID feedbackId;

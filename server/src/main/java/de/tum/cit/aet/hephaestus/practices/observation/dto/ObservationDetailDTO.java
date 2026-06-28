@@ -25,8 +25,8 @@ public record ObservationDetailDTO(
     @NonNull @Schema(description = "Observation ID") UUID id,
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
-    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
-    @NonNull @Schema(description = "Target entity ID") Long artifactId,
+    @NonNull @Schema(description = "Artifact type (e.g. PULL_REQUEST)") WorkArtifact artifactType,
+    @NonNull @Schema(description = "Artifact entity ID") Long artifactId,
     @NonNull @Schema(description = "Observation title") String title,
     @NonNull @Schema(description = "Presence: PRESENT, ABSENT, or NOT_APPLICABLE") Presence presence,
     @Nullable @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
@@ -44,26 +44,26 @@ public record ObservationDetailDTO(
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     public static ObservationDetailDTO from(
-        Observation f,
+        Observation observation,
         @Nullable String deliveredGuidance,
         tools.jackson.databind.ObjectMapper mapper
     ) {
-        var practice = f.getPractice();
+        var practice = observation.getPractice();
         return new ObservationDetailDTO(
-            f.getId(),
+            observation.getId(),
             practice.getSlug(),
             practice.getName(),
-            f.getArtifactType(),
-            f.getArtifactId(),
-            f.getTitle(),
-            f.getPresence(),
-            f.getAssessment(),
-            f.getSeverity(),
-            f.getConfidence(),
-            toMap(f.getEvidence(), mapper),
-            f.getReasoning(),
+            observation.getArtifactType(),
+            observation.getArtifactId(),
+            observation.getTitle(),
+            observation.getPresence(),
+            observation.getAssessment(),
+            observation.getSeverity(),
+            observation.getConfidence(),
+            toMap(observation.getEvidence(), mapper),
+            observation.getReasoning(),
             deliveredGuidance,
-            f.getObservedAt()
+            observation.getObservedAt()
         );
     }
 

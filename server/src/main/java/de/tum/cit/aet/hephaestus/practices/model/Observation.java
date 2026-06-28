@@ -30,9 +30,10 @@ import tools.jackson.databind.JsonNode;
 /**
  * Immutable record of a practice evaluation for a specific contribution.
  *
- * <p>Each finding represents an AI agent's assessment of whether a developer
- * followed or violated a {@link Practice} in a specific target (pull request, commit, review).
- * Findings are append-only and deduplicated by {@link #occurrenceKey}.
+ * <p>Each observation records, for a {@link Practice} on a specific {@link WorkArtifact},
+ * whether the practice's target signal was present, expected-but-absent, or not-applicable
+ * ({@link #presence}) and, when applicable, whether it was good or bad ({@link #assessment}).
+ * Observations are append-only and deduplicated by {@link #occurrenceKey}.
  *
  * <p>Follows the {@code ActivityEvent} pattern: {@code @Immutable}, UUID PK with
  * {@code @PrePersist}, and {@code insertIfAbsent} for race-condition-safe insertion.
