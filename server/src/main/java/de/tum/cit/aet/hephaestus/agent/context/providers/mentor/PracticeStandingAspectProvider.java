@@ -171,11 +171,23 @@ public class PracticeStandingAspectProvider implements ContentProvider {
                 a.flaggedCount += count;
                 a.recentFlagged += recent;
                 a.priorFlagged += (count - recent);
+                // Corroboration/confidence MUST track the worst-severity flagged row ONLY — otherwise a
+                // well-corroborated MINOR lends its distinct-target count / confidence to a single-target,
+                // conf=0.3 CRITICAL, turning a coin-flip CRITICAL into the #1 priority and defeating the P4
+                // quarantine floor. So: a strictly-worse severity row REPLACES the floor inputs (the new worst
+                // carries its OWN corroboration), an equal-severity row maxes, a less-severe row is ignored.
+                int rel = severityRelation(r.getSeverity(), a.topSeverity);
+                if (rel > 0) {
+                    // Strictly worse than the current worst — this row defines the new floor inputs.
+                    a.flaggedDistinctTargets = distinct;
+                    a.flaggedMaxConfidence = conf;
+                } else if (rel == 0) {
+                    // Same severity as the current worst — corroborate within the worst tier.
+                    a.flaggedDistinctTargets = Math.max(a.flaggedDistinctTargets, distinct);
+                    a.flaggedMaxConfidence = Math.max(a.flaggedMaxConfidence, conf);
+                }
+                // rel < 0: less severe than the current worst — counts toward flaggedCount but never the floor.
                 a.topSeverity = worst(a.topSeverity, r.getSeverity());
-                // Corroboration/confidence are tracked against the WORST-severity flagged row so the floor
-                // decision (does this gap deserve to headline?) keys on the same signal that sets topSeverity.
-                a.flaggedDistinctTargets = Math.max(a.flaggedDistinctTargets, distinct);
-                a.flaggedMaxConfidence = Math.max(a.flaggedMaxConfidence, conf);
             } else if (assessment == Assessment.GOOD) {
                 a.affirmedCount += count;
                 a.affirmedDistinctTargets = Math.max(a.affirmedDistinctTargets, distinct);
@@ -303,6 +315,23 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         }
     }
 
+    /**
+     * Severity relation of {@code candidate} against the current worst {@code current}, for the floor-input fold:
+     * {@code >0} when candidate is strictly worse (so it REPLACES the floor inputs), {@code 0} when equally severe
+     * (max within the tier), {@code <0} when less severe (ignored for the floor). Lower ordinal = more severe.
+     * A null current means no worst-severity row yet, so any candidate (incl. null) seeds the floor (returns 1).
+     */
+    private static int severityRelation(@Nullable Severity candidate, @Nullable Severity current) {
+        if (current == null) {
+            return 1; // first flagged row of the area defines the floor inputs
+        }
+        if (candidate == null) {
+            return -1; // unknown severity never displaces a known worst tier
+        }
+        // ordinal ascending = more severe; candidate strictly worse ⇒ strictly smaller ordinal.
+        return Integer.compare(current.ordinal(), candidate.ordinal());
+    }
+
     @Nullable
     private static Severity worst(@Nullable Severity current, @Nullable Severity candidate) {
         if (current == null) {
@@ -341,7 +370,11 @@ public class PracticeStandingAspectProvider implements ContentProvider {
         long recentFlagged;
         long priorFlagged;
 
-        /** Distinct targets the WORST flagged signal spans, and its strongest confidence — the P4 floor inputs. */
+        /**
+         * Distinct targets the WORST-severity flagged signal spans, and its strongest confidence — the P4 floor
+         * inputs. Tracked for the worst tier ONLY (replaced on a strictly-worse row, maxed within the tier) so a
+         * well-corroborated lower-severity gap cannot lend its corroboration to a weaker, more-severe one.
+         */
         long flaggedDistinctTargets;
         float flaggedMaxConfidence;
 

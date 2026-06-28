@@ -299,6 +299,31 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("A4: a well-corroborated MINOR does NOT lend corroboration to a weak CRITICAL in the same area")
+    void crossSeverityCorroborationDoesNotBleedToWorseSeverity() {
+        // Single area with two BAD rows: a well-corroborated MINOR (3 targets, conf 0.9 — clears the floor on
+        // its own) and a weak CRITICAL (1 target, conf 0.3 — below the QUARANTINE floor). The worst-severity
+        // floor inputs MUST track the CRITICAL row, so the area is uncorroborated and NEVER headlines at
+        // CRITICAL. Before the fix the global Math.max bled the MINOR's 3 targets / 0.9 conf onto the CRITICAL,
+        // surfacing a coin-flip CRITICAL as the #1 priority and defeating the P4 quarantine floor.
+        List<Practice> spine = List.of(practice("mixed-area", "Mixed severity area"));
+        List<AreaStandingRow> rows = List.of(
+            // well-corroborated MINOR: distinct=3, conf=0.9
+            row("mixed-area", "Mixed severity area", Presence.ABSENT, Assessment.BAD, Severity.MINOR, 4, 1, 3L, 0.9f),
+            // weak CRITICAL: distinct=1, conf=0.3 (below QUARANTINE)
+            row("mixed-area", "Mixed severity area", Presence.ABSENT, Assessment.BAD, Severity.CRITICAL, 1, 1, 1L, 0.3f)
+        );
+        JsonNode root = build(spine, rows);
+
+        // topSeverity is still CRITICAL (the worst seen), but the area is NOT a priority — the weak CRITICAL
+        // doesn't clear the floor and the MINOR's corroboration can no longer rescue it.
+        assertThat(area(root, "mixed-area").get("topSeverity").asString()).isEqualTo("CRITICAL");
+        assertThat(area(root, "mixed-area").get("assessmentState").asString()).isEqualTo("NOT_MEASURED");
+        assertThat(root.get("priorities")).isEmpty();
+        assertThat(root.get("headline").get("durableGap").isNull()).isTrue();
+    }
+
+    @Test
     @DisplayName("trajectory reflects the recent-vs-prior flag split")
     void trajectoryReflectsRecentVsPrior() {
         assertThat(trajectoryFor(5, 1)).isEqualTo("improving"); // prior 4 > recent 1
