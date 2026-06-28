@@ -151,11 +151,11 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("flag-only GOOD_PRACTICE area has praiseChannelOpen=false (affirmation asymmetry guard)")
+    @DisplayName("flag-only area has praiseChannelOpen=false (affirmation asymmetry guard)")
     void flagOnlyAreaHasPraiseChannelClosed() {
         List<Practice> spine = List.of(practice("robust-error-handling", "Handling failure robustly"));
         List<AreaStandingRow> rows = List.of(
-            // former GOOD practice + NOT_OBSERVED -> (ABSENT, BAD) [a gap]
+            // (ABSENT, BAD) [a gap]
             row(
                 "robust-error-handling",
                 "Handling failure robustly",
@@ -176,11 +176,11 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("an OBSERVED finding opens the praise channel")
+    @DisplayName("a (PRESENT, GOOD) observation opens the praise channel")
     void affirmedAreaOpensPraiseChannel() {
         List<Practice> spine = List.of(practice("review-ready-work", "Submitting review-ready work"));
         List<AreaStandingRow> rows = List.of(
-            // former GOOD practice + OBSERVED -> (PRESENT, GOOD) [a strength]
+            // (PRESENT, GOOD) [a strength]
             row(
                 "review-ready-work",
                 "Submitting review-ready work",
@@ -203,7 +203,7 @@ class PracticeStandingAspectProviderTest extends BaseUnitTest {
     void polarityDrivesCounts() {
         List<Practice> spine = List.of(practice("anti-pattern", "Avoids anti-patterns"));
         List<AreaStandingRow> rows = List.of(
-            // former BAD practice + OBSERVED -> (PRESENT, BAD) [a problem]
+            // (PRESENT, BAD) [a problem]
             row("anti-pattern", "Avoids anti-patterns", Presence.PRESENT, Assessment.BAD, Severity.MAJOR, 4, 2)
         );
         JsonNode root = build(spine, rows);

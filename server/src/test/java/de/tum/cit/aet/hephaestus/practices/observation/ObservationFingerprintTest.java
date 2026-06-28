@@ -51,4 +51,29 @@ class ObservationFingerprintTest extends BaseUnitTest {
         assertThat(n1).isEqualTo(n2).hasSize(64);
         assertThat(n1).isNotEqualTo(ObservationFingerprint.compute("mr-description-quality", TYPE, 42L, 7L, "F.swift"));
     }
+
+    @Test
+    @DisplayName("anchor normalization: surrounding whitespace + casing do not split identity")
+    void pathNormalizationEquivalence() {
+        // The anchor is locale-fixed lower-cased and whitespace-collapsed, so trivial path
+        // casing/spacing differences across runs must NOT produce a different recurrence key.
+        String canonical = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift");
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "  SRC/Foo.swift  "))
+            .as("leading/trailing whitespace + upper-case folds to the same key")
+            .isEqualTo(canonical);
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift\t"))
+            .as("internal/trailing whitespace collapses to the same key")
+            .isEqualTo(canonical);
+    }
+
+    @Test
+    @DisplayName("golden vector: the canonical digest is pinned so the wire identity never drifts silently")
+    void goldenVector() {
+        // A change to the field set, separator, normalization, or hash algorithm would silently
+        // re-identify EVERY historical finding (breaking cross-run supersession). Pin one vector so
+        // such a change must be a deliberate, reviewed edit to this expectation.
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift")).isEqualTo(
+            "90419eec6d267f4442ca1e0fd1c8afc9658eaa003ab1dacb7af1d0f68c4809d9"
+        );
+    }
 }

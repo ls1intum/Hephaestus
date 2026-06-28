@@ -79,7 +79,7 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void surfacesUsageAndRunnerDebug() {
         String findings =
-            "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"observation\":\"OBSERVED\"," +
+            "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"x\",\"presence\":\"PRESENT\",\"assessment\":\"GOOD\"," +
             "\"severity\":\"INFO\",\"confidence\":0.9}]}";
         String usage =
             "{\"model\":\"m\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20," +
@@ -113,7 +113,7 @@ class PiResultParserTest extends BaseUnitTest {
     void sanitizesSwiftEscapes() {
         String json =
             "{\"findings\":[{\"practiceSlug\":\"t\",\"title\":\"line1\\nline2\"," +
-            "\"observation\":\"OBSERVED\",\"severity\":\"INFO\",\"confidence\":0.9," +
+            "\"presence\":\"PRESENT\",\"assessment\":\"GOOD\",\"severity\":\"INFO\",\"confidence\":0.9," +
             "\"reasoning\":\"Text(\\\"\\(weather.temp)°\\\")\"}]}";
         var result = parser.parse(
             new SandboxResult(0, Map.of("result.json", json.getBytes()), "done", false, Duration.ofSeconds(10))

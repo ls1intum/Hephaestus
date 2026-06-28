@@ -254,6 +254,33 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
+        @DisplayName("returned findingFingerprints align exactly with the persisted recurrence_key set")
+        void returnedFingerprintsMatchPersistedRecurrenceKeys() {
+            var findings = List.of(
+                finding("pr-description-quality", Presence.PRESENT),
+                finding("error-handling", Presence.ABSENT)
+            );
+
+            var result = deliveryService.deliver(agentJob, findings);
+
+            // The map the service returns is the contract the delivery layer keys feedback supersession on;
+            // it MUST be the same value written to observation.recurrence_key, or supersession breaks.
+            assertThat(result.findingFingerprints().values())
+                .as("one stable key returned per delivered finding")
+                .hasSize(2)
+                .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
+
+            List<String> persistedKeys = observationRepository
+                .findAll()
+                .stream()
+                .map(Observation::getRecurrenceKey)
+                .toList();
+            assertThat(persistedKeys)
+                .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
+                .containsExactlyInAnyOrderElementsOf(result.findingFingerprints().values());
+        }
+
+        @Test
         @DisplayName("re-delivering same job creates no duplicates")
         void idempotentRedelivery() {
             var findings = List.of(finding("pr-description-quality", Presence.PRESENT));
@@ -318,13 +345,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     @Nested
-    class NegativeCapEnforcement {
+    class DistinctBadFindingsAllPersisted {
 
         @Test
-        void capsNegatives() {
-            // Each finding gets a unique idempotency key (includes index), so all
-            // 7 findings are distinct. maxNegativeFindingsPerPractice=5 caps at 5,
-            // discarding the last 2 over cap.
+        void persistsEveryDistinctBadFinding() {
+            // Each finding gets a unique idempotency key (includes index), so all 7 are
+            // distinct. There is NO per-practice cap on BAD findings: every distinct one
+            // is persisted (none discarded as a duplicate).
             var findings = new ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(

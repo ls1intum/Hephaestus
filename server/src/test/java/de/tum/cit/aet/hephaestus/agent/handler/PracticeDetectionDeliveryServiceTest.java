@@ -178,6 +178,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(result.discardedUnknownSlug()).isZero();
             assertThat(result.discardedDuplicate()).isZero();
 
+            ArgumentCaptor<String> fingerprintCaptor = ArgumentCaptor.forClass(String.class);
             verify(observationRepository).insertIfAbsent(
                 any(UUID.class),
                 eq("pr-description-quality:0:PULL_REQUEST:456:" + testJob.getId()),
@@ -188,15 +189,22 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq(456L),
                 eq(789L), // aboutUserId
                 eq("Test finding"),
-                eq("PRESENT"), // presence (OBSERVED → PRESENT, ADR 0022)
-                eq("GOOD"), // assessment (former-GOOD practice OBSERVED → strength)
+                eq("PRESENT"), // presence (ADR 0022)
+                eq("GOOD"), // assessment (former-GOOD practice, PRESENT → a strength)
                 eq("INFO"),
                 eq(0.9f),
                 isNull(),
                 isNull(),
-                anyString(),
+                fingerprintCaptor.capture(), // findingFingerprint == persisted recurrence_key
                 any()
             );
+
+            // The recurrence_key written to the row MUST equal the fingerprint the result map returns —
+            // they are the single supersession identity, so any drift between them silently breaks re-review.
+            assertThat(fingerprintCaptor.getValue())
+                .as("persisted recurrence_key matches the returned findingFingerprint")
+                .matches("[0-9a-f]{64}")
+                .isEqualTo(result.findingFingerprints().values().iterator().next());
 
             verify(eventPublisher).publishEvent(eventCaptor.capture());
             PracticeDetectionCompletedEvent event = eventCaptor.getValue();
@@ -510,7 +518,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq(999L),
                 eq(789L), // aboutUserId
                 anyString(), // title
-                eq("ABSENT"), // presence (NOT_OBSERVED → ABSENT, ADR 0022)
+                eq("ABSENT"), // presence (ADR 0022)
                 eq("BAD"), // assessment (former-GOOD practice ABSENT → gap)
                 anyString(), // severity
                 anyFloat(),

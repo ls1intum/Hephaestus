@@ -93,7 +93,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
     }
 
     private static LocusTransition transition(String key, TransitionStatus status, String title, String slug) {
-        // Former-GOOD practices (code-hygiene, control-flow, naming, ships-tests): a NOT_OBSERVED/ABSENT
+        // For a former-GOOD practice (code-hygiene, control-flow, naming, ships-tests) an ABSENT
         // locus is a gap → Assessment.BAD. NEW has no prior; RESOLVED has no current.
         Assessment prior = status == TransitionStatus.NEW ? null : Assessment.BAD;
         Assessment curr = status == TransitionStatus.RESOLVED ? null : Assessment.BAD;

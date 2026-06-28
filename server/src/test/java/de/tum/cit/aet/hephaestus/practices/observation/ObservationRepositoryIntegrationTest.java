@@ -400,7 +400,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void aggregatesSinglePractice() {
-            // Insert 3 NEGATIVE and 1 POSITIVE for the same practice
+            // Insert 3 ABSENT and 1 PRESENT for the same practice
             insertFinding("sum-1", practice, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
             insertFinding("sum-2", practice, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
             insertFinding("sum-3", practice, "ABSENT", Instant.parse("2026-03-20T14:30:00Z"));
@@ -617,7 +617,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             String idempotencyKey,
             Practice targetPractice,
             String presence,
-            Instant detectedAt
+            Instant observedAt
         ) {
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -636,7 +636,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                detectedAt
+                observedAt
             );
         }
 
@@ -657,7 +657,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             return agentJobRepository.save(job);
         }
 
-        private void insertForJob(String key, UUID jobId, long artifactId, String presence, Instant detectedAt) {
+        private void insertForJob(String key, UUID jobId, long artifactId, String presence, Instant observedAt) {
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 key,
@@ -676,7 +676,7 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                detectedAt
+                observedAt
             );
         }
 
@@ -684,8 +684,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         @DisplayName("dashboard summary counts only the latest run per target (re-review dedup)")
         void countsOnlyLatestRunPerArtifact() {
             // The SAME target (PR 42) reviewed twice: an earlier run said ABSENT/BAD, a later run said PRESENT/GOOD.
-            // A naive COUNT would show 2 findings (1 observed, 1 not-observed); the dashboard must show the
-            // target's CURRENT state only — 1 finding, observed.
+            // A naive COUNT would show 2 observations (1 PRESENT, 1 ABSENT); the dashboard must show the
+            // target's CURRENT state only — 1 observation, PRESENT/GOOD.
             AgentJob laterJob = anotherJob();
             insertForJob("dedup-old", agentJob.getId(), 42L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
             insertForJob("dedup-new", laterJob.getId(), 42L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));

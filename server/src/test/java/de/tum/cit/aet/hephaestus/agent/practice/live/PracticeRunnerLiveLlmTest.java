@@ -213,9 +213,13 @@ class PracticeRunnerLiveLlmTest {
             assertThat(finding.path("practiceSlug").asString())
                 .as(tag + ".practiceSlug")
                 .isEqualTo("hardcoded-secrets");
-            assertThat(finding.path("observation").asString())
-                .as(tag + ".observation")
-                .isIn("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
+            assertThat(finding.path("presence").asString())
+                .as(tag + ".presence")
+                .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE");
+            // assessment is null/absent only when presence is NOT_APPLICABLE
+            if (!"NOT_APPLICABLE".equals(finding.path("presence").asString())) {
+                assertThat(finding.path("assessment").asString()).as(tag + ".assessment").isIn("GOOD", "BAD");
+            }
             assertThat(finding.path("severity").asString())
                 .as(tag + ".severity")
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
@@ -227,20 +231,22 @@ class PracticeRunnerLiveLlmTest {
         }
 
         // Planted-violation detection: this practice must be detected when the violation is present.
-        // if it misses, the prompt or fixture is broken — not the LLM.
-        boolean foundNegative = false;
+        // if it misses, the prompt or fixture is broken — not the LLM. A planted secret is a (PRESENT, BAD)
+        // observation: the bad signal IS present and that is a violation.
+        boolean foundViolation = false;
         for (JsonNode finding : findings) {
             if (
                 "hardcoded-secrets".equals(finding.path("practiceSlug").asString()) &&
-                "NOT_OBSERVED".equals(finding.path("observation").asString())
+                "PRESENT".equals(finding.path("presence").asString()) &&
+                "BAD".equals(finding.path("assessment").asString())
             ) {
-                foundNegative = true;
+                foundViolation = true;
                 break;
             }
         }
-        assertThat(foundNegative)
+        assertThat(foundViolation)
             .as(
-                "at least one NEGATIVE hardcoded-secrets finding for the planted apiKey/dbPassword. " +
+                "at least one (PRESENT, BAD) hardcoded-secrets finding for the planted apiKey/dbPassword. " +
                     "Findings payload: " +
                     rawOutput
             )
@@ -259,7 +265,7 @@ class PracticeRunnerLiveLlmTest {
                 usage.costUsd()
             );
         }
-        System.out.printf("[practice-live] %d finding(s); negative=%s%n", findings.size(), foundNegative);
+        System.out.printf("[practice-live] %d finding(s); violation=%s%n", findings.size(), foundViolation);
     }
 
     // Workspace staging
