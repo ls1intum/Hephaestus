@@ -217,5 +217,16 @@ public class Observation {
                     ")"
             );
         }
+        // Severity is an impact band for a BAD observation only (ADR 0022, mirrored by the severity field's
+        // javadoc): it MUST be null unless the assessment is BAD.
+        if (assessment != Assessment.BAD && severity != null) {
+            throw new IllegalStateException(
+                "Observation coherence violation: severity must be null unless assessment is BAD (assessment=" +
+                    assessment +
+                    ", severity=" +
+                    severity +
+                    ")"
+            );
+        }
     }
 }

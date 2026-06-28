@@ -34,6 +34,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     private PracticeAreaRepository areaRepository;
 
     @Mock
+    private PracticeRepository practiceRepository;
+
+    @Mock
     private WorkspaceRepository workspaceRepository;
 
     private DefaultPracticeCatalogSeeder seeder(boolean enabled) {
@@ -43,6 +46,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             areaService,
             practiceService,
             areaRepository,
+            practiceRepository,
             workspaceRepository
         );
     }
@@ -103,14 +107,33 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void idempotent_skipsAreasThatAlreadyExist() {
+    void idempotent_skipsAreasAndPracticesThatAlreadyExist() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
+        when(practiceRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
 
         seeder(true).seed();
 
         verify(areaService, never()).createArea(any(), any(), any());
         verify(practiceService, never()).createPractice(any(), any());
+        verify(areaService, never()).bindPractice(any(), any(), any());
+    }
+
+    @Test
+    void perRowIdempotent_resumesMissingPracticesWhenAreaAlreadyExists() {
+        // Regression: a mid-area failure can leave the area created but only some practices seeded. A per-AREA
+        // skip would permanently strand the rest; per-ROW idempotency must still seed the practices that are
+        // absent even though their area already exists.
+        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
+        when(practiceRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+
+        seeder(true).seed();
+
+        // No area is re-created (all present), but every absent practice is still seeded and bound.
+        verify(areaService, never()).createArea(any(), any(), any());
+        verify(practiceService, times(32)).createPractice(any(), any());
+        verify(areaService, times(32)).bindPractice(any(), any(), any());
     }
 
     @Test

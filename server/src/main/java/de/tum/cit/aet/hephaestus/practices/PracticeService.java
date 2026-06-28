@@ -41,9 +41,7 @@ public class PracticeService {
      * tokenizes (uppercase enum names: {@link de.tum.cit.aet.hephaestus.practices.model.Presence} /
      * {@link de.tum.cit.aet.hephaestus.practices.model.Assessment}).
      */
-    private static final Pattern DETECTOR_VOCAB = Pattern.compile(
-        "\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b"
-    );
+    private static final Pattern DETECTOR_VOCAB = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");
 
     @Transactional(readOnly = true)
     public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {

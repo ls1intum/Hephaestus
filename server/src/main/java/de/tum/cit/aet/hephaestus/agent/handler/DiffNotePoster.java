@@ -81,7 +81,8 @@ class DiffNotePoster {
         // the empty-diff pathology where a re-reviewed PR keeps line-numbered notes on code no longer in the
         // diff. When there ARE findings we DON'T clear-then-post; postInlineFindings reconciles by correlation
         // key (edit-in-place / preserve-human / delete-truly-gone), so a stable finding keeps its one thread
-        // instead of being destroyed and re-created every run. No-op on append-only vendors (GitHub).
+        // instead of being destroyed and re-created every run. On GitHub (append-only threads) clearStaleFindings
+        // does not delete — it minimizes the vanished threads as OUTDATED — so it is NOT a no-op there.
         if (findings.isEmpty()) {
             try {
                 channel.clearStaleFindings(target, HEPHAESTUS_MARKER);

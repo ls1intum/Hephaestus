@@ -17,7 +17,6 @@ import java.time.Instant;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.OnDelete;
@@ -45,7 +44,6 @@ import org.hibernate.annotations.OnDeleteAction;
     indexes = @Index(name = "idx_practice_revision_practice", columnList = "practice_id")
 )
 @Getter
-@Setter
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

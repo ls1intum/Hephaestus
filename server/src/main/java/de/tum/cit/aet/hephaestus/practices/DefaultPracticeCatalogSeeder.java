@@ -43,6 +43,7 @@ class DefaultPracticeCatalogSeeder {
     private final PracticeAreaService areaService;
     private final PracticeService practiceService;
     private final PracticeAreaRepository areaRepository;
+    private final PracticeRepository practiceRepository;
     private final WorkspaceRepository workspaceRepository;
 
     DefaultPracticeCatalogSeeder(
@@ -51,6 +52,7 @@ class DefaultPracticeCatalogSeeder {
         PracticeAreaService areaService,
         PracticeService practiceService,
         PracticeAreaRepository areaRepository,
+        PracticeRepository practiceRepository,
         WorkspaceRepository workspaceRepository
     ) {
         this.enabled = enabled;
@@ -58,6 +60,7 @@ class DefaultPracticeCatalogSeeder {
         this.areaService = areaService;
         this.practiceService = practiceService;
         this.areaRepository = areaRepository;
+        this.practiceRepository = practiceRepository;
         this.workspaceRepository = workspaceRepository;
     }
 
@@ -86,31 +89,36 @@ class DefaultPracticeCatalogSeeder {
         int seededPractices = 0;
         for (JsonNode areaNode : catalog.path("areas")) {
             String areaSlug = areaNode.path("slug").asString();
-            if (areaRepository.existsByWorkspaceIdAndSlug(ctx.id(), areaSlug)) {
-                // Already present — respect any admin edits and do not overwrite.
-                continue;
+            // Per-ROW idempotency (not per-area): create the area only if absent, but ALWAYS walk its practices
+            // and create each only if absent. A per-area skip would, after a mid-area failure (area created, only
+            // some practices seeded), permanently leave the remaining practices unseeded because the area exists.
+            if (!areaRepository.existsByWorkspaceIdAndSlug(ctx.id(), areaSlug)) {
+                areaService.createArea(
+                    ctx,
+                    areaSlug,
+                    new AreaAttributes(
+                        areaNode.path("name").asString(),
+                        text(areaNode, "description"),
+                        areaNode.path("displayOrder").asInt(),
+                        text(areaNode, "icon"),
+                        text(areaNode, "color")
+                    )
+                );
+                seededAreas++;
             }
-            areaService.createArea(
-                ctx,
-                areaSlug,
-                new AreaAttributes(
-                    areaNode.path("name").asString(),
-                    text(areaNode, "description"),
-                    areaNode.path("displayOrder").asInt(),
-                    text(areaNode, "icon"),
-                    text(areaNode, "color")
-                )
-            );
-            seededAreas++;
 
             for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
+                if (practiceRepository.existsByWorkspaceIdAndSlug(ctx.id(), practiceSlug)) {
+                    // Already present — respect any admin edits and do not overwrite.
+                    continue;
+                }
                 practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));
                 areaService.bindPractice(ctx, practiceSlug, areaSlug);
                 seededPractices++;
             }
         }
-        if (seededAreas > 0) {
+        if (seededAreas > 0 || seededPractices > 0) {
             log.info(
                 "Seeded default practice catalog: {} areas, {} practices into workspace {}",
                 seededAreas,

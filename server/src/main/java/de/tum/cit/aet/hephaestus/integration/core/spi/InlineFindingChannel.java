@@ -20,9 +20,9 @@ public interface InlineFindingChannel {
      * run never survive a review that now finds nothing inline (the empty-diff pathology where a re-reviewed
      * PR keeps line-numbered notes on code no longer in the diff).
      *
-     * <p>Default is a no-op: vendors whose review model is append-only/immutable (GitHub posts a single
-     * {@code addPullRequestReview} with no per-thread delete path) cannot reconcile and inherit this safely.
-     * Vendors with a deletable note model (GitLab) override to delete every marker-bearing note on the target.
+     * <p>Default is a no-op for a vendor that offers no reconciliation at all. Both shipped channels override
+     * it: GitLab deletes every marker-bearing note; GitHub (whose threads cannot be deleted, only minimized)
+     * minimizes each vanished thread as {@code OUTDATED}. "Append-only" therefore does NOT mean "no-op" here.
      */
     default void clearStaleFindings(FeedbackChannel.FeedbackTarget target, String marker) {
         // no-op — see Javadoc: only deletable-note vendors override.

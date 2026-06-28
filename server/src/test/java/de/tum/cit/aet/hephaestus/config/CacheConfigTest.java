@@ -24,6 +24,8 @@ class CacheConfigTest extends BaseUnitTest {
         "achievementProgress",
         "auth_jwt_revoked",
         "contributors",
+        "mentor_authored_work_aspect",
+        "mentor_delivered_feedback_aspect",
         "mentor_findings_aspect",
         "mentor_practice_aspect",
         "mentor_practice_standing_aspect",
