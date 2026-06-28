@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -143,6 +144,25 @@ class DeliveryComposer {
     }
 
     /**
+     * Compose with a server-side GROUNDING GUARD (M1): the last line of defence before a hallucinated locus
+     * lands on a student as a confidently-anchored inline note. {@code unifiedDiff} is the raw two-ref diff
+     * of the change under review; any inline anchor whose file is not in that diff's changed-file set, AND
+     * whose evidence snippet is not substring-present in that file's hunk, has its inline anchor DROPPED —
+     * the finding still delivers in full via the summary, only the ungrounded file:line is withheld. Passing
+     * a blank diff (or using an overload without one) disables the guard — a strict no-op, preserving the
+     * existing delivery layout for callers that cannot supply the diff.
+     */
+    @Nullable
+    static DeliveryContent compose(
+        List<ValidatedFinding> findings,
+        WorkArtifact artifact,
+        Map<String, String> whyBySlug,
+        @Nullable String unifiedDiff
+    ) {
+        return compose(findings, artifact, whyBySlug, Set.of(), GroundingContext.fromDiff(artifact, unifiedDiff));
+    }
+
+    /**
      * Recomposes ONLY the MR summary body after inline notes have been posted, demoting every inlinable
      * finding whose inline comment actually landed (its {@code findingFingerprint} is in {@code deliveredKeys})
      * to a one-line "see inline comments" pointer, while a finding whose inline note FAILED keeps its full
@@ -167,6 +187,17 @@ class DeliveryComposer {
         WorkArtifact artifact,
         Map<String, String> whyBySlug,
         Set<String> deliveredKeys
+    ) {
+        return compose(findings, artifact, whyBySlug, deliveredKeys, GroundingContext.none());
+    }
+
+    @Nullable
+    private static DeliveryContent compose(
+        List<ValidatedFinding> findings,
+        WorkArtifact artifact,
+        Map<String, String> whyBySlug,
+        Set<String> deliveredKeys,
+        GroundingContext grounding
     ) {
         if (findings == null || findings.isEmpty()) {
             return null;
@@ -257,8 +288,8 @@ class DeliveryComposer {
             emittedWhy
         );
 
-        // Diff notes: ALL inlinable negatives get inline comments
-        List<DiffNote> diffNotes = collectDiffNotes(inlinable, whyBySlug, emittedWhy);
+        // Diff notes: ALL inlinable negatives get inline comments (grounding guard drops ungrounded anchors)
+        List<DiffNote> diffNotes = collectDiffNotes(inlinable, whyBySlug, emittedWhy, grounding);
 
         return new DeliveryContent(mrNote, diffNotes);
     }
@@ -1119,7 +1150,8 @@ class DeliveryComposer {
     private static List<DiffNote> collectDiffNotes(
         List<ValidatedFinding> negatives,
         Map<String, String> whyBySlug,
-        Set<String> emittedWhy
+        Set<String> emittedWhy,
+        GroundingContext grounding
     ) {
         List<DiffNote> notes = new ArrayList<>();
 
@@ -1136,6 +1168,12 @@ class DeliveryComposer {
                 // not). Carry the finding's correlation key so the inline channel can match the delivered
                 // placement back to its persisted finding (ADR 0021 C2).
                 DiffNote suggested = f.suggestedDiffNotes().get(0);
+                // GROUNDING GUARD (M1): drop the inline ANCHOR if it is ungrounded — a path absent from the
+                // diff's changed-file set whose finding-evidence snippet is not substring-present in that
+                // file's hunk. The finding is not lost: with no inline note it keeps its full summary line.
+                if (!grounding.anchorIsGrounded(suggested.filePath(), extractPrimarySnippet(f))) {
+                    continue;
+                }
                 String clean = sanitizeStudentText(suggested.body());
                 if (clean.isBlank()) continue;
                 // Append the transferable principle so an inline note (the primary surface for an inlinable
@@ -1169,6 +1207,12 @@ class DeliveryComposer {
             if (startLineNode == null || !startLineNode.isNumber()) continue;
             int startLine = startLineNode.asInt();
             if (startLine <= 0) continue;
+
+            // GROUNDING GUARD (M1): same drop on the synthesized branch — an ungrounded evidence.location
+            // never becomes an inline anchor. The finding keeps its full summary line.
+            if (!grounding.anchorIsGrounded(pathNode.asString(), extractPrimarySnippet(f))) {
+                continue;
+            }
 
             Integer endLine = null;
             JsonNode endLineNode = loc.get("endLine");
@@ -1209,5 +1253,110 @@ class DeliveryComposer {
             body = body.substring(0, PracticeDetectionResultParser.MAX_DIFF_NOTE_BODY_LENGTH - 3) + "...";
         }
         return body.isBlank() ? null : body;
+    }
+
+    /**
+     * Server-side grounding context for the inline-anchor guard (M1). Built from the raw two-ref diff of the
+     * change under review, it answers one question: is a finding's proposed inline anchor real, or a
+     * hallucinated locus that would land a confident file:line note on a student about code that isn't there?
+     *
+     * <p>An anchor is GROUNDED when its file is in the diff's changed-file set AND the finding's evidence
+     * snippet is substring-present in that file's hunk text. A {@link #FORCE_NO_LOCUS} context (issues, which
+     * have no file path at all) treats every anchor as ungrounded. An INACTIVE context (no diff supplied)
+     * is a strict no-op: every anchor passes, so the existing PR delivery layout is unchanged for callers
+     * that cannot produce the diff.
+     *
+     * @param active        whether the guard runs at all (false ⇒ no-op pass-through)
+     * @param forceNoLocus  whether to reject every anchor regardless of the diff (issues have no file locus)
+     * @param hunkByFile    changed file path → concatenated added/context hunk text (new-side), for the
+     *                      snippet substring check
+     */
+    record GroundingContext(boolean active, boolean forceNoLocus, Map<String, String> hunkByFile) {
+        /** The no-op context: the guard does not run and every anchor is admitted unchanged. */
+        static GroundingContext none() {
+            return new GroundingContext(false, false, Map.of());
+        }
+
+        /**
+         * Build the guard from an artifact + its raw unified diff. ISSUE ⇒ force-no-locus (issue findings
+         * carry no file anchor). PR with a non-blank diff ⇒ an active snippet/changed-file guard. PR with no
+         * diff ⇒ inactive (no-op): without the diff we cannot tell grounded from hallucinated, and silently
+         * dropping every anchor would be worse than the status quo, so we fall back to the pre-existing
+         * downstream {@code DiffHunkValidator} line check.
+         */
+        static GroundingContext fromDiff(WorkArtifact artifact, @Nullable String unifiedDiff) {
+            if (artifact == WorkArtifact.ISSUE) {
+                return new GroundingContext(true, true, Map.of());
+            }
+            if (unifiedDiff == null || unifiedDiff.isBlank()) {
+                return none();
+            }
+            return new GroundingContext(true, false, parseHunksByFile(unifiedDiff));
+        }
+
+        /**
+         * Is {@code path}'s inline anchor grounded? A no-op context admits everything; a force-no-locus
+         * context (issue) rejects everything. Otherwise the path must be a changed file, and — when a
+         * non-blank {@code snippet} is given — that snippet (whitespace-normalised) must appear in the file's
+         * hunk text. A blank/absent snippet falls back to changed-file membership alone (we have nothing to
+         * substring-match, so the path being in the diff is the strongest signal available).
+         */
+        boolean anchorIsGrounded(@Nullable String path, @Nullable String snippet) {
+            if (!active) return true;
+            if (forceNoLocus) return false;
+            if (path == null || path.isBlank()) return false;
+            String key = repoRelative(path);
+            String hunk = hunkByFile.get(key);
+            if (hunk == null) {
+                // Path is not in the diff's changed-file set ⇒ hallucinated locus.
+                return false;
+            }
+            if (snippet == null || snippet.isBlank()) {
+                // No snippet to verify against — the changed-file membership is the grounding we have.
+                return true;
+            }
+            return hunk.contains(normalizeForMatch(snippet));
+        }
+
+        /**
+         * Parse a unified diff into {@code newPath → concatenated new-side hunk text} (added + context
+         * lines), whitespace-normalised for a tolerant substring check. Mirrors
+         * {@link DiffHunkValidator#parseValidLines}'s header handling: tolerates the {@code [L<n>]} annotated
+         * form and resolves the file from the {@code diff --git a/… b/<path>} header.
+         */
+        private static Map<String, String> parseHunksByFile(String diff) {
+            Map<String, StringBuilder> acc = new HashMap<>();
+            String currentFile = null;
+            for (String raw : diff.split("\n", -1)) {
+                String line = raw;
+                if (line.startsWith("[L") && line.contains("] ")) {
+                    line = line.substring(line.indexOf("] ") + 2);
+                }
+                if (line.startsWith("diff --git")) {
+                    int bIdx = line.lastIndexOf(" b/");
+                    currentFile = bIdx > 0 ? line.substring(bIdx + 3) : null;
+                    if (currentFile != null) acc.putIfAbsent(currentFile, new StringBuilder());
+                    continue;
+                }
+                if (currentFile == null) continue;
+                // Collect new-side content: added (+) and context ( ) lines. Skip hunk headers, ---/+++ file
+                // markers, and deletions (not present in the new file the student is reading).
+                if (line.startsWith("@@") || line.startsWith("+++") || line.startsWith("---")) continue;
+                if (line.startsWith("+") || line.startsWith(" ")) {
+                    acc.get(currentFile).append(normalizeForMatch(line.substring(1))).append('\n');
+                }
+            }
+            Map<String, String> out = new HashMap<>(acc.size());
+            for (Map.Entry<String, StringBuilder> e : acc.entrySet()) {
+                out.put(e.getKey(), e.getValue().toString());
+            }
+            return out;
+        }
+
+        /** Collapse all runs of whitespace to a single space and strip, so a snippet's indentation/EOL
+         * quirks don't defeat the substring match. */
+        private static String normalizeForMatch(String s) {
+            return s.replaceAll("\\s+", " ").strip();
+        }
     }
 }

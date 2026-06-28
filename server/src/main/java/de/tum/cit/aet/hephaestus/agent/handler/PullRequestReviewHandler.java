@@ -448,15 +448,22 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
+        // Raw two-ref diff: the substrate for BOTH the M1 grounding guard (drop a hallucinated inline anchor
+        // before it lands on a student) and the downstream line-position validator. Computed once here.
+        String unifiedDiff = computeUnifiedDiff(job);
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
             WorkArtifact.PULL_REQUEST,
-            whyBySlug
+            whyBySlug,
+            unifiedDiff
         );
         if (delivery != null) {
             log.info("Server-side delivery composed from {} findings: jobId={}", deliverable.size(), job.getId());
             if (!delivery.diffNotes().isEmpty()) {
-                var validLines = computeDiffValidLines(job);
+                var validLines =
+                    unifiedDiff == null
+                        ? Map.<String, TreeSet<Integer>>of()
+                        : DiffHunkValidator.parseValidLines(unifiedDiff);
                 if (!validLines.isEmpty()) {
                     var correctedNotes = DiffHunkValidator.validateAndCorrect(
                         delivery.diffNotes(),
@@ -595,12 +602,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
         return (diff == null || diff.isBlank()) ? null : diff;
-    }
-
-    private Map<String, TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
-        String diff = computeUnifiedDiff(job);
-        if (diff == null) return Map.of();
-        return DiffHunkValidator.parseValidLines(diff);
     }
 
     private Set<String> computeDiffStatFiles(AgentJob job) {

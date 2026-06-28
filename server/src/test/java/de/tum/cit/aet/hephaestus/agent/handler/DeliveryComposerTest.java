@@ -1826,4 +1826,145 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         assertThat(note.split("_Why this matters:_", -1)).hasSize(3); // 2 occurrences => 3 split parts
     }
+
+    // ---- M1: server-side grounding guard (drop a hallucinated inline anchor before it lands on a student) ----
+
+    /** A minimal unified diff: one real changed file with one real added line. */
+    private static final String REAL_DIFF =
+        "diff --git a/Sources/Capture/DepthData.swift b/Sources/Capture/DepthData.swift\n" +
+        "--- a/Sources/Capture/DepthData.swift\n" +
+        "+++ b/Sources/Capture/DepthData.swift\n" +
+        "@@ -10,3 +10,4 @@\n" +
+        " struct DepthData {\n" +
+        "+    let confidence: Float\n" +
+        " }\n";
+
+    @Test
+    void groundingGuard_hallucinatedPath_anchorDropped_findingStillDelivers() {
+        // A BAD finding anchored to a file that is NOT in the diff at all — a hallucinated locus.
+        ValidatedFinding hallucinated = negativeFinding(
+            "code-hygiene",
+            "Dead code",
+            Severity.MINOR,
+            List.of(new LocationSpec("Sources/Ghost/FrameRecorder.swift", 76)),
+            List.of("let x = 0"),
+            "There is dead code here.",
+            "Remove it."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(hallucinated),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            REAL_DIFF
+        );
+
+        assertThat(result).isNotNull();
+        // The ungrounded inline anchor is dropped...
+        assertThat(result.diffNotes()).isEmpty();
+        // ...but the finding is NOT silently discarded — its detail survives in the summary.
+        assertThat(result.mrNote()).contains("Dead code");
+    }
+
+    @Test
+    void groundingGuard_realPathAndSnippet_anchorKept() {
+        // A BAD finding whose file IS in the diff and whose snippet IS substring-present in the hunk.
+        ValidatedFinding grounded = negativeFinding(
+            "code-hygiene",
+            "Missing doc on new field",
+            Severity.MINOR,
+            List.of(new LocationSpec("Sources/Capture/DepthData.swift", 11)),
+            List.of("let confidence: Float"),
+            "The new field is undocumented.",
+            "Add a doc comment."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(grounded),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            REAL_DIFF
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).filePath()).isEqualTo("Sources/Capture/DepthData.swift");
+    }
+
+    @Test
+    void groundingGuard_realPathButSnippetNotInHunk_anchorDropped() {
+        // File is in the diff, but the quoted snippet never appears in its hunk — a fabricated evidence line.
+        ValidatedFinding fabricatedSnippet = negativeFinding(
+            "code-hygiene",
+            "Phantom evidence",
+            Severity.MINOR,
+            List.of(new LocationSpec("Sources/Capture/DepthData.swift", 11)),
+            List.of("deleteEverything() // never written"),
+            "This line is a problem.",
+            "Fix it."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(fabricatedSnippet),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            REAL_DIFF
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).isEmpty(); // ungrounded snippet ⇒ no inline anchor
+        assertThat(result.mrNote()).contains("Phantom evidence"); // finding still delivered in summary
+    }
+
+    @Test
+    void groundingGuard_issueArtifact_forcesNoFileLocus() {
+        // An ISSUE finding carries a file location the agent should never have set — it must not become an anchor.
+        ValidatedFinding issueFinding = negativeFinding(
+            "issue-states-an-actionable-problem",
+            "Vague problem statement",
+            Severity.MINOR,
+            List.of(new LocationSpec("metadata.json", 1)),
+            List.of("\"title\": \"do stuff\""),
+            "The issue does not state a concrete problem.",
+            "State the problem as <one sentence>."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(issueFinding),
+            WorkArtifact.ISSUE,
+            Map.of(),
+            null // issues have no diff; force-no-locus still applies via the ISSUE branch
+        );
+
+        assertThat(result).isNotNull();
+        // Issues never inline anyway, but the guard makes the no-locus contract explicit.
+        assertThat(result.diffNotes()).isEmpty();
+        assertThat(result.mrNote()).contains("Vague problem statement");
+    }
+
+    @Test
+    void groundingGuard_noDiffSupplied_isNoOp_anchorKept() {
+        // Without a diff the guard is INACTIVE: a PR finding's anchor passes through unchanged, preserving the
+        // existing delivery layout for callers that cannot produce the diff (the downstream line validator
+        // remains the only check).
+        ValidatedFinding finding = negativeFinding(
+            "code-hygiene",
+            "Some inline issue",
+            Severity.MINOR,
+            List.of(new LocationSpec("Sources/Whatever.swift", 5)),
+            List.of("anything"),
+            "An inline issue.",
+            "Fix it."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(finding),
+            WorkArtifact.PULL_REQUEST,
+            Map.of(),
+            (String) null
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1); // no-op guard ⇒ anchor kept
+    }
 }
