@@ -798,6 +798,49 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
+        @DisplayName("returns 200 (not 500) when evidence jsonb is not an object")
+        void shouldReturn200WhenEvidenceIsNotAnObject() {
+            // C5 regression: the detail mapper coerces evidence jsonb to a Map; a non-object payload (here a
+            // JSON array) would make convertValue throw -> HTTP 500 on a perfectly valid stored observation.
+            // The endpoint must return 200 with the evidence map simply absent.
+            UUID findingId = UUID.randomUUID();
+            String arrayEvidenceJson = "[{\"file\":\"README.md\",\"line\":42}]";
+            observationRepository.insertIfAbsent(
+                findingId,
+                "key-" + findingId,
+                agentJob.getId(),
+                practiceA.getId(),
+                null, // practiceRevisionId — pre-versioning marker
+                "PULL_REQUEST",
+                51L,
+                developer.getId(),
+                "Array evidence finding",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                0.9f,
+                arrayEvidenceJson,
+                "reasoning",
+                null,
+                Instant.now()
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "/{findingId}", workspace.getWorkspaceSlug(), findingId)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.title")
+                .isEqualTo("Array evidence finding")
+                .jsonPath("$.evidence")
+                .doesNotExist();
+        }
+
+        @Test
+        @WithUser
         void shouldReturn404ForFindingInDifferentWorkspace() {
             // Create finding in current workspace
             UUID findingId = insertFinding(

@@ -69,7 +69,10 @@ public record ObservationDetailDTO(
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> toMap(JsonNode node, tools.jackson.databind.ObjectMapper mapper) {
-        if (node == null) {
+        // evidence is free-form jsonb: a non-object payload (array, scalar, null) cannot be coerced to a
+        // Map and would otherwise make convertValue throw, turning a valid stored observation into a 500.
+        // Only object-shaped evidence maps; anything else surfaces as an absent evidence map.
+        if (node == null || !node.isObject()) {
             return null;
         }
         return mapper.convertValue(node, Map.class);
