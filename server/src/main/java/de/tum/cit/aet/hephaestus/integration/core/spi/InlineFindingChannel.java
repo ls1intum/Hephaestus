@@ -79,7 +79,10 @@ public interface InlineFindingChannel {
      *
      * <p>Counting invariant (both shipped impls): {@code posted} counts every signal whose {@link Disposition}
      * is not {@code FAILED} (i.e. {@code POSTED}, {@code FELL_BACK}, {@code PRESERVED_EXISTING}); {@code failed}
-     * counts {@code FAILED} signals; on the per-finding paths {@code posted + failed == signals.size()}.
+     * counts {@code FAILED} signals. Every finding that produced a per-finding outcome contributes exactly one
+     * signal, so {@code posted + failed == signals.size()} across the signalled findings. A finding the channel
+     * skips outright (e.g. a blank body the GitHub impl drops without posting) yields no signal and no count, so
+     * it is simply absent from both sides rather than violating the equality.
      */
     record InlineResult(int posted, int failed, List<DeliveredSignal> signals) {
         /** Count-only result with no per-finding signals (rate-limit short-circuit / empty input). */

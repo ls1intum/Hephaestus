@@ -172,6 +172,29 @@ class WorkspaceInventoryContentProviderTest extends BaseUnitTest {
     }
 
     @Test
+    void truncatedIsTrueWhenAFullPageReturnsAndFocalExclusionIsCountedOff() throws Exception {
+        // A full MAX_PER_TYPE page (one row focal) → emitted is one short of the cap, but the listing is
+        // NOT exhaustive: truncated must be derived from the PRE-exclusion page size, not the emitted count,
+        // so absence-of-match cannot be read as uniqueness.
+        List<Issue> fullPage = new java.util.ArrayList<>();
+        fullPage.add(issue(1, "Focal issue under review", Issue.State.OPEN, "alice"));
+        for (int n = 2; n <= WorkspaceInventoryContentProvider.MAX_PER_TYPE; n++) {
+            fullPage.add(issue(n, "Issue " + n, Issue.State.OPEN, "bob"));
+        }
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(fullPage);
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(issueRequest(1), files);
+
+        JsonNode root = objectMapper.readTree(files.get(OUTPUT));
+        assertThat(root.get("truncated").asBoolean()).isTrue();
+        // Focal #1 is excluded from the emitted list, so the count is one below the cap even though the page was full.
+        assertThat(root.get("counts").get("issuesListed").asInt()).isEqualTo(
+            WorkspaceInventoryContentProvider.MAX_PER_TYPE - 1
+        );
+    }
+
+    @Test
     void excludesTheFocalPullRequestInPrFlow() throws Exception {
         when(pullRequestRepository.findPullRequestInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
             List.of(

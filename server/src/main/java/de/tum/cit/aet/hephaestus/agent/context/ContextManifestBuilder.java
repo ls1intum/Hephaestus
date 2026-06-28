@@ -70,6 +70,12 @@ public class ContextManifestBuilder {
                     continue;
                 }
                 byte[] bytes = files.get(key);
+                // A provider that mapped the key to a null blob would NPE on bytes.length below, and the
+                // catch(RuntimeException) would then discard the ENTIRE manifest — losing the telescope index
+                // for every other valid context file in the job. Skip the single bad entry instead.
+                if (bytes == null) {
+                    continue;
+                }
                 ObjectNode entry = entries.addObject();
                 // Emit the FULL workspace-relative key (e.g. "inputs/context/test_presence.json"), not a bare
                 // filename. The criteria + orchestrator prompt cite the full path, so the manifest — the agent's
@@ -79,7 +85,9 @@ public class ContextManifestBuilder {
                 // Never default to a connector name — that is exactly the mislabel the manifest exists to
                 // prevent. connectorId() is abstract so every provider-written key is present; "unknown" is
                 // the fail-loud marker for the impossible case rather than a silent attribution to SCM.
-                entry.put("connector", keyConnector.getOrDefault(key, "unknown"));
+                // getOrDefault only substitutes on an ABSENT key, so coalesce a present-but-null mapping too.
+                String connector = keyConnector.get(key);
+                entry.put("connector", connector != null ? connector : "unknown");
                 entry.put("bytes", bytes.length);
                 entry.put("sha256", cas.put(bytes));
             }
@@ -87,7 +95,9 @@ public class ContextManifestBuilder {
             files.put(WorkspaceAbi.MANIFEST_PATH, manifestBytes);
             persistJobManifest(jobId, manifestBytes);
         } catch (RuntimeException e) {
-            log.warn("Context manifest generation failed (best-effort), continuing without it: {}", e.getMessage());
+            // Log the throwable, not just getMessage() — an NPE message is null/unhelpful and this path is
+            // best-effort-swallowed, so a stack trace is the only diagnostic a prod failure leaves behind.
+            log.warn("Context manifest generation failed (best-effort), continuing without it", e);
         }
     }
 

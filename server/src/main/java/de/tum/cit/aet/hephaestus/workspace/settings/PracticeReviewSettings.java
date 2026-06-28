@@ -78,12 +78,27 @@ public class PracticeReviewSettings {
             return;
         }
         for (PracticeReviewField field : fields) {
-            switch (field) {
-                case RUN_FOR_ALL_USERS -> this.runForAllUsers = null;
-                case SKIP_DRAFTS -> this.skipDrafts = null;
-                case DELIVER_TO_MERGED -> this.deliverToMerged = null;
-                case COOLDOWN_MINUTES -> this.cooldownMinutes = null;
-            }
+            // Switch EXPRESSION (not statement) so the compiler forces a new PracticeReviewField constant to
+            // be handled here — a statement switch would silently no-op the new field. The yielded value is
+            // unused; the exhaustiveness check is the point.
+            boolean ignored = switch (field) {
+                case RUN_FOR_ALL_USERS -> {
+                    this.runForAllUsers = null;
+                    yield true;
+                }
+                case SKIP_DRAFTS -> {
+                    this.skipDrafts = null;
+                    yield true;
+                }
+                case DELIVER_TO_MERGED -> {
+                    this.deliverToMerged = null;
+                    yield true;
+                }
+                case COOLDOWN_MINUTES -> {
+                    this.cooldownMinutes = null;
+                    yield true;
+                }
+            };
         }
     }
 }

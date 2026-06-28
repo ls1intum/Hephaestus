@@ -11,9 +11,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * REST controller for developer reactions to delivered units of feedback.
@@ -70,8 +69,9 @@ public class ReactionController {
         @Valid @RequestBody CreateReactionDTO request
     ) {
         ReactionDTO reaction = reactionService.submitReaction(workspaceContext, feedbackId, request);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
-        return ResponseEntity.created(location).body(reaction);
+        // No Location header: the append-only model has no per-reaction GET, so a resolvable
+        // resource URI does not exist (the collection URI would be misleading per RFC 7231).
+        return ResponseEntity.status(HttpStatus.CREATED).body(reaction);
     }
 
     @GetMapping("/{feedbackId}/reactions")
@@ -107,7 +107,7 @@ public class ReactionController {
     @GetMapping("/engagement")
     @Operation(
         summary = "Get engagement statistics",
-        description = "Returns the current user's reaction action counts across all findings in this workspace."
+        description = "Returns the current user's reaction action counts across all feedback they received in this workspace."
     )
     @ApiResponse(
         responseCode = "200",

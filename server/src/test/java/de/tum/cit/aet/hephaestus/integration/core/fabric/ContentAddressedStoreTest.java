@@ -83,6 +83,42 @@ class ContentAddressedStoreTest extends BaseUnitTest {
     }
 
     @Test
+    void get_returnsEmpty_whenBlobVanishedAfterTheExistsCheck() throws Exception {
+        // The documented "no longer present" branch: a blob deleted out-of-band (sweep racing a read) must
+        // read back as empty, not throw UncheckedIOException(NoSuchFileException). Deleting the file directly
+        // models the post-exists()/pre-read window the old pre-check left open.
+        String sha = cas.put("ephemeral".getBytes(StandardCharsets.UTF_8));
+        java.nio.file.Files.delete(cas.pathFor(sha));
+
+        assertThat(cas.get(sha)).isEmpty();
+    }
+
+    @Test
+    void sweep_prunesEmptyedFanoutDirectories() {
+        // After the only blob in a {ab} fan-out dir is swept, the now-empty directory must be removed too,
+        // so the store does not accrue empty two-char dirs that every future sweep keeps walking.
+        String drop = cas.put("solo".getBytes(StandardCharsets.UTF_8));
+        Path fanout = cas.pathFor(drop).getParent();
+        assertThat(fanout).exists();
+
+        cas.sweep(Set.of()); // nothing live → the blob and then its empty fan-out dir are removed
+
+        assertThat(fanout).as("an emptied fan-out dir is pruned").doesNotExist();
+    }
+
+    @Test
+    void sweep_keepsFanoutDirectoryThatStillHoldsALiveBlob() {
+        // The prune pass must only delete EMPTY fan-out dirs — a dir still holding a referenced blob stays.
+        String keep = cas.put("retained".getBytes(StandardCharsets.UTF_8));
+        Path fanout = cas.pathFor(keep).getParent();
+
+        cas.sweep(Set.of(keep));
+
+        assertThat(fanout).as("a fan-out dir with a live blob is not pruned").exists();
+        assertThat(cas.exists(keep)).isTrue();
+    }
+
+    @Test
     void pathFor_rejectsNonSha() {
         assertThatThrownBy(() -> cas.pathFor("not-a-sha")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> cas.pathFor("../escape")).isInstanceOf(IllegalArgumentException.class);

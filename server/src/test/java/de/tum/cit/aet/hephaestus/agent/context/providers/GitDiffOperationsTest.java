@@ -98,6 +98,27 @@ class GitDiffOperationsTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("does not emit a spurious [L<n>] for the trailing empty element of a diff ending in a newline")
+    void trailingNewline_doesNotEmitSpuriousMarker() {
+        // split("\n", -1) on a diff ending with '\n' yields a trailing "" element. Inside a hunk (newLineNum
+        // non-null) that empty element must NOT be stamped with an [L<n>] prefix the model reads as a real
+        // (empty) source line. The diff below ends inside the hunk with a trailing '\n'.
+        String diff =
+            "diff --git a/Foo.swift b/Foo.swift\n" +
+            "--- a/Foo.swift\n" +
+            "+++ b/Foo.swift\n" +
+            "@@ -1,1 +1,2 @@\n" +
+            " first\n" +
+            "+second\n";
+        String annotated = GitDiffOperations.annotateDiffWithLineNumbers(diff);
+
+        assertThat(annotated).contains("[L1]  first");
+        assertThat(annotated).contains("[L2] +second");
+        // After "+second" the new-side counter is at 3; the trailing empty element must not surface as "[L3] ".
+        assertThat(annotated).doesNotContain("[L3] ");
+    }
+
+    @Test
     @DisplayName("leaves diff metadata lines unmodified (before first hunk header)")
     void preservesMetadata() {
         String diff =

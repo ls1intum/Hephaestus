@@ -198,6 +198,15 @@ public class Observation {
     @Column(name = "observed_at", nullable = false)
     private Instant observedAt;
 
+    /**
+     * JPA-path safety net only. The production write path is the native {@code ObservationRepository.insertIfAbsent}
+     * (this entity is {@code @Immutable} and nothing calls {@code save()}), so @PrePersist never fires in prod — the
+     * real guards there are {@link de.tum.cit.aet.hephaestus.practices.detection.PracticeDetectionResultParser}'s
+     * coherence coercion plus the DB CHECK constraints. The presence/assessment invariant below HAS a DB backstop
+     * ({@code chk_observation_presence_assessment}); the severity invariant does NOT (the DB only allow-lists severity
+     * values), so the parser coercion is its sole enforcement. This method keeps both invariants meaningful for any
+     * future caller that does go through the JPA persist path.
+     */
     @PrePersist
     protected void onCreate() {
         if (id == null) {
@@ -219,7 +228,8 @@ public class Observation {
             );
         }
         // Severity is an impact band for a BAD observation only (ADR 0022, mirrored by the severity field's
-        // javadoc): it MUST be null unless the assessment is BAD.
+        // javadoc): it MUST be null unless the assessment is BAD. No DB CHECK enforces this (see method javadoc);
+        // the parser's coercion is the production backstop, this is the JPA-path one.
         if (assessment != Assessment.BAD && severity != null) {
             throw new IllegalStateException(
                 "Observation coherence violation: severity must be null unless assessment is BAD (assessment=" +

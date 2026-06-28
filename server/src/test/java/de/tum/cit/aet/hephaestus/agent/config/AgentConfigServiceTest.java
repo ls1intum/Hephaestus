@@ -178,7 +178,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRejectCredentialModeChangeOnUpdate() {
+        void shouldRejectSwitchingToApiKeyWhenInternetDisabled() {
+            // Switching PROXY→API_KEY on a config whose internet is still off hits the requiresInternet
+            // branch (allowInternet=false is checked before the credential branch).
             AgentConfig existing = new AgentConfig();
             existing.setId(10L);
             existing.setWorkspace(workspace);
@@ -190,9 +192,32 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
 
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
-                AgentConfigCredentialModeException.class
-            );
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(AgentConfigCredentialModeException.class)
+                .hasMessageContaining("API_KEY")
+                .hasMessageContaining("internet");
+        }
+
+        @Test
+        void shouldRejectSwitchingToApiKeyWithInternetButNoCredential() {
+            // The genuine PROXY→API_KEY transition where internet IS allowed: now the credential branch
+            // fires because the enabled config carries no key.
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            existing.setLlmProvider(LlmProvider.ANTHROPIC);
+            existing.setEnabled(true);
+            existing.setAllowInternet(true);
+            existing.setCredentialMode(CredentialMode.PROXY);
+
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+
+            var request = UpdateAgentConfigRequestDTO.builder().credentialMode(CredentialMode.API_KEY).build();
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(AgentConfigCredentialModeException.class)
+                .hasMessageContaining("API_KEY")
+                .hasMessageContaining("API key");
         }
 
         @Test
@@ -208,9 +233,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
             var request = UpdateAgentConfigRequestDTO.builder().allowInternet(false).build();
 
-            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request)).isInstanceOf(
-                AgentConfigCredentialModeException.class
-            );
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(AgentConfigCredentialModeException.class)
+                .hasMessageContaining("internet");
         }
     }
 
@@ -284,6 +309,27 @@ class AgentConfigServiceTest extends BaseUnitTest {
         @Test
         void shouldRejectDuplicateName() {
             when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
+
+            var request = CreateAgentConfigRequestDTO.builder()
+                .name("my-agent")
+                .enabled(true)
+                .llmProvider(LlmProvider.ANTHROPIC)
+                .build();
+
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+                .isInstanceOf(AgentConfigNameConflictException.class)
+                .hasMessageContaining("my-agent");
+        }
+
+        @Test
+        void shouldTranslateUniqueConstraintRaceIntoConflict() {
+            // The exists-check passed (the concurrent winner committed after it ran), so save() trips the
+            // DB unique constraint. The loser must still surface the 409 conflict, not a raw 500.
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(agentConfigRepository.save(any())).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException("uk_agent_config_workspace_name")
+            );
 
             var request = CreateAgentConfigRequestDTO.builder()
                 .name("my-agent")
@@ -414,6 +460,31 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(0L);
             workspace.setPracticeConfigId(10L);
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+
+            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L)).isInstanceOf(
+                AgentConfigBoundException.class
+            );
+
+            verify(agentConfigRepository, never()).delete(any());
+        }
+
+        @Test
+        void shouldRejectDeleteWhenBoundToMentor() {
+            // Sibling of shouldRejectDeleteWhenConfigBound for the mentorConfigId branch (practiceConfigId
+            // left null) — guards against dropping the mentor clause from the bound-check.
+            AgentConfig config = new AgentConfig();
+            config.setId(10L);
+            config.setWorkspace(workspace);
+
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
+            when(
+                agentJobRepository.countByConfigIdAndStatusIn(
+                    eq(10L),
+                    eq(Set.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+                )
+            ).thenReturn(0L);
+            workspace.setMentorConfigId(10L);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L)).isInstanceOf(

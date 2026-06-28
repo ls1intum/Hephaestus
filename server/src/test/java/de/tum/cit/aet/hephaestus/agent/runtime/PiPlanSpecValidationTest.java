@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -7,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -114,5 +116,121 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
+    }
+
+    /** A profile whose runner script is blank — the runnerScript() guard must reject it. */
+    private static final PiRunnerProfile BLANK_SCRIPT_PROFILE = new PiRunnerProfile() {
+        @Override
+        public String runnerScript() {
+            return "  ";
+        }
+
+        @Override
+        public List<String> nodeFlags() {
+            return List.of();
+        }
+
+        @Override
+        public Map<String, String> additionalEnv() {
+            return Map.of();
+        }
+    };
+
+    @Test
+    void blankRunnerScriptRejected() {
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.API_KEY,
+                "sk",
+                null,
+                null,
+                null,
+                true,
+                600,
+                BLANK_SCRIPT_PROFILE,
+                Map.of(),
+                ""
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("runnerScript");
+    }
+
+    @Test
+    void nullPrecomputeStepNormalizesToEmptyString() {
+        PiPlanSpec spec = new PiPlanSpec(
+            LlmProvider.OPENAI,
+            CredentialMode.API_KEY,
+            "sk",
+            null,
+            null,
+            null,
+            true,
+            600,
+            PROFILE,
+            Map.of(),
+            null
+        );
+
+        // The null-coalesce protects PiRuntimeFactory's string concat from an NPE downstream.
+        assertThat(spec.precomputeStep()).isEmpty();
+    }
+
+    @Test
+    void proxyWithAzureOpenAiAndTokenConstructs() {
+        assertThatNoException().isThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.AZURE_OPENAI,
+                CredentialMode.PROXY,
+                null,
+                null,
+                null,
+                "job-token",
+                false,
+                600,
+                PROFILE,
+                Map.of(),
+                ""
+            )
+        );
+    }
+
+    @Test
+    void proxyRejectsBaseUrl() {
+        // Documented "baseUrl trap": PROXY resolves $LLM_PROXY_URL, so a baseUrl is silently shadowed —
+        // the constructor must fail fast on the misconfiguration instead of accepting dead config.
+        assertThatThrownBy(() ->
+            new PiPlanSpec(
+                LlmProvider.OPENAI,
+                CredentialMode.PROXY,
+                null,
+                null,
+                "https://example.test/v1",
+                "job-token",
+                false,
+                600,
+                PROFILE,
+                Map.of(),
+                ""
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("PROXY mode");
+    }
+
+    @Test
+    void prefixEqualToKeyAccepted() {
+        // Boundary: a key that is EXACTLY an allowed prefix (the startsWith edge) must be accepted.
+        assertThatNoException().isThrownBy(() -> specWith(Map.of("inputs/context/", BYTES)));
+    }
+
+    @Test
+    void prefixedTraversalAcceptedHere_normalizationDelegatedToWorkspaceManager() {
+        // PiPlanSpec only checks allowlist membership via String.startsWith — it does NOT path-normalize, so a
+        // key that startsWith an allowed prefix yet contains "../" traversal is ACCEPTED at THIS layer. The
+        // traversal defense lives one layer down in SandboxWorkspaceManager.injectFiles. This test pins that
+        // seam so a future refactor that tightens PiPlanSpec (or loosens the manager) does not silently lose it.
+        assertThatNoException().isThrownBy(() -> specWith(Map.of("inputs/context/../../../etc/passwd", BYTES)));
     }
 }

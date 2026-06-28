@@ -178,7 +178,10 @@ final class SecretDiffScanner {
         // placeholder guards (the token IS the example) apply.
         for (PrefixRule rule : PREFIX_RULES) {
             Matcher m = rule.pattern().matcher(content);
-            if (m.find()) {
+            // Loop over EVERY occurrence, not just the first: a line that hardcodes two same-type tokens (e.g.
+            // two `ghp_` PATs) must report both, or the second leaks. (The caller dedups by path:newLine:ruleId,
+            // so genuinely identical same-rule hits on one line still collapse there.)
+            while (m.find()) {
                 String token = m.group();
                 if (isDocExample(token) || isPlaceholder(token)) {
                     continue;
@@ -206,12 +209,39 @@ final class SecretDiffScanner {
                 !alreadyFlagged &&
                 !envRef &&
                 !isPlaceholder(value) &&
-                !value.contains("/") &&
+                !looksLikePathOrUrl(value) &&
                 shannonEntropy(value) >= ENTROPY_THRESHOLD
             ) {
                 hits.add(new SecretHit(path, line, content.strip(), "generic-entropy", value));
             }
         }
+    }
+
+    /**
+     * Heuristic for a value that is a filesystem path or URL rather than a credential — used to avoid flagging
+     * paths/URLs as generic-entropy secrets. Deliberately NOT a blanket {@code /}-ban: standard base64/base64url
+     * secret material routinely contains a {@code /} from its alphabet, so a single slash must not suppress a
+     * real high-entropy token. Skips only when the value starts with a path/URL prefix, embeds a {@code ://}
+     * scheme, or carries enough slashes ({@code >= 3}) to be path-structured (a 40-char base64 averages well
+     * under one slash). The entropy gate remains the precision backstop.
+     */
+    private static boolean looksLikePathOrUrl(String value) {
+        if (
+            value.startsWith("/") ||
+            value.startsWith("./") ||
+            value.startsWith("../") ||
+            value.startsWith("http") ||
+            value.contains("://")
+        ) {
+            return true;
+        }
+        int slashes = 0;
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == '/') {
+                slashes++;
+            }
+        }
+        return slashes >= 3;
     }
 
     private boolean isPlaceholder(String value) {

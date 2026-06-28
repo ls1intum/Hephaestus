@@ -1051,6 +1051,156 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 any()
             );
         }
+
+        @Test
+        void shouldHumaniseMultiWordTypeNameBeforeLookup() {
+            // The lookup depends on humaniseTypeName: TEST_CASE must become "Test Case" (not "TEST_CASE"
+            // or "test case") before the case-insensitive query — the single-word "TASK" case can't catch
+            // a regression in the multi-word/lowercasing path.
+            var organization = new de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization();
+            organization.setId(42L);
+            testRepo.setOrganization(organization);
+
+            IssueType testCaseType = new IssueType();
+            testCaseType.setId("gid://gitlab/IssueType/7");
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Test Case")).thenReturn(
+                Optional.of(testCaseType)
+            );
+
+            processor.processFromSync(syncDataWithType("TEST_CASE"), testRepo, 1L);
+
+            verify(issueTypeRepository).findByOrganizationIdAndNameIgnoreCase(42L, "Test Case");
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                any(),
+                eq("gid://gitlab/IssueType/7"),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        void shouldFallBackToProviderScopedLookupForSubgroupOrg() {
+            // Subgroup orgs have no own issue_type seed rows: the org-scoped lookup misses and the
+            // provider-scoped fallback (the documented LazyInitializationException workaround) resolves
+            // the shared provider-global row.
+            var organization = new de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization();
+            organization.setId(99L);
+            testRepo.setOrganization(organization);
+
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(99L, "Task")).thenReturn(Optional.empty());
+            IssueType providerScoped = new IssueType();
+            providerScoped.setId("gid://gitlab/IssueType/global-1");
+            when(issueTypeRepository.findFirstByOrganizationProviderAndNameIgnoreCase(99L, "Task")).thenReturn(
+                Optional.of(providerScoped)
+            );
+
+            processor.processFromSync(syncDataWithType("TASK"), testRepo, 1L);
+
+            verify(issueTypeRepository).findFirstByOrganizationProviderAndNameIgnoreCase(99L, "Task");
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                any(),
+                eq("gid://gitlab/IssueType/global-1"),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        void shouldResolveNullIssueTypeWhenOrganizationMissing() {
+            // No organization on the repository → early return null; the issue_type FK passed to upsert is
+            // null and the COALESCE on the DB side preserves any previously set value.
+            testRepo.setOrganization(null);
+
+            processor.processFromSync(syncDataWithType("TASK"), testRepo, 1L);
+
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                any(),
+                eq((String) null),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        /** A minimal sync payload carrying the given GraphQL issue-type enum (e.g. {@code TASK}). */
+        private GitLabIssueProcessor.SyncIssueData syncDataWithType(String typeName) {
+            return new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "opened",
+                false,
+                "https://example.com",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null,
+                typeName,
+                null
+            );
+        }
     }
 
     // Helpers
@@ -1159,5 +1309,60 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             "https://gitlab.lrz.de/hephaestustest/demo-repository",
             "hephaestustest/demo-repository"
         );
+    }
+
+    /**
+     * DTO-level coverage for {@code GitLabIssueEventDTO.addedLabels()} — the current-minus-previous
+     * delta. Independent of processor mocking so the filter logic is pinned directly.
+     */
+    @Nested
+    class AddedLabelsDelta {
+
+        private GitLabIssueEventDTO eventWithLabelChange(
+            List<GitLabWebhookLabel> previous,
+            List<GitLabWebhookLabel> current
+        ) {
+            var changes = new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(previous, current));
+            return new GitLabIssueEventDTO("issue", "issue", null, null, null, List.of(), null, changes);
+        }
+
+        @Test
+        void onlyEmitsLabelsAbsentFromPrevious() {
+            // current = {1,2}, previous = {1}: only id=2 is newly added; the re-sent id=1 must NOT re-emit.
+            var label1 = new GitLabWebhookLabel(1L, "bug", "#ff0000");
+            var label2 = new GitLabWebhookLabel(2L, "feature", "#00ff00");
+
+            var added = eventWithLabelChange(List.of(label1), List.of(label1, label2)).addedLabels();
+
+            assertThat(added).extracting(GitLabWebhookLabel::id).containsExactly(2L);
+        }
+
+        @Test
+        void emitsNothingWhenLabelAlreadyPresent() {
+            // An unrelated edit that re-sends an existing label (previous == current) must not trigger
+            // IssueLabeled.
+            var label1 = new GitLabWebhookLabel(1L, "bug", "#ff0000");
+
+            var added = eventWithLabelChange(List.of(label1), List.of(label1)).addedLabels();
+
+            assertThat(added).isEmpty();
+        }
+
+        @Test
+        void treatsNullPreviousAsAllAdded() {
+            var label1 = new GitLabWebhookLabel(1L, "bug", "#ff0000");
+
+            var added = eventWithLabelChange(null, List.of(label1)).addedLabels();
+
+            assertThat(added).extracting(GitLabWebhookLabel::id).containsExactly(1L);
+        }
+
+        @Test
+        void emptyWhenNoLabelChangeSection() {
+            // No changes diff at all → an ordinary title/description edit never spuriously adds labels.
+            var event = new GitLabIssueEventDTO("issue", "issue", null, null, null, List.of(), null, null);
+
+            assertThat(event.addedLabels()).isEmpty();
+        }
     }
 }

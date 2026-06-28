@@ -90,6 +90,13 @@ public class Reaction {
      * locus that DOES recur, letting B2 suppression find a prior DISPUTED / NOT_APPLICABLE reaction against
      * a re-detected locus. Nullable: a reaction whose source locus predates C2 (null key) stays null and
      * simply cannot participate in B2.
+     *
+     * <p><b>Headline-only by design.</b> A {@link Feedback} unit can fuse several findings (one PRIMARY per
+     * problem, ADR 0022), but only the headline locus is captured here. So when a recipient disputes a
+     * multi-finding unit, B2 suppresses only the headline locus on re-run; the non-headline loci bundled into
+     * the same unit recur and may re-nag. Eval/reviewers should treat that as the known suppression grain, not
+     * a miss. Full-unit suppression would require capturing every member recurrence key (e.g. a child
+     * {@code reaction_locus} table keyed off {@code FeedbackObservation}), which is out of scope here.
      */
     @Column(name = "recurrence_key", length = 64)
     private String recurrenceKey;

@@ -135,9 +135,17 @@ public class PullRequestContentProvider implements ContentProvider {
 
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
+        // Refresh the clone ONCE, up-front, before anything reads refs from it. The commit log
+        // (addCommitLog) and the diff (computeAndStoreDiff) both resolve a range against the local
+        // clone; doing the fetch here guarantees they see the same, freshest ref state. Otherwise a
+        // fresh-push / stale-clone run would skip the commit log (head not yet local) while the diff,
+        // computed after a later fetch, succeeds — an inconsistent context.
+        String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
+        boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
+
         storeMetadataAndComments(files, pullRequest, pullRequestId, metadata);
         storeDeveloperHistory(files, pullRequest, job);
-        computeAndStoreDiff(files, repositoryId, metadata, job);
+        computeAndStoreDiff(files, repositoryId, metadata, headVerified);
         computeAndStoreDiffSummary(files);
     }
 
@@ -162,23 +170,25 @@ public class PullRequestContentProvider implements ContentProvider {
             return false;
         }
 
+        var workspace = job.getWorkspace();
+        // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
+        // kind from the connection (never hardcode a vendor) and look up its token source.
+        // The fetch only actually fires when that source exposes a deterministic clone URL
+        // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
+        // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
+        // empty serverUrl; its historical fetches go through GithubDataSyncService instead).
+        var kind =
+            workspace == null
+                ? Optional.<IntegrationKind>empty()
+                : connectionService.findActiveProviderKind(workspace.getId());
+        ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
+
         boolean fetched = false;
+        String serverUrl = null;
         try {
-            var workspace = job.getWorkspace();
-            // The pre-diff fetch is gated on the workspace's active SCM kind: we resolve that
-            // kind from the connection (never hardcode a vendor) and look up its token source.
-            // The fetch only actually fires when that source exposes a deterministic clone URL
-            // derivable from {serverUrl, repository_full_name} — see the guard below. That makes
-            // it a safe no-op for kinds without such a URL (e.g. GitHub, whose source returns an
-            // empty serverUrl; its historical fetches go through GithubDataSyncService instead).
-            var kind =
-                workspace == null
-                    ? Optional.<IntegrationKind>empty()
-                    : connectionService.findActiveProviderKind(workspace.getId());
-            ScmTokenSource source = kind.map(tokenSources::get).orElse(null);
             if (source != null) {
                 Long scopeId = workspace.getId();
-                String serverUrl = source.serverUrl(scopeId).orElse(null);
+                serverUrl = source.serverUrl(scopeId).orElse(null);
                 String token = source.accessToken(scopeId).orElse(null);
                 JsonNode metadata = job.getMetadata();
                 String repoFullName =
@@ -193,7 +203,16 @@ public class PullRequestContentProvider implements ContentProvider {
                 }
             }
         } catch (Exception e) {
-            log.warn("Pre-diff fetch failed: repoId={}, error={}", repositoryId, e.getMessage());
+            // Log the full exception (class + stack), not just the message: an auth/credential failure here
+            // is usually systemic (it will hit every job in the workspace) and the class is what makes it
+            // diagnosable. Include kind/serverUrl for triage — never the token.
+            log.warn(
+                "Pre-diff fetch failed: repoId={}, kind={}, serverUrl={}",
+                repositoryId,
+                kind.orElse(null),
+                serverUrl,
+                e
+            );
         }
 
         if (headSha != null && !headSha.isBlank()) {
@@ -383,7 +402,12 @@ public class PullRequestContentProvider implements ContentProvider {
 
     // Diff
 
-    private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata, AgentJob job) {
+    private void computeAndStoreDiff(
+        Map<String, byte[]> files,
+        long repositoryId,
+        JsonNode metadata,
+        boolean headVerified
+    ) {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asString() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
@@ -392,8 +416,6 @@ public class PullRequestContentProvider implements ContentProvider {
             return;
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-
-        boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
 
         try {
             String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
@@ -494,7 +516,10 @@ public class PullRequestContentProvider implements ContentProvider {
                 }
                 currentChunk = new StringBuilder();
                 Matcher m = DIFF_GIT_HEADER.matcher(effectiveLine);
-                currentPath = m.matches() ? m.group(1) : effectiveLine;
+                // On a malformed/unusual header the captured path is unavailable; fall back to the raw
+                // header line, but sanitize it first — it is rendered verbatim into a markdown table cell
+                // and a section heading, so a stray pipe/backtick would corrupt the table the agent reads.
+                currentPath = m.matches() ? m.group(1) : sanitizePathCell(effectiveLine);
             }
             currentChunk.append(line).append('\n');
         }
@@ -529,6 +554,16 @@ public class PullRequestContentProvider implements ContentProvider {
         byte[] summaryBytes = summary.toString().getBytes(StandardCharsets.UTF_8);
         files.put(OUTPUT_PREFIX + "diff_summary.md", summaryBytes);
         log.info("Diff summary: {} files, {} bytes", filePaths.size(), summaryBytes.length);
+    }
+
+    /**
+     * Sanitizes a fallback (unparseable) diff-header path before it is placed into the markdown summary's
+     * table cell and section heading: strips the {@code diff --git } prefix and removes pipe/backtick
+     * characters that would break the markdown table the agent consumes.
+     */
+    private static String sanitizePathCell(String rawHeader) {
+        String stripped = rawHeader.startsWith("diff --git ") ? rawHeader.substring("diff --git ".length()) : rawHeader;
+        return stripped.replace("|", "").replace("`", "").trim();
     }
 
     private static int countAddedLines(String fileDiff) {

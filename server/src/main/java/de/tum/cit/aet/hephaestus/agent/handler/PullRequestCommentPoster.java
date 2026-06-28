@@ -382,6 +382,10 @@ class PullRequestCommentPoster {
         return new FeedbackTarget(ref, subjectExternalId, resourceUrl);
     }
 
+    // The dedup marker that actually lands is the one formatComment embeds in the comment BODY
+    // (SUMMARY_MARKER_PREFIX). The FeedbackContent.marker() component passed below is NOT read by any
+    // summary channel today (GithubFeedbackChannel / GitlabFeedbackChannel use only content.body()); it is
+    // populated for parity so a future channel that wants out-of-band marker dedup has it available.
     private static String summaryMarkerFor(AgentJob job) {
         return SUMMARY_MARKER_PREFIX + job.getId() + " -->";
     }
@@ -491,10 +495,12 @@ class PullRequestCommentPoster {
         // Collapsible review body (cap summary to prevent total comment exceeding provider limits)
         String summaryText;
         if (sanitizedSummary != null && !sanitizedSummary.isBlank()) {
+            // sanitize() preserves newlines, but summaryText is embedded in the single-line <summary> element;
+            // collapse newlines to spaces first so a multi-line agent summary cannot break out of the header
+            // (everything after the first \n would otherwise render outside the collapsible block).
+            String oneLine = sanitizedSummary.replace('\n', ' ').strip();
             summaryText =
-                sanitizedSummary.length() > MAX_SUMMARY_LENGTH
-                    ? sanitizedSummary.substring(0, MAX_SUMMARY_LENGTH) + "…"
-                    : sanitizedSummary;
+                oneLine.length() > MAX_SUMMARY_LENGTH ? oneLine.substring(0, MAX_SUMMARY_LENGTH) + "…" : oneLine;
         } else {
             summaryText = "Review details";
         }

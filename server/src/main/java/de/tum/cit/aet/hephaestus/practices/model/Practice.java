@@ -33,9 +33,9 @@ import tools.jackson.databind.JsonNode;
 /**
  * Workspace-scoped practice definition for evaluating developer contributions.
  *
- * <p>A practice represents a specific coding or process standard that can be
- * detected in a {@link WorkArtifact} (a pull request or an issue today). Each practice
- * belongs to a workspace and is identified by a unique slug within that workspace.
+ * <p>A practice represents a specific coding or process standard that can be detected on a work
+ * artifact (a pull request or an issue today), routed by its {@link WorkArtifact} discriminator. Each
+ * practice belongs to a workspace and is identified by a unique slug within that workspace.
  *
  * <p>The {@link #triggerEvents} field (JSONB) specifies which domain events
  * should trigger detection for this practice (e.g., PullRequestCreated, ReviewSubmitted).
@@ -163,6 +163,11 @@ public class Practice {
      * has no legal {@code (PRESENT, GOOD)} clean-bill-of-health observation (a clean surface is NOT_APPLICABLE, never
      * a strength to endorse). The detection and delivery layers coerce/suppress accordingly; keeping the rule
      * here keeps it in one place.
+     *
+     * <p>{@code DEFECT-DETECTOR DISCIPLINE} is a LOAD-BEARING marker token, matched verbatim. An admin who edits
+     * a defect-detector's {@link #criteria} must preserve it exactly — dropping or reformatting it (lowercasing,
+     * hyphen→space, wrapping the token across a line) silently flips the practice into an ordinary one and
+     * re-enables the false {@code (PRESENT, GOOD)} strength this firewall exists to block.
      */
     public boolean isDefectDetector() {
         return criteria != null && criteria.contains("DEFECT-DETECTOR DISCIPLINE");

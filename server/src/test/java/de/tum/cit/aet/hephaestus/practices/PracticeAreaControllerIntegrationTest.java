@@ -327,6 +327,144 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         }
     }
 
+    // FUNCTIONAL — conflict / not-found / validation paths an admin can hit
+
+    @Nested
+    @DisplayName("functional admin paths (conflict / not-found / validation / tenancy)")
+    class FunctionalAdminPaths {
+
+        @Test
+        @WithAdminUser
+        @DisplayName("POST a duplicate slug returns 409")
+        void createDuplicateSlugConflicts() {
+            ensureAdminMembership(workspace);
+            persistArea("dup", "Existing");
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validCreateRequest("dup"))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("GET an unknown slug returns 404")
+        void getUnknownSlugNotFound() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("PATCH an unknown slug returns 404")
+        void patchUnknownSlugNotFound() {
+            ensureAdminMembership(workspace);
+            var request = new UpdatePracticeAreaRequestDTO("New Name", null, null, null, null, null);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isNotFound();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("DELETE an unknown slug returns 404")
+        void deleteUnknownSlugNotFound() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .delete()
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "does-not-exist")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("PATCH /reorder with a duplicate slug returns 400")
+        void reorderDuplicateSlugIsBadRequest() {
+            ensureAdminMembership(workspace);
+            persistArea("only", "Only");
+
+            var request = new ReorderPracticeAreasRequestDTO(List.of("only", "only"));
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("PATCH /reorder with an unknown slug returns 404")
+        void reorderUnknownSlugNotFound() {
+            ensureAdminMembership(workspace);
+            persistArea("known", "Known");
+
+            var request = new ReorderPracticeAreasRequestDTO(List.of("known", "ghost"));
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/reorder", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isNotFound();
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("an area in another workspace is not readable via this workspace's slug (tenancy 404)")
+        void crossWorkspaceAreaIsNotLeaked() {
+            ensureAdminMembership(workspace);
+
+            // Persist an area that belongs ONLY to a second workspace.
+            User otherOwner = persistUser("other-owner");
+            Workspace other = createWorkspace("other-ws", "Other WS", "other-org", AccountType.ORG, otherOwner);
+            PracticeArea foreign = new PracticeArea();
+            foreign.setWorkspace(other);
+            foreign.setSlug("foreign-area");
+            foreign.setName("Foreign");
+            areaRepository.save(foreign);
+
+            // Reading it through THIS workspace's slug must 404 — it is scoped to the other workspace.
+            webTestClient
+                .get()
+                .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "foreign-area")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
+        }
+    }
+
     // DELETE — @RequireAtLeastWorkspaceAdmin
 
     @Nested

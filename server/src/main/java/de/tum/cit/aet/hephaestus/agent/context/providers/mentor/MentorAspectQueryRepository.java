@@ -79,7 +79,8 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
                 JOIN RepositoryToMonitor rtmr3 ON rtmr3.nameWithOwner = r3.pullRequest.repository.nameWithOwner
                 WHERE r3.pullRequest.author.id = :userId
                   AND rtmr3.workspace.id = :workspaceId
-                  AND r3.submittedAt > :weekAgo), 0L),
+                  AND r3.submittedAt > :weekAgo
+                  AND r3.submittedAt <= :now), 0L),
             COALESCE((SELECT COUNT(prr)
                 FROM PullRequest prr
                 JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = prr.repository.nameWithOwner
@@ -173,6 +174,10 @@ public interface MentorAspectQueryRepository extends JpaRepository<User, Long> {
      * String the caller parses with {@code readTree}. Selecting the raw {@code jsonb} into an untyped
      * {@code Object[]} made Hibernate apply its JSON Java-type and throw "JSON deserialize failed for String
      * … from Array" — which silently degraded the whole prior-conversation aspect to empty.
+     *
+     * <p><b>Precondition:</b> {@code threadIds} MUST be non-empty. The native {@code IN (:threadIds)}
+     * expands to invalid {@code IN ()} SQL (a Postgres syntax error) for an empty list, so callers must
+     * short-circuit beforehand (as {@code WorkspaceAspectProvider.loadFirstUserMessages} does).
      */
     @Query(
         value = """

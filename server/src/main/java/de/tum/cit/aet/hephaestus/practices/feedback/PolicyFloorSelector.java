@@ -41,7 +41,7 @@ public final class PolicyFloorSelector {
             return new Partition(kept, dropped);
         }
         nonBlocking.sort(
-            Comparator.comparingInt((Observation f) -> f.getSeverity().ordinal())
+            Comparator.comparingInt(PolicyFloorSelector::severityRank)
                 .thenComparing(Comparator.comparing(PolicyFloorSelector::confidence).reversed())
                 .thenComparing(f -> f.getId().toString())
         );
@@ -52,7 +52,14 @@ public final class PolicyFloorSelector {
     }
 
     private static boolean isBlocking(Severity s) {
+        // A null severity (an uncoerced BAD observation) is treated as non-blocking and sorted last,
+        // mirroring ObservationService's null-last ranking — never NPE on the volume-cap path.
         return s == Severity.CRITICAL || s == Severity.MAJOR;
+    }
+
+    /** Severity ordinal with null sorted last (most-severe = lowest ordinal first). */
+    private static int severityRank(Observation f) {
+        return f.getSeverity() == null ? Severity.values().length : f.getSeverity().ordinal();
     }
 
     private static float confidence(Observation f) {

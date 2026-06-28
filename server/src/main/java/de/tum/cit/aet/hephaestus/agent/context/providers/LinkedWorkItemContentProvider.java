@@ -81,13 +81,16 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
     );
 
     /**
-     * Bare {@code #N} mention. Group 1 captures the issue number. A trailing boundary
-     * {@code (?![\w.])} rejects false positives that look like {@code #N} but are not issue refs:
-     * a hex colour ({@code #1a2b}), a version ({@code #1.2}), or a unit ({@code #42px}). The DB
-     * lookup is only a partial safety net here because low numbers (#1–#9) usually DO resolve to a
-     * real issue row, so the wrong work-item would otherwise be materialised.
+     * Bare {@code #N} mention. Group 1 captures the issue number. The trailing boundary
+     * {@code (?![\w]|\.[0-9])} rejects false positives that look like {@code #N} but are not issue
+     * refs: a hex colour ({@code #1a2b}), a unit ({@code #42px}), or a version ({@code #1.2}, where the
+     * {@code .} is followed by another digit). It deliberately does NOT reject a trailing sentence
+     * period — {@code "relates to #42."} is a legitimate bare mention — by only vetoing {@code .}
+     * when a digit follows. The DB lookup is only a partial safety net here because low numbers
+     * (#1–#9) usually DO resolve to a real issue row, so the wrong work-item would otherwise be
+     * materialised.
      */
-    private static final Pattern BARE_REF = Pattern.compile("#(\\d+)(?![\\w.])");
+    private static final Pattern BARE_REF = Pattern.compile("#(\\d+)(?![\\w]|\\.[0-9])");
 
     /**
      * Issue id embedded at the start of a branch-slug segment, e.g. {@code 18-foo} or the
@@ -160,7 +163,7 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
 
             collectFromText(body, refs, "body");
             collectFromBranch(sourceBranch, refs);
-            collectFromCommits(m, repositoryId, refs);
+            collectFromCommits(m, repositoryId, sourceBranch, refs);
 
             if (refs.isEmpty()) {
                 return;
@@ -226,7 +229,18 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
         String issueBody = issue.getBody();
         if (issueBody != null && !issueBody.isBlank()) {
             String trimmed = issueBody.strip();
-            String excerpt = trimmed.length() > EXCERPT_CHARS ? trimmed.substring(0, EXCERPT_CHARS) : trimmed;
+            String excerpt;
+            if (trimmed.length() > EXCERPT_CHARS) {
+                // Don't split a UTF-16 surrogate pair: if the cut boundary lands on a high surrogate, back off
+                // one char so we never leave a lone surrogate that JSON UTF-8 encoding mangles to a replacement.
+                int end = EXCERPT_CHARS;
+                if (Character.isHighSurrogate(trimmed.charAt(end - 1))) {
+                    end--;
+                }
+                excerpt = trimmed.substring(0, end);
+            } else {
+                excerpt = trimmed;
+            }
             node.put("bodyExcerpt", excerpt);
         }
 
@@ -291,14 +305,16 @@ public class LinkedWorkItemContentProvider implements ContentProvider {
         }
     }
 
-    private void collectFromCommits(JsonNode metadata, long repositoryId, Refs refs) {
+    private void collectFromCommits(JsonNode metadata, long repositoryId, String sourceBranch, Refs refs) {
         if (!gitRepositoryManager.isEnabled() || !gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             return;
         }
-        String sourceBranch = MetaJson.optString(metadata, "source_branch");
+        // sourceBranch is the already-resolved head ref (metadata first, PR-row headRefName fallback) so the
+        // commit-subject scan and the branch scan agree on the branch name. target_branch / commit_sha stay
+        // metadata-only — they have no DB fallback here.
         String targetBranch = MetaJson.optString(metadata, "target_branch");
         String headSha = MetaJson.optString(metadata, "commit_sha");
-        if (sourceBranch == null || targetBranch == null || headSha == null) {
+        if (sourceBranch == null || sourceBranch.isBlank() || targetBranch == null || headSha == null) {
             return;
         }
 

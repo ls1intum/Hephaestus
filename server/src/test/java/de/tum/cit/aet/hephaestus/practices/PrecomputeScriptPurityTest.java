@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,8 +27,10 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
     );
 
     // The sign-neutral observation vocabulary (ADR 0021, F-6). A precompute script produces hints, never
-    // observations, so it must launder none of these.
-    private static final List<String> OBSERVATION_TOKENS = List.of("OBSERVED", "NOT_OBSERVED", "NOT_APPLICABLE");
+    // observations, so it must launder none of these. We match on word boundaries (\b) so the reported token
+    // is accurate: a plain substring check would report "OBSERVED" for a "NOT_OBSERVED" leak, because
+    // "OBSERVED" is a substring of "NOT_OBSERVED".
+    private static final List<String> OBSERVATION_TOKENS = List.of("NOT_OBSERVED", "NOT_APPLICABLE", "OBSERVED");
 
     @Test
     @DisplayName("no precompute script emits an observation token outside its header comments")
@@ -36,18 +39,24 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
             for (String line : Files.readAllLines(script, StandardCharsets.UTF_8)) {
                 String trimmed = line.strip();
                 // Header comments legitimately state the "facts not observations" contract — skip them.
+                // Note: this exempts full-line comments only (lines starting with // * /*); a trailing inline
+                // comment is deliberately NOT exempt, so even a commented-out observation token in code is
+                // flagged — a conservative stance that keeps the firewall structural.
                 if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) {
                     continue;
                 }
                 for (String token : OBSERVATION_TOKENS) {
-                    assertThat(line)
+                    // \b would treat the leading "_" / "." as a boundary, so anchor on the surrounding chars
+                    // explicitly: the token must not be flanked by another identifier character.
+                    boolean leaks = Pattern.compile("(?<![A-Z_])" + token + "(?![A-Z_])").matcher(line).find();
+                    assertThat(leaks)
                         .as(
                             "%s emits the observation token '%s' in code/directions — precompute surfaces facts, " +
                                 "the LLM decides the observation",
                             script.getFileName(),
                             token
                         )
-                        .doesNotContain(token);
+                        .isFalse();
                 }
             }
         }

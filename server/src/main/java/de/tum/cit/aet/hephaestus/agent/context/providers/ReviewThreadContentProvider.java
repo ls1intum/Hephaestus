@@ -178,6 +178,16 @@ public class ReviewThreadContentProvider implements ContentProvider {
                     if (review == null || review.getState() == null) {
                         continue;
                     }
+                    // A PENDING review is an unsubmitted draft ("only visible to the author" per GitHub) with no
+                    // submittedAt — never a real reviewer decision. UNKNOWN is the unmapped fallback. Emitting
+                    // either would fabricate a "CHANGES_REQUESTED was outstanding" style signal the supersession
+                    // lesson keys on, so only genuinely-submitted decisions reach the agent.
+                    if (
+                        review.getState() == PullRequestReview.State.PENDING ||
+                        review.getState() == PullRequestReview.State.UNKNOWN
+                    ) {
+                        continue;
+                    }
                     if (emitted >= MAX_DECISIONS) {
                         break;
                     }
@@ -209,9 +219,12 @@ public class ReviewThreadContentProvider implements ContentProvider {
      * Marker embedded in every Hephaestus practice-review note ({@code <!-- hephaestus-diff-note -->},
      * {@code <!-- hephaestus:practice-review:… -->}). A human reviewer never writes it, so a thread that
      * carries it is the tool's own posted finding, never a reviewer thread. The {@code rootComment} FK is
-     * not populated by the sync, so we scan the thread's comment set (the marker is the reliable signal —
-     * the mirror's Hephaestus identity is a {@code group_*_bot_*} access-token login indistinguishable
-     * from a human reviewer's by login alone).
+     * not populated by the sync, so we scan the thread's comment set for the marker.
+     *
+     * <p>The marker is the ONLY signal used: the mirror's Hephaestus identity is an opaque
+     * {@code group_*_bot_*} access-token login indistinguishable from a human's by login alone, so a
+     * login substring match would silently drop a genuine reviewer thread from anyone whose login happens
+     * to contain "hephaestus" (e.g. a fork named {@code hephaestus-fan}) — masking a real review signal.
      */
     private static final String HEPHAESTUS_MARKER = "<!-- hephaestus";
 
@@ -226,10 +239,6 @@ public class ReviewThreadContentProvider implements ContentProvider {
             }
             String body = c.getBody();
             if (body != null && body.contains(HEPHAESTUS_MARKER)) {
-                return true;
-            }
-            String login = login(c.getAuthor());
-            if (login != null && login.toLowerCase(java.util.Locale.ROOT).contains("hephaestus")) {
                 return true;
             }
         }

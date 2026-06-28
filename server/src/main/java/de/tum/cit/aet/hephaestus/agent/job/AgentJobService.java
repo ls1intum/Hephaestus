@@ -265,8 +265,8 @@ public class AgentJobService {
                 return existing.get();
             }
 
-            // Cooldown check — prevent rapid re-triggering for the same PR/config.
-            // Strips the commit-SHA segment from the idempotency key to match any SHA.
+            // Cooldown check — prevent rapid re-triggering for the same (PR, phase)/config.
+            // Strips the trailing freshness segment (commit SHA / updatedAt) to match any freshness.
             int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(reviewProperties.cooldownMinutes());
             if (cooldown > 0) {
                 String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
@@ -350,11 +350,17 @@ public class AgentJobService {
     // Retry delivery
 
     /**
-     * Retry delivery for a completed agent job whose delivery failed or was never attempted.
+     * Retry delivery for a completed agent job whose delivery previously FAILED.
      *
-     * <p>Validates the job is COMPLETED and delivery is FAILED or PENDING, then re-runs
-     * the handler's deliver() method. This is the same delivery path used by
-     * {@link AgentJobExecutor#completeJob} after sandbox execution.
+     * <p>Atomically CASes delivery {@code FAILED → PENDING} then re-runs the handler's {@code deliver()}
+     * method — the same delivery path used by {@link AgentJobExecutor} after sandbox execution. Only
+     * {@code FAILED} is accepted as the CAS source: admitting {@code PENDING} would let two concurrent
+     * retries both succeed (a {@code PENDING → PENDING} no-op returns {@code updated=1}).
+     *
+     * <p><strong>PENDING is therefore not recoverable through this API.</strong> A job stuck in
+     * {@code PENDING} (executor crashed between marking PENDING and finishing delivery, or this method
+     * crashed after the {@code FAILED → PENDING} CAS committed) requires operator intervention to demote
+     * it back to {@code FAILED} before it can be retried here.
      *
      * @param workspaceId workspace ID
      * @param jobId       job UUID
@@ -506,13 +512,15 @@ public class AgentJobService {
     // Cooldown helpers
 
     /**
-     * Extract the PR-scoped prefix from an idempotency key by stripping the commit-SHA segment.
-     * Input: {@code "pr_review:owner/repo:42:abc123"} → Output: {@code "pr_review:owner/repo:42:"}
-     * This allows LIKE-matching against any SHA for the same PR.
+     * Extract the (PR, phase)-scoped prefix from an idempotency key by stripping the trailing freshness
+     * segment (the commit SHA for PRs, the updatedAt version for issues).
+     * Input: {@code "pr_review:owner/repo:42:authoring:abc123"} → Output: {@code "pr_review:owner/repo:42:authoring:"}
+     * This allows LIKE-matching against any freshness for the same (PR, phase).
      */
     static String extractCooldownKeyPrefix(String idempotencyKey) {
-        // The key format is "pr_review:{nameWithOwner}:{prNumber}:{sha}"
-        // We want everything up to and including the last ':' before the SHA.
+        // The key format is "<type>:{nameWithOwner}:{number}:{phase}:{freshness}" — only the trailing
+        // freshness segment is stripped, so the (number, phase) scope is preserved.
+        // We want everything up to and including the last ':' before the freshness.
         int lastColon = idempotencyKey.lastIndexOf(':');
         if (lastColon > 0) {
             return idempotencyKey.substring(0, lastColon + 1);

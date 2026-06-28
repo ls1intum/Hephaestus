@@ -270,14 +270,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Recent findings for a developer within a workspace since a cutoff, newest first.
-     *
-     * <p>Used by the mentor's {@code findings_history.json} aspect: the agent needs to see
-     * what specific findings have been delivered to the developer lately so it can refer
-     * to them by title in the conversation. Bounded by {@code limit} at the caller so the
-     * page size stays a JPA concern.
-     */
-    /**
      * Recent findings the mentor can refer to by title in conversation.
      *
      * <p>Re-review deduped (same grain as {@link #findSummaryByDeveloperAndWorkspace}): keeps only each

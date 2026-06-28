@@ -63,7 +63,36 @@ class ObservationFingerprintTest extends BaseUnitTest {
             .as("leading/trailing whitespace + upper-case folds to the same key")
             .isEqualTo(canonical);
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift\t"))
-            .as("internal/trailing whitespace collapses to the same key")
+            .as("trailing whitespace folds to the same key")
+            .isEqualTo(canonical);
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/  foo.swift"))
+            .as("internal whitespace collapses (the replaceAll(\\s+,' ') branch) to the same key")
+            .isEqualTo(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/ foo.swift"));
+    }
+
+    @Test
+    @DisplayName("adjacent fields cannot bleed: a shifted boundary between them yields a different key")
+    void fieldBoundariesAreSeparated() {
+        // The SEP separator is the invariant that stops adjacent fields from concatenating ambiguously.
+        // Were it dropped, these pairs (which differ ONLY in where the boundary falls) would collide and
+        // silently re-identify distinct findings. Lock that the separator keeps them apart.
+        assertThat(ObservationFingerprint.compute("a-b", "PR", 1L, 1L, "F"))
+            .as("slug 'a-b' + type 'PR' must not collide with slug 'a' + type 'b-PR'")
+            .isNotEqualTo(ObservationFingerprint.compute("a", "b-PR", 1L, 1L, "F"));
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 1L, 23L, "F"))
+            .as("artifactId 1 + aboutUserId 23 must not collide with artifactId 12 + aboutUserId 3")
+            .isNotEqualTo(ObservationFingerprint.compute(SLUG, TYPE, 12L, 3L, "F"));
+    }
+
+    @Test
+    @DisplayName("an embedded separator/control byte in the path cannot split or collapse identity")
+    void controlCharsInPathAreStripped() {
+        // The path is the only LLM-influenced field; stripping control chars (incl. the SEP byte 0x1F)
+        // removes the lone canonicalization ambiguity — two paths differing only by an embedded 0x1F
+        // must canonicalize to one locus rather than two distinct recurrence keys.
+        String canonical = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift");
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift"))
+            .as("an embedded unit-separator byte is stripped, not preserved")
             .isEqualTo(canonical);
     }
 

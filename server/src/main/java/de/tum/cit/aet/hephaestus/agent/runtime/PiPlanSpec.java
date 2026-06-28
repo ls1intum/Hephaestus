@@ -47,6 +47,13 @@ public record PiPlanSpec(
                 if (jobToken == null || jobToken.isBlank()) {
                     throw new IllegalArgumentException("jobToken is required in PROXY mode");
                 }
+                // PROXY resolves its base URL from the sandbox-injected $LLM_PROXY_URL, so a baseUrl here would
+                // be silently shadowed. Fail fast on the documented trap rather than accepting dead config.
+                if (baseUrl != null && !baseUrl.isBlank()) {
+                    throw new IllegalArgumentException(
+                        "baseUrl is ignored in PROXY mode (proxy resolves $LLM_PROXY_URL); pass it only in API_KEY mode"
+                    );
+                }
             }
             case API_KEY -> {
                 if (credential == null || credential.isBlank()) {
@@ -54,7 +61,18 @@ public record PiPlanSpec(
                 }
             }
         }
-        extraInputs = extraInputs != null ? Map.copyOf(extraInputs) : Map.of();
+        // Map.copyOf freezes the MAP, but byte[] values stay caller-mutable shared references — a caller could
+        // mutate file contents after validation passed. Clone each value too so the record is genuinely
+        // immutable (the keySet allowlist check below then runs over the defensive copy).
+        extraInputs =
+            extraInputs != null
+                ? extraInputs
+                      .entrySet()
+                      .stream()
+                      .collect(
+                          java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().clone())
+                      )
+                : Map.of();
         for (String path : extraInputs.keySet()) {
             boolean ok =
                 WorkspaceAbi.allowedExtraInputPaths().contains(path) ||

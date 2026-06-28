@@ -513,7 +513,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                // Set max to 500 bytes — README.md (~19 bytes) should fit, large.txt (1000 bytes) may not
+                // Set max to 500 bytes — README.md (18 bytes) fits, large.txt (1000 bytes) is over the limit.
                 Map<String, byte[]> files = manager.readFilesAtCommit(1L, sha, 500);
                 long totalSize = files
                     .values()
@@ -521,6 +521,10 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                     .mapToLong(b -> b.length)
                     .sum();
                 assertThat(totalSize).isLessThanOrEqualTo(500);
+                // Prove the byte-limit branch actually collected the small file and skipped the over-limit one,
+                // so the bound is not satisfied vacuously by an empty result.
+                assertThat(files).containsKey("README.md");
+                assertThat(files).doesNotContainKey("large.txt");
             }
         }
 

@@ -235,7 +235,12 @@ public class MentorTurnPersistence {
         usageNode.put("output", usage.outputTokens());
         usageNode.put("cacheRead", usage.cacheReadTokens());
         usageNode.put("cacheWrite", usage.cacheWriteTokens());
-        long totalTokens = usage.inputTokens() + usage.outputTokens();
+        // totalTokens: honour the provider-reported value carried on the wire Finish when present (it may
+        // include cache tokens and so legitimately differ from input+output) — single source of truth,
+        // mirroring how costUsd is reused below. Only when the wire carries no total do we derive
+        // input+output as a fallback.
+        Long wireTotalTokens = wireTotalTokens(finish);
+        long totalTokens = wireTotalTokens != null ? wireTotalTokens : usage.inputTokens() + usage.outputTokens();
         if (totalTokens > 0) {
             usageNode.put("totalTokens", totalTokens);
         }
@@ -296,6 +301,15 @@ public class MentorTurnPersistence {
         if (sessionBytes != null) {
             chatThreadRepository.updateSessionJsonl(cookie.threadId(), sessionBytes);
         }
+    }
+
+    /** The provider-reported {@code totalTokens} carried on the wire Finish, or {@code null} when absent. */
+    @Nullable
+    private static Long wireTotalTokens(UIMessageChunk.Finish finish) {
+        UIMessageChunk.MessageMetadata meta = finish.messageMetadata();
+        UIMessageChunk.MessageMetadata.Usage usage = meta != null ? meta.usage() : null;
+        Integer total = usage != null ? usage.totalTokens() : null;
+        return total != null ? total.longValue() : null;
     }
 
     private static ObjectNode newOrCopyMeta(ChatMessage message) {

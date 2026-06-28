@@ -90,9 +90,6 @@ public class FeedbackPlacement {
     private PlacementType placementType;
 
     // --- Diff anchor coordinates (all nullable: only INLINE placements anchor to a diff) ---
-    // These are an append-only forensic/research record: nothing currently READS the anchor coordinates back
-    // (only placementType + postedCommentRef are read on the reconcile path). Do not assume reconciliation
-    // consumes them.
 
     /** Granularity of the anchor (LINE / RANGE / FILE / IMAGE). Null for non-inline placements. */
     @Enumerated(EnumType.STRING)
@@ -111,7 +108,11 @@ public class FeedbackPlacement {
     @Column(name = "anchor_end_line")
     private Integer anchorEndLine;
 
-    /** Diff side of the anchor end / single line (OLD or NEW). */
+    /**
+     * Diff side of the anchor end / single line (OLD or NEW). Today every writer emits {@code NEW}
+     * (head side), so this is not yet a real OLD/NEW discriminator — the column is kept for future
+     * reviewer-side / binary anchors.
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "anchor_side", length = 8)
     private PlacementAnchorSide anchorSide;

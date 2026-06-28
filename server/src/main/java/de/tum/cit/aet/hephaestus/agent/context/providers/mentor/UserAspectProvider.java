@@ -24,9 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/user.json} for {@link MentorChatRequest}.
  *
- * <p>Replaces the legacy intelligence-service {@code activity-summary} tool: same
- * fields, same heuristics for {@code insights} and {@code suggestedReflectionTopics}. The
- * provider does NOT decide whether a piece of data is relevant — the agent does, given the
+ * <p>The provider does NOT decide whether a piece of data is relevant — the agent does, given the
  * full week/last-week numbers and a small set of pre-generated insight strings.
  *
  * <p>Cache key: {@code workspaceId + ":" + developerId} (1-D as specified by the plan; the
@@ -82,6 +80,9 @@ public class UserAspectProvider implements ContentProvider {
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
+            // An ObjectNode of longs/strings is effectively always serializable, so this is defensive only.
+            // Note: because required()==false, WorkspaceContextBuilder catches this and logs-and-continues
+            // rather than aborting the turn — it does NOT hard-fail the job despite the throw shape here.
             throw new IllegalStateException("Failed to serialize user aspect", e);
         }
     }
@@ -144,8 +145,7 @@ public class UserAspectProvider implements ContentProvider {
     }
 
     /**
-     * Pure function turning the raw counts into a small set of hand-crafted nudges. Mirrors
-     * {@code generateActivityInsights} in {@code activity-summary.tool.ts}. Heuristics live
+     * Pure function turning the raw counts into a small set of hand-crafted nudges. Heuristics live
      * here (not in the agent) so the wire payload is identical across deployments.
      */
     static ActivityInsights generateInsights(

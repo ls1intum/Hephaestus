@@ -183,6 +183,12 @@ public class PracticeDetectionDeliveryService {
                     .orElse(null)
             );
 
+            // Self-enforce the ADR-0022 invariant that Observation.@PrePersist applies but the native
+            // insertIfAbsent path bypasses: severity is an impact band for a BAD observation only, so it
+            // must be null unless the assessment is BAD. Idempotent for an already-coerced finding.
+            String severityName =
+                finding.assessment() == Assessment.BAD && finding.severity() != null ? finding.severity().name() : null;
+
             int rows = observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 idempotencyKey,
@@ -195,7 +201,7 @@ public class PracticeDetectionDeliveryService {
                 finding.title(),
                 finding.presence().name(),
                 finding.assessment() == null ? null : finding.assessment().name(),
-                finding.severity() == null ? null : finding.severity().name(),
+                severityName,
                 finding.confidence(),
                 evidenceJson,
                 finding.reasoning(),

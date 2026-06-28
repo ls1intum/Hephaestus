@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
@@ -329,12 +330,21 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
+        // Raw two-ref diff for the PR range — computed ONCE here and threaded through every consumer
+        // (the secret pre-pass, the M1 grounding guard, and the line-position validator) so deliver()
+        // opens the JGit repo + resolves the diff range a single time per job instead of re-materialising
+        // the full unified diff for each use. Null when the diff is unavailable.
+        String unifiedDiff = computeUnifiedDiff(job);
+        // File set from the same range, also computed once and reused by both the stale-diff guard and
+        // the diff-scope filter below.
+        Set<String> diffFiles = computeDiffStatFiles(job);
+
         // Deterministic, LLM-independent secret pre-pass over the raw diff. This catches a committed
         // credential even when the model abstains, the precompute crashes, or the clone is checked
         // out at the merge base (so a working-tree grep finds nothing). The synthetic PRESENT/BAD
         // findings flow through the normal persist+compose+deliver path and force the green→red flip.
         List<PracticeDetectionResultParser.ValidatedFinding> secretFindings = scanForSecrets(
-            job,
+            unifiedDiff,
             parsed.validFindings()
         );
 
@@ -343,7 +353,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             .stream()
             .allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
         if (allNotApplicable && secretFindings.isEmpty()) {
-            Set<String> diffFiles = computeDiffStatFiles(job);
             boolean hasDiffContent = !diffFiles.isEmpty();
             if (hasDiffContent) {
                 throw new JobDeliveryException(
@@ -356,7 +365,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
 
-        Set<String> diffFiles = computeDiffStatFiles(job);
         var scopedFindings = new ArrayList<>(filterByDiffScope(parsed.validFindings(), diffFiles));
         if (scopedFindings.size() < parsed.validFindings().size()) {
             log.info(
@@ -444,13 +452,29 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             return;
         }
 
+        // Silent-clean-on-stale-diff signal: the NOT_APPLICABLE guard above only fires when EVERY finding
+        // is NA. A weak model that instead reads a stale/empty diff as "all clean" — emitting only
+        // ABSENT/GOOD strengths (no BAD) — slips past that guard and composes an all-clear over an artifact
+        // that was effectively never diffed. We do NOT throw (a genuinely clean PR over a non-empty diff is
+        // legitimate strengths-only), but a strengths-only delivery while diffFiles is EMPTY is the stale-diff
+        // fingerprint — surface it so the case is observable rather than silent.
+        boolean hasGap = deliverable.stream().anyMatch(f -> f.assessment() == Assessment.BAD);
+        if (!hasGap && diffFiles.isEmpty()) {
+            log.warn(
+                "Composing a strengths-only delivery over an EMPTY diff ({} finding(s), no BAD): the diff may " +
+                    "be stale/unavailable, so this all-clear is not grounded in changed code. jobId={}",
+                deliverable.size(),
+                job.getId()
+            );
+        }
+
         Map<String, String> whyBySlug =
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
-        // Raw two-ref diff: the substrate for BOTH the M1 grounding guard (drop a hallucinated inline anchor
-        // before it lands on a student) and the downstream line-position validator. Computed once here.
-        String unifiedDiff = computeUnifiedDiff(job);
+        // unifiedDiff (computed once at the top of deliver()) is the substrate for BOTH the M1 grounding
+        // guard (drop a hallucinated inline anchor before it lands on a student) and the downstream
+        // line-position validator below.
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
             WorkArtifact.PULL_REQUEST,
@@ -492,10 +516,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * hardcoded-secrets finding (same matched token already quoted) are skipped to avoid double-posting.
      */
     private List<PracticeDetectionResultParser.ValidatedFinding> scanForSecrets(
-        AgentJob job,
+        @Nullable String diff,
         List<PracticeDetectionResultParser.ValidatedFinding> existing
     ) {
-        String diff = computeUnifiedDiff(job);
         List<SecretDiffScanner.SecretHit> hits = secretDiffScanner.scan(diff);
         if (hits.isEmpty()) return List.of();
 

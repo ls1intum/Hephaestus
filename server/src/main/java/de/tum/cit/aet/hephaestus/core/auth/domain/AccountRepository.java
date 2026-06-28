@@ -66,6 +66,14 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      * {@code APP_ADMIN} exists — so it self-disables the instant a real admin appears (the
      * {@code NOT EXISTS} is the gate). Returns the number of rows updated: {@code 1} on success,
      * {@code 0} if an admin already exists or the account is already {@code APP_ADMIN}.
+     *
+     * <p><b>Concurrency:</b> the single statement removes the read-modify-write count TOCTOU within a
+     * node, but under READ COMMITTED the {@code NOT EXISTS} subquery takes no predicate lock on the
+     * (empty) admin set, so two concurrent break-glass calls promoting DIFFERENT accounts can both see
+     * {@code NOT EXISTS} as true and each promote one — yielding two simultaneous first-admins. That is
+     * acceptable for this one-time operator-gated path (the demotion guard at
+     * {@link #findByAppRoleAndStatusForUpdate} still serialises with {@code FOR UPDATE}); it is NOT a
+     * hard single-winner gate.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(

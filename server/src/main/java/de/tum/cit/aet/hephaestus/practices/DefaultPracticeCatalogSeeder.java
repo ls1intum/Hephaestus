@@ -77,7 +77,14 @@ class DefaultPracticeCatalogSeeder {
     }
 
     private void seedCatalog() {
-        Workspace workspace = workspaceRepository.findAll().stream().findFirst().orElse(null);
+        // Deterministic target: the lowest-id workspace. findAll() has no ORDER BY, so without this sort the
+        // seeded workspace would be whatever row Postgres returned first — arbitrary and inconsistent across
+        // restarts when multiple workspaces exist (the startup listener bootstraps several).
+        Workspace workspace = workspaceRepository
+            .findAll()
+            .stream()
+            .min(java.util.Comparator.comparing(Workspace::getId, java.util.Comparator.nullsLast(Long::compareTo)))
+            .orElse(null);
         if (workspace == null) {
             log.warn("Default practice catalog enabled but no workspace exists yet; skipping.");
             return;
@@ -109,23 +116,15 @@ class DefaultPracticeCatalogSeeder {
 
             for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
-                // Resumable seeding: create + bind run in SEPARATE transactions, so a mid-seed failure can
-                // strand a practice that exists but is unbound (area=NULL). A plain exists-then-skip guard
-                // would never re-bind it. Instead, fetch-or-create, then bind only when the area is still
-                // null — so a half-seeded practice self-heals on the next boot, while an admin who has
-                // intentionally bound (or unbound) a practice is never overwritten.
-                var existing = practiceRepository.findByWorkspaceIdAndSlug(ctx.id(), practiceSlug);
-                if (existing.isPresent()) {
-                    if (existing.get().getArea() == null) {
-                        areaService.bindPractice(ctx, practiceSlug, areaSlug);
+                // Per-ROW resilience: one malformed catalog entry (e.g. an unknown artifactType that makes
+                // WorkArtifact.valueOf throw) must skip only that row, not abort the rest of the catalog.
+                try {
+                    if (seedPractice(ctx, catalog, areaSlug, practiceNode, practiceSlug)) {
                         seededPractices++;
                     }
-                    // Otherwise already bound — respect any admin edits and do not overwrite.
-                    continue;
+                } catch (RuntimeException e) {
+                    log.error("Skipping malformed catalog practice '{}': {}", practiceSlug, e.getMessage());
                 }
-                practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));
-                areaService.bindPractice(ctx, practiceSlug, areaSlug);
-                seededPractices++;
             }
         }
         if (seededAreas > 0 || seededPractices > 0) {
@@ -136,6 +135,37 @@ class DefaultPracticeCatalogSeeder {
                 workspace.getId()
             );
         }
+    }
+
+    /**
+     * Seed a single practice row idempotently. Returns {@code true} when it created or (re-)bound a practice,
+     * {@code false} when the practice already existed and was left untouched.
+     *
+     * <p>Resumable seeding: create + bind run in SEPARATE transactions, so a mid-seed failure can strand a
+     * practice that exists but is unbound (area=NULL). A plain exists-then-skip guard would never re-bind it.
+     * Instead, fetch-or-create, then bind only when the area is still null — so a half-seeded practice
+     * self-heals on the next boot, while an admin who has intentionally bound (or unbound) a practice is never
+     * overwritten.
+     */
+    private boolean seedPractice(
+        WorkspaceContext ctx,
+        JsonNode catalog,
+        String areaSlug,
+        JsonNode practiceNode,
+        String practiceSlug
+    ) {
+        var existing = practiceRepository.findByWorkspaceIdAndSlug(ctx.id(), practiceSlug);
+        if (existing.isPresent()) {
+            if (existing.get().getArea() == null) {
+                areaService.bindPractice(ctx, practiceSlug, areaSlug);
+                return true;
+            }
+            // Otherwise already bound — respect any admin edits and do not overwrite.
+            return false;
+        }
+        practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));
+        areaService.bindPractice(ctx, practiceSlug, areaSlug);
+        return true;
     }
 
     private CreatePracticeRequestDTO toCreateRequest(JsonNode catalog, JsonNode practiceNode) {

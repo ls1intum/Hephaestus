@@ -525,10 +525,142 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
         }
 
+        /**
+         * Wire the delivery-phase diff helpers so {@code computeUnifiedDiff} / {@code computeDiffStatFiles}
+         * return a real two-ref diff instead of {@code null}. Without this every existing Deliver test runs
+         * with an empty diff (the secret pre-pass and stale-diff guard are no-ops). {@code diff} carries the
+         * unified body; {@code nameOnly} the changed-file list.
+         */
+        private void stubDiff(String diff, String nameOnly) {
+            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
+            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(java.nio.file.Path.of("/tmp/repo-123"));
+            when(
+                gitDiffOperations.resolveDiffRange(any(), eq("main"), eq("feature/auth-fix"), eq("abc123def456"))
+            ).thenReturn(new String[] { "base", "head" });
+            when(gitDiffOperations.diff(any(), eq("base"), eq("head"))).thenReturn(diff);
+            when(gitDiffOperations.diffNameOnly(any(), eq("base"), eq("head"))).thenReturn(nameOnly);
+        }
+
+        @Test
+        void throwsWhenAllNotApplicableButDiffHasFiles() {
+            // Stale/empty-diff refuse-to-deliver: every finding is NOT_APPLICABLE yet the diff lists changed
+            // files — the agent was handed a stale diff. Refusing here stops a misleading "nothing applies"
+            // post over an artifact that did change.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "pr-description-quality",
+                    "title": "Not applicable here",
+                    "presence": "NOT_APPLICABLE",
+                    "assessment": "GOOD",
+                    "severity": "INFO",
+                    "confidence": 0.9
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            stubDiff(
+                "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n+++ b/Sources/Auth.swift\n@@ -1 +1 @@\n+changed\n",
+                "Sources/Auth.swift\n"
+            );
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("stale/empty diff");
+            verifyNoInteractions(deliveryService);
+        }
+
+        @Test
+        void throwsWhenAllFindingsFilteredByDiffScope() {
+            // The only finding cites a file that is NOT in the diff — the diff-scope filter drops it, leaving
+            // nothing to deliver. That is a refuse-to-deliver, not a silent empty post.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "error-handling",
+                    "title": "Unhandled error path",
+                    "presence": "ABSENT",
+                    "assessment": "BAD",
+                    "severity": "MAJOR",
+                    "confidence": 0.9,
+                    "reasoning": "The error branch is swallowed.",
+                    "guidance": "Surface the error.",
+                    "evidence": { "locations": [{ "path": "Sources/NotInDiff.swift", "startLine": 3 }] }
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            // Diff touches a DIFFERENT file, so the finding's location is out of scope.
+            stubDiff(
+                "diff --git a/Sources/Other.swift b/Sources/Other.swift\n+++ b/Sources/Other.swift\n@@ -1 +1 @@\n+x\n",
+                "Sources/Other.swift\n"
+            );
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("filtered by diff scope");
+            verifyNoInteractions(deliveryService);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void injectsSecretFindingWhenModelAbstainsButDiffCommitsCredential() {
+            // Deterministic secret pre-pass: the model emitted a single benign strength and never flagged the
+            // committed AWS key on the changed line. The handler must INJECT a synthetic hardcoded-secrets
+            // PRESENT/BAD finding so the credential still reaches deliver()/compose() — the green→red flip the
+            // weak model missed.
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "pr-description-quality",
+                    "title": "Clear description",
+                    "presence": "PRESENT",
+                    "assessment": "GOOD",
+                    "severity": "INFO",
+                    "confidence": 0.9
+                  }]
+                }
+                """;
+            AgentJob job = jobWithMetadata(sampleJobMetadata());
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutput);
+            job.setOutput(output);
+            // A committed AWS access key on an added line of a file that is in the diff.
+            stubDiff(
+                "diff --git a/Sources/Config.swift b/Sources/Config.swift\n" +
+                    "+++ b/Sources/Config.swift\n" +
+                    "@@ -1 +1,2 @@\n" +
+                    "+let key = \"AKIA1234567890ABCDEF\"\n",
+                "Sources/Config.swift\n"
+            );
+
+            ArgumentCaptor<List<PracticeDetectionResultParser.ValidatedFinding>> captor = ArgumentCaptor.forClass(
+                List.class
+            );
+            when(deliveryService.deliver(eq(job), captor.capture())).thenReturn(new DeliveryResult(1, 0, 0, false));
+
+            handler.deliver(job);
+
+            List<PracticeDetectionResultParser.ValidatedFinding> delivered = captor.getValue();
+            var secret = delivered
+                .stream()
+                .filter(f -> "hardcoded-secrets".equals(f.practiceSlug()))
+                .findFirst()
+                .orElseThrow();
+            assertThat(secret.presence()).isEqualTo(Presence.PRESENT);
+            assertThat(secret.assessment()).isEqualTo(Assessment.BAD);
+        }
+
         @Test
         @SuppressWarnings("unchecked")
         void stampsDeliveryObservationFingerprintOntoComposedDiffNote() {
-            // A NOT_OBSERVED finding with a code location synthesizes an inline diff note. The key deliver()
+            // An ABSENT/BAD (gap) finding with a code location synthesizes an inline diff note. The key deliver()
             // persisted must be threaded onto that note (not recomputed), so the composed DeliveryContent the
             // handler hands to FeedbackDeliveryService carries it. Fails against a no-op (key would be null).
             String rawOutput = """

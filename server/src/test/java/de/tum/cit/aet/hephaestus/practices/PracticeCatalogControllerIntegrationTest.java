@@ -1406,6 +1406,96 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
+    // TRIGGER-EVENT / FOCUS COMPATIBILITY (validated against the MERGED state)
+
+    @Nested
+    @DisplayName("Trigger events must be compatible with the practice focus")
+    class TriggerFocusCompatibility {
+
+        @Test
+        @WithAdminUser
+        @DisplayName("PATCH artifactType=ISSUE on a PR practice with PR-only triggers → 400 (merged-state check)")
+        void changingFocusToIssueWithStalePrTriggersIsRejected() {
+            // The PR practice keeps its previously-saved PR-only trigger; flipping the focus to ISSUE without
+            // also changing the triggers leaves a config that can never fire. The check reads the MERGED state
+            // (existing triggerEvents + new artifactType) and must reject — this pins that ordering.
+            ensureAdminMembership(workspace);
+            persistPractice("focus-flip", "Focus Flip", true); // saved with PR trigger PullRequestCreated
+
+            var request = new UpdatePracticeRequestDTO(
+                null,
+                null,
+                null,
+                null,
+                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE,
+                null,
+                null
+            );
+
+            ProblemDetail problem = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "focus-flip")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getStatus()).isEqualTo(400);
+            assertThat(problem.getDetail()).contains("PullRequestCreated").contains("not valid for a ISSUE");
+            // The stale PR trigger blocked the focus change — nothing was persisted.
+            assertThat(
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
+                    .orElseThrow()
+                    .getArtifactType()
+            ).isEqualTo(de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.PULL_REQUEST);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("create an ISSUE practice with a PR-only trigger event → 400")
+        void creatingIssuePracticeWithPrTriggerIsRejected() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "issue-with-pr-trigger",
+                "Issue With PR Trigger",
+                List.of("ReviewSubmitted"), // a PR-only event, invalid for an ISSUE focus
+                "Detect something",
+                null,
+                de.tum.cit.aet.hephaestus.practices.model.WorkArtifact.ISSUE,
+                null,
+                null
+            );
+
+            ProblemDetail problem = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getStatus()).isEqualTo(400);
+            assertThat(problem.getDetail()).contains("ReviewSubmitted").contains("not valid for a ISSUE");
+            assertThat(
+                practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "issue-with-pr-trigger")
+            ).isEmpty();
+        }
+    }
+
     // LEARNER ANTI-LEAK PROJECTION
 
     @Nested

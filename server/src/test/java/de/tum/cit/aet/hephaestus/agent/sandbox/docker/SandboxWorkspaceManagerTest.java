@@ -128,10 +128,19 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldRejectOversizedInput() {
-            byte[] largeFile = new byte[(int) (SandboxWorkspaceManager.MAX_INPUT_BYTES + 1)];
+            // Use a tiny input limit (1 KB) to avoid allocating ~50 MB in CI, mirroring the other size tests.
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                SandboxWorkspaceManager.MAX_OUTPUT_BYTES,
+                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
+                1024,
+                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
+            byte[] largeFile = new byte[1025]; // 1 byte over the 1 KB input limit
             Map<String, byte[]> files = Map.of("huge.bin", largeFile);
 
-            assertThatThrownBy(() -> manager.injectFiles(CONTAINER_ID, files))
+            assertThatThrownBy(() -> limitedManager.injectFiles(CONTAINER_ID, files))
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("maximum size limit");
         }

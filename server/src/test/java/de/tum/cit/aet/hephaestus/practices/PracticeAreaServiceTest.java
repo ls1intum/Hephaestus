@@ -84,16 +84,21 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         PracticeArea area = new PracticeArea();
         area.setSlug("g");
         area.setName("Old");
+        area.setDescription("original blurb");
+        area.setColor("slate");
         area.setDisplayOrder(0);
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(area));
         when(practiceAreaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PracticeArea updated = service.updateArea(CTX, "g", new AreaAttributes("New", null, 5, "Eye", "teal"));
+        // null description means "keep", not "clear" (partial-PATCH semantics): supply null for description/color
+        // and assert the supplied fields change while the omitted ones retain their original values.
+        PracticeArea updated = service.updateArea(CTX, "g", new AreaAttributes("New", null, 5, "Eye", null));
 
         assertThat(updated.getName()).isEqualTo("New");
         assertThat(updated.getDisplayOrder()).isEqualTo(5);
         assertThat(updated.getIcon()).isEqualTo("Eye");
-        assertThat(updated.getColor()).isEqualTo("teal");
+        assertThat(updated.getDescription()).isEqualTo("original blurb");
+        assertThat(updated.getColor()).isEqualTo("slate");
     }
 
     @Test
@@ -140,17 +145,18 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         verify(practiceRepository, never()).save(any());
     }
 
+    private static PracticeArea area(String slug) {
+        PracticeArea g = new PracticeArea();
+        g.setSlug(slug);
+        return g;
+    }
+
     @Test
     void reorder_setsDisplayOrderByListIndex() {
-        PracticeArea a = new PracticeArea();
-        a.setSlug("a");
-        PracticeArea b = new PracticeArea();
-        b.setSlug("b");
-        PracticeArea c = new PracticeArea();
-        c.setSlug("c");
-        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "c")).thenReturn(Optional.of(c));
-        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "a")).thenReturn(Optional.of(a));
-        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "b")).thenReturn(Optional.of(b));
+        PracticeArea a = area("a");
+        PracticeArea b = area("b");
+        PracticeArea c = area("c");
+        when(practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L)).thenReturn(List.of(a, b, c));
 
         service.reorder(CTX, List.of("c", "a", "b"));
 
@@ -162,11 +168,14 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
     @Test
     void reorder_unknownSlug_throws() {
-        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "ghost")).thenReturn(Optional.empty());
+        when(practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L)).thenReturn(
+            List.of(area("a"), area("b"))
+        );
 
         assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() ->
-            service.reorder(CTX, List.of("ghost"))
+            service.reorder(CTX, List.of("ghost", "a", "b"))
         );
+        verify(practiceAreaRepository, never()).save(any());
     }
 
     @Test
@@ -174,6 +183,21 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         // A duplicate slug would silently assign two display_order indices to one area — rejected up front.
         assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() ->
             service.reorder(CTX, List.of("a", "a"))
+        );
+        verify(practiceAreaRepository, never()).save(any());
+    }
+
+    @Test
+    void reorder_partialList_rejectsAndWritesNothing() {
+        // The docstring promises a TOTAL ordering. A partial list (2 of 3 areas) would leave the omitted area
+        // at a stale display_order that collides with the reassigned 0..n-1 indices — so an incomplete set is
+        // rejected up front (400) and nothing is written, rather than silently producing a garbled order.
+        when(practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(1L)).thenReturn(
+            List.of(area("a"), area("b"), area("c"))
+        );
+
+        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() ->
+            service.reorder(CTX, List.of("a", "b"))
         );
         verify(practiceAreaRepository, never()).save(any());
     }

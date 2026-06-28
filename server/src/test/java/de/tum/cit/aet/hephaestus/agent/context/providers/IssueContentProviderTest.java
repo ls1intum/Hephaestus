@@ -298,6 +298,45 @@ class IssueContentProviderTest extends BaseUnitTest {
             assertThat(md).contains("## Discussion (1 comments)");
             assertThat(md).contains("**bob** wrote:");
         }
+
+        @Test
+        void rendersNullAuthorAsUnknownInSummary() {
+            // A null-author comment must render as the literal "**unknown** wrote:", never "**null** wrote:".
+            Issue issue = richIssue();
+            issue.setComments(
+                new java.util.LinkedHashSet<>(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))))
+            );
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.contribute(request(sampleMetadata()), files);
+
+            String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
+            assertThat(md).contains("**unknown** wrote:");
+            assertThat(md).doesNotContain("**null** wrote:");
+        }
+
+        @Test
+        void discussionHeaderReflectsTruncatedCount() {
+            // The summary uses the post-truncation list, so its "## Discussion (N comments)" header must
+            // report the capped MAX_COMMENTS, not the pre-truncation total.
+            Issue issue = richIssue();
+            var thread = new java.util.LinkedHashSet<IssueComment>();
+            int overflow = IssueContentProvider.MAX_COMMENTS + 50;
+            Instant base = Instant.parse("2025-01-01T00:00:00Z");
+            for (int i = 0; i < overflow; i++) {
+                thread.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
+            }
+            issue.setComments(thread);
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
+
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            provider.contribute(request(sampleMetadata()), files);
+
+            String md = new String(files.get(SUMMARY_KEY), StandardCharsets.UTF_8);
+            assertThat(md).contains("## Discussion (" + IssueContentProvider.MAX_COMMENTS + " comments)");
+            assertThat(md).doesNotContain("## Discussion (" + overflow + " comments)");
+        }
     }
 
     // ---- Abstention paths --------------------------------------------------
@@ -312,7 +351,7 @@ class IssueContentProviderTest extends BaseUnitTest {
                 provider.contribute(new ContextRequest.IssueReviewRequest(job), new LinkedHashMap<>())
             )
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Missing issue_id");
+                .hasMessageContaining("Job has no metadata");
         }
 
         @Test
@@ -322,7 +361,32 @@ class IssueContentProviderTest extends BaseUnitTest {
 
             assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
                 .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Missing issue_id");
+                .hasMessageContaining("metadata field: issue_id");
+        }
+
+        @Test
+        void throwsWhenIssueIdIsExplicitNull() {
+            // {"issue_id": null}: has("issue_id") is true but the field is null. The strict reader must
+            // reject it rather than letting NullNode.asLong() default to 0 and surface as the misleading
+            // "Issue not found: issueId=0".
+            ObjectNode metadata = objectMapper.createObjectNode();
+            metadata.putNull("issue_id");
+
+            assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("metadata field: issue_id");
+        }
+
+        @Test
+        void throwsWhenIssueIdIsNonNumeric() {
+            // A non-numeric issue_id must fail at metadata parse with the "metadata field" message, not
+            // resolve to 0 and surface downstream as "Issue not found: issueId=0".
+            ObjectNode metadata = objectMapper.createObjectNode();
+            metadata.put("issue_id", "not-a-number");
+
+            assertThatThrownBy(() -> provider.contribute(request(metadata), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("metadata field: issue_id");
         }
 
         @Test

@@ -155,6 +155,29 @@ class LinkedWorkItemContentProviderTest extends BaseUnitTest {
     }
 
     @Test
+    void bareMentionEndingASentenceWithAPeriodIsResolved() throws Exception {
+        // "This relates to #42." — the trailing period must NOT swallow the reference (the old (?![\w.])
+        // lookahead rejected it). A version like #1.2 (digit after the dot) is still rejected.
+        PullRequest pr = new PullRequest();
+        pr.setBody("This work relates to #42. It also touches the version bump #1.2 which is not an issue.");
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
+        when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42)).thenReturn(
+            Optional.of(issue(42, "Trailing period ref", "Some body"))
+        );
+
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        provider.contribute(request(sampleMetadata()), files);
+
+        assertThat(files).containsKey("inputs/context/linked_work_items.json");
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/linked_work_items.json"));
+        JsonNode items = root.get("workItems");
+        // Exactly #42 resolves; the version-looking #1.2 is rejected (and #1 was never looked up).
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).get("number").asInt()).isEqualTo(42);
+        assertThat(items.get(0).get("closingKeyword").asBoolean()).isFalse();
+    }
+
+    @Test
     void resolvesIssueIdFromBranchSlugWhenNoBodyRef() throws Exception {
         PullRequest pr = new PullRequest();
         pr.setBody("No references in body.");

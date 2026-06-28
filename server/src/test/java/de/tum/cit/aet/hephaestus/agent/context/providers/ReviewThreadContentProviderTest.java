@@ -248,10 +248,13 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // Only the human reviewer thread is counted; the Hephaestus note is dropped entirely.
+        // Only the human reviewer thread is counted; the Hephaestus note is dropped entirely. Assert by
+        // CONTENT, not position, so the test does not encode an incidental ordering over the comment Set.
         assertThat(out.get("unresolvedCount").asInt()).isEqualTo(1);
         assertThat(out.get("threads")).hasSize(1);
-        assertThat(out.get("threads").get(0).get("path").asString()).isEqualTo("src/Bar.swift");
+        java.util.List<String> paths = new java.util.ArrayList<>();
+        out.get("threads").forEach(node -> paths.add(node.get("path").asString()));
+        assertThat(paths).containsExactly("src/Bar.swift").doesNotContain("src/Foo.swift");
     }
 
     @Test
@@ -272,6 +275,93 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
         JsonNode resolved = out.get("threads").get(1);
         assertThat(resolved.get("state").asString()).isEqualTo("RESOLVED");
         assertThat(resolved.get("resolvedBy").asString()).isEqualTo("reviewer-b");
+    }
+
+    @Test
+    void contribute_pendingReview_excludedFromDecisions() throws Exception {
+        // A PENDING review is an unsubmitted draft ("only visible to the author") with no submittedAt — it
+        // must never reach the agent as a real decision, else it fabricates an outstanding-CHANGES signal.
+        when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(
+            List.of(
+                review(PullRequestReview.State.PENDING, "drafting-reviewer", Instant.parse("2025-05-01T12:00:00Z")),
+                review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z"))
+            )
+        );
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(mergedPr()));
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        JsonNode decisions = out.get("reviewDecisions");
+        assertThat(decisions).hasSize(1);
+        assertThat(decisions.get(0).get("state").asString()).isEqualTo("APPROVED");
+    }
+
+    @Test
+    void contribute_unknownReview_excludedFromDecisions() throws Exception {
+        // UNKNOWN is the unmapped forward-compat fallback — not a genuine submitted decision.
+        when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(
+            List.of(review(PullRequestReview.State.UNKNOWN, "reviewer-x", Instant.parse("2025-05-01T12:00:00Z")))
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("reviewDecisions")).isEmpty();
+    }
+
+    @Test
+    void contribute_moreThreadsThanCap_emitsCapButCountsAll() throws Exception {
+        // unresolvedCount must reflect the TRUE total even past the emit cap — the one subtle invariant: the
+        // count is incremented before the MAX_THREADS truncation, so a noisy PR still reports the real backlog.
+        java.util.List<PullRequestReviewThread> many = new java.util.ArrayList<>();
+        int total = ReviewThreadContentProvider.MAX_THREADS + 7;
+        for (int i = 0; i < total; i++) {
+            many.add(thread(PullRequestReviewThread.State.UNRESOLVED, "src/File" + i + ".swift", i, null));
+        }
+        when(threadRepository.findAllByPullRequestIdWithResolvedBy(PR_ID)).thenReturn(many);
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("threads")).hasSize(ReviewThreadContentProvider.MAX_THREADS);
+        assertThat(out.get("unresolvedCount").asInt()).isEqualTo(total);
+    }
+
+    @Test
+    void contribute_prLookupEmpty_mergeStateUnknown() throws Exception {
+        // findByIdWithAllForGate returns empty (default stub) — mergeState degrades to UNKNOWN, never throws.
+        when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(
+            List.of(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-01T12:00:00Z")))
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("mergeState").asString()).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void contribute_openUnmergedPr_mergeStateOpen() throws Exception {
+        when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(
+            List.of(
+                review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer-a", Instant.parse("2025-06-01T10:00:00Z"))
+            )
+        );
+        PullRequest openPr = new PullRequest();
+        openPr.setMerged(false);
+        openPr.setState(Issue.State.OPEN);
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(openPr));
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("mergeState").asString()).isEqualTo("OPEN");
     }
 
     @Test

@@ -95,12 +95,15 @@ public class GitDiffOperations {
             // fork point, surfaces files the target changed as phantom diffs — the developer never
             // touched them. Always fall through to the merge-base so the range is 3-dot
             // (git diff target...head = only what THIS branch added since it diverged).
-            if (branchBase != null && branchHead != null && !branchHead.equals(head)) {
-                log.warn(
-                    "Stale branch ref: branch=origin/{}, expected={}, actual={}",
+            if (branchBase != null && branchHead != null && !branchHead.equals(head) && log.isDebugEnabled()) {
+                // Informational only: the source tip is never used as a range endpoint (we always use the
+                // merge-base for a 3-dot range), so a source ref that differs from head is the normal expected
+                // condition, not an actionable problem.
+                log.debug(
+                    "source ref origin/{} resolves to {} not head {}, using merge-base range",
                     sourceBranch,
-                    headSha,
-                    branchHead.getName()
+                    branchHead.getName(),
+                    headSha
                 );
             }
 
@@ -323,6 +326,15 @@ public class GitDiffOperations {
 
             if (newLineNum == null) {
                 out.append(line).append('\n');
+                continue;
+            }
+
+            // The trailing element of split("\n", -1) is "" because the JGit diff ends with '\n'. When the diff
+            // ended inside a hunk (newLineNum non-null) that empty element would otherwise hit the context branch
+            // below and emit a spurious "[L<n>] " line the model reads as a real (empty) source line. An in-hunk
+            // blank context line is a single space, never empty, so skipping the empty element is safe.
+            if (line.isEmpty()) {
+                out.append('\n');
                 continue;
             }
 

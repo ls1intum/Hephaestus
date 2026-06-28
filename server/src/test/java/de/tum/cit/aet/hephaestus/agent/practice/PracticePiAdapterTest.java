@@ -62,6 +62,26 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     @Test
+    void precomputeIsBestEffortNonFatal() {
+        // The precompute fragment is interpolated verbatim into the agent's sh -c command. Its robustness
+        // properties are load-bearing: a failed (or absent) precompute must NOT abort the whole agent run.
+        String step = PracticePiAdapter.buildPrecomputeStep();
+        assertThat(step)
+            // Non-fatal contract: a failed runner falls into the '|| { … ; true; }' guard and continues.
+            .contains("|| {")
+            .contains("; true; }")
+            // Zero-script tolerance: bun is reached via ';' (not '&&') after the sed strip, so a missing
+            // '*.ts' / failed cp still lets the runner start.
+            .contains("2>/dev/null ; bun run")
+            // The runner gets the repo mount, the cleaned diff, and writes into the precompute-out dir.
+            .contains("--repo " + WorkspaceAbi.REPO_MOUNT)
+            .contains("/diff_clean.patch")
+            .contains("--output /workspace/work/precompute-out")
+            // The agent-facing [L<n>] line annotations are stripped to a raw diff for the static parser.
+            .contains("sed 's/^\\[L[0-9]*\\] //'");
+    }
+
+    @Test
     void networkPolicyContract() {
         var spec = adapter.buildSandboxSpec(proxyRequest());
         assertThat(spec.networkPolicy().llmProxyToken()).isEqualTo("job-token-123");

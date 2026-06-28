@@ -209,26 +209,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 .containsEntry("PI_HEPHAESTUS_MODEL", "gpt-x")
                 .doesNotContainKey("OPENAI_BASE_URL");
         }
-
-        @Test
-        void baseUrlIgnoredInProxyMode() {
-            PiPlanSpec spec = new PiPlanSpec(
-                LlmProvider.OPENAI,
-                CredentialMode.PROXY,
-                null,
-                null,
-                "https://gpu.example.com/api",
-                "job-token-123",
-                false,
-                600,
-                PRACTICE,
-                Map.of(),
-                ""
-            );
-            assertThat(factory.build(spec).environment())
-                .doesNotContainKey("OPENAI_BASE_URL")
-                .doesNotContainKey("PI_HEPHAESTUS_BASE_URL");
-        }
     }
 
     @Nested

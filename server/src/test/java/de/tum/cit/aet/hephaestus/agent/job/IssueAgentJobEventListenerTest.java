@@ -429,5 +429,34 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
+
+        @Test
+        void shouldSkipClosedIssues() {
+            // The closed-skip guard lives in handleIssueEvent, shared by the labeled path: a label fired on an
+            // already-closed issue must never reach the gate, mirroring the onIssueCreated coverage.
+            var issueData = createIssueData(Issue.State.CLOSED);
+            var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L));
+
+            listener.onIssueLabeled(event);
+
+            verify(issueRepository, never()).findByIdWithRepositoryAndAssignees(anyLong());
+            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any());
+        }
+
+        @Test
+        void shouldSkipWhenIssueHasNullRepository() {
+            var issueData = createIssueData(Issue.State.OPEN);
+            var event = new ScmDomainEvent.IssueLabeled(issueData, createLabelData(), webhookContext(1L));
+
+            Issue issue = createIssue(Issue.State.OPEN);
+            issue.setRepository(null);
+            when(issueRepository.findByIdWithRepositoryAndAssignees(ISSUE_ID)).thenReturn(Optional.of(issue));
+
+            listener.onIssueLabeled(event);
+
+            verify(practiceReviewDetectionGate, never()).evaluateIssue(any(), any(), any());
+            verify(agentJobService, never()).submit(any(), any(), any());
+        }
     }
 }

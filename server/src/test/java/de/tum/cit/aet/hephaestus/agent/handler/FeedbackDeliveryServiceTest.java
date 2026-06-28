@@ -77,7 +77,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        reviewProperties = new PracticeReviewProperties(false, true, false, APP_BASE_URL, 15, false, false, false);
+        reviewProperties = new PracticeReviewProperties(
+            /* runForAllUsers */ false,
+            /* skipDrafts */ true,
+            /* deliverToMerged */ false,
+            /* appBaseUrl */ APP_BASE_URL,
+            /* cooldownMinutes */ 15,
+            /* progressFooter */ false,
+            /* reactionSuppression */ false,
+            /* policyFloor */ false
+        );
         service = new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,
@@ -586,7 +595,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private FeedbackDeliveryService serviceWithProgressFooter() {
-        var props = new PracticeReviewProperties(false, true, false, APP_BASE_URL, 15, true, false, false);
+        var props = new PracticeReviewProperties(
+            /* runForAllUsers */ false,
+            /* skipDrafts */ true,
+            /* deliverToMerged */ false,
+            /* appBaseUrl */ APP_BASE_URL,
+            /* cooldownMinutes */ 15,
+            /* progressFooter */ true,
+            /* reactionSuppression */ false,
+            /* policyFloor */ false
+        );
         return new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,

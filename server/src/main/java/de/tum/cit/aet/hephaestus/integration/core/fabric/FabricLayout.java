@@ -76,7 +76,16 @@ public class FabricLayout {
      * {@code scm.gitlab} is legal); path separators and traversal are not.
      */
     private static String segment(String value) {
-        if (value == null || value.isBlank() || value.contains("/") || value.contains("\\") || value.contains("..")) {
+        // Separators are banned outright, so the only traversal a single segment can express is a bare
+        // "." or ".." — reject exactly those, not any embedded double-dot (an id like "v1..2" is legal).
+        if (
+            value == null ||
+            value.isBlank() ||
+            value.contains("/") ||
+            value.contains("\\") ||
+            value.equals(".") ||
+            value.equals("..")
+        ) {
             throw new IllegalArgumentException("Unsafe fabric path segment: " + value);
         }
         return value;

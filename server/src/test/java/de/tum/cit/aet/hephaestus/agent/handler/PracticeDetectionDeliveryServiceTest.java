@@ -129,7 +129,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     anyString(),
                     any(), // assessment — null for NOT_APPLICABLE, so any() (anyString() would not match null)
-                    anyString(),
+                    any(), // severity — null for non-BAD findings (ADR 0022), so any() not anyString()
                     anyFloat(),
                     any(),
                     any(),
@@ -191,7 +191,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("Test finding"),
                 eq("PRESENT"), // presence (ADR 0022)
                 eq("GOOD"), // assessment (former-GOOD practice, PRESENT → a strength)
-                eq("INFO"),
+                isNull(), // severity — coerced to null for a non-BAD finding (ADR 0022 invariant)
                 eq(0.9f),
                 isNull(),
                 isNull(),
@@ -389,6 +389,56 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     @Nested
+    class SeverityCoherence {
+
+        /** Captures the severity (position 12) the native insert receives for one delivered finding. */
+        private String capturedSeverityFor(ValidatedFinding finding) {
+            service.deliver(testJob, List.of(finding));
+            ArgumentCaptor<String> severityCaptor = ArgumentCaptor.forClass(String.class);
+            verify(observationRepository).insertIfAbsent(
+                any(),
+                anyString(),
+                any(),
+                anyLong(),
+                any(), // practiceRevisionId
+                anyString(),
+                anyLong(),
+                anyLong(),
+                any(),
+                anyString(),
+                any(), // assessment (null for NOT_APPLICABLE)
+                severityCaptor.capture(),
+                anyFloat(),
+                any(),
+                any(),
+                anyString(),
+                any()
+            );
+            return severityCaptor.getValue();
+        }
+
+        @Test
+        @DisplayName("a BAD finding keeps its severity")
+        void badFindingKeepsSeverity() {
+            // ABSENT → BAD with Severity.INFO from the fixture helper.
+            assertThat(capturedSeverityFor(validFinding("pr-description-quality", Presence.ABSENT))).isEqualTo("INFO");
+        }
+
+        @Test
+        @DisplayName("a GOOD finding's severity is coerced to null (ADR 0022: severity is BAD-only)")
+        void goodFindingSeverityCoercedToNull() {
+            // PRESENT → GOOD, yet the fixture helper still carries Severity.INFO; it must not be persisted.
+            assertThat(capturedSeverityFor(validFinding("pr-description-quality", Presence.PRESENT))).isNull();
+        }
+
+        @Test
+        @DisplayName("a NOT_APPLICABLE finding's severity is coerced to null")
+        void notApplicableFindingSeverityCoercedToNull() {
+            assertThat(capturedSeverityFor(validFinding("pr-description-quality", Presence.NOT_APPLICABLE))).isNull();
+        }
+    }
+
+    @Nested
     class Idempotency {
 
         @Test
@@ -406,7 +456,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     anyString(),
                     anyString(),
-                    anyString(),
+                    any(), // severity — null for non-BAD findings (ADR 0022), so any() not anyString()
                     anyFloat(),
                     any(),
                     any(),
@@ -429,7 +479,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             service.deliver(testJob, findings);
 
-            @SuppressWarnings("unchecked")
             ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
             verify(observationRepository).insertIfAbsent(
                 any(),
@@ -443,7 +492,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 any(),
                 anyString(),
                 anyString(),
-                anyString(),
+                isNull(), // severity — coerced to null for the PRESENT/GOOD finding (ADR 0022)
                 anyFloat(),
                 any(),
                 any(),

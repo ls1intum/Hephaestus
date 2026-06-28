@@ -179,6 +179,25 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
+        void jobDeliveryException_propagates_andDoesNotRecord() {
+            // The deliberate firewall: a JobDeliveryException is a genuinely-undelivered review (the agent
+            // ran, but the student saw nothing). It MUST re-throw so the job is recorded FAILED — never
+            // swallowed like a transient RuntimeException — and the ledger must NOT record a phantom
+            // DELIVERED unit. A regression that broadened the swallow to also catch JobDeliveryException
+            // would otherwise ship green.
+            AgentJob job = issueJob("OPEN");
+            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenThrow(
+                new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("delivery failed")
+            );
+
+            assertThatThrownBy(() -> handler.postIssueNote(job, note())).isInstanceOf(
+                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
+            );
+            assertThat(job.getDeliveryCommentId()).isNull();
+            verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
+        }
+
+        @Test
         void nullCommentId_doesNotRecordPhantomDelivered() {
             // C12: a best-effort post that returns no comment id (vendor returned nothing without raising) means
             // nothing landed — the ledger must NOT record a DELIVERED unit for feedback the student never saw.

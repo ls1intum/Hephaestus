@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionAction;
@@ -16,12 +15,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 
 /**
  * Reaction-aware re-nag suppression (ADR 0021, B2). Runs AFTER the findings are persisted (so each carries
@@ -44,6 +41,12 @@ class ReactionSuppressionFilter {
         ReactionAction.DISPUTED,
         ReactionAction.NOT_APPLICABLE
     );
+
+    // Credential-leak practices whose still-BAD findings a reaction may never silence: a single DISPUTED /
+    // NOT_APPLICABLE must not permanently mute a secret that is STILL present this run. Membership here ==
+    // never-silenceable — a slug rename or a second secret practice must be added here (caught in one place)
+    // rather than silently becoming reaction-silenceable.
+    private static final Set<String> UNSUPPRESSABLE_SECRET_SLUGS = Set.of("hardcoded-secrets");
 
     private final ObservationRepository observationRepository;
     private final ReactionRepository reactionRepository;
@@ -82,8 +85,6 @@ class ReactionSuppressionFilter {
         // into each recurrence_key. about_user_id is always populated, so no fallback is needed.
         Observation any = persisted.get(0);
         long aboutUserId = any.getAboutUserId();
-        String artifactType = any.getArtifactType().name();
-        long artifactId = any.getArtifactId();
 
         Map<String, Observation> persistedByKey = new HashMap<>();
         for (Observation f : persisted) {
@@ -112,20 +113,19 @@ class ReactionSuppressionFilter {
         int suppressed = 0;
         int suppressedIndex = 0;
         for (ValidatedFinding vf : scopedFindings) {
-            // Recompute the canonical locus key the same way deliver() did, so we match the persisted row a
-            // reaction is keyed to — without re-deriving identity (ObservationFingerprint deliberately excludes the title).
-            String key = ObservationFingerprint.compute(
-                vf.practiceSlug(),
-                artifactType,
-                artifactId,
-                aboutUserId,
-                firstLocationPath(vf.evidence())
-            );
+            // Use the recurrence_key the handler already stamped from the value deliver() persisted (it runs
+            // strictly after that stamp loop), so the match is provably identical to the persisted row a
+            // reaction is keyed to — not a parallel recompute that could drift. A finding with no stamped key
+            // was never persisted (unknown slug / no locatable findings), so no reaction can target it.
+            String key = vf.recurrenceKey();
+            if (key == null) {
+                deliverable.add(vf);
+                continue;
+            }
             ReactionAction action = actionByKey.get(key);
-            // A live hardcoded-secrets BAD alarm is never silenceable by a reaction: a single DISPUTED /
-            // NOT_APPLICABLE must not permanently mute a credential leak that is STILL present this run.
+            // A live credential-leak BAD alarm is never silenceable by a reaction (see UNSUPPRESSABLE_SECRET_SLUGS).
             boolean unsuppressableSecret =
-                "hardcoded-secrets".equals(vf.practiceSlug()) && vf.assessment() == Assessment.BAD;
+                UNSUPPRESSABLE_SECRET_SLUGS.contains(vf.practiceSlug()) && vf.assessment() == Assessment.BAD;
             if (!unsuppressableSecret && action != null && SUPPRESS_ACTIONS.contains(action)) {
                 Observation pf = persistedByKey.get(key);
                 if (pf != null) {
@@ -181,10 +181,5 @@ class ReactionSuppressionFilter {
         return action == ReactionAction.DISPUTED
             ? FeedbackSuppressionReason.REACTED_DISPUTED
             : FeedbackSuppressionReason.REACTED_NOT_APPLICABLE;
-    }
-
-    @Nullable
-    private static String firstLocationPath(@Nullable JsonNode evidence) {
-        return PracticeDetectionDeliveryService.firstLocationPath(evidence);
     }
 }

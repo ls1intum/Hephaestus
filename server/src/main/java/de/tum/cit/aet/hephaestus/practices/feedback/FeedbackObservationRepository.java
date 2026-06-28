@@ -62,7 +62,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
      * The DELIVERED feedback body bound to each of the given observations — the developer's advice source for
      * the read surfaces (reflection dashboard, observation detail). Per ADR 0021 the immutable {@code Observation}
      * carries evidence + observation + reasoning but NO advice; advice is composed into the delivered {@code Feedback}
-     * and read back from {@code rendered_body} here.
+     * and read back from the delivered {@code Feedback}'s {@code body} column here.
      *
      * <p>An observation can be bound to more than one DELIVERED unit (e.g. successive re-deliveries), so this can
      * return multiple rows per observation id; callers keep the most recent by {@code feedbackCreatedAt}. Only

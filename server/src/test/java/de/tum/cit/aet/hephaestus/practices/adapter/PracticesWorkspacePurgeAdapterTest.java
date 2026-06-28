@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 
 class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
@@ -45,10 +46,19 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
         adapter.deleteWorkspaceData(workspaceId);
 
-        verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
-        verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
-        verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
-        verify(practiceAreaRepository).deleteAllByWorkspaceId(workspaceId);
+        // The FK-driven dependency order is load-bearing (feedback has a RESTRICT FK; practices clear the
+        // practice -> practice_area references before areas are removed). Assert the ORDER, not just the
+        // calls, so a reordering refactor fails the unit test instead of only failing on a real DB.
+        InOrder inOrder = inOrder(
+            feedbackRepository,
+            observationRepository,
+            practiceRepository,
+            practiceAreaRepository
+        );
+        inOrder.verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
+        inOrder.verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
+        inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
+        inOrder.verify(practiceAreaRepository).deleteAllByWorkspaceId(workspaceId);
     }
 
     @Test

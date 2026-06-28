@@ -60,9 +60,11 @@ class GeneralReviewCommentContentProviderTest extends BaseUnitTest {
     private IssueComment comment(String login, String body, Instant createdAt) {
         IssueComment c = new IssueComment();
         c.setBody(body);
-        User u = new User();
-        u.setLogin(login);
-        c.setAuthor(u);
+        if (login != null) {
+            User u = new User();
+            u.setLogin(login);
+            c.setAuthor(u);
+        }
         c.setCreatedAt(createdAt);
         return c;
     }
@@ -204,6 +206,76 @@ class GeneralReviewCommentContentProviderTest extends BaseUnitTest {
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
         assertThat(out.get("truncated").asBoolean()).isFalse();
+    }
+
+    @Test
+    void contribute_nullAuthor_omitsAuthorKey() throws Exception {
+        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+            List.of(comment(null, "anonymous note", Instant.parse("2025-06-01T10:00:00Z")))
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode first = objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
+        // login()==null → the author key is omitted entirely, never serialised as JSON null.
+        assertThat(first.has("author")).isFalse();
+        assertThat(first.get("body").asString()).isEqualTo("anonymous note");
+    }
+
+    @Test
+    void contribute_nullCreatedAt_omitsCreatedAtKey() throws Exception {
+        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+            List.of(comment("reviewer-a", "no timestamp", null))
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode first = objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
+        assertThat(first.has("createdAt")).isFalse();
+        assertThat(first.get("author").asString()).isEqualTo("reviewer-a");
+    }
+
+    @Test
+    void contribute_blankBody_isSkipped() throws Exception {
+        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+            List.of(
+                comment("reviewer-a", "   ", Instant.parse("2025-06-01T09:00:00Z")),
+                comment("reviewer-b", "real feedback", Instant.parse("2025-06-01T10:00:00Z"))
+            )
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        // The blank-body comment is dropped; only the substantive comment survives.
+        assertThat(out.get("count").asInt()).isEqualTo(1);
+        assertThat(out.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-b");
+    }
+
+    @Test
+    void contribute_hyphenFormDiffNoteMarker_isNotExcluded() throws Exception {
+        // HEPHAESTUS_MARKER is the colon form `<!-- hephaestus:` only. The hyphen-form diff-note marker
+        // `<!-- hephaestus-diff-note -->` is NOT matched here — and correctly so: diff notes are stored as
+        // PullRequestReviewComment, never IssueComment, so this provider (IssueComment-only) never sees them.
+        // This test pins that storage-split boundary so a marker-narrowing regression is caught.
+        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+            List.of(
+                comment(
+                    "reviewer-a",
+                    "<!-- hephaestus-diff-note --> human follow-up",
+                    Instant.parse("2025-06-01T10:00:00Z")
+                )
+            )
+        );
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        assertThat(out.get("count").asInt()).isEqualTo(1);
     }
 
     @Test

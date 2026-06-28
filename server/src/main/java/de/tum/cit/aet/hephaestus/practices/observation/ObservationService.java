@@ -29,7 +29,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -94,8 +93,6 @@ public class ObservationService {
 
     /** Look-back for the reflection surface — mirrors the mentor's findings window. */
     private static final int REFLECTION_LOOKBACK_DAYS = 90;
-    /** Upper bound on findings pulled before grouping; the post-group per-practice caps do the real trimming. */
-    private static final int MAX_REFLECTION_FINDINGS = 300;
     /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
     /** Per-practice cap on acknowledged strengths — enough to affirm, bounded so affirmations don't drown signal. */
@@ -132,23 +129,28 @@ public class ObservationService {
             return List.of();
         }
         Instant since = Instant.now().minus(REFLECTION_LOOKBACK_DAYS, ChronoUnit.DAYS);
-        List<Observation> findings = observationRepository.findRecentByDeveloperAndWorkspace(
+        // No pre-group LIMIT: a global recency cap would silently drop WHOLE practice cards whose findings fall
+        // past the cap row, making a missing card indistinguishable from "no findings". The query is already
+        // latest-run-deduped within a 90-day window (so cardinality is bounded by a developer's distinct
+        // latest-run findings, not their full history), and the per-practice caps below do the real trimming —
+        // so every practice with at least one actionable finding gets a card regardless of overall volume.
+        List<Observation> observations = observationRepository.findRecentByDeveloperAndWorkspace(
             currentUser.get().getId(),
             workspaceId,
             since,
-            PageRequest.of(0, MAX_REFLECTION_FINDINGS)
+            Pageable.unpaged()
         );
 
-        // Advice now lives on the delivered Feedback (ADR 0021), not on the finding. Batch-fetch the
-        // finding-id → delivered-body map ONCE for every finding on this surface so each card's items can show
-        // what was actually delivered (null when nothing was). One query, not N+1.
-        Map<UUID, String> deliveredGuidance = deliveredGuidanceByFinding(
-            findings.stream().map(Observation::getId).collect(Collectors.toSet())
+        // Advice now lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
+        // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can
+        // show what was actually delivered (null when nothing was). One query, not N+1.
+        Map<UUID, String> deliveredGuidance = deliveredGuidanceByObservation(
+            observations.stream().map(Observation::getId).collect(Collectors.toSet())
         );
 
         // Group by practice, preserving first-seen (recency) order from the query.
         Map<String, List<Observation>> byPractice = new LinkedHashMap<>();
-        for (Observation f : findings) {
+        for (Observation f : observations) {
             byPractice.computeIfAbsent(f.getPractice().getSlug(), k -> new ArrayList<>()).add(f);
         }
 
@@ -168,15 +170,28 @@ public class ObservationService {
                 .stream()
                 .filter(f -> f.getAssessment() == Assessment.BAD)
                 .toList();
-            Set<Long> distinctTargets = bad.stream().map(Observation::getArtifactId).collect(Collectors.toSet());
-            boolean singleTarget = distinctTargets.size() < CORROBORATION_TARGETS;
+            // Corroboration is per recurrence LOCUS, not per practice group (matching the standing-aspect
+            // design, where distinct-target counts are keyed per row): an uncorroborated gap on target A must
+            // not be rescued from quarantine just because an UNRELATED BAD exists on target B for the same
+            // practice. Count distinct targets within each recurrenceKey; the whole-group count is the fallback
+            // only for observations that carry no recurrenceKey.
+            Set<Long> groupTargets = bad.stream().map(Observation::getArtifactId).collect(Collectors.toSet());
+            boolean groupSingleTarget = groupTargets.size() < CORROBORATION_TARGETS;
+            Map<String, Set<Long>> targetsByLocus = new HashMap<>();
+            for (Observation f : bad) {
+                if (f.getRecurrenceKey() != null) {
+                    targetsByLocus
+                        .computeIfAbsent(f.getRecurrenceKey(), k -> new java.util.HashSet<>())
+                        .add(f.getArtifactId());
+                }
+            }
             // P4 firewall on the read model (audit gap #1c): a quarantined BAD (low-confidence AND seen on a
             // single target) must not just sort last — it must NOT be DISPLAYED at all. Otherwise the dashboard's
             // bounded MAX_ITEMS list still surfaces a coin-flip detector hunch as something to work on, bypassing
             // the same floor the mentor standing surface already enforces. Filter first, then rank what survives.
             List<ReflectionItemDTO> toWorkOn = bad
                 .stream()
-                .filter(f -> !quarantined(f, singleTarget))
+                .filter(f -> !quarantined(f, locusSingleTarget(f, targetsByLocus, groupSingleTarget)))
                 .sorted(Comparator.comparingDouble(ObservationService::priorityScore).reversed())
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
@@ -257,6 +272,24 @@ public class ObservationService {
     }
 
     /**
+     * Whether the recurrence locus this observation belongs to is corroborated on fewer than
+     * {@link #CORROBORATION_TARGETS} distinct targets. Keyed per {@code recurrenceKey} so an unrelated BAD on
+     * another target for the same practice never lends corroboration to this gap. An observation with no
+     * recurrenceKey falls back to the whole-group single-target verdict.
+     */
+    private static boolean locusSingleTarget(
+        Observation f,
+        Map<String, Set<Long>> targetsByLocus,
+        boolean groupSingleTarget
+    ) {
+        if (f.getRecurrenceKey() == null) {
+            return groupSingleTarget;
+        }
+        Set<Long> locusTargets = targetsByLocus.get(f.getRecurrenceKey());
+        return locusTargets == null || locusTargets.size() < CORROBORATION_TARGETS;
+    }
+
+    /**
      * Ranking weight for a BAD gap: {@code confidence × severity-weight}, so a low-confidence gap sinks below
      * a corroborated/confident one of the same severity, and a high-severity-but-uncertain gap does not
      * automatically outrank a confident lower-severity one. Severity weight is CRITICAL=4..INFO=1, null=0.
@@ -286,28 +319,28 @@ public class ObservationService {
     }
 
     /**
-     * The delivered feedback body for a single finding — the developer's advice source for the detail view
-     * (ADR 0021: advice lives on the delivered {@code Feedback}, not the immutable finding). Null when the
-     * finding was never delivered. Callers pass this into {@code ObservationDetailDTO.from}.
+     * The delivered feedback body for a single observation — the developer's advice source for the detail view
+     * (ADR 0021: advice lives on the delivered {@code Feedback}, not the immutable observation). Null when the
+     * observation was never delivered. Callers pass this into {@code ObservationDetailDTO.from}.
      */
     @Transactional(readOnly = true)
-    public Optional<String> getDeliveredGuidance(UUID findingId) {
-        return Optional.ofNullable(deliveredGuidanceByFinding(Set.of(findingId)).get(findingId));
+    public Optional<String> getDeliveredGuidance(UUID observationId) {
+        return Optional.ofNullable(deliveredGuidanceByObservation(Set.of(observationId)).get(observationId));
     }
 
     /**
-     * Batch-resolve finding-id → delivered feedback body for the given ids in ONE query. A finding can be bound
-     * to several DELIVERED units (re-deliveries); the most recent one (by feedback {@code createdAt}) wins so the
-     * surface shows the latest advice the developer actually saw. Findings with no DELIVERED feedback are absent
-     * from the map (the caller treats absence as "nothing delivered").
+     * Batch-resolve observation-id → delivered feedback body for the given ids in ONE query. An observation can
+     * be bound to several DELIVERED units (re-deliveries); the most recent one (by feedback {@code createdAt})
+     * wins so the surface shows the latest advice the developer actually saw. Observations with no DELIVERED
+     * feedback are absent from the map (the caller treats absence as "nothing delivered").
      */
-    private Map<UUID, String> deliveredGuidanceByFinding(Set<UUID> findingIds) {
-        if (findingIds.isEmpty()) {
+    private Map<UUID, String> deliveredGuidanceByObservation(Set<UUID> observationIds) {
+        if (observationIds.isEmpty()) {
             return Map.of();
         }
         Map<UUID, DeliveredObservationBody> latest = new HashMap<>();
         for (DeliveredObservationBody row : feedbackObservationRepository.findDeliveredBodiesByObservationIds(
-            findingIds
+            observationIds
         )) {
             latest.merge(row.getObservationId(), row, (existing, candidate) ->
                 candidate.getFeedbackCreatedAt().isAfter(existing.getFeedbackCreatedAt()) ? candidate : existing

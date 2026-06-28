@@ -102,13 +102,34 @@ public class PracticeService {
      * Append a new {@link PracticeRevision} snapshotting the practice's current {@code criteria}. Called on
      * create (revision 1) and whenever {@code criteria} changes, so every finding can pin to the criteria
      * version it was detected against (the criteria as it was).
+     *
+     * <p>The revision number is read-max-then-insert, guarded at the DB by
+     * {@code uk_practice_revision_practice_number}. Two concurrent criteria edits to the SAME practice can
+     * both compute {@code next=N}; the loser's insert violates the unique constraint. We catch that and
+     * retry once recomputing {@code next}, so the constraint produces a clean append instead of bubbling a
+     * {@link DataIntegrityViolationException} out of {@link #updatePractice} as a raw 500 (mirrors the
+     * create path's slug-conflict safety net).
      */
     private void snapshotRevision(Practice practice) {
-        int next = practiceRevisionRepository
+        try {
+            saveRevision(practice);
+        } catch (DataIntegrityViolationException ex) {
+            // A concurrent edit grabbed the same revision number first — recompute and retry once.
+            saveRevision(practice);
+        }
+    }
+
+    private void saveRevision(Practice practice) {
+        practiceRevisionRepository.save(
+            new PracticeRevision(practice, nextRevisionNumber(practice), practice.getCriteria())
+        );
+    }
+
+    private int nextRevisionNumber(Practice practice) {
+        return practiceRevisionRepository
             .findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId())
             .map(r -> r.getRevisionNumber() + 1)
             .orElse(1);
-        practiceRevisionRepository.save(new PracticeRevision(practice, next, practice.getCriteria()));
     }
 
     /**

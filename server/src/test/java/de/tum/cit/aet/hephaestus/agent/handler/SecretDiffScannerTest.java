@@ -172,6 +172,61 @@ class SecretDiffScannerTest extends BaseUnitTest {
             // hunk starts at new line 10: context=10, filler=11, key=12
             assertThat(hits.get(0).newLine()).isEqualTo(12);
         }
+
+        @Test
+        @DisplayName("a \\ No newline at end of file marker does not advance the new-side counter")
+        void noNewlineMarkerDoesNotShiftLineNumber() {
+            // The marker is diff metadata, not a source line; the secret on the line BEFORE it must keep its
+            // true new-side number. Hunk starts at 5: context=5, EOF-appended secret=6, then the marker.
+            String d =
+                "diff --git a/.env b/.env\n--- a/.env\n+++ b/.env\n@@ -5,1 +5,2 @@\n" +
+                " EXISTING=1\n" +
+                "+API_KEY=\"" +
+                OPENAI_KEY +
+                "\"\n" +
+                "\\ No newline at end of file\n";
+            List<SecretHit> hits = scanner.scan(d);
+            assertThat(hits).isNotEmpty();
+            assertThat(hits.get(0).newLine()).isEqualTo(6);
+        }
+    }
+
+    @Nested
+    class GenericEntropyPathHeuristic {
+
+        @Test
+        @DisplayName("a high-entropy base64 secret containing a single '/' is still flagged")
+        void base64SecretWithSlashIsFlagged() {
+            // Standard base64 uses '/' in its alphabet; a blanket '/'-ban would silently skip this real secret.
+            String value = "aB3" + "xQ9/zR2tK7wL5pY8mN1";
+            List<SecretHit> hits = scanner.scan(diff("server.js", "const secret = \"" + value + "\";"));
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("generic-entropy") && h.matchedToken().equals(value));
+        }
+
+        @Test
+        @DisplayName("a path-shaped value (3+ slashes) is NOT flagged as a generic-entropy secret")
+        void pathShapedValueNotFlagged() {
+            List<SecretHit> hits = scanner.scan(diff("config.ts", "const secret = \"/usr/local/share/app\";"));
+            assertThat(hits).noneMatch(h -> h.ruleId().equals("generic-entropy"));
+        }
+    }
+
+    @Nested
+    class MultiSecretPerLine {
+
+        @Test
+        @DisplayName("two distinct same-type tokens on one line both produce a hit")
+        void twoPatsOnOneLineBothReported() {
+            // Each rule must report EVERY occurrence, not just the first, or the second token leaks.
+            String pat1 = "glpat-" + "3hQ7kZ9mW2pX5tR8vL1q";
+            String pat2 = "glpat-" + "9zX2mK7wL5pY8nR1tQ3v";
+            List<SecretHit> hits = scanner.scan(diff("ci.env", "TOKENS=" + pat1 + "," + pat2));
+            assertThat(hits)
+                .filteredOn(h -> h.ruleId().equals("gitlab-pat"))
+                .hasSize(2);
+            assertThat(hits).anyMatch(h -> h.matchedToken().equals(pat1));
+            assertThat(hits).anyMatch(h -> h.matchedToken().equals(pat2));
+        }
     }
 
     @Nested

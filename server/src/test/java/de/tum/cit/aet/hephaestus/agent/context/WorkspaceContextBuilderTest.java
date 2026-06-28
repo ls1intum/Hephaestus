@@ -333,6 +333,47 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             assertThat(t1.isAlive()).isFalse();
             assertThat(t2.isAlive()).isFalse();
         }
+
+        @Test
+        @DisplayName("null repoKey requests (e.g. issue reviews) all collide on stripe 0 and serialise")
+        void serialisesOnNullRepoKey() throws Exception {
+            java.util.concurrent.CountDownLatch firstInside = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.CountDownLatch firstMayFinish = new java.util.concurrent.CountDownLatch(1);
+            ContentProvider gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
+            ContentProvider unboundedSecond = new LatchedProvider(null, null);
+            var builder = new WorkspaceContextBuilder(
+                List.of(gatedFirst, unboundedSecond),
+                new SimpleMeterRegistry(),
+                null
+            );
+
+            // IssueReviewRequest jobs WITHOUT repository_id metadata → repoKey() is null → stripe 0.
+            // A regression returning distinct stripes for null keys would let these de-serialise.
+            AgentJob jobA = new AgentJob();
+            jobA.setId(UUID.randomUUID());
+            AgentJob jobB = new AgentJob();
+            jobB.setId(UUID.randomUUID());
+
+            Thread t1 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobA)), "t1-null");
+            Thread t2 = new Thread(() -> builder.build(new ContextRequest.IssueReviewRequest(jobB)), "t2-null");
+            t1.start();
+            assertThat(firstInside.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                .as("t1 should enter the critical section quickly")
+                .isTrue();
+            t2.start();
+            // t2 must park on the same stripe-0 lock while t1 holds it — its `entered` latch is null,
+            // so reaching a wait/block state proves it could not run ahead.
+            awaitState(
+                t2,
+                java.util.Set.of(Thread.State.WAITING, Thread.State.TIMED_WAITING, Thread.State.BLOCKED),
+                2_000
+            );
+            firstMayFinish.countDown();
+            t1.join(2_000);
+            t2.join(2_000);
+            assertThat(t1.isAlive()).isFalse();
+            assertThat(t2.isAlive()).isFalse();
+        }
     }
 
     /** Wait until {@code thread} enters one of {@code wanted} or the timeout elapses. */

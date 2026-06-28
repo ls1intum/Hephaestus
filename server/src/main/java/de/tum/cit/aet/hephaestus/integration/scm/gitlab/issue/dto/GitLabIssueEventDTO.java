@@ -68,6 +68,9 @@ public record GitLabIssueEventDTO(
             .labels()
             .current()
             .stream()
+            // A current label with a null id is treated as added: GitLab's changes.labels diff reliably carries
+            // ids, so this branch is defensive only and deliberately favours over-firing IssueLabeled (better to
+            // re-trigger detection than silently miss a real add) over under-firing on a malformed payload.
             .filter(label -> label.id() == null || !previousIds.contains(label.id()))
             .toList();
     }

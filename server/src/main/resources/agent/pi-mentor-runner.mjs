@@ -371,8 +371,10 @@ function defineFetchContextTool() {
         label: "Fetch Context",
         description:
             "Fetch a Hephaestus context aspect (workspace state, user activity, practice catalog, finding history, " +
-            "prepared practice standing) from the server. Returns JSON content. Allowed paths: workspace.json, user.json, " +
-            "practice_catalog.json, findings_history.json, practice_standing.json. Names match the aspect provider OUTPUT_KEY constants.",
+            "prepared practice standing, delivered feedback, recent authored work) from the server. Returns JSON content. " +
+            "Allowed paths: " +
+            [...FETCH_CONTEXT_ALLOWED].join(", ") +
+            ". Names match the aspect provider OUTPUT_KEY constants.",
         parameters: {
             type: "object",
             additionalProperties: false,
@@ -471,8 +473,16 @@ async function handleHello(id /*, params */) {
 // security primitive and happily resolves `..` / absolute paths out of the base.
 const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+// Canonicalise the thread id the SAME way for open AND every later lookup. open_thread stores
+// state under this key, so a caller sending an uppercase UUID (the dev-bridge / mis-routed
+// threat model THREAD_ID_PATTERN guards) must be normalised identically on prompt/steer/abort/
+// close or `threads.get()` misses and returns a spurious THREAD_NOT_OPEN.
+function normalizeThreadId(params) {
+    return String(params?.threadId ?? "").trim().toLowerCase();
+}
+
 async function handleOpenThread(id, params) {
-    const threadId = String(params?.threadId ?? "").trim().toLowerCase();
+    const threadId = normalizeThreadId(params);
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
     }
@@ -590,7 +600,7 @@ function maybePostTurnGc() {
 }
 
 async function handlePrompt(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     const text = String(params?.text ?? "");
     if (!threadId || !text) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId and text are required");
@@ -636,7 +646,7 @@ async function handlePrompt(id, params) {
 }
 
 async function handleSteer(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     const text = String(params?.text ?? "");
     if (!threadId || !text) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId and text are required");
@@ -655,7 +665,7 @@ async function handleSteer(id, params) {
 }
 
 async function handleAbort(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
     }
@@ -677,7 +687,7 @@ async function handleAbort(id, params) {
 }
 
 async function handleCloseThread(id, params) {
-    const threadId = String(params?.threadId ?? "").trim();
+    const threadId = normalizeThreadId(params);
     if (!threadId) {
         return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
     }
@@ -854,8 +864,14 @@ async function runWatchdogRebind(state) {
             }
         }
     } finally {
-        sendEvent(state.threadId, { type: "agent_end", messages: [] });
-        state.inFlight = false;
+        // The abort() above can emit a real terminal agent_end through the still-active
+        // subscription (torn down only afterwards), which flows through forwardEvent and clears
+        // inFlight. Guard the synthetic emit on inFlight — mirroring handlePrompt's catch — so the
+        // translator never sees a SECOND agent_end and double-finalises the turn.
+        if (state.inFlight) {
+            sendEvent(state.threadId, { type: "agent_end", messages: [] });
+            state.inFlight = false;
+        }
     }
 }
 

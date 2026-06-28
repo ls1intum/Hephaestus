@@ -176,6 +176,11 @@ class FeedbackDeliveryService {
         // Always post new
 
         SummaryOutcome summaryOutcome = postSummaryNote(job, delivery, trend);
+        // Inline reconciliation (clear-then-post) is INTENTIONALLY independent of the summary outcome: the diff
+        // notes anchor to THIS run's diff, so they are always reconciled to match it even when the summary edit
+        // was a TRANSIENT no-op (a stale prior summary is harmless; stale inline notes anchored to lines no
+        // longer in the diff are not). The ledger write below, by contrast, IS gated on summaryDelivered so a
+        // DELIVERED unit is only recorded when the summary actually landed this run.
         List<InlineFindingChannel.DeliveredSignal> inlineSignals = postDiffNotes(job, delivery);
 
         // The summary was composed+posted BEFORE the inline notes (the order the ledger + A4 ping depend on),
@@ -217,7 +222,14 @@ class FeedbackDeliveryService {
      * summary with this no-op run's recomposed body.
      */
     private enum SummaryOutcome {
+        /**
+         * A live summary now sits at {@code job.getDeliveryCommentId()}. Covers ALL the ways that happens:
+         * a fresh post, an edit-in-place of the prior summary, a gone-fallback fresh post (prior comment
+         * deleted), and the no-MR-note early return. Every one leaves a summary the post-inline demotion may
+         * safely re-edit — which is why {@link #reEditSummaryWithSignals} runs for the whole POSTED set.
+         */
         POSTED,
+        /** The edit hit a recoverable error; the PRIOR run's summary stays live and untouched (no fresh post). */
         TRANSIENT_NOOP,
     }
 

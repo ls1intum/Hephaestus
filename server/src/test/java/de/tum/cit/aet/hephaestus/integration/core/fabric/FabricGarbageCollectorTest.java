@@ -67,6 +67,19 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
     }
 
     @Test
+    void referencedShas_skipsCorruptManifestWithoutDroppingSurvivingJobs() throws Exception {
+        // A truncated/half-written manifest (the worker-writes/server-reads race) must be skipped, NOT clear
+        // the live set — otherwise the surviving job's shas vanish and its in-flight blobs get swept. Resilient
+        // degradation of the mark phase is what keeps the empty-set mass-sweep guard from being defeated.
+        writeJob("valid", "1111", "2222");
+        Path corrupt = layout.jobDir("corrupt");
+        Files.createDirectories(corrupt);
+        Files.write(corrupt.resolve("manifest.json"), "{\"entries\":".getBytes(StandardCharsets.UTF_8));
+
+        assertThat(gc.referencedShas()).containsExactlyInAnyOrder("1111", "2222");
+    }
+
+    @Test
     void pruneLegacyClones_removesAllDigitTopLevelDirsOnly() throws Exception {
         Files.createDirectories(root.resolve("42")); // legacy {repoId} clone
         Files.createDirectories(root.resolve("bulk")); // current region — must survive

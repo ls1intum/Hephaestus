@@ -58,13 +58,29 @@ class DefaultAgentConfigSeeder {
             log.warn("Default agent config enabled but hephaestus.agent.default-config.api-key is unset; skipping.");
             return;
         }
-        Workspace workspace = workspaceRepository.findAll().stream().findFirst().orElse(null);
+        // findAll() has no guaranteed order, so on a multi-workspace instance the "default" target would be
+        // non-deterministic across boots — and the existsBy idempotency check and the create could even land
+        // on different rows. Pin to the oldest workspace (lowest id) so the pick is stable.
+        Workspace workspace = workspaceRepository
+            .findAll()
+            .stream()
+            .min(java.util.Comparator.comparing(Workspace::getId))
+            .orElse(null);
         if (workspace == null) {
             log.warn("Default agent config enabled but no workspace exists yet; skipping.");
             return;
         }
         if (agentConfigRepository.existsByWorkspaceIdAndName(workspace.getId(), properties.name())) {
             return;
+        }
+        if (properties.modelName() == null || properties.modelName().isBlank()) {
+            // createConfig leaves model_name null when modelName is null, producing an enabled config that is
+            // unlikely to run. Unlike the missing-api-key case we still seed it (the model can be set later in
+            // the UI), but surface the misconfiguration loudly rather than failing silently at first job.
+            log.warn(
+                "Default agent config has no model-name (hephaestus.agent.default-config.model-name is unset); " +
+                    "seeding an enabled config without a model — set a model before it can run."
+            );
         }
         var request = CreateAgentConfigRequestDTO.builder()
             .name(properties.name())

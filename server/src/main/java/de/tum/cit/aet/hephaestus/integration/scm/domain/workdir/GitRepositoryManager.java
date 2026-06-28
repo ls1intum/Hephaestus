@@ -128,13 +128,34 @@ public class GitRepositoryManager {
                     deleteRecursively(repoPath);
                     log.info("Deleted local git clone: repoId={}, path={}", repositoryId, repoPath);
                 } catch (IOException e) {
-                    log.error(
-                        "Failed to delete local git clone: repoId={}, path={}, error={}",
+                    // A partial delete that leaves .git/HEAD behind would let isRepositoryCloned() keep
+                    // reporting true, so a later ensureRepository() would fetch into a half-deleted tree
+                    // forever. Fall back to JGit's forced recursive delete (same as cloneRepository's
+                    // stale-checkout cleanup); if even that fails, surface the failure so the purge caller
+                    // can react instead of silently leaving a corrupt clone in place.
+                    log.warn(
+                        "Recursive delete failed, retrying with forced delete: repoId={}, path={}, error={}",
                         repositoryId,
                         repoPath,
-                        e.getMessage(),
-                        e
+                        e.getMessage()
                     );
+                    try {
+                        FileUtils.delete(repoPath.toFile(), FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
+                        log.info(
+                            "Deleted local git clone via forced delete: repoId={}, path={}",
+                            repositoryId,
+                            repoPath
+                        );
+                    } catch (IOException forced) {
+                        log.error(
+                            "Failed to delete local git clone: repoId={}, path={}, error={}",
+                            repositoryId,
+                            repoPath,
+                            forced.getMessage(),
+                            forced
+                        );
+                        throw new GitOperationException("Failed to delete local git clone: " + repositoryId, forced);
+                    }
                 }
             }
         });
@@ -453,7 +474,9 @@ public class GitRepositoryManager {
                 );
                 if (remoteRefs.isEmpty()) {
                     log.warn("No remote branches found for multi-branch walk: repoId={}", repositoryId);
-                    return List.of();
+                    // Return a mutable empty list, matching the normal-path return below, so callers see one
+                    // consistent contract (GitLabCommitBackfillService calls subList on the result).
+                    return new ArrayList<>();
                 }
 
                 ObjectId fromId = fromSha != null ? repo.resolve(fromSha) : null;
@@ -857,11 +880,16 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Sanitize URL for logging (remove tokens).
+     * Sanitize URL for logging (remove credentials).
+     *
+     * <p>Redacts the ENTIRE userinfo segment ({@code //user:secret@host} → {@code //***@host}), not just
+     * the {@code x-access-token:} shape: GitLab auto-registration commonly carries credentials as
+     * {@code gitlab-ci-token:<token>@} or {@code oauth2:<token>@}, so a token-specific redaction would leak
+     * those forms in clear text.
      */
     private String sanitizeUrl(String url) {
         if (url == null) return null;
-        return url.replaceAll("x-access-token:[^@]+@", "x-access-token:***@");
+        return url.replaceAll("//[^/@]+@", "//***@");
     }
 
     /**

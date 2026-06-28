@@ -43,6 +43,12 @@ public record IssueReviewSubmissionRequest(
         if (issueNumber <= 0) {
             throw new IllegalArgumentException("issueNumber must be positive, got " + issueNumber);
         }
+        if (issueId <= 0) {
+            throw new IllegalArgumentException("issueId must be positive, got " + issueId);
+        }
+        if (repositoryId <= 0) {
+            throw new IllegalArgumentException("repositoryId must be positive, got " + repositoryId);
+        }
     }
 
     /** Back-compat constructor for callers without a trigger event (gate-bypass dev path). */

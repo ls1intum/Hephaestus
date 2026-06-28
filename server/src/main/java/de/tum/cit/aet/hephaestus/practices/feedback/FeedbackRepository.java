@@ -55,6 +55,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * references the exact words the student saw ({@link Feedback#getBody()}) instead of
      * reconstructing from raw pre-delivery findings (which may have been suppressed, superseded, or never
      * postable). Bounded by the caller's {@code Pageable}.
+     *
+     * <p>Filters and orders on {@code created_at} (not {@code delivered_at}) so the
+     * {@code idx_feedback_recipient_created (recipient_user_id, created_at DESC)} index serves both the
+     * {@code >= :since} range and the {@code ORDER BY}. This is behaviour-equivalent: a DELIVERED unit is
+     * written with {@code createdAt == deliveredAt} (same {@code Instant.now()} — see
+     * {@code FeedbackLedgerRecorder}), so the two timestamps coincide for every row this query can match.
      */
     @Query(
         """
@@ -62,8 +68,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         WHERE f.workspaceId = :workspaceId
           AND f.recipientUserId = :recipientUserId
           AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-          AND f.deliveredAt >= :since
-        ORDER BY f.deliveredAt DESC
+          AND f.createdAt >= :since
+        ORDER BY f.createdAt DESC
         """
     )
     List<Feedback> findRecentDeliveredForRecipient(
@@ -92,16 +98,23 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * by the {@code chk_feedback_state} CHECK (PREPARED/DELIVERED/SUPERSEDED/SUPPRESSED/FAILED), so a typo
      * fails fast at write time; callers still MUST pass a {@link FeedbackDeliveryState#name()} value.
      *
-     * <p><strong>Concurrency invariant (SYSTEMIC #5):</strong> this is an unconditional write-by-PK — it does
-     * NOT re-check the row's current {@code delivery_state}. The "at most one live (DELIVERED) row per
-     * continuity/thread key" invariant therefore rests on the orchestrator serializing recorder runs for a
-     * given thread key (one detection job at a time per artifact), NOT on a DB-level guard. Do not introduce
-     * a concurrent second writer for the same thread key without adding a state-predicated update (e.g.
-     * {@code AND delivery_state = 'DELIVERED'}) or optimistic locking here.
+     * <p><strong>Concurrency invariant (SYSTEMIC #5):</strong> the supersession is a guarded, idempotent
+     * transition — it flips a row to {@code :state} only while it is still {@code DELIVERED}. Two concurrent
+     * re-reviews of the same artifact can both read the same prior DELIVERED row and both attempt to flip it;
+     * the {@code AND delivery_state = 'DELIVERED'} predicate makes the second flip a no-op (affected rows = 0)
+     * instead of double-superseding, and the returned count lets a caller detect the lost race. The "at most
+     * one live (DELIVERED) row per continuity/thread key" invariant still relies on the orchestrator
+     * serializing recorder runs for a given thread key for the {@code INSERT}; this guard hardens the flip.
+     *
+     * @return the number of rows updated — {@code 1} on a clean supersession, {@code 0} if the row was no
+     *     longer {@code DELIVERED} (already superseded by a concurrent writer).
      */
     @Modifying
     @Transactional
-    @Query(value = "UPDATE feedback SET delivery_state = :state WHERE id = :id", nativeQuery = true)
+    @Query(
+        value = "UPDATE feedback SET delivery_state = :state WHERE id = :id AND delivery_state = 'DELIVERED'",
+        nativeQuery = true
+    )
     int updateState(@Param("id") UUID id, @Param("state") String state);
 
     /**

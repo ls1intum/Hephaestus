@@ -11,6 +11,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
  */
 public final class SecurityUtils {
 
+    /**
+     * The instance-admin authority string minted by {@code JwtPrincipalFactory} for
+     * {@code Account.AppRole.APP_ADMIN} accounts and gated on here by {@link #isSuperAdmin()}. It is a
+     * security contract shared between that producer and this consumer — keep the two in agreement.
+     */
+    public static final String APP_ADMIN_AUTHORITY = "app_admin";
+
     private SecurityUtils() {}
 
     /**
@@ -107,6 +114,6 @@ public final class SecurityUtils {
 
         // Flat `roles` claim on the Hephaestus-issued JWT (ADR 0017).
         var rolesObj = jwt.getClaims().get("roles");
-        return rolesObj instanceof List<?> roles && roles.contains("app_admin");
+        return rolesObj instanceof List<?> roles && roles.contains(APP_ADMIN_AUTHORITY);
     }
 }

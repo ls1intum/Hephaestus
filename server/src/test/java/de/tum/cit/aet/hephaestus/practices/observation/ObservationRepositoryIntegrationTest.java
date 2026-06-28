@@ -664,6 +664,11 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         private void insertForJob(String key, UUID jobId, long artifactId, String presence, Instant observedAt) {
+            // Former-GOOD practice valence: PRESENT -> GOOD (strength), ABSENT -> BAD (problem). A
+            // NOT_APPLICABLE observation has no sign at all (assessment + severity are null).
+            boolean notApplicable = "NOT_APPLICABLE".equals(presence);
+            String assessment = notApplicable ? null : ("PRESENT".equals(presence) ? "GOOD" : "BAD");
+            String severity = notApplicable ? null : "INFO";
             observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
                 key,
@@ -675,9 +680,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 aboutUser.getId(),
                 "finding",
                 presence,
-                // Former-GOOD practice valence: PRESENT -> GOOD (strength), ABSENT -> BAD (problem).
-                "PRESENT".equals(presence) ? "GOOD" : "BAD",
-                "INFO",
+                assessment,
+                severity,
                 0.9f,
                 null,
                 null,
@@ -730,6 +734,39 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(row.getTotalObservations()).isEqualTo(2L);
             assertThat(row.getGoodCount()).isEqualTo(1L);
             assertThat(row.getBadCount()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("NOT_APPLICABLE inflates totalObservations but never good/bad, and is omitted from findRecent")
+        void notApplicableCountedInTotalButExcludedFromRecent() {
+            // A NOT_APPLICABLE observation (no assessment, no severity) for a distinct target so the latest-run
+            // dedup keeps it: it must count toward totalObservations yet contribute to neither good nor bad
+            // (so total != good + bad by design), and the mentor's drill-down list must omit it entirely.
+            insertForJob("na-target", agentJob.getId(), 50L, "NOT_APPLICABLE", Instant.parse("2026-03-20T10:00:00Z"));
+            insertForJob("bad-target", agentJob.getId(), 51L, "ABSENT", Instant.parse("2026-03-20T11:00:00Z"));
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+
+            assertThat(summary).hasSize(1);
+            DeveloperPracticeSummaryProjection row = summary.get(0);
+            assertThat(row.getTotalObservations()).isEqualTo(2L); // NA + BAD both counted
+            assertThat(row.getGoodCount()).isEqualTo(0L);
+            assertThat(row.getBadCount()).isEqualTo(1L); // only the BAD row, the NA is excluded
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                org.springframework.data.domain.PageRequest.of(0, 50)
+            );
+
+            // The NA row is filtered out of the drill-down list; only the actionable BAD finding remains.
+            assertThat(recent).hasSize(1);
+            assertThat(recent.get(0).getOccurrenceKey()).isEqualTo("bad-target");
+            assertThat(recent.get(0).getPresence()).isEqualTo(Presence.ABSENT);
         }
     }
 
@@ -805,6 +842,49 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(bad.getCount()).isEqualTo(2L);
             assertThat(bad.getDistinctTargets()).isEqualTo(2L);
             assertThat(bad.getMaxConfidence()).isEqualTo(0.7f);
+        }
+
+        /**
+         * Pins the recent-window arithmetic: {@code recentCount} comes from a separate {@code :recentSince}
+         * bind, so it must count only findings at-or-after that cutoff while {@code count} spans the whole
+         * {@code :since} look-back. With {@code recentSince} strictly later than {@code since} and one of two
+         * findings falling before it, recentCount must be 1 while count is 2 — a regression that reused
+         * {@code :since} for the SUM (or dropped the :recentSince bind) would make recentCount == count and be
+         * caught here. The mentor standing floor (P4) keys on this distinction.
+         */
+        @Test
+        @DisplayName("area-standing recentCount counts only the recent window, not the full look-back")
+        void areaStandingRecentCountHonoursSeparateRecentSince() {
+            PracticeArea area = new PracticeArea();
+            area.setWorkspace(workspace);
+            area.setSlug("robust-error-handling");
+            area.setName("Handling failure robustly");
+            area = practiceAreaRepository.save(area);
+            practice.setArea(area);
+            practice = practiceRepository.save(practice);
+
+            Instant since = Instant.parse("2026-01-01T00:00:00Z");
+            Instant recentSince = Instant.parse("2026-03-15T00:00:00Z");
+            // One BAD before the recent window (still inside the full look-back) and one inside it, on two
+            // distinct targets.
+            insertAreaFinding("rc-old", 20L, "ABSENT", "BAD", "MAJOR", 0.5f, Instant.parse("2026-02-01T10:00:00Z"));
+            insertAreaFinding("rc-new", 21L, "ABSENT", "BAD", "MAJOR", 0.6f, Instant.parse("2026-03-20T10:00:00Z"));
+
+            List<AreaStandingRow> rows = observationRepository.findAreaStandingByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                since,
+                recentSince
+            );
+
+            AreaStandingRow bad = rows
+                .stream()
+                .filter(r -> r.getAssessment() == Assessment.BAD)
+                .findFirst()
+                .orElseThrow();
+            assertThat(bad.getCount()).isEqualTo(2L);
+            assertThat(bad.getRecentCount()).isEqualTo(1L); // only rc-new is at/after recentSince
+            assertThat(bad.getDistinctTargets()).isEqualTo(2L);
         }
 
         private void insertAreaFinding(

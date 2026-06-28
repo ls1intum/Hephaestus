@@ -96,6 +96,12 @@ public final class LlmProxyAuthShell {
         }
         boolean hasBaseUrl = baseUrl != null && !baseUrl.isBlank();
         return switch (provider) {
+            // Azure direct-key mode exports ONLY the key + api-version. The endpoint is NOT taken from
+            // `baseUrl` here: Pi's azure-openai-responses provider reads the separately-injected
+            // AZURE_OPENAI_BASE_URL env var (the one AZURE_* exception to the sandbox blocklist — see the
+            // class javadoc), so the caller supplies the endpoint there, not through this builder. `baseUrl`
+            // and `modelName` are intentionally ignored on this path (Azure routes by deployment name, not a
+            // wire model id); they are honoured only for the OPENAI / ANTHROPIC custom-provider extension below.
             case AZURE_OPENAI -> "export AZURE_OPENAI_API_KEY=" +
             shellQuote(credential) +
             " AZURE_OPENAI_API_VERSION=\"" +

@@ -29,8 +29,6 @@ query GetPullRequestReviewThreads(
                     id
                     isResolved
                     isOutdated
-                    path
-                    line
                     comments(first: 1) {
                         nodes {
                             id

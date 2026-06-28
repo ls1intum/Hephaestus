@@ -27,7 +27,14 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
-    /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
+    /**
+     * Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job).
+     * Fetches the bound area eagerly so {@code PracticeCatalogInjector.inject} can read
+     * {@code practice.getArea().getSlug()} for the index.json area key without firing one extra SELECT
+     * per active practice — open-in-view is disabled. Harmless for the whyBySlug/defectDetectorSlugs
+     * callers, which never touch area.
+     */
+    @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
 
     // Fetches the bound area eagerly so PracticeDTO.from (which reads area.slug) is safe to map

@@ -56,6 +56,20 @@ public class PracticeDetectionResultParser {
     private static final int MAX_GUIDANCE_LENGTH = 5_000;
     private static final int MAX_EVIDENCE_BYTES = 64 * 1024;
 
+    /** Upper bound on the raw agent output we will materialize/sanitize/parse in memory. */
+    private static final int MAX_RAW_OUTPUT_LENGTH = 1_000_000;
+
+    /**
+     * Workspace-relative prefix of the collected-output dir, derived from the ABI's absolute {@code OUTPUT_PATH}
+     * so the firewall below tracks a rename of the output dir instead of hardcoding {@code "out/"}.
+     * {@code OUTPUT_PATH} = {@code WORKSPACE_ROOT + "/out"}, so strip the root and the leading slash, then append one.
+     */
+    private static final String OUTPUT_RELATIVE_PREFIX =
+        de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.OUTPUT_PATH.substring(
+            de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.WORKSPACE_ROOT.length() + 1
+        ) +
+        "/";
+
     /** Maximum length for the pre-rendered MR/PR summary note (matches PullRequestCommentPoster.MAX_BODY_LENGTH). */
     static final int MAX_MR_NOTE_LENGTH = 60_000;
 
@@ -122,6 +136,12 @@ public class PracticeDetectionResultParser {
         String rawOutputText = rawOutputNode.asString();
         if (rawOutputText.isBlank()) {
             return ParseResult.empty("rawOutput is blank");
+        }
+        // Bound the whole pipeline (readTree AND sanitizeJsonEscapes both walk the full string), not just the
+        // fallback extractor — a runaway/oversized sandbox output must not be fully materialized in memory.
+        if (rawOutputText.length() > MAX_RAW_OUTPUT_LENGTH) {
+            log.warn("parse: rawOutput too large ({} chars), skipping", rawOutputText.length());
+            return ParseResult.empty("rawOutput too large");
         }
 
         // rawOutput is JSON but LLMs sometimes emit Swift-style \(var) interpolation that strict
@@ -213,7 +233,7 @@ public class PracticeDetectionResultParser {
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.CONTEXT_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRACTICES_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.ANALYSIS_PREFIX) ||
-            filePath.startsWith("out/") ||
+            filePath.startsWith(OUTPUT_RELATIVE_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_PREFIX) ||
             filePath.startsWith(de.tum.cit.aet.hephaestus.agent.runtime.WorkspaceAbi.PRECOMPUTE_OUT_PREFIX)
         ) {
@@ -404,7 +424,7 @@ public class PracticeDetectionResultParser {
     /**
      * Parses the optional {@code severity}. A missing, null, or non-text value defaults to
      * {@link Severity#INFO} — the model commonly omits severity on non-BAD findings, and
-     * {@link ValidatedFinding#coerceCoherence(boolean)} re-derives the final band regardless (nulling it
+     * {@link ValidatedFinding#coerceCoherence(boolean, boolean)} re-derives the final band regardless (nulling it
      * out unless {@code assessment == BAD}), so discarding such a finding would silently drop valid
      * coaching. A present but unrecognised value still fails the entry (genuinely malformed output).
      */
@@ -496,8 +516,8 @@ public class PracticeDetectionResultParser {
      */
     @Nullable
     private JsonNode extractJsonFromText(String text) {
-        // Guard: skip absurdly large inputs (agent rawOutput shouldn't exceed 1MB)
-        if (text.length() > 1_000_000) {
+        // Guard: skip absurdly large inputs (agent rawOutput shouldn't exceed MAX_RAW_OUTPUT_LENGTH)
+        if (text.length() > MAX_RAW_OUTPUT_LENGTH) {
             log.warn("extractJsonFromText: input too large ({} chars), skipping", text.length());
             return null;
         }
@@ -617,22 +637,16 @@ public class PracticeDetectionResultParser {
          *   <li><b>Severity sentinel.</b> Severity is a coaching band only for a {@code BAD} finding; it is
          *       forced null otherwise, and a {@code BAD} that arrived as {@code INFO} (a defect with no band)
          *       is raised to {@code MINOR}.</li>
+         *   <li><b>Advisory ceiling.</b> When {@code advisoryOnly} (the practice is craft/process/authoring, not
+         *       in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a {@code BAD} finding may never present as a
+         *       merge-blocker, so its {@code CRITICAL}/{@code MAJOR} band is capped to {@code MINOR}. This lands
+         *       the lesson as a suggestion rather than a "fix before merging" — reserving the blocking signal for
+         *       correctness/security/data-integrity practices so the rare real blocker is not drowned out by the
+         *       many high-confidence craft critiques. The coerced band is carried by the returned finding and is
+         *       what persists (and delivers).</li>
          * </ol>
-         * Idempotent: a no-op coercion returns {@code this}.
-         */
-        public ValidatedFinding coerceCoherence(boolean isDefectDetector) {
-            return coerceCoherence(isDefectDetector, false);
-        }
-
-        /**
-         * As {@link #coerceCoherence(boolean)}, plus the <b>advisory ceiling</b>: when {@code advisoryOnly}
-         * (the practice is craft/process/authoring, not in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a
-         * {@code BAD} finding may never present as a merge-blocker, so its {@code CRITICAL}/{@code MAJOR}
-         * band is capped to {@code MINOR}. This lands the lesson as a suggestion rather than a "fix before
-         * merging" — reserving the blocking signal for correctness/security/data-integrity practices so the
-         * rare real blocker is not drowned out by the many high-confidence craft critiques. The coerced band
-         * is carried by the returned finding and is what persists (and delivers) — the original instance is
-         * left untouched only because this returns a fresh value, not because the band is delivery-only.
+         * Idempotent: a no-op coercion returns {@code this}. The list helper
+         * {@link PracticeDetectionResultParser#coerceCoherence(List, Set)} is the sole production entry point.
          */
         public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
             Presence p = presence;
@@ -679,7 +693,7 @@ public class PracticeDetectionResultParser {
     }
 
     /**
-     * Apply {@link ValidatedFinding#coerceCoherence(boolean)} to every finding, passing the per-finding
+     * Apply {@link ValidatedFinding#coerceCoherence(boolean, boolean)} to every finding, passing the per-finding
      * defect-detector flag from {@code defectDetectorSlugs}. Returns a fresh mutable list (call sites mutate
      * it downstream for fingerprint stamping). Shared by the PR and Issue handlers so the rule lives in one
      * place and cannot drift between them.

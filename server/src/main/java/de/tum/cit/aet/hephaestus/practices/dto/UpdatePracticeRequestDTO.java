@@ -17,20 +17,24 @@ public record UpdatePracticeRequestDTO(
     @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
     @Pattern(regexp = ".*\\S.*", message = "Name must not be blank")
     @Schema(description = "Human-readable name", example = "PR Description Quality")
+    @Nullable
     String name,
 
     @Size(min = 1, max = 10, message = "Trigger events must contain between 1 and 10 entries")
     @ValidTriggerEvents
     @Schema(description = "Domain events that trigger detection")
+    @Nullable
     List<String> triggerEvents,
 
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Criteria must not be blank")
     @Schema(description = "Practice evaluation criteria")
+    @Nullable
     String criteria,
 
     @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
     @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    @Nullable
     String precomputeScript,
 
     @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact artifactType,

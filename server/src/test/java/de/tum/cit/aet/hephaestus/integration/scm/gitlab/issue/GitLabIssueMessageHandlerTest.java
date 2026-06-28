@@ -144,6 +144,46 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             verify(issueProcessor, never()).processClosed(any(), any());
             verify(issueProcessor, never()).processReopened(any(), any());
         }
+
+        @Test
+        void nullAction_skipsProcessing() throws IOException {
+            // A genuinely malformed payload omits object_attributes.action entirely (null), not a bogus
+            // string. actionType() guards null → UNKNOWN → the default/skip branch, so no processor runs.
+            var attrs = new GitLabIssueEventDTO.ObjectAttributes(
+                422296L,
+                5,
+                "Title",
+                "desc",
+                "opened",
+                null,
+                false,
+                18024L,
+                null,
+                null,
+                "2026-01-31 19:03:35 +0100",
+                "2026-01-31 19:03:35 +0100",
+                null,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
+            );
+            GitLabIssueEventDTO event = new GitLabIssueEventDTO(
+                "issue",
+                "issue",
+                createUser(),
+                createProject(),
+                attrs,
+                List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+                null,
+                null
+            );
+
+            Message msg = mockMessage(event);
+            handler.onMessage(msg);
+
+            verify(issueProcessor, never()).process(any(), any());
+            verify(issueProcessor, never()).processUpdated(any(), any());
+            verify(issueProcessor, never()).processClosed(any(), any());
+            verify(issueProcessor, never()).processReopened(any(), any());
+        }
     }
 
     // Confidential Issue Handling

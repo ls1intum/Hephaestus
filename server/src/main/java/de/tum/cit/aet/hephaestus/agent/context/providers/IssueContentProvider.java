@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
+import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireLong;
+
 import de.tum.cit.aet.hephaestus.agent.context.ContentProvider;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -62,10 +64,12 @@ public class IssueContentProvider implements ContentProvider {
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         AgentJob job = ((ContextRequest.IssueReviewRequest) request).job();
         var metadata = job.getMetadata();
-        if (metadata == null || !metadata.has("issue_id")) {
-            throw new JobPreparationException("Missing issue_id in job metadata: jobId=" + job.getId());
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
         }
-        long issueId = metadata.get("issue_id").asLong();
+        // Strict shared reader: an absent / null / non-numeric issue_id is a job-preparation failure, not
+        // a silently-defaulted 0 that would later surface as the misleading "Issue not found: issueId=0".
+        long issueId = requireLong(metadata, "issue_id");
         // TYPE(i)=Issue finder: a target_type=ISSUE job must resolve to an Issue, never a PullRequest
         // (both share the single inheritance table + id space).
         Issue issue = issueRepository

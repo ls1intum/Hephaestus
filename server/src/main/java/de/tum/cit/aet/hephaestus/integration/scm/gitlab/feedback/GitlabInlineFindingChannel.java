@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Deliv
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import java.util.ArrayList;
@@ -57,8 +58,15 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
     private static final Logger log = LoggerFactory.getLogger(GitlabInlineFindingChannel.class);
 
-    /** GitLab's max per-page limit for note pagination — sufficient since we post at most ~30 notes per review. */
-    private static final int NOTES_PAGE_SIZE = 500;
+    /**
+     * GitLab's max page size for the {@code discussions} connection (the GraphQL {@code first} cap is 100).
+     * The note count we post per review is small (~30), but an active MR's TOTAL discussion count (human
+     * threads included) routinely exceeds one page, so {@link #fetchAllDiscussions} pages on the cursor.
+     */
+    private static final int DISCUSSIONS_PAGE_SIZE = 100;
+
+    /** Hard ceiling on discussion pages walked per reconcile, mirroring the sync paginators' MAX_PAGES guard. */
+    private static final int MAX_DISCUSSION_PAGES = 50;
 
     /**
      * Hidden per-finding correlation tag embedded in a note body so a prior thread can be matched back to the
@@ -137,6 +145,11 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         int remaining = findings.size();
         boolean rateLimited = false;
         Set<String> seenKeys = new HashSet<>();
+        // Keys we've already posted/edited a thread for THIS run. Guards the case where two findings in one
+        // batch carry the same non-null recurrenceKey (a fingerprint that escaped upstream dedup): without
+        // this, both would createThread a fresh duplicate, and the next run's last-wins index would orphan one
+        // permanently (its key stays in seenKeys, so it is never reaped). First wins; the twin is skipped.
+        Set<String> processedKeys = new HashSet<>();
         List<DeliveredSignal> signals = new ArrayList<>(findings.size());
 
         for (InlineFinding finding : findings) {
@@ -155,6 +168,14 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 seenKeys.add(key);
             }
             if (finding.body() == null || finding.body().isBlank()) {
+                continue;
+            }
+
+            // Within-batch duplicate fingerprint: this key already produced a thread this run. Skip the twin
+            // rather than create a second thread that no future run could reconcile. (Null keys are
+            // pre-correlation findings and are never collapsed.)
+            if (key != null && !processedKeys.add(key)) {
+                log.warn("Skipping duplicate recurrenceKey within batch: workspaceId={}, key={}", scopeId, key);
                 continue;
             }
 
@@ -324,30 +345,53 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             return byKey;
         }
         try {
-            ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("GetMergeRequestDiscussions")
-                .variable("fullPath", projectPath)
-                .variable("iid", String.valueOf(mrIid))
-                .variable("first", NOTES_PAGE_SIZE)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
-
-            if (response == null) {
-                return byKey;
-            }
-            List<Map<String, Object>> discussions = response.field("project.mergeRequest.discussions.nodes").getValue();
-            if (discussions == null || discussions.isEmpty()) {
-                return byKey;
-            }
-
-            for (Map<String, Object> discussion : discussions) {
+            for (Map<String, Object> discussion : fetchAllDiscussions(scopeId, projectPath, mrIid)) {
                 indexDiscussion(discussion, marker, byKey);
             }
         } catch (Exception e) {
             log.debug("Failed to read MR discussions for correlation reconcile: workspaceId={}", scopeId, e);
         }
         return byKey;
+    }
+
+    /**
+     * Reads every discussion on the MR, paging on {@code discussions.pageInfo.{hasNextPage,endCursor}} via the
+     * already-declared {@code $after} variable — an active MR carries far more than one page of human + bot
+     * threads, and a single-page read would leave prior bot threads on page 2+ neither editable nor reapable.
+     * Bounded by {@link #MAX_DISCUSSION_PAGES}. Best-effort: a failed page returns what was accumulated so far.
+     */
+    private List<Map<String, Object>> fetchAllDiscussions(long scopeId, String projectPath, int mrIid) {
+        List<Map<String, Object>> all = new ArrayList<>();
+        String cursor = null;
+        int page = 0;
+        while (page < MAX_DISCUSSION_PAGES) {
+            ClientGraphQlResponse response = gitLabProvider
+                .forScope(scopeId)
+                .documentName("GetMergeRequestDiscussions")
+                .variable("fullPath", projectPath)
+                .variable("iid", String.valueOf(mrIid))
+                .variable("first", DISCUSSIONS_PAGE_SIZE)
+                .variable("after", cursor)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response == null) {
+                break;
+            }
+            List<Map<String, Object>> nodes = response.field("project.mergeRequest.discussions.nodes").getValue();
+            if (nodes != null) {
+                all.addAll(nodes);
+            }
+            GitLabPageInfo pageInfo = response
+                .field("project.mergeRequest.discussions.pageInfo")
+                .toEntity(GitLabPageInfo.class);
+            page++;
+            if (pageInfo == null || !pageInfo.hasNextPage() || pageInfo.endCursor() == null) {
+                break;
+            }
+            cursor = pageInfo.endCursor();
+        }
+        return all;
     }
 
     /** Indexes one discussion's marked bot note (if any) under its parsed correlation key. */
@@ -470,21 +514,8 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
             return;
         }
         try {
-            ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("GetMergeRequestDiscussions")
-                .variable("fullPath", projectPath)
-                .variable("iid", String.valueOf(mrIid))
-                .variable("first", NOTES_PAGE_SIZE)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
-
-            if (response == null) {
-                return;
-            }
-
-            List<Map<String, Object>> discussions = response.field("project.mergeRequest.discussions.nodes").getValue();
-            if (discussions == null || discussions.isEmpty()) {
+            List<Map<String, Object>> discussions = fetchAllDiscussions(scopeId, projectPath, mrIid);
+            if (discussions.isEmpty()) {
                 return;
             }
 

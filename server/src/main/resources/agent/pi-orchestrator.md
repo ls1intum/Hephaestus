@@ -15,7 +15,7 @@ Each finding is described on TWO independent axes:
    - `BAD` — a problem the developer should act on.
    - Required for every `PRESENT` or `ABSENT` finding; omitted only for `NOT_APPLICABLE` (see the COHERENCE RULE below).
 
-`presence` is measurement — what you saw. `assessment` is valence — whether it is good or bad. They are orthogonal; you decide each per finding by reading the practice criteria (in `inputs/practices/all-criteria.md`). The 2×2 reads directly:
+`presence` is measurement — what you saw. `assessment` is valence — whether it is good or bad. They are orthogonal; you decide each per finding by reading the practice criteria (in `inputs/practices/<slug>.md` for the practice(s) scoped to this turn; `inputs/practices/all-criteria.md` is the full bundle for reference). The 2×2 reads directly:
 
 | presence \ assessment | GOOD | BAD |
 | --- | --- | --- |
@@ -32,8 +32,15 @@ So: a BAD finding is either `PRESENT, BAD` (something harmful is in the change) 
 1. **Quote or abstain — but READ FIRST.** Every finding MUST quote the exact evidence string that decides it — a sentence from the description, a commit subject, a label value, a specific added/removed diff line (`+`/`-`), or a precompute count. Abstention (`NOT_APPLICABLE`) is better than an ungrounded finding — but abstention is NOT a substitute for reading. "I did not read the file/hunk" is NEVER a valid basis for `NOT_APPLICABLE`: read it, then decide.
 
 2. **READ-BEFORE-NA gate (MANDATORY for code-level practices).** Before you may emit `NOT_APPLICABLE` on a code-level practice
-   (testing-discipline, code-craftsmanship, robust-error-handling, secure-by-default-changes, decisions-and-documentation,
-   delivery-and-version-control-discipline), you MUST have actually examined the change: read `inputs/context/diff.patch` (every changed
+   (the leaf practices you actually score — `ships-tests-with-the-change`, `keeps-the-test-suite-honest`,
+   `removes-duplication-instead-of-copy-pasting`, `keeps-functions-small-and-single-purpose`,
+   `leaves-the-code-clean-with-intent-revealing-comments`, `handles-errors-instead-of-swallowing-them`,
+   `validates-inputs-and-edge-cases-at-the-boundary`, `avoids-unsafe-panics-and-chosen-crashes`,
+   `validates-and-escapes-untrusted-input`, `avoids-insecure-defaults-and-over-broad-permissions`,
+   `changes-dependencies-deliberately`, `records-significant-decisions-with-rationale`,
+   `documents-public-api-and-behaviour-changes`, `commits-are-atomic-and-cohesive`,
+   `excludes-generated-and-build-artifacts`, `branches-from-the-integration-branch`), you MUST have actually examined
+   the change: read `inputs/context/diff.patch` (every changed
    *code* file's hunks) — open the underlying file in `inputs/sources/scm/repo` when the hunk alone is ambiguous. `NOT_APPLICABLE` is valid
    ONLY when, having READ the changed code, the practice's subject genuinely does not occur in it (e.g. no error-handling site
    in the diff at all). NA "for insufficient coverage / I have not read the diff" is a BUG — you have a multi-minute budget;
@@ -220,7 +227,7 @@ The `task.json` prompt tells you which artifact you are reviewing. **Pull-reques
 review** has NO diff — its context is the issue body, discussion thread, and lifecycle metadata. Read the artifact's
 context files accordingly (see Workspace below) and always follow the task prompt.
 
-1. **Read** the practice catalog (`inputs/practices/all-criteria.md`, `inputs/practices/index.json`) and the artifact context: for a
+1. **Read** the practice criteria for the practice(s) scoped to this turn (`inputs/practices/<slug>.md` for each; `inputs/practices/index.json` lists the slugs, and `inputs/practices/all-criteria.md` is the full bundle for reference) and the artifact context: for a
    PR, `inputs/context/diff_summary.md` + `inputs/context/metadata.json`; for an ISSUE,
    `inputs/context/issue_summary.md` + `inputs/context/comments.json` + `inputs/context/metadata.json`. For any
    cross-artifact judgement (duplicate/overlapping issues, scope, "is this already tracked or in flight"), also read
@@ -266,7 +273,8 @@ You may also read `inputs/context/diff.patch` for line-number verification, `inp
 - `inputs/context/review_threads.json` — (PR only) the raw review-decision + thread-resolution rows (from SQL — not derivable from the worktree) **(read before judging reviewer-craft / engaging / merged-past-unresolved practices)**
 - the mounted repo at `inputs/sources/scm/repo` IS the substrate for everything else — to judge test-presence, branch origin, or any code question, search/read the repo and the diff directly rather than expecting a pre-computed file.
 - `inputs/manifest.json` — the authoritative index of EVERY context file actually materialised this run. **Before concluding a practice is `NOT_APPLICABLE` for lack of context, consult the manifest: if the file it needs is listed there, open it — do not assume it is missing.**
-- `inputs/practices/all-criteria.md` — ALL practice criteria bundled **(read this instead of individual files)**
+- `inputs/practices/<slug>.md` — the criteria for the practice(s) in this turn's scope **(read these — the runner scopes each turn to a few practices and steers you to the per-slug files because a long bundle mid-context degrades recall)**
+- `inputs/practices/all-criteria.md` — ALL practice criteria bundled (the full reference, when you need a practice outside this turn's scope)
 - `inputs/practices/index.json` — practice list with slugs
 - `work/precompute-out/summary.md` — static analysis hints (optional, may not exist)
 - `inputs/sources/scm/repo/` — full repository checkout for exploring context around changed code
@@ -274,7 +282,7 @@ You may also read `inputs/context/diff.patch` for line-number verification, `inp
 ## Rules
 
 1. Only flag **changed** code — additions (`+` lines) and deletions (`-` lines). Context lines (no prefix) are pre-existing and not in scope. A deletion can be a finding (e.g., removing error handling). Before any BAD finding, confirm the evidence is from changed lines — if unsure, grep `diff.patch` to verify.
-2. Report **all distinct findings** you can justify from the diff. Multiple BAD findings for the same practice are allowed and should be reported separately when they cover different defects. Read the criteria for each practice (from `all-criteria.md`) to decide applicability — some define themselves as always applicable.
+2. Report **all distinct findings** you can justify from the diff. Multiple BAD findings for the same practice are allowed and should be reported separately when they cover different defects. Read the criteria for each practice (from its `inputs/practices/<slug>.md`, or `all-criteria.md` for the full bundle) to decide applicability — some define themselves as always applicable.
    2a. Do **not** generate low-value review noise. If a `GOOD` finding would not materially help the author, omit it.
    2b. Do **not** stack derivative findings on top of a stronger root-cause finding unless both would independently matter to the author.
 3. Evidence snippets must be copied character-for-character from `+` or `-` lines in the diff. Do not paraphrase or reconstruct from memory. Line numbers use the `[L<n>]` annotations from `diff.patch`.

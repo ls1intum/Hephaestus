@@ -161,6 +161,100 @@ class ObservationHistoryAspectProviderTest extends BaseUnitTest {
         assertThat(shipped).doesNotContain("capped at MINOR");
     }
 
+    @Test
+    @DisplayName("rows: (presence,assessment) matrix nulls + populated reviewsReceived row")
+    void recentObservationsAndReviewsPopulated() throws Exception {
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+
+        var practiceBad = new de.tum.cit.aet.hephaestus.practices.model.Practice();
+        practiceBad.setSlug("robust-error-handling");
+        Instant observedBad = Instant.parse("2025-06-10T08:00:00Z");
+        var badObservation = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
+            .id(UUID.randomUUID())
+            .title("Swallowed IOException")
+            .practice(practiceBad)
+            .presence(Presence.PRESENT)
+            .assessment(de.tum.cit.aet.hephaestus.practices.model.Assessment.BAD)
+            .severity(Severity.MAJOR)
+            .confidence(0.9f)
+            .observedAt(observedBad)
+            .reasoning("The retry block swallows the IOException.")
+            .build();
+
+        var practiceNa = new de.tum.cit.aet.hephaestus.practices.model.Practice();
+        practiceNa.setSlug("writes-tests");
+        Instant observedNa = Instant.parse("2025-06-09T08:00:00Z");
+        // NOT_APPLICABLE: assessment AND severity are null — must serialise as JSON null, not the enum name.
+        var naObservation = de.tum.cit.aet.hephaestus.practices.model.Observation.builder()
+            .id(UUID.randomUUID())
+            .title("No test surface")
+            .practice(practiceNa)
+            .presence(Presence.NOT_APPLICABLE)
+            .assessment(null)
+            .severity(null)
+            .confidence(0.5f)
+            .observedAt(observedNa)
+            .reasoning("Docs-only change.")
+            .build();
+
+        when(
+            findingRepository.findRecentByDeveloperAndWorkspace(eq(2L), eq(1L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of(badObservation, naObservation));
+        when(findingRepository.countByPresenceForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
+        when(findingRepository.countBySeverityForDeveloper(eq(2L), eq(1L), any(Instant.class))).thenReturn(List.of());
+
+        var pr = new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+        pr.setNumber(42);
+        pr.setTitle("Add retry");
+        var review = new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview();
+        review.setPullRequest(pr);
+        var reviewer = new User();
+        reviewer.setLogin("mentor-bot");
+        review.setAuthor(reviewer);
+        review.setState(
+            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview.State.CHANGES_REQUESTED
+        );
+        review.setBody("Please add a test.");
+        review.setHtmlUrl("https://example.test/pr/42#review");
+        review.setSubmittedAt(Instant.parse("2025-06-11T12:00:00Z"));
+        when(
+            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of(review));
+
+        Map<String, byte[]> files = new HashMap<>();
+        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/findings_history.json"));
+
+        JsonNode obs = root.get("recentObservations");
+        assertThat(obs).hasSize(2);
+        JsonNode bad = obs.get(0);
+        assertThat(bad.get("practiceSlug").asString()).isEqualTo("robust-error-handling");
+        assertThat(bad.get("title").asString()).isEqualTo("Swallowed IOException");
+        assertThat(bad.get("presence").asString()).isEqualTo("PRESENT");
+        assertThat(bad.get("assessment").asString()).isEqualTo("BAD");
+        assertThat(bad.get("severity").asString()).isEqualTo("MAJOR");
+        assertThat(bad.get("observedAt").asString()).isEqualTo(observedBad.toString());
+
+        JsonNode na = obs.get(1);
+        assertThat(na.get("presence").asString()).isEqualTo("NOT_APPLICABLE");
+        // assessment/severity must be JSON null (not the string "null", not absent).
+        assertThat(na.get("assessment").isNull()).isTrue();
+        assertThat(na.get("severity").isNull()).isTrue();
+
+        JsonNode reviews = root.get("reviewsReceived");
+        assertThat(reviews).hasSize(1);
+        JsonNode r0 = reviews.get(0);
+        assertThat(r0.get("prNumber").asInt()).isEqualTo(42);
+        assertThat(r0.get("prTitle").asString()).isEqualTo("Add retry");
+        assertThat(r0.get("reviewer").asString()).isEqualTo("mentor-bot");
+        assertThat(r0.get("state").asString()).isEqualTo("CHANGES_REQUESTED");
+        assertThat(r0.get("hasComment").asBoolean()).isTrue();
+        assertThat(r0.get("submittedAt").asString()).isEqualTo("2025-06-11T12:00:00Z");
+    }
+
     private static PresenceCount mockObservationCount(Presence v, long c) {
         return new PresenceCount() {
             @Override

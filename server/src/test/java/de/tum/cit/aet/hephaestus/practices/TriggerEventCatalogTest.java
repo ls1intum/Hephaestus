@@ -27,6 +27,16 @@ class TriggerEventCatalogTest extends BaseUnitTest {
     }
 
     @Test
+    void pullRequestFocus_carriesRetrospectiveClosedEvent() {
+        // The abandoned-PR outcome (wasMerged=false) is the contract-sensitive sibling of PULL_REQUEST_MERGED
+        // (ScmDomainEvent.TriggerEventNames.PULL_REQUEST_CLOSED javadoc). Assert it explicitly so a regression
+        // that drops the not-landed trigger from PULL_REQUEST_EVENTS fails loudly instead of only via the
+        // transitive disjointness check.
+        var pr = TriggerEventCatalog.eligibleFor(WorkArtifact.PULL_REQUEST);
+        assertThat(pr).contains(TriggerEventNames.PULL_REQUEST_CLOSED);
+    }
+
+    @Test
     void issueFocus_carriesIssueEvents() {
         var issue = TriggerEventCatalog.eligibleFor(WorkArtifact.ISSUE);
         assertThat(issue).contains(TriggerEventNames.ISSUE_CREATED, TriggerEventNames.ISSUE_LABELED);

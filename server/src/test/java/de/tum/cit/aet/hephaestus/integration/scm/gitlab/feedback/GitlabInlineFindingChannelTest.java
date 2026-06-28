@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Inlin
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
@@ -324,6 +325,37 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         verify(destroySpec, never()).variable("noteId", "gid://Note/B");
     }
 
+    /**
+     * A prior bot thread that lives on discussion page 2 must still be matched and edited in place — the read
+     * pages on {@code discussions.pageInfo}. A single-page read would miss it and re-post a duplicate.
+     */
+
+    /**
+     * Two findings in one batch carrying the SAME non-null recurrenceKey (a fingerprint that escaped upstream
+     * dedup): only the first creates a thread; the twin is skipped so no orphan thread is left behind.
+     */
+    @Test
+    void skipsDuplicateRecurrenceKeyWithinBatch() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of()); // no prior threads
+        stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(
+                new InlineFinding(new DiffAnchor("src/A.java", 10, null), "first", MARKER, "ck-dup"),
+                new InlineFinding(new DiffAnchor("src/B.java", 20, null), "twin", MARKER, "ck-dup")
+            )
+        );
+
+        // Exactly one thread is created and exactly one signal emitted; the twin is dropped.
+        verify(client).documentName("CreateDiffNote");
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.signals())
+            .singleElement()
+            .satisfies(s -> assertThat(s.recurrenceKey()).isEqualTo("ck-dup"));
+    }
+
     // --- stubbing helpers ----------------------------------------------------------------------------------
 
     private void stubResolvedMr() {
@@ -334,15 +366,28 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         );
     }
 
+    /** Stubs a single page of discussions (pageInfo.hasNextPage=false), the common case. */
     private void stubDiscussionsReturning(List<Map<String, Object>> discussions) {
         HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
         when(client.documentName("GetMergeRequestDiscussions")).thenReturn(spec);
         when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = discussionsResponse(discussions, new GitLabPageInfo(false, null));
+        when(spec.execute()).thenReturn(Mono.just(response));
+    }
+
+    /** Builds a discussions GraphQL response carrying the given nodes + pageInfo. */
+    private static ClientGraphQlResponse discussionsResponse(
+        List<Map<String, Object>> discussions,
+        GitLabPageInfo pageInfo
+    ) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField nodesField = mock(ClientResponseField.class);
         when(response.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
         when(nodesField.getValue()).thenReturn(discussions);
-        when(spec.execute()).thenReturn(Mono.just(response));
+        ClientResponseField pageInfoField = mock(ClientResponseField.class);
+        when(response.field("project.mergeRequest.discussions.pageInfo")).thenReturn(pageInfoField);
+        when(pageInfoField.toEntity(GitLabPageInfo.class)).thenReturn(pageInfo);
+        return response;
     }
 
     /** Stubs a successful CreateDiffNote returning the given note + discussion ids; captures the posted body. */

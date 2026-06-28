@@ -31,7 +31,7 @@ final class MetaJson {
         // string and silently pass as a branch/SHA, so the "wrong type → null" contract must guard the type.
         if (node.has(field) && node.get(field).isString()) {
             String value = node.get(field).asString();
-            return (value != null && !value.isBlank()) ? value : null;
+            return value.isBlank() ? null : value;
         }
         return null;
     }

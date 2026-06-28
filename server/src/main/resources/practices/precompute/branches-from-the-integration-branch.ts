@@ -16,7 +16,7 @@ export default async function (_r: string, _d: Map<string, DiffFile>, meta: Pull
 		);
 	} else if (targetIsIntegration) {
 		directions.push(
-			`This PR targets '${meta.target_branch}', a conventional integration branch — the concrete off-integration signal is FALSE (the practice's subject, branching off a non-integration branch, does not occur here). Decide the observation from that fact; do NOT claim git history is unavailable — the full clone IS mounted at inputs/sources/scm/repo.`,
+			`target_branch '${meta.target_branch}' is a conventional integration branch (main/master/dev/develop); the full clone is mounted at inputs/sources/scm/repo if you need the ahead-range/authors.`,
 		);
 	}
 	if (prCommitCount >= 8) {

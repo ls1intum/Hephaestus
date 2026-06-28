@@ -1,39 +1,28 @@
 // Precompute HINTS for ships-tests-with-the-change. Surfaces facts only — the LLM judges.
-import { findFiles } from "../lib/grep";
 import type { DiffFile, PullRequestMetadata } from "../lib/types";
 
 const TEST =
 	/(^|\/)(tests?|specs?|__tests__)(\/)|[._-](test|tests|spec|specs)\.[a-z]+$|Tests?\.[a-z0-9]+$|Spec\.[a-z0-9]+$/i;
 const CODE = /\.(swift|ts|tsx|js|jsx|py|java|kt|go|rb|cs|cpp|cc|cxx|c|m|mm|h|hpp)$/i;
 const isTest = (p: string) => TEST.test(p);
+// Mirrors lib/grep.ts#shouldIncludeDiscoveredFile: skip node_modules, .build, and dotfile dirs.
+const isExcluded = (p: string) =>
+	p.split("/").some((seg) => seg === "node_modules" || seg === ".build" || seg.startsWith("."));
 
 export default async function (repoPath: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
 	let repoTestFileCount = 0;
 	let repoCodeFileCount = 0;
-	for (const ext of [
-		"swift",
-		"ts",
-		"tsx",
-		"js",
-		"jsx",
-		"py",
-		"java",
-		"kt",
-		"go",
-		"rb",
-		"cs",
-		"cpp",
-		"cc",
-		"cxx",
-		"c",
-		"m",
-		"mm",
-		"h",
-		"hpp",
-	]) {
-		const all = await findFiles(repoPath, ext);
-		repoCodeFileCount += all.length;
-		repoTestFileCount += all.filter(isTest).length;
+	// One tree walk classified by extension, instead of one full scan per extension (~19x the I/O
+	// under the shared 15s precompute timeout). The brace pattern enumerates the same code extensions.
+	const matcher = new Bun.Glob("**/*.{swift,ts,tsx,js,jsx,py,java,kt,go,rb,cs,cpp,cc,cxx,c,m,mm,h,hpp}");
+	for (const path of matcher.scanSync(repoPath)) {
+		if (isExcluded(path)) {
+			continue;
+		}
+		repoCodeFileCount += 1;
+		if (isTest(path)) {
+			repoTestFileCount += 1;
+		}
 	}
 	const changed = [...diffFiles.keys()];
 	const diffTestFiles = changed.filter(isTest).length;

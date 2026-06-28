@@ -774,11 +774,6 @@ class MentorLiveLlmTest {
                 .isTrue();
         }
 
-        /** Test-only escape hatch: send a raw method call and return the full response frame. */
-        JsonNode callRaw(String method, JsonNode params, Duration timeout) {
-            return call(method, params, timeout);
-        }
-
         private JsonNode call(String method, JsonNode params, Duration timeout) {
             int id = requestIdCounter.incrementAndGet();
             ObjectNode request = MAPPER.createObjectNode();

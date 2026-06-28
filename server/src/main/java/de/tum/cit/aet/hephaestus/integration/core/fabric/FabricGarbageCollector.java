@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.fabric;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,8 +25,11 @@ import tools.jackson.databind.json.JsonMapper;
  * mark-and-sweeps the {@link ContentAddressedStore} against the blobs still referenced by the surviving
  * job manifests. A blob wrongly swept is simply rebuilt on next access; SQL stays the source of truth.
  *
- * <p>Mirrors the established {@code @Scheduled} sweepers (ExportRetentionSweeper, AccountHardDeleteSweeper).
+ * <p>Mirrors the established {@code @Scheduled} sweepers (ExportRetentionSweeper, AccountHardDeleteSweeper),
+ * including their {@link ConditionalOnServerRole} gate so the bean only exists on the server role rather than
+ * relying incidentally on {@code @EnableScheduling} placement to keep {@link #collect()} from firing off-role.
  */
+@ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic(
     "The fabric cache (content-addressed blob store + job-replay dirs) is shared across all workspaces " +

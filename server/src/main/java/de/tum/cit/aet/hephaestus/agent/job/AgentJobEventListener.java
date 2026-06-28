@@ -193,9 +193,7 @@ public class AgentJobEventListener {
      * Routes a terminal-state PR event through the same gate as the live handlers, but WITHOUT the
      * closed/merged short-circuit — closed/merged IS the expected state here. Sync events are still
      * skipped: a sync replays history en masse and would fire a retrospective review for every PR the
-     * repository ever merged, so retrospective detection is for real-time terminal transitions only. To
-     * validate this path on a synced mirror (no live webhooks), use the dev-trigger endpoint with a
-     * {@code triggerEvent} param, which calls the gate directly and bypasses the sync guard.
+     * repository ever merged, so retrospective detection is for real-time terminal transitions only.
      */
     private void handleRetrospectivePullRequestEvent(
         ScmEventPayload.PullRequestData prData,

@@ -60,7 +60,10 @@ public class GithubFeedbackChannel implements FeedbackChannel {
         if (repoFullName == null || repoFullName.isBlank()) {
             throw new IllegalArgumentException("repoFullName is required");
         }
-        if (repoFullName.split("/", 3).length != 2) {
+        // Require exactly two NON-BLANK segments — "owner/", "/repo" and "owner/repo/x" must all fail fast
+        // rather than yield a malformed "owner/#42" / "owner//issues/42" subject downstream.
+        String[] parts = repoFullName.split("/", 3);
+        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
             throw new IllegalArgumentException("GitHub repoFullName must be 'owner/repo': " + repoFullName);
         }
         return repoFullName;

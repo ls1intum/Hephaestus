@@ -621,6 +621,50 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
 
         @Test
+        void skipWhenAssigneeHalfSyncedNoProvider() {
+            // Fail-safe guard: an assignee whose provider didn't sync has no resolvable identity, so the
+            // gate must skip it WITHOUT a role lookup (a null subject would otherwise be passed to hasRole).
+            PullRequest pr = createPullRequest();
+            Practice practice = createPractice(TRIGGER_EVENT);
+            setupThroughPracticeMatching(pr, practice);
+
+            User assignee = createUser("half-synced");
+            assignee.setProvider(null);
+            pr.setAssignees(Set.of(assignee));
+            when(userRoleChecker.isHealthy()).thenReturn(true);
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
+                "no assignee with role: " + PRACTICE_REVIEW_ROLE
+            );
+            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
+        }
+
+        @Test
+        void skipWhenAssigneeHalfSyncedNoNativeId() {
+            // Same fail-safe guard for the other half of the (provider, subject) identity: a missing
+            // native id also short-circuits before any role lookup.
+            PullRequest pr = createPullRequest();
+            Practice practice = createPractice(TRIGGER_EVENT);
+            setupThroughPracticeMatching(pr, practice);
+
+            User assignee = createUser("half-synced");
+            assignee.setNativeId(null);
+            pr.setAssignees(Set.of(assignee));
+            when(userRoleChecker.isHealthy()).thenReturn(true);
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
+                "no assignee with role: " + PRACTICE_REVIEW_ROLE
+            );
+            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
+        }
+
+        @Test
         void skipWhenRoleCheckThrowsException() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(TRIGGER_EVENT);

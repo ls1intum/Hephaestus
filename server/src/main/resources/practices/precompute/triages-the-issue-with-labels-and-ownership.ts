@@ -14,10 +14,13 @@ interface IssueMeta {
 
 export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
 	const labels = m.labels ?? [];
-	const assignees = m.assignees ?? (m.assignee ? [m.assignee] : []);
+	// Prefer a non-empty plural array, then fall back to the singular owner — a producer that always emits
+	// `assignees: []` plus a separate `assignee` would otherwise under-report ownership (`??` only fires on
+	// null/undefined, not on an empty array).
+	const assignees = m.assignees && m.assignees.length > 0 ? m.assignees : m.assignee ? [m.assignee] : [];
 	const milestone = m.milestone ?? null;
 	const state = (m.state ?? "").toUpperCase();
-	// A self-applied staleness/rot label on a still-OPEN issue with no owner is an untriaged liability, not a routable issue.
+	// Presence of a staleness/rot label on a still-OPEN issue with no owner — surface it as a fact; the LLM decides whether routing metadata is missing.
 	const staleLabel = labels.find((l) => /out.?of.?date|stale|rotten|obsolete|outdated|deprecated/i.test(l)) ?? null;
 
 	const directions: string[] = [
@@ -25,12 +28,12 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	];
 	if (staleLabel && state === "OPEN" && assignees.length === 0) {
 		directions.push(
-			`ROT SIGNAL: OPEN issue self-labeled "${staleLabel}" with no assignee — an untriaged rotting liability. This is a candidate triage/lifecycle finding (no owner to act on a known-stale item), not something to wave through as routable.`,
+			`OPEN issue carries a staleness label "${staleLabel}" and has no assignee — presence facts only; confirm against the labels/owner before deciding whether routing metadata is missing, and do not assert the label is the correct one.`,
 		);
 	}
 	if (labels.length === 0 && assignees.length === 0 && !milestone) {
 		directions.push(
-			`No labels, no assignee, no milestone — a strong candidate finding for un-triaged routing metadata (unless the issue is a pure question).`,
+			`No labels, no assignee, no milestone present — confirm whether the issue is a pure question/discussion (which legitimately needs none) before treating absent routing metadata as a gap.`,
 		);
 	}
 

@@ -8,6 +8,9 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -43,20 +46,39 @@ public class PracticeAreaService {
 
     /**
      * Sets each area's {@code displayOrder} to its index in the given list — one atomic write of the
-     * whole ordering, so a mid-list failure can't leave duplicate/garbled order values. Every slug must
-     * belong to the workspace (a stale/foreign slug is a 404) and must be unique (a duplicate slug would
-     * silently assign two indices to one area and is rejected up front).
+     * whole ordering, so a mid-list failure can't leave duplicate/garbled order values. The list must be a
+     * TOTAL ordering: exactly the workspace's full set of area slugs, each unique. A duplicate slug (which
+     * would silently assign two indices to one area) and a partial list (which would leave the omitted areas
+     * at stale {@code displayOrder} values that collide with the reassigned 0..n-1 indices) are both rejected
+     * up front, so the stated total-ordering invariant actually holds.
      */
     @Transactional
     public void reorder(WorkspaceContext ctx, List<String> orderedSlugs) {
         if (new HashSet<>(orderedSlugs).size() != orderedSlugs.size()) {
             throw new IllegalArgumentException("orderedSlugs must not contain duplicate slugs");
         }
+        List<PracticeArea> areas = practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
+        Set<String> existingSlugs = areas.stream().map(PracticeArea::getSlug).collect(Collectors.toSet());
+        Set<String> requestedSlugs = new HashSet<>(orderedSlugs);
+        if (!existingSlugs.equals(requestedSlugs)) {
+            // A foreign/stale slug is a 404; a partial list (missing some of the workspace's areas) is a 400 —
+            // either way the request is not the total ordering the invariant requires.
+            String unknown = requestedSlugs
+                .stream()
+                .filter(s -> !existingSlugs.contains(s))
+                .findFirst()
+                .orElse(null);
+            if (unknown != null) {
+                throw new EntityNotFoundException("PracticeArea", unknown);
+            }
+            throw new IllegalArgumentException(
+                "orderedSlugs must contain every practice area in the workspace (a complete ordering)"
+            );
+        }
+        Map<String, PracticeArea> bySlug = areas.stream().collect(Collectors.toMap(PracticeArea::getSlug, a -> a));
         int order = 0;
         for (String slug : orderedSlugs) {
-            PracticeArea area = practiceAreaRepository
-                .findByWorkspaceIdAndSlug(ctx.id(), slug)
-                .orElseThrow(() -> new EntityNotFoundException("PracticeArea", slug));
+            PracticeArea area = bySlug.get(slug);
             area.setDisplayOrder(order++);
             practiceAreaRepository.save(area);
         }

@@ -31,14 +31,18 @@ import org.springframework.context.annotation.Configuration;
  *
  * <h2>Mentor aspect caches</h2>
  *
- * <p>{@code mentor_user_aspect}, {@code mentor_workspace_aspect},
- * {@code mentor_practice_aspect}, {@code mentor_practice_standing_aspect},
- * {@code mentor_findings_aspect} feed the
- * {@code agent.context.providers.mentor.*} content providers. 5-minute TTL is short enough
- * that staleness across a single chat turn (which itself runs in seconds) is invisible to
- * users, but long enough that two consecutive turns from the same user hit warm. The
- * invalidator ({@code MentorContextInvalidator}) evicts surgically on PR / Issue events for
- * per-user caches; the practice cache has no event-driven invalidator and relies on TTL alone.
+ * <p>The {@code mentor_*_aspect} caches feed the {@code agent.context.providers.mentor.*}
+ * content providers. 5-minute TTL is short enough that staleness across a single chat turn
+ * (which itself runs in seconds) is invisible to users, but long enough that two consecutive
+ * turns from the same user hit warm.
+ *
+ * <p>The invalidator ({@code MentorContextInvalidator}) evicts surgically on PR / Issue /
+ * review and detection-completed events. Event-invalidated caches: {@code mentor_user_aspect},
+ * {@code mentor_workspace_aspect}, {@code mentor_findings_aspect},
+ * {@code mentor_practice_standing_aspect}, {@code mentor_authored_work_aspect} (see
+ * {@code MentorContextInvalidator.PER_USER_CACHES} for the authoritative list). TTL-only caches
+ * (no event-driven invalidator): {@code mentor_delivered_feedback_aspect} (immutable once posted,
+ * so it cannot drift) and {@code mentor_practice_aspect}.
  */
 @Configuration
 public class CacheConfig {
@@ -53,8 +57,11 @@ public class CacheConfig {
      * TTL for the JWT revocation NEGATIVE cache. Only REVOKED verdicts are cached (see
      * {@code RevocationAwareJwtDecoder}), so this is not a staleness window — a cached REVOKED entry
      * can never be wrong (revocation is monotonic). It only bounds how long a revocation is remembered
-     * locally to shed token-replay load; sized to the access-token lifetime so a revoked token is
-     * remembered for as long as it could still be presented.
+     * locally to shed token-replay load; sized to the DEFAULT access-token lifetime
+     * ({@code AuthProperties.accessTtl} default "15m"). This is a static load-shedding hint, not a
+     * tracked invariant: if an operator raises accessTtl above 15m, a revoked token presented after
+     * this window simply forces a fresh DB re-read (still correct — the negative cache is only ever
+     * more permissive in forgetting, never in admitting).
      */
     private static final Duration AUTH_JWT_REVOKED_TTL = Duration.ofMinutes(15);
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -356,6 +357,67 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         assertThat(result.signals()).isEmpty();
     }
 
+    @Test
+    void graphqlErrorOnBatchRoutesPostedToFailedButKeepsPreserved() {
+        // Partial-failure ledger semantics: when the addPullRequestReview mutation returns GraphQL errors, every
+        // freshly-posted thread is FAILED, the preserved survivors stay POSTED, and BOTH categories remain in
+        // signals() so the SPI invariant posted + failed == signals.size() holds and the placement layer can
+        // persist an accurate posted_state per finding.
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+
+        // ck-foo has a live prior thread (preserved); ck-bar is new (posted, then fails on the GraphQL error).
+        stubReviewThreads(List.of(thread("THREAD_foo", "RC_old_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
+        stubAddReviewWithErrors();
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(
+                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
+            )
+        );
+
+        // 1 thread posted-then-failed; the 1 preserved survivor stays posted; invariant holds (1 + 1 == 2 signals).
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.signals()).hasSize(2);
+        assertThat(signalForKey(result, "ck-foo").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
+        assertThat(signalForKey(result, "ck-bar").disposition()).isEqualTo(Disposition.FAILED);
+    }
+
+    @Test
+    void exceptionDuringBatchRoutesPostedToFailedButKeepsPreserved() {
+        // The catch-all path: an unexpected exception (e.g. a thrown block timeout) during the mutation must mirror
+        // the GraphQL-error ledger semantics — posted→FAILED, preserved survives, invariant preserved.
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+
+        stubReviewThreads(List.of(thread("THREAD_foo", "RC_old_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("AddPullRequestReviewWithThreads")).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        when(spec.execute()).thenReturn(Mono.error(new RuntimeException("boom")));
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(
+                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
+            )
+        );
+
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.signals()).hasSize(2);
+        assertThat(signalForKey(result, "ck-foo").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
+        assertThat(signalForKey(result, "ck-bar").disposition()).isEqualTo(Disposition.FAILED);
+    }
+
     // --- stubbing helpers ----------------------------------------------------------------------------------
 
     /** Stubs GetPullRequestReviewThreads to return a single page of the given thread nodes. */
@@ -384,6 +446,19 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubField(response, "addPullRequestReview.pullRequestReview.comments.nodes", commentNodes);
         when(spec.execute()).thenReturn(Mono.just(response));
         return spec;
+    }
+
+    /** Stubs AddPullRequestReviewWithThreads to return a non-empty {@code errors} list (batch GraphQL failure). */
+    private void stubAddReviewWithErrors() {
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("AddPullRequestReviewWithThreads")).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+
+        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        ResponseError error = mock(ResponseError.class);
+        lenient().when(error.getMessage()).thenReturn("commitOID is not a valid GitObjectID");
+        when(response.getErrors()).thenReturn(List.of(error));
+        when(spec.execute()).thenReturn(Mono.just(response));
     }
 
     /** Like {@link #stubAddReview} but captures the {@code threads} variable so the body can be asserted. */

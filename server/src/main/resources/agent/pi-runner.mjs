@@ -331,8 +331,14 @@ function extractLastAssistantText(sessionState) {
     return null;
 }
 
+// Mirror PracticeDetectionResultParser.MAX_RAW_OUTPUT_LENGTH on the Java side: a well-formed agent
+// rawOutput never approaches this, so a larger blob is junk and the brace-scan below would burn the
+// remaining grace window parsing growing slices for nothing.
+const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
+
 function tryParseJsonFromText(text) {
     if (!text) return null;
+    if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
     try {
         const parsed = JSON.parse(text);
         if (isValidFindingsPayload(parsed)) return parsed;
@@ -350,7 +356,12 @@ function tryParseJsonFromText(text) {
     const findingsMatch = text.match(/\{\s*"findings"/);
     if (!findingsMatch || findingsMatch.index === undefined) return null;
     const braceStart = findingsMatch.index;
-    for (let end = text.indexOf("}", braceStart); end >= 0; end = text.indexOf("}", end + 1)) {
+    // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
+    // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
+    // extractJsonFromText, which caps at a small fixed number of attempts).
+    let attempts = 0;
+    for (let end = text.indexOf("}", braceStart); end >= 0 && attempts < 256; end = text.indexOf("}", end + 1)) {
+        attempts++;
         try {
             const candidate = text.slice(braceStart, end + 1);
             const parsed = JSON.parse(candidate);

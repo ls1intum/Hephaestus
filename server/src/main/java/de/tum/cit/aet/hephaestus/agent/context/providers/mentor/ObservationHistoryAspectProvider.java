@@ -33,10 +33,10 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/findings_history.json} for {@link MentorChatRequest}.
  *
- * <p>Combines per-practice findings (the practice-detection agent's output for this
+ * <p>Combines per-practice observations (the practice-detection agent's output for this
  * developer over the last 90 days) and reviews received in the same window. Lets the
- * mentor refer to specific findings by title and severity when discussing the user's work
- * patterns.
+ * mentor refer to specific observations by title and severity when discussing the user's
+ * work patterns.
  *
  * <p>Cache key: {@code workspaceId + ":" + developerId} — per-user-per-workspace.
  */
@@ -55,7 +55,7 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
     /** Look-back horizon — mirrors the {@code MAX_LOOKBACK_DAYS} in the TS feedback tool. */
     private static final int LOOKBACK_DAYS = 90;
 
-    /** Cap on findings shipped per turn. The aggregations are unbounded — the list is the budget. */
+    /** Cap on observations shipped per turn. The aggregations are unbounded — the list is the budget. */
     private static final int MAX_RECENT_OBSERVATIONS = 50;
 
     /** Cap on review entries — enough to spot patterns, bounded for envelope size. */
@@ -152,9 +152,9 @@ public class ObservationHistoryAspectProvider implements ContentProvider {
             severityNode.put(row.getSeverity().name(), row.getCount());
         }
 
-        ArrayNode findingsArr = root.putArray("recentObservations");
+        ArrayNode observationsArr = root.putArray("recentObservations");
         for (Observation o : recent) {
-            ObjectNode node = findingsArr.addObject();
+            ObjectNode node = observationsArr.addObject();
             node.put("id", o.getId().toString());
             node.put("title", o.getTitle());
             node.put("practiceSlug", o.getPractice().getSlug());

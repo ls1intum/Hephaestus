@@ -175,6 +175,26 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("parses a space-containing (git-quoted) path from the +++ b/ line")
+        void quotedPathFromPlusLine() {
+            // git quotes paths containing spaces: `diff --git "a/x y" "b/x y"`. The `diff --git` heuristic
+            // (lastIndexOf " b/") cannot find the path there, so currentFile must come from the +++ b/ line
+            // (which is unquoted-stripped) — otherwise this file's notes never match and validation is disabled.
+            String diff = """
+                diff --git "a/src/my file.swift" "b/src/my file.swift"
+                --- "a/src/my file.swift"
+                +++ "b/src/my file.swift"
+                @@ -1,1 +1,2 @@
+                 existing
+                +added
+                """;
+            Map<String, TreeSet<Integer>> result = DiffHunkValidator.parseValidLines(diff);
+
+            assertThat(result).containsKey("src/my file.swift");
+            assertThat(result.get("src/my file.swift")).containsExactly(1, 2);
+        }
+
+        @Test
         @DisplayName("handles hunk starting at line 0 (pure addition)")
         void hunkStartAtZero() {
             String diff = """
@@ -315,6 +335,39 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             assertThat(result.getFirst().startLine()).isEqualTo(10);
             // endLine should collapse to 10, not jump to 100
             assertThat(result.getFirst().endLine()).isEqualTo(10);
+        }
+
+        @Test
+        @DisplayName("validates endLine even when startLine is already valid")
+        void validStartButGapCrossingEndLineCollapses() {
+            // startLine 10 is a valid diff line, so it is never snapped — but endLine 13 spans the non-diff
+            // interior line 11. The valid-start branch must still run the span-containment guard and collapse
+            // endLine to startLine, or GitHub rejects the multi-line suggestion anchor at the API.
+            TreeSet<Integer> lines = new TreeSet<>(List.of(10, 12, 13));
+            DiffNote note = new DiffNote("File.swift", 10, 13, "valid start, gap-crossing end");
+            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
+                List.of(note),
+                Map.of("File.swift", lines),
+                "job-1"
+            );
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().startLine()).isEqualTo(10);
+            assertThat(result.getFirst().endLine()).isEqualTo(10);
+        }
+
+        @Test
+        @DisplayName("keeps a valid-start contiguous endLine unchanged")
+        void validStartContiguousEndLineKept() {
+            TreeSet<Integer> lines = new TreeSet<>(List.of(10, 11, 12, 13));
+            DiffNote note = new DiffNote("File.swift", 10, 13, "valid start, contiguous end");
+            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
+                List.of(note),
+                Map.of("File.swift", lines),
+                "job-1"
+            );
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().startLine()).isEqualTo(10);
+            assertThat(result.getFirst().endLine()).isEqualTo(13);
         }
 
         @Test

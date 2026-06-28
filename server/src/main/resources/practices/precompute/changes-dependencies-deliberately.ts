@@ -36,6 +36,16 @@ function isLoose(c: string): boolean {
 	return LOOSE.test(t);
 }
 
+// A package.json string value LOOKS like a dependency constraint (semver/range/protocol) rather than a
+// script body, an `engines`/`exports`/`resolutions`/`config` value, etc. The per-line JSON parser cannot
+// see which object block a line sits in, so this shape guard keeps `"build": "tsc"` or `"./dist": "..."`
+// out of the dependency tally. A bare "*"/"x"/"latest" and the npm pseudo-protocols (workspace:/npm:/
+// file:/link:/git/http) are real dependency specifiers and are admitted.
+const VERSIONISH = /^(?:[\^~>=<* v]|\d|x\b|latest$|workspace:|npm:|file:|link:|git[+:]|https?:|github:|gitlab:|bitbucket:)/i;
+function isVersionish(c: string): boolean {
+	return VERSIONISH.test(c.trim());
+}
+
 // --- per-ecosystem line parsers (kept deliberately small + tolerant; the LLM reads full context) ---
 
 // JSON "name": "constraint"  (package.json dependency blocks)
@@ -84,6 +94,10 @@ const ECOSYSTEMS: Ecosystem[] = [
 			if (!m) return null;
 			// Skip the package's own scalar fields (name/version/etc.) so we only surface dependency-block edits.
 			if (NPM_NON_DEP_KEYS.has(m[1].toLowerCase())) return null;
+			// Per-line parsing can't tell a dependency block from scripts/engines/exports/resolutions/config —
+			// they all share the `"key": "value"` shape. Require the value to look like a version specifier so a
+			// `"build": "tsc"` line is not misread as `dep:ADDED build tsc`.
+			if (!isVersionish(m[2])) return null;
 			return { name: m[1], constraint: m[2] };
 		},
 	},
@@ -174,6 +188,11 @@ function basenameLower(path: string): string {
 	return (path.split("/").pop() ?? path).toLowerCase();
 }
 
+// Escape a dependency name for safe embedding in a RegExp (names can contain ., -, /, @ and similar).
+function escapeRegExp(s: string): string {
+	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function ecosystemFor(path: string): Ecosystem | null {
 	const base = basenameLower(path);
 	return ECOSYSTEMS.find((e) => e.isManifest(base)) ?? null;
@@ -209,21 +228,27 @@ function collectDeps(
 	return out;
 }
 
-// Maven needs pairing of <artifactId>/<version> across adjacent lines; handle it on its own.
+// Maven needs pairing of <artifactId>/<version> across adjacent lines; handle it on its own. A <version>
+// only pairs with an <artifactId> within MVN_PAIR_WINDOW lines — a non-adjacent version belongs to a
+// different coordinate and must not be stitched onto the wrong artifactId (which would forge a PIN_DROPPED
+// when the artifact's real version sits further down).
+const MVN_PAIR_WINDOW = 2;
 function collectMavenDeps(df: DiffFile, side: "added" | "removed"): Map<string, string> {
 	const out = new Map<string, string>();
 	const lines = side === "added" ? df.addedLines : df.removedLines;
 	const ordered = [...lines.entries()].sort((a, b) => a[0] - b[0]);
 	let pendingName: string | null = null;
-	for (const [, content] of ordered) {
+	let pendingLine = 0;
+	for (const [ln, content] of ordered) {
 		const a = reMvnArtifact.exec(content);
 		if (a) {
 			pendingName = a[1];
+			pendingLine = ln;
 			out.set(a[1], ""); // record artifact even if no adjacent version line appears
 			continue;
 		}
 		const v = reMvnVersion.exec(content);
-		if (v && pendingName) {
+		if (v && pendingName && ln - pendingLine <= MVN_PAIR_WINDOW) {
 			out.set(pendingName, v[1]);
 			pendingName = null;
 		}
@@ -266,9 +291,15 @@ export default async function (repoPath: string, diffFiles: Map<string, DiffFile
 		const added = isMaven ? collectMavenDeps(df, "added") : collectDeps(df, eco, "added");
 		const removed = isMaven ? collectMavenDeps(df, "removed") : collectDeps(df, eco, "removed");
 
-		// helper to find the diff line for a dependency name on a given side (for hint placement).
+		// helper to find the diff line for a dependency name on a given side (for hint placement). Match on a
+		// quote/word/coordinate boundary, not a bare substring, so a prefix-sharing sibling (react vs
+		// react-dom, or a scoped name appearing inside another package's URL) doesn't grab the wrong line.
 		const lineFor = (name: string, side: "added" | "removed"): number => {
 			const lines = side === "added" ? df.addedLines : df.removedLines;
+			const bounded = new RegExp(`(^|[^\\w.\\-/])${escapeRegExp(name)}([^\\w.\\-/]|$)`);
+			for (const [ln, content] of lines) if (bounded.test(content)) return ln;
+			// Fallback: a constructed key (e.g. a Gradle group:name coordinate) may not survive the boundary
+			// test against the raw line — keep the substring scan so the hint still lands on a real line.
 			for (const [ln, content] of lines) if (content.includes(name)) return ln;
 			return 0;
 		};
@@ -315,11 +346,18 @@ export default async function (repoPath: string, diffFiles: Map<string, DiffFile
 
 	const lockfilePresent = repoLockfilesPresent.size > 0 || touchedLockfiles.size > 0;
 
+	const mavenChanged = [...changedManifests].some((p) => basenameLower(p) === "pom.xml");
+
 	const directions: string[] = [];
 	if (changedManifests.size > 0) {
 		directions.push(
 			`Dependency manifest(s) changed (${changedManifests.size}): ${depsAdded} added, ${depsRemoved} removed, ${pinsLoosened} pin(s) loosened, ${pinsDropped} pin(s) dropped, ${bumped} version bump(s) — investigate whether each constraint change is deliberate and appropriately bounded.`,
 		);
+		if (mavenChanged) {
+			directions.push(
+				"pom.xml hints pair any <artifactId>/<version> on changed lines, so they may include build-plugin or parent/BOM coordinates (from <plugin>/<parent>/<dependencyManagement> blocks), not only runtime dependencies — confirm the coordinate is an actual dependency before treating it as one.",
+			);
+		}
 		if (!lockfilePresent) {
 			directions.push(
 				"No sibling lockfile is present in the repo and none was touched in the diff — investigate whether the ecosystem expects a committed lockfile to make the resolved versions reproducible.",

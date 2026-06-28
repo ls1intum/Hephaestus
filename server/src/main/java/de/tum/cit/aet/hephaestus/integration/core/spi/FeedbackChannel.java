@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
+import java.util.Objects;
+
 /**
  * Root feedback SPI — every kind that declares {@link Capability#FEEDBACK_DELIVERY}
  * implements this. {@link InlineFindingChannel} and {@link ApprovalChannel} are
@@ -76,6 +78,12 @@ public interface FeedbackChannel {
         }
 
         public static UpdateOutcome edited(SummaryHandle handle) {
+            // EDITED guarantees a usable handle (the caller dereferences handle().externalId()); a null
+            // handle / blank id is a contract bug in an impl — fail at the boundary, not as a downstream NPE.
+            Objects.requireNonNull(handle, "EDITED outcome requires a SummaryHandle");
+            if (handle.externalId() == null || handle.externalId().isBlank()) {
+                throw new IllegalArgumentException("EDITED outcome requires a non-blank externalId");
+            }
             return new UpdateOutcome(Kind.EDITED, handle, null);
         }
 

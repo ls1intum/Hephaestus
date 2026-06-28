@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
@@ -23,7 +24,10 @@ public record UpdatePracticeAreaRequestDTO(
     @Nullable
     String description,
 
-    @Schema(description = "Sort order within the workspace") @Nullable Integer displayOrder,
+    @PositiveOrZero(message = "Display order must be zero or positive")
+    @Schema(description = "Sort order within the workspace")
+    @Nullable
+    Integer displayOrder,
 
     @Schema(description = "Whether this area is active") @Nullable Boolean active,
 

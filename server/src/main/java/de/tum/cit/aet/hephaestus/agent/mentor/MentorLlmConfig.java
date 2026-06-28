@@ -8,6 +8,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * Slim projection of the LLM fields that {@link MentorPiAdapter} needs to build a sandbox spec.
  * Decouples the mentor module from the JPA {@link AgentConfig} entity.
+ *
+ * <p>This record deliberately carries NO credential-mode precondition: the API_KEY-needs-credential /
+ * PROXY-needs-jobToken invariant is owned by {@code PiPlanSpec}'s compact constructor, which
+ * {@link MentorPiAdapter#buildSandboxSpec} feeds these values into and which fails fast at spec build.
+ * Keeping the check single-sourced there avoids a second, drift-prone copy here.
  */
 public record MentorLlmConfig(
     LlmProvider llmProvider,

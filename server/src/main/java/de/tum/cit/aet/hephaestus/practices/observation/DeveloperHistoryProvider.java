@@ -61,13 +61,17 @@ public class DeveloperHistoryProvider {
         // Group by practice slug, accumulate observation counts and track latest observation
         Map<String, PracticeAggregate> byPractice = new LinkedHashMap<>();
         for (DeveloperPracticeSummary row : summaries) {
-            byPractice.computeIfAbsent(row.getPracticeSlug(), slug -> new PracticeAggregate()).add(row);
+            byPractice.computeIfAbsent(row.getPracticeSlug(), k -> new PracticeAggregate()).add(row);
         }
 
+        // Drop zero-signal practices (only NOT_APPLICABLE observations: good==0 && bad==0) so they cannot
+        // occupy a slot or be injected as empty agent context — matching the NA-exclusion intent of the
+        // sibling drill-down query findRecentByDeveloperAndWorkspace.
         // Sort by problem (BAD) count desc, then slug for deterministic ordering
         List<Map.Entry<String, PracticeAggregate>> sorted = byPractice
             .entrySet()
             .stream()
+            .filter(e -> e.getValue().good > 0 || e.getValue().bad > 0)
             .sorted(
                 Comparator.<Map.Entry<String, PracticeAggregate>>comparingLong(e -> e.getValue().bad)
                     .reversed()
@@ -76,6 +80,11 @@ public class DeveloperHistoryProvider {
             .limit(MAX_PRACTICES)
             .toList();
 
+        if (sorted.isEmpty()) {
+            // Every practice was NA-only — no signal worth injecting.
+            return Optional.empty();
+        }
+
         ArrayNode array = objectMapper.createArrayNode();
         for (Map.Entry<String, PracticeAggregate> entry : sorted) {
             ObjectNode node = objectMapper.createObjectNode();
@@ -83,7 +92,10 @@ public class DeveloperHistoryProvider {
             node.put("practice", entry.getKey());
             node.put("good", agg.good);
             node.put("bad", agg.bad);
-            node.put("lastSeen", agg.lastObservedAt.toString());
+            // Omit lastSeen rather than NPE if every row for this practice had a null timestamp.
+            if (agg.lastObservedAt != null) {
+                node.put("lastSeen", agg.lastObservedAt.toString());
+            }
             array.add(node);
         }
 
@@ -123,8 +135,11 @@ public class DeveloperHistoryProvider {
                 bad += row.getCount();
             }
             // NOT_APPLICABLE (null assessment) is not counted in history.
-            if (lastObservedAt == null || row.getLastObservedAt().isAfter(lastObservedAt)) {
-                lastObservedAt = row.getLastObservedAt();
+            // Ignore rows with a null timestamp (observed_at is NOT NULL today, but a malformed/partial
+            // row must not null out the field and NPE the whole build at emit time).
+            Instant rowObservedAt = row.getLastObservedAt();
+            if (rowObservedAt != null && (lastObservedAt == null || rowObservedAt.isAfter(lastObservedAt))) {
+                lastObservedAt = rowObservedAt;
             }
         }
     }

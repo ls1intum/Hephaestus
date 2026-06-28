@@ -72,6 +72,16 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         float confidence,
         long artifactId
     ) {
+        return bad(practice, severity, confidence, artifactId, null);
+    }
+
+    private Observation bad(
+        Practice practice,
+        @org.jspecify.annotations.Nullable Severity severity,
+        float confidence,
+        long artifactId,
+        @org.jspecify.annotations.Nullable String recurrenceKey
+    ) {
         return Observation.builder()
             .id(UUID.randomUUID())
             .practice(practice)
@@ -82,6 +92,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
             .assessment(Assessment.BAD)
             .severity(severity)
             .confidence(confidence)
+            .recurrenceKey(recurrenceKey)
             .build();
     }
 
@@ -202,5 +213,63 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         assertThat(cards).hasSize(1);
         // Neither is quarantined (2 distinct targets) → the CRITICAL leads on severity-weight.
         assertThat(cards.get(0).toWorkOn().get(0).observationId()).isEqualTo(criticalTargetA.getId());
+    }
+
+    @Test
+    @DisplayName("corroboration is per recurrence LOCUS: an unrelated BAD on another target does not rescue a gap")
+    void corroborationIsPerRecurrenceLocusNotPerPractice() {
+        Practice practice = practice("robust-error-handling");
+
+        // A coin-flip gap at locus-A on a SINGLE target, plus an UNRELATED confident BAD at locus-B on a second
+        // target. With per-practice corroboration the two distinct targets would (wrongly) un-quarantine the
+        // locus-A gap; with per-LOCUS corroboration locus-A is still single-target → stays quarantined.
+        Observation lowConfLocusA = bad(practice, Severity.CRITICAL, 0.3f, 42L, "locus-A");
+        Observation confidentLocusB = bad(practice, Severity.MINOR, 0.95f, 43L, "locus-B");
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
+        // Only locus-B (confident) survives; the single-target coin-flip at locus-A is withheld even though an
+        // unrelated BAD exists on a second target for the same practice.
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).observationId()).isEqualTo(confidentLocusB.getId());
+        assertThat(items.stream().map(ReflectionItemDTO::observationId)).doesNotContain(lowConfLocusA.getId());
+    }
+
+    @Test
+    @DisplayName("a low-confidence gap corroborated across >=2 targets within the SAME locus is not quarantined")
+    void sameLocusAcrossTwoTargetsIsCorroborated() {
+        Practice practice = practice("robust-error-handling");
+
+        // The same recurrence locus seen on TWO distinct targets → corroborated within the locus → displayed.
+        Observation locusOnA = bad(practice, Severity.MAJOR, 0.3f, 42L, "same-locus");
+        Observation locusOnB = bad(practice, Severity.MAJOR, 0.3f, 43L, "same-locus");
+
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(locusOnA, locusOnB));
+        when(feedbackObservationRepository.findDeliveredBodiesByObservationIds(any())).thenReturn(List.of());
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        // Both share a locus seen on 2 targets → neither quarantined → both displayed.
+        assertThat(cards.get(0).toWorkOn()).hasSize(2);
     }
 }

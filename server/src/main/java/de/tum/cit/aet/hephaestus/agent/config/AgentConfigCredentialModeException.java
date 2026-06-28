@@ -2,15 +2,15 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import java.io.Serial;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
  * Thrown when a credential mode configuration violates business rules: {@link CredentialMode#API_KEY}
  * requires both internet access and a stored credential, because the container reaches the LLM
  * provider directly.
+ *
+ * <p>HTTP mapping (status/title/detail) is owned solely by {@code AgentControllerAdvice}; this
+ * exception carries no {@code @ResponseStatus} so there is one authoritative mapper.
  */
-@ResponseStatus(HttpStatus.BAD_REQUEST)
 public class AgentConfigCredentialModeException extends RuntimeException {
 
     @Serial

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
@@ -61,18 +62,29 @@ public class ContentAddressedStore {
         }
         ReentrantLock lock = locks[Math.floorMod(sha.hashCode(), LOCK_STRIPES)];
         lock.lock();
+        Path temp = null;
         try {
             if (Files.exists(blob)) {
                 return sha;
             }
             Files.createDirectories(blob.getParent());
-            Path temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
+            temp = Files.createTempFile(blob.getParent(), ".tmp-", ".blob");
             Files.write(temp, content);
             moveAtomically(temp, blob);
+            temp = null; // moved into place — nothing to clean up
             return sha;
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write CAS blob " + sha, e);
         } finally {
+            // A failed write leaves a `.tmp-*.blob` that sweep() never reclaims (isShaHex filters it),
+            // so delete it here rather than leak an un-GC'able orphan on every failed write.
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (IOException cleanup) {
+                    log.warn("CAS could not delete orphaned temp {}: {}", temp, cleanup.getMessage());
+                }
+            }
             lock.unlock();
         }
     }
@@ -80,11 +92,13 @@ public class ContentAddressedStore {
     /** Read a blob by its sha-256, or empty if it is not (or no longer) present. */
     public Optional<byte[]> get(String sha) {
         Path blob = pathFor(sha);
-        if (!Files.exists(blob)) {
-            return Optional.empty();
-        }
+        // No exists()-then-read pre-check: sweep() runs concurrently with reads, so a blob can vanish
+        // between the check and the read. Reading directly and treating a missing file as empty closes
+        // that TOCTOU gap and makes the documented "no longer present" branch actually hold.
         try {
             return Optional.of(Files.readAllBytes(blob));
+        } catch (NoSuchFileException e) {
+            return Optional.empty();
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read CAS blob " + sha, e);
         }
@@ -141,7 +155,36 @@ public class ContentAddressedStore {
         if (removed[0] > 0) {
             log.info("CAS sweep removed {} unreferenced blob(s)", removed[0]);
         }
+        pruneEmptyFanoutDirs(casRoot);
         return removed[0];
+    }
+
+    /**
+     * Second cheap pass: delete the {@code {ab}} fan-out directories left empty after the blob delete pass,
+     * so the store does not accrue up to 256 empty two-char directories that every future sweep still walks.
+     * Best-effort — a non-empty dir (a Files.delete of a populated directory throws) or a delete failure is
+     * skipped silently; a re-created dir on the next put() is harmless.
+     */
+    private void pruneEmptyFanoutDirs(Path casRoot) {
+        Path sha256Root = casRoot.resolve("sha256");
+        if (!Files.isDirectory(sha256Root)) {
+            return;
+        }
+        try (Stream<Path> fanout = Files.list(sha256Root)) {
+            fanout
+                .filter(Files::isDirectory)
+                .forEach(dir -> {
+                    try (Stream<Path> entries = Files.list(dir)) {
+                        if (entries.findAny().isEmpty()) {
+                            Files.delete(dir);
+                        }
+                    } catch (IOException e) {
+                        log.debug("CAS sweep left fan-out dir {}: {}", dir, e.getMessage());
+                    }
+                });
+        } catch (IOException e) {
+            log.debug("CAS sweep could not list {}: {}", sha256Root, e.getMessage());
+        }
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {

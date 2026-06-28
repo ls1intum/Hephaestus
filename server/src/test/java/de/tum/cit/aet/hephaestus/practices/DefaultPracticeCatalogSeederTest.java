@@ -160,6 +160,26 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
+    void perRowFailure_skipsTheBadRowButSeedsTheRest() {
+        // Per-ROW resilience: one practice that fails (e.g. a malformed artifactType making createPractice
+        // throw) must skip ONLY that row, not abort the remaining catalog. With 32 practices, a single
+        // throwing createPractice still leaves 31 created and bound.
+        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+        when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
+        // First createPractice throws; all subsequent calls succeed.
+        when(practiceService.createPractice(any(), any()))
+            .thenThrow(new RuntimeException("malformed artifactType"))
+            .thenReturn(new Practice());
+
+        assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
+
+        // All 32 are attempted; the 31 that did not throw are bound (the failed row never reaches bindPractice).
+        verify(practiceService, times(32)).createPractice(any(), any());
+        verify(areaService, times(31)).bindPractice(any(), any(), any());
+    }
+
+    @Test
     void seedingFailure_isIsolatedAndDoesNotThrow() {
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);

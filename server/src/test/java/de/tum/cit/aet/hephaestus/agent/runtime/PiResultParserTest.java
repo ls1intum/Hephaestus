@@ -24,10 +24,10 @@ class PiResultParserTest extends BaseUnitTest {
         parser = new PiResultParser(new ObjectMapper(), meterRegistry);
     }
 
-    @org.junit.jupiter.api.Test
-    @org.junit.jupiter.api.DisplayName("emits agent.pi.result.parse.failure{stage=usage} when usage.json is invalid")
+    @Test
+    @DisplayName("emits agent.pi.result.parse.failure{stage=usage} when usage.json is invalid")
     void emitsParseFailureMetric() {
-        var bad = "not-json".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var bad = "not-json".getBytes(StandardCharsets.UTF_8);
         // Trigger via usage parse path.
         parser.parseUsage(bad);
         assertThat(meterRegistry.counter("agent.pi.result.parse.failure", "stage", "usage").count()).isEqualTo(1d);

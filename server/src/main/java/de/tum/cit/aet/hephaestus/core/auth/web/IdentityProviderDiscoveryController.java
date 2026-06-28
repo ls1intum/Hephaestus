@@ -44,7 +44,14 @@ public class IdentityProviderDiscoveryController {
 
     /**
      * One row per sign-in option. {@code providerType} drives the SPA's icon choice; {@code baseUrl} is
-     * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
+     * the OAuth instance origin (scheme + host[:port]) of the authorization endpoint, so the
+     * workspace-creation wizard can match a target instance to its login.
+     *
+     * <p><b>baseUrl is the OAuth origin, not the SCM API origin.</b> It is only meaningful for GitLab rows,
+     * where the OAuth origin and the API origin coincide (e.g. {@code https://gitlab.example.com}). For a
+     * GitHub row it is {@code https://github.com} (the OAuth host), NOT {@code https://api.github.com}; the
+     * sole consumer (the workspace wizard) matches GitLab self-hosted origins and never relies on the GitHub
+     * value, so the discrepancy is harmless. Do not treat this as an SCM API base URL.
      */
     public record IdentityProviderViewDTO(
         String registrationId,
@@ -82,14 +89,14 @@ public class IdentityProviderDiscoveryController {
      * (the only GitHub login target is github.com; everything else is a GitLab instance), so it works
      * for any admin-registered self-hosted GitLab without relying on the registration-id naming.
      */
-    private static String providerTypeOf(ClientRegistration reg) {
+    static String providerTypeOf(ClientRegistration reg) {
         // Match on the parsed HOST, not a substring of the whole URI — "github.com" appearing in a
         // path/query of a GitLab instance (or a look-alike host) must not be misclassified as GitHub.
         return "github.com".equals(hostOf(reg)) ? "GITHUB" : "GITLAB";
     }
 
     /** Host of the authorization endpoint, or {@code null} if absent/malformed. */
-    private static String hostOf(ClientRegistration reg) {
+    static String hostOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
         if (authorizationUri == null) {
             return null;
@@ -101,8 +108,8 @@ public class IdentityProviderDiscoveryController {
         }
     }
 
-    /** The SCM instance origin (scheme + host[:port]) derived from the authorization endpoint. */
-    private static String baseUrlOf(ClientRegistration reg) {
+    /** The OAuth instance origin (scheme + host[:port]) derived from the authorization endpoint. */
+    static String baseUrlOf(ClientRegistration reg) {
         String authorizationUri = reg.getProviderDetails().getAuthorizationUri();
         if (authorizationUri == null) {
             return "";

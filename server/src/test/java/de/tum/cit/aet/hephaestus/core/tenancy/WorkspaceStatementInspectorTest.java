@@ -21,11 +21,9 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
 
     @AfterEach
     void clearBypass() {
-        while (TenancyBypass.isActive()) {
-            // safety: ensure no test leaks ThreadLocal state into the next test
-            // (BaseUnitTest does not fork)
-            // depth-decrement happens via close; if we get here someone forgot
-            // try-with-resources — fail loud below.
+        // Fail loud if a test leaked ThreadLocal bypass state (BaseUnitTest does not fork): a bypass is
+        // only opened via try-with-resources, so an active bypass here means someone forgot to close it.
+        if (TenancyBypass.isActive()) {
             throw new IllegalStateException("TenancyBypass not closed by prior test");
         }
     }
@@ -253,6 +251,41 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
         inspector.inspect("select c1_0.id,c1_0.body from issue_comment c1_0 where c1_0.issue_id=?");
         verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void pkPredicateDisjoinedWithOrStillEnforced() {
+        // The PK-only fast path tolerates extra CONJUNCTIVE predicates, but a DISJUNCTION broadens the
+        // result set past the single keyed row — "WHERE id = ? OR is_public = true" returns every public
+        // row regardless of the key. That must NOT bypass enforcement. (This is the SELECT-with-OR
+        // direction that actually leaks; the prior tests only guarded the no-PK and DELETE directions.)
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("practice")).thenReturn(true);
+        String sql = "select p1_0.id from practice p1_0 where p1_0.id=? or p1_0.is_public=true";
+        inspector.inspect(sql);
+        verify(reporter).report(sql, Set.of("practice"), TenancyEnforcement.LOG);
+    }
+
+    @Test
+    void pkLoadWithCorrelationFreeExistsSubqueryIsAllowed() {
+        // Policy: an outer load still pinned to a single keyed row by <alias>.id = ?, with a
+        // correlation-free EXISTS guard, stays on the PK-only fast path — the projected result set is
+        // still the one keyed row, so it is tenancy-safe by construction.
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
+        inspector.inspect("select p1_0.id from practice p1_0 where p1_0.id=? and exists (select 1 from observation o)");
+        verifyNoInteractions(reporter, scopedTables);
+    }
+
+    @Test
+    void malformedSingleQuotedTableIdentifierStillEnforced() {
+        // A malformed single open-quote identifier ("practice with no closing quote) must not slip past the
+        // scoped lookup: unqualify strips every stray quote char so the lowercase name still resolves to the
+        // scoped set (degrade toward OVER-reporting, never under-reporting).
+        WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
+        when(scopedTables.isScoped("practice")).thenReturn(true);
+        String sql = "select x from \"practice where y=?";
+        inspector.inspect(sql);
+        verify(reporter).report(sql, Set.of("practice"), TenancyEnforcement.LOG);
     }
 
     @Test

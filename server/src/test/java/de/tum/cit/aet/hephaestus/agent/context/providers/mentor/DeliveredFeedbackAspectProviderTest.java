@@ -110,6 +110,39 @@ class DeliveredFeedbackAspectProviderTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName(
+        "omits artifactType/artifactId for a reflection-style unit with no artifact, still ships surface + body"
+    )
+    void omitsNullArtifactFields() throws Exception {
+        User user = new User();
+        user.setLogin("octo");
+        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+
+        // A reflection/profile-style delivered unit legitimately carries no artifactType/artifactId
+        // (Feedback allows them null). The null-omission contract: those JSON fields are absent, but the
+        // mentor still gets the surface + body it quotes.
+        Feedback noArtifact = Feedback.builder()
+            .channel(FeedbackChannel.IN_CONTEXT)
+            .deliveredAt(Instant.parse("2026-06-17T08:30:00Z"))
+            .body("Reflecting on your last few reviews — here is a pattern to watch.")
+            .build();
+        when(
+            feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
+        ).thenReturn(List.of(noArtifact));
+
+        Map<String, byte[]> files = new HashMap<>();
+        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+
+        JsonNode root = objectMapper.readTree(files.get("inputs/context/delivered_feedback.json"));
+        assertThat(root.get("totalDelivered").asLong()).isEqualTo(1L);
+        JsonNode only = root.get("deliveredFeedback").get(0);
+        assertThat(only.has("artifactType")).isFalse();
+        assertThat(only.has("artifactId")).isFalse();
+        assertThat(only.get("surface").asString()).isEqualTo("IN_CONTEXT");
+        assertThat(only.get("body").asString()).contains("Reflecting on your last few reviews");
+    }
+
+    @Test
     @DisplayName("warm cache: a second turn with the same key reuses the payload without rebuilding")
     void warmCacheReusesPayload() throws Exception {
         // Stub a REAL cache so the compute-if-absent branch is exercised — without this, getCache returns null

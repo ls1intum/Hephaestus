@@ -79,6 +79,15 @@ class MentorChatServiceTest extends BaseUnitTest {
     private static final long USER_ID = 99L;
     private static final UUID THREAD_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
+    /**
+     * Number of synchronous orchestrator preamble sends that precede the runner event stream:
+     * {@code Start} (1), {@code DataMentorStatus} (2), then the translator's {@code Start} + {@code StartStep}
+     * from Pi's first {@code message_start} (3, 4). A disconnect scheduled at this index lands on the FIRST
+     * mid-stream text chunk (the event-handler thread). Named so the intent survives a preamble refactor —
+     * a raw literal silently moves which frame throws.
+     */
+    private static final int PREAMBLE_SEND_COUNT = 4;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Mock
@@ -284,16 +293,44 @@ class MentorChatServiceTest extends BaseUnitTest {
         verify(agentConfigRepository).findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(WORKSPACE_ID);
     }
 
+    // 1d. No enabled AgentConfig for the workspace → resolveLlmConfig.orElseThrow. This is the only
+    // un-covered exit of the documented cross-tenant guard, and it fires BEFORE the sandbox attaches —
+    // a distinct early-failure ordering (no runner, lock still released, ERROR outcome).
+
+    @Test
+    void runTurn_noEnabledConfig_recordsErrorAndNeverAttaches() throws Exception {
+        // Neither a bound config (findById → empty by default) nor the fallback finder yields a config.
+        when(agentConfigRepository.findFirstByWorkspaceIdAndEnabledTrueOrderByIdAsc(eq(WORKSPACE_ID))).thenReturn(
+            Optional.empty()
+        );
+
+        runTurnSync();
+
+        // Error surfaced on the wire (resolveLlmConfig threw before any runner work).
+        assertThat(emitter.recordedTypes()).contains("error");
+        // Sandbox never attached — the failure precedes the cold-start attach.
+        try {
+            verify(interactiveSandboxService, never()).attach(any());
+        } catch (InteractiveSandboxException e) {
+            throw new AssertionError(e);
+        }
+        // No runner persistence side effects past the in-flight row; neither finalise nor a sandbox close.
+        verify(persistence, never()).finalise(any(), any(), any());
+        // Lock released cleanly and the ERROR outcome recorded.
+        assertThat(turnLock.activeKeys()).isZero();
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.ERROR);
+    }
+
     // 2. Client disconnect: runner draining, abort sent, finalise still runs
 
     @Test
     void runTurn_clientDisconnect_completesNormallyAndAbortsRunner() throws Exception {
         scheduleHappyPathResponses(sandbox).run();
-        // 4 sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
-        // message_start), 5th throws IOException. By call 5 the runner client is live, so the
+        // The preamble sends succeed (Start, DataMentorStatus, then translator's Start + StartStep from
+        // message_start); the next send throws IOException. By then the runner client is live, so the
         // abort hook fires. The runner keeps streaming to Finish; persistence.finalise still
         // runs from inside handleEvent — disconnects must NOT be reclassified as turn failures.
-        emitter.disconnectAfterCalls = 4;
+        emitter.disconnectAfterCalls = PREAMBLE_SEND_COUNT;
 
         runTurnSync();
 
@@ -312,6 +349,26 @@ class MentorChatServiceTest extends BaseUnitTest {
         // hook fired (verified above). CLIENT_DISCONNECT outcome is reserved for the rare
         // case where the orchestrator's *synchronous* sends fail before the runner attaches —
         // tested separately below.
+        assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
+    }
+
+    @Test
+    void runTurn_clientDisconnectBeforeEventStream_stillAbortsAndFinalises() throws Exception {
+        scheduleHappyPathResponses(sandbox).run();
+        // Disconnect lands on call #3 — the translator's FIRST chunk from Pi's message_start — i.e. before
+        // any text delta has streamed. This proves the abort hook + persistence.finalise still run when the
+        // disconnect precedes the bulk of the event stream, not only on a mid-text chunk. Decoupled from the
+        // exact preamble length so it survives a preamble refactor.
+        emitter.disconnectAfterCalls = 2;
+
+        runTurnSync();
+
+        // Abort fired and the runner drained to its terminal Finish despite the gone wire.
+        assertThat(sandbox.methodsSent()).contains("abort");
+        verify(persistence, atLeastOnce()).finalise(any(), any(), any(UIMessageChunk.Finish.class));
+        verify(persistence, never()).interrupt(any(), any(), any());
+        assertThat(turnLock.activeKeys()).isZero();
+        // Same as the mid-stream case: a disconnect swallowed inside handleEvent completes as SUCCESS.
         assertOutcomeRecorded(MentorChatMetrics.Outcome.SUCCESS);
     }
 

@@ -169,7 +169,11 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         }
 
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
-        String commitOid = target.resourceUrl(); // agent encodes head SHA here
+        // The agent encodes the head SHA in resourceUrl. Normalize blank to null: commitOID is a nullable
+        // GitObjectID (a null falls back to head-anchoring), but a blank "" is an INVALID GitObjectID that
+        // would fail the whole batch mutation with a GraphQL error and route every finding to FAILED.
+        String rawCommitOid = target.resourceUrl();
+        String commitOid = (rawCommitOid == null || rawCommitOid.isBlank()) ? null : rawCommitOid;
 
         // Build the thread payloads, embedding each finding's correlation tag so the next run can index it back.
         List<Map<String, Object>> threads = new ArrayList<>(toPost.size());

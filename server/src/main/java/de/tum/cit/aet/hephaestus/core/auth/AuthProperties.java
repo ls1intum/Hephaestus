@@ -127,6 +127,10 @@ public record AuthProperties(
         if (trimmed.isEmpty()) {
             return "";
         }
+        // Collapse a leading slash run to a single slash so `//api` (and any deeper duplicate) cannot
+        // survive into a protocol-relative-looking `{baseUrl}//api/…` redirect_uri; a missing leading
+        // slash is then prepended.
+        trimmed = trimmed.replaceAll("^/+", "/");
         return trimmed.startsWith("/") ? trimmed : "/" + trimmed;
     }
 

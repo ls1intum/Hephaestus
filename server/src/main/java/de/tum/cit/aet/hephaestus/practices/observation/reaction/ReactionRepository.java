@@ -37,6 +37,11 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
      * {@code artifactId}, and {@code artifactId} is the GLOBAL PR/Issue primary key (one identity sequence
      * across all workspaces), so a key resolves to exactly one artifact in exactly one workspace — two
      * workspaces cannot share one. The reactor scope already pins the recipient.
+     *
+     * <p><b>Precondition:</b> the caller MUST pass a non-empty {@code recurrenceKeys}. This is a native
+     * query: an empty collection renders {@code IN ()}, which Postgres rejects as a syntax error at
+     * execution time (it does NOT return an empty result like a JPQL {@code IN} would). Short-circuit
+     * upstream when there are no keys (see {@code ReactionSuppressionFilter}'s empty-key guard).
      */
     @Query(
         value = """

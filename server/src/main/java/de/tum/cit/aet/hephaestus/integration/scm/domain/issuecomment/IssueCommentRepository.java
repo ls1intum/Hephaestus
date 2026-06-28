@@ -131,6 +131,11 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
      * note without a diff position). The inline-only {@code comments.json} cannot see these, so the
      * reviewer-craft practices were blind to review that happened in the conversation tab.
      *
+     * <p>This fetch is intentionally unbounded: the consumer first filters out blank and bot-authored
+     * notes, then tail-slices to {@code GeneralReviewCommentContentProvider.MAX_COMMENTS}. Pushing a DB-side
+     * {@code LIMIT} here would slice the raw set (bot/blank rows included) and could drop the latest real
+     * approval, so the cap stays consumer-side. Conversation-tab comment counts are small in practice.
+     *
      * @param issueId the issue/PR id (a {@code PullRequest} is an {@code Issue} subtype, so its
      *     general notes are {@code IssueComment} rows keyed by the same id)
      * @return general comments ordered by creation time ascending

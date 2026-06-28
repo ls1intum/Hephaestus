@@ -4,9 +4,14 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Sealed SCM domain events published in-process after vendor processors commit.
- * Records (not JPA entities) keep async handlers safe from
- * {@code LazyInitializationException}.
+ * Holder for the SCM domain-event vocabulary. Two responsibilities live here:
+ * <ul>
+ *   <li>the sealed {@link Event} hierarchy — events published in-process after vendor processors
+ *       commit; modelled as records (not JPA entities) so async handlers stay safe from
+ *       {@code LazyInitializationException};</li>
+ *   <li>the {@link TriggerEventNames} literals that practices subscribe to (the join key persisted
+ *       in {@code practice.trigger_events}).</li>
+ * </ul>
  */
 public final class ScmDomainEvent {
 

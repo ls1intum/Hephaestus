@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,7 +62,10 @@ public class AgentConfigService {
             config.setLlmApiKey(request.llmApiKey());
         }
         if (request.llmBaseUrl() != null) {
-            // Empty string clears the field; otherwise stores the trimmed value.
+            // Empty string clears the field; otherwise stores the trimmed value. The request DTO caps
+            // this at @Size(max=512) — deliberately well under the entity column (length=2048) so the
+            // column can never overflow even though trimming runs after validation. The wider column is
+            // headroom, not a target; don't "reconcile" it down to 512 without a changelog.
             config.setLlmBaseUrl(request.llmBaseUrl().isBlank() ? null : request.llmBaseUrl().trim());
         }
         if (request.timeoutSeconds() != null) {
@@ -79,7 +83,17 @@ public class AgentConfigService {
 
         validateCredentialMode(config);
 
-        return agentConfigRepository.save(config);
+        try {
+            return agentConfigRepository.save(config);
+        } catch (DataIntegrityViolationException e) {
+            // The existsByWorkspaceIdAndName fast-path above is racy: two concurrent creates with the
+            // same name both pass the check, and the DB unique constraint uk_agent_config_workspace_name
+            // backstops the loser. Translate that loser's violation into the same 409 the fast path
+            // advertises, instead of leaking a 500.
+            throw new AgentConfigNameConflictException(
+                "An agent config with name '" + request.name() + "' already exists in this workspace."
+            );
+        }
     }
 
     @Transactional

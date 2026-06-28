@@ -134,10 +134,11 @@ public class WorkspaceContextBuilder {
             }
             for (String key : files.keySet()) {
                 if (beforeKeys.contains(key)) {
-                    // Pre-existing key — only an overwrite is a wiring bug. Reference-equality
-                    // on the array is enough because providers must publish fresh byte[]s; a
-                    // mutated-in-place array from an earlier provider would also fail here
-                    // (which is the safer default).
+                    // Pre-existing key — only a re-put is a wiring bug. Reference inequality
+                    // identifies a fresh put(key, newArray); the SPI mandates providers publish a
+                    // NEW byte[] for any change, so this is sufficient. Note: an in-place mutation
+                    // of an earlier provider's array keeps the same reference and is NOT detected —
+                    // the contract relies on providers treating earlier outputs as immutable.
                     if (beforeValues.get(key) != files.get(key)) {
                         String existingOwner = keyOwner.get(key);
                         throw new IllegalStateException(
@@ -156,12 +157,11 @@ public class WorkspaceContextBuilder {
                         providerName + " wrote file outside " + ContentProvider.OUTPUT_PREFIX + ": " + key
                     );
                 }
-                String existingOwner = keyOwner.get(key);
-                if (existingOwner != null) {
-                    throw new IllegalStateException(
-                        "Duplicate workspace key " + key + ": written by both " + existingOwner + " and " + providerName
-                    );
-                }
+                // Invariant: a brand-new key (absent from beforeKeys) cannot already be owned —
+                // keyOwner only holds keys that were added to `files`, and every such key is in
+                // beforeKeys on subsequent iterations. The re-put guard above is the real
+                // cross-provider duplicate detector.
+                assert keyOwner.get(key) == null : "brand-new key already owned: " + key;
                 keyOwner.put(key, providerName);
                 keyConnector.put(key, provider.connectorId());
             }
@@ -192,13 +192,19 @@ public class WorkspaceContextBuilder {
         return null;
     }
 
-    /** Repository id for single-flight locking, or {@code null} for requests that don't touch git. */
+    /**
+     * Repository id for single-flight locking, or {@code null} for requests that don't touch git.
+     * Both PR- and issue-review jobs carry {@code repository_id} in metadata; reading it for both
+     * spreads concurrent issue builds across the stripes by repo instead of all colliding on stripe 0.
+     */
     private static Long repoKey(ContextRequest request) {
-        if (request instanceof ContextRequest.PracticeReviewRequest pr) {
-            JsonNode meta = pr.job().getMetadata();
-            if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
-                return meta.get("repository_id").asLong();
-            }
+        AgentJob job = reviewJob(request);
+        if (job == null) {
+            return null;
+        }
+        JsonNode meta = job.getMetadata();
+        if (meta != null && meta.has("repository_id") && meta.get("repository_id").isNumber()) {
+            return meta.get("repository_id").asLong();
         }
         return null;
     }

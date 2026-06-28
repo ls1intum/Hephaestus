@@ -19,7 +19,8 @@ import org.springframework.stereotype.Service;
 /**
  * Mentor adapter: builds an {@link InteractiveSandboxSpec} for a long-lived stdin/stdout JSONL
  * session, symmetric to {@code PracticePiAdapter}'s one-shot {@code task.json} build.
- * Single-flight is enforced by the sandbox registry's {@code (userId, workspaceId)} keying.
+ * Single-flight is enforced by the sandbox registry's {@code (userId, workspaceId)} keying, where the
+ * mentee's {@code developerId} is carried in the spec's {@code userId} slot.
  */
 @Service
 @RequiredArgsConstructor
@@ -68,6 +69,12 @@ public class MentorPiAdapter {
             baseUrl = mentorProperties.baseUrl().isBlank() ? null : mentorProperties.baseUrl();
         }
 
+        // The config API floor (@Min(30) on AgentConfig timeoutSeconds) sits below PiPlanSpec's runtime
+        // floor (must exceed TIMEOUT_BUFFER_SECONDS=60), so a legitimately persisted 30-60s config would
+        // otherwise throw from PiPlanSpec and surface as an ERROR on the chat stream. Clamp up to the
+        // minimum buildable budget so any valid config always yields a mentor sandbox.
+        int timeoutSeconds = Math.max(llmConfig.timeoutSeconds(), PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1);
+
         PiPlanSpec planSpec = new PiPlanSpec(
             llmConfig.llmProvider(),
             llmConfig.credentialMode(),
@@ -76,7 +83,7 @@ public class MentorPiAdapter {
             baseUrl,
             null,
             true,
-            llmConfig.timeoutSeconds(),
+            timeoutSeconds,
             PROFILE,
             extraInputs,
             ""
@@ -100,11 +107,17 @@ public class MentorPiAdapter {
     }
 
     private static void validateAspectInputs(Map<String, byte[]> aspectInputs) {
-        for (String key : aspectInputs.keySet()) {
+        for (Map.Entry<String, byte[]> entry : aspectInputs.entrySet()) {
+            String key = entry.getKey();
             if (key == null || !key.startsWith(ASPECT_INPUT_PREFIX)) {
                 throw new IllegalArgumentException(
                     "aspectInputs key must begin with '" + ASPECT_INPUT_PREFIX + "', got: " + key
                 );
+            }
+            // Reject null bytes here so the failure names the offending key, rather than surfacing as an
+            // opaque NPE deep inside PiPlanSpec's Map.copyOf(extraInputs), which rejects null values.
+            if (entry.getValue() == null) {
+                throw new IllegalArgumentException("aspectInputs value for '" + key + "' must not be null");
             }
         }
     }

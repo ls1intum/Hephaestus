@@ -265,9 +265,13 @@ public class MentorChatService {
             clientHolder.set(client);
             client.start();
             // SSE lifecycle may have flipped the channel between bindLifecycle and clientHolder.set.
-            // Re-fire the abort if so.
+            // Re-fire the abort AND short-circuit: without the throw, execution falls through into the
+            // 20s hello + 195s prompt deadline while still holding the per-thread lock — the exact cost
+            // the pre-attach guard at isClientGone() above was added to avoid. The outer
+            // ClientDisconnectedException catch takes the cheap drain-with-20s-timeout path instead.
             if (channel.isClientGone()) {
                 abortRunnerOnDisconnect(client, request.threadId());
+                throw new ClientDisconnectedException("Client disconnected after runner start");
             }
 
             JsonNode hello = client.hello().get(20, TimeUnit.SECONDS);

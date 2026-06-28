@@ -199,6 +199,37 @@ class DeveloperHistoryProviderTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("a practice with only NOT_APPLICABLE observations is omitted (zero-signal, not a slot)")
+        void allNotApplicablePracticeIsOmitted() throws Exception {
+            when(observationRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
+                List.of(
+                    // 'na-only' has nothing but NA rows -> good==0 && bad==0 -> must NOT be emitted.
+                    summary("na-only", Presence.NOT_APPLICABLE, null, 4, Instant.parse("2026-03-21T10:00:00Z")),
+                    summary("real-problem", Presence.ABSENT, Assessment.BAD, 2, Instant.parse("2026-03-20T10:00:00Z"))
+                )
+            );
+
+            byte[] json = provider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID).orElseThrow();
+            JsonNode root = objectMapper.readTree(json);
+
+            assertThat(root).hasSize(1);
+            assertThat(root.get(0).get("practice").asString()).isEqualTo("real-problem");
+        }
+
+        @Test
+        @DisplayName("returns empty when every practice is NA-only (no signal worth injecting)")
+        void returnsEmptyWhenAllPracticesAreNotApplicable() {
+            when(observationRepository.findDeveloperPracticeSummary(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
+                List.of(
+                    summary("na-a", Presence.NOT_APPLICABLE, null, 1, Instant.parse("2026-03-20T10:00:00Z")),
+                    summary("na-b", Presence.NOT_APPLICABLE, null, 3, Instant.parse("2026-03-21T10:00:00Z"))
+                )
+            );
+
+            assertThat(provider.buildHistoryJson(CONTRIBUTOR_ID, WORKSPACE_ID)).isEmpty();
+        }
+
+        @Test
         @DisplayName("returns empty when ObjectMapper throws JacksonException")
         void returnsEmptyOnSerializationFailure() throws Exception {
             ObjectMapper brokenMapper = org.mockito.Mockito.mock(ObjectMapper.class);

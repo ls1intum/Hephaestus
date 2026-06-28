@@ -33,18 +33,18 @@ import tools.jackson.databind.JsonNode;
  * <strong>Preconditions:</strong> The {@link PullRequest} must have labels, assignees,
  * and repository eagerly loaded before calling {@link #evaluate}.
  *
- * <h2>Gate checks (in order)</h2>
+ * <h2>Gate checks (in order; numbers match the inline step comments in {@code evaluateReviewable})</h2>
  * <ol>
- *   <li>Workspace resolution → SKIP if not found (first, so per-workspace settings drive the gates below)</li>
- *   <li>Draft PR + {@code skipDrafts} setting → SKIP</li>
- *   <li>Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
- *   <li>Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
- *   <li>No runnable practice config for workspace → SKIP</li>
- *   <li>No active practices match trigger event → SKIP</li>
- *   <li>{@code runForAllUsers} setting → DETECT (bypass role check)</li>
- *   <li>No assignee → SKIP</li>
- *   <li>Role checker unhealthy → SKIP</li>
- *   <li>Assignee has {@code run_practice_review} role → DETECT / SKIP</li>
+ *   <li>(1) Workspace resolution → SKIP if not found (first, so per-workspace settings drive the gates below)</li>
+ *   <li>(2) Draft PR + {@code skipDrafts} setting → SKIP</li>
+ *   <li>(2a) Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
+ *   <li>(2b) Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
+ *   <li>(3) No runnable practice config for workspace → SKIP</li>
+ *   <li>(4) No active practices match trigger event → SKIP</li>
+ *   <li>(5) {@code runForAllUsers} setting → DETECT (bypass role check)</li>
+ *   <li>(6) No assignee → SKIP</li>
+ *   <li>(7) Role checker unhealthy → SKIP</li>
+ *   <li>(8) Assignee has {@code run_practice_review} role → DETECT / SKIP</li>
  * </ol>
  */
 @Service
@@ -82,7 +82,7 @@ public class PracticeReviewDetectionGate {
      * <p>
      * <strong>Transaction design:</strong> This method is intentionally NOT {@code @Transactional}.
      * Each DB read (workspace resolution, agent config check, practice query) runs in its own
-     * transaction via Spring Data defaults / explicit annotation. The role check (step 7) is a
+     * transaction via Spring Data defaults / explicit annotation. The role check (step 8) is a
      * local DB lookup, so the gate holds no connection across an external call.
      *
      * @param pullRequest      the pull request (must have labels, assignees, repository eagerly loaded)
@@ -301,7 +301,9 @@ public class PracticeReviewDetectionGate {
             return false;
         }
         for (JsonNode node : triggerEvents) {
-            if (eventName.equals(node.asString())) {
+            // Guard the type before coercion: in Jackson 3 a non-scalar element (object/array, e.g. from an
+            // out-of-band JSONB edit) makes asString() THROW. Skipping non-strings keeps the matcher total.
+            if (node.isString() && eventName.equals(node.asString())) {
                 return true;
             }
         }

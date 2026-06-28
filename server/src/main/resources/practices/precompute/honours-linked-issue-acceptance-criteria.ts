@@ -3,6 +3,7 @@
 // checkable acceptance-criteria block. FACTS only — closing-ref candidates + AC-block presence. The LLM maps
 // each criterion to done/deferred. No observation. This practice over-NAs when the linked-issue fact is absent, so
 // the point is to make BOTH the link and the issue's done-artifact visible when they exist.
+import { readContextJson } from "../lib/context";
 import type { DiffFile, PullRequestMetadata } from "../lib/types";
 
 // Closing-keyword grammar shared by GitHub/GitLab: close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved
@@ -35,30 +36,42 @@ interface LinkedWorkItem {
 	description?: string;
 }
 
-// Resolve inputs/context/linked_work_items.json from the repo mount (.../inputs/sources/scm/repo).
-function contextCandidates(repoPath: string): string[] {
-	const out: string[] = [];
-	const idx = repoPath.lastIndexOf("/inputs/");
-	if (idx >= 0) out.push(`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`);
-	return out;
+// Unwrap whatever shape linked_work_items.json carries into a flat item list (or null if not a usable object).
+function unwrapLinkedItems(data: unknown): LinkedWorkItem[] | null {
+	// The SCM connector wraps items under `workItems`; check it FIRST, then host-general fallbacks.
+	if (data && Array.isArray((data as { workItems?: unknown }).workItems))
+		return (data as { workItems: LinkedWorkItem[] }).workItems;
+	if (Array.isArray(data)) return data as LinkedWorkItem[];
+	if (data && Array.isArray((data as { items?: unknown }).items))
+		return (data as { items: LinkedWorkItem[] }).items;
+	if (data && typeof data === "object") return [data as LinkedWorkItem];
+	return null;
 }
 
-async function readLinkedItems(repoPath: string): Promise<LinkedWorkItem[] | null> {
-	for (const path of contextCandidates(repoPath)) {
-		try {
-			const data = await Bun.file(path).json();
-			// The SCM connector wraps items under `workItems`; check it FIRST, then host-general fallbacks.
-			if (data && Array.isArray((data as { workItems?: unknown }).workItems))
-				return (data as { workItems: LinkedWorkItem[] }).workItems;
-			if (Array.isArray(data)) return data as LinkedWorkItem[];
-			if (data && Array.isArray((data as { items?: unknown }).items))
-				return (data as { items: LinkedWorkItem[] }).items;
-			if (data && typeof data === "object") return [data as LinkedWorkItem];
-		} catch {
-			// absent or unreadable — that itself is the over-NA condition; fall through.
-		}
+// Repo-mount-derived fallback for linked_work_items.json (.../inputs/sources/scm/repo → .../inputs/context/...).
+// Only used when the runner did not pass --context (or it failed to resolve), so we are not coupled to the
+// REPO_MOUNT string layout in the normal path.
+async function readLinkedItemsFromRepoPath(repoPath: string): Promise<LinkedWorkItem[] | null> {
+	const idx = repoPath.lastIndexOf("/inputs/");
+	if (idx < 0) return null;
+	try {
+		const data = await Bun.file(`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`).json();
+		return unwrapLinkedItems(data);
+	} catch {
+		// absent or unreadable — that itself is the over-NA condition; fall through.
+		return null;
 	}
-	return null;
+}
+
+// Prefer the runner-supplied --context dir (lib/context.ts), falling back to the repoPath-derived path so an
+// older invocation without --context still resolves.
+async function readLinkedItems(
+	repoPath: string,
+	contextDir: string | undefined,
+): Promise<LinkedWorkItem[] | null> {
+	const fromContext = unwrapLinkedItems(await readContextJson(contextDir, "linked_work_items.json"));
+	if (fromContext !== null) return fromContext;
+	return readLinkedItemsFromRepoPath(repoPath);
 }
 
 // A checkable acceptance-criteria artifact: an AC/DoD heading or a "- [ ]" checklist in the issue body.
@@ -69,22 +82,34 @@ function acFacts(body: string): { heading: boolean; boxes: number } {
 	return { heading, boxes };
 }
 
-export default async function (repoPath: string, _diff: Map<string, DiffFile>, meta: PullRequestMetadata) {
+export default async function (
+	repoPath: string,
+	_diff: Map<string, DiffFile>,
+	meta: PullRequestMetadata,
+	contextDir?: string,
+) {
 	const title = meta.title ?? "";
 	const body = meta.body ?? "";
 	const branch = meta.source_branch ?? "";
 
+	// Only explicit closing keywords + issue URLs in title/body are CLOSING references. A bare number in a
+	// branch name (e.g. `fix/2024-01-rewrite` → #2024, a year) is at most a *traceability* candidate, not a
+	// claim to close a tracked issue, so it is tracked separately and phrased more weakly below.
 	const refs = new Set<string>();
 	collect(CLOSE_REF, `${title}\n${body}`, refs);
 	collect(ISSUE_URL, `${title}\n${body}`, refs);
-	collect(BRANCH_REF, branch, refs);
 	const closingRefs = [...refs];
 	const hasClosingRef = closingRefs.length > 0;
+
+	const branchRefSet = new Set<string>();
+	collect(BRANCH_REF, branch, branchRefSet);
+	const branchRefs = [...branchRefSet];
+	const hasBranchRef = branchRefs.length > 0;
 
 	const keywordHits = (`${title}\n${body}`.match(CLOSE_KEYWORD) ?? []).length;
 	CLOSE_KEYWORD.lastIndex = 0;
 
-	const linked = await readLinkedItems(repoPath);
+	const linked = await readLinkedItems(repoPath, contextDir);
 	const linkedIssueBodyPresent =
 		linked !== null && linked.some((i) => (i.bodyExcerpt ?? i.body ?? i.description ?? "").trim().length > 0);
 	let acHeading = false;
@@ -101,7 +126,11 @@ export default async function (repoPath: string, _diff: Map<string, DiffFile>, m
 	const directions: string[] = [];
 	if (hasClosingRef) {
 		directions.push(
-			`Closing reference(s) detected (${closingRefs.join(", ")}) from title/body/branch — this change claims to close a tracked issue; map each linked issue's acceptance criteria to what the diff actually delivers.`,
+			`Closing reference(s) detected (${closingRefs.join(", ")}) from title/body — this change claims to close a tracked issue; map each linked issue's acceptance criteria to what the diff actually delivers.`,
+		);
+	} else if (hasBranchRef) {
+		directions.push(
+			`Branch name encodes a possible issue number (${branchRefs.join(", ")}) but no closing keyword/URL was found in title/body — treat this as a traceability candidate, not a closing claim: confirm it maps to a tracked issue before mapping any acceptance criteria.`,
 		);
 	} else if (keywordHits > 0) {
 		directions.push(
@@ -109,7 +138,7 @@ export default async function (repoPath: string, _diff: Map<string, DiffFile>, m
 		);
 	} else {
 		directions.push(
-			`No closing reference or issue URL found in title/body/branch — confirm there is genuinely no linked tracker issue before concluding there are no acceptance criteria to honour.`,
+			`No closing reference, issue URL, or branch-encoded number found in title/body/branch — confirm there is genuinely no linked tracker issue before concluding there are no acceptance criteria to honour.`,
 		);
 	}
 
@@ -132,6 +161,8 @@ export default async function (repoPath: string, _diff: Map<string, DiffFile>, m
 		metrics: {
 			closingRefCount: closingRefs.length,
 			hasClosingRef: hasClosingRef ? 1 : 0,
+			branchRefCount: branchRefs.length,
+			hasBranchRef: hasBranchRef ? 1 : 0,
 			closingKeywordHits: keywordHits,
 			linkedItemsFilePresent: linked !== null ? 1 : 0,
 			linkedIssueCount: linked?.length ?? 0,

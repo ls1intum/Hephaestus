@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.CredentialMode;
 import de.tum.cit.aet.hephaestus.agent.LlmProvider;
+import de.tum.cit.aet.hephaestus.agent.sandbox.docker.SandboxEnvBlocklist;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.HashMap;
 import java.util.Map;
@@ -85,6 +86,16 @@ class LlmProxyAuthShellTest extends BaseUnitTest {
             );
             assertThat(env).doesNotContainKey("AZURE_OPENAI_API_KEY");
             assertThat(script).contains("AZURE_OPENAI_API_KEY='secret-key'").endsWith(" && ");
+        }
+
+        @Test
+        @DisplayName("Azure key MUST go via export because the sandbox blocklist strips it from the env map")
+        void azureKeyViaExportIsCoupledToBlocklist() {
+            // The whole reason AZURE_OPENAI_API_KEY is exported (above) instead of being placed in the env map
+            // is that SandboxEnvBlocklist strips every AZURE_* var from the env map (class javadoc rationale).
+            // Pin that invariant here so a future change that makes the key an ALLOWED_PREFIX_EXCEPTION (and
+            // moves it to the env map) trips this test instead of silently dropping the credential.
+            assertThat(SandboxEnvBlocklist.isBlocked("AZURE_OPENAI_API_KEY")).isTrue();
         }
 
         @ParameterizedTest(name = "{0} key placed in env map")

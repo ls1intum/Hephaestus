@@ -82,6 +82,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(jobOutput);
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("missing rawOutput");
         }
 
@@ -90,7 +91,21 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput("  "));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("blank");
+        }
+
+        @Test
+        void oversizedRawOutputIsRejectedBeforeSanitizing() {
+            // A runaway/oversized sandbox output must be rejected up front — before readTree or
+            // sanitizeJsonEscapes walk the whole string — not just in the fallback extractor.
+            String huge = "{\"findings\":[" + "\\".repeat(1_000_001) + "]}";
+
+            ParseResult result = parser.parse(wrapRawOutput(huge));
+
+            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
+            assertThat(result.discarded().get(0).reason()).contains("too large");
         }
 
         @Test
@@ -98,6 +113,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput("not json {{{"));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("invalid JSON");
         }
 
@@ -106,6 +122,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput("{\"summary\":\"hello\"}"));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("missing");
         }
 
@@ -114,6 +131,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput("{\"findings\":[]}"));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("empty");
         }
 
@@ -188,6 +206,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("title is blank");
         }
 
@@ -216,7 +235,20 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        void presentWithAssessmentKeepsValence() {
+        void absentWithMissingAssessmentIsDiscarded() {
+            // The valence requirement holds for ABSENT too, not only PRESENT — a gap with no GOOD/BAD is malformed.
+            ObjectNode finding = validFindingNode();
+            finding.put("presence", "ABSENT");
+            finding.remove("assessment");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
+        }
+
+        @Test
+        void absentWithAssessmentKeepsValence() {
             ObjectNode finding = validFindingNode();
             finding.put("presence", "ABSENT");
             finding.put("assessment", "BAD");
@@ -226,6 +258,19 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(result.validFindings()).hasSize(1);
             assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.ABSENT);
             assertThat(result.validFindings().get(0).assessment()).isEqualTo(Assessment.BAD);
+        }
+
+        @Test
+        void presentWithAssessmentKeepsValence() {
+            ObjectNode finding = validFindingNode();
+            finding.put("presence", "PRESENT");
+            finding.put("assessment", "GOOD");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.PRESENT);
+            assertThat(result.validFindings().get(0).assessment()).isEqualTo(Assessment.GOOD);
         }
 
         @Test
@@ -261,6 +306,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("invalid presence");
         }
 
@@ -290,6 +336,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
                 assertThat(result.validFindings()).isEmpty();
+                assertThat(result.discarded()).hasSize(1);
                 assertThat(result.discarded().get(0).reason()).contains("invalid presence");
             }
         }
@@ -349,6 +396,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("out of range");
         }
 
@@ -371,6 +419,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
             assertThat(result.validFindings()).isEmpty();
+            assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("out of range");
         }
 
@@ -806,7 +855,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("defect-detector PRESENT/GOOD is coerced to NOT_APPLICABLE (severity null) with an audit note")
         void defectDetectorObservedToNa() {
-            var out = finding(Presence.PRESENT, Severity.MAJOR).coerceCoherence(true);
+            var out = finding(Presence.PRESENT, Severity.MAJOR).coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
             // Severity is a band only for a BAD finding (ADR 0022); a coerced NA finding has none.
             assertThat(out.severity()).isNull();
@@ -816,7 +865,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("non-defect-detector PRESENT/GOOD keeps presence but nulls severity (no band for a strength)")
         void nonDefectObservedSeverityInfo() {
-            var out = finding(Presence.PRESENT, Severity.MAJOR).coerceCoherence(false);
+            var out = finding(Presence.PRESENT, Severity.MAJOR).coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.PRESENT);
             // A GOOD (strength) finding carries no severity band under ADR 0022.
             assertThat(out.severity()).isNull();
@@ -825,7 +874,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("ABSENT with INFO severity is raised to MINOR (a gap must carry a band)")
         void notObservedInfoToMinor() {
-            var out = finding(Presence.ABSENT, Severity.INFO).coerceCoherence(false);
+            var out = finding(Presence.ABSENT, Severity.INFO).coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.severity()).isEqualTo(Severity.MINOR);
         }
@@ -834,13 +883,13 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("ABSENT with a real band is unchanged (identity)")
         void notObservedMajorUnchanged() {
             var in = finding(Presence.ABSENT, Severity.MAJOR);
-            assertThat(in.coerceCoherence(false)).isSameAs(in);
+            assertThat(in.coerceCoherence(false, false)).isSameAs(in);
         }
 
         @Test
         @DisplayName("NOT_APPLICABLE severity is nulled (no band for an inapplicable practice)")
         void naSeverityInfo() {
-            var out = finding(Presence.NOT_APPLICABLE, Severity.MAJOR).coerceCoherence(false);
+            var out = finding(Presence.NOT_APPLICABLE, Severity.MAJOR).coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.severity()).isNull();
         }
@@ -848,7 +897,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("defect-detector ABSENT defect is preserved with its band")
         void defectDetectorNotObservedPreserved() {
-            var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(true);
+            var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.severity()).isEqualTo(Severity.MAJOR);
         }
@@ -871,7 +920,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "guidance",
                 List.of()
             );
-            var out = strength.coerceCoherence(false);
+            var out = strength.coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.assessment()).isEqualTo(Assessment.GOOD);
             assertThat(out.severity()).isNull();
@@ -895,7 +944,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "guidance",
                 List.of()
             );
-            var out = offContract.coerceCoherence(true);
+            var out = offContract.coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.assessment()).isNull();
             assertThat(out.reasoning()).startsWith("[auto-downgraded");

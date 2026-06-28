@@ -24,6 +24,10 @@ import org.junit.jupiter.api.Test;
 class DetectionReactionFirewallTest extends HephaestusArchitectureTest {
 
     private static final String CONTEXT_PROVIDERS = "..agent.context.providers..";
+    // The mentor sub-package holds the delivery/coaching aspect providers (DeliveredFeedbackAspectProvider
+    // etc.) which are reaction-aware BY DESIGN — the javadoc scope-note exempts them. The firewall covers
+    // only the detection-sandbox ContentProviders that materialise inputs/..., so it must NOT match here.
+    private static final String MENTOR_PROVIDERS = "..agent.context.providers.mentor..";
     private static final String REACTION_PACKAGE = "..practices.observation.reaction..";
 
     @Test
@@ -31,6 +35,8 @@ class DetectionReactionFirewallTest extends HephaestusArchitectureTest {
         ArchRule rule = noClasses()
             .that()
             .resideInAPackage(CONTEXT_PROVIDERS)
+            .and()
+            .resideOutsideOfPackage(MENTOR_PROVIDERS)
             .should()
             .dependOnClassesThat()
             .resideInAPackage(REACTION_PACKAGE)

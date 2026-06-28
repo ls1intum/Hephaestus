@@ -208,6 +208,80 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
         );
     }
 
+    @Test
+    void postSummary_nullResponse_throwsNullResponse() {
+        // createComment must fail loudly on a null mutation response (partial-delivery guard), not return a
+        // SummaryHandle with a null id that the ledger would later try to edit.
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo#42",
+            null
+        );
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        when(spec.execute()).thenReturn(Mono.empty());
+
+        assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
+            .isInstanceOf(FeedbackDeliveryException.class)
+            .hasMessageContaining("Null response from AddPullRequestComment");
+    }
+
+    @Test
+    void postSummary_nullCommentId_throwsNoCommentId() {
+        // A mutation that returns no comment node id is a malformed-model/partial response — fail, don't
+        // hand back a SummaryHandle wrapping a null external ref.
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/repo#42",
+            null
+        );
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+
+        HttpGraphQlClient client = mock(HttpGraphQlClient.class);
+        HttpGraphQlClient.RequestSpec spec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(client.documentName(any())).thenReturn(spec);
+        when(spec.variable(any(), any())).thenReturn(spec);
+        ClientGraphQlResponse response = mockGraphQlResponse("addComment.commentEdge.node.id", null);
+        when(spec.execute()).thenReturn(Mono.just(response));
+
+        assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
+            .isInstanceOf(FeedbackDeliveryException.class)
+            .hasMessageContaining("No comment ID in AddPullRequestComment response");
+    }
+
+    @Test
+    void postSummary_malformedIssueSubject_throwsInvalidIssueSubject() {
+        // An ISSUE subject that does not match owner/repo/issues/N must fail with the issue-specific message,
+        // not be mis-routed to the PR resolver.
+        FeedbackTarget target = new FeedbackTarget(
+            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
+            "owner/issues/x",
+            null
+        );
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+
+        assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
+            .isInstanceOf(FeedbackDeliveryException.class)
+            .hasMessageContaining("Invalid GitHub PR subjectExternalId");
+    }
+
+    @Test
+    void parseIssueSubjectExternalId_rejectsSubjectWithoutNumber() {
+        // A subject that is not the owner/repo/issues/<number> form must throw the issue-specific error so a
+        // malformed model output fails loudly rather than resolving to a wrong node.
+        assertThatThrownBy(() -> GithubFeedbackChannel.parseIssueSubjectExternalId("owner/issues/x"))
+            .isInstanceOf(FeedbackDeliveryException.class)
+            .hasMessageContaining("Invalid GitHub issue subjectExternalId");
+    }
+
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockGraphQlResponse(String fieldPath, String value) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
@@ -229,6 +303,13 @@ class GithubFeedbackChannelTest extends BaseUnitTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("owner/repo");
         assertThatThrownBy(() -> channel.formatIssueSubjectId("a/b/c", 7)).isInstanceOf(IllegalArgumentException.class);
+        // A blank owner or repo segment must also fail fast, not yield "owner/#42" / "owner//issues/42".
+        assertThatThrownBy(() -> channel.formatPullRequestSubjectId("owner/", 7))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("owner/repo");
+        assertThatThrownBy(() -> channel.formatIssueSubjectId("/repo", 7))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("owner/repo");
     }
 
     @Test

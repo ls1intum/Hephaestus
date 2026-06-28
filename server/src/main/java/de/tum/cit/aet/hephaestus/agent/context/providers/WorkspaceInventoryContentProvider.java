@@ -39,7 +39,7 @@ import tools.jackson.databind.node.ObjectNode;
  * artifact for depth and follows {@code linked_work_items.json} for resolved bodies. It does NOT carry the
  * PR-to-issue closing-reference edge (not synced), so "already covered by an open PR" is answerable only via
  * title/number overlap (a candidate signal, not a hard link). Capped at {@link #MAX_PER_TYPE} newest entries
- * per type so the file stays a few KB even on large repos; a {@code truncated} flag tells the agent the
+ * per type so the file stays bounded (tens of KB) even on large repos; a {@code truncated} flag tells the agent the
  * listing is not exhaustive (so the absence of a match does NOT prove uniqueness).
  *
  * <p><b>EXTRACT+LOAD only.</b> Per the {@link ContentProvider} contract this connector emits raw native
@@ -58,7 +58,7 @@ public class WorkspaceInventoryContentProvider implements ContentProvider {
     /** Output filename under {@link ContentProvider#OUTPUT_PREFIX}. */
     static final String OUTPUT_FILE = OUTPUT_PREFIX + "project_inventory.json";
 
-    /** Newest-N cap per artifact type; keeps the index a few KB on large repos. */
+    /** Newest-N cap per artifact type; keeps the index bounded (tens of KB) on large repos. */
     static final int MAX_PER_TYPE = 200;
 
     private final ObjectMapper objectMapper;
@@ -182,7 +182,9 @@ public class WorkspaceInventoryContentProvider implements ContentProvider {
             if (item.getState() != null) {
                 node.put("state", item.getState().name());
             }
-            if (item.getAuthor() != null) {
+            if (item.getAuthor() != null && item.getAuthor().getLogin() != null) {
+                // Omit (not null) when the SCM account is a deleted/ghost user with no login, mirroring
+                // the milestone/url branches below — keeps the "field absent, never JSON null" convention.
                 node.put("author", item.getAuthor().getLogin());
             }
             // Milestone (title only) is the cross-artifact lifecycle anchor several practices reason about —

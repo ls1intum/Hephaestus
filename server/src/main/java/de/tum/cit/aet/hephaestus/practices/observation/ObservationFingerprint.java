@@ -87,9 +87,14 @@ public final class ObservationFingerprint {
         return sha256Hex(canonical);
     }
 
-    /** Locale-fixed (Locale.ROOT — LocaleSafetyArchTest) lower-case + whitespace collapse for the anchor. */
+    /**
+     * Locale-fixed (Locale.ROOT — LocaleSafetyArchTest) lower-case + whitespace collapse for the anchor.
+     * Control chars (incl. the {@link #SEP} separator byte) are stripped first: the path is the only
+     * LLM-influenced, last-positioned field, so although an embedded SEP cannot forge an earlier field it
+     * could collapse two genuinely distinct loci — stripping removes that one canonicalization ambiguity.
+     */
     private static String normalizeAnchorText(String text) {
-        return text.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        return text.trim().replaceAll("\\p{Cntrl}", "").replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     private static String sha256Hex(String canonical) {

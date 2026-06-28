@@ -96,13 +96,20 @@ public class GitlabFeedbackChannel implements FeedbackChannel {
         }
         String body = escapeSlashCommands(content.body());
 
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("CreateMergeRequestNote")
-            .variable("noteableId", noteableGid)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+        ClientGraphQlResponse response;
+        try {
+            response = gitLabProvider
+                .forScope(scopeId)
+                .documentName("CreateMergeRequestNote")
+                .variable("noteableId", noteableGid)
+                .variable("body", body)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+        } catch (RuntimeException e) {
+            // A transport/timeout error must surface as the channel's typed exception (consistent with
+            // updateSummary) so PullRequestCommentPoster's catch(FeedbackDeliveryException) wraps it uniformly.
+            throw new FeedbackDeliveryException("createNote transport error: " + e.getMessage(), e);
+        }
 
         if (response == null) {
             throw new FeedbackDeliveryException("Null response from createNote mutation");

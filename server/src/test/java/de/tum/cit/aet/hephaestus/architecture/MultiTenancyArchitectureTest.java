@@ -974,14 +974,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                     a.getRawType().getSimpleName().contains("Ensure")
                             );
 
-                    // Check for path variable that includes workspace (e.g., /api/{workspaceSlug}/...)
-                    boolean hasWorkspacePathVariable = method
-                        .getRawParameterTypes()
-                        .stream()
-                        .anyMatch(
-                            p -> p.getSimpleName().equals("String") // Could be workspaceSlug
-                        );
-
                     if (!hasWorkspaceContext && !hasWorkspaceSecurityAnnotation) {
                         events.add(
                             SimpleConditionEvent.violated(

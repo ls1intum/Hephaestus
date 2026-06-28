@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
@@ -31,6 +32,7 @@ public record CreatePracticeAreaRequestDTO(
     @Nullable
     String description,
 
+    @PositiveOrZero(message = "Display order must be zero or positive")
     @Schema(description = "Sort order within the workspace. Defaults to 0 when omitted.", example = "1")
     @Nullable
     Integer displayOrder,

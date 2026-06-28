@@ -169,6 +169,11 @@ public class PracticeAreaController {
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaDTO.class)))
     )
     @ApiResponse(
+        responseCode = "400",
+        description = "orderedSlugs is empty or contains duplicates",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
         responseCode = "404",
         description = "A slug is unknown",
         content = @Content(schema = @Schema(hidden = true))

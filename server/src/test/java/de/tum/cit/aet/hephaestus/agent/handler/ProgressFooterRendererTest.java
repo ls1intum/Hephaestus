@@ -51,6 +51,41 @@ class ProgressFooterRendererTest extends BaseUnitTest {
     }
 
     @Test
+    void render_newPlusBadToGoodPersisted_doesNotCountSatisfiedLocusAsStillOpen() {
+        // A BAD→GOOD improvement is carried as PERSISTED with currentAssessment=GOOD (the locus recurs
+        // but is now satisfied). With a co-occurring NEW problem the footer renders, but the now-satisfied
+        // locus must NOT be folded into the "still open" count (C10) — only genuinely-open (BAD) persisted
+        // loci are still open.
+        LocusTransition newProblem = new LocusTransition(
+            "k-new",
+            TransitionStatus.NEW,
+            "control-flow",
+            "New dead branch",
+            null,
+            Assessment.BAD,
+            Severity.MAJOR,
+            0.8f
+        );
+        LocusTransition nowSatisfied = new LocusTransition(
+            "k-fixed",
+            TransitionStatus.PERSISTED,
+            "naming",
+            "Name now clear",
+            Assessment.BAD,
+            Assessment.GOOD,
+            Severity.MINOR,
+            0.8f
+        );
+        TrendDelta d = delta(List.of(newProblem, nowSatisfied));
+
+        String out = ProgressFooterRenderer.render(d);
+
+        assertThat(out).contains("**1 new**");
+        // The satisfied persisted locus is not "still open" — the line is omitted entirely (count is 0).
+        assertThat(out).doesNotContain("still open");
+    }
+
+    @Test
     void render_regressed_rendersSlippedBackSection() {
         TrendDelta d = delta(
             List.of(transition("k1", TransitionStatus.REGRESSED, "Tests dropped again", "ships-tests"))

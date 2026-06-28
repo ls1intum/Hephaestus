@@ -95,6 +95,14 @@ class AuthSessionServiceTest extends BaseUnitTest {
         return counter == null ? 0.0 : counter.count();
     }
 
+    /** Asserts the access cookie was cleared on a session-ending path: present with empty value + maxAge=0. */
+    private static void assertCookieCleared(MockHttpServletResponse response) {
+        jakarta.servlet.http.Cookie cookie = response.getCookie("__Host-HEPHAESTUS_AT");
+        assertThat(cookie).as("session-ending path must clear the access cookie").isNotNull();
+        assertThat(cookie.getMaxAge()).isZero();
+        assertThat(cookie.getValue()).isEmpty();
+    }
+
     private Account activeAccount() {
         Account account = new Account("Alice");
         account.setId(ACCOUNT_ID);
@@ -121,9 +129,11 @@ class AuthSessionServiceTest extends BaseUnitTest {
     void logout_revokesPresentingTokenAndAuditsLogout() {
         UUID jti = UUID.randomUUID();
 
-        service.logout(ACCOUNT_ID, jti, new MockHttpServletResponse());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        service.logout(ACCOUNT_ID, jti, response);
 
         verify(issuedJwtRepository).revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.LOGOUT));
+        assertCookieCleared(response);
         AuthEventData event = capturedEvent();
         assertThat(event.type()).isEqualTo(AuthEvent.EventType.LOGOUT);
         assertThat(event.result()).isEqualTo(AuthEvent.Result.SUCCESS);
@@ -199,16 +209,13 @@ class AuthSessionServiceTest extends BaseUnitTest {
         // A concurrent refresh/logout already rotated this jti — the conditional UPDATE matches 0 rows.
         when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(0);
 
-        service.refresh(
-            ACCOUNT_ID,
-            jti,
-            ctx(null, null, null),
-            mock(HttpServletRequest.class),
-            new MockHttpServletResponse()
-        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        service.refresh(ACCOUNT_ID, jti, ctx(null, null, null), mock(HttpServletRequest.class), response);
 
         assertThat(refreshResult("noop")).isEqualTo(1.0);
         assertThat(refreshResult("success")).isZero();
+        // A rotation that affects 0 rows ends the session — the stale cookie must be cleared, not left behind.
+        assertCookieCleared(response);
         verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
     }
 
@@ -220,15 +227,12 @@ class AuthSessionServiceTest extends BaseUnitTest {
         suspended.setStatus(Account.Status.SUSPENDED);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(suspended));
 
-        service.refresh(
-            ACCOUNT_ID,
-            jti,
-            ctx(null, null, null),
-            mock(HttpServletRequest.class),
-            new MockHttpServletResponse()
-        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        service.refresh(ACCOUNT_ID, jti, ctx(null, null, null), mock(HttpServletRequest.class), response);
 
         assertThat(refreshResult("suspended")).isEqualTo(1.0);
+        // A suspended account cannot keep its session — the cookie must be cleared on the early return.
+        assertCookieCleared(response);
         verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
     }
 

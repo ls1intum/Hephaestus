@@ -113,10 +113,9 @@ public class WorkspaceAspectProvider implements ContentProvider {
         workspaceNode.put("slug", workspace.getWorkspaceSlug());
         workspaceNode.put("displayName", workspace.getDisplayName());
 
-        // Each sub-aspect is independent and best-effort: one failing query must degrade only its own
-        // section, not blank the entire workspace aspect (which previously stripped ALL project-state
-        // context from every mentor turn). The real cause is logged here instead of being swallowed by
-        // the cache loader's generic "could not be loaded" wrapper.
+        // Each sub-aspect is independent and best-effort: a failing query degrades only its own
+        // section to an empty array, never blanking the whole workspace aspect. The real cause is
+        // logged here so it is not swallowed by the cache loader's generic wrapper.
         guarded(
             "recentSessions",
             () -> addRecentSessions(root, workspaceId, developerId),
@@ -168,8 +167,8 @@ public class WorkspaceAspectProvider implements ContentProvider {
     }
 
     private void addRecentSessions(ObjectNode root, Long workspaceId, Long developerId) {
-        // DB-side LIMIT via Pageable: previously the query returned every thread the user had
-        // ever opened (power users hit 100s) and we trimmed in-memory; ship the cap as SQL.
+        // DB-side LIMIT via Pageable: the cap ships as SQL so a power user with hundreds of threads
+        // returns at most MAX_RECENT_SESSIONS rows rather than being trimmed in-memory.
         List<ChatThread> threads = queryRepository.findRecentChatThreads(
             workspaceId,
             developerId,
@@ -192,8 +191,8 @@ public class WorkspaceAspectProvider implements ContentProvider {
     }
 
     /**
-     * Single round-trip: pull the earliest user message for every capped thread in one query.
-     * Replaces the prior per-thread {@code findByThreadIdOrderByCreatedAtAsc} loop (N+1).
+     * Single round-trip: pull the earliest user message for every capped thread in one query,
+     * keyed by thread id — avoids an N+1 per-thread fetch.
      */
     private Map<UUID, String> loadFirstUserMessages(Long workspaceId, List<ChatThread> threads) {
         List<UUID> ids = new ArrayList<>(threads.size());
@@ -214,7 +213,16 @@ public class WorkspaceAspectProvider implements ContentProvider {
             JsonNode parts = objectMapper.readTree(partsJson);
             String text = extractText(parts);
             if (text == null) return "";
-            return text.length() > MESSAGE_PREVIEW_LENGTH ? text.substring(0, MESSAGE_PREVIEW_LENGTH) : text;
+            if (text.length() <= MESSAGE_PREVIEW_LENGTH) {
+                return text;
+            }
+            // Don't split a surrogate pair (e.g. an emoji straddling the cut): a lone high surrogate
+            // would serialise as an isolated U+D8xx — malformed for downstream consumers. Trim it off.
+            int end = MESSAGE_PREVIEW_LENGTH;
+            if (Character.isHighSurrogate(text.charAt(end - 1))) {
+                end--;
+            }
+            return text.substring(0, end);
         } catch (JacksonException e) {
             // Malformed parts JSON: degrade silently rather than poison the aspect.
             return "";

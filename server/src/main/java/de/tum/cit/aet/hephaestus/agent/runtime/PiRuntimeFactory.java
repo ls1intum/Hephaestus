@@ -30,10 +30,16 @@ public class PiRuntimeFactory {
 
     private static final Logger log = LoggerFactory.getLogger(PiRuntimeFactory.class);
 
-    public static final String OUTPUT_PATH = WorkspaceAbi.OUTPUT_PATH;
-
     /** Grace window before the sandbox hard-kills the runner — must fire before that deadline. */
     public static final int TIMEOUT_BUFFER_SECONDS = 60;
+
+    /**
+     * Floor for the self-watchdog budget (ms). Guards against a non-positive or tiny budget when a spec
+     * sits just above the {@link PiPlanSpec} minimum (timeoutSeconds &gt; {@link #TIMEOUT_BUFFER_SECONDS}).
+     * MUST stay strictly below {@code TIMEOUT_BUFFER_SECONDS * 1000} so the watchdog always fires before
+     * the SPI hard kill — otherwise the floor could exceed the hard-kill deadline and invert the invariant.
+     */
+    static final long MIN_BUDGET_MS = (TIMEOUT_BUFFER_SECONDS - 1) * 1000L;
 
     static final String AGENT_RESOURCE_PREFIX = "agent/";
 
@@ -69,7 +75,7 @@ public class PiRuntimeFactory {
         inputFiles.put(WorkspaceAbi.RUNNER_SCRIPT_FILENAME, loadClasspathResource(spec.runnerProfile().runnerScript()));
         inputFiles.putAll(spec.extraInputs());
 
-        long agentTimeoutMs = Math.max(60_000L, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
+        long agentTimeoutMs = Math.max(MIN_BUDGET_MS, (long) (spec.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
         env.put("AGENT_BUDGET_MS", Long.toString(agentTimeoutMs));
 
         env.put("HOME", "/home/agent");
@@ -184,7 +190,7 @@ public class PiRuntimeFactory {
         try {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(settings);
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize Pi practice settings", e);
+            throw new IllegalStateException("Failed to serialize Pi settings", e);
         }
     }
 

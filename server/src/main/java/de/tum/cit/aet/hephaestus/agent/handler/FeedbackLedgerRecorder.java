@@ -220,7 +220,14 @@ public class FeedbackLedgerRecorder {
             .stream()
             .filter(f -> f.getPresence() != Presence.NOT_APPLICABLE)
             .filter(f -> !excludedIds.contains(f.getId()))
-            .sorted(Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal))
+            // Stable order matching PolicyFloorSelector: severity, then confidence DESC, then id — so the
+            // persisted PRIMARY ordinal of equal-severity problems is reproducible across re-runs rather
+            // than flapping with the repository's findByAgentJobId iteration order.
+            .sorted(
+                Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
+                    .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
+                    .thenComparing(f -> f.getId().toString())
+            )
             .toList();
         int ordinal = 0;
         for (Observation f : assessed) {
@@ -448,5 +455,10 @@ public class FeedbackLedgerRecorder {
      */
     private static int severityOrdinal(Observation f) {
         return f.getSeverity() == null ? Integer.MAX_VALUE : f.getSeverity().ordinal();
+    }
+
+    /** Confidence for the stable sort tiebreak, treating a null confidence as 0 (mirrors PolicyFloorSelector). */
+    private static float confidenceOf(Observation f) {
+        return f.getConfidence() == null ? 0f : f.getConfidence();
     }
 }
