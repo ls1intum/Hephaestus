@@ -2132,6 +2132,8 @@ paths:
                 items:
                   $ref: "#/components/schemas/PracticeArea"
           description: Areas reordered; the full ordered list is returned
+        "400":
+          description: orderedSlugs is empty or contains duplicates
         "404":
           description: A slug is unknown
       summary: Reorder practice areas
@@ -2286,8 +2288,8 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
     get:
-      description: Returns the current user's reaction action counts across all findings
-        in this workspace.
+      description: Returns the current user's reaction action counts across all feedback
+        they received in this workspace.
       operationId: getEngagement
       parameters:
       - description: Workspace slug
@@ -4850,7 +4852,14 @@ components:
       type: object
       description: |-
         One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
-         the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
+         the OAuth instance origin (scheme + host[:port]) of the authorization endpoint, so the
+         workspace-creation wizard can match a target instance to its login.
+
+         <p><b>baseUrl is the OAuth origin, not the SCM API origin.</b> It is only meaningful for GitLab rows,
+         where the OAuth origin and the API origin coincide (e.g. <code>https://gitlab.example.com</code>). For a
+         GitHub row it is <code>https://github.com</code> (the OAuth host), NOT <code>https://api.github.com</code>; the
+         sole consumer (the workspace wizard) matches GitLab self-hosted origins and never relies on the GitHub
+         value, so the discrepancy is harmless. Do not treat this as an SCM API base URL.
       properties:
         baseUrl:
           type: string

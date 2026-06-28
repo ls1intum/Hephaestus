@@ -1737,7 +1737,7 @@ export const getEngagementQueryKey = (options: Options<GetEngagementData>) => cr
 /**
  * Get engagement statistics
  *
- * Returns the current user's reaction action counts across all findings in this workspace.
+ * Returns the current user's reaction action counts across all feedback they received in this workspace.
  */
 export const getEngagementOptions = (options: Options<GetEngagementData>) => queryOptions<GetEngagementResponse, DefaultError, GetEngagementResponse, ReturnType<typeof getEngagementQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

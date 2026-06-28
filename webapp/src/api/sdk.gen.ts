@@ -865,7 +865,7 @@ export const createPractice = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Get engagement statistics
  *
- * Returns the current user's reaction action counts across all findings in this workspace.
+ * Returns the current user's reaction action counts across all feedback they received in this workspace.
  */
 export const getEngagement = <ThrowOnError extends boolean = false>(options: Options<GetEngagementData, ThrowOnError>) => (options.client ?? client).get<GetEngagementResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

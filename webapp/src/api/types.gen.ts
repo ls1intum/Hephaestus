@@ -1920,7 +1920,14 @@ export type IdentityView = {
 
 /**
  * One row per sign-in option. <code>providerType</code> drives the SPA's icon choice; <code>baseUrl</code> is
- * the SCM instance origin so the workspace-creation wizard can match a target instance to its login.
+ * the OAuth instance origin (scheme + host[:port]) of the authorization endpoint, so the
+ * workspace-creation wizard can match a target instance to its login.
+ *
+ * <p><b>baseUrl is the OAuth origin, not the SCM API origin.</b> It is only meaningful for GitLab rows,
+ * where the OAuth origin and the API origin coincide (e.g. <code>https://gitlab.example.com</code>). For a
+ * GitHub row it is <code>https://github.com</code> (the OAuth host), NOT <code>https://api.github.com</code>; the
+ * sole consumer (the workspace wizard) matches GitLab self-hosted origins and never relies on the GitHub
+ * value, so the discrepancy is harmless. Do not treat this as an SCM API base URL.
  */
 export type IdentityProviderView = {
     baseUrl?: string;
@@ -4370,6 +4377,10 @@ export type ReorderAreasData = {
 };
 
 export type ReorderAreasErrors = {
+    /**
+     * orderedSlugs is empty or contains duplicates
+     */
+    400: unknown;
     /**
      * A slug is unknown
      */
