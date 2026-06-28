@@ -127,7 +127,7 @@ The agent returns a JSON object with a `findings` array:
 
 ## Practices
 
-> **Terminology.** A **practice** is one detectable item (its slug, e.g. `scope-one-reviewable-change`). A **practice area** is one of the groupings that contain practices (entity `PracticeArea`, table `practice_area`). Always write "practice area" in code, UI copy, and docs — never a bare "area", "goal", or "category" for the grouping. (Unrelated uses — achievement categories, mentor goal-setting, CSS grid areas — are exempt.)
+> **Terminology.** A **practice** is one detectable item (its slug, e.g. `scope-one-reviewable-change`). A **practice area** is one of the groupings that contain practices (entity `PracticeArea`, table `practice_area`). The canonical one-word name for the grouping is **area** (the field is literally `Practice.area` / `practice_area_id`; see `practice-feedback-schema.md` §2 and `practice-catalogue.md` — *area*, never *goal* or *category*). Spell it out as "practice area" only where a bare "area" would be ambiguous from context; never substitute "goal" or "category" for the grouping. (Unrelated uses — achievement categories, mentor goal-setting, CSS grid areas — are exempt.)
 
 Practices are stored in the database (`practice` table, `criteria` column). At runtime, the handler generates `.practices/{slug}.md` files from the DB criteria and injects them into the agent workspace. Each practice defines:
 
