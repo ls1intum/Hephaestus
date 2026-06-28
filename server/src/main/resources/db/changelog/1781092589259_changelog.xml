@@ -1141,4 +1141,34 @@
         </rollback>
     </changeSet>
 
+    <!-- Re-align two feedback enum CHECKs that drifted from the Java enums (SYSTEMIC #3 / C13).
+         chk_feedback_channel still admitted the dropped 'REFLECTION_DASHBOARD' (FeedbackChannel is now
+         IN_CONTEXT/CONVERSATION/PROFILE); chk_feedback_source still admitted the removed 'POLICY_FLOOR'/'FALLBACK'
+         (FeedbackSource is now AGENT only). ddl-auto:create tests regenerate the schema from entities so these
+         stale CHECKs never run — they are a prod-only landmine the moment a PROFILE-channel or non-AGENT row
+         is written. Drop and re-add both with the exact current allowed-lists. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-67">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback channel/source CHECKs not present to re-align">
+            <and>
+                <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_channel'</sqlCheck>
+                <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'chk_feedback_source'</sqlCheck>
+            </and>
+        </preConditions>
+        <comment>Re-align chk_feedback_channel (PROFILE not REFLECTION_DASHBOARD) and chk_feedback_source (AGENT only) with the current enums.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_channel;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_channel CHECK (channel IN ('IN_CONTEXT', 'CONVERSATION', 'PROFILE'));
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_source;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_source CHECK (source IN ('AGENT'));
+        </sql>
+        <rollback>
+            <sql splitStatements="true" endDelimiter=";">
+                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_channel;
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_channel CHECK (channel IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION_DASHBOARD'));
+                ALTER TABLE feedback DROP CONSTRAINT chk_feedback_source;
+                ALTER TABLE feedback ADD CONSTRAINT chk_feedback_source CHECK (source IN ('AGENT', 'POLICY_FLOOR', 'FALLBACK'));
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>
