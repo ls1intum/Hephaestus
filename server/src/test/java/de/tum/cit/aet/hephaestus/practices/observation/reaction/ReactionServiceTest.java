@@ -294,8 +294,8 @@ class ReactionServiceTest extends BaseUnitTest {
 
             var addressedProjection = new ReactionRepository.ActionCountProjection() {
                 @Override
-                public ReactionAction getAction() {
-                    return ReactionAction.ADDRESSED;
+                public String getAction() {
+                    return ReactionAction.ADDRESSED.name();
                 }
 
                 @Override
@@ -305,8 +305,8 @@ class ReactionServiceTest extends BaseUnitTest {
             };
             var disputedProjection = new ReactionRepository.ActionCountProjection() {
                 @Override
-                public ReactionAction getAction() {
-                    return ReactionAction.DISPUTED;
+                public String getAction() {
+                    return ReactionAction.DISPUTED.name();
                 }
 
                 @Override

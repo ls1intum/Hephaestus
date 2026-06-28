@@ -54,20 +54,32 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     );
 
     /**
-     * Engagement statistics: count of reaction actions grouped by action type,
-     * scoped to a specific workspace through the feedback → workspace relationship.
+     * Engagement statistics: count of reaction actions grouped by action type, scoped to a workspace through
+     * the feedback → workspace relationship.
+     *
+     * <p>Reaction is {@code @Immutable} and append-only: a developer changing their mind appends a NEW row, and
+     * only the LATEST row per {@code feedback_id} is the current reaction (see
+     * {@link #findFirstByFeedbackIdAndReactorUserIdOrderByCreatedAtDescIdDesc}). Counting every historical row
+     * would double-count a feedback unit the developer reacted to more than once, inflating the uptake ratio.
+     * So collapse to the latest row per {@code feedback_id} ({@code DISTINCT ON … ORDER BY created_at DESC,
+     * id DESC}) BEFORE grouping. Native because {@code DISTINCT ON} is Postgres-specific.
      *
      * @see ActionCountProjection
      */
     @Query(
-        """
-        SELECT r.action AS action, COUNT(r) AS count
-        FROM Reaction r
-        JOIN r.feedback fb
-        WHERE r.reactorUserId = :reactorUserId
-          AND fb.workspaceId = :workspaceId
-        GROUP BY r.action
-        """
+        value = """
+        SELECT latest.action AS action, COUNT(*) AS count
+        FROM (
+            SELECT DISTINCT ON (r.feedback_id) r.action AS action
+            FROM reaction r
+            JOIN feedback fb ON fb.id = r.feedback_id
+            WHERE r.reactor_user_id = :reactorUserId
+              AND fb.workspace_id = :workspaceId
+            ORDER BY r.feedback_id, r.created_at DESC, r.id DESC
+        ) latest
+        GROUP BY latest.action
+        """,
+        nativeQuery = true
     )
     List<ActionCountProjection> countByReactorAndWorkspaceGroupByAction(
         @Param("reactorUserId") Long reactorUserId,
@@ -75,10 +87,11 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
     );
 
     /**
-     * Projection for reaction action counts used in engagement statistics.
+     * Projection for reaction action counts used in engagement statistics. {@code action} is the stored enum
+     * STRING (the native query selects the raw column); the caller maps it back via {@link ReactionAction}.
      */
     interface ActionCountProjection {
-        ReactionAction getAction();
+        String getAction();
 
         Long getCount();
     }

@@ -191,6 +191,41 @@ class ReviewThreadContentProviderTest extends BaseUnitTest {
     }
 
     @Test
+    void contribute_moreDecisionsThanCap_keepsLatestApprove() throws Exception {
+        // A7: the repository now returns decisions newest-first (ORDER BY submittedAt DESC, id DESC). With more
+        // than MAX_DECISIONS rows, the consumer's truncation keeps the NEWEST — so a final superseding APPROVE
+        // must survive, not be dropped behind older CHANGES_REQUESTED (which would fabricate a false
+        // "merged past unresolved request-changes" finding).
+        java.util.List<PullRequestReview> newestFirst = new java.util.ArrayList<>();
+        // The latest decision: an APPROVE at the most recent timestamp.
+        newestFirst.add(
+            review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z"))
+        );
+        // Followed by MAX_DECISIONS + 5 older CHANGES_REQUESTED rows (descending timestamps).
+        for (int i = 0; i < ReviewThreadContentProvider.MAX_DECISIONS + 5; i++) {
+            newestFirst.add(
+                review(
+                    PullRequestReview.State.CHANGES_REQUESTED,
+                    "reviewer-a",
+                    Instant.parse("2025-06-01T10:00:00Z").minusSeconds(i)
+                )
+            );
+        }
+        when(reviewRepository.findAllByPullRequestIdWithAuthor(PR_ID)).thenReturn(newestFirst);
+        when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(java.util.Optional.of(mergedPr()));
+
+        Map<String, byte[]> files = new java.util.HashMap<>();
+        provider.contribute(request(metadataWithPr()), files);
+
+        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
+        JsonNode decisions = out.get("reviewDecisions");
+        assertThat(decisions).hasSize(ReviewThreadContentProvider.MAX_DECISIONS);
+        // The latest APPROVE is retained (it is the first row newest-first).
+        assertThat(decisions.get(0).get("state").asString()).isEqualTo("APPROVED");
+        assertThat(decisions.get(0).get("submittedAt").asString()).isEqualTo("2025-06-30T23:59:00Z");
+    }
+
+    @Test
     void contribute_hephaestusOwnThread_excludedFromCountAndEmit() throws Exception {
         // A thread whose comments are Hephaestus's own posted note (marker-bearing) must NOT count as a
         // reviewer thread — the rootComment FK is null in sync, so the comment set is the signal.

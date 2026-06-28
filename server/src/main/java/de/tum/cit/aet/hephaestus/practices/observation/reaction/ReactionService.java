@@ -122,7 +122,7 @@ public class ReactionService {
         Map<ReactionAction, Long> counts = new EnumMap<>(ReactionAction.class);
         reactionRepository
             .countByReactorAndWorkspaceGroupByAction(currentUser.getId(), workspaceContext.id())
-            .forEach(p -> counts.put(p.getAction(), p.getCount()));
+            .forEach(p -> counts.put(ReactionAction.valueOf(p.getAction()), p.getCount()));
         return new ReactionEngagementDTO(
             counts.getOrDefault(ReactionAction.ADDRESSED, 0L),
             counts.getOrDefault(ReactionAction.DISPUTED, 0L),

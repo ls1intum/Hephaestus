@@ -493,7 +493,10 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         @Test
         @WithAdminUser
         void returnsCorrectCounts() {
-            // Submit multiple feedbacks
+            // C1: react ADDRESSED then change the mind to DISPUTED on the SAME feedback unit. Reaction is
+            // @Immutable / append-only, so the second submit appends a new row and only the LATEST row per
+            // feedback_id is the current reaction. Engagement must therefore count ONLY the latest (DISPUTED=1),
+            // not double-count the superseded ADDRESSED row.
             webTestClient
                 .post()
                 .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
@@ -526,9 +529,67 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .getResponseBody();
 
             assertThat(response).isNotNull();
-            assertThat(response.addressed()).isEqualTo(1);
+            // The superseded ADDRESSED row no longer counts — only the current DISPUTED reaction does.
+            assertThat(response.addressed()).isZero();
             assertThat(response.disputed()).isEqualTo(1);
             assertThat(response.notApplicable()).isZero();
+        }
+
+        @Test
+        @WithAdminUser
+        void countsDistinctFeedbackUnitsNotHistoricalRows() {
+            // Two DISTINCT feedback units, each reacted ADDRESSED once → addressed=2 (distinct current
+            // reactions). Guards that the DISTINCT ON (feedback_id) collapse does not over-collapse across
+            // different feedback units.
+            Feedback secondFeedbackUnit = feedbackRepository.save(
+                Feedback.builder()
+                    .agentJobId(feedbackUnit.getAgentJobId())
+                    .workspaceId(workspace.getId())
+                    .artifactType(WorkArtifact.PULL_REQUEST)
+                    .artifactId(42L)
+                    .recipientUserId(feedbackUnit.getRecipientUserId())
+                    .aboutUserId(feedbackUnit.getAboutUserId())
+                    .channel(FeedbackChannel.IN_CONTEXT)
+                    .position(1)
+                    .deliveryState(FeedbackDeliveryState.DELIVERED)
+                    .source(FeedbackSource.AGENT)
+                    .createdAt(Instant.now())
+                    .deliveredAt(Instant.now())
+                    .build()
+            );
+
+            webTestClient
+                .post()
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), feedbackUnit.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreateReactionDTO(ReactionAction.ADDRESSED, null))
+                .exchange()
+                .expectStatus()
+                .isCreated();
+            webTestClient
+                .post()
+                .uri(FEEDBACK_URI, workspace.getWorkspaceSlug(), secondFeedbackUnit.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreateReactionDTO(ReactionAction.ADDRESSED, null))
+                .exchange()
+                .expectStatus()
+                .isCreated();
+
+            ReactionEngagementDTO response = webTestClient
+                .get()
+                .uri(ENGAGEMENT_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(ReactionEngagementDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(response).isNotNull();
+            assertThat(response.addressed()).isEqualTo(2);
         }
     }
 }

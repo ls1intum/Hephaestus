@@ -44,6 +44,11 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * state (CHANGES_REQUESTED / APPROVED) — the signal a "merged past unresolved request-changes"
      * lesson is grounded in, which neither inline comments nor the diff carry. Read-only context
      * materialisation; the caller establishes workspace scope.
+     *
+     * <p>Ordered most-recent-first ({@code submittedAt DESC, id DESC}) so the consumer's
+     * {@code MAX_DECISIONS} truncation keeps the LATEST decisions: on a heavily-reviewed PR a
+     * superseding final APPROVE must not be dropped, which would manufacture a false "merged past
+     * unresolved request-changes" finding. {@code id} breaks ties on equal/null timestamps.
      */
     @Query(
         """
@@ -51,6 +56,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
         WHERE prr.pullRequest.id = :pullRequestId
+        ORDER BY prr.submittedAt DESC, prr.id DESC
         """
     )
     List<PullRequestReview> findAllByPullRequestIdWithAuthor(@Param("pullRequestId") Long pullRequestId);
