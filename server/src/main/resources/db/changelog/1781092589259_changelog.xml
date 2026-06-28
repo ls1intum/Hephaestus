@@ -1171,4 +1171,30 @@
         </rollback>
     </changeSet>
 
+    <!-- The two scalar (Hibernate-invisible) user FKs were created with the plain fk_ prefix instead of the
+         sfk_ scalar-FK convention (cf. sfk_feedback_subject). The entities reference users by scalar id, with no
+         @ManyToOne (to avoid the workspace<->agent Spring Modulith cycle), so Hibernate never generates these
+         FKs — and the Liquibase schema-drift gate (pom diffExcludeObjects: foreignkey:sfk_.*) therefore flagged
+         them as drift on every run. Rename them to the sfk_ convention so they are recognised as intentional
+         scalar FKs and excluded, matching their sibling sfk_feedback_subject. -->
+    <changeSet author="hephaestus-feedback" id="1781092589259-68">
+        <preConditions onFail="MARK_RAN" onFailMessage="scalar user FKs already follow the sfk_ convention">
+            <and>
+                <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'fk_observation_subject'</sqlCheck>
+                <sqlCheck expectedResult="1">SELECT count(*) FROM pg_constraint WHERE conname = 'fk_reaction_reactor'</sqlCheck>
+            </and>
+        </preConditions>
+        <comment>Rename scalar user FKs fk_observation_subject/fk_reaction_reactor to the sfk_ convention so the schema-drift gate excludes them.</comment>
+        <sql splitStatements="true" endDelimiter=";">
+            ALTER TABLE observation RENAME CONSTRAINT fk_observation_subject TO sfk_observation_subject;
+            ALTER TABLE reaction RENAME CONSTRAINT fk_reaction_reactor TO sfk_reaction_reactor;
+        </sql>
+        <rollback>
+            <sql splitStatements="true" endDelimiter=";">
+                ALTER TABLE observation RENAME CONSTRAINT sfk_observation_subject TO fk_observation_subject;
+                ALTER TABLE reaction RENAME CONSTRAINT sfk_reaction_reactor TO fk_reaction_reactor;
+            </sql>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

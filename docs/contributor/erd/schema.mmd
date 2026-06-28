@@ -283,7 +283,7 @@ erDiagram
         VARCHAR(32) artifact_type
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
-        BIGINT subject_user_id FK "NOT NULL"
+        BIGINT about_user_id FK "NOT NULL"
         VARCHAR(32) channel "NOT NULL"
         INTEGER position UK "NOT NULL"
         VARCHAR(16) delivery_state "NOT NULL"
@@ -615,7 +615,7 @@ erDiagram
         BIGINT practice_id FK,UK "NOT NULL"
         INTEGER revision_number UK "NOT NULL"
         TEXT criteria "NOT NULL"
-        TIMESTAMP created_at "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Project {
@@ -1054,7 +1054,7 @@ erDiagram
     DiscussionComment ||--o{ DiscussionComment : commented_on
     Workspace ||--o{ Feedback : has
     User ||--o{ Feedback : recipient_user_id
-    User ||--o{ Feedback : subject_user_id
+    User ||--o{ Feedback : about_user_id
     Feedback ||--o{ Feedback : references
     Feedback ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by
