@@ -76,6 +76,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     @Mock
     private SandboxManager sandboxManager;
 
+    @Mock
+    private de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate detectionGate;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AgentJobService service;
@@ -96,6 +99,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             eventPublisher,
             transactionTemplate,
             new PracticeReviewProperties(false, true, false, "", 15, false, false, false),
+            detectionGate,
             sandboxManager,
             java.util.Optional.empty()
         );
@@ -690,6 +694,62 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(AgentJobService.extractCooldownKeyPrefix("issue_review:owner/repo:12:1700000000000")).isEqualTo(
                 "issue_review:owner/repo:12:"
             );
+        }
+    }
+
+    @Nested
+    class DevTrigger {
+
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void setUpPrepTransaction() {
+            // The dev-trigger preparation runs load + gate + request-building inside transactionTemplate.execute;
+            // make the mock actually invoke that callback so the path is exercised.
+            lenient()
+                .when(transactionTemplate.execute(any()))
+                .thenAnswer(inv -> {
+                    TransactionCallback<?> callback = inv.getArgument(0);
+                    return callback.doInTransaction(mock(TransactionStatus.class));
+                });
+        }
+
+        @Test
+        void reviewReturnsNotFoundWhenPrAbsent() {
+            when(artifactLoader.findPullRequestForGate(99L)).thenReturn(Optional.empty());
+
+            String result = service.devTriggerReview(1L, 99L, null);
+
+            assertThat(result).isEqualTo("PR not found: 99");
+            // submit() never reached → no workspace lookup, no job persisted.
+            verify(workspaceRepository, never()).findById(anyLong());
+        }
+
+        @Test
+        void gateRoutedReviewSkipDoesNotReachSubmit() {
+            de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest pr =
+                new de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest();
+            pr.setId(5L);
+            when(artifactLoader.findPullRequestForGate(5L)).thenReturn(Optional.of(pr));
+            when(detectionGate.evaluate(eq(pr), eq("PullRequestMerged"), any())).thenReturn(
+                new de.tum.cit.aet.hephaestus.practices.review.GateDecision.Skip("no matching practices")
+            );
+
+            String result = service.devTriggerReview(1L, 5L, "PullRequestMerged");
+
+            assertThat(result).isEqualTo("Gate skipped (PullRequestMerged): no matching practices");
+            // The gate ran inside the prep transaction and short-circuited BEFORE submit() — which must run
+            // outside any outer transaction (SYSTEMIC #5). No workspace resolution means submit() was skipped.
+            verify(workspaceRepository, never()).findById(anyLong());
+        }
+
+        @Test
+        void issueDetectionReturnsNotFoundWhenIssueAbsent() {
+            when(artifactLoader.findIssueForGate(7L)).thenReturn(Optional.empty());
+
+            String result = service.devTriggerIssueDetection(1L, 7L, "IssueClosed");
+
+            assertThat(result).isEqualTo("Issue not found: 7");
+            verify(workspaceRepository, never()).findById(anyLong());
         }
     }
 }

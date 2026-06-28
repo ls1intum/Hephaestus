@@ -18,7 +18,10 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -55,6 +58,7 @@ public class AgentJobService {
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final PracticeReviewProperties reviewProperties;
+    private final PracticeReviewDetectionGate detectionGate;
     private final @Nullable SandboxManager sandboxManager;
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
 
@@ -69,6 +73,7 @@ public class AgentJobService {
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
         PracticeReviewProperties reviewProperties,
+        PracticeReviewDetectionGate detectionGate,
         @Nullable SandboxManager sandboxManager,
         Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher
     ) {
@@ -82,6 +87,7 @@ public class AgentJobService {
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
         this.reviewProperties = reviewProperties;
+        this.detectionGate = detectionGate;
         this.sandboxManager = sandboxManager;
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
     }
@@ -112,93 +118,107 @@ public class AgentJobService {
     // Submit
 
     /**
-     * Lookup a PR by ID, build a review submission request, and submit a job.
-     * Used by the dev trigger endpoint to bypass NATS.
+     * Outcome of the session-bound dev-trigger preparation phase: either a fully-built, detached
+     * {@link JobSubmissionRequest} ready to submit outside any transaction, or a terminal human-readable
+     * {@code message} (not-found / missing-branch-info / gate-skip) that needs no submission.
+     */
+    private record PreparedDevSubmission(@Nullable JobSubmissionRequest request, @Nullable String message) {
+        static PreparedDevSubmission ready(JobSubmissionRequest request) {
+            return new PreparedDevSubmission(request, null);
+        }
+
+        static PreparedDevSubmission done(String message) {
+            return new PreparedDevSubmission(null, message);
+        }
+    }
+
+    /**
+     * Dev/manual trigger: load a PR, optionally run the detection gate ({@code triggerEvent} non-null), and
+     * submit a review job. Bypasses NATS.
      *
-     * @param workspaceId workspace ID
-     * @param prId        the pull request's DB id
-     * @return description of result (job ID or error message)
+     * <p><strong>Transaction boundary (SYSTEMIC #5):</strong> {@link #submit} contracts that it MUST NOT run
+     * inside an outer transaction (each config gets its own transaction for isolation). So the session-bound
+     * work — loading the PR, the gate's lazy {@code Workspace.reviewSettings} access, and building the
+     * detached request via {@link ScmEventPayload.PullRequestData#from} — happens inside a
+     * {@link TransactionTemplate} block, and {@link #submit} is invoked only AFTER that block returns. This
+     * replaces the former controller-level {@code @Transactional}, which wrapped {@code submit} and silently
+     * violated the contract.
      */
-    public String submitReviewForPullRequest(Long workspaceId, Long prId) {
-        PullRequest pr = artifactLoader.findPullRequestForGate(prId).orElse(null);
-        if (pr == null) {
-            return "PR not found: " + prId;
-        }
-        return submitReviewForLoadedPullRequest(workspaceId, pr);
+    public String devTriggerReview(Long workspaceId, Long prId, @Nullable String triggerEvent) {
+        PreparedDevSubmission prepared = transactionTemplate.execute(status -> {
+            PullRequest pr = artifactLoader.findPullRequestForGate(prId).orElse(null);
+            if (pr == null) {
+                return PreparedDevSubmission.done("PR not found: " + prId);
+            }
+            if (triggerEvent != null && !triggerEvent.isBlank()) {
+                GateDecision decision = detectionGate.evaluate(pr, triggerEvent, TriggerMode.AUTO);
+                if (decision instanceof GateDecision.Skip skip) {
+                    return PreparedDevSubmission.done("Gate skipped (" + triggerEvent + "): " + skip.reason());
+                }
+            }
+            if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
+                return PreparedDevSubmission.done("PR missing branch info: prId=" + pr.getId());
+            }
+            log.info("Dev trigger: submitting review for PR {} ({})", pr.getId(), pr.getHtmlUrl());
+            return PreparedDevSubmission.ready(
+                new PullRequestReviewSubmissionRequest(
+                    ScmEventPayload.PullRequestData.from(pr),
+                    pr.getHeadRefName(),
+                    pr.getHeadRefOid(),
+                    pr.getBaseRefName(),
+                    triggerEvent
+                )
+            );
+        });
+        return submitPrepared(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, prepared);
     }
 
     /**
-     * Build a PR review submission from an already-loaded entity and submit it. Shared by the
-     * gate-bypassing dev path ({@link #submitReviewForPullRequest}) and the gate-routed dev path
-     * ({@code DevTriggerController} with a {@code triggerEvent} param), so request construction lives in
-     * one place. The caller is responsible for any gate evaluation; this method only validates that the
-     * branch refs needed to clone/diff are present (a merged PR retains them, and the handler resolves the
-     * diff from the merge commit's parent).
+     * Dev/manual trigger: load an issue, optionally run the detection gate, and submit an issue-detection
+     * job. Mirrors {@link #devTriggerReview} (including the submit-outside-the-transaction contract).
      */
-    String submitReviewForLoadedPullRequest(Long workspaceId, PullRequest pr) {
-        return submitReviewForLoadedPullRequest(workspaceId, pr, null);
-    }
-
-    String submitReviewForLoadedPullRequest(Long workspaceId, PullRequest pr, @Nullable String triggerEvent) {
-        if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-            return "PR missing branch info: prId=" + pr.getId();
-        }
-
-        ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
-        PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
-            prData,
-            pr.getHeadRefName(),
-            pr.getHeadRefOid(),
-            pr.getBaseRefName(),
-            triggerEvent
-        );
-
-        log.info("Dev trigger: submitting review for PR {} ({})", pr.getId(), pr.getHtmlUrl());
-
-        Optional<AgentJob> job = submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
-        return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
+    public String devTriggerIssueDetection(Long workspaceId, Long issueId, @Nullable String triggerEvent) {
+        PreparedDevSubmission prepared = transactionTemplate.execute(status -> {
+            Issue issue = artifactLoader.findIssueForGate(issueId).orElse(null);
+            if (issue == null) {
+                return PreparedDevSubmission.done("Issue not found: " + issueId);
+            }
+            if (triggerEvent != null && !triggerEvent.isBlank()) {
+                GateDecision decision = detectionGate.evaluateIssue(issue, triggerEvent, TriggerMode.AUTO);
+                if (decision instanceof GateDecision.Skip skip) {
+                    return PreparedDevSubmission.done("Gate skipped (" + triggerEvent + "): " + skip.reason());
+                }
+            }
+            if (issue.getRepository() == null) {
+                return PreparedDevSubmission.done("Issue missing repository: issueId=" + issue.getId());
+            }
+            log.info("Dev trigger: submitting issue detection for issue {} ({})", issue.getId(), issue.getHtmlUrl());
+            return PreparedDevSubmission.ready(
+                new IssueReviewSubmissionRequest(
+                    issue.getId(),
+                    issue.getNumber(),
+                    issue.getRepository().getId(),
+                    issue.getRepository().getNameWithOwner(),
+                    issue.getTitle(),
+                    issue.getBody() != null ? issue.getBody() : "",
+                    issue.getState() != null ? issue.getState().name() : "OPEN",
+                    issue.getUpdatedAt(),
+                    triggerEvent
+                )
+            );
+        });
+        return submitPrepared(workspaceId, AgentJobType.ISSUE_REVIEW, prepared);
     }
 
     /**
-     * Dev/manual trigger: submit an issue-detection review for a single issue. Mirrors
-     * {@link #submitReviewForPullRequest} on the issue artifact.
+     * Submit a prepared dev request OUTSIDE the preparation transaction (honouring {@link #submit}'s
+     * no-outer-transaction contract), or return the terminal message when nothing was prepared.
      */
-    public String submitDetectionForIssue(Long workspaceId, Long issueId) {
-        Issue issue = artifactLoader.findIssueWithRepository(issueId).orElse(null);
-        if (issue == null) {
-            return "Issue not found: " + issueId;
+    private String submitPrepared(Long workspaceId, AgentJobType jobType, @Nullable PreparedDevSubmission prepared) {
+        if (prepared == null || prepared.request() == null) {
+            return prepared == null ? "No submission prepared" : prepared.message();
         }
-        return submitDetectionForLoadedIssue(workspaceId, issue);
-    }
-
-    /**
-     * Build an issue-detection submission from an already-loaded entity and submit it. Shared by the
-     * gate-bypassing dev path ({@link #submitDetectionForIssue}) and the gate-routed dev path
-     * ({@code DevTriggerController} with a {@code triggerEvent} param) so request construction has one home.
-     */
-    String submitDetectionForLoadedIssue(Long workspaceId, Issue issue) {
-        return submitDetectionForLoadedIssue(workspaceId, issue, null);
-    }
-
-    String submitDetectionForLoadedIssue(Long workspaceId, Issue issue, @Nullable String triggerEvent) {
-        if (issue.getRepository() == null) {
-            return "Issue missing repository: issueId=" + issue.getId();
-        }
-        IssueReviewSubmissionRequest request = new IssueReviewSubmissionRequest(
-            issue.getId(),
-            issue.getNumber(),
-            issue.getRepository().getId(),
-            issue.getRepository().getNameWithOwner(),
-            issue.getTitle(),
-            issue.getBody() != null ? issue.getBody() : "",
-            issue.getState() != null ? issue.getState().name() : "OPEN",
-            issue.getUpdatedAt(),
-            triggerEvent
-        );
-
-        log.info("Dev trigger: submitting issue detection for issue {} ({})", issue.getId(), issue.getHtmlUrl());
-
-        Optional<AgentJob> job = submit(workspaceId, AgentJobType.ISSUE_REVIEW, request);
+        Optional<AgentJob> job = submit(workspaceId, jobType, prepared.request());
         return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
     }
 

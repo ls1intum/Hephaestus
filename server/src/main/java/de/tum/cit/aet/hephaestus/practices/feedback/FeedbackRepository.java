@@ -88,9 +88,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * Native (not JPQL) because the {@code @Immutable} entity forbids ORM updates; the row's {@code state}
      * is the one lifecycle column and is transitioned only through this explicit statement.
      *
-     * <p>{@code state} is written verbatim into the {@code delivery_state varchar(16)} column with no enum
-     * binding or DB CHECK, so callers MUST pass a {@link FeedbackDeliveryState#name()} value — an arbitrary
-     * string would persist and only fail later when Hibernate maps the {@code @Enumerated(STRING)} column.
+     * <p>{@code state} is written verbatim into the {@code delivery_state varchar(16)} column. It IS guarded
+     * by the {@code chk_feedback_state} CHECK (PREPARED/DELIVERED/SUPERSEDED/SUPPRESSED/FAILED), so a typo
+     * fails fast at write time; callers still MUST pass a {@link FeedbackDeliveryState#name()} value.
+     *
+     * <p><strong>Concurrency invariant (SYSTEMIC #5):</strong> this is an unconditional write-by-PK — it does
+     * NOT re-check the row's current {@code delivery_state}. The "at most one live (DELIVERED) row per
+     * continuity/thread key" invariant therefore rests on the orchestrator serializing recorder runs for a
+     * given thread key (one detection job at a time per artifact), NOT on a DB-level guard. Do not introduce
+     * a concurrent second writer for the same thread key without adding a state-predicated update (e.g.
+     * {@code AND delivery_state = 'DELIVERED'}) or optimistic locking here.
      */
     @Modifying
     @Transactional
