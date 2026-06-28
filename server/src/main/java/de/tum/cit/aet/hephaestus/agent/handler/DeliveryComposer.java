@@ -840,7 +840,7 @@ class DeliveryComposer {
      * surfaced this delivery, so only the lead advisory critique carries one. Not a valid practice slug
      * (slugs match {@code WorkspaceAbi.PRACTICE_SLUG}), so it can never collide with a real entry.
      */
-    private static final String ADVISORY_PRINCIPLE_SHOWN = " advisory-principle-shown";
+    private static final String ADVISORY_PRINCIPLE_SHOWN = " advisory-principle-shown";
 
     /**
      * The "Why this matters" line for {@code f}, or {@code ""} when it should not be surfaced (INFO nudge,
