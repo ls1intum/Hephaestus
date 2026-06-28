@@ -109,8 +109,18 @@ class DefaultPracticeCatalogSeeder {
 
             for (JsonNode practiceNode : areaNode.path("practices")) {
                 String practiceSlug = practiceNode.path("slug").asString();
-                if (practiceRepository.existsByWorkspaceIdAndSlug(ctx.id(), practiceSlug)) {
-                    // Already present — respect any admin edits and do not overwrite.
+                // Resumable seeding: create + bind run in SEPARATE transactions, so a mid-seed failure can
+                // strand a practice that exists but is unbound (area=NULL). A plain exists-then-skip guard
+                // would never re-bind it. Instead, fetch-or-create, then bind only when the area is still
+                // null — so a half-seeded practice self-heals on the next boot, while an admin who has
+                // intentionally bound (or unbound) a practice is never overwritten.
+                var existing = practiceRepository.findByWorkspaceIdAndSlug(ctx.id(), practiceSlug);
+                if (existing.isPresent()) {
+                    if (existing.get().getArea() == null) {
+                        areaService.bindPractice(ctx, practiceSlug, areaSlug);
+                        seededPractices++;
+                    }
+                    // Otherwise already bound — respect any admin edits and do not overwrite.
                     continue;
                 }
                 practiceService.createPractice(ctx, toCreateRequest(catalog, practiceNode));

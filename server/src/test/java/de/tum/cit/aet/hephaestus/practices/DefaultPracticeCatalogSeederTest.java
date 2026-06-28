@@ -11,11 +11,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -107,10 +110,13 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void idempotent_skipsAreasAndPracticesThatAlreadyExist() {
+    void idempotent_skipsAreasAndPracticesThatAlreadyExistAndAreBound() {
+        // An already-present practice that is already bound to an area must be left untouched (respect admin edits).
+        Practice bound = new Practice();
+        bound.setArea(new PracticeArea());
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
-        when(practiceRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
+        when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.of(bound));
 
         seeder(true).seed();
 
@@ -126,13 +132,30 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         // absent even though their area already exists.
         when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
         when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
-        when(practiceRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(false);
+        when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.empty());
 
         seeder(true).seed();
 
         // No area is re-created (all present), but every absent practice is still seeded and bound.
         verify(areaService, never()).createArea(any(), any(), any());
         verify(practiceService, times(32)).createPractice(any(), any());
+        verify(areaService, times(32)).bindPractice(any(), any(), any());
+    }
+
+    @Test
+    void resumable_bindsAStrandedPracticeThatExistsButIsUnbound() {
+        // C4 root cause: createPractice and bindPractice run in SEPARATE transactions, so a mid-seed failure
+        // can leave a practice committed with area=NULL. A plain exists-then-skip guard would strand it forever.
+        // On the next boot the seeder must re-bind the unbound practice WITHOUT re-creating it.
+        Practice unbound = new Practice(); // area defaults to null
+        when(workspaceRepository.findAll()).thenReturn(List.of(new Workspace()));
+        when(areaRepository.existsByWorkspaceIdAndSlug(any(), any())).thenReturn(true);
+        when(practiceRepository.findByWorkspaceIdAndSlug(any(), any())).thenReturn(Optional.of(unbound));
+
+        seeder(true).seed();
+
+        // Never re-create an existing practice, but bind each unbound one to its catalog area.
+        verify(practiceService, never()).createPractice(any(), any());
         verify(areaService, times(32)).bindPractice(any(), any(), any());
     }
 
