@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import java.util.HashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -43,10 +44,14 @@ public class PracticeAreaService {
     /**
      * Sets each area's {@code displayOrder} to its index in the given list — one atomic write of the
      * whole ordering, so a mid-list failure can't leave duplicate/garbled order values. Every slug must
-     * belong to the workspace (a stale/foreign slug is a 404).
+     * belong to the workspace (a stale/foreign slug is a 404) and must be unique (a duplicate slug would
+     * silently assign two indices to one area and is rejected up front).
      */
     @Transactional
     public void reorder(WorkspaceContext ctx, List<String> orderedSlugs) {
+        if (new HashSet<>(orderedSlugs).size() != orderedSlugs.size()) {
+            throw new IllegalArgumentException("orderedSlugs must not contain duplicate slugs");
+        }
         int order = 0;
         for (String slug : orderedSlugs) {
             PracticeArea area = practiceAreaRepository

@@ -116,8 +116,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         "reviews-substantively-with-understanding",
         "leaves-useful-specific-review-comments",
         "reviews-respectfully-asks-rather-than-demands",
-        "mr-description-quality",
-        "commit-discipline",
         // Cross-context practices: grounded in a neighbourhood context file, not a diff line.
         "honours-linked-issue-acceptance-criteria",
         "branches-from-the-integration-branch"
@@ -188,8 +186,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put("source_branch", submissionRequest.headRefName());
         metadata.put("target_branch", submissionRequest.baseRefName());
         // The MR title + description are the sole inputs for the communication/process practices
-        // (mr-description-quality, commit-discipline) — their precompute scripts read metadata.title /
-        // metadata.body. Without these the practices silently can't evaluate.
+        // (describe-what-and-why, commit-subjects-explain-each-change) — their precompute scripts read
+        // metadata.title / metadata.body. Without these the practices silently can't evaluate.
         metadata.put("title", pullRequestData.title());
         metadata.put("body", pullRequestData.body());
         // The lifecycle event that triggered this job. When present, the catalog injector materialises

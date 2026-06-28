@@ -21,6 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
+    // Fetches the bound area eagerly so callers (e.g. PracticeStandingAspectProvider) can read
+    // practice.getArea().getSlug()/getName() outside the transaction — open-in-view is disabled —
+    // without firing one extra SELECT per active practice.
+    @EntityGraph(attributePaths = "area")
     List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
 
     /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */

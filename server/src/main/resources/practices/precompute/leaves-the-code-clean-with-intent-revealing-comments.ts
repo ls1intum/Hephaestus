@@ -84,6 +84,7 @@ export default async function (_repo: string, diffFiles: Map<string, DiffFile>, 
 					hints.push({ file: path, line: lineNum, pattern: label, context: trimmed.slice(0, 160), inDiff: true, flags: { kind: "debug-output" } });
 					debugCandidates++;
 					if (lang) byLang[lang] = (byLang[lang] ?? 0) + 1;
+					break; // one debug-output hint per added line — match the sibling validates-inputs script
 				}
 			}
 			if (TODO_MARKER.test(text)) {
