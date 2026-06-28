@@ -4,7 +4,7 @@
 **Date:** 2026-06-09
 **Authors:** Hephaestus maintainers
 **Finishes:** [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md) (the `workspace_membership.user_id → account_id` rename it specifies but never implemented)
-**Builds on:** [ADR 0004](0004-sql-layer-multi-tenancy.md), [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md)
+**Builds on:** [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md), [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md)
 
 > **Scope note.** This ADR is intentionally carved out of the practice-detection-config / dev-login
 > work (branch `1011-practice-detection-mentor-config`). That branch ships the **dev/test login** and

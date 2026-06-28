@@ -239,7 +239,7 @@ supersession chain.
 | body | String (TEXT) | `body` | yes | Final student-facing body. | Null while PREPARED or when suppressed. |
 | source | FeedbackSource | `source` | no | `AGENT` / `POLICY_FLOOR` / `FALLBACK`. | Provenance: policy/fallback units must not be scored as model output. |
 | replacesId | UUID | `replaces_id` | yes | Self-FK to the prior row this replaces (`fk_feedback_replaces`). | Re-delivery without duplication; null for first delivery. ≈ SARIF `baselineState=updated`. |
-| threadKey | String(64) | `thread_key` | yes | Cross-run continuity tying successive deliveries of "the same" feedback, independent of job. Indexed (`idx_feedback_thread`). | Conversation continuity across runs. |
+| threadKey | String(64) | `thread_key` | yes | Cross-run continuity tying successive deliveries of "the same" feedback, independent of job. Indexed (`idx_feedback_continuity`). | Conversation continuity across runs. |
 | createdAt | Instant | `created_at` | no (immutable) | Insert timestamp; `@PrePersist`. | Audit + temporal ordering. |
 | deliveredAt | Instant | `delivered_at` | yes | When actually delivered. | Null while PREPARED, suppressed, or failed. |
 
@@ -423,8 +423,9 @@ A few identifiers intentionally retain an older spelling:
 - The entity is `Observation` (table `observation`); its outcome is the two columns `presence` and
   `assessment`. There is no longer a single `observation` outcome column — that signed enum was split
   (§2, §3.3).
-- Index **names** track their columns: `idx_observation_recurrence`, `idx_reaction_recurrence`,
-  `idx_feedback_thread` reference `recurrence_key` / `thread_key`.
+- The index **names** deliberately keep the older correlation/continuity spelling even though their
+  columns were renamed: `idx_observation_correlation` and `idx_reaction_correlation` index
+  `recurrence_key`, and `idx_feedback_continuity` indexes `thread_key`.
 
 ---
 

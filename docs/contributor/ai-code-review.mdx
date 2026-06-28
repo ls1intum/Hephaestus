@@ -50,7 +50,7 @@ sequenceDiagram
 
 ## Agent architecture
 
-A single backend powers practice detection: the **Pi practice agent**, wired via `PracticePiAdapter` on top of the shared `PiRuntimeFactory`. It uses a single-pass architecture — one agent evaluates all relevant practices for the diff and persists structured findings via custom Pi tools (`report_finding`, `set_review_summary`).
+A single backend powers practice detection: the **Pi practice agent**, wired via `PracticePiAdapter` on top of the shared `PiRuntimeFactory`. It uses a single-pass architecture — one agent evaluates all relevant practices for the diff and persists structured findings via the custom Pi tool `report_finding` (the run-level summary is composed downstream from the persisted findings, not via a separate tool).
 
 The runner (`.run-pi.mjs`) drives the Pi SDK in-process: initial analysis with a soft-timeout steering message and a hard-timeout abort, followed by a format retry if the persisted output is incomplete. A top-level watchdog hard-exits the process at `AGENT_BUDGET_MS + 30s` so the orchestrator always observes a terminal state.
 
@@ -149,7 +149,7 @@ After the agent returns findings, the server runs a 6-step delivery pipeline in 
 
 4. **Compose** -- `DeliveryComposer` partitions findings into:
    - **Inlinable** (have file locations, not in internal paths like `inputs/context/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
-   - **Non-inlinable** (`mr-description-quality`, `commit-discipline`, or no file location) -- full detail in MR summary
+   - **Non-inlinable** (PR-description / commit-discipline practices such as `describe-what-and-why` and `commits-are-atomic-and-cohesive`, or no file location) -- full detail in MR summary
    - When all findings are `GOOD` strengths, composes a short approval comment naming the top strengths
 
 5. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
