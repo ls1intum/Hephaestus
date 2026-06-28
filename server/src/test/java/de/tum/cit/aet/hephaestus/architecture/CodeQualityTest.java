@@ -361,6 +361,20 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         return;
                     }
 
+                    // Skip Spring Data query-projection interfaces (interfaces nested inside a repository):
+                    // these are data carriers shaped by a query's SELECT list, not behavioural interfaces, so the
+                    // ISP "small interface" rule does not apply (same rationale as the generated-model exclusion).
+                    if (
+                        javaClass
+                            .getEnclosingClass()
+                            .map(enclosing ->
+                                enclosing.isAssignableTo(org.springframework.data.repository.Repository.class)
+                            )
+                            .orElse(false)
+                    ) {
+                        return;
+                    }
+
                     int methodCount = (int) javaClass
                         .getMethods()
                         .stream()
