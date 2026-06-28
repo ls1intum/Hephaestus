@@ -246,15 +246,21 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         }
     }
 
-    /** Builds {@link DeliveredSignal}s for the posted threads, matching comment node ids back by {@code path:line}. */
+    /**
+     * Builds {@link DeliveredSignal}s for the posted threads, matching comment node ids back to findings.
+     *
+     * <p>Primary match is the per-finding correlation tag (ck-fingerprint) embedded in each posted comment body:
+     * {@code path:line} is NOT unique — two findings can anchor to the same line — so a positional or path:line
+     * index would hand the second finding the first's comment id (or none), corrupting its ledger external_ref.
+     * Falls back to path:line only for a comment whose body carries no parseable tag (pre-correlation findings).
+     */
     private static List<DeliveredSignal> buildPostedSignals(
         ClientGraphQlResponse response,
         @Nullable String reviewId,
         List<FindingAnchor.DiffAnchor> anchors,
         List<String> keys
     ) {
-        // Index returned comment node ids by path:line so each posted finding gets its own durable handle. The
-        // mutation returns comments in no guaranteed order, so we cannot rely on positional alignment.
+        Map<String, String> commentIdByCk = new HashMap<>();
         Map<String, String> commentIdByPathLine = new HashMap<>();
         List<Map<String, Object>> comments = response
             .field("addPullRequestReview.pullRequestReview.comments.nodes")
@@ -262,9 +268,17 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         if (comments != null) {
             for (Map<String, Object> comment : comments) {
                 String id = (String) comment.get("id");
+                if (id == null) {
+                    continue;
+                }
+                String body = (String) comment.get("body");
+                String ck = body == null ? null : parseObservationFingerprint(body);
+                if (ck != null) {
+                    commentIdByCk.putIfAbsent(ck, id);
+                }
                 String path = (String) comment.get("path");
                 Object line = comment.get("line");
-                if (id != null && path != null && line != null) {
+                if (path != null && line != null) {
                     commentIdByPathLine.putIfAbsent(path + ":" + line, id);
                 }
             }
@@ -273,8 +287,12 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         List<DeliveredSignal> signals = new ArrayList<>(anchors.size());
         for (int i = 0; i < anchors.size(); i++) {
             FindingAnchor.DiffAnchor diff = anchors.get(i);
-            String commentId = commentIdByPathLine.get(diff.filePath() + ":" + diff.newLineNumber());
-            signals.add(new DeliveredSignal(keys.get(i), diff, Disposition.POSTED, commentId, reviewId));
+            String key = keys.get(i);
+            String commentId = key == null ? null : commentIdByCk.get(key);
+            if (commentId == null) {
+                commentId = commentIdByPathLine.get(diff.filePath() + ":" + diff.newLineNumber());
+            }
+            signals.add(new DeliveredSignal(key, diff, Disposition.POSTED, commentId, reviewId));
         }
         return signals;
     }

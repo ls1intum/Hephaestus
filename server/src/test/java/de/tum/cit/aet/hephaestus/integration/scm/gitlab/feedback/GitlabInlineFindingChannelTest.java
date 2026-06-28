@@ -205,6 +205,70 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         verify(destroySpec, never()).variable("noteId", "gid://Note/Bb");
     }
 
+    /** A diff note whose line is outside the diff hunk falls back to a plain MR comment (FELL_BACK). */
+    @Test
+    void fallsBackToMrCommentWhenLineOutsideHunk() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of());
+
+        // CreateDiffNote returns a "line_code" error → the channel must fall back to CreateMergeRequestNote.
+        HttpGraphQlClient.RequestSpec diffSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("CreateDiffNote")).thenReturn(diffSpec);
+        when(diffSpec.variable(any(), any())).thenReturn(diffSpec);
+        ClientGraphQlResponse diffResponse = mock(ClientGraphQlResponse.class);
+        stubField(diffResponse, "createDiffNote.errors", List.of("line_code is invalid"));
+        when(diffSpec.execute()).thenReturn(Mono.just(diffResponse));
+
+        HttpGraphQlClient.RequestSpec noteSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("CreateMergeRequestNote")).thenReturn(noteSpec);
+        when(noteSpec.variable(any(), any())).thenReturn(noteSpec);
+        ClientGraphQlResponse noteResponse = mock(ClientGraphQlResponse.class);
+        stubField(noteResponse, "createNote.errors", List.of());
+        stubField(noteResponse, "createNote.note.id", "gid://Note/FALLBACK");
+        when(noteSpec.execute()).thenReturn(Mono.just(noteResponse));
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 999, null), "fix", MARKER, "ck-fb"))
+        );
+
+        assertThat(result.posted()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
+        assertThat(result.signals())
+            .singleElement()
+            .satisfies(s -> {
+                assertThat(s.disposition()).isEqualTo(Disposition.FELL_BACK);
+                assertThat(s.externalRef()).isEqualTo("gid://Note/FALLBACK");
+            });
+    }
+
+    /** A rate-limit error mid-batch stops the run: the offending finding fails and the remaining ones are not posted. */
+    @Test
+    void rateLimitMidBatchStopsAndCountsRemainingAsFailed() {
+        stubResolvedMr();
+        stubDiscussionsReturning(List.of());
+
+        // CreateDiffNote throws a rate-limit error on the FIRST call → the channel must stop the whole batch.
+        HttpGraphQlClient.RequestSpec diffSpec = mock(HttpGraphQlClient.RequestSpec.class);
+        when(client.documentName("CreateDiffNote")).thenReturn(diffSpec);
+        when(diffSpec.variable(any(), any())).thenReturn(diffSpec);
+        when(diffSpec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
+
+        InlineResult result = channel.postInlineFindings(
+            gitlabTarget(),
+            List.of(
+                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-a", MARKER, "ck-a"),
+                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix-b", MARKER, "ck-b")
+            )
+        );
+
+        // The batch stops at the first finding; both are reported failed (the one that hit the limit + the
+        // unattempted remainder), and nothing is posted.
+        assertThat(result.posted()).isZero();
+        assertThat(result.failed()).isEqualTo(2);
+        verify(client, never()).documentName("CreateMergeRequestNote");
+    }
+
     @Test
     void clearStalePreservesHumanRepliedThreads() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);

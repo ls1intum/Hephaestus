@@ -72,7 +72,9 @@ const evidenceSchema = {
             items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["path", "startLine", "endLine"],
+                // endLine is optional (a single-line note omits it; normalizers + the Java parser treat it as
+                // optional). Keeping it REQUIRED would reject the whole tool call at the SDK boundary.
+                required: ["path", "startLine"],
                 properties: {
                     path: { type: "string", minLength: 1 },
                     startLine: { type: "integer", minimum: 1 },
@@ -86,7 +88,9 @@ const evidenceSchema = {
 const diffNoteSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["filePath", "startLine", "endLine", "body"],
+    // endLine is optional (single-line suggestion); normalizers + the Java parser treat it as optional, so
+    // keeping it REQUIRED would reject an otherwise-valid single-line note at the SDK boundary.
+    required: ["filePath", "startLine", "body"],
     properties: {
         filePath: { type: "string", minLength: 1 },
         startLine: { type: "integer", minimum: 1 },

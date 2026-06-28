@@ -91,6 +91,12 @@ class ReactionSuppressionFilter {
                 persistedByKey.putIfAbsent(f.getRecurrenceKey(), f);
             }
         }
+        // Every persisted observation may carry a null recurrence_key (pre-C2 rows / a detector that emitted
+        // no locatable findings). The reaction lookup is a native query whose `IN (:recurrenceKeys)` would
+        // render as `IN ()` and crash on Postgres — short-circuit with no suppression when there are no keys.
+        if (persistedByKey.isEmpty()) {
+            return new ReactionDecision(scopedFindings, 0);
+        }
         Map<String, ReactionAction> actionByKey = new HashMap<>();
         for (Reaction r : findingReactionRepository.findLatestByRecurrenceKeysAndReactor(
             persistedByKey.keySet(),
@@ -116,7 +122,11 @@ class ReactionSuppressionFilter {
                 firstLocationPath(vf.evidence())
             );
             ReactionAction action = actionByKey.get(key);
-            if (action != null && SUPPRESS_ACTIONS.contains(action)) {
+            // A live hardcoded-secrets BAD alarm is never silenceable by a reaction: a single DISPUTED /
+            // NOT_APPLICABLE must not permanently mute a credential leak that is STILL present this run.
+            boolean unsuppressableSecret =
+                "hardcoded-secrets".equals(vf.practiceSlug()) && vf.assessment() == Assessment.BAD;
+            if (!unsuppressableSecret && action != null && SUPPRESS_ACTIONS.contains(action)) {
                 Observation pf = persistedByKey.get(key);
                 if (pf != null) {
                     try {

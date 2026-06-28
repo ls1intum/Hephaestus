@@ -254,7 +254,10 @@ public class MentorTurnPersistence {
         }
         meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
-        chatMessageRepository.save(assistant);
+        // saveAndFlush (not save): force the optimistic-lock check NOW, inside the try/catch, instead of at the
+        // REQUIRES_NEW commit boundary where an OptimisticLockingFailureException would escape uncaught and turn
+        // a benign reaper race into a logged turn failure.
+        chatMessageRepository.saveAndFlush(assistant);
 
         byte[] sessionBytes = state.observedSessionJsonl();
         if (sessionBytes != null) {
@@ -287,7 +290,9 @@ public class MentorTurnPersistence {
                 meta.put("error", cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
                 meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
                 assistant.setMetadata(meta);
-                chatMessageRepository.save(assistant);
+                // saveAndFlush (not save): surface OptimisticLockingFailureException inside the try/catch (the
+                // no-session-bytes interrupt path would otherwise defer the version check to commit, escaping it).
+                chatMessageRepository.saveAndFlush(assistant);
             });
 
         // If the runner shipped session_persisted before the interrupt (e.g. pi_error AFTER a

@@ -93,6 +93,39 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     }
 
     @Test
+    void sameAnchorFindingsAreMatchedByCkNotPathLine() {
+        // M12 guard: two findings on the SAME path:line. A path:line index would hand both the same comment id
+        // (corrupting the ledger external_ref). The ck-fingerprint in each returned comment body disambiguates.
+        FeedbackTarget target = githubTarget();
+        when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
+        stubReviewThreads(List.of());
+        // Both comments anchor at src/Foo.java:10 but carry distinct correlation tags in their bodies.
+        stubAddReview(
+            "REVIEW_1",
+            List.of(
+                commentWithCk("RC_a", "src/Foo.java", 10, "ck-a"),
+                commentWithCk("RC_b", "src/Foo.java", 10, "ck-b")
+            )
+        );
+
+        InlineResult result = channel.postInlineFindings(
+            target,
+            List.of(
+                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
+                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-b", "marker", "ck-b")
+            )
+        );
+
+        DeliveredSignal a = signalForKey(result, "ck-a");
+        DeliveredSignal b = signalForKey(result, "ck-b");
+        // Each finding gets its OWN comment id — no collision.
+        assertThat(a.externalRef()).isEqualTo("RC_a");
+        assertThat(b.externalRef()).isEqualTo("RC_b");
+    }
+
+    @Test
     void embedsCorrelationTagInPostedThreadBody() {
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
@@ -371,6 +404,13 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         c.put("id", id);
         c.put("path", path);
         c.put("line", line);
+        return c;
+    }
+
+    /** A returned comment node that also carries a body with the per-finding correlation tag. */
+    private static Map<String, Object> commentWithCk(String id, String path, int line, String ck) {
+        Map<String, Object> c = comment(id, path, line);
+        c.put("body", "posted body\n" + ckTag(ck));
         return c;
     }
 

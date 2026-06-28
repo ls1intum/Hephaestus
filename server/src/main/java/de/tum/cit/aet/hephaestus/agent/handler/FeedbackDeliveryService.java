@@ -169,14 +169,20 @@ class FeedbackDeliveryService {
 
         // Always post new
 
-        postSummaryNote(job, delivery, trend);
+        SummaryOutcome summaryOutcome = postSummaryNote(job, delivery, trend);
         List<InlineFindingChannel.DeliveredSignal> inlineSignals = postDiffNotes(job, delivery);
 
         // The summary was composed+posted BEFORE the inline notes (the order the ledger + A4 ping depend on),
         // so its inline section listed every finding's full line. Now that the inline signals are known, demote
         // the findings whose inline comment actually landed to a "see inline comments" pointer by re-editing the
         // same summary in place (B4-safe updateFormattedBody). A finding whose note failed keeps its full line.
-        reEditSummaryWithSignals(job, recomposer, inlineSignals, trend);
+        //
+        // Skip this entirely on a TRANSIENT no-op: the summary edit did NOT land this run, so the live comment is
+        // the PRIOR run's summary. Re-editing it with this run's recomposed body would silently overwrite that
+        // prior summary — the two paths must be mutually exclusive.
+        if (summaryOutcome != SummaryOutcome.TRANSIENT_NOOP) {
+            reEditSummaryWithSignals(job, recomposer, inlineSignals, trend);
+        }
 
         // Record the delivered-feedback ledger (ADR 0021 C6) as a best-effort write-through side-effect:
         // REQUIRES_NEW inside the recorder + this try/catch mean a ledger failure can never alter or roll
@@ -194,14 +200,25 @@ class FeedbackDeliveryService {
         }
     }
 
-    private void postSummaryNote(AgentJob job, DeliveryContent delivery, @Nullable TrendDelta trend) {
+    /**
+     * Outcome of {@link #postSummaryNote}: whether a fresh/edited summary is now live (and may have its inline
+     * section demoted afterwards), or whether the run was a transient no-op that kept the PRIOR summary
+     * untouched — in which case the post-inline demotion MUST be skipped, or it would overwrite the prior
+     * summary with this no-op run's recomposed body.
+     */
+    private enum SummaryOutcome {
+        POSTED,
+        TRANSIENT_NOOP,
+    }
+
+    private SummaryOutcome postSummaryNote(AgentJob job, DeliveryContent delivery, @Nullable TrendDelta trend) {
         if (delivery.mrNote() == null) {
-            return;
+            return SummaryOutcome.POSTED;
         }
         String sanitized = PullRequestCommentPoster.sanitize(delivery.mrNote());
         if (sanitized.isBlank()) {
             log.debug("Practice note was empty after sanitization, skipping post: jobId={}", job.getId());
-            return;
+            return SummaryOutcome.POSTED;
         }
         // B1/B3: append the collapsed progress-delta footer (empty string when nothing meaningfully changed).
         String footer = ProgressFooterRenderer.render(trend);
@@ -227,7 +244,7 @@ class FeedbackDeliveryService {
                 job.getId(),
                 priorRef
             );
-            return;
+            return SummaryOutcome.TRANSIENT_NOOP;
         }
 
         boolean editedInPlace = update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED;
@@ -254,6 +271,7 @@ class FeedbackDeliveryService {
         if (editedInPlace && trend != null && trend.hasMeaningfulChange()) {
             postReReviewPing(job, trend);
         }
+        return SummaryOutcome.POSTED;
     }
 
     /**

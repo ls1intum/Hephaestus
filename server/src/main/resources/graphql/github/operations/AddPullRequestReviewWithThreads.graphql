@@ -23,6 +23,7 @@ mutation AddPullRequestReviewWithThreads(
                     id
                     path
                     line
+                    body
                 }
             }
         }

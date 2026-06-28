@@ -153,7 +153,11 @@ public class ObservationService {
             List<ReflectionItemDTO> toWorkOn = group
                 .stream()
                 .filter(f -> f.getAssessment() == Assessment.BAD)
-                .sorted(Comparator.comparingInt(f -> f.getSeverity().ordinal()))
+                .sorted(
+                    Comparator.comparingInt(f ->
+                        f.getSeverity() == null ? Severity.values().length : f.getSeverity().ordinal()
+                    )
+                )
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                 .toList();
@@ -166,7 +170,10 @@ public class ObservationService {
                       .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                       .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
-                continue; // defensive: NA is already filtered, so every finding lands in one bucket
+                // This fires for a defect-detector practice whose only rows are GOOD: strengths are suppressed
+                // for defect-detectors (no clean-bill-of-health) and there are no BAD rows, so the card is empty
+                // and contributes nothing to the dashboard. Skip it rather than emit a contentless card.
+                continue;
             }
 
             ReflectionPracticeDTO.Standing standing =
@@ -213,7 +220,7 @@ public class ObservationService {
         return card
             .toWorkOn()
             .stream()
-            .mapToInt(i -> i.severity().ordinal())
+            .mapToInt(i -> i.severity() == null ? Severity.values().length : i.severity().ordinal())
             .min()
             .orElse(Severity.values().length); // strengths-only cards sort after any with problems
     }
